@@ -1,0 +1,12 @@
+GetExtendedTcpTable
+WIN32_ERROR
+MIB_TCPROW_OWNER_PID
+ADDRESS_FAMILY
+
+CreateToolhelp32Snapshot
+Process32FirstW
+Process32NextW
+
+SetWinEventHook
+
+GetWindowThreadProcessId

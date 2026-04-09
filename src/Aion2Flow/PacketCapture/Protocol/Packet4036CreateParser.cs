@@ -1,0 +1,122 @@
+using Cloris.Aion2Flow.PacketCapture.Readers;
+
+namespace Cloris.Aion2Flow.PacketCapture.Protocol;
+
+internal readonly record struct Packet4036Create(
+    string Family,
+    int OwnerId,
+    int SummonId,
+    int? MobCode,
+    int TailOffset);
+
+internal static class Packet4036CreateParser
+{
+    private static readonly byte[] EightByteMarker =
+        [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+
+    private static readonly byte[] OwnerOpcodeMarker =
+        [0x07, 0x02, 0x06];
+
+    public static bool TryParse(ReadOnlySpan<byte> packet, out Packet4036Create result)
+    {
+        result = default;
+
+        var reader = new PacketSpanReader(packet);
+        if (!reader.TryReadVarInt(out _)) return false;
+        if (reader.Remaining < 2) return false;
+        if (packet[reader.Offset] != 0x40 || packet[reader.Offset + 1] != 0x36) return false;
+
+        var family = ClassifyFamily(packet.Length);
+        if (family is not "create-198" and not "create-177")
+        {
+            return false;
+        }
+
+        if (!reader.TryAdvance(2)) return false;
+        if (!reader.TryReadVarInt(out var summonId)) return false;
+        if (!reader.TryAdvance(28)) return false;
+
+        int? mobCode = null;
+        var duplicateReader = reader;
+        if (duplicateReader.TryReadVarInt(out var mob0))
+        {
+            var mobReader = duplicateReader;
+            if (mobReader.TryReadVarInt(out var mob1) && mob0 == mob1)
+            {
+                mobCode = mob0;
+            }
+        }
+
+        var keyIndex = FindArrayIndex(packet, EightByteMarker);
+        if (keyIndex < 0) return false;
+
+        var afterMarker = packet[(keyIndex + EightByteMarker.Length)..];
+        var ownerOpcodeIndex = FindLastArrayIndex(afterMarker, OwnerOpcodeMarker);
+        if (ownerOpcodeIndex < 0) return false;
+
+        var ownerOffset = keyIndex + ownerOpcodeIndex + 11;
+        if (ownerOffset + 2 > packet.Length) return false;
+
+        var ownerId = packet[ownerOffset] | (packet[ownerOffset + 1] << 8);
+        if (ownerId == 0) return false;
+
+        result = new Packet4036Create(family, ownerId, summonId, mobCode, ownerOffset + 2);
+        return true;
+    }
+
+    private static string ClassifyFamily(int payloadLength)
+    {
+        return payloadLength switch
+        {
+            >= 190 => "create-198",
+            >= 175 => "create-177",
+            >= 150 => "state-152",
+            >= 135 => "state-137",
+            >= 118 => "state-120",
+            >= 110 => "state-113",
+            >= 95 => "state-97",
+            _ => $"state-{payloadLength}"
+        };
+    }
+
+    private static int FindArrayIndex(ReadOnlySpan<byte> data, ReadOnlySpan<byte> needle)
+    {
+        if (needle.Length == 0) return 0;
+        if (data.Length < needle.Length) return -1;
+
+        var index = data.IndexOf(needle[0]);
+        while (index >= 0 && index <= data.Length - needle.Length)
+        {
+            if (data.Slice(index, needle.Length).SequenceEqual(needle))
+            {
+                return index;
+            }
+
+            var next = data[(index + 1)..].IndexOf(needle[0]);
+            if (next < 0)
+            {
+                return -1;
+            }
+
+            index += next + 1;
+        }
+
+        return -1;
+    }
+
+    private static int FindLastArrayIndex(ReadOnlySpan<byte> data, ReadOnlySpan<byte> needle)
+    {
+        if (needle.Length == 0) return data.Length;
+        if (data.Length < needle.Length) return -1;
+
+        for (var index = data.Length - needle.Length; index >= 0; index--)
+        {
+            if (data.Slice(index, needle.Length).SequenceEqual(needle))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+}

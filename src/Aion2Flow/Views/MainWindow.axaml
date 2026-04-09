@@ -1,0 +1,418 @@
+<Window xmlns="https://github.com/avaloniaui"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:fa="using:Cloris.Aion2Flow.Assets.FontAwesome"
+		xmlns:shimskiasharp="using:ShimSkiaSharp"
+		xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
+		xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
+		xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
+		xmlns:conv="clr-namespace:Cloris.Aion2Flow.Converters"
+		x:Class="Cloris.Aion2Flow.Views.MainWindow"
+		x:DataType="vm:MainViewModel"
+		ExtendClientAreaChromeHints="NoChrome"
+		ExtendClientAreaTitleBarHeightHint="30"
+		ExtendClientAreaToDecorationsHint="True"
+		TransparencyLevelHint="AcrylicBlur"
+		Background="#80000000"
+		Width="320" Height="320"
+		CanMaximize="False"
+		Title="{Binding Localization[Window.Title]}"
+		Icon="/Assets/Images/Aion2Flow.png"
+		Topmost="{Binding IsTopMost}" >
+
+
+	<Window.Resources>
+		<conv:ClassToIconConverter x:Key="ClassToIconConverter" />
+	</Window.Resources>
+
+	<Window.Styles>
+		<Style Selector="TextBlock">
+			<Setter Property="Effect" >
+				<DropShadowEffect  Color="Gray" BlurRadius="4" OffsetX="0" OffsetY="0" />
+			</Setter>
+		</Style>
+
+		<Style Selector="FlyoutPresenter">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderBrush" Value="Transparent" />
+			<Setter Property="Focusable" Value="False" />
+		</Style>
+
+
+		<Style Selector="Button.WindowBtn">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Width" Value="28"/>
+			<Setter Property="Height" Value="28"/>
+			<Setter Property="CornerRadius" Value="4"/>
+			<Setter Property="Transitions">
+				<Transitions>
+					<BrushTransition Property="Background" Duration="0:0:0.2"/>
+				</Transitions>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.WindowBtn PathIcon">
+			<Setter Property="Foreground" Value="LightGray"/>
+			<Setter Property="Width" Value="14"/>
+			<Setter Property="Height" Value="14"/>
+			<Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+			<Setter Property="Transitions">
+				<Transitions>
+					<BrushTransition Property="Foreground" Duration="0:0:0.2"/>
+					<TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="BackEaseOut"/>
+				</Transitions>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.WindowBtn:pointerover PathIcon">
+			<Setter Property="Foreground" Value="White"/>
+		</Style>
+
+		<Style Selector="Button.MinBtn PathIcon">
+			<Setter Property="RenderTransform" Value="translateY(3px)"/>
+		</Style>
+
+		<Style Selector="Button.MinBtn:pointerover PathIcon">
+			<Setter Property="RenderTransform" Value="translateY(6px) scale(1.2)"/>
+		</Style>
+
+		<Style Selector="Button.RefreshBtn PathIcon">
+			<Setter Property="RenderTransform" Value="rotate(0deg)"/>
+		</Style>
+		<Style Selector="Button.RefreshBtn:pointerover PathIcon">
+			<Setter Property="RenderTransform" Value="rotate(180deg)"/>
+		</Style>
+
+		<Style Selector="Button.CloseBtn:pointerover PathIcon">
+			<Setter Property="Foreground" Value="#E81123"/>
+			<Setter Property="RenderTransform" Value="scale(1.2)"/>
+		</Style>
+
+		<Style Selector="Button.CloseBtn:pressed PathIcon">
+			<Setter Property="Foreground" Value="#E81123"/>
+			<Setter Property="RenderTransform" Value="scale(0.9)"/>
+		</Style>
+
+		<Style Selector="Border.BottomBarPill">
+			<Setter Property="Background" Value="#22101214"/>
+			<Setter Property="BorderBrush" Value="#486A7782"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="999"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="MinHeight" Value="30"/>
+			<Setter Property="ClipToBounds" Value="True"/>
+		</Style>
+
+		<Style Selector="Border.BottomBarInfoPill">
+			<Setter Property="Padding" Value="10,0"/>
+		</Style>
+
+		<Style Selector="Border.BottomBarDivider">
+			<Setter Property="Background" Value="#406A7782"/>
+			<Setter Property="Width" Value="1"/>
+			<Setter Property="Height" Value="12"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+
+		<Style Selector="Button.BottomBarButton">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="999"/>
+			<Setter Property="Foreground" Value="#EEF2F6"/>
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Padding" Value="10,0"/>
+			<Setter Property="MinWidth" Value="32"/>
+			<Setter Property="MinHeight" Value="30"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="Transitions">
+				<Transitions>
+					<BrushTransition Property="Background" Duration="0:0:0.18"/>
+				</Transitions>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.BottomBarButton PathIcon">
+			<Setter Property="Foreground" Value="#EEF2F6"/>
+			<Setter Property="Width" Value="15"/>
+			<Setter Property="Height" Value="15"/>
+		</Style>
+
+		<Style Selector="Button.BottomBarButton:pointerover">
+			<Setter Property="Background" Value="#16FFFFFF"/>
+		</Style>
+
+		<Style Selector="Button.BottomBarButton:pressed">
+			<Setter Property="Background" Value="#24FFFFFF"/>
+		</Style>
+
+		<Style Selector="Button.BottomBarButton:disabled">
+			<Setter Property="Opacity" Value="0.55"/>
+		</Style>
+
+		<Style Selector="Button.FlyoutMenuButton">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="10,8"/>
+			<Setter Property="HorizontalContentAlignment" Value="Left"/>
+			<Setter Property="Transitions">
+				<Transitions>
+					<BrushTransition Property="Background" Duration="0:0:0.18"/>
+				</Transitions>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.FlyoutMenuButton:pointerover">
+			<Setter Property="Background" Value="#28FFFFFF"/>
+		</Style>
+
+		<Style Selector="Button.FlyoutMenuButton:pressed">
+			<Setter Property="Background" Value="#30202020"/>
+		</Style>
+
+		<Style Selector="MenuItem.FlyoutMenuItem">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="12"/>
+			<Setter Property="Foreground" Value="#F2F4F7"/>
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Padding" Value="9,6"/>
+			<Setter Property="MinHeight" Value="30"/>
+		</Style>
+
+		<Style Selector="MenuItem.FlyoutMenuItem /template/ ContentPresenter#PART_IconPresenter">
+			<Setter Property="Width" Value="16"/>
+			<Setter Property="Height" Value="16"/>
+			<Setter Property="Margin" Value="0,0,8,0"/>
+		</Style>
+
+		<Style Selector="MenuItem.FlyoutMenuItem /template/ ContentPresenter#PART_HeaderPresenter">
+			<Setter Property="Margin" Value="0,0,2,0"/>
+		</Style>
+
+		<Style Selector="MenuItem.FlyoutMenuItem /template/ TextBlock#PART_InputGestureText">
+			<Setter Property="IsVisible" Value="False"/>
+			<Setter Property="Margin" Value="0"/>
+		</Style>
+
+		<Style Selector="MenuItem.FlyoutMenuItem:pointerover">
+			<Setter Property="Background" Value="#28FFFFFF"/>
+		</Style>
+
+		<Style Selector="MenuItem.FlyoutMenuItem:pressed">
+			<Setter Property="Background" Value="#30202020"/>
+		</Style>
+
+		<Style Selector="MenuItem.FlyoutMenuItemPlaceholder:disabled">
+			<Setter Property="Foreground" Value="#8F9AA7"/>
+			<Setter Property="Opacity" Value="1"/>
+		</Style>
+
+		<Style Selector="MenuFlyoutPresenter.BottomBarMenuFlyout">
+			<Setter Property="Background" Value="#E6101011"/>
+			<Setter Property="BorderBrush" Value="#5571808A"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="16"/>
+			<Setter Property="Foreground" Value="#F2F4F7"/>
+			<Setter Property="Padding" Value="5"/>
+		</Style>
+
+		<Style Selector="MenuFlyoutPresenter.BottomBarHistoryMenuFlyout">
+			<Setter Property="MinWidth" Value="210"/>
+			<Setter Property="MaxHeight" Value="280"/>
+		</Style>
+
+		<Style Selector="Ellipse.BottomBarStatusDot">
+			<Setter Property="Width" Value="8"/>
+			<Setter Property="Height" Value="8"/>
+		</Style>
+
+		<Style Selector="PathIcon.BottomBarSignalIcon">
+			<Setter Property="Width" Value="14"/>
+			<Setter Property="Height" Value="14"/>
+			<Setter Property="Margin" Value="0,0,1,0"/>
+		</Style>
+
+		<Style Selector="TextBlock.BottomBarText">
+			<Setter Property="Foreground" Value="#E6EBF0"/>
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+	</Window.Styles>
+
+	<Grid RowDefinitions="Auto, *, Auto">
+		<Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="4,0,4,0">
+			<StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+				<Button Classes="WindowBtn RefreshBtn"
+						Command="{Binding ResetCommand}"
+						IsEnabled="{Binding IsCapturing}"
+						VerticalAlignment="Center"
+						ToolTip.Tip="{Binding Localization[Action.Reset]}">
+					<PathIcon Data="{StaticResource arrows-rotate}" />
+				</Button>
+				<TextBlock Text="{Binding BattleTimeText}" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold" />
+			</StackPanel>
+			<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+				<Button Classes="WindowBtn MinBtn" Click="Minimize">
+					<PathIcon Data="{StaticResource window-minimize}" />
+				</Button>
+				<Button Classes="WindowBtn CloseBtn" Click="Exit">
+					<PathIcon Data="{StaticResource xmark}" />
+				</Button>
+
+			</StackPanel>
+		</Grid>
+
+		<Grid Grid.Row="1" Margin="6">
+			<ScrollViewer VerticalScrollBarVisibility="Hidden">
+				<controls:AnimatedItemsView ItemsSource="{Binding Combatants}" SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}">
+					<controls:AnimatedItemsView.Styles>
+						<Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#BaseImage">
+							<Setter Property="RenderTransform" >
+								<TranslateTransform Y="0" />
+							</Setter>
+						</Style>
+
+						<Style Selector="controls|AnimatedItemsViewItem:pointerover Border#RowRoot Image#BaseImage">
+							<Setter Property="RenderTransform" >
+								<TranslateTransform Y="-44" />
+							</Setter>
+						</Style>
+
+						<Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#BaseImage">
+							<Setter Property="RenderTransform" >
+								<TranslateTransform Y="-44" />
+							</Setter>
+						</Style>
+
+						<Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#OverlayImage">
+							<Setter Property="IsVisible" Value="False" />
+						</Style>
+
+						<Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#OverlayImage">
+							<Setter Property="IsVisible" Value="True" />
+						</Style>
+					</controls:AnimatedItemsView.Styles>
+
+					<controls:AnimatedItemsView.ItemTemplate>
+						<DataTemplate x:DataType="vm:CombatantRowViewModel">
+							<Border Name="RowRoot" Background="Transparent" Tapped="CombatantRowTapped">
+								<Grid ColumnDefinitions="48, 5*, 3*, 4*, 64">
+									<Panel Grid.Column="0" Width="48" Height="48">
+										<Panel  Width="44" Height="44" ClipToBounds="True" HorizontalAlignment="Center" VerticalAlignment="Center">
+											<Image Name="BaseImage"
+												   Width="44" Height="88"
+												   Source="{Binding CharacterClass, Converter={StaticResource ClassToIconConverter}}"
+												   VerticalAlignment="Top" />
+										</Panel>
+
+										<Image Name="OverlayImage"
+											   Width="46" Height="46"
+											   Source="/Assets/Images/Overlay.webp"
+											   ZIndex="10"
+											   HorizontalAlignment="Center" VerticalAlignment="Center" >
+
+										</Image>
+									</Panel>
+
+									<TextBlock Grid.Column="1" Text="{Binding DisplayName, Mode=OneWay}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+
+									<TextBlock Grid.Column="2" Text="{Binding DamagePerSecond, Mode=OneWay , StringFormat={}{0:0}}" VerticalAlignment="Center" HorizontalAlignment="Stretch" TextAlignment="Right" />
+
+									<TextBlock Grid.Column="3" Text="{Binding Damage, Mode=OneWay , StringFormat={}{0:0}}" VerticalAlignment="Center" HorizontalAlignment="Stretch"  TextAlignment="Right" />
+
+									<TextBlock Grid.Column="4" Text="{Binding DamageContribution, Mode=OneWay , StringFormat={}{0:0.0}%}" VerticalAlignment="Center" HorizontalAlignment="Stretch"  TextAlignment="Right" />
+								</Grid>
+							</Border>
+						</DataTemplate>
+					</controls:AnimatedItemsView.ItemTemplate>
+				</controls:AnimatedItemsView>
+			</ScrollViewer>
+		</Grid>
+
+		<Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="6,0,6,6">
+			<StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+				<Border Classes="BottomBarPill" VerticalAlignment="Center">
+					<Button Classes="BottomBarButton"
+							VerticalAlignment="Center"
+							ToolTip.Tip="{Binding SelectedLanguage.DisplayName}">
+						<PathIcon Data="{Binding SelectedLanguage.IconGeometry}" Width="16" Height="16" />
+						<Button.Flyout>
+							<MenuFlyout Placement="TopEdgeAlignedLeft" ShowMode="Transient" FlyoutPresenterClasses="BottomBarMenuFlyout">
+								<MenuItem Classes="FlyoutMenuItem" Header="繁體中文" Tag="zh-TW" Click="LanguageMenuItemClicked">
+									<MenuItem.Icon>
+										<PathIcon Data="{StaticResource language-zh}" Width="16" Height="16" />
+									</MenuItem.Icon>
+								</MenuItem>
+								<MenuItem Classes="FlyoutMenuItem" Header="English" Tag="en-US" Click="LanguageMenuItemClicked">
+									<MenuItem.Icon>
+										<PathIcon Data="{StaticResource language-en}" Width="16" Height="16" />
+									</MenuItem.Icon>
+								</MenuItem>
+								<MenuItem Classes="FlyoutMenuItem" Header="한국어" Tag="ko-KR" Click="LanguageMenuItemClicked">
+									<MenuItem.Icon>
+										<PathIcon Data="{StaticResource language-ko}" Width="16" Height="16" />
+									</MenuItem.Icon>
+								</MenuItem>
+							</MenuFlyout>
+						</Button.Flyout>
+					</Button>
+				</Border>
+
+				<Border Classes="BottomBarPill BottomBarInfoPill" VerticalAlignment="Center">
+					<StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+						<StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+							<Ellipse Classes="BottomBarStatusDot" Fill="{Binding DriverIndicatorColor}" ToolTip.Tip="{Binding DriverIndicatorToolTip}" />
+							<Ellipse Classes="BottomBarStatusDot" Fill="{Binding GamePortIndicatorColor}" ToolTip.Tip="{Binding GamePortIndicatorToolTip}" />
+							<Ellipse Classes="BottomBarStatusDot" Fill="{Binding CaptureLockIndicatorColor}" ToolTip.Tip="{Binding CaptureLockIndicatorToolTip}" />
+						</StackPanel>
+
+						<Border Classes="BottomBarDivider" />
+
+						<StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" ToolTip.Tip="{Binding LatencyToolTip}">
+							<PathIcon Classes="BottomBarSignalIcon" Data="{StaticResource wifi}" Foreground="{Binding LatencyIndicatorColor}" />
+							<TextBlock Classes="BottomBarText" Text="{Binding RoundTripDisplayText}" HorizontalAlignment="Right" />
+						</StackPanel>
+					</StackPanel>
+				</Border>
+			</StackPanel>
+
+			<Border Grid.Column="1" Classes="BottomBarPill" HorizontalAlignment="Right" VerticalAlignment="Center">
+				<StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+					<Button Classes="BottomBarButton"
+							CornerRadius="999,0,0,999"
+							MinWidth="34"
+							Command="{Binding ReturnToLiveCommand}"
+							ToolTip.Tip="{Binding Localization[Action.Live]}">
+						<PathIcon Data="{StaticResource podcast-line}" Width="13" Height="13" />
+					</Button>
+
+					<Border Classes="BottomBarDivider" IsHitTestVisible="False" />
+
+					<Button x:Name="BattleHistoryButton"
+							Classes="BottomBarButton"
+							CornerRadius="0,999,999,0"
+							MinWidth="34"
+							ToolTip.Tip="{Binding Localization[Column.History]}">
+						<PathIcon Data="{StaticResource angle-down}" Width="10" Height="10" />
+						<Button.Flyout>
+							<MenuFlyout Placement="TopEdgeAlignedRight"
+									ShowMode="Transient"
+									FlyoutPresenterClasses="BottomBarMenuFlyout BottomBarHistoryMenuFlyout" />
+						</Button.Flyout>
+					</Button>
+				</StackPanel>
+			</Border>
+		</Grid>
+	</Grid>
+
+	<FlyoutBase.AttachedFlyout>
+		<Flyout Placement="LeftEdgeAlignedTop" ShowMode="Transient" Closed="FlyoutClosed">
+			<views:CombatantSkillDetailsFlyoutView DataContext="{Binding CombatantDetails}" />
+		</Flyout>
+	</FlyoutBase.AttachedFlyout>
+</Window>

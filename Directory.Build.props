@@ -1,0 +1,10 @@
+<Project>
+	<PropertyGroup>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<LangVersion>preview</LangVersion>
+		<Authors>Cloris</Authors>
+		<RootNamespace>$(Authors).$(MSBuildProjectName)</RootNamespace>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+</Project>

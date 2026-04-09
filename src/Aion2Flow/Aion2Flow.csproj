@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<ApplicationIcon>../../assets/Aion2Flow.ico</ApplicationIcon>
+		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+		<PublishAot>true</PublishAot>
+		<IsAotCompatible>true</IsAotCompatible>
+		<AnalysisMode>Recommended</AnalysisMode>
+		<IsAotCompatible>true</IsAotCompatible>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Avalonia.Desktop" />
+		<PackageReference Include="Avalonia.Themes.Simple" />
+		<PackageReference Include="CommunityToolkit.Mvvm" />
+		<PackageReference Include="K4os.Compression.LZ4" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.Extensions.ObjectPool" />
+		<PackageReference Include="Microsoft.Windows.CsWin32">
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Aion2Flow.Resources\Aion2Flow.Resources.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<AvaloniaResource Include="Assets\Images\**" />
+		<None Update="Native\WinDivert.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>WinDivert.dll</TargetPath>
+		</None>
+		<None Update="Native\WinDivert64.sys">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>WinDivert64.sys</TargetPath>
+		</None>
+	</ItemGroup>
+
+</Project>
