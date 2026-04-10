@@ -1,0 +1,1114 @@
+using Cloris.Aion2Flow.Battle.Model;
+using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat.Classification;
+using Cloris.Aion2Flow.Combat.Metrics;
+using Cloris.Aion2Flow.PacketCapture.Protocol;
+using Cloris.Aion2Flow.PacketCapture.Readers;
+using Cloris.Aion2Flow.PacketCapture.Streams;
+using System.Globalization;
+
+namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
+
+public sealed class PacketLogReplayService
+{
+    public PacketLogReplayResult Replay(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        using var reader = File.OpenText(path);
+        return Replay(reader, path);
+    }
+
+    public IReadOnlyList<PacketLogReplayResult> ReplayMany(IEnumerable<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+
+        var results = new List<PacketLogReplayResult>();
+        foreach (var path in paths)
+        {
+            results.Add(Replay(path));
+        }
+
+        return results;
+    }
+
+    public PacketLogReplayResult Replay(TextReader reader, string sourceName)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
+
+        var lines = new List<string>();
+        while (reader.ReadLine() is { } line)
+        {
+            lines.Add(line);
+        }
+
+        var logKind = DetectLogKind(lines, sourceName);
+        return logKind switch
+        {
+            ReplayLogKind.Stream => ReplayStreamLines(lines, sourceName),
+            ReplayLogKind.Frame => ReplayFrameLines(lines, sourceName),
+            ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-battle replay."),
+            _ => throw new InvalidOperationException($"Unsupported replay log kind: {logKind}.")
+        };
+    }
+
+    private static PacketLogReplayResult ReplayFrameLines(IReadOnlyList<string> lines, string sourceName)
+    {
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        long frameOrdinal = 0;
+
+        foreach (var line in lines)
+        {
+            if (!TryParseEntry(line, out var entry))
+            {
+                IncrementCount(skippedEventCounts, "<invalid>");
+                continue;
+            }
+
+            frameOrdinal++;
+            if (TryReplayEntry(store, entry, frameOrdinal))
+            {
+                IncrementCount(replayedEventCounts, entry.EventName);
+            }
+            else
+            {
+                IncrementCount(skippedEventCounts, entry.EventName);
+            }
+        }
+
+        var snapshot = engine.CreateBattleSnapshot();
+        var summaries = BuildCombatantSummaries(store, snapshot);
+
+        return new PacketLogReplayResult(
+            sourceName,
+            lines.Count,
+            replayedEventCounts.Values.Sum(),
+            skippedEventCounts.Values.Sum(),
+            snapshot,
+            store.DeepClone(),
+            summaries,
+            replayedEventCounts,
+            skippedEventCounts);
+    }
+
+    private static PacketLogReplayResult ReplayStreamLines(IReadOnlyList<string> lines, string sourceName)
+    {
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        using var inboundProcessor = new PacketStreamProcessor(store);
+
+        foreach (var line in lines)
+        {
+            if (!TryParseStreamEntry(line, out var entry))
+            {
+                IncrementCount(skippedEventCounts, "<invalid>");
+                continue;
+            }
+
+            if (string.Equals(entry.Direction, "outbound", StringComparison.OrdinalIgnoreCase))
+            {
+                IncrementCount(skippedEventCounts, "outbound-ignored");
+                continue;
+            }
+
+            var parsed = inboundProcessor.AppendAndProcess(
+                entry.Payload,
+                entry.Connection,
+                entry.Timestamp.ToUnixTimeMilliseconds());
+
+            if (parsed)
+            {
+                IncrementCount(replayedEventCounts, entry.Direction);
+            }
+            else
+            {
+                IncrementCount(skippedEventCounts, entry.Direction);
+            }
+        }
+
+        var snapshot = engine.CreateBattleSnapshot();
+        var summaries = BuildCombatantSummaries(store, snapshot);
+
+        return new PacketLogReplayResult(
+            sourceName,
+            lines.Count,
+            replayedEventCounts.Values.Sum(),
+            skippedEventCounts.Values.Sum(),
+            snapshot,
+            store.DeepClone(),
+            summaries,
+            replayedEventCounts,
+            skippedEventCounts);
+    }
+
+    private static IReadOnlyList<PacketLogCombatantSummary> BuildCombatantSummaries(
+        CombatMetricsStore store,
+        DamageMeterSnapshot snapshot)
+    {
+        var summariesByActor = new Dictionary<int, MutableCombatantSummary>();
+
+        foreach (var context in CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime))
+        {
+            var packet = context.Packet;
+            var sourceActorId = context.SourceActorId;
+            var targetActorId = context.TargetActorId;
+
+            if (sourceActorId > 0)
+            {
+                EnsureSummary(summariesByActor, sourceActorId, store, snapshot);
+            }
+
+            if (targetActorId > 0)
+            {
+                EnsureSummary(summariesByActor, targetActorId, store, snapshot);
+            }
+
+            if (ContributesDamage(packet))
+            {
+                ApplyDamageSummary(summariesByActor, sourceActorId, targetActorId, packet);
+                continue;
+            }
+
+            if (ContributesHealing(packet))
+            {
+                ApplyHealingSummary(summariesByActor, sourceActorId, targetActorId, packet);
+                continue;
+            }
+
+            if (ContributesShield(packet))
+            {
+                ApplyShieldSummary(summariesByActor, sourceActorId, targetActorId, packet);
+            }
+        }
+
+        return summariesByActor
+            .OrderBy(static pair => pair.Key)
+            .Select(static pair => pair.Value.ToSummary())
+            .ToArray();
+    }
+
+    private static MutableCombatantSummary EnsureSummary(
+        Dictionary<int, MutableCombatantSummary> summariesByActor,
+        int actorId,
+        CombatMetricsStore store,
+        DamageMeterSnapshot snapshot)
+    {
+        if (summariesByActor.TryGetValue(actorId, out var existing))
+        {
+            return existing;
+        }
+
+        var created = new MutableCombatantSummary(
+            actorId,
+            CombatMetricsEngine.ResolveActorDisplayName(store, snapshot, actorId));
+        summariesByActor[actorId] = created;
+        return created;
+    }
+
+    private static void ApplyDamageSummary(
+        Dictionary<int, MutableCombatantSummary> summariesByActor,
+        int sourceActorId,
+        int targetActorId,
+        ParsedCombatPacket packet)
+    {
+        var hitContribution = Math.Max(0, packet.HitContribution);
+        var attemptContribution = Math.Max(hitContribution, Math.Max(0, packet.AttemptContribution));
+        var criticalContribution = packet.IsCritical ? hitContribution : 0;
+        var evadeContribution = (packet.Modifiers & DamageModifiers.Evade) != 0 ? attemptContribution : 0;
+        var invincibleContribution = (packet.Modifiers & DamageModifiers.Invincible) != 0 ? attemptContribution : 0;
+
+        if (sourceActorId > 0 && summariesByActor.TryGetValue(sourceActorId, out var source))
+        {
+            source.OutgoingDamage += packet.Damage;
+            source.OutgoingHits += hitContribution;
+            source.OutgoingAttempts += attemptContribution;
+            source.OutgoingCriticals += criticalContribution;
+            source.OutgoingEvades += evadeContribution;
+            source.OutgoingInvincibles += invincibleContribution;
+        }
+
+        if (targetActorId > 0 && summariesByActor.TryGetValue(targetActorId, out var target))
+        {
+            target.IncomingDamage += packet.Damage;
+            target.IncomingHits += hitContribution;
+            target.IncomingAttempts += attemptContribution;
+            target.IncomingCriticals += criticalContribution;
+            target.IncomingEvades += evadeContribution;
+            target.IncomingInvincibles += invincibleContribution;
+        }
+    }
+
+    private static void ApplyHealingSummary(
+        Dictionary<int, MutableCombatantSummary> summariesByActor,
+        int sourceActorId,
+        int targetActorId,
+        ParsedCombatPacket packet)
+    {
+        if (sourceActorId > 0 && summariesByActor.TryGetValue(sourceActorId, out var source))
+        {
+            source.OutgoingHealing += packet.Damage;
+        }
+
+        if (targetActorId > 0 && summariesByActor.TryGetValue(targetActorId, out var target))
+        {
+            target.IncomingHealing += packet.Damage;
+        }
+    }
+
+    private static void ApplyShieldSummary(
+        Dictionary<int, MutableCombatantSummary> summariesByActor,
+        int sourceActorId,
+        int targetActorId,
+        ParsedCombatPacket packet)
+    {
+        if (sourceActorId > 0 && summariesByActor.TryGetValue(sourceActorId, out var source))
+        {
+            source.OutgoingShield += packet.Damage;
+        }
+
+        if (targetActorId > 0 && summariesByActor.TryGetValue(targetActorId, out var target))
+        {
+            target.IncomingShield += packet.Damage;
+        }
+    }
+
+    private static bool ContributesDamage(ParsedCombatPacket packet)
+    {
+        if (packet.EventKind == CombatEventKind.Damage &&
+            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
+            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
+        {
+            return true;
+        }
+
+        return packet.ValueKind switch
+        {
+            CombatValueKind.Damage => packet.Damage > 0,
+            CombatValueKind.PeriodicDamage => packet.Damage > 0,
+            CombatValueKind.DrainDamage => packet.Damage > 0,
+            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
+            _ => false
+        };
+    }
+
+    private static bool ContributesHealing(ParsedCombatPacket packet)
+    {
+        return packet.ValueKind switch
+        {
+            CombatValueKind.Healing => packet.Damage > 0,
+            CombatValueKind.PeriodicHealing => packet.Damage > 0,
+            CombatValueKind.DrainHealing => packet.Damage > 0,
+            CombatValueKind.Shield => false,
+            _ => packet.EventKind == CombatEventKind.Healing && packet.Damage > 0
+        };
+    }
+
+    private static bool ContributesShield(ParsedCombatPacket packet)
+        => packet.ValueKind == CombatValueKind.Shield && packet.Damage > 0;
+
+    private static bool TryReplayEntry(CombatMetricsStore store, FrameReplayEntry entry, long frameOrdinal)
+    {
+        var timestamp = entry.Timestamp.ToUnixTimeMilliseconds();
+        var packet = entry.Payload;
+
+        return entry.EventName switch
+        {
+            "damage" => TryReplayDamage(store, packet, timestamp, frameOrdinal),
+            "periodic" => TryReplayPeriodic(store, packet, timestamp, frameOrdinal),
+            "periodic-link" => Packet0538PeriodicValueParser.TryParse(packet, out _),
+            "compact-value" => TryReplayCompactValue(store, packet, timestamp, frameOrdinal),
+            "compact-outcome" => TryReplayCompactOutcome(store, packet, timestamp, frameOrdinal),
+            "compact-0238" => TryReplayCompact0238(store, packet, timestamp, frameOrdinal),
+            "compact-0638" => TryReplayCompact0638(store, packet, timestamp, frameOrdinal),
+            "sidecar-3538" => TryReplay3538(store, packet, timestamp, frameOrdinal),
+            "wrapped-8456" => TryReplay8456(store, packet, timestamp, frameOrdinal),
+            "state-0140" => TryReplay0140(store, packet, timestamp),
+            "state-2136" => TryReplay2136(store, packet, timestamp),
+            "state-0240" => TryReplay0240(store, packet, timestamp),
+            "state-4636" => TryReplay4636(store, packet, timestamp),
+            "state-4536" => TryReplay4536(store, packet, timestamp),
+            "state-4036" => Packet4036Parser.TryParse(packet, out _),
+            "state-4136" => Packet4136Parser.TryParse(packet, out _),
+            "state-1d37" => Packet1D37Parser.TryParse(packet, out _),
+            "state-4936" => Packet4936Parser.TryParse(packet, out _),
+            "aux-2a38" => TryReplay2A38(store, packet, timestamp, frameOrdinal),
+            "aux-2b38" => Packet2B38Parser.TryParse(packet, out _),
+            "aux-2c38" => TryReplay2C38(store, packet, timestamp, frameOrdinal),
+            "nickname" => TryReplayNickname(store, packet),
+            "remain-hp" => TryReplayRemainHp(store, packet),
+            "battle-toggle" => TryReplayBattleToggle(store, packet),
+            "summon" => TryReplaySummon(store, packet),
+            _ => false
+        };
+    }
+
+    private static bool TryReplayDamage(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!TryParseDamagePacket(packet, out var parsed) || parsed.Damage <= 0)
+        {
+            return false;
+        }
+
+        var combatPacket = new ParsedCombatPacket
+        {
+            TargetId = parsed.TargetId,
+            LayoutTag = parsed.LayoutTag,
+            Flag = parsed.Flag,
+            SourceId = parsed.SourceId,
+            OriginalSkillCode = parsed.SkillCodeRaw,
+            SkillCode = parsed.SkillCodeRaw,
+            Marker = parsed.Marker,
+            Type = parsed.Type,
+            Modifiers = parsed.Modifiers,
+            Unknown = parsed.Unknown,
+            Damage = parsed.Damage,
+            Loop = parsed.Loop,
+            Timestamp = timestamp,
+            FrameOrdinal = frameOrdinal
+        };
+
+        if (parsed.TailMultiHitCount > 0)
+        {
+            combatPacket.MultiHitCount = parsed.TailMultiHitCount;
+            combatPacket.HasAuthoritativeMultiHitCount = true;
+            combatPacket.Modifiers |= DamageModifiers.MultiHit;
+        }
+
+        store.AppendCombatPacket(combatPacket);
+        return true;
+    }
+
+    private static bool TryReplayPeriodic(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!Packet0538PeriodicValueParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        if (parsed.IsLinkRecord)
+        {
+            return true;
+        }
+
+        var combatPacket = new ParsedCombatPacket
+        {
+            TargetId = parsed.TargetId,
+            SourceId = parsed.SourceId,
+            EffectFamily = parsed.Family,
+            OriginalSkillCode = parsed.SkillCodeRaw,
+            SkillCode = parsed.LegacySkillCode,
+            Unknown = parsed.Unknown,
+            Damage = parsed.Damage,
+            Timestamp = timestamp,
+            FrameOrdinal = frameOrdinal
+        };
+
+        store.AppendCombatPacket(combatPacket);
+        return true;
+    }
+
+    private static bool TryReplayCompactValue(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!TryParseCompactValuePacket(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal);
+        store.RegisterCompactValue0438(
+            parsed.TargetId,
+            parsed.SourceId,
+            parsed.SkillCodeRaw,
+            parsed.Marker,
+            parsed.LayoutTag,
+            parsed.Type,
+            timestamp,
+            frameOrdinal);
+        return true;
+    }
+
+    private static bool TryReplayCompactOutcome(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!TryParseCompactOutcomePacket(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.RegisterCompactValue0438(
+            parsed.TargetId,
+            parsed.SourceId,
+            parsed.SkillCodeRaw,
+            parsed.Marker,
+            parsed.LayoutTag,
+            parsed.Type,
+            timestamp,
+            frameOrdinal);
+        return true;
+    }
+
+    private static bool TryReplayCompact0238(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!Packet0238CompactControlParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal);
+        return true;
+    }
+
+    private static bool TryReplayCompact0638(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!Packet0638CompactControlParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal);
+        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, parsed.Flag, timestamp, frameOrdinal);
+        return true;
+    }
+
+    private static bool TryReplay3538(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!Packet3538SidecarParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.Register3538Sidecar(parsed.TargetId, parsed.ActorId, timestamp, frameOrdinal);
+        return true;
+    }
+
+    private static bool TryReplay8456(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!Packet8456EnvelopeParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.RegisterWrapped8456Sidecar(parsed.InnerOpcode, parsed.InnerValue, parsed.Stamp, timestamp, frameOrdinal);
+        return true;
+    }
+
+    private static bool TryReplay0140(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    {
+        if (!Packet0140Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        var targetId = store.ResolveNpcObservationSource();
+        if (targetId > 0)
+        {
+            store.AppendNpc0140Value(targetId, parsed.Value0);
+            if (parsed.Value0 <= int.MaxValue)
+            {
+                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0);
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryReplay2136(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    {
+        if (!Packet2136Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        var targetId = store.ResolveNpcObservationSource();
+        if (targetId > 0)
+        {
+            store.AppendNpc2136State(targetId, parsed.Sequence, parsed.Value0);
+            if (parsed.Value0 <= int.MaxValue)
+            {
+                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0);
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryReplay0240(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    {
+        if (!Packet0240Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        var targetId = store.ResolveNpcObservationSource();
+        if (targetId > 0)
+        {
+            store.AppendNpc0240Value(targetId, parsed.Value0);
+            if (parsed.Value0 <= int.MaxValue)
+            {
+                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0);
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryReplay4636(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    {
+        if (!Packet4636Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.AppendNpc4636State(parsed.SourceId, parsed.State0, parsed.State1);
+        store.RememberNpcObservationSource(parsed.SourceId);
+        return true;
+    }
+
+    private static bool TryReplay4536(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    {
+        if (!Packet4536Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.RememberNpcObservationSource(parsed.SourceId);
+        return true;
+    }
+
+    private static bool TryReplay2A38(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!Packet2A38Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.RegisterObservation2A38(
+            parsed.SourceId,
+            parsed.Mode,
+            parsed.GroupCode,
+            parsed.SequenceId,
+            parsed.BuffCodeRaw,
+            parsed.HeadValue,
+            parsed.StackValue,
+            timestamp,
+            frameOrdinal);
+        return true;
+    }
+
+    private static bool TryReplay2C38(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    {
+        if (!Packet2C38Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.RegisterObservation2C38(parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, timestamp, frameOrdinal);
+        return true;
+    }
+
+    private static bool TryReplayNickname(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    {
+        if (Packet3336NicknameParser.TryParse(packet, out var ownParsed))
+        {
+            store.AppendNickname(ownParsed.PlayerId, ownParsed.Nickname);
+            store.RememberLocalActor(ownParsed.PlayerId);
+            return true;
+        }
+
+        if (Packet4436NicknameParser.TryParse(packet, out var otherParsed))
+        {
+            store.AppendNickname(otherParsed.PlayerId, otherParsed.Nickname);
+            return true;
+        }
+
+        if (Packet048DNicknameParser.TryParse(packet, out var parsed))
+        {
+            store.AppendNickname(parsed.PlayerId, parsed.Nickname);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryReplayRemainHp(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    {
+        if (!Packet008DRemainHpParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.AppendNpcHp(parsed.MobId, checked((int)parsed.Hp));
+        return true;
+    }
+
+    private static bool TryReplayBattleToggle(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    {
+        if (!Packet218DBattleToggleParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.ToggleNpcBattle(parsed.MobId);
+        return true;
+    }
+
+    private static bool TryReplaySummon(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    {
+        if (!Packet4036CreateParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        if (parsed.MobCode.HasValue)
+        {
+            TryApplyNpcCatalog(store, parsed.SummonId, parsed.MobCode.Value);
+        }
+
+        store.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
+        store.AppendSummon(parsed.OwnerId, parsed.SummonId);
+        return true;
+    }
+
+    private static void TryApplyNpcCatalog(CombatMetricsStore store, int instanceId, int npcCode)
+    {
+        if (instanceId <= 0 || npcCode <= 0)
+        {
+            return;
+        }
+
+        if (!CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry))
+        {
+            return;
+        }
+
+        store.AppendNpcCode(instanceId, npcCode);
+        store.AppendNpcName(npcCode, entry.Name);
+
+        var kind = CombatMetricsEngine.ResolveNpcKind(entry.Kind);
+        if (kind != NpcKind.Unknown && kind != NpcKind.Summon)
+        {
+            store.AppendNpcKind(instanceId, kind);
+        }
+    }
+
+    private static bool TryParseEntry(string line, out FrameReplayEntry entry)
+    {
+        entry = default;
+        if (!TryReadLineSegments(line, out var timestampText, out var eventName, out var connectionText, out var dataText))
+        {
+            return false;
+        }
+
+        if (!DateTimeOffset.TryParse(
+                timestampText,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var timestamp))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(eventName))
+        {
+            return false;
+        }
+
+        if (!TryParseConnection(connectionText, out var connection))
+        {
+            return false;
+        }
+
+        try
+        {
+            entry = new FrameReplayEntry(
+                timestamp,
+                eventName,
+                connection,
+                Convert.FromHexString(dataText));
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static ReplayLogKind DetectLogKind(IReadOnlyList<string> lines, string sourceName)
+    {
+        if (sourceName.Contains(".stream.", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReplayLogKind.Stream;
+        }
+
+        if (sourceName.Contains(".frame.", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReplayLogKind.Frame;
+        }
+
+        if (sourceName.Contains(".raw.", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReplayLogKind.Raw;
+        }
+
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (!TryReadLineSegments(line, out _, out var secondSegment, out var thirdSegment, out _))
+            {
+                continue;
+            }
+
+            if (!secondSegment.StartsWith("dir=", StringComparison.Ordinal))
+            {
+                return ReplayLogKind.Frame;
+            }
+
+            return thirdSegment.Contains(':')
+                ? ReplayLogKind.Stream
+                : ReplayLogKind.Raw;
+        }
+
+        return ReplayLogKind.Frame;
+    }
+
+    private static bool TryParseStreamEntry(string line, out StreamReplayEntry entry)
+    {
+        entry = default;
+        if (!TryReadLineSegments(line, out var timestampText, out var directionSegment, out var connectionSegment, out var dataText))
+        {
+            return false;
+        }
+
+        if (!directionSegment.StartsWith("dir=", StringComparison.Ordinal) ||
+            !DateTimeOffset.TryParse(
+                timestampText,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var timestamp) ||
+            !TryParseConnection(connectionSegment, out var connection))
+        {
+            return false;
+        }
+
+        try
+        {
+            entry = new StreamReplayEntry(
+                timestamp,
+                directionSegment["dir=".Length..],
+                connection,
+                Convert.FromHexString(dataText));
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryReadLineSegments(
+        string line,
+        out string timestampText,
+        out string secondSegment,
+        out string thirdSegment,
+        out string dataText)
+    {
+        timestampText = string.Empty;
+        secondSegment = string.Empty;
+        thirdSegment = string.Empty;
+        dataText = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        var firstSeparator = line.IndexOf('|');
+        if (firstSeparator <= 0)
+        {
+            return false;
+        }
+
+        var secondSeparator = line.IndexOf('|', firstSeparator + 1);
+        if (secondSeparator <= firstSeparator + 1)
+        {
+            return false;
+        }
+
+        var thirdSeparator = line.IndexOf('|', secondSeparator + 1);
+        if (thirdSeparator <= secondSeparator + 1)
+        {
+            return false;
+        }
+
+        var dataSeparator = line.LastIndexOf("|data=", StringComparison.Ordinal);
+        if (dataSeparator <= thirdSeparator)
+        {
+            return false;
+        }
+
+        timestampText = line[..firstSeparator];
+        secondSegment = line[(firstSeparator + 1)..secondSeparator];
+        thirdSegment = line[(secondSeparator + 1)..thirdSeparator];
+        dataText = line[(dataSeparator + 6)..];
+        return true;
+    }
+
+    private static bool TryParseConnection(string text, out TcpConnection connection)
+    {
+        connection = default;
+        var arrowIndex = text.IndexOf("->", StringComparison.Ordinal);
+        if (arrowIndex <= 0 || arrowIndex >= text.Length - 2)
+        {
+            return false;
+        }
+
+        if (!TryParseEndpoint(text[..arrowIndex], out var sourceAddress, out var sourcePort) ||
+            !TryParseEndpoint(text[(arrowIndex + 2)..], out var destinationAddress, out var destinationPort))
+        {
+            return false;
+        }
+
+        connection = new TcpConnection(sourceAddress, destinationAddress, sourcePort, destinationPort);
+        return true;
+    }
+
+    private static bool TryParseEndpoint(string text, out uint address, out ushort port)
+    {
+        address = 0;
+        port = 0;
+
+        var separatorIndex = text.LastIndexOf(':');
+        if (separatorIndex <= 0 || separatorIndex >= text.Length - 1)
+        {
+            return false;
+        }
+
+        return uint.TryParse(text[..separatorIndex], NumberStyles.None, CultureInfo.InvariantCulture, out address) &&
+               ushort.TryParse(text[(separatorIndex + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out port);
+    }
+
+    private static void IncrementCount(Dictionary<string, int> counts, string key)
+    {
+        counts[key] = counts.TryGetValue(key, out var current) ? current + 1 : 1;
+    }
+
+    private static bool TryParseDamagePacket(ReadOnlySpan<byte> packet, out Packet0438Damage parsed)
+    {
+        if (Packet0438DamageParser.TryParse(packet, out parsed))
+        {
+            return true;
+        }
+
+        var reader = new PacketSpanReader(packet);
+        if (!reader.TryReadVarInt(out _))
+        {
+            return false;
+        }
+
+        return Packet0438DamageParser.TryParsePayload(packet[reader.Offset..], out parsed, out _);
+    }
+
+    private static bool TryParseCompactValuePacket(ReadOnlySpan<byte> packet, out Packet0438CompactValue parsed)
+    {
+        if (Packet0438CompactValueParser.TryParse(packet, out parsed))
+        {
+            return true;
+        }
+
+        parsed = default;
+        var reader = new PacketSpanReader(packet);
+        if (!reader.TryReadVarInt(out var length) || length <= 3 || reader.Remaining < 2)
+        {
+            return false;
+        }
+
+        if (packet[reader.Offset] != 0x04 || packet[reader.Offset + 1] != 0x38)
+        {
+            return false;
+        }
+
+        if (!reader.TryAdvance(2)) return false;
+        if (!reader.TryReadVarInt(out var targetId)) return false;
+        if (!reader.TryReadVarInt(out var layoutTag)) return false;
+        if (!reader.TryReadVarInt(out var flag)) return false;
+        if (!reader.TryReadVarInt(out var sourceId)) return false;
+        if (targetId <= 0 || sourceId <= 0 || layoutTag != 0 || reader.Remaining < 5) return false;
+        if (!reader.TryReadUInt32Le(out var skillCodeRaw)) return false;
+        if (!reader.TryReadByte(out var marker)) return false;
+        if (!reader.TryReadVarInt(out var type)) return false;
+        if (!reader.TryReadVarInt(out var unknown)) return false;
+        if (!reader.TryReadVarInt(out var value)) return false;
+        if (!reader.TryReadVarInt(out var loop)) return false;
+
+        var tailLength = reader.Remaining;
+        var tailRaw = 0;
+        if (tailLength >= 4)
+        {
+            var tail = packet[reader.Offset..];
+            tailRaw = tail[0]
+                | (tail[1] << 8)
+                | (tail[2] << 16)
+                | (tail[3] << 24);
+        }
+
+        parsed = new Packet0438CompactValue(
+            targetId,
+            layoutTag,
+            flag,
+            sourceId,
+            skillCodeRaw,
+            marker,
+            type,
+            unknown,
+            value,
+            loop,
+            tailLength,
+            tailRaw);
+        return true;
+    }
+
+    private static bool TryParseCompactOutcomePacket(ReadOnlySpan<byte> packet, out Packet0438CompactOutcome parsed)
+    {
+        if (Packet0438CompactOutcomeParser.TryParse(packet, out parsed))
+        {
+            return true;
+        }
+
+        parsed = default;
+        var reader = new PacketSpanReader(packet);
+        if (!reader.TryReadVarInt(out var length) || length <= 3 || reader.Remaining < 2)
+        {
+            return false;
+        }
+
+        if (packet[reader.Offset] != 0x04 || packet[reader.Offset + 1] != 0x38)
+        {
+            return false;
+        }
+
+        if (!reader.TryAdvance(2)) return false;
+        if (!reader.TryReadVarInt(out var targetId)) return false;
+        if (!reader.TryReadVarInt(out var layoutTag)) return false;
+        if (!reader.TryReadVarInt(out var flag)) return false;
+        if (!reader.TryReadVarInt(out var sourceId)) return false;
+        if (targetId <= 0 || sourceId <= 0 || layoutTag != 2 || reader.Remaining < 5) return false;
+        if (!reader.TryReadUInt32Le(out var skillCodeRaw)) return false;
+        if (!reader.TryReadByte(out var marker)) return false;
+        if (!reader.TryReadVarInt(out var type)) return false;
+
+        parsed = new Packet0438CompactOutcome(
+            targetId,
+            layoutTag,
+            flag,
+            sourceId,
+            skillCodeRaw,
+            marker,
+            type,
+            reader.Remaining);
+        return true;
+    }
+
+    private readonly record struct FrameReplayEntry(
+        DateTimeOffset Timestamp,
+        string EventName,
+        TcpConnection Connection,
+        byte[] Payload);
+
+    private readonly record struct StreamReplayEntry(
+        DateTimeOffset Timestamp,
+        string Direction,
+        TcpConnection Connection,
+        byte[] Payload);
+
+    private enum ReplayLogKind
+    {
+        Frame,
+        Stream,
+        Raw
+    }
+
+    private sealed class MutableCombatantSummary(int actorId, string displayName)
+    {
+        public int ActorId { get; } = actorId;
+        public string DisplayName { get; } = displayName;
+        public long OutgoingDamage { get; set; }
+        public long IncomingDamage { get; set; }
+        public long OutgoingHealing { get; set; }
+        public long IncomingHealing { get; set; }
+        public long OutgoingShield { get; set; }
+        public long IncomingShield { get; set; }
+        public int OutgoingHits { get; set; }
+        public int IncomingHits { get; set; }
+        public int OutgoingAttempts { get; set; }
+        public int IncomingAttempts { get; set; }
+        public int OutgoingCriticals { get; set; }
+        public int IncomingCriticals { get; set; }
+        public int OutgoingEvades { get; set; }
+        public int IncomingEvades { get; set; }
+        public int OutgoingInvincibles { get; set; }
+        public int IncomingInvincibles { get; set; }
+
+        public PacketLogCombatantSummary ToSummary()
+        {
+            return new PacketLogCombatantSummary(
+                ActorId,
+                DisplayName,
+                OutgoingDamage,
+                IncomingDamage,
+                OutgoingHealing,
+                IncomingHealing,
+                OutgoingShield,
+                IncomingShield,
+                OutgoingHits,
+                IncomingHits,
+                OutgoingAttempts,
+                IncomingAttempts,
+                OutgoingCriticals,
+                IncomingCriticals,
+                OutgoingEvades,
+                IncomingEvades,
+                OutgoingInvincibles,
+                IncomingInvincibles);
+        }
+    }
+}
+
+public sealed record PacketLogReplayResult(
+    string SourceName,
+    int TotalLines,
+    int ReplayedLines,
+    int SkippedLines,
+    DamageMeterSnapshot Snapshot,
+    CombatMetricsStore Store,
+    IReadOnlyList<PacketLogCombatantSummary> Combatants,
+    IReadOnlyDictionary<string, int> ReplayedEventCounts,
+    IReadOnlyDictionary<string, int> SkippedEventCounts);
+
+public sealed record PacketLogCombatantSummary(
+    int ActorId,
+    string DisplayName,
+    long OutgoingDamage,
+    long IncomingDamage,
+    long OutgoingHealing,
+    long IncomingHealing,
+    long OutgoingShield,
+    long IncomingShield,
+    int OutgoingHits,
+    int IncomingHits,
+    int OutgoingAttempts,
+    int IncomingAttempts,
+    int OutgoingCriticals,
+    int IncomingCriticals,
+    int OutgoingEvades,
+    int IncomingEvades,
+    int OutgoingInvincibles,
+    int IncomingInvincibles);

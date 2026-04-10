@@ -7,7 +7,6 @@ using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using K4os.Compression.LZ4;
 using System.Buffers;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Cloris.Aion2Flow.PacketCapture.Streams;
@@ -22,6 +21,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private TcpConnection _connection;
     private long _currentFrameOrdinal;
     private long _nextFrameOrdinal;
+    private long? _timestampOverrideMilliseconds;
 
     private static readonly byte[] Pattern = [0x06, 0x00, 0x36];
 
@@ -238,6 +238,26 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         return hasParsed;
     }
+
+    public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection, long timestampMilliseconds)
+    {
+        var previousTimestampOverride = _timestampOverrideMilliseconds;
+        _timestampOverrideMilliseconds = timestampMilliseconds > 0
+            ? timestampMilliseconds
+            : null;
+
+        try
+        {
+            return AppendAndProcess(payload, connection);
+        }
+        finally
+        {
+            _timestampOverrideMilliseconds = previousTimestampOverride;
+        }
+    }
+
+    private long CurrentTimestampMilliseconds
+        => _timestampOverrideMilliseconds ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     private void ProcessBufferedPackets(ref bool hasParsed)
     {
@@ -762,6 +782,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             Unknown = parsed.Unknown,
             Damage = parsed.Damage,
             Loop = parsed.Loop,
+            Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal
         });
 
@@ -804,6 +825,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             SkillCode = resolvedSkillCode.Value,
             Unknown = unknownInfo,
             Damage = damage,
+            Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal
         });
 
@@ -1082,6 +1104,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 Unknown = parsed.Unknown,
                 Damage = parsed.Damage,
                 Loop = parsed.Loop,
+                Timestamp = CurrentTimestampMilliseconds,
                 FrameOrdinal = frameOrdinal
             };
 
@@ -1100,7 +1123,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (Packet0438CompactValueParser.TryParse(packet, out var compact))
         {
             var tailHint = FormatResolvedReferenceHint("tailSkill", compact.TailRaw);
-            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var timestamp = CurrentTimestampMilliseconds;
             store.RegisterMultiHitSidecar(compact.SourceId, compact.SkillCodeRaw, compact.Marker, timestamp, frameOrdinal);
             store.RegisterCompactValue0438(
                 compact.TargetId,
@@ -1124,7 +1147,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        var compactOutcomeTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var compactOutcomeTimestamp = CurrentTimestampMilliseconds;
         store.RegisterCompactValue0438(
             compactOutcome.TargetId,
             compactOutcome.SourceId,
@@ -1171,6 +1194,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             SkillCode = parsed.LegacySkillCode,
             Unknown = parsed.Unknown,
             Damage = parsed.Damage,
+            Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal
         };
 
@@ -1188,7 +1212,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), frameOrdinal);
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentTimestampMilliseconds, frameOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-0238",
             _connection,
@@ -1206,7 +1230,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var timestamp = CurrentTimestampMilliseconds;
         store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal);
         store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, parsed.Flag, timestamp, frameOrdinal);
         RawPacketDump.AppendFrameEvent(
@@ -1226,7 +1250,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.Register3538Sidecar(parsed.TargetId, parsed.ActorId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), frameOrdinal);
+        store.Register3538Sidecar(parsed.TargetId, parsed.ActorId, CurrentTimestampMilliseconds, frameOrdinal);
         RawPacketDump.AppendFrameEvent(
             "sidecar-3538",
             _connection,
@@ -1309,7 +1333,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             parsed.BuffCodeRaw,
             parsed.HeadValue,
             parsed.StackValue,
-            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            CurrentTimestampMilliseconds,
             frameOrdinal);
 
         RawPacketDump.AppendFrameEvent(
@@ -1335,7 +1359,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             parsed.Mode,
             parsed.SequenceId,
             parsed.ResultCode,
-            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            CurrentTimestampMilliseconds,
             frameOrdinal);
 
         RawPacketDump.AppendFrameEvent(
@@ -1392,7 +1416,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             parsed.InnerOpcode,
             parsed.InnerValue,
             parsed.Stamp,
-            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            CurrentTimestampMilliseconds,
             frameOrdinal);
 
         RawPacketDump.AppendFrameEvent(
