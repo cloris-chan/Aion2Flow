@@ -14,7 +14,7 @@ public sealed class CombatMetricsStoreNpcIdentityTests
 
         Assert.True(store.SummonOwnerByInstance.TryGetValue(18345, out var ownerId));
         Assert.Equal(12115, ownerId);
-        Assert.True(store.NpcKindByInstance.TryGetValue(18345, out var kind));
-        Assert.Equal(NpcKind.Summon, kind);
+        Assert.True(store.TryGetNpcRuntimeState(18345, out var state));
+        Assert.Equal(NpcKind.Summon, state.Kind);
     }
 }

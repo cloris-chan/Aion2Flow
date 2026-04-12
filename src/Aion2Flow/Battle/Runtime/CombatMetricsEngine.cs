@@ -1,11 +1,11 @@
+using System.Collections.Concurrent;
+using System.Globalization;
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Combat.NpcRuntime;
 using Cloris.Aion2Flow.Resources;
-using System.Collections.Concurrent;
-using System.Globalization;
 
 namespace Cloris.Aion2Flow.Battle.Runtime;
 
@@ -13,7 +13,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 {
     private readonly Lock _stateLock = new();
 
-    internal readonly record struct BattlePacketContext(ParsedCombatPacket Packet, int SourceActorId, int TargetActorId);
+    internal readonly record struct BattlePacketContext(ParsedCombatPacket Packet, int SourceId, int TargetId);
 
     public CombatMetricsEngine() : this(new CombatMetricsStore())
     {
@@ -180,9 +180,8 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
     {
         lock (_stateLock)
         {
-            Store.FlushPendingOutcomeSidecars(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            Store.FlushPendingOutcomeSidecars();
             var packetMap = Store.CombatPacketsByTarget;
-            var packetsBySource = Store.CombatPacketsBySource;
             var nicknameData = Store.Nicknames;
             var characterClassEvidenceByCombatant = new Dictionary<int, CharacterClassInferenceState>();
 
@@ -232,7 +231,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             foreach (var battlePacket in EnumerateBattlePackets(Store, battleStart, battleEnd))
             {
                 var packet = battlePacket.Packet;
-                var uid = battlePacket.SourceActorId;
+                var uid = battlePacket.SourceId;
                 if (uid <= 0)
                 {
                     continue;
@@ -430,7 +429,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return inferredSkillCode;
         }
 
-        var hasTriggeredSibling = false;
         foreach (var triggeredSkillId in inferredSkill.EnumerateTriggeredSkillIds())
         {
             if (triggeredSkillId <= 0)
@@ -438,7 +436,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                 continue;
             }
 
-            hasTriggeredSibling = true;
             if (!SkillMap.TryGetValue(triggeredSkillId, out var candidate))
             {
                 continue;
@@ -455,11 +452,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return candidate.Id;
         }
 
-        if (!hasTriggeredSibling)
-        {
-            return inferredSkillCode;
-        }
-
         return inferredSkillCode;
     }
 
@@ -468,7 +460,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         characterClass = default;
         score = 0;
 
-        if (SkillMap is null || !SkillMap.TryGetValue(packet.SkillCode, out var skill))
+        if (!SkillMap.TryGetValue(packet.SkillCode, out var skill))
         {
             return false;
         }
@@ -600,7 +592,12 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
     private string ResolveTargetName(int target)
     {
-        if (!Store.NpcCodeByInstance.TryGetValue(target, out var npcCode)) return string.Empty;
+        if (!Store.TryGetNpcRuntimeState(target, out var state) ||
+            state.NpcCode is not int npcCode)
+        {
+            return string.Empty;
+        }
+
         if (NpcCatalog.TryGetValue(npcCode, out var entry) && !string.IsNullOrWhiteSpace(entry.Name))
         {
             return entry.Name;
@@ -619,7 +616,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             yield break;
         }
 
-        var relevantActorIds = new HashSet<int>();
+        var relevantCombatantIds = new HashSet<int>();
 
         foreach (var queue in store.CombatPacketsBySource.Values)
         {
@@ -630,15 +627,15 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     continue;
                 }
 
-                var sourceActorId = ResolveCombatantActorId(store, packet.SourceId);
-                var targetActorId = ResolveCombatantActorId(store, packet.TargetId);
-                relevantActorIds.Add(sourceActorId);
-                relevantActorIds.Add(targetActorId);
-                yield return new BattlePacketContext(packet, sourceActorId, targetActorId);
+                var sourceId = ResolveCombatantId(store, packet.SourceId);
+                var targetId = ResolveCombatantId(store, packet.TargetId);
+                relevantCombatantIds.Add(sourceId);
+                relevantCombatantIds.Add(targetId);
+                yield return new BattlePacketContext(packet, sourceId, targetId);
             }
         }
 
-        if (relevantActorIds.Count == 0)
+        if (relevantCombatantIds.Count == 0)
         {
             yield break;
         }
@@ -652,14 +649,14 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     continue;
                 }
 
-                var sourceActorId = ResolveCombatantActorId(store, packet.SourceId);
-                var targetActorId = ResolveCombatantActorId(store, packet.TargetId);
-                if (!IsRelevantRecoveryPacket(packet, sourceActorId, targetActorId, relevantActorIds))
+                var sourceId = ResolveCombatantId(store, packet.SourceId);
+                var targetId = ResolveCombatantId(store, packet.TargetId);
+                if (!IsRelevantRecoveryPacket(packet, sourceId, targetId, relevantCombatantIds))
                 {
                     continue;
                 }
 
-                yield return new BattlePacketContext(packet, sourceActorId, targetActorId);
+                yield return new BattlePacketContext(packet, sourceId, targetId);
             }
         }
     }
@@ -695,31 +692,27 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         return found ? (start, end) : (0, 0);
     }
 
-    internal int ResolveCombatantActorId(int actorId)
+    internal static int ResolveCombatantId(CombatMetricsStore store, int combatantId)
     {
-        return ResolveCombatantActorId(Store, actorId);
-    }
-
-    internal static int ResolveCombatantActorId(CombatMetricsStore store, int actorId)
-    {
-        return store.SummonOwnerByInstance.TryGetValue(actorId, out var ownerId)
+        return store.SummonOwnerByInstance.TryGetValue(combatantId, out var ownerId)
             ? ownerId
-            : actorId;
+            : combatantId;
     }
 
-    internal static string ResolveActorDisplayName(CombatMetricsStore store, DamageMeterSnapshot snapshot, int actorId)
+    internal static string ResolveCombatantDisplayName(CombatMetricsStore store, DamageMeterSnapshot snapshot, int combatantId)
     {
-        if (snapshot.Combatants.TryGetValue(actorId, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname))
+        if (snapshot.Combatants.TryGetValue(combatantId, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname))
         {
             return combatant.Nickname;
         }
 
-        if (store.Nicknames.TryGetValue(actorId, out var nickname) && !string.IsNullOrWhiteSpace(nickname))
+        if (store.Nicknames.TryGetValue(combatantId, out var nickname) && !string.IsNullOrWhiteSpace(nickname))
         {
             return nickname;
         }
 
-        if (store.NpcCodeByInstance.TryGetValue(actorId, out var npcCode))
+        if (store.TryGetNpcRuntimeState(combatantId, out var state) &&
+            state.NpcCode is int npcCode)
         {
             if (NpcCatalog.TryGetValue(npcCode, out var entry) && !string.IsNullOrWhiteSpace(entry.Name))
             {
@@ -732,21 +725,21 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             }
         }
 
-        return actorId.ToString(CultureInfo.InvariantCulture);
+        return combatantId.ToString(CultureInfo.InvariantCulture);
     }
 
     internal static bool IsRelevantRecoveryPacket(
         ParsedCombatPacket packet,
-        int sourceActorId,
-        int targetActorId,
-        HashSet<int> relevantActorIds)
+        int sourceId,
+        int targetId,
+        HashSet<int> relevantCombatantIds)
     {
         if (packet.Damage <= 0)
         {
             return false;
         }
 
-        if (!relevantActorIds.Contains(sourceActorId) && !relevantActorIds.Contains(targetActorId))
+        if (!relevantCombatantIds.Contains(sourceId) && !relevantCombatantIds.Contains(targetId))
         {
             return false;
         }
@@ -771,30 +764,43 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             InstanceId = targetId
         };
 
-        if (Store.Npc2136ValueByInstance.TryGetValue(targetId, out var value2136))
+        if (Store.TryGetNpcRuntimeState(targetId, out var state))
         {
-            observation.Value2136 = value2136;
-        }
+            if (state.Value2136 is uint value2136)
+            {
+                observation.Value2136 = value2136;
+            }
 
-        if (Store.Npc2136SequenceByInstance.TryGetValue(targetId, out var seq2136))
-        {
-            observation.Sequence2136 = seq2136;
-        }
+            if (state.Sequence2136 is uint seq2136)
+            {
+                observation.Sequence2136 = seq2136;
+            }
 
-        if (Store.Npc0140ValueByInstance.TryGetValue(targetId, out var value0140))
-        {
-            observation.Value0140 = value0140;
-        }
+            if (state.Value0140 is uint value0140)
+            {
+                observation.Value0140 = value0140;
+            }
 
-        if (Store.Npc0240ValueByInstance.TryGetValue(targetId, out var value0240))
-        {
-            observation.Value0240 = value0240;
-        }
+            if (state.Value0240 is uint value0240)
+            {
+                observation.Value0240 = value0240;
+            }
 
-        if (Store.Npc4636StateByInstance.TryGetValue(targetId, out var state4636))
-        {
-            observation.State4636Value0 = state4636.State0;
-            observation.State4636Value1 = state4636.State1;
+            if (state.State4636 is { } state4636)
+            {
+                observation.State4636Value0 = state4636.State0;
+                observation.State4636Value1 = state4636.State1;
+            }
+
+            if (state.Hp is int hp)
+            {
+                observation.Hp = hp;
+            }
+
+            if (state.BattleToggledOn is bool battle)
+            {
+                observation.BattleToggledOn = battle;
+            }
         }
 
         int? preferred2C38Sequence = observation.Sequence2136.HasValue
@@ -805,16 +811,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         {
             observation.Sequence2C38 = sequence2C38;
             observation.Result2C38 = result2C38;
-        }
-
-        if (Store.NpcHpByInstance.TryGetValue(targetId, out var hp))
-        {
-            observation.Hp = hp;
-        }
-
-        if (Store.NpcBattleStateByInstance.TryGetValue(targetId, out var battle))
-        {
-            observation.BattleToggledOn = battle;
         }
 
         observation.PhaseHint = NpcRuntimeObservationInterpreter.InferPhaseHint(observation);

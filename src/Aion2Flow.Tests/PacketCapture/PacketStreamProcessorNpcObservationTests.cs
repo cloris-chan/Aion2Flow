@@ -12,7 +12,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     private static readonly TcpConnection TestConnection = new(0x0100007f, 0x0100007f, 49820, 57080);
 
     [Fact]
-    public void Uses_Recent_4536_Actor_As_Fallback_For_Actorless_Runtime_State_Frames()
+    public void Uses_Recent_4536_Source_As_Fallback_For_SourceLess_Runtime_State_Frames()
     {
         var store = new CombatMetricsStore();
         var processor = new PacketStreamProcessor(store);
@@ -22,14 +22,15 @@ public sealed class PacketStreamProcessorNpcObservationTests
         processor.AppendAndProcess(HexHelper.FromFixture("state/0140-boss-tail-430d03.hex"), TestConnection);
         processor.AppendAndProcess(HexHelper.FromFixture("state/0240-boss-tail-430d03.hex"), TestConnection);
 
-        Assert.Equal((uint)6, store.Npc2136SequenceByInstance[4370]);
-        Assert.Equal((uint)200003, store.Npc2136ValueByInstance[4370]);
-        Assert.Equal((uint)200003, store.Npc0140ValueByInstance[4370]);
-        Assert.Equal((uint)200003, store.Npc0240ValueByInstance[4370]);
+        Assert.True(store.TryGetNpcRuntimeState(4370, out var state));
+        Assert.Equal((uint)6, state.Sequence2136);
+        Assert.Equal((uint)200003, state.Value2136);
+        Assert.Equal((uint)200003, state.Value0140);
+        Assert.Equal((uint)200003, state.Value0240);
     }
 
     [Fact]
-    public void Skips_Mode48_Periodic_Link_Record_From_Combat_Metrics()
+    public void Synthesizes_Invincible_From_Mode48_Periodic_Link_Record()
     {
         var store = new CombatMetricsStore();
         var processor = new PacketStreamProcessor(store);
@@ -37,7 +38,15 @@ public sealed class PacketStreamProcessorNpcObservationTests
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("combat/0538-mode48-link.hex"), TestConnection);
 
         Assert.True(parsed);
-        Assert.Empty(store.CombatPacketsByTarget);
+        Assert.True(store.CombatPacketsByTarget.TryGetValue(16047, out var packets));
+
+        var invincible = Assert.Single(packets);
+        Assert.Equal(29240, invincible.SourceId);
+        Assert.Equal(16047, invincible.TargetId);
+        Assert.Equal(608, invincible.Marker);
+        Assert.Equal(1237540, invincible.OriginalSkillCode);
+        Assert.Equal(1230000, invincible.SkillCode);
+        Assert.True((invincible.Modifiers & DamageModifiers.Invincible) != 0);
     }
 
     [Fact]
@@ -65,7 +74,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.True(parsed);
         Assert.True(store.Nicknames.TryGetValue(2007, out var nickname));
         Assert.Equal("Perigee", nickname);
-        Assert.Equal(2007, store.LocalActorId);
     }
 
     [Fact]
@@ -187,7 +195,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        store.RememberLocalActor(933);
         var processor = new PacketStreamProcessor(store);
 
         processor.AppendAndProcess(HexHelper.Parse("280438AFDD013600A507368E0301F1021800033F636501000000D88501A1550101DF010100"), TestConnection);
@@ -211,7 +218,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        store.RememberLocalActor(8171);
         var processor = new PacketStreamProcessor(store);
 
         processor.AppendAndProcess(HexHelper.Parse("270438D0A10B3400EB3F368E03011003033F636501000000F07DD3470102950795070100"), TestConnection);
@@ -240,7 +246,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
-    public void Attributes_3538_DualActor_Sidecar_To_Preceding_Damage_Packet_Without_LocalActor_As_Single_MultiHit()
+    public void Attributes_3538_SourceTarget_Sidecar_To_Preceding_Damage_Packet_As_Single_MultiHit()
     {
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -260,40 +266,20 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
-    public void Does_Not_Synthesize_Evade_From_Standalone_Compact0638_Without_CompactValue()
+    public void Flushes_Pending_Compact_Type1_Avoid_As_Evade_At_Batch_End()
     {
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("290438A395014610A0B907F4C81000590244005B7F8E0601000000904E0101"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0F0638A0B907F4C810005900"), TestConnection);
-
-        Assert.True(store.CombatPacketsBySource.TryGetValue(122016, out var packets));
-
-        var parsedPackets = packets.ToArray();
-        var landed = Assert.Single(parsedPackets);
-        Assert.Equal(89, landed.Marker);
-        Assert.True((landed.Modifiers & DamageModifiers.Evade) == 0);
-    }
-
-    [Fact]
-    public void Synthesizes_Evade_From_Generic_Type1_CompactValue_When_Matching_0638_Arrives()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("1F0438A5070000ADCB01368F1200060123F13F0701000000904E0100"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0F0638ADCB01368F12000600"), TestConnection);
+        store.RegisterCompactValue0438(933, 26029, 1216310, 6, 0, 1, 1_000, 1, 100);
+        store.FlushPendingOutcomeSidecars();
 
         Assert.True(store.CombatPacketsBySource.TryGetValue(26029, out var packets));
 
         var evade = Assert.Single(packets);
         Assert.Equal(933, evade.TargetId);
         Assert.Equal(6, evade.Marker);
+        Assert.Equal(100, evade.BatchOrdinal);
         Assert.Equal(0, evade.Damage);
         Assert.Equal(0, evade.HitContribution);
         Assert.Equal(1, evade.AttemptContribution);
@@ -301,256 +287,179 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
-    public void Synthesizes_Evade_From_Layout2_Type1_CompactOutcome_When_Matching_0638_Arrives()
+    public void Keeps_Pending_Compact_Type1_Avoid_As_Evade_When_Group17_Arrives_Without_PeriodicLink()
     {
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("210438A5070200AFDD01368F12000601200023F13F0701000000904E0100"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0F0638AFDD01368F12000600"), TestConnection);
-
-        Assert.True(store.CombatPacketsBySource.TryGetValue(28335, out var packets));
-
-        var evade = Assert.Single(packets);
-        Assert.Equal(933, evade.TargetId);
-        Assert.Equal(6, evade.Marker);
-        Assert.Equal(0, evade.Damage);
-        Assert.Equal(0, evade.HitContribution);
-        Assert.Equal(1, evade.AttemptContribution);
-        Assert.True((evade.Modifiers & DamageModifiers.Evade) != 0);
-    }
-
-    [Fact]
-    public void Synthesizes_Evade_From_Generic_Type1_CompactValue_Even_When_Same_Marker_Landed_Damage_Exists()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("280438A5074610EB99015E8F120004024200C300400701000000904E0101EF3E2F0D010001"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("1F0438A5070000EB99015E8F12000401C300400701000000904E0100"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0F0638EB99015E8F12000400"), TestConnection);
-
-        Assert.True(store.CombatPacketsBySource.TryGetValue(19691, out var packets));
-
-        var parsedPackets = packets.OrderBy(static x => x.Timestamp).ToArray();
-        Assert.Equal(2, parsedPackets.Length);
-        Assert.Equal(4, parsedPackets[0].Marker);
-        Assert.Equal(1, parsedPackets[0].Damage);
-        Assert.Equal(4, parsedPackets[1].Marker);
-        Assert.Equal(0, parsedPackets[1].Damage);
-        Assert.Equal(1, parsedPackets[1].AttemptContribution);
-        Assert.True((parsedPackets[1].Modifiers & DamageModifiers.Evade) != 0);
-    }
-
-    [Fact]
-    public void Synthesizes_Evade_From_Layout2_Type1_CompactOutcome_Even_When_Same_Marker_Landed_Damage_Exists()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("280438A5074610EB99015E8F120009020400C300400701000000904E0101EF3E2F0D010001"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("210438A5070200EB99015E8F120009014000C300400702000000904E0200"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0F0638EB99015E8F12000900"), TestConnection);
-
-        Assert.True(store.CombatPacketsBySource.TryGetValue(19691, out var packets));
-
-        var parsedPackets = packets.OrderBy(static x => x.Timestamp).ToArray();
-        Assert.Equal(2, parsedPackets.Length);
-        Assert.Equal(9, parsedPackets[0].Marker);
-        Assert.Equal(1, parsedPackets[0].Damage);
-        Assert.Equal(9, parsedPackets[1].Marker);
-        Assert.Equal(0, parsedPackets[1].Damage);
-        Assert.Equal(1, parsedPackets[1].AttemptContribution);
-        Assert.True((parsedPackets[1].Modifiers & DamageModifiers.Evade) != 0);
-    }
-
-    [Fact]
-    public void Flushes_Evade_From_Generic_Type1_CompactValue_When_Matching_0638_Is_Missing()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        store.RegisterCompactValue0438(933, 26029, 1216310, 6, 1, 1_000);
-        store.FlushPendingOutcomeSidecars(5_000);
+        store.RegisterCompactValue0438(933, 26029, 1216310, 6, 0, 1, 1_000, 1, 100);
+        store.RegisterObservation2A38(933, 1, 17, 44, 0x1388, 0x1ab57000, 1_001, 2, 100);
+        store.FlushPendingOutcomeSidecars();
 
         Assert.True(store.CombatPacketsBySource.TryGetValue(26029, out var packets));
 
         var evade = Assert.Single(packets);
         Assert.Equal(933, evade.TargetId);
         Assert.Equal(6, evade.Marker);
+        Assert.Equal(100, evade.BatchOrdinal);
+        Assert.Equal(1216310, evade.SkillCode);
         Assert.Equal(0, evade.Damage);
+        Assert.Equal(0, evade.HitContribution);
+        Assert.Equal(1, evade.AttemptContribution);
         Assert.True((evade.Modifiers & DamageModifiers.Evade) != 0);
+        Assert.True((evade.Modifiers & DamageModifiers.Invincible) == 0);
     }
 
     [Fact]
-    public void Does_Not_Synthesize_Evade_From_Flag2_Compact0638_Without_Entity_Relation()
+    public void Keeps_Direct_Blocked_Damage_As_Hit_When_Group17_Arrives_Without_PeriodicLink()
     {
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        store.RememberLocalActor(933);
-        var processor = new PacketStreamProcessor(store);
+        store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 26029,
+            TargetId = 933,
+            OriginalSkillCode = 1216310,
+            SkillCode = 1216310,
+            Marker = 6,
+            Damage = 1,
+            Timestamp = 1_000,
+            FrameOrdinal = 1,
+            BatchOrdinal = 100,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        store.RegisterObservation2A38(933, 1, 17, 44, 0x1388, 0x1ab57000, 1_001, 2, 100);
+        store.FlushPendingOutcomeSidecars();
 
-        processor.AppendAndProcess(HexHelper.Parse("0F0638ADCB01368F12001302"), TestConnection);
-
-        Assert.False(store.CombatPacketsBySource.TryGetValue(26029, out _));
-    }
-
-    [Fact]
-    public void Does_Not_Synthesize_Evade_From_Flag2_Compact0638_When_DirectDamage_Already_Exists_For_Marker()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        store.RememberLocalActor(933);
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("280438A5074610AFDD01368F12000F02420023F13F0701000000904E0101EF3E2F0D010001"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0F0638AFDD01368F12000F02"), TestConnection);
-
-        Assert.True(store.CombatPacketsBySource.TryGetValue(28335, out var packets));
+        Assert.True(store.CombatPacketsByTarget.TryGetValue(933, out var packets));
 
         var packet = Assert.Single(packets);
-        Assert.Equal(15, packet.Marker);
+        Assert.Equal(26029, packet.SourceId);
+        Assert.Equal(933, packet.TargetId);
+        Assert.Equal(6, packet.Marker);
+        Assert.Equal(100, packet.BatchOrdinal);
         Assert.Equal(1, packet.Damage);
+        Assert.Equal(1, packet.HitContribution);
+        Assert.Equal(1, packet.AttemptContribution);
+        Assert.True((packet.Modifiers & DamageModifiers.Invincible) == 0);
         Assert.True((packet.Modifiers & DamageModifiers.Evade) == 0);
     }
 
     [Fact]
-    public void Does_Not_Synthesize_Invincible_From_Charged_Dodge_Mode1_Result7()
+    public void Prefers_Evade_Over_Invincible_When_Same_Batch_Dodge_Arrives()
     {
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        store.RegisterCompactControl0638(9990, 17000101, 9, 1_000);
-        store.RegisterObservation2C38(9990, 1, 65, 7, 1_050, 2);
-
-        Assert.False(store.CombatPacketsByTarget.TryGetValue(9990, out var packets) &&
-                     packets.Any(packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible));
-    }
-
-    [Fact]
-    public void Does_Not_Synthesize_Invincible_From_CurrentTarget_Alone_Without_Authoritative_Avoided_Hit_Outcome()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore
+        store.AppendCombatPacket(new ParsedCombatPacket
         {
-            CurrentTarget = 9990
-        };
-        store.RegisterCompactControl0638(2007, 12000101, 8, 1_000);
-        store.RegisterObservation2C38(2007, 73, 7, 1_050);
+            SourceId = 26029,
+            TargetId = 933,
+            OriginalSkillCode = 1216310,
+            SkillCode = 1216310,
+            Marker = 8,
+            Damage = 1,
+            Timestamp = 1_000,
+            FrameOrdinal = 1,
+            BatchOrdinal = 100,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        store.RegisterCompactControl0238(933, 17000100, 72, 100);
+        store.FlushPendingOutcomeSidecars();
 
-        Assert.False(store.CombatPacketsBySource.TryGetValue(9990, out var packets) &&
-                     packets.Any(packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible));
+        Assert.True(store.CombatPacketsByTarget.TryGetValue(933, out var packets));
+
+        var evade = Assert.Single(packets);
+        Assert.Equal(26029, evade.SourceId);
+        Assert.Equal(933, evade.TargetId);
+        Assert.Equal(8, evade.Marker);
+        Assert.Equal(100, evade.BatchOrdinal);
+        Assert.Equal(0, evade.Damage);
+        Assert.Equal(0, evade.HitContribution);
+        Assert.Equal(1, evade.AttemptContribution);
+        Assert.True((evade.Modifiers & DamageModifiers.Evade) != 0);
+        Assert.True((evade.Modifiers & DamageModifiers.Invincible) == 0);
     }
 
     [Fact]
-    public void Synthesizes_Invincible_From_Charged_Dodge_Mode2_Result7()
+    public void Synthesizes_Invincible_Alongside_Compact_Evade_When_PeriodicLink_Arrives()
     {
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        store.RegisterCompactControl0638(8171, 17000101, 72, 1_100);
-        store.RegisterObservation2C38(8171, 2, 1652, 7, 1_150, 2);
+        store.RegisterCompactValue0438(933, 26029, 1216310, 6, 0, 1, 1_000, 1, 100);
+        store.FlushPendingOutcomeSidecars();
+        store.RegisterPeriodicLink0538(933, 933, 26029, 45, 1216310, 1_020, 4, 102);
 
-        Assert.True(store.CombatPacketsByTarget.TryGetValue(8171, out var packets));
+        Assert.True(store.CombatPacketsBySource.TryGetValue(26029, out var packets));
 
-        var outcome = Assert.Single(packets, packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible);
-        Assert.Equal(0, outcome.SourceId);
-        Assert.Equal(8171, outcome.TargetId);
-        Assert.Equal(72, outcome.Marker);
-        Assert.Equal(0, outcome.Damage);
-        Assert.Equal(0, outcome.HitContribution);
-        Assert.Equal(1, outcome.AttemptContribution);
-        Assert.True((outcome.Modifiers & DamageModifiers.Invincible) != 0);
+        var parsedPackets = packets.OrderBy(packet => packet.Modifiers).ThenBy(packet => packet.Marker).ToArray();
+        Assert.Equal(2, parsedPackets.Length);
+
+        var evade = Assert.Single(parsedPackets, static packet => (packet.Modifiers & DamageModifiers.Evade) != 0);
+        Assert.Equal(6, evade.Marker);
+        Assert.Equal(1216310, evade.SkillCode);
+
+        var invincible = Assert.Single(parsedPackets, static packet => (packet.Modifiers & DamageModifiers.Invincible) != 0);
+        Assert.Equal(26029, invincible.SourceId);
+        Assert.Equal(933, invincible.TargetId);
+        Assert.Equal(1216310, invincible.SkillCode);
+        Assert.Equal(45, invincible.Marker);
+        Assert.Equal(0, invincible.Damage);
+        Assert.Equal(0, invincible.HitContribution);
+        Assert.Equal(1, invincible.AttemptContribution);
+        Assert.True((invincible.Modifiers & DamageModifiers.Invincible) != 0);
     }
 
     [Fact]
-    public void Does_Not_Synthesize_Invincible_From_Charged_Dodge_Mode1_Result7_After_Compact_Control()
+    public void Leaves_DefensivePerfect_Blocked_Damage_Unchanged_Without_Explicit_Avoided_Evidence()
     {
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        store.RegisterCompactControl0638(8171, 17000101, 114, 10_150);
-        store.RegisterObservation2C38(8171, 1, 2477, 7, 10_300, 2);
+        store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 26029,
+            TargetId = 933,
+            OriginalSkillCode = 1216310,
+            SkillCode = 1216310,
+            Marker = 7,
+            Damage = 1,
+            Modifiers = DamageModifiers.Perfect | DamageModifiers.Block,
+            Timestamp = 2_000,
+            FrameOrdinal = 3,
+            BatchOrdinal = 101,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        store.FlushPendingOutcomeSidecars();
 
-        Assert.False(store.CombatPacketsByTarget.TryGetValue(8171, out var packets) &&
-                     packets.Any(packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible));
+        Assert.True(store.CombatPacketsByTarget.TryGetValue(933, out var packets));
+
+        var packet = Assert.Single(packets);
+        Assert.Equal(26029, packet.SourceId);
+        Assert.Equal(7, packet.Marker);
+        Assert.Equal(1, packet.Damage);
+        Assert.Equal(1, packet.HitContribution);
+        Assert.Equal(1, packet.AttemptContribution);
+        Assert.True((packet.Modifiers & DamageModifiers.Evade) == 0);
+        Assert.True((packet.Modifiers & DamageModifiers.Invincible) == 0);
     }
 
     [Fact]
-    public void Does_Not_Synthesize_Invincible_From_Current_Logs_False_Charged_Dodge_Lane_Without_Incoming_Evade()
+    public void Does_Not_Synthesize_Invincible_From_Group17_Without_Avoided_Hit()
     {
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        store.RegisterObservation2A38(933, 1, 17, 44, 0x1388, 0x1ab57000, 1_001, 2, 100);
+        store.FlushPendingOutcomeSidecars();
 
-        processor.AppendAndProcess(HexHelper.Parse("0E0638F922A5660301DE00"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0D2C38F92201009A1407"), TestConnection);
-
-        Assert.False(store.CombatPacketsByTarget.TryGetValue(4473, out var packets) &&
-                     packets.Any(packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible));
-    }
-
-    [Fact]
-    public void Synthesizes_Invincible_From_Current_Logs_Real_Charged_Dodge_Lane_With_Incoming_Avoided_Hit_Outcome()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("0E0638F922A56603011600"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("112C38F9220200DF140700E01407"), TestConnection);
-
-        Assert.True(store.CombatPacketsByTarget.TryGetValue(4473, out var packets));
-
-        var outcome = Assert.Single(packets, packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible);
-        Assert.Equal(0, outcome.SourceId);
-        Assert.Equal(4473, outcome.TargetId);
-        Assert.Equal(22, outcome.Marker);
-        Assert.Equal(0, outcome.Damage);
-        Assert.Equal(0, outcome.HitContribution);
-        Assert.Equal(1, outcome.AttemptContribution);
-        Assert.True((outcome.Modifiers & DamageModifiers.Invincible) != 0);
-    }
-
-    [Fact]
-    public void Does_Not_Synthesize_Invincible_From_Base_Dodge_SelfEcho_That_Only_Resembles_Shift_Iframe()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-
-        store.RegisterCompactValue0438(5957, 5957, 17000100, 236, 2, 1_100);
-        store.RegisterCompactControl0638(5957, 17000100, 236, 1_140);
-        store.RegisterObservation2C38(5957, 3608, 7, 1_150);
-
-        Assert.False(store.CombatPacketsByTarget.TryGetValue(5957, out var packets) &&
-                     packets.Any(packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible));
-    }
-
-    [Fact]
-    public void Does_Not_Synthesize_Invincible_From_Group17_2A38_Without_Dodge_Signal()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("302A38C52E01119009C1EA2101FFFFFFFFFFFFFFFF8075D52ABB030000C52E010094BF1847015A4447B86C1F47"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0D2C38C52E0100900907"), TestConnection);
-
-        Assert.False(store.CombatPacketsByTarget.TryGetValue(5957, out var packets) &&
-                     packets.Any(packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible));
+        Assert.False(store.CombatPacketsByTarget.TryGetValue(933, out _));
+        Assert.Empty(store.CombatPacketsBySource);
     }
 
     [Fact]
@@ -559,27 +468,10 @@ public sealed class PacketStreamProcessorNpcObservationTests
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("0D2C38C52E0100900907"), TestConnection);
+        store.RegisterObservation2C38(5957, 1, 3608, 7, 1_150, 2, 100);
 
         Assert.False(store.CombatPacketsByTarget.TryGetValue(5957, out _));
         Assert.Empty(store.CombatPacketsBySource);
-    }
-
-    [Fact]
-    public void Does_Not_Synthesize_Invincible_From_Uncharged_Dodge_Result7_Without_Charged_Variant()
-    {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
-
-        processor.AppendAndProcess(HexHelper.Parse("0E0638F922A46603011000"), TestConnection);
-        processor.AppendAndProcess(HexHelper.Parse("0D2C38F9220100D51407"), TestConnection);
-
-        Assert.False(store.CombatPacketsByTarget.TryGetValue(4473, out var packets) &&
-                     packets.Any(packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible));
     }
 
     private static SkillCollection BuildMultiHitSkillMap()

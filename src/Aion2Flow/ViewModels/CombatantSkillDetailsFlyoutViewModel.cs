@@ -1,11 +1,10 @@
+using System.Globalization;
 using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
-using System.Collections.ObjectModel;
-using System.Globalization;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
@@ -29,7 +28,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
     private readonly bool _isDebugBuild;
 #endif
 
-    private sealed record ResolvedDetailPacket(ParsedCombatPacket Packet, int SourceActorId, int TargetActorId);
+    private sealed record ResolvedDetailPacket(ParsedCombatPacket Packet, int SourceId, int TargetId);
 
     private enum DetailSectionKind
     {
@@ -112,15 +111,15 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         {
             if (ReferenceEquals(sender, OutgoingHealing) || ReferenceEquals(sender, OutgoingShield))
             {
-                var actorId = (ReferenceEquals(sender, OutgoingHealing) ? OutgoingHealing.SelectedScope : OutgoingShield.SelectedScope)?.ActorId;
-                SyncSectionScope(OutgoingHealing, actorId);
-                SyncSectionScope(OutgoingShield, actorId);
+                var combatantId = (ReferenceEquals(sender, OutgoingHealing) ? OutgoingHealing.SelectedScope : OutgoingShield.SelectedScope)?.CombatantId;
+                SyncSectionScope(OutgoingHealing, combatantId);
+                SyncSectionScope(OutgoingShield, combatantId);
             }
             else if (ReferenceEquals(sender, IncomingHealing) || ReferenceEquals(sender, IncomingShield))
             {
-                var actorId = (ReferenceEquals(sender, IncomingHealing) ? IncomingHealing.SelectedScope : IncomingShield.SelectedScope)?.ActorId;
-                SyncSectionScope(IncomingHealing, actorId);
-                SyncSectionScope(IncomingShield, actorId);
+                var combatantId = (ReferenceEquals(sender, IncomingHealing) ? IncomingHealing.SelectedScope : IncomingShield.SelectedScope)?.CombatantId;
+                SyncSectionScope(IncomingHealing, combatantId);
+                SyncSectionScope(IncomingShield, combatantId);
             }
         }
         finally
@@ -167,7 +166,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         _currentStore = store;
         _battlePackets.Clear();
         _battlePackets.AddRange(CollectBattlePackets(snapshot, store));
-        CombatantName = CombatMetricsEngine.ResolveActorDisplayName(store, snapshot, _combatantId.Value);
+        CombatantName = CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, _combatantId.Value);
 
         RebuildScopeOptions();
         RefreshSections();
@@ -207,8 +206,8 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         {
             yield return new ResolvedDetailPacket(
                 battlePacket.Packet,
-                battlePacket.SourceActorId,
-                battlePacket.TargetActorId);
+                battlePacket.SourceId,
+                battlePacket.TargetId);
         }
     }
 
@@ -236,9 +235,9 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
     private void RebuildScopeOptionsForSection(SkillDetailSectionViewModel section, DetailSectionKind sectionKind)
     {
         var scopes = BuildScopeOptions(sectionKind);
-        var selectedActorId = section.SelectedScope?.ActorId;
+        var selectedCombatantId = section.SelectedScope?.CombatantId;
         section.ReplaceScopeOptions(scopes);
-        section.SelectedScope = scopes.FirstOrDefault(x => x.ActorId == selectedActorId) ?? scopes.FirstOrDefault();
+        section.SelectedScope = scopes.FirstOrDefault(x => x.CombatantId == selectedCombatantId) ?? scopes.FirstOrDefault();
     }
 
     private void RebuildSharedScopeOptions(
@@ -247,13 +246,13 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         params DetailSectionKind[] sectionKinds)
     {
         var scopes = BuildScopeOptions(sectionKinds);
-        var selectedActorId = primarySection.SelectedScope?.ActorId ?? secondarySection.SelectedScope?.ActorId;
+        var selectedCombatantId = primarySection.SelectedScope?.CombatantId ?? secondarySection.SelectedScope?.CombatantId;
 
         primarySection.ReplaceScopeOptions(scopes);
-        secondarySection.ReplaceScopeOptions(scopes.Select(static x => new SkillDetailScopeOption(x.ActorId, x.DisplayName)).ToArray());
+        secondarySection.ReplaceScopeOptions(scopes.Select(static x => new SkillDetailScopeOption(x.CombatantId, x.DisplayName)).ToArray());
 
-        var primarySelectedScope = primarySection.ScopeOptions.FirstOrDefault(x => x.ActorId == selectedActorId) ?? primarySection.ScopeOptions.FirstOrDefault();
-        var secondarySelectedScope = secondarySection.ScopeOptions.FirstOrDefault(x => x.ActorId == selectedActorId) ?? secondarySection.ScopeOptions.FirstOrDefault();
+        var primarySelectedScope = primarySection.ScopeOptions.FirstOrDefault(x => x.CombatantId == selectedCombatantId) ?? primarySection.ScopeOptions.FirstOrDefault();
+        var secondarySelectedScope = secondarySection.ScopeOptions.FirstOrDefault(x => x.CombatantId == selectedCombatantId) ?? secondarySection.ScopeOptions.FirstOrDefault();
         primarySection.SelectedScope = primarySelectedScope;
         secondarySection.SelectedScope = secondarySelectedScope;
     }
@@ -270,7 +269,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
             return options;
         }
 
-        var actorDisplayNames = new Dictionary<int, string>();
+        var combatantDisplayNames = new Dictionary<int, string>();
         foreach (var detailPacket in _battlePackets)
         {
             var matchesAnySection = false;
@@ -291,26 +290,26 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
                 continue;
             }
 
-            var actorId = GetCounterpartActorId(detailPacket, sectionKinds[0]);
-            if (actorId <= 0)
+            var combatantId = GetCounterpartCombatantId(detailPacket, sectionKinds[0]);
+            if (combatantId <= 0)
             {
                 continue;
             }
 
-            actorDisplayNames.TryAdd(actorId, CombatMetricsEngine.ResolveActorDisplayName(_currentStore, _currentSnapshot, actorId));
+            combatantDisplayNames.TryAdd(combatantId, CombatMetricsEngine.ResolveCombatantDisplayName(_currentStore, _currentSnapshot, combatantId));
         }
 
-        if (actorDisplayNames.Count == 0)
+        if (combatantDisplayNames.Count == 0)
         {
             return options;
         }
 
-        var sortedActorIds = new List<int>(actorDisplayNames.Keys);
-        sortedActorIds.Sort((left, right) => StringComparer.CurrentCulture.Compare(actorDisplayNames[left], actorDisplayNames[right]));
+        var sortedCombatantIds = new List<int>(combatantDisplayNames.Keys);
+        sortedCombatantIds.Sort((left, right) => StringComparer.CurrentCulture.Compare(combatantDisplayNames[left], combatantDisplayNames[right]));
 
-        foreach (var actorId in sortedActorIds)
+        foreach (var combatantId in sortedCombatantIds)
         {
-            options.Add(new SkillDetailScopeOption(actorId, actorDisplayNames[actorId]));
+            options.Add(new SkillDetailScopeOption(combatantId, combatantDisplayNames[combatantId]));
         }
 
         return options;
@@ -334,7 +333,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
             return;
         }
 
-        var selectedScopeActorId = section.SelectedScope?.ActorId;
+        var selectedScopeCombatantId = section.SelectedScope?.CombatantId;
         var metrics = new Dictionary<int, SkillMetrics>();
 
         foreach (var detailPacket in _battlePackets)
@@ -344,7 +343,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
                 continue;
             }
 
-            if (selectedScopeActorId.HasValue && GetCounterpartActorId(detailPacket, sectionKind) != selectedScopeActorId.Value)
+            if (selectedScopeCombatantId.HasValue && GetCounterpartCombatantId(detailPacket, sectionKind) != selectedScopeCombatantId.Value)
             {
                 continue;
             }
@@ -484,18 +483,18 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
     {
         return sectionKind switch
         {
-            DetailSectionKind.OutgoingDamage or DetailSectionKind.OutgoingHealing or DetailSectionKind.OutgoingShield => packet.SourceActorId == combatantId,
-            DetailSectionKind.IncomingDamage or DetailSectionKind.IncomingHealing or DetailSectionKind.IncomingShield => packet.TargetActorId == combatantId,
+            DetailSectionKind.OutgoingDamage or DetailSectionKind.OutgoingHealing or DetailSectionKind.OutgoingShield => packet.SourceId == combatantId,
+            DetailSectionKind.IncomingDamage or DetailSectionKind.IncomingHealing or DetailSectionKind.IncomingShield => packet.TargetId == combatantId,
             _ => false
         };
     }
 
-    private static int GetCounterpartActorId(ResolvedDetailPacket packet, DetailSectionKind sectionKind)
+    private static int GetCounterpartCombatantId(ResolvedDetailPacket packet, DetailSectionKind sectionKind)
     {
         return sectionKind switch
         {
-            DetailSectionKind.OutgoingDamage or DetailSectionKind.OutgoingHealing or DetailSectionKind.OutgoingShield => packet.TargetActorId,
-            DetailSectionKind.IncomingDamage or DetailSectionKind.IncomingHealing or DetailSectionKind.IncomingShield => packet.SourceActorId,
+            DetailSectionKind.OutgoingDamage or DetailSectionKind.OutgoingHealing or DetailSectionKind.OutgoingShield => packet.TargetId,
+            DetailSectionKind.IncomingDamage or DetailSectionKind.IncomingHealing or DetailSectionKind.IncomingShield => packet.SourceId,
             _ => 0
         };
     }
@@ -514,7 +513,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
     private static bool ContributesDamage(ParsedCombatPacket packet)
     {
         if (packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
+            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
             (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
         {
             return true;
@@ -733,9 +732,9 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         IncomingShield.Clear();
     }
 
-    private static void SyncSectionScope(SkillDetailSectionViewModel section, int? actorId)
+    private static void SyncSectionScope(SkillDetailSectionViewModel section, int? combatantId)
     {
-        var selectedScope = section.ScopeOptions.FirstOrDefault(x => x.ActorId == actorId) ?? section.ScopeOptions.FirstOrDefault();
+        var selectedScope = section.ScopeOptions.FirstOrDefault(x => x.CombatantId == combatantId) ?? section.ScopeOptions.FirstOrDefault();
         if (Equals(section.SelectedScope, selectedScope))
         {
             return;

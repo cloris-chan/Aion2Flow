@@ -26,6 +26,7 @@ public sealed class ParsedCombatPacket
     public int MultiHitCount { get; set; }
     public bool HasAuthoritativeMultiHitCount { get; set; }
     public long FrameOrdinal { get; set; }
+    public long BatchOrdinal { get; set; }
     public long Timestamp { get; init; } = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     public Guid Id { get; init; } = Guid.CreateVersion7();
     public DamageModifiers Modifiers { get; set; }
@@ -61,6 +62,7 @@ public sealed class ParsedCombatPacket
             MultiHitCount = MultiHitCount,
             HasAuthoritativeMultiHitCount = HasAuthoritativeMultiHitCount,
             FrameOrdinal = FrameOrdinal,
+            BatchOrdinal = BatchOrdinal,
             Timestamp = Timestamp,
             Id = Id,
             Modifiers = Modifiers,

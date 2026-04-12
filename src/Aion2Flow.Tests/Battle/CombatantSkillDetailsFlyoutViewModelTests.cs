@@ -2,9 +2,13 @@ using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
+using Cloris.Aion2Flow.PacketCapture.Diagnostics;
+using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Tests.Protocol;
 using Cloris.Aion2Flow.ViewModels;
+using System.Globalization;
 
 namespace Cloris.Aion2Flow.Tests.Battle;
 
@@ -48,7 +52,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal(340, viewModel.IncomingHealing.Total);
         Assert.Equal(3, viewModel.OutgoingDamage.ScopeOptions.Count);
 
-        viewModel.OutgoingDamage.SelectedScope = viewModel.OutgoingDamage.ScopeOptions.First(x => x.ActorId == bossId);
+        viewModel.OutgoingDamage.SelectedScope = viewModel.OutgoingDamage.ScopeOptions.First(x => x.CombatantId == bossId);
 
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
         Assert.Single(viewModel.OutgoingDamage.Rows);
@@ -191,9 +195,9 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal(3, viewModel.OutgoingHealing.ScopeOptions.Count);
         Assert.Equal(3, viewModel.OutgoingShield.ScopeOptions.Count);
 
-        viewModel.OutgoingHealing.SelectedScope = viewModel.OutgoingHealing.ScopeOptions.First(x => x.ActorId == allyId);
+        viewModel.OutgoingHealing.SelectedScope = viewModel.OutgoingHealing.ScopeOptions.First(x => x.CombatantId == allyId);
 
-        Assert.Equal(allyId, viewModel.OutgoingShield.SelectedScope?.ActorId);
+        Assert.Equal(allyId, viewModel.OutgoingShield.SelectedScope?.CombatantId);
         Assert.Equal(0, viewModel.OutgoingHealing.Total);
         Assert.Equal(200, viewModel.OutgoingShield.Total);
         Assert.Single(viewModel.OutgoingShield.Rows);
@@ -222,12 +226,12 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
-        viewModel.OutgoingDamage.SelectedScope = viewModel.OutgoingDamage.ScopeOptions.First(x => x.ActorId == bossId);
+        viewModel.OutgoingDamage.SelectedScope = viewModel.OutgoingDamage.ScopeOptions.First(x => x.CombatantId == bossId);
 
         AppendPacket(store, playerId, bossId, 11000010, 300, "direct-hit", 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
 
-        Assert.Equal(bossId, viewModel.OutgoingDamage.SelectedScope?.ActorId);
+        Assert.Equal(bossId, viewModel.OutgoingDamage.SelectedScope?.CombatantId);
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
         Assert.Single(viewModel.OutgoingDamage.Rows);
     }
@@ -661,8 +665,128 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal(2, viewModel.IncomingDamage.Attempts);
         Assert.Equal(1, viewModel.IncomingDamage.Hits);
         Assert.Equal(1, viewModel.IncomingDamage.Invincible);
-        Assert.DoesNotContain(viewModel.IncomingDamage.ScopeOptions, option => option.ActorId == 0);
+        Assert.DoesNotContain(viewModel.IncomingDamage.ScopeOptions, option => option.CombatantId == 0);
         Assert.Equal(FormatModifierSummary(1, 2), viewModel.IncomingDamage.InvincibleSummary);
+    }
+
+    [Fact]
+    public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412103519_Stream_Log()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
+        var liveStore = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(liveStore);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, liveStore, archive, localization);
+
+        var record = archive.Archive(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+
+        Assert.NotNull(record);
+        Assert.Contains(3737, record!.Snapshot.Combatants.Keys);
+
+        viewModel.SelectBattleCombatant(record.BattleId, 3737);
+
+        Assert.Equal(18, viewModel.IncomingDamage.Evades);
+        Assert.Equal(7, viewModel.IncomingDamage.Invincible);
+        Assert.Equal(FormatModifierSummary(18, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.EvadeSummary);
+        Assert.Equal(FormatModifierSummary(7, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.InvincibleSummary);
+    }
+
+    [Fact]
+    public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412110721_Stream_Log()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260412110721.log"));
+        var liveStore = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(liveStore);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, liveStore, archive, localization);
+        var primary = replay.Combatants
+            .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
+            .ThenByDescending(static summary => summary.IncomingDamage)
+            .First();
+
+        var record = archive.Archive(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+
+        Assert.NotNull(record);
+        Assert.Contains(primary.CombatantId, record!.Snapshot.Combatants.Keys);
+
+        viewModel.SelectBattleCombatant(record.BattleId, primary.CombatantId);
+
+        Assert.Equal(10, viewModel.IncomingDamage.Evades);
+        Assert.Equal(7, viewModel.IncomingDamage.Invincible);
+        Assert.Equal(FormatModifierSummary(10, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.EvadeSummary);
+        Assert.Equal(FormatModifierSummary(7, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.InvincibleSummary);
+    }
+
+    [Fact]
+    public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412103519_Live_Stream_Path()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        using var processor = new PacketStreamProcessor(store);
+
+        foreach (var entry in ReadStreamLogEntries("aion2flow.stream.20260412103519.log"))
+        {
+            if (!entry.IsInbound)
+            {
+                continue;
+            }
+
+            processor.AppendAndProcess(entry.Payload, entry.Connection, entry.TimestampMilliseconds);
+        }
+
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+
+        var snapshot = engine.CreateBattleSnapshot();
+        var battlePackets = CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime)
+            .Where(static context => context.TargetId == 3737)
+            .ToArray();
+        var battleInvincibles = battlePackets
+            .Where(static context => context.TargetId == 3737 && (context.Packet.Modifiers & DamageModifiers.Invincible) != 0)
+            .Select(static context => $"ts={context.Packet.Timestamp}|source={context.SourceId}|marker={context.Packet.Marker}|attempt={context.Packet.AttemptContribution}|family={context.Packet.EffectFamily}")
+            .ToArray();
+        var manualIncomingDamageMetrics = new Dictionary<int, SkillMetrics>();
+
+        foreach (var battlePacket in battlePackets)
+        {
+            if (!ContributesDamageForDetail(battlePacket.Packet))
+            {
+                continue;
+            }
+
+            if (!manualIncomingDamageMetrics.TryGetValue(battlePacket.Packet.SkillCode, out var skill))
+            {
+                skill = new SkillMetrics(battlePacket.Packet);
+                manualIncomingDamageMetrics[battlePacket.Packet.SkillCode] = skill;
+            }
+
+            skill.ProcessEvent(battlePacket.Packet);
+        }
+
+        var manualInvincibleCount = manualIncomingDamageMetrics.Values.Sum(static skill => skill.InvincibleTimes);
+
+        Assert.Contains(3737, snapshot.Combatants.Keys);
+        Assert.True(battleInvincibles.Length == 7, string.Join(Environment.NewLine, battleInvincibles));
+        Assert.True(manualInvincibleCount == 7, string.Join(Environment.NewLine, battleInvincibles));
+
+        viewModel.SelectBattleCombatant(snapshot.BattleId, 3737);
+
+        Assert.Equal(18, viewModel.IncomingDamage.Evades);
+        Assert.Equal(7, viewModel.IncomingDamage.Invincible);
+        Assert.Equal(FormatModifierSummary(18, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.EvadeSummary);
+        Assert.Equal(FormatModifierSummary(7, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.InvincibleSummary);
     }
 
     private static SkillCollection BuildSkillMap()
@@ -676,6 +800,99 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
             new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null)
         ];
     }
+
+    private static IEnumerable<StreamLogEntry> ReadStreamLogEntries(string fileName)
+    {
+        foreach (var line in File.ReadLines(FixtureHelper.GetPath($"logs/{fileName}")))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var parts = line.Split('|');
+            if (parts.Length < 6)
+            {
+                continue;
+            }
+
+            var timestamp = DateTimeOffset.Parse(parts[0], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUnixTimeMilliseconds();
+            var isInbound = parts[1].Equals("dir=inbound", StringComparison.OrdinalIgnoreCase);
+
+            if (!TryParseConnection(parts[2], out var connection))
+            {
+                continue;
+            }
+
+            var dataPart = parts.FirstOrDefault(part => part.StartsWith("data=", StringComparison.OrdinalIgnoreCase));
+            if (dataPart is null)
+            {
+                continue;
+            }
+
+            yield return new StreamLogEntry(timestamp, isInbound, connection, Convert.FromHexString(dataPart[5..]));
+        }
+    }
+
+    private static bool TryParseConnection(string value, out TcpConnection connection)
+    {
+        connection = default;
+
+        var arrowIndex = value.IndexOf("->", StringComparison.Ordinal);
+        if (arrowIndex <= 0)
+        {
+            return false;
+        }
+
+        if (!TryParseEndpoint(value[..arrowIndex], out var sourceAddress, out var sourcePort))
+        {
+            return false;
+        }
+
+        if (!TryParseEndpoint(value[(arrowIndex + 2)..], out var destinationAddress, out var destinationPort))
+        {
+            return false;
+        }
+
+        connection = new TcpConnection(sourceAddress, destinationAddress, sourcePort, destinationPort);
+        return true;
+    }
+
+    private static bool TryParseEndpoint(string value, out uint address, out ushort port)
+    {
+        address = 0;
+        port = 0;
+
+        var separatorIndex = value.IndexOf(':');
+        if (separatorIndex <= 0)
+        {
+            return false;
+        }
+
+        return uint.TryParse(value[..separatorIndex], NumberStyles.Integer, CultureInfo.InvariantCulture, out address)
+            && ushort.TryParse(value[(separatorIndex + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out port);
+    }
+
+    private static bool ContributesDamageForDetail(ParsedCombatPacket packet)
+    {
+        if (packet.EventKind == CombatEventKind.Damage &&
+            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
+            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
+        {
+            return true;
+        }
+
+        return packet.ValueKind switch
+        {
+            CombatValueKind.Damage => packet.Damage > 0,
+            CombatValueKind.PeriodicDamage => packet.Damage > 0,
+            CombatValueKind.DrainDamage => packet.Damage > 0,
+            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
+            _ => false
+        };
+    }
+
+    private readonly record struct StreamLogEntry(long TimestampMilliseconds, bool IsInbound, TcpConnection Connection, byte[] Payload);
 
     private static void AppendPacket(
         CombatMetricsStore store,

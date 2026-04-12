@@ -5,7 +5,7 @@ namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 internal readonly record struct Packet3538Sidecar(
     int TargetId,
     int State,
-    int ActorId);
+    int SourceId);
 
 internal static class Packet3538SidecarParser
 {
@@ -22,10 +22,10 @@ internal static class Packet3538SidecarParser
 
         if (!reader.TryReadVarInt(out var targetId)) return false;
         if (!reader.TryReadVarInt(out var state)) return false;
-        if (!reader.TryReadVarInt(out var actorId)) return false;
+        if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (reader.Remaining != 0) return false;
 
-        result = new Packet3538Sidecar(targetId, state, actorId);
+        result = new Packet3538Sidecar(targetId, state, sourceId);
         return true;
     }
 }

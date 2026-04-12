@@ -1,3 +1,4 @@
+using System.Globalization;
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
@@ -5,13 +6,12 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using System.Globalization;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
 
 public sealed class PacketLogReplayService
 {
-    public PacketLogReplayResult Replay(string path)
+    public static PacketLogReplayResult Replay(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
@@ -19,7 +19,7 @@ public sealed class PacketLogReplayService
         return Replay(reader, path);
     }
 
-    public IReadOnlyList<PacketLogReplayResult> ReplayMany(IEnumerable<string> paths)
+    public static IReadOnlyList<PacketLogReplayResult> ReplayMany(IEnumerable<string> paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
@@ -32,7 +32,7 @@ public sealed class PacketLogReplayService
         return results;
     }
 
-    public PacketLogReplayResult Replay(TextReader reader, string sourceName)
+    public static PacketLogReplayResult Replay(TextReader reader, string sourceName)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
@@ -53,7 +53,7 @@ public sealed class PacketLogReplayService
         };
     }
 
-    private static PacketLogReplayResult ReplayFrameLines(IReadOnlyList<string> lines, string sourceName)
+    private static PacketLogReplayResult ReplayFrameLines(List<string> lines, string sourceName)
     {
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
@@ -70,7 +70,8 @@ public sealed class PacketLogReplayService
             }
 
             frameOrdinal++;
-            if (TryReplayEntry(store, entry, frameOrdinal))
+            var batchOrdinal = entry.Timestamp.UtcDateTime.Ticks;
+            if (TryReplayEntry(store, entry, frameOrdinal, batchOrdinal))
             {
                 IncrementCount(replayedEventCounts, entry.EventName);
             }
@@ -95,7 +96,7 @@ public sealed class PacketLogReplayService
             skippedEventCounts);
     }
 
-    private static PacketLogReplayResult ReplayStreamLines(IReadOnlyList<string> lines, string sourceName)
+    private static PacketLogReplayResult ReplayStreamLines(List<string> lines, string sourceName)
     {
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
@@ -147,74 +148,74 @@ public sealed class PacketLogReplayService
             skippedEventCounts);
     }
 
-    private static IReadOnlyList<PacketLogCombatantSummary> BuildCombatantSummaries(
+    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(
         CombatMetricsStore store,
         DamageMeterSnapshot snapshot)
     {
-        var summariesByActor = new Dictionary<int, MutableCombatantSummary>();
+        var summariesByCombatantId = new Dictionary<int, MutableCombatantSummary>();
 
         foreach (var context in CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime))
         {
             var packet = context.Packet;
-            var sourceActorId = context.SourceActorId;
-            var targetActorId = context.TargetActorId;
+            var sourceId = context.SourceId;
+            var targetId = context.TargetId;
 
-            if (sourceActorId > 0)
+            if (sourceId > 0)
             {
-                EnsureSummary(summariesByActor, sourceActorId, store, snapshot);
+                EnsureSummary(summariesByCombatantId, sourceId, store, snapshot);
             }
 
-            if (targetActorId > 0)
+            if (targetId > 0)
             {
-                EnsureSummary(summariesByActor, targetActorId, store, snapshot);
+                EnsureSummary(summariesByCombatantId, targetId, store, snapshot);
             }
 
             if (ContributesDamage(packet))
             {
-                ApplyDamageSummary(summariesByActor, sourceActorId, targetActorId, packet);
+                ApplyDamageSummary(summariesByCombatantId, sourceId, targetId, packet);
                 continue;
             }
 
             if (ContributesHealing(packet))
             {
-                ApplyHealingSummary(summariesByActor, sourceActorId, targetActorId, packet);
+                ApplyHealingSummary(summariesByCombatantId, sourceId, targetId, packet);
                 continue;
             }
 
             if (ContributesShield(packet))
             {
-                ApplyShieldSummary(summariesByActor, sourceActorId, targetActorId, packet);
+                ApplyShieldSummary(summariesByCombatantId, sourceId, targetId, packet);
             }
         }
 
-        return summariesByActor
+        return summariesByCombatantId
             .OrderBy(static pair => pair.Key)
             .Select(static pair => pair.Value.ToSummary())
-            .ToArray();
+            .ToList();
     }
 
     private static MutableCombatantSummary EnsureSummary(
-        Dictionary<int, MutableCombatantSummary> summariesByActor,
-        int actorId,
+        Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
+        int combatantId,
         CombatMetricsStore store,
         DamageMeterSnapshot snapshot)
     {
-        if (summariesByActor.TryGetValue(actorId, out var existing))
+        if (summariesByCombatantId.TryGetValue(combatantId, out var existing))
         {
             return existing;
         }
 
         var created = new MutableCombatantSummary(
-            actorId,
-            CombatMetricsEngine.ResolveActorDisplayName(store, snapshot, actorId));
-        summariesByActor[actorId] = created;
+            combatantId,
+            CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, combatantId));
+        summariesByCombatantId[combatantId] = created;
         return created;
     }
 
     private static void ApplyDamageSummary(
-        Dictionary<int, MutableCombatantSummary> summariesByActor,
-        int sourceActorId,
-        int targetActorId,
+        Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
+        int sourceId,
+        int targetId,
         ParsedCombatPacket packet)
     {
         var hitContribution = Math.Max(0, packet.HitContribution);
@@ -223,7 +224,7 @@ public sealed class PacketLogReplayService
         var evadeContribution = (packet.Modifiers & DamageModifiers.Evade) != 0 ? attemptContribution : 0;
         var invincibleContribution = (packet.Modifiers & DamageModifiers.Invincible) != 0 ? attemptContribution : 0;
 
-        if (sourceActorId > 0 && summariesByActor.TryGetValue(sourceActorId, out var source))
+        if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
             source.OutgoingDamage += packet.Damage;
             source.OutgoingHits += hitContribution;
@@ -233,7 +234,7 @@ public sealed class PacketLogReplayService
             source.OutgoingInvincibles += invincibleContribution;
         }
 
-        if (targetActorId > 0 && summariesByActor.TryGetValue(targetActorId, out var target))
+        if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
             target.IncomingDamage += packet.Damage;
             target.IncomingHits += hitContribution;
@@ -245,34 +246,34 @@ public sealed class PacketLogReplayService
     }
 
     private static void ApplyHealingSummary(
-        Dictionary<int, MutableCombatantSummary> summariesByActor,
-        int sourceActorId,
-        int targetActorId,
+        Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
+        int sourceId,
+        int targetId,
         ParsedCombatPacket packet)
     {
-        if (sourceActorId > 0 && summariesByActor.TryGetValue(sourceActorId, out var source))
+        if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
             source.OutgoingHealing += packet.Damage;
         }
 
-        if (targetActorId > 0 && summariesByActor.TryGetValue(targetActorId, out var target))
+        if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
             target.IncomingHealing += packet.Damage;
         }
     }
 
     private static void ApplyShieldSummary(
-        Dictionary<int, MutableCombatantSummary> summariesByActor,
-        int sourceActorId,
-        int targetActorId,
+        Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
+        int sourceId,
+        int targetId,
         ParsedCombatPacket packet)
     {
-        if (sourceActorId > 0 && summariesByActor.TryGetValue(sourceActorId, out var source))
+        if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
             source.OutgoingShield += packet.Damage;
         }
 
-        if (targetActorId > 0 && summariesByActor.TryGetValue(targetActorId, out var target))
+        if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
             target.IncomingShield += packet.Damage;
         }
@@ -281,7 +282,7 @@ public sealed class PacketLogReplayService
     private static bool ContributesDamage(ParsedCombatPacket packet)
     {
         if (packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
+            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
             (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
         {
             return true;
@@ -312,34 +313,34 @@ public sealed class PacketLogReplayService
     private static bool ContributesShield(ParsedCombatPacket packet)
         => packet.ValueKind == CombatValueKind.Shield && packet.Damage > 0;
 
-    private static bool TryReplayEntry(CombatMetricsStore store, FrameReplayEntry entry, long frameOrdinal)
+    private static bool TryReplayEntry(CombatMetricsStore store, FrameReplayEntry entry, long frameOrdinal, long batchOrdinal)
     {
         var timestamp = entry.Timestamp.ToUnixTimeMilliseconds();
         var packet = entry.Payload;
 
         return entry.EventName switch
         {
-            "damage" => TryReplayDamage(store, packet, timestamp, frameOrdinal),
-            "periodic" => TryReplayPeriodic(store, packet, timestamp, frameOrdinal),
+            "damage" => TryReplayDamage(store, packet, timestamp, frameOrdinal, batchOrdinal),
+            "periodic" => TryReplayPeriodic(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "periodic-link" => Packet0538PeriodicValueParser.TryParse(packet, out _),
-            "compact-value" => TryReplayCompactValue(store, packet, timestamp, frameOrdinal),
-            "compact-outcome" => TryReplayCompactOutcome(store, packet, timestamp, frameOrdinal),
-            "compact-0238" => TryReplayCompact0238(store, packet, timestamp, frameOrdinal),
-            "compact-0638" => TryReplayCompact0638(store, packet, timestamp, frameOrdinal),
-            "sidecar-3538" => TryReplay3538(store, packet, timestamp, frameOrdinal),
-            "wrapped-8456" => TryReplay8456(store, packet, timestamp, frameOrdinal),
-            "state-0140" => TryReplay0140(store, packet, timestamp),
-            "state-2136" => TryReplay2136(store, packet, timestamp),
-            "state-0240" => TryReplay0240(store, packet, timestamp),
-            "state-4636" => TryReplay4636(store, packet, timestamp),
-            "state-4536" => TryReplay4536(store, packet, timestamp),
+            "compact-value" => TryReplayCompactValue(store, packet, timestamp, frameOrdinal, batchOrdinal),
+            "compact-outcome" => TryReplayCompactOutcome(store, packet, timestamp, frameOrdinal, batchOrdinal),
+            "compact-0238" => TryReplayCompact0238(store, packet, batchOrdinal),
+            "compact-0638" => TryReplayCompact0638(store, packet, batchOrdinal),
+            "sidecar-3538" => TryReplay3538(store, packet),
+            "wrapped-8456" => TryReplay8456(store, packet),
+            "state-0140" => TryReplay0140(store, packet),
+            "state-2136" => TryReplay2136(store, packet),
+            "state-0240" => TryReplay0240(store, packet),
+            "state-4636" => TryReplay4636(store, packet),
+            "state-4536" => TryReplay4536(store, packet),
             "state-4036" => Packet4036Parser.TryParse(packet, out _),
             "state-4136" => Packet4136Parser.TryParse(packet, out _),
             "state-1d37" => Packet1D37Parser.TryParse(packet, out _),
             "state-4936" => Packet4936Parser.TryParse(packet, out _),
-            "aux-2a38" => TryReplay2A38(store, packet, timestamp, frameOrdinal),
+            "aux-2a38" => TryReplay2A38(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "aux-2b38" => Packet2B38Parser.TryParse(packet, out _),
-            "aux-2c38" => TryReplay2C38(store, packet, timestamp, frameOrdinal),
+            "aux-2c38" => TryReplay2C38(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "nickname" => TryReplayNickname(store, packet),
             "remain-hp" => TryReplayRemainHp(store, packet),
             "battle-toggle" => TryReplayBattleToggle(store, packet),
@@ -348,7 +349,7 @@ public sealed class PacketLogReplayService
         };
     }
 
-    private static bool TryReplayDamage(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplayDamage(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!TryParseDamagePacket(packet, out var parsed) || parsed.Damage <= 0)
         {
@@ -370,7 +371,8 @@ public sealed class PacketLogReplayService
             Damage = parsed.Damage,
             Loop = parsed.Loop,
             Timestamp = timestamp,
-            FrameOrdinal = frameOrdinal
+            FrameOrdinal = frameOrdinal,
+            BatchOrdinal = batchOrdinal
         };
 
         if (parsed.TailMultiHitCount > 0)
@@ -384,7 +386,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayPeriodic(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplayPeriodic(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet0538PeriodicValueParser.TryParse(packet, out var parsed))
         {
@@ -393,6 +395,15 @@ public sealed class PacketLogReplayService
 
         if (parsed.IsLinkRecord)
         {
+            store.RegisterPeriodicLink0538(
+                parsed.TargetId,
+                parsed.SourceId,
+                parsed.LinkId,
+                parsed.Unknown,
+                parsed.TailRaw,
+                timestamp,
+                frameOrdinal,
+                batchOrdinal);
             return true;
         }
 
@@ -406,21 +417,22 @@ public sealed class PacketLogReplayService
             Unknown = parsed.Unknown,
             Damage = parsed.Damage,
             Timestamp = timestamp,
-            FrameOrdinal = frameOrdinal
+            FrameOrdinal = frameOrdinal,
+            BatchOrdinal = batchOrdinal
         };
 
         store.AppendCombatPacket(combatPacket);
         return true;
     }
 
-    private static bool TryReplayCompactValue(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplayCompactValue(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!TryParseCompactValuePacket(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal);
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
         store.RegisterCompactValue0438(
             parsed.TargetId,
             parsed.SourceId,
@@ -429,11 +441,12 @@ public sealed class PacketLogReplayService
             parsed.LayoutTag,
             parsed.Type,
             timestamp,
-            frameOrdinal);
+            frameOrdinal,
+            batchOrdinal);
         return true;
     }
 
-    private static bool TryReplayCompactOutcome(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplayCompactOutcome(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!TryParseCompactOutcomePacket(packet, out var parsed))
         {
@@ -448,56 +461,58 @@ public sealed class PacketLogReplayService
             parsed.LayoutTag,
             parsed.Type,
             timestamp,
-            frameOrdinal);
+            frameOrdinal,
+            batchOrdinal);
         return true;
     }
 
-    private static bool TryReplayCompact0238(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplayCompact0238(CombatMetricsStore store, ReadOnlySpan<byte> packet, long batchOrdinal)
     {
         if (!Packet0238CompactControlParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal);
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
+        store.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, batchOrdinal);
         return true;
     }
 
-    private static bool TryReplayCompact0638(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplayCompact0638(CombatMetricsStore store, ReadOnlySpan<byte> packet, long batchOrdinal)
     {
         if (!Packet0638CompactControlParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal);
-        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, parsed.Flag, timestamp, frameOrdinal);
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
+        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, batchOrdinal);
         return true;
     }
 
-    private static bool TryReplay3538(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplay3538(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {
         if (!Packet3538SidecarParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.Register3538Sidecar(parsed.TargetId, parsed.ActorId, timestamp, frameOrdinal);
+        store.Register3538Sidecar(parsed.TargetId, parsed.SourceId);
         return true;
     }
 
-    private static bool TryReplay8456(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplay8456(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {
         if (!Packet8456EnvelopeParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterWrapped8456Sidecar(parsed.InnerOpcode, parsed.InnerValue, parsed.Stamp, timestamp, frameOrdinal);
+        store.RegisterWrapped8456Sidecar(parsed.InnerOpcode, parsed.InnerValue, parsed.Stamp);
         return true;
     }
 
-    private static bool TryReplay0140(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplay0140(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {
         if (!Packet0140Parser.TryParse(packet, out var parsed))
         {
@@ -517,7 +532,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay2136(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplay2136(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {
         if (!Packet2136Parser.TryParse(packet, out var parsed))
         {
@@ -537,7 +552,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay0240(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplay0240(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {
         if (!Packet0240Parser.TryParse(packet, out var parsed))
         {
@@ -557,7 +572,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay4636(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplay4636(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {
         if (!Packet4636Parser.TryParse(packet, out var parsed))
         {
@@ -569,7 +584,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay4536(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplay4536(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {
         if (!Packet4536Parser.TryParse(packet, out var parsed))
         {
@@ -580,34 +595,25 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay2A38(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplay2A38(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet2A38Parser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterObservation2A38(
-            parsed.SourceId,
-            parsed.Mode,
-            parsed.GroupCode,
-            parsed.SequenceId,
-            parsed.BuffCodeRaw,
-            parsed.HeadValue,
-            parsed.StackValue,
-            timestamp,
-            frameOrdinal);
+        store.RegisterObservation2A38(parsed.SourceId, parsed.Mode, parsed.GroupCode, parsed.SequenceId, parsed.HeadValue, parsed.BuffCodeRaw, timestamp, frameOrdinal, batchOrdinal);
         return true;
     }
 
-    private static bool TryReplay2C38(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal)
+    private static bool TryReplay2C38(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet2C38Parser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterObservation2C38(parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, timestamp, frameOrdinal);
+        store.RegisterObservation2C38(parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, timestamp, frameOrdinal, batchOrdinal);
         return true;
     }
 
@@ -616,7 +622,6 @@ public sealed class PacketLogReplayService
         if (Packet3336NicknameParser.TryParse(packet, out var ownParsed))
         {
             store.AppendNickname(ownParsed.PlayerId, ownParsed.Nickname);
-            store.RememberLocalActor(ownParsed.PlayerId);
             return true;
         }
 
@@ -1036,9 +1041,9 @@ public sealed class PacketLogReplayService
         Raw
     }
 
-    private sealed class MutableCombatantSummary(int actorId, string displayName)
+    private sealed class MutableCombatantSummary(int combatantId, string displayName)
     {
-        public int ActorId { get; } = actorId;
+        public int CombatantId { get; } = combatantId;
         public string DisplayName { get; } = displayName;
         public long OutgoingDamage { get; set; }
         public long IncomingDamage { get; set; }
@@ -1060,7 +1065,7 @@ public sealed class PacketLogReplayService
         public PacketLogCombatantSummary ToSummary()
         {
             return new PacketLogCombatantSummary(
-                ActorId,
+                CombatantId,
                 DisplayName,
                 OutgoingDamage,
                 IncomingDamage,
@@ -1094,7 +1099,7 @@ public sealed record PacketLogReplayResult(
     IReadOnlyDictionary<string, int> SkippedEventCounts);
 
 public sealed record PacketLogCombatantSummary(
-    int ActorId,
+    int CombatantId,
     string DisplayName,
     long OutgoingDamage,
     long IncomingDamage,

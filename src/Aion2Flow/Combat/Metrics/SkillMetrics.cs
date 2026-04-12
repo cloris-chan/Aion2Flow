@@ -92,12 +92,23 @@ public sealed class SkillMetrics
             packet.AttemptContribution > 0 ||
             packet.HitContribution > 0 ||
             (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0;
+        var isOutcomeOnlyDamageAttempt =
+            packet.Damage <= 0 &&
+            contributesOutcomeOnly &&
+            packet.EventKind == CombatEventKind.Damage &&
+            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown;
 
         if (packet.Damage <= 0 &&
             !contributesOutcomeOnly &&
             packet.ValueKind is not CombatValueKind.Support &&
             packet.EventKind != CombatEventKind.Support)
         {
+            return;
+        }
+
+        if (isOutcomeOnlyDamageAttempt)
+        {
+            ApplyDamageAttemptMetrics(packet);
             return;
         }
 
@@ -162,6 +173,11 @@ public sealed class SkillMetrics
             return;
         }
 
+        ApplyDamageAttemptMetrics(packet);
+    }
+
+    private void ApplyDamageAttemptMetrics(ParsedCombatPacket packet)
+    {
         DamageAmount += packet.Damage;
         var hitContribution = Math.Max(0, packet.HitContribution);
         var attemptContribution = Math.Max(hitContribution, Math.Max(0, packet.AttemptContribution));

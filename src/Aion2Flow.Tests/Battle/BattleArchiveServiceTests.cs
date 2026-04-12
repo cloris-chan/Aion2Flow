@@ -96,15 +96,18 @@ public sealed class BattleArchiveServiceTests
 
         Assert.True(record!.Store.Nicknames.ContainsKey(playerId));
         Assert.False(record.Store.Nicknames.ContainsKey(unrelatedPlayerId));
-        Assert.True(record.Store.NpcCodeByInstance.ContainsKey(bossInstanceId));
-        Assert.False(record.Store.NpcCodeByInstance.ContainsKey(unrelatedNpcInstanceId));
+        Assert.True(record.Store.TryGetNpcRuntimeState(bossInstanceId, out var archivedBossState));
+        Assert.Equal(bossCode, archivedBossState.NpcCode);
+        Assert.False(record.Store.TryGetNpcRuntimeState(unrelatedNpcInstanceId, out _));
         Assert.True(record.Store.NpcNameByCode.ContainsKey(bossCode));
         Assert.False(record.Store.NpcNameByCode.ContainsKey(unrelatedNpcCode));
 
         Assert.True(store.Nicknames.ContainsKey(playerId));
         Assert.True(store.Nicknames.ContainsKey(unrelatedPlayerId));
-        Assert.True(store.NpcCodeByInstance.ContainsKey(bossInstanceId));
-        Assert.True(store.NpcCodeByInstance.ContainsKey(unrelatedNpcInstanceId));
+        Assert.True(store.TryGetNpcRuntimeState(bossInstanceId, out var liveBossState));
+        Assert.Equal(bossCode, liveBossState.NpcCode);
+        Assert.True(store.TryGetNpcRuntimeState(unrelatedNpcInstanceId, out var liveUnrelatedNpcState));
+        Assert.Equal(unrelatedNpcCode, liveUnrelatedNpcState.NpcCode);
         Assert.True(store.NpcNameByCode.ContainsKey(bossCode));
         Assert.True(store.NpcNameByCode.ContainsKey(unrelatedNpcCode));
     }

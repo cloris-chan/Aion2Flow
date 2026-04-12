@@ -28,7 +28,7 @@ public sealed class PacketLogReplayServiceTests
         var path = WriteTempReplayLog("frame", metaLine, firstLine, secondLine);
         try
         {
-            var replay = new PacketLogReplayService().Replay(path);
+            var replay = PacketLogReplayService.Replay(path);
 
             Assert.Equal(3, replay.TotalLines);
             Assert.Equal(2, replay.ReplayedLines);
@@ -38,13 +38,13 @@ public sealed class PacketLogReplayServiceTests
             Assert.Equal(expectedBattleTime, replay.Snapshot.BattleTime);
             Assert.Equal(200287, replay.Snapshot.TargetObservation?.InstanceId);
 
-            var source = Assert.Single(replay.Combatants, static summary => summary.ActorId == 16039);
+            var source = Assert.Single(replay.Combatants, static summary => summary.CombatantId == 16039);
             Assert.Equal(firstPacket.Damage + secondPacket.Damage, source.OutgoingDamage);
             Assert.Equal((firstPacket.IsCritical ? 1 : 0) + (secondPacket.IsCritical ? 1 : 0), source.OutgoingCriticals);
             Assert.Equal(2, source.OutgoingHits);
             Assert.Equal(2, source.OutgoingAttempts);
 
-            var target = Assert.Single(replay.Combatants, static summary => summary.ActorId == 200287);
+            var target = Assert.Single(replay.Combatants, static summary => summary.CombatantId == 200287);
             Assert.Equal(firstPacket.Damage + secondPacket.Damage, target.IncomingDamage);
             Assert.Equal(source.OutgoingCriticals, target.IncomingCriticals);
             Assert.Equal(2, target.IncomingHits);
@@ -56,87 +56,56 @@ public sealed class PacketLogReplayServiceTests
         }
     }
 
-    [Fact]
-    public void Replay_Reconstructs_Incoming_Invincible_Summary_From_Frame_Log()
+    [Theory]
+    [InlineData("aion2flow.stream.20260411174533.log", 3, 0)]
+    [InlineData("aion2flow.stream.20260411174739.log", 0, 3)]
+    [InlineData("aion2flow.stream.20260411184521.log", 2, 2)]
+    [InlineData("aion2flow.stream.20260411192501.log", 6, 1)]
+    [InlineData("aion2flow.stream.20260411205158.log", 3, 2)]
+    [InlineData("aion2flow.stream.20260411210634.log", 5, 0)]
+    [InlineData("aion2flow.stream.20260411212441.log", 1, 0)]
+    [InlineData("aion2flow.stream.20260411215842.log", 7, 0)]
+    [InlineData("aion2flow.stream.20260411232425.log", 10, 3)]
+    [InlineData("aion2flow.stream.20260411235759.log", 1, 1)]
+    [InlineData("aion2flow.stream.20260412103519.log", 18, 7)]
+    [InlineData("aion2flow.stream.20260412110721.log", 10, 7)]
+    public void Replay_Reconstructs_April11_Incoming_Avoidance_Ground_Truth_From_Stream_Log(string fileName, int expectedEvades, int expectedInvincibles)
     {
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var damageLine = "2026-04-10T16:15:41.4121194+08:00|damage|16777343:62420->16777343:52250|target=16039|source=200287|skillRaw=1230180|damage=1|skill=1230000|baseSkill=1230000|charge=0|specs=1|skillKind=Unknown|skillSemantics=None|valueKind=Damage|data=260438A77D4410DF9C0C64C5120002021B1B550701000000904E0101";
-        var dodgeControlLine = "2026-04-10T16:15:41.6149585+08:00|compact-0638|16777343:62420->16777343:52250|source=16039|skillRaw=17000101|marker=87|flag=0|skill=17000100|baseSkill=17000000|charge=1|specs=1|skillName=Dodge|skillKind=Support|skillSemantics=Support|data=0E0638A77DA56603015700";
-        var dodgeOutcomeLine = "2026-04-10T16:15:41.6155335+08:00|aux-2c38|16777343:62420->16777343:52250|source=16039|mode=2|state=0|seq=143|result=7|family=mode-2-state-0-result-7|tailLen=4|data=112C38A77D02008D0107008F0107";
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
 
-        var path = WriteTempReplayLog("frame", damageLine, dodgeControlLine, dodgeOutcomeLine);
-        try
-        {
-            var replay = new PacketLogReplayService().Replay(path);
+        Assert.True(replay.ReplayedLines > 0);
 
-            Assert.Equal(3, replay.ReplayedLines);
-            Assert.Equal(0, replay.SkippedLines);
+        var primary = replay.Combatants
+            .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
+            .ThenByDescending(static summary => summary.IncomingDamage)
+            .First();
 
-            var player = Assert.Single(replay.Combatants, static summary => summary.ActorId == 16039);
-            Assert.Equal(1, player.IncomingDamage);
-            Assert.Equal(1, player.IncomingInvincibles);
-            Assert.Equal(2, player.IncomingAttempts);
-
-            var monster = Assert.Single(replay.Combatants, static summary => summary.ActorId == 200287);
-            Assert.Equal(1, monster.OutgoingDamage);
-            Assert.Equal(1, monster.OutgoingAttempts);
-
-            Assert.True(replay.Store.CombatPacketsByTarget.TryGetValue(16039, out var packets));
-            Assert.Contains(packets, static packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        Assert.True(primary.IncomingEvades == expectedEvades, summaryDump);
+        Assert.True(primary.IncomingInvincibles == expectedInvincibles, summaryDump);
     }
 
-    [Fact]
-    public void Replay_Reconstructs_Incoming_Invincible_Summary_From_Stream_Log()
+    [Theory]
+    [InlineData("aion2flow.stream.20260412103519.log", 18, 7)]
+    [InlineData("aion2flow.stream.20260412110721.log", 10, 7)]
+    public void Replay_Reconstructs_Reported_MultiSource_Invincibles_With_Full_Skill_Map(string fileName, int expectedEvades, int expectedInvincibles)
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var firstTimestamp = DateTimeOffset.Parse("2026-04-10T16:15:41.1000000+08:00");
-        var lastTimestamp = DateTimeOffset.Parse("2026-04-10T16:15:41.6155335+08:00");
-        var damagePacket = ParseDamagePacket("220438ADCB010400A507D1890E014402AFD5AD6901000000D88501FB1D0100");
-        var damageLine = "2026-04-10T16:15:41.1000000+08:00|dir=inbound|16777343:52250->16777343:62420|seq=101|len=31|data=220438ADCB010400A507D1890E014402AFD5AD6901000000D88501FB1D0100";
-        var outboundNoiseLine = "2026-04-10T16:15:41.5000000+08:00|dir=outbound|16777343:62420->16777343:52250|seq=77|len=1|data=00";
-        var dodgeControlLine = "2026-04-10T16:15:41.6149585+08:00|dir=inbound|16777343:52250->16777343:62420|seq=102|len=11|data=0E0638F922A56603011600";
-        var dodgeOutcomeLine = "2026-04-10T16:15:41.6155335+08:00|dir=inbound|16777343:52250->16777343:62420|seq=103|len=14|data=112C38F9220200DF140700E01407";
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
 
-        var path = WriteTempReplayLog("stream", damageLine, outboundNoiseLine, dodgeControlLine, dodgeOutcomeLine);
-        try
-        {
-            var replay = new PacketLogReplayService().Replay(path);
+        Assert.True(replay.ReplayedLines > 0);
 
-            Assert.Equal(4, replay.TotalLines);
-            Assert.Equal(3, replay.ReplayedLines);
-            Assert.Equal(1, replay.SkippedLines);
-            Assert.Equal(3, replay.ReplayedEventCounts["inbound"]);
-            Assert.Equal(1, replay.SkippedEventCounts["outbound-ignored"]);
-            Assert.Equal(lastTimestamp.ToUnixTimeMilliseconds() - firstTimestamp.ToUnixTimeMilliseconds(), replay.Snapshot.BattleTime);
+        var primary = replay.Combatants
+            .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
+            .ThenByDescending(static summary => summary.IncomingDamage)
+            .First();
 
-            var source = Assert.Single(replay.Combatants, summary => summary.ActorId == damagePacket.SourceId);
-            Assert.Equal(damagePacket.Damage, source.OutgoingDamage);
-            Assert.Equal(1, source.OutgoingHits);
-            Assert.Equal(1, source.OutgoingAttempts);
-
-            var target = Assert.Single(replay.Combatants, summary => summary.ActorId == damagePacket.TargetId);
-            Assert.Equal(damagePacket.Damage, target.IncomingDamage);
-            Assert.Equal(1, target.IncomingHits);
-            Assert.Equal(1, target.IncomingAttempts);
-
-            var player = Assert.Single(replay.Combatants, static summary => summary.ActorId == 4473);
-            Assert.Equal(1, player.IncomingInvincibles);
-            Assert.Equal(1, player.IncomingAttempts);
-
-            Assert.True(replay.Store.CombatPacketsByTarget.TryGetValue(4473, out var packets));
-            Assert.Contains(packets, static packet => packet.SkillCode == SyntheticCombatSkillCodes.UnresolvedInvincible);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        Assert.True(primary.IncomingEvades == expectedEvades, summaryDump);
+        Assert.True(primary.IncomingInvincibles == expectedInvincibles, summaryDump);
     }
 
     private static string WriteTempReplayLog(string logKind, params string[] lines)
@@ -144,6 +113,17 @@ public sealed class PacketLogReplayServiceTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.{logKind}.log");
         File.WriteAllLines(path, lines);
         return path;
+    }
+
+    private static string BuildSummaryDump(IEnumerable<PacketLogCombatantSummary> summaries)
+    {
+        return string.Join(
+            Environment.NewLine,
+            summaries
+                .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
+                .ThenByDescending(static summary => summary.IncomingDamage)
+                .Select(static summary =>
+                    $"id={summary.CombatantId} incoming(evade={summary.IncomingEvades}, invincible={summary.IncomingInvincibles}, damage={summary.IncomingDamage}, hits={summary.IncomingHits}, attempts={summary.IncomingAttempts}) outgoing(damage={summary.OutgoingDamage}, hits={summary.OutgoingHits}, attempts={summary.OutgoingAttempts})"));
     }
 
     private static ParsedCombatPacket ParseDamagePacket(string hex)

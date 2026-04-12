@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Text;
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
@@ -6,8 +8,6 @@ using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using K4os.Compression.LZ4;
-using System.Buffers;
-using System.Text;
 
 namespace Cloris.Aion2Flow.PacketCapture.Streams;
 
@@ -21,6 +21,9 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private TcpConnection _connection;
     private long _currentFrameOrdinal;
     private long _nextFrameOrdinal;
+    private long _currentBatchOrdinal;
+    private long _currentAppendBatchOrdinal;
+    private long _nextBatchOrdinal;
     private long? _timestampOverrideMilliseconds;
 
     private static readonly byte[] Pattern = [0x06, 0x00, 0x36];
@@ -203,40 +206,49 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection)
     {
         _connection = connection;
+        var previousAppendBatchOrdinal = _currentAppendBatchOrdinal;
+        _currentAppendBatchOrdinal = ++_nextBatchOrdinal;
 
-        var hasParsed = false;
-
-        if (_tail.Length != 0)
+        try
         {
-            if (!payload.IsEmpty)
+            var hasParsed = false;
+
+            if (_tail.Length != 0)
             {
-                AppendToTail(payload);
+                if (!payload.IsEmpty)
+                {
+                    AppendToTail(payload);
+                }
+
+                ProcessBufferedPackets(ref hasParsed);
+                return hasParsed;
             }
 
-            ProcessBufferedPackets(ref hasParsed);
+            if (payload.IsEmpty)
+            {
+                return false;
+            }
+
+            var remaining = payload;
+            while (TryTakePacket(ref remaining, out var packet))
+            {
+                if (EmitPacket(packet))
+                {
+                    hasParsed = true;
+                }
+            }
+
+            if (!remaining.IsEmpty)
+            {
+                AppendToTail(remaining);
+            }
+
             return hasParsed;
         }
-
-        if (payload.IsEmpty)
+        finally
         {
-            return false;
+            _currentAppendBatchOrdinal = previousAppendBatchOrdinal;
         }
-
-        var remaining = payload;
-        while (TryTakePacket(ref remaining, out var packet))
-        {
-            if (EmitPacket(packet))
-            {
-                hasParsed = true;
-            }
-        }
-
-        if (!remaining.IsEmpty)
-        {
-            AppendToTail(remaining);
-        }
-
-        return hasParsed;
     }
 
     public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection, long timestampMilliseconds)
@@ -459,51 +471,63 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
     private bool TryParseFrameBatch(ReadOnlySpan<byte> packet)
     {
+        var previousBatchOrdinal = _currentBatchOrdinal;
+        _currentBatchOrdinal = _currentAppendBatchOrdinal > 0
+            ? _currentAppendBatchOrdinal
+            : ++_nextBatchOrdinal;
+
         var offset = 0;
         var parsed = false;
         var frameCount = 0;
 
-        while (offset < packet.Length)
+        try
         {
-            if (packet.Length - offset >= Pattern.Length && packet[offset..].StartsWith(Pattern))
+            while (offset < packet.Length)
             {
-                offset += Pattern.Length;
-                continue;
-            }
+                if (packet.Length - offset >= Pattern.Length && packet[offset..].StartsWith(Pattern))
+                {
+                    offset += Pattern.Length;
+                    continue;
+                }
 
-            if (!TryReadTransportLength(packet, offset, out var frameLength))
-            {
-                break;
-            }
+                if (!TryReadTransportLength(packet, offset, out var frameLength))
+                {
+                    break;
+                }
 
-            if (frameLength <= 0 || offset + frameLength > packet.Length)
-            {
-                break;
-            }
+                if (frameLength <= 0 || offset + frameLength > packet.Length)
+                {
+                    break;
+                }
 
-            var frame = packet.Slice(offset, frameLength);
-            var framePayload = frame.EndsWith(Pattern)
-                ? frame[..^Pattern.Length]
-                : frame;
+                var frame = packet.Slice(offset, frameLength);
+                var framePayload = frame.EndsWith(Pattern)
+                    ? frame[..^Pattern.Length]
+                    : frame;
 
-            if (framePayload.IsEmpty)
-            {
+                if (framePayload.IsEmpty)
+                {
+                    offset += frameLength;
+                    continue;
+                }
+
+                frameCount++;
+                RawPacketDump.AppendFrameEvent("frame-batch", _connection, $"offset={offset}|frameLength={frameLength}", frame);
+
+                if (ParseFramePayload(framePayload))
+                {
+                    parsed = true;
+                }
+
                 offset += frameLength;
-                continue;
             }
 
-            frameCount++;
-            RawPacketDump.AppendFrameEvent("frame-batch", _connection, $"offset={offset}|frameLength={frameLength}", frame);
-
-            if (ParseFramePayload(framePayload))
-            {
-                parsed = true;
-            }
-
-            offset += frameLength;
+            return parsed && frameCount > 0;
         }
-
-        return parsed && frameCount > 0;
+        finally
+        {
+            _currentBatchOrdinal = previousBatchOrdinal;
+        }
     }
 
     private bool TryParseExactFrame(ReadOnlySpan<byte> packet)
@@ -684,7 +708,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         store.AppendNickname(parsed.PlayerId, parsed.Nickname);
-        store.RememberLocalActor(parsed.PlayerId);
         consumed = parsed.TailOffset;
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}|embedded=true", payload[..consumed]);
         return _hasParsed = true;
@@ -693,7 +716,14 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private bool ParseFramePayload(ReadOnlySpan<byte> payload)
     {
         var previousFrameOrdinal = _currentFrameOrdinal;
+        var previousBatchOrdinal = _currentBatchOrdinal;
         _currentFrameOrdinal = ++_nextFrameOrdinal;
+        if (_currentBatchOrdinal <= 0)
+        {
+            _currentBatchOrdinal = _currentAppendBatchOrdinal > 0
+                ? _currentAppendBatchOrdinal
+                : ++_nextBatchOrdinal;
+        }
 
         try
         {
@@ -702,11 +732,19 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         finally
         {
             _currentFrameOrdinal = previousFrameOrdinal;
+            _currentBatchOrdinal = previousBatchOrdinal;
         }
     }
 
     private long CurrentFrameOrdinal
         => _currentFrameOrdinal > 0 ? _currentFrameOrdinal : ++_nextFrameOrdinal;
+
+    private long CurrentBatchOrdinal
+        => _currentBatchOrdinal > 0
+            ? _currentBatchOrdinal
+            : _currentAppendBatchOrdinal > 0
+                ? _currentAppendBatchOrdinal
+                : ++_nextBatchOrdinal;
 
     private bool TryParseRemainHpAt(ReadOnlySpan<byte> packet, int opcodeOffset, out int consumed)
     {
@@ -758,6 +796,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private bool TryParseDamageAt(ReadOnlySpan<byte> packet, int opcodeOffset, out int consumed)
     {
         var frameOrdinal = CurrentFrameOrdinal;
+        var batchOrdinal = CurrentBatchOrdinal;
         var payload = packet[opcodeOffset..];
         if (!Packet0438DamageParser.TryParsePayload(payload, out var parsed, out consumed))
         {
@@ -783,7 +822,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             Damage = parsed.Damage,
             Loop = parsed.Loop,
             Timestamp = CurrentTimestampMilliseconds,
-            FrameOrdinal = frameOrdinal
+            FrameOrdinal = frameOrdinal,
+            BatchOrdinal = batchOrdinal
         });
 
         RawPacketDump.AppendFrameEvent("damage", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|skill={resolvedSkillCode.Value}|damage={parsed.Damage}", payload[..consumed]);
@@ -793,6 +833,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private bool TryParsePeriodicValuePacketAt(ReadOnlySpan<byte> packet, int opcodeOffset, out int consumed)
     {
         var frameOrdinal = CurrentFrameOrdinal;
+        var batchOrdinal = CurrentBatchOrdinal;
         consumed = 0;
 
         var payload = packet[opcodeOffset..];
@@ -826,7 +867,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             Unknown = unknownInfo,
             Damage = damage,
             Timestamp = CurrentTimestampMilliseconds,
-            FrameOrdinal = frameOrdinal
+            FrameOrdinal = frameOrdinal,
+            BatchOrdinal = batchOrdinal
         });
 
         consumed = reader.Offset;
@@ -1087,6 +1129,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private bool Parse0438ValuePacket(ReadOnlySpan<byte> packet)
     {
         var frameOrdinal = CurrentFrameOrdinal;
+        var batchOrdinal = CurrentBatchOrdinal;
 
         if (Packet0438DamageParser.TryParse(packet, out var parsed))
         {
@@ -1105,7 +1148,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 Damage = parsed.Damage,
                 Loop = parsed.Loop,
                 Timestamp = CurrentTimestampMilliseconds,
-                FrameOrdinal = frameOrdinal
+                FrameOrdinal = frameOrdinal,
+                BatchOrdinal = batchOrdinal
             };
 
             if (parsed.TailMultiHitCount > 0)
@@ -1124,7 +1168,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         {
             var tailHint = FormatResolvedReferenceHint("tailSkill", compact.TailRaw);
             var timestamp = CurrentTimestampMilliseconds;
-            store.RegisterMultiHitSidecar(compact.SourceId, compact.SkillCodeRaw, compact.Marker, timestamp, frameOrdinal);
+            store.RegisterMultiHitSidecar(compact.SourceId, compact.SkillCodeRaw, compact.Marker);
             store.RegisterCompactValue0438(
                 compact.TargetId,
                 compact.SourceId,
@@ -1133,7 +1177,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 compact.LayoutTag,
                 compact.Type,
                 timestamp,
-                frameOrdinal);
+                frameOrdinal,
+                batchOrdinal);
             RawPacketDump.AppendFrameEvent(
                 "compact-value",
                 _connection,
@@ -1156,7 +1201,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             compactOutcome.LayoutTag,
             compactOutcome.Type,
             compactOutcomeTimestamp,
-            frameOrdinal);
+            frameOrdinal,
+            batchOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-outcome",
             _connection,
@@ -1168,6 +1214,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private bool ParsePeriodicValuePacket(ReadOnlySpan<byte> packet)
     {
         var frameOrdinal = CurrentFrameOrdinal;
+        var batchOrdinal = CurrentBatchOrdinal;
 
         if (!Packet0538PeriodicValueParser.TryParse(packet, out var parsed))
         {
@@ -1176,6 +1223,16 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (parsed.IsLinkRecord)
         {
+            store.RegisterPeriodicLink0538(
+                parsed.TargetId,
+                parsed.SourceId,
+                parsed.LinkId,
+                parsed.Unknown,
+                parsed.TailRaw,
+                CurrentTimestampMilliseconds,
+                frameOrdinal,
+                batchOrdinal);
+
             var tailHint = FormatResolvedReferenceHint("tailSkill", parsed.TailRaw);
             RawPacketDump.AppendFrameEvent(
                 "periodic-link",
@@ -1195,7 +1252,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             Unknown = parsed.Unknown,
             Damage = parsed.Damage,
             Timestamp = CurrentTimestampMilliseconds,
-            FrameOrdinal = frameOrdinal
+            FrameOrdinal = frameOrdinal,
+            BatchOrdinal = batchOrdinal
         };
 
         store.AppendCombatPacket(combatPacket);
@@ -1205,14 +1263,13 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
     private bool ParseCompactControl0238Packet(ReadOnlySpan<byte> packet)
     {
-        var frameOrdinal = CurrentFrameOrdinal;
-
         if (!Packet0238CompactControlParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentTimestampMilliseconds, frameOrdinal);
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
+        store.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentBatchOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-0238",
             _connection,
@@ -1223,16 +1280,13 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
     private bool ParseCompactControl0638Packet(ReadOnlySpan<byte> packet)
     {
-        var frameOrdinal = CurrentFrameOrdinal;
-
         if (!Packet0638CompactControlParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        var timestamp = CurrentTimestampMilliseconds;
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal);
-        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, parsed.Flag, timestamp, frameOrdinal);
+        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
+        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentBatchOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-0638",
             _connection,
@@ -1243,18 +1297,16 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
     private bool Parse3538SidecarPacket(ReadOnlySpan<byte> packet)
     {
-        var frameOrdinal = CurrentFrameOrdinal;
-
         if (!Packet3538SidecarParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.Register3538Sidecar(parsed.TargetId, parsed.ActorId, CurrentTimestampMilliseconds, frameOrdinal);
+        store.Register3538Sidecar(parsed.TargetId, parsed.SourceId);
         RawPacketDump.AppendFrameEvent(
             "sidecar-3538",
             _connection,
-            $"target={parsed.TargetId}|state={parsed.State}|actor={parsed.ActorId}",
+            $"target={parsed.TargetId}|state={parsed.State}|source={parsed.SourceId}",
             packet);
         return _hasParsed = true;
     }
@@ -1319,6 +1371,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private bool ParseAux2A38Packet(ReadOnlySpan<byte> packet)
     {
         var frameOrdinal = CurrentFrameOrdinal;
+        var batchOrdinal = CurrentBatchOrdinal;
 
         if (!Packet2A38Parser.TryParse(packet, out var parsed))
         {
@@ -1330,11 +1383,11 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             parsed.Mode,
             parsed.GroupCode,
             parsed.SequenceId,
-            parsed.BuffCodeRaw,
             parsed.HeadValue,
-            parsed.StackValue,
+            parsed.BuffCodeRaw,
             CurrentTimestampMilliseconds,
-            frameOrdinal);
+            frameOrdinal,
+            batchOrdinal);
 
         RawPacketDump.AppendFrameEvent(
             "aux-2a38",
@@ -1348,6 +1401,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private bool ParseAux2C38Packet(ReadOnlySpan<byte> packet)
     {
         var frameOrdinal = CurrentFrameOrdinal;
+        var batchOrdinal = CurrentBatchOrdinal;
 
         if (!Packet2C38Parser.TryParse(packet, out var parsed))
         {
@@ -1360,7 +1414,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             parsed.SequenceId,
             parsed.ResultCode,
             CurrentTimestampMilliseconds,
-            frameOrdinal);
+            frameOrdinal,
+            batchOrdinal);
 
         RawPacketDump.AppendFrameEvent(
             "aux-2c38",
@@ -1405,19 +1460,12 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
     private bool ParseWrapped8456Packet(ReadOnlySpan<byte> packet)
     {
-        var frameOrdinal = CurrentFrameOrdinal;
-
         if (!Packet8456EnvelopeParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterWrapped8456Sidecar(
-            parsed.InnerOpcode,
-            parsed.InnerValue,
-            parsed.Stamp,
-            CurrentTimestampMilliseconds,
-            frameOrdinal);
+        store.RegisterWrapped8456Sidecar(parsed.InnerOpcode, parsed.InnerValue, parsed.Stamp);
 
         RawPacketDump.AppendFrameEvent(
             "wrapped-8456",
@@ -1594,7 +1642,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         var tailOffset = Math.Min(packet.Length, reader.Offset + parsed.TailOffset);
         store.AppendNickname(parsed.PlayerId, parsed.Nickname);
-        store.RememberLocalActor(parsed.PlayerId);
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}", packet[..tailOffset]);
         return _hasParsed = true;
     }

@@ -15,14 +15,15 @@ public sealed class CombatMetricsStoreNpcRuntimeObservationTests
         store.AppendNpc4636State(4370, 2, 79);
         store.AppendNpc2C38State(4370, 95, 7);
 
-        Assert.Equal((uint)6, store.Npc2136SequenceByInstance[4370]);
-        Assert.Equal((uint)200003, store.Npc2136ValueByInstance[4370]);
-        Assert.Equal((uint)200003, store.Npc0140ValueByInstance[4370]);
-        Assert.Equal((uint)200003, store.Npc0240ValueByInstance[4370]);
-        Assert.Equal((byte)2, store.Npc4636StateByInstance[4370].State0);
-        Assert.Equal((byte)79, store.Npc4636StateByInstance[4370].State1);
-        Assert.Equal(95, store.Npc2C38StateByInstance[4370].SequenceId);
-        Assert.Equal(7, store.Npc2C38StateByInstance[4370].ResultCode);
+        Assert.True(store.TryGetNpcRuntimeState(4370, out var state));
+        Assert.Equal((uint)6, state.Sequence2136);
+        Assert.Equal((uint)200003, state.Value2136);
+        Assert.Equal((uint)200003, state.Value0140);
+        Assert.Equal((uint)200003, state.Value0240);
+        Assert.Equal((byte)2, state.State4636?.State0);
+        Assert.Equal((byte)79, state.State4636?.State1);
+        Assert.Equal(95, state.Latest2C38?.SequenceId);
+        Assert.Equal(7, state.Latest2C38?.ResultCode);
     }
 
     [Fact]
