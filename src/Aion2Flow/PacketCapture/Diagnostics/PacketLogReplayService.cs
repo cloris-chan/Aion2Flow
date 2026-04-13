@@ -432,7 +432,6 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
         store.RegisterCompactValue0438(
             parsed.TargetId,
             parsed.SourceId,
@@ -473,7 +472,6 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
         store.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, batchOrdinal);
         return true;
     }
@@ -485,7 +483,6 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
         store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, batchOrdinal);
         return true;
     }
@@ -497,7 +494,6 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.Register3538Sidecar(parsed.TargetId, parsed.SourceId);
         return true;
     }
 
@@ -508,7 +504,6 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.RegisterWrapped8456Sidecar(parsed.InnerOpcode, parsed.InnerValue, parsed.Stamp);
         return true;
     }
 

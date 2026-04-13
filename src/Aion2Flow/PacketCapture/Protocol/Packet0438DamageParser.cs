@@ -70,8 +70,14 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (!reader.TryReadVarInt(out var loop)) return false;
 
+        var multiHitCount = 0;
+        if (Packet0438Layout.HasMultiHitData(layoutTag))
+        {
+            var segmentCount = TryParseMultiHitSegment(ref reader);
+            multiHitCount = Math.Max(1, segmentCount);
+        }
+
         consumed = reader.Offset;
-        var tail = payload[consumed..];
         result = new Packet0438Damage(
             targetId,
             layoutTag,
@@ -85,39 +91,41 @@ internal static class Packet0438DamageParser
             damage,
             loop,
             payload.Length - consumed,
-            ParseTailMultiHitCount(tail));
+            multiHitCount);
         return true;
     }
 
-    private static int ParseTailMultiHitCount(ReadOnlySpan<byte> tail)
+    private static int TryParseMultiHitSegment(ref PacketSpanReader reader)
     {
-        if (tail.Length < 5)
+        var remaining = reader.RemainingSpan;
+        if (remaining.Length < 3)
         {
             return 0;
         }
 
-        var count = tail[0];
-        if (count <= 0 || count > 16)
+        var count = remaining[0];
+        if (count == 0 || count > 16)
         {
             return 0;
         }
 
-        var expectedLength = (count * 2) + 3;
-        if (tail.Length != expectedLength || tail[^2] != 0x01 || tail[^1] != 0x00)
+        var dataLength = 1 + (count * 2);
+        if (remaining.Length < dataLength)
         {
             return 0;
         }
 
         for (var i = 0; i < count; i++)
         {
-            var amountOffset = 1 + (i * 2);
-            var amount = tail[amountOffset] | (tail[amountOffset + 1] << 8);
+            var offset = 1 + (i * 2);
+            var amount = remaining[offset] | (remaining[offset + 1] << 8);
             if (amount <= 0)
             {
                 return 0;
             }
         }
 
+        reader.TryAdvance(dataLength);
         return count;
     }
 

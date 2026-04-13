@@ -15,10 +15,7 @@ public sealed class CombatMetricsStore
     private const int MaxTrackedMultiHitCandidates = 64;
     private const int MaxPendingDodgeSignals = 16;
     private const int MaxPendingAvoidancePackets = 32;
-    private const int MaxPendingWrappedMultiHitOwners = 8;
     private const int MaxResolvedPeriodicLinks = 128;
-    private const int MultiHitSidecarSkillCode = 13350000;
-    private const ushort WrappedMultiHitInnerOpcode = 0x3642;
 
     private static readonly HashSet<int> DodgeSkillCodes =
     [
@@ -57,9 +54,6 @@ public sealed class CombatMetricsStore
         long BatchOrdinal);
     private readonly record struct AvoidedSignature(int SourceId, int TargetId, int Marker);
     private readonly record struct PeriodicLinkSignature(int TargetId, int LinkId, int SequenceId, int TailRaw);
-    private readonly record struct PendingWrappedMultiHitOwner(
-        Guid PacketId,
-        ulong Stamp);
     private sealed record NpcInstanceState
     {
         public int? NpcCode { get; init; }
@@ -98,7 +92,6 @@ public sealed class CombatMetricsStore
     private readonly Dictionary<SelfPeriodicHealingPoolKey, SelfPeriodicHealingPoolState> _selfPeriodicHealingPools = [];
     private readonly Lock _multiHitLock = new();
     private readonly List<MultiHitDamageCandidate> _recentDamageCandidates = [];
-    private readonly List<PendingWrappedMultiHitOwner> _pendingWrappedMultiHitOwners = [];
     private readonly Lock _compactOutcomeLock = new();
     private readonly Dictionary<int, PendingDodgeSignal> _pendingDodgeSignalsBySource = [];
     private readonly List<PendingCompactAvoidance> _pendingCompactAvoidances = [];
@@ -197,42 +190,6 @@ public sealed class CombatMetricsStore
             TrimPendingAvoidances_NoLock();
         }
     }
-
-    public void RegisterWrapped8456Sidecar(ushort innerOpcode, uint innerValue, ulong stamp)
-    {
-        if (innerOpcode != WrappedMultiHitInnerOpcode || innerValue == 0)
-        {
-            return;
-        }
-
-        lock (_multiHitLock)
-        {
-            TrimExpiredMultiHitCandidates_NoLock();
-            if (!TryFindWrapped8456MultiHitOwner_NoLock(stamp, out var ownerPacketId))
-            {
-                return;
-            }
-
-            if (!TryFindDamageCandidateByPacketId_NoLock(ownerPacketId, out var candidate))
-            {
-                return;
-            }
-
-            if (candidate.Packet.HasAuthoritativeMultiHitCount)
-            {
-                return;
-            }
-
-            candidate.Packet.MultiHitCount = Math.Max(candidate.Packet.MultiHitCount, (int)innerValue);
-            if (candidate.Packet.MultiHitCount > 0)
-            {
-                candidate.Packet.Modifiers |= DamageModifiers.MultiHit;
-            }
-        }
-    }
-
-    public void RegisterWrapped8456Sidecar(ushort innerOpcode, uint innerValue) =>
-        RegisterWrapped8456Sidecar(innerOpcode, innerValue, 0);
 
     public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker) =>
         RegisterCompactControl0238(sourceId, skillCodeRaw, marker, 0);
@@ -404,75 +361,6 @@ public sealed class CombatMetricsStore
             }
 
             _selfPeriodicHealingPools[key] = new SelfPeriodicHealingPoolState(rawDamage, packet.Timestamp);
-        }
-    }
-
-    public void RegisterMultiHitSidecar(int sourceId, int skillCodeRaw, int marker)
-    {
-        if (sourceId <= 0 || marker <= 0)
-        {
-            return;
-        }
-
-        if (ResolveTrackedSkillCode(skillCodeRaw) != MultiHitSidecarSkillCode)
-        {
-            return;
-        }
-
-        lock (_multiHitLock)
-        {
-            TrimExpiredMultiHitCandidates_NoLock();
-
-            for (var i = _recentDamageCandidates.Count - 1; i >= 0; i--)
-            {
-                var candidate = _recentDamageCandidates[i];
-                if (candidate.SourceId != sourceId)
-                {
-                    continue;
-                }
-
-                var expectedMarker = candidate.Marker + candidate.Packet.MultiHitCount + 1;
-                if (marker != expectedMarker)
-                {
-                    continue;
-                }
-
-                if (candidate.Packet.HasAuthoritativeMultiHitCount)
-                {
-                    return;
-                }
-
-                candidate.Packet.MultiHitCount++;
-                candidate.Packet.Modifiers |= DamageModifiers.MultiHit;
-                RegisterPendingWrappedMultiHitOwner_NoLock(candidate.Packet.Id, 0);
-                return;
-            }
-        }
-    }
-
-    public void Register3538Sidecar(int targetId, int sourceId)
-    {
-        if (targetId <= 0 || sourceId <= 0 || sourceId == targetId)
-        {
-            return;
-        }
-
-        lock (_multiHitLock)
-        {
-            TrimExpiredMultiHitCandidates_NoLock();
-            if (!TryFindLatestMultiHitCandidate_NoLock(sourceId, targetId, out var candidate))
-            {
-                return;
-            }
-
-            if (candidate.Packet.HasAuthoritativeMultiHitCount || candidate.Packet.MultiHitCount > 0)
-            {
-                return;
-            }
-
-            candidate.Packet.MultiHitCount = 1;
-            candidate.Packet.Modifiers |= DamageModifiers.MultiHit;
-            RegisterPendingWrappedMultiHitOwner_NoLock(candidate.Packet.Id, 0);
         }
     }
 
@@ -714,7 +602,6 @@ public sealed class CombatMetricsStore
         lock (_multiHitLock)
         {
             _recentDamageCandidates.Clear();
-            _pendingWrappedMultiHitOwners.Clear();
         }
         lock (_compactOutcomeLock)
         {
@@ -759,11 +646,6 @@ public sealed class CombatMetricsStore
                 clone._pendingDodgeSignalsBySource[sourceId] = pendingSignal;
             }
         }
-        lock (_multiHitLock)
-        {
-            clone._pendingWrappedMultiHitOwners.AddRange(_pendingWrappedMultiHitOwners);
-        }
-
         return clone;
     }
 
@@ -1182,15 +1064,6 @@ public sealed class CombatMetricsStore
         lock (_multiHitLock)
         {
             TrimExpiredMultiHitCandidates_NoLock();
-            if (TryResolveEmbeddedMultiHitFollowup(packet, trackedSkillCode, out var candidate))
-            {
-                packet.HitContribution = 0;
-                packet.AttemptContribution = 0;
-                candidate.Packet.MultiHitCount++;
-                candidate.Packet.Modifiers |= DamageModifiers.MultiHit;
-                RegisterPendingWrappedMultiHitOwner_NoLock(candidate.Packet.Id, 0);
-                return;
-            }
 
             _recentDamageCandidates.Add(new MultiHitDamageCandidate(
                 packet,
@@ -1201,187 +1074,7 @@ public sealed class CombatMetricsStore
                 packet.Unknown,
                 packet.Flag));
             TrimExpiredMultiHitCandidates_NoLock();
-
-            if (packet.HasAuthoritativeMultiHitCount || packet.MultiHitCount > 0)
-            {
-                RegisterPendingWrappedMultiHitOwner_NoLock(packet.Id, 0);
-            }
         }
-    }
-
-    private bool TryResolveEmbeddedMultiHitFollowup(
-        ParsedCombatPacket packet,
-        int trackedSkillCode,
-        out MultiHitDamageCandidate candidate)
-    {
-        candidate = default;
-
-        if (packet.Flag != 0)
-        {
-            return false;
-        }
-
-        for (var i = _recentDamageCandidates.Count - 1; i >= 0; i--)
-        {
-            var current = _recentDamageCandidates[i];
-            if (current.SourceId != packet.SourceId ||
-                current.TargetId != packet.TargetId ||
-                current.SkillCode != trackedSkillCode ||
-                current.Marker != packet.Marker ||
-                current.Unknown != packet.Unknown ||
-                current.Flag == 0 ||
-                current.Packet.HasAuthoritativeMultiHitCount)
-            {
-                continue;
-            }
-
-            candidate = current;
-            return true;
-        }
-
-        return false;
-    }
-
-    private bool TryFindLatestMultiHitCandidate_NoLock(int sourceId, int? targetId, out MultiHitDamageCandidate candidate)
-    {
-        candidate = default;
-        var hasLatest = false;
-        var latest = default(MultiHitDamageCandidate);
-        var hasOwned = false;
-        var owned = default(MultiHitDamageCandidate);
-
-        for (var i = _recentDamageCandidates.Count - 1; i >= 0; i--)
-        {
-            var current = _recentDamageCandidates[i];
-            if (current.SourceId != sourceId)
-            {
-                continue;
-            }
-
-            if (targetId is int resolvedTargetId && current.TargetId != resolvedTargetId)
-            {
-                continue;
-            }
-
-            if (!hasLatest)
-            {
-                latest = current;
-                hasLatest = true;
-            }
-
-            if (!hasOwned &&
-                (current.Packet.HasAuthoritativeMultiHitCount || current.Packet.MultiHitCount > 0))
-            {
-                owned = current;
-                hasOwned = true;
-            }
-        }
-
-        if (hasOwned)
-        {
-            candidate = owned;
-            return true;
-        }
-
-        if (hasLatest)
-        {
-            candidate = latest;
-            return true;
-        }
-
-        return false;
-    }
-
-    private bool TryFindDamageCandidateByPacketId_NoLock(Guid packetId, out MultiHitDamageCandidate candidate)
-    {
-        for (var i = _recentDamageCandidates.Count - 1; i >= 0; i--)
-        {
-            if (_recentDamageCandidates[i].Packet.Id != packetId)
-            {
-                continue;
-            }
-
-            candidate = _recentDamageCandidates[i];
-            return true;
-        }
-
-        candidate = default;
-        return false;
-    }
-
-    private void RegisterPendingWrappedMultiHitOwner_NoLock(Guid packetId, ulong stamp)
-    {
-        for (var i = _pendingWrappedMultiHitOwners.Count - 1; i >= 0; i--)
-        {
-            if (_pendingWrappedMultiHitOwners[i].PacketId != packetId)
-            {
-                continue;
-            }
-
-            _pendingWrappedMultiHitOwners[i] = new PendingWrappedMultiHitOwner(
-                packetId,
-                stamp != 0 ? stamp : _pendingWrappedMultiHitOwners[i].Stamp);
-            TrimPendingWrappedMultiHitOwners_NoLock();
-            return;
-        }
-
-        _pendingWrappedMultiHitOwners.Add(new PendingWrappedMultiHitOwner(packetId, stamp));
-        TrimPendingWrappedMultiHitOwners_NoLock();
-    }
-
-    private bool TryFindWrapped8456MultiHitOwner_NoLock(ulong stamp, out Guid packetId)
-    {
-        for (var i = _pendingWrappedMultiHitOwners.Count - 1; i >= 0; i--)
-        {
-            var current = _pendingWrappedMultiHitOwners[i];
-            if (current.Stamp != stamp)
-            {
-                continue;
-            }
-
-            packetId = current.PacketId;
-            return true;
-        }
-
-        PendingWrappedMultiHitOwner candidate = default;
-        var hasCandidate = false;
-        for (var i = _pendingWrappedMultiHitOwners.Count - 1; i >= 0; i--)
-        {
-            var current = _pendingWrappedMultiHitOwners[i];
-            if (current.Stamp != 0)
-            {
-                continue;
-            }
-
-            if (hasCandidate)
-            {
-                packetId = Guid.Empty;
-                return false;
-            }
-
-            candidate = current;
-            hasCandidate = true;
-        }
-
-        if (!hasCandidate)
-        {
-            packetId = Guid.Empty;
-            return false;
-        }
-
-        for (var i = 0; i < _pendingWrappedMultiHitOwners.Count; i++)
-        {
-            if (_pendingWrappedMultiHitOwners[i].PacketId != candidate.PacketId)
-            {
-                continue;
-            }
-
-            _pendingWrappedMultiHitOwners[i] = new PendingWrappedMultiHitOwner(candidate.PacketId, stamp);
-            break;
-        }
-
-        packetId = candidate.PacketId;
-        return true;
     }
 
     private void TrimExpiredMultiHitCandidates_NoLock()
@@ -1389,24 +1082,6 @@ public sealed class CombatMetricsStore
         while (_recentDamageCandidates.Count > MaxTrackedMultiHitCandidates)
         {
             _recentDamageCandidates.RemoveAt(0);
-        }
-
-        for (var i = _pendingWrappedMultiHitOwners.Count - 1; i >= 0; i--)
-        {
-            if (TryFindDamageCandidateByPacketId_NoLock(_pendingWrappedMultiHitOwners[i].PacketId, out _))
-            {
-                continue;
-            }
-
-            _pendingWrappedMultiHitOwners.RemoveAt(i);
-        }
-    }
-
-    private void TrimPendingWrappedMultiHitOwners_NoLock()
-    {
-        while (_pendingWrappedMultiHitOwners.Count > MaxPendingWrappedMultiHitOwners)
-        {
-            _pendingWrappedMultiHitOwners.RemoveAt(0);
         }
     }
 

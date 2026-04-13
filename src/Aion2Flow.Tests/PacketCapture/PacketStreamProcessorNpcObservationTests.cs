@@ -124,7 +124,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
-    public void Attributes_SameMarker_Followup_Damage_To_Primary_Hit_As_MultiHit()
+    public void Does_Not_Merge_SameMarker_Followup_Without_Authoritative_MultiHit_Signal()
     {
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -161,9 +161,9 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Equal(2, parsedPackets.Length);
         Assert.Equal(parsedPackets[0].Marker, parsedPackets[1].Marker);
         Assert.Equal(1, parsedPackets[0].HitContribution);
-        Assert.Equal(1, parsedPackets[0].MultiHitCount);
-        Assert.True((parsedPackets[0].Modifiers & DamageModifiers.MultiHit) != 0);
-        Assert.Equal(0, parsedPackets[1].HitContribution);
+        Assert.Equal(0, parsedPackets[0].MultiHitCount);
+        Assert.True((parsedPackets[0].Modifiers & DamageModifiers.MultiHit) == 0);
+        Assert.Equal(1, parsedPackets[1].HitContribution);
         Assert.Equal(0, parsedPackets[1].MultiHitCount);
     }
 
@@ -246,7 +246,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
-    public void Attributes_3538_SourceTarget_Sidecar_To_Preceding_Damage_Packet_As_Single_MultiHit()
+    public void Does_Not_Attribute_MultiHit_From_3538_Sidecar_Without_LayoutTag_Signal()
     {
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -260,9 +260,9 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         var packet = Assert.Single(packets);
         Assert.Equal(196, packet.Marker);
-        Assert.Equal(1, packet.MultiHitCount);
+        Assert.Equal(0, packet.MultiHitCount);
         Assert.False(packet.HasAuthoritativeMultiHitCount);
-        Assert.True((packet.Modifiers & DamageModifiers.MultiHit) != 0);
+        Assert.False((packet.Modifiers & DamageModifiers.MultiHit) != 0);
     }
 
     [Fact]

@@ -816,11 +816,16 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             SourceId = parsed.SourceId,
             OriginalSkillCode = parsed.SkillCodeRaw,
             SkillCode = resolvedSkillCode.Value,
+            Marker = parsed.Marker,
             Type = parsed.Type,
-            Modifiers = parsed.Modifiers,
+            Modifiers = parsed.TailMultiHitCount > 0
+                ? parsed.Modifiers | DamageModifiers.MultiHit
+                : parsed.Modifiers,
             Unknown = parsed.Unknown,
             Damage = parsed.Damage,
             Loop = parsed.Loop,
+            MultiHitCount = parsed.TailMultiHitCount,
+            HasAuthoritativeMultiHitCount = parsed.TailMultiHitCount > 0,
             Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
@@ -1168,7 +1173,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         {
             var tailHint = FormatResolvedReferenceHint("tailSkill", compact.TailRaw);
             var timestamp = CurrentTimestampMilliseconds;
-            store.RegisterMultiHitSidecar(compact.SourceId, compact.SkillCodeRaw, compact.Marker);
             store.RegisterCompactValue0438(
                 compact.TargetId,
                 compact.SourceId,
@@ -1268,7 +1272,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
         store.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentBatchOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-0238",
@@ -1285,7 +1288,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RegisterMultiHitSidecar(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker);
         store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentBatchOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-0638",
@@ -1302,7 +1304,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.Register3538Sidecar(parsed.TargetId, parsed.SourceId);
         RawPacketDump.AppendFrameEvent(
             "sidecar-3538",
             _connection,
@@ -1464,8 +1465,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         {
             return false;
         }
-
-        store.RegisterWrapped8456Sidecar(parsed.InnerOpcode, parsed.InnerValue, parsed.Stamp);
 
         RawPacketDump.AppendFrameEvent(
             "wrapped-8456",
