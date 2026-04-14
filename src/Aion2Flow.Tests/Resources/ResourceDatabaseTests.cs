@@ -37,13 +37,13 @@ public sealed class ResourceDatabaseTests
     }
 
     [Fact]
-    public void LoadNpcCatalog_Contains_Orphan_Catalog_Entry()
+    public void LoadNpcCatalog_Contains_Summon_Kind_Entry()
     {
         var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
 
-        Assert.True(catalog.TryGetValue(2920018, out var npc));
-        Assert.Equal("결박의 덫", npc.Name);
-        Assert.Equal(NpcCatalogKind.Unknown, npc.Kind);
+        Assert.True(catalog.TryGetValue(2920015, out var npc));
+        Assert.Equal("結縛圈套", npc.Name);
+        Assert.Equal(NpcCatalogKind.Summon, npc.Kind);
     }
 
     [Fact]

@@ -141,7 +141,7 @@ public sealed class PacketCombatParsersTests
         var ok = Packet008DRemainHpParser.TryParse(packet, out var parsed);
 
         Assert.True(ok);
-        Assert.Equal(sample.MobId, parsed.MobId);
+        Assert.Equal(sample.NpcId, parsed.NpcId);
         Assert.Equal(sample.Value0, parsed.Value0);
         Assert.Equal(sample.Value1, parsed.Value1);
         Assert.Equal(sample.Value2, parsed.Value2);
@@ -158,7 +158,7 @@ public sealed class PacketCombatParsersTests
         var ok = Packet218DBattleToggleParser.TryParse(packet, out var parsed);
 
         Assert.True(ok);
-        Assert.Equal(sample.MobId, parsed.MobId);
+        Assert.Equal(sample.NpcId, parsed.NpcId);
         Assert.Equal(sample.TailLength, parsed.TailLength);
     }
 
@@ -174,7 +174,7 @@ public sealed class PacketCombatParsersTests
         Assert.Equal(sample.Family, parsed.Family);
         Assert.Equal(sample.OwnerId, parsed.OwnerId);
         Assert.Equal(sample.SummonId, parsed.SummonId);
-        Assert.Equal(sample.MobCode, parsed.MobCode);
+        Assert.Equal(sample.NpcCode, parsed.NpcCode);
         Assert.True(parsed.TailOffset > 0);
     }
 }

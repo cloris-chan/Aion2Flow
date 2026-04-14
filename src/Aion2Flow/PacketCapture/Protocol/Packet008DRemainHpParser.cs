@@ -1,15 +1,9 @@
-using Cloris.Aion2Flow.PacketCapture.Readers;
 using System.Buffers.Binary;
+using Cloris.Aion2Flow.PacketCapture.Readers;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
-internal readonly record struct Packet008DRemainHp(
-    int MobId,
-    int Value0,
-    int Value1,
-    int Value2,
-    uint Hp,
-    int TailLength);
+internal readonly record struct Packet008DRemainHp(int NpcId, int Value0, int Value1, int Value2, uint Hp, int TailLength);
 
 internal static class Packet008DRemainHpParser
 {
@@ -23,8 +17,8 @@ internal static class Packet008DRemainHpParser
         if (packet[reader.Offset] != 0x00 || packet[reader.Offset + 1] != 0x8d) return false;
         if (!reader.TryAdvance(2)) return false;
 
-        if (!reader.TryReadVarInt(out var mobId)) return false;
-        if (mobId == 0) return false;
+        if (!reader.TryReadVarInt(out var npcId)) return false;
+        if (npcId == 0) return false;
         if (!reader.TryReadVarInt(out var value0)) return false;
         if (!reader.TryReadVarInt(out var value1)) return false;
         if (!reader.TryReadVarInt(out var value2)) return false;
@@ -33,7 +27,7 @@ internal static class Packet008DRemainHpParser
         var hp = BinaryPrimitives.ReadUInt32LittleEndian(packet.Slice(reader.Offset, 4));
         if (!reader.TryAdvance(4)) return false;
 
-        result = new Packet008DRemainHp(mobId, value0, value1, value2, hp, reader.Remaining);
+        result = new Packet008DRemainHp(npcId, value0, value1, value2, hp, reader.Remaining);
         return true;
     }
 }

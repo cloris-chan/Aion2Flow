@@ -2,20 +2,17 @@ using Cloris.Aion2Flow.PacketCapture.Readers;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
-internal readonly record struct Packet4036Create(
-    string Family,
-    int OwnerId,
-    int SummonId,
-    int? MobCode,
-    int TailOffset);
+internal readonly record struct Packet4036Create(string Family, int OwnerId, int SummonId, int? NpcCode, int TailOffset);
+
+internal readonly record struct Packet4036NpcSpawn(string Family, int EntityId, int? NpcCode);
 
 internal static class Packet4036CreateParser
 {
-    private static readonly byte[] EightByteMarker =
-        [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+    private static readonly byte[] EightByteMarker = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
 
-    private static readonly byte[] OwnerOpcodeMarker =
-        [0x07, 0x02, 0x06];
+    private static readonly byte[] OwnerOpcodeMarker = [0x07, 0x02, 0x06];
+
+    private static readonly byte[] OwnerOpcodeMarkerAlt = [0x07, 0x02, 0x01];
 
     public static bool TryParse(ReadOnlySpan<byte> packet, out Packet4036Create result)
     {
@@ -36,14 +33,14 @@ internal static class Packet4036CreateParser
         if (!reader.TryReadVarInt(out var summonId)) return false;
         if (!reader.TryAdvance(28)) return false;
 
-        int? mobCode = null;
+        int? npcCode = null;
         var duplicateReader = reader;
-        if (duplicateReader.TryReadVarInt(out var mob0))
+        if (duplicateReader.TryReadVarInt(out var npc0))
         {
-            var mobReader = duplicateReader;
-            if (mobReader.TryReadVarInt(out var mob1) && mob0 == mob1)
+            var npcReader = duplicateReader;
+            if (npcReader.TryReadVarInt(out var npc1) && npc0 == npc1)
             {
-                mobCode = mob0;
+                npcCode = npc0;
             }
         }
 
@@ -52,6 +49,8 @@ internal static class Packet4036CreateParser
 
         var afterMarker = packet[(keyIndex + EightByteMarker.Length)..];
         var ownerOpcodeIndex = FindLastArrayIndex(afterMarker, OwnerOpcodeMarker);
+        if (ownerOpcodeIndex < 0)
+            ownerOpcodeIndex = FindLastArrayIndex(afterMarker, OwnerOpcodeMarkerAlt);
         if (ownerOpcodeIndex < 0) return false;
 
         var ownerOffset = keyIndex + ownerOpcodeIndex + 11;
@@ -60,7 +59,7 @@ internal static class Packet4036CreateParser
         var ownerId = packet[ownerOffset] | (packet[ownerOffset + 1] << 8);
         if (ownerId == 0) return false;
 
-        result = new Packet4036Create(family, ownerId, summonId, mobCode, ownerOffset + 2);
+        result = new Packet4036Create(family, ownerId, summonId, npcCode, ownerOffset + 2);
         return true;
     }
 
@@ -118,5 +117,40 @@ internal static class Packet4036CreateParser
         }
 
         return -1;
+    }
+
+    public static bool TryParseNpcSpawn(ReadOnlySpan<byte> packet, out Packet4036NpcSpawn result)
+    {
+        result = default;
+
+        var reader = new PacketSpanReader(packet);
+        if (!reader.TryReadVarInt(out _)) return false;
+        if (reader.Remaining < 2) return false;
+        if (packet[reader.Offset] != 0x40 || packet[reader.Offset + 1] != 0x36) return false;
+
+        var family = ClassifyFamily(packet.Length);
+        if (family is not "create-198" and not "create-177")
+        {
+            return false;
+        }
+
+        if (!reader.TryAdvance(2)) return false;
+        if (!reader.TryReadVarInt(out var entityId)) return false;
+        if (entityId <= 0) return false;
+        if (!reader.TryAdvance(28)) return false;
+
+        int? npcCode = null;
+        var duplicateReader = reader;
+        if (duplicateReader.TryReadVarInt(out var npc0))
+        {
+            var npcReader = duplicateReader;
+            if (npcReader.TryReadVarInt(out var npc1) && npc0 == npc1)
+            {
+                npcCode = npc0;
+            }
+        }
+
+        result = new Packet4036NpcSpawn(family, entityId, npcCode);
+        return true;
     }
 }

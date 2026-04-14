@@ -6,67 +6,19 @@ public static class FixtureCatalog
 {
     public sealed record NicknameSample(string Path, int PlayerId, string Nickname);
 
-    public sealed record DamageSample(
-        string Path,
-        int TargetId,
-        int SourceId,
-        int SkillCodeRaw,
-        int Type,
-        DamageModifiers Modifiers,
-        int Unknown,
-        int Damage,
-        int Loop);
+    public sealed record DamageSample(string Path, int TargetId, int SourceId, int SkillCodeRaw, int Type, DamageModifiers Modifiers, int Unknown, int Damage, int Loop);
 
-    public sealed record ObservedDamageSample(
-        string Path,
-        int TargetId,
-        int SourceId,
-        int SkillCodeRaw,
-        int Type,
-        int Damage);
+    public sealed record ObservedDamageSample(string Path, int TargetId, int SourceId, int SkillCodeRaw, int Type, int Damage);
 
-    public sealed record Compact0438Sample(
-        string Path,
-        int TargetId,
-        int SourceId,
-        int SkillCodeRaw,
-        int Marker,
-        int Type,
-        int Unknown,
-        int Value,
-        int Loop,
-        int TailLength);
+    public sealed record Compact0438Sample(string Path, int TargetId, int SourceId, int SkillCodeRaw, int Marker, int Type, int Unknown, int Value, int Loop, int TailLength);
 
-    public sealed record PeriodicValueSample(
-        string Path,
-        int TargetId,
-        int Mode,
-        int SourceId,
-        int SkillCodeRaw,
-        int LegacySkillCode,
-        int Damage,
-        string Family,
-        int LinkId = 0,
-        int TailRaw = 0,
-        bool IsLinkRecord = false);
+    public sealed record PeriodicValueSample(string Path, int TargetId, int Mode, int SourceId, int SkillCodeRaw, int LegacySkillCode, int Damage, string Family, int LinkId = 0, int TailRaw = 0, bool IsLinkRecord = false);
 
-    public sealed record RemainHpSample(
-        string Path,
-        int MobId,
-        int Value0,
-        int Value1,
-        int Value2,
-        uint Hp,
-        int TailLength);
+    public sealed record RemainHpSample(string Path, int NpcId, int Value0, int Value1, int Value2, uint Hp, int TailLength);
 
-    public sealed record BattleToggleSample(string Path, int MobId, int TailLength);
+    public sealed record BattleToggleSample(string Path, int NpcId, int TailLength);
 
-    public sealed record Create4036Sample(
-        string Path,
-        string Family,
-        int OwnerId,
-        int SummonId,
-        int? MobCode);
+    public sealed record Create4036Sample(string Path, string Family, int OwnerId, int SummonId, int? NpcCode);
 
     public sealed record State4136Sample(string Path, int SourceId, byte State0, byte State1);
 

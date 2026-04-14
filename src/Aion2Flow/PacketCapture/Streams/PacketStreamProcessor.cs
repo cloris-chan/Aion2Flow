@@ -58,12 +58,13 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return;
         }
 
+        store.AppendNpcCode(instanceId, npcCode);
+
         if (!CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry))
         {
             return;
         }
 
-        store.AppendNpcCode(instanceId, npcCode);
         store.AppendNpcName(npcCode, entry.Name);
 
         var kind = CombatMetricsEngine.ResolveNpcKind(entry.Kind);
@@ -759,17 +760,17 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         var reader = new PacketSpanReader(payload);
         if (!reader.TryAdvance(2)) return false;
-        if (!reader.TryReadVarInt(out var mobId)) return false;
-        if (mobId == 0) return false;
+        if (!reader.TryReadVarInt(out var npcId)) return false;
+        if (npcId == 0) return false;
 
         if (!reader.TryReadVarInt(out _)) return false;
         if (!reader.TryReadVarInt(out _)) return false;
         if (!reader.TryReadVarInt(out _)) return false;
-        if (!reader.TryReadUInt32Le(out var mobHp)) return false;
+        if (!reader.TryReadUInt32Le(out var npcHp)) return false;
 
-        store.AppendNpcHp(mobId, mobHp);
+        store.AppendNpcHp(npcId, npcHp);
         consumed = reader.Offset;
-        RawPacketDump.AppendFrameEvent("remain-hp", _connection, $"npcId={mobId}|hp={mobHp}", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("remain-hp", _connection, $"npcId={npcId}|hp={npcHp}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -785,12 +786,12 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         var reader = new PacketSpanReader(payload);
         if (!reader.TryAdvance(2)) return false;
-        if (!reader.TryReadVarInt(out var mobId)) return false;
-        if (mobId == 0) return false;
+        if (!reader.TryReadVarInt(out var npcId)) return false;
+        if (npcId == 0) return false;
 
-        store.ToggleNpcBattle(mobId);
+        store.ToggleNpcBattle(npcId);
         consumed = reader.Offset;
-        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={mobId}", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={npcId}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -914,15 +915,15 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (!reader.TryReadVarInt(out var summonId)) return false;
         if (!reader.TryAdvance(28)) return false;
 
-        int? mobCode = null;
+        int? npcCode = null;
         var summonReader = reader;
-        if (summonReader.TryReadVarInt(out var mob1))
+        if (summonReader.TryReadVarInt(out var npc1))
         {
-            var mobReader = summonReader;
-            if (mobReader.TryReadVarInt(out var mob2) && mob1 == mob2)
+            var npcReader = summonReader;
+            if (npcReader.TryReadVarInt(out var npc2) && npc1 == npc2)
             {
-                mobCode = mob1;
-                TryApplyNpcCatalog(summonId, mob1);
+                npcCode = npc1;
+                TryApplyNpcCatalog(summonId, npc1);
                 store.AppendNpcKind(summonId, NpcKind.Summon);
             }
         }
@@ -945,8 +946,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         store.AppendSummon(realSourceId, summonId);
         consumed = Math.Max(offset + 2, reader.Offset);
         var family = Classify4036Family(consumed > 0 ? consumed : payload.Length);
-        var mobCodeText = mobCode.HasValue ? $"|mobCode={mobCode.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("summon", _connection, $"family={family}|owner={realSourceId}|summon={summonId}{mobCodeText}", payload[..consumed]);
+        var npcCodeText = npcCode.HasValue ? $"|npcCode={npcCode.Value}" : string.Empty;
+        RawPacketDump.AppendFrameEvent("summon", _connection, $"family={family}|owner={realSourceId}|summon={summonId}{npcCodeText}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -1364,21 +1365,33 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return Parse4036StatePacket(packet, family);
         }
 
-        if (!Packet4036CreateParser.TryParse(packet, out var parsed))
+        if (Packet4036CreateParser.TryParse(packet, out var parsed))
         {
-            return false;
+            if (parsed.NpcCode.HasValue)
+            {
+                TryApplyNpcCatalog(parsed.SummonId, parsed.NpcCode.Value);
+            }
+
+            store.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
+            store.AppendSummon(parsed.OwnerId, parsed.SummonId);
+            var npcCodeText = parsed.NpcCode.HasValue ? $"|npcCode={parsed.NpcCode.Value}" : string.Empty;
+            RawPacketDump.AppendFrameEvent("summon", _connection, $"family={parsed.Family}|owner={parsed.OwnerId}|summon={parsed.SummonId}{npcCodeText}", packet[..Math.Min(parsed.TailOffset, packet.Length)]);
+            return _hasParsed = true;
         }
 
-        if (parsed.MobCode.HasValue)
+        if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn))
         {
-            TryApplyNpcCatalog(parsed.SummonId, parsed.MobCode.Value);
+            if (spawn.NpcCode.HasValue)
+            {
+                TryApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value);
+            }
+
+            var spawnNpcCodeText = spawn.NpcCode.HasValue ? $"|npcCode={spawn.NpcCode.Value}" : string.Empty;
+            RawPacketDump.AppendFrameEvent("npc-spawn", _connection, $"family={spawn.Family}|entity={spawn.EntityId}{spawnNpcCodeText}", packet);
+            return _hasParsed = true;
         }
 
-        store.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
-        store.AppendSummon(parsed.OwnerId, parsed.SummonId);
-        var mobCodeText = parsed.MobCode.HasValue ? $"|mobCode={parsed.MobCode.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("summon", _connection, $"family={parsed.Family}|owner={parsed.OwnerId}|summon={parsed.SummonId}{mobCodeText}", packet[..Math.Min(parsed.TailOffset, packet.Length)]);
-        return _hasParsed = true;
+        return false;
     }
 
     private bool Parse4036StatePacket(ReadOnlySpan<byte> packet, string family)
@@ -1708,8 +1721,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.AppendNpcHp(parsed.MobId, checked((int)parsed.Hp));
-        RawPacketDump.AppendFrameEvent("remain-hp", _connection, $"npcId={parsed.MobId}|hp={parsed.Hp}", packet[..(packet.Length - parsed.TailLength)]);
+        store.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp));
+        RawPacketDump.AppendFrameEvent("remain-hp", _connection, $"npcId={parsed.NpcId}|hp={parsed.Hp}", packet[..(packet.Length - parsed.TailLength)]);
         return _hasParsed = true;
     }
 
@@ -1720,8 +1733,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.ToggleNpcBattle(parsed.MobId);
-        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={parsed.MobId}", packet[..(packet.Length - parsed.TailLength)]);
+        store.ToggleNpcBattle(parsed.NpcId);
+        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={parsed.NpcId}", packet[..(packet.Length - parsed.TailLength)]);
         return _hasParsed = true;
     }
 

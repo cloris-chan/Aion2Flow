@@ -345,7 +345,9 @@ public sealed class PacketLogReplayService
             "nickname" => TryReplayNickname(store, packet),
             "remain-hp" => TryReplayRemainHp(store, packet),
             "battle-toggle" => TryReplayBattleToggle(store, packet),
-            "summon" => TryReplaySummon(store, packet),
+            "summon" => TryReplaySummon(store, packet, entry.Metadata),
+            "npc-spawn" => TryReplayNpcSpawn(store, packet, entry.Metadata),
+            "recovery-path" => TryReplayRecoveryPath(store, packet, entry.Metadata),
             _ => false
         };
     }
@@ -668,7 +670,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.AppendNpcHp(parsed.MobId, checked((int)parsed.Hp));
+        store.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp));
         return true;
     }
 
@@ -679,25 +681,148 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.ToggleNpcBattle(parsed.MobId);
+        store.ToggleNpcBattle(parsed.NpcId);
         return true;
     }
 
-    private static bool TryReplaySummon(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplaySummon(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata)
     {
+        if (TryParseSummonMetadata(metadata, out var ownerId, out var summonId, out var npcCode))
+        {
+            if (npcCode > 0)
+            {
+                TryApplyNpcCatalog(store, summonId, npcCode);
+            }
+
+            store.AppendNpcKind(summonId, NpcKind.Summon);
+            store.AppendSummon(ownerId, summonId);
+            return true;
+        }
+
         if (!Packet4036CreateParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        if (parsed.MobCode.HasValue)
+        if (parsed.NpcCode.HasValue)
         {
-            TryApplyNpcCatalog(store, parsed.SummonId, parsed.MobCode.Value);
+            TryApplyNpcCatalog(store, parsed.SummonId, parsed.NpcCode.Value);
         }
 
         store.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
         store.AppendSummon(parsed.OwnerId, parsed.SummonId);
         return true;
+    }
+
+    private static bool TryParseSummonMetadata(string metadata, out int ownerId, out int summonId, out int npcCode)
+    {
+        ownerId = 0;
+        summonId = 0;
+        npcCode = 0;
+
+        if (string.IsNullOrEmpty(metadata))
+        {
+            return false;
+        }
+
+        foreach (var segment in metadata.Split('|'))
+        {
+            if (segment.StartsWith("owner=", StringComparison.Ordinal) &&
+                int.TryParse(segment.AsSpan("owner=".Length), CultureInfo.InvariantCulture, out var o))
+            {
+                ownerId = o;
+            }
+            else if (segment.StartsWith("summon=", StringComparison.Ordinal) &&
+                     int.TryParse(segment.AsSpan("summon=".Length), CultureInfo.InvariantCulture, out var s))
+            {
+                summonId = s;
+            }
+            else if (segment.StartsWith("npcCode=", StringComparison.Ordinal) &&
+                     int.TryParse(segment.AsSpan("npcCode=".Length), CultureInfo.InvariantCulture, out var m))
+            {
+                npcCode = m;
+            }
+        }
+
+        return ownerId > 0 && summonId > 0;
+    }
+
+    private static bool TryReplayNpcSpawn(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata)
+    {
+        if (TryParseNpcSpawnMetadata(metadata, out var entityId, out var npcCode))
+        {
+            if (npcCode > 0)
+            {
+                TryApplyNpcCatalog(store, entityId, npcCode);
+            }
+
+            return true;
+        }
+
+        if (!Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn))
+        {
+            return false;
+        }
+
+        if (spawn.NpcCode.HasValue)
+        {
+            TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value);
+        }
+
+        return true;
+    }
+
+    private static bool TryParseNpcSpawnMetadata(string metadata, out int entityId, out int npcCode)
+    {
+        entityId = 0;
+        npcCode = 0;
+
+        if (string.IsNullOrEmpty(metadata))
+        {
+            return false;
+        }
+
+        foreach (var segment in metadata.Split('|'))
+        {
+            if (segment.StartsWith("entity=", StringComparison.Ordinal) &&
+                int.TryParse(segment.AsSpan("entity=".Length), CultureInfo.InvariantCulture, out var e))
+            {
+                entityId = e;
+            }
+            else if (segment.StartsWith("npcCode=", StringComparison.Ordinal) &&
+                     int.TryParse(segment.AsSpan("npcCode=".Length), CultureInfo.InvariantCulture, out var m))
+            {
+                npcCode = m;
+            }
+        }
+
+        return entityId > 0;
+    }
+
+    private static bool TryReplayRecoveryPath(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata)
+    {
+        if (Packet4036CreateParser.TryParse(packet, out var summon))
+        {
+            store.AppendSummon(summon.OwnerId, summon.SummonId);
+            if (summon.NpcCode.HasValue)
+            {
+                TryApplyNpcCatalog(store, summon.SummonId, summon.NpcCode.Value);
+            }
+
+            return true;
+        }
+
+        if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn))
+        {
+            if (spawn.NpcCode.HasValue)
+            {
+                TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value);
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private static void TryApplyNpcCatalog(CombatMetricsStore store, int instanceId, int npcCode)
@@ -707,12 +832,12 @@ public sealed class PacketLogReplayService
             return;
         }
 
+        store.AppendNpcCode(instanceId, npcCode);
+
         if (!CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry))
         {
             return;
         }
-
-        store.AppendNpcCode(instanceId, npcCode);
         store.AppendNpcName(npcCode, entry.Name);
 
         var kind = CombatMetricsEngine.ResolveNpcKind(entry.Kind);
@@ -725,7 +850,7 @@ public sealed class PacketLogReplayService
     private static bool TryParseEntry(string line, out FrameReplayEntry entry)
     {
         entry = default;
-        if (!TryReadLineSegments(line, out var timestampText, out var eventName, out var connectionText, out var dataText))
+        if (!TryReadLineSegments(line, out var timestampText, out var eventName, out var connectionText, out var dataText, out var metadata))
         {
             return false;
         }
@@ -755,7 +880,8 @@ public sealed class PacketLogReplayService
                 timestamp,
                 eventName,
                 connection,
-                Convert.FromHexString(dataText));
+                Convert.FromHexString(dataText),
+                metadata);
             return true;
         }
         catch (FormatException)
@@ -788,7 +914,7 @@ public sealed class PacketLogReplayService
                 continue;
             }
 
-            if (!TryReadLineSegments(line, out _, out var secondSegment, out var thirdSegment, out _))
+            if (!TryReadLineSegments(line, out _, out var secondSegment, out var thirdSegment, out _, out _))
             {
                 continue;
             }
@@ -809,7 +935,7 @@ public sealed class PacketLogReplayService
     private static bool TryParseStreamEntry(string line, out StreamReplayEntry entry)
     {
         entry = default;
-        if (!TryReadLineSegments(line, out var timestampText, out var directionSegment, out var connectionSegment, out var dataText))
+        if (!TryReadLineSegments(line, out var timestampText, out var directionSegment, out var connectionSegment, out var dataText, out _))
         {
             return false;
         }
@@ -845,12 +971,14 @@ public sealed class PacketLogReplayService
         out string timestampText,
         out string secondSegment,
         out string thirdSegment,
-        out string dataText)
+        out string dataText,
+        out string metadata)
     {
         timestampText = string.Empty;
         secondSegment = string.Empty;
         thirdSegment = string.Empty;
         dataText = string.Empty;
+        metadata = string.Empty;
 
         if (string.IsNullOrWhiteSpace(line))
         {
@@ -885,6 +1013,9 @@ public sealed class PacketLogReplayService
         secondSegment = line[(firstSeparator + 1)..secondSeparator];
         thirdSegment = line[(secondSeparator + 1)..thirdSeparator];
         dataText = line[(dataSeparator + 6)..];
+        metadata = thirdSeparator + 1 < dataSeparator
+            ? line[(thirdSeparator + 1)..dataSeparator]
+            : string.Empty;
         return true;
     }
 
@@ -1047,7 +1178,8 @@ public sealed class PacketLogReplayService
         DateTimeOffset Timestamp,
         string EventName,
         TcpConnection Connection,
-        byte[] Payload);
+        byte[] Payload,
+        string Metadata);
 
     private readonly record struct StreamReplayEntry(
         DateTimeOffset Timestamp,
