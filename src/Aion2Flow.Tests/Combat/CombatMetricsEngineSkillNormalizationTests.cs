@@ -149,7 +149,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     }
 
     [Fact]
-    public void Attributes_Ambush_Drain_Followup_To_Player_And_Trigger_Skill()
+    public void Attributes_Ambush_Drain_Heal_From_Tail_Extraction()
     {
         CombatMetricsEngine.SetGameResources(
         [
@@ -169,31 +169,55 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             SkillCode = 13060250,
             OriginalSkillCode = 13060250,
             Damage = 1200,
+            DrainHealAmount = 240,
             EffectFamily = "direct-hit",
             Timestamp = 1_000
         });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = playerId,
+            SkillCode = 13060250,
+            OriginalSkillCode = 13060250,
+            Damage = 240,
+            EffectFamily = "direct-hit",
+            Timestamp = 1_000
+        });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = npcId,
+            SkillCode = 13060250,
+            OriginalSkillCode = 13060250,
+            Damage = 800,
+            EffectFamily = "direct-hit",
+            Timestamp = 1_040
+        });
+
         engine.Store.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = npcId,
             TargetId = npcId,
             SkillCode = 1010000,
             OriginalSkillCode = 1010000,
-            Damage = 240,
+            Damage = 120,
             EffectFamily = "direct-hit",
-            Timestamp = 1_040
+            Timestamp = 1_050
         });
 
         var snapshot = engine.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
-        Assert.Equal(1200, combatant.DamageAmount);
+        Assert.Equal(2000, combatant.DamageAmount);
         Assert.Equal(240, combatant.HealingAmount);
         Assert.Equal(240, combatant.DrainHealingAmount);
 
         Assert.True(combatant.Skills.TryGetValue(13060250, out var skill));
-        Assert.Equal(1200, skill.DamageAmount);
+        Assert.Equal(2000, skill.DamageAmount);
         Assert.Equal(240, skill.DrainHealingAmount);
-        Assert.Equal(1, skill.Times);
+        Assert.Equal(2, skill.Times);
         Assert.Equal(1, skill.DrainHealingTimes);
     }
 

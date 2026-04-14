@@ -7,6 +7,7 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
+using Cloris.Aion2Flow.Resources;
 using K4os.Compression.LZ4;
 
 namespace Cloris.Aion2Flow.PacketCapture.Streams;
@@ -826,10 +827,27 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             Loop = parsed.Loop,
             MultiHitCount = parsed.TailMultiHitCount,
             HasAuthoritativeMultiHitCount = parsed.TailMultiHitCount > 0,
+            DrainHealAmount = parsed.DrainHealAmount,
             Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
         });
+
+        if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId
+            && IsDrainOrAbsorbSkill(parsed.SkillCodeRaw))
+        {
+            store.AppendCombatPacket(new ParsedCombatPacket
+            {
+                TargetId = parsed.SourceId,
+                SourceId = parsed.SourceId,
+                OriginalSkillCode = parsed.SkillCodeRaw,
+                SkillCode = resolvedSkillCode.Value,
+                Damage = parsed.DrainHealAmount,
+                Timestamp = CurrentTimestampMilliseconds,
+                FrameOrdinal = frameOrdinal,
+                BatchOrdinal = batchOrdinal
+            });
+        }
 
         RawPacketDump.AppendFrameEvent("damage", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|skill={resolvedSkillCode.Value}|damage={parsed.Damage}", payload[..consumed]);
         return _hasParsed = true;
@@ -940,6 +958,14 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         return CombatMetricsEngine.InferOriginalSkillCode(skillCode);
+    }
+
+    private static bool IsDrainOrAbsorbSkill(int skillCodeRaw)
+    {
+        var resolved = ResolveSkillCode(skillCodeRaw);
+        if (resolved is null) return false;
+        var semantics = CombatEventClassifier.ResolveSkillSemantics(resolved.Value);
+        return (semantics & SkillSemantics.DrainOrAbsorb) != 0;
     }
 
     private void ParseRecoveryPacket(ReadOnlySpan<byte> packet, bool flag = true)
@@ -1152,6 +1178,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 Unknown = parsed.Unknown,
                 Damage = parsed.Damage,
                 Loop = parsed.Loop,
+                DrainHealAmount = parsed.DrainHealAmount,
                 Timestamp = CurrentTimestampMilliseconds,
                 FrameOrdinal = frameOrdinal,
                 BatchOrdinal = batchOrdinal
@@ -1165,6 +1192,23 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             }
 
             store.AppendCombatPacket(combatPacket);
+
+            if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId
+                && IsDrainOrAbsorbSkill(parsed.SkillCodeRaw))
+            {
+                store.AppendCombatPacket(new ParsedCombatPacket
+                {
+                    TargetId = parsed.SourceId,
+                    SourceId = parsed.SourceId,
+                    OriginalSkillCode = parsed.SkillCodeRaw,
+                    SkillCode = parsed.SkillCodeRaw,
+                    Damage = parsed.DrainHealAmount,
+                    Timestamp = CurrentTimestampMilliseconds,
+                    FrameOrdinal = frameOrdinal,
+                    BatchOrdinal = batchOrdinal
+                });
+            }
+
             RawPacketDump.AppendFrameEvent("damage", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|skillRaw={parsed.SkillCodeRaw}|damage={parsed.Damage}{FormatResolvedCombatHint(combatPacket)}", packet[..(packet.Length - parsed.TailLength)]);
             return _hasParsed = true;
         }

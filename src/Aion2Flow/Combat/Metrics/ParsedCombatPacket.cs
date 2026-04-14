@@ -25,6 +25,7 @@ public sealed class ParsedCombatPacket
     public int AttemptContribution { get; set; } = 1;
     public int MultiHitCount { get; set; }
     public bool HasAuthoritativeMultiHitCount { get; set; }
+    public int DrainHealAmount { get; set; }
     public long FrameOrdinal { get; set; }
     public long BatchOrdinal { get; set; }
     public long Timestamp { get; init; } = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -61,6 +62,7 @@ public sealed class ParsedCombatPacket
             AttemptContribution = AttemptContribution,
             MultiHitCount = MultiHitCount,
             HasAuthoritativeMultiHitCount = HasAuthoritativeMultiHitCount,
+            DrainHealAmount = DrainHealAmount,
             FrameOrdinal = FrameOrdinal,
             BatchOrdinal = BatchOrdinal,
             Timestamp = Timestamp,

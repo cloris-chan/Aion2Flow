@@ -6,6 +6,7 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
 
@@ -370,6 +371,7 @@ public sealed class PacketLogReplayService
             Unknown = parsed.Unknown,
             Damage = parsed.Damage,
             Loop = parsed.Loop,
+            DrainHealAmount = parsed.DrainHealAmount,
             Timestamp = timestamp,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
@@ -383,6 +385,30 @@ public sealed class PacketLogReplayService
         }
 
         store.AppendCombatPacket(combatPacket);
+
+        if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId)
+        {
+            var resolvedCode = CombatMetricsEngine.InferOriginalSkillCode(parsed.SkillCodeRaw);
+            if (resolvedCode is not null)
+            {
+                var semantics = CombatEventClassifier.ResolveSkillSemantics(resolvedCode.Value);
+                if ((semantics & SkillSemantics.DrainOrAbsorb) != 0)
+                {
+                    store.AppendCombatPacket(new ParsedCombatPacket
+                    {
+                        TargetId = parsed.SourceId,
+                        SourceId = parsed.SourceId,
+                        OriginalSkillCode = parsed.SkillCodeRaw,
+                        SkillCode = parsed.SkillCodeRaw,
+                        Damage = parsed.DrainHealAmount,
+                        Timestamp = timestamp,
+                        FrameOrdinal = frameOrdinal,
+                        BatchOrdinal = batchOrdinal
+                    });
+                }
+            }
+        }
+
         return true;
     }
 

@@ -16,7 +16,8 @@ internal readonly record struct Packet0438Damage(
     int Damage,
     int Loop,
     int TailLength,
-    int TailMultiHitCount);
+    int TailMultiHitCount,
+    int DrainHealAmount = 0);
 
 internal static class Packet0438DamageParser
 {
@@ -77,6 +78,8 @@ internal static class Packet0438DamageParser
             multiHitCount = Math.Max(1, segmentCount);
         }
 
+        var drainHealAmount = TryParseDrainHealTail(ref reader);
+
         consumed = reader.Offset;
         result = new Packet0438Damage(
             targetId,
@@ -91,7 +94,8 @@ internal static class Packet0438DamageParser
             damage,
             loop,
             payload.Length - consumed,
-            multiHitCount);
+            multiHitCount,
+            drainHealAmount);
         return true;
     }
 
@@ -127,6 +131,34 @@ internal static class Packet0438DamageParser
 
         reader.TryAdvance(dataLength);
         return count;
+    }
+
+    private static int TryParseDrainHealTail(ref PacketSpanReader reader)
+    {
+        var remaining = reader.RemainingSpan;
+        if (remaining.Length < 3)
+        {
+            return 0;
+        }
+
+        var tailReader = new PacketSpanReader(remaining);
+        if (!tailReader.TryReadVarInt(out var count) || count <= 0)
+        {
+            return 0;
+        }
+
+        if (!tailReader.TryReadVarInt(out _))
+        {
+            return 0;
+        }
+
+        if (!tailReader.TryReadVarInt(out var drainValue) || drainValue <= 0)
+        {
+            return 0;
+        }
+
+        reader.TryAdvance(tailReader.Offset);
+        return drainValue;
     }
 
     private static DamageModifiers ParseDamageModifiers(ReadOnlySpan<byte> packet, int type)

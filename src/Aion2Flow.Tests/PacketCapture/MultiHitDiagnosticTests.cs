@@ -32,12 +32,10 @@ public sealed class MultiHitDiagnosticTests
         var path = FixtureHelper.GetPath($"logs/{fileName}");
         var replay = PacketLogReplayService.Replay(path);
 
-        // Find the player: highest outgoing damage combatant
         var player = replay.Combatants
             .OrderByDescending(static s => s.OutgoingDamage)
             .First();
 
-        // Collect all source IDs belonging to the player (including summons)
         var sourceIds = new HashSet<int> { player.CombatantId };
         foreach (var (summonId, ownerId) in replay.Store.SummonOwnerByInstance)
         {
@@ -47,7 +45,6 @@ public sealed class MultiHitDiagnosticTests
             }
         }
 
-        // Count multi-hit from stored packets (player + summons)
         var totalMultiHit = 0;
         foreach (var sourceId in sourceIds)
         {

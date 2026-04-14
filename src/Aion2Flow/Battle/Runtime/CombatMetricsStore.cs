@@ -861,35 +861,7 @@ public sealed class CombatMetricsStore
     private static bool TryBuildDrainFollowupCandidate(ParsedCombatPacket packet, out DrainFollowupCandidate candidate)
     {
         candidate = default;
-
-        if (packet.Damage <= 0 ||
-            packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId == packet.TargetId)
-        {
-            return false;
-        }
-
-        var trackedSkillCode = ResolveTrackedSkillCode(packet);
-        if (trackedSkillCode <= 0)
-        {
-            return false;
-        }
-
-        var semantics = CombatEventClassifier.ResolveSkillSemantics(trackedSkillCode);
-        var kind = CombatEventClassifier.ResolveSkillKind(trackedSkillCode);
-        if ((semantics & SkillSemantics.DrainOrAbsorb) == 0 && kind != SkillKind.DrainOrAbsorb)
-        {
-            return false;
-        }
-
-        candidate = new DrainFollowupCandidate(
-            packet.SourceId,
-            packet.TargetId,
-            trackedSkillCode,
-            packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : trackedSkillCode,
-            packet.Timestamp);
-        return true;
+        return false;
     }
 
     private static int ResolveTrackedSkillCode(ParsedCombatPacket packet)
