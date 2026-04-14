@@ -51,6 +51,13 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         _battleArchiveService = battleArchiveService;
         _localization = localization;
 
+        OutgoingDamage.SetLocalization(localization);
+        OutgoingHealing.SetLocalization(localization);
+        OutgoingShield.SetLocalization(localization);
+        IncomingDamage.SetLocalization(localization);
+        IncomingHealing.SetLocalization(localization);
+        IncomingShield.SetLocalization(localization);
+
         OutgoingDamage.SelectedScopeChanged += HandleScopeChanged;
         OutgoingHealing.SelectedScopeChanged += HandleScopeChanged;
         IncomingDamage.SelectedScopeChanged += HandleScopeChanged;
@@ -413,6 +420,15 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         section.EvadeRate = 0d;
         section.InvincibleRate = 0d;
         section.SetDamageModifierSummaries(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        if (sectionKind is DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield)
+        {
+            section.UpdateShieldColumnHeaders();
+        }
+        else
+        {
+            section.UpdateHealingColumnHeaders();
+        }
     }
 
     private void ApplyDamageSection(SkillDetailSectionViewModel section, IEnumerable<SkillMetrics> skills)

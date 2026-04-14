@@ -44,177 +44,125 @@
 
 				<Grid ColumnDefinitions="*,*" ColumnSpacing="12">
 					<Border Grid.Column="0" Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="12">
-						<StackPanel Orientation="Vertical" Spacing="10">
-							<Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-								<TextBlock Grid.Column="0" Text="{Binding Localization[Panel.Outgoing]}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
-								<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-									<Border Classes="ScopeFilterCard" IsVisible="{Binding OutgoingDamage.HasMultipleScopes}">
-										<StackPanel Orientation="Vertical" Spacing="4">
-											<TextBlock Classes="ScopeFilterLabel" Text="{Binding Localization[Panel.Damage]}" />
-											<ComboBox Classes="ScopeFilterComboBox"
-													  ItemsSource="{Binding OutgoingDamage.ScopeOptions}"
-													  SelectedItem="{Binding OutgoingDamage.SelectedScope, Mode=TwoWay}"
-													  IsEnabled="{Binding OutgoingDamage.HasMultipleScopes}">
-												<ComboBox.ItemTemplate>
-													<DataTemplate x:DataType="vm:SkillDetailScopeOption">
-														<TextBlock Text="{Binding DisplayName}" />
-													</DataTemplate>
-												</ComboBox.ItemTemplate>
-											</ComboBox>
-										</StackPanel>
-									</Border>
-									<Border Classes="ScopeFilterCard" IsVisible="{Binding OutgoingHealing.HasMultipleScopes}">
-										<StackPanel Orientation="Vertical" Spacing="4">
-											<TextBlock Classes="ScopeFilterLabel" Text="{Binding Localization[Panel.SupportType]}" />
-											<ComboBox Classes="ScopeFilterComboBox"
-													  ItemsSource="{Binding OutgoingHealing.ScopeOptions}"
-													  SelectedItem="{Binding OutgoingHealing.SelectedScope, Mode=TwoWay}"
-													  IsEnabled="{Binding OutgoingHealing.HasMultipleScopes}">
-												<ComboBox.ItemTemplate>
-													<DataTemplate x:DataType="vm:SkillDetailScopeOption">
-														<TextBlock Text="{Binding DisplayName}" />
-													</DataTemplate>
-												</ComboBox.ItemTemplate>
-											</ComboBox>
-										</StackPanel>
-									</Border>
-								</StackPanel>
-							</Grid>
-							<Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="8">
-								<StackPanel Grid.Row="0" Grid.Column="0" Orientation="Vertical" Spacing="2">
+						<StackPanel Orientation="Vertical" Spacing="8">
+							<TextBlock Text="{Binding Localization[Panel.Outgoing]}" FontSize="16" FontWeight="Bold" />
+							<Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+								<StackPanel Grid.Column="0" Orientation="Vertical" Spacing="2">
 									<TextBlock Text="{Binding Localization[Panel.Damage]}" Foreground="Gray" />
 									<TextBlock Text="{Binding OutgoingDamage.Total, StringFormat={}{0:0}}" FontSize="18" FontWeight="SemiBold" />
 								</StackPanel>
-								<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Vertical" Spacing="2">
+								<StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2">
 									<TextBlock Text="{Binding Localization[Panel.Healing]}" Foreground="Gray" />
 									<TextBlock Text="{Binding OutgoingHealing.Total, StringFormat={}{0:0}}" FontSize="18" FontWeight="SemiBold" />
 								</StackPanel>
-								<StackPanel Grid.Row="0" Grid.Column="2" Orientation="Vertical" Spacing="2">
+								<StackPanel Grid.Column="2" Orientation="Vertical" Spacing="2">
 									<TextBlock Text="{Binding Localization[Panel.Shield]}" Foreground="Gray" />
 									<TextBlock Text="{Binding OutgoingShield.Total, StringFormat={}{0:0}}" FontSize="18" FontWeight="SemiBold" />
 								</StackPanel>
-								<Grid Grid.Row="1" Grid.ColumnSpan="3" ColumnDefinitions="*,*" ColumnSpacing="16">
-									<StackPanel Grid.Column="0" Orientation="Vertical" Spacing="2">
-										<TextBlock Text="{Binding Localization[Summary.Dps]}" Foreground="Gray" />
-										<TextBlock Text="{Binding OutgoingDamage.PerSecond, StringFormat={}{0:0.0}}" FontSize="16" FontWeight="SemiBold" />
-									</StackPanel>
-									<StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2">
-										<TextBlock Text="{Binding Localization[Summary.Hps]}" Foreground="Gray" />
-										<TextBlock Text="{Binding OutgoingHealing.PerSecond, StringFormat={}{0:0.0}}" FontSize="16" FontWeight="SemiBold" />
-									</StackPanel>
-								</Grid>
 							</Grid>
-							<Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="3">
-								<TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Localization[Label.CriticalRate]}" FontWeight="Bold" />
-								<TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding OutgoingDamage.CriticalSummary}" />
-								<TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Localization[Label.PerfectRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding OutgoingDamage.PerfectSummary}" />
-								<TextBlock Grid.Row="0" Grid.Column="4" Text="{Binding Localization[Label.SmiteRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="0" Grid.Column="5" Text="{Binding OutgoingDamage.SmiteSummary}" />
-								<TextBlock Grid.Row="0" Grid.Column="6" Text="{Binding Localization[Label.MultiHitRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="0" Grid.Column="7" Text="{Binding OutgoingDamage.MultiHitSummary}" />
-								<TextBlock Grid.Row="0" Grid.Column="8" Text="{Binding Localization[Label.BackRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="0" Grid.Column="9" Text="{Binding OutgoingDamage.BackSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Localization[Label.ParryRate]}" FontWeight="Bold" />
-								<TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding OutgoingDamage.ParrySummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Localization[Label.BlockRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding OutgoingDamage.BlockSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="4" Text="{Binding Localization[Label.EnduranceRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="5" Text="{Binding OutgoingDamage.EnduranceSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="6" Text="{Binding Localization[Label.RegenerationRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="7" Text="{Binding OutgoingDamage.RegenerationSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="8" Text="{Binding Localization[Label.EvadeRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="9" Text="{Binding OutgoingDamage.EvadeSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="10" Text="{Binding Localization[Label.InvincibleRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="11" Text="{Binding OutgoingDamage.InvincibleSummary}" />
+							<Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+								<StackPanel Grid.Column="0" Orientation="Vertical" Spacing="2">
+									<TextBlock Text="{Binding Localization[Summary.Dps]}" Foreground="Gray" />
+									<TextBlock Text="{Binding OutgoingDamage.PerSecond, StringFormat={}{0:0.0}}" FontSize="16" FontWeight="SemiBold" />
+								</StackPanel>
+								<StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2">
+									<TextBlock Text="{Binding Localization[Summary.Hps]}" Foreground="Gray" />
+									<TextBlock Text="{Binding OutgoingHealing.PerSecond, StringFormat={}{0:0.0}}" FontSize="16" FontWeight="SemiBold" />
+								</StackPanel>
+							</Grid>
+							<Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+								<Border Grid.Column="0" Classes="ScopeFilterCard" IsVisible="{Binding OutgoingDamage.HasMultipleScopes}">
+									<StackPanel Orientation="Vertical" Spacing="3">
+										<TextBlock Classes="ScopeFilterLabel" Text="{Binding Localization[Panel.Damage]}" />
+										<ComboBox Classes="ScopeFilterComboBox"
+												  ItemsSource="{Binding OutgoingDamage.ScopeOptions}"
+												  SelectedItem="{Binding OutgoingDamage.SelectedScope, Mode=TwoWay}"
+												  IsEnabled="{Binding OutgoingDamage.HasMultipleScopes}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate x:DataType="vm:SkillDetailScopeOption">
+													<TextBlock Text="{Binding DisplayName}" />
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
+									</StackPanel>
+								</Border>
+								<Border Grid.Column="1" Classes="ScopeFilterCard" IsVisible="{Binding OutgoingHealing.HasMultipleScopes}">
+									<StackPanel Orientation="Vertical" Spacing="3">
+										<TextBlock Classes="ScopeFilterLabel" Text="{Binding Localization[Panel.SupportType]}" />
+										<ComboBox Classes="ScopeFilterComboBox"
+												  ItemsSource="{Binding OutgoingHealing.ScopeOptions}"
+												  SelectedItem="{Binding OutgoingHealing.SelectedScope, Mode=TwoWay}"
+												  IsEnabled="{Binding OutgoingHealing.HasMultipleScopes}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate x:DataType="vm:SkillDetailScopeOption">
+													<TextBlock Text="{Binding DisplayName}" />
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
+									</StackPanel>
+								</Border>
 							</Grid>
 						</StackPanel>
 					</Border>
 
 					<Border Grid.Column="1" Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="12">
-						<StackPanel Orientation="Vertical" Spacing="10">
-							<Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-								<TextBlock Grid.Column="0" Text="{Binding Localization[Panel.Incoming]}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
-								<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-									<Border Classes="ScopeFilterCard" IsVisible="{Binding IncomingDamage.HasMultipleScopes}">
-										<StackPanel Orientation="Vertical" Spacing="4">
-											<TextBlock Classes="ScopeFilterLabel" Text="{Binding Localization[Panel.Damage]}" />
-											<ComboBox Classes="ScopeFilterComboBox"
-													  ItemsSource="{Binding IncomingDamage.ScopeOptions}"
-													  SelectedItem="{Binding IncomingDamage.SelectedScope, Mode=TwoWay}"
-													  IsEnabled="{Binding IncomingDamage.HasMultipleScopes}">
-												<ComboBox.ItemTemplate>
-													<DataTemplate x:DataType="vm:SkillDetailScopeOption">
-														<TextBlock Text="{Binding DisplayName}" />
-													</DataTemplate>
-												</ComboBox.ItemTemplate>
-											</ComboBox>
-										</StackPanel>
-									</Border>
-									<Border Classes="ScopeFilterCard" IsVisible="{Binding IncomingHealing.HasMultipleScopes}">
-										<StackPanel Orientation="Vertical" Spacing="4">
-											<TextBlock Classes="ScopeFilterLabel" Text="{Binding Localization[Panel.SupportType]}" />
-											<ComboBox Classes="ScopeFilterComboBox"
-													  ItemsSource="{Binding IncomingHealing.ScopeOptions}"
-													  SelectedItem="{Binding IncomingHealing.SelectedScope, Mode=TwoWay}"
-													  IsEnabled="{Binding IncomingHealing.HasMultipleScopes}">
-												<ComboBox.ItemTemplate>
-													<DataTemplate x:DataType="vm:SkillDetailScopeOption">
-														<TextBlock Text="{Binding DisplayName}" />
-													</DataTemplate>
-												</ComboBox.ItemTemplate>
-											</ComboBox>
-										</StackPanel>
-									</Border>
-								</StackPanel>
-							</Grid>
-							<Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="8">
-								<StackPanel Grid.Row="0" Grid.Column="0" Orientation="Vertical" Spacing="2">
+						<StackPanel Orientation="Vertical" Spacing="8">
+							<TextBlock Text="{Binding Localization[Panel.Incoming]}" FontSize="16" FontWeight="Bold" />
+							<Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+								<StackPanel Grid.Column="0" Orientation="Vertical" Spacing="2">
 									<TextBlock Text="{Binding Localization[Panel.Damage]}" Foreground="Gray" />
 									<TextBlock Text="{Binding IncomingDamage.Total, StringFormat={}{0:0}}" FontSize="18" FontWeight="SemiBold" />
 								</StackPanel>
-								<StackPanel Grid.Row="0" Grid.Column="1" Orientation="Vertical" Spacing="2">
+								<StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2">
 									<TextBlock Text="{Binding Localization[Panel.Healing]}" Foreground="Gray" />
 									<TextBlock Text="{Binding IncomingHealing.Total, StringFormat={}{0:0}}" FontSize="18" FontWeight="SemiBold" />
 								</StackPanel>
-								<StackPanel Grid.Row="0" Grid.Column="2" Orientation="Vertical" Spacing="2">
+								<StackPanel Grid.Column="2" Orientation="Vertical" Spacing="2">
 									<TextBlock Text="{Binding Localization[Panel.Shield]}" Foreground="Gray" />
 									<TextBlock Text="{Binding IncomingShield.Total, StringFormat={}{0:0}}" FontSize="18" FontWeight="SemiBold" />
 								</StackPanel>
-								<Grid Grid.Row="1" Grid.ColumnSpan="3" ColumnDefinitions="*,*" ColumnSpacing="16">
-									<StackPanel Grid.Column="0" Orientation="Vertical" Spacing="2">
-										<TextBlock Text="{Binding Localization[Summary.Dps]}" Foreground="Gray" />
-										<TextBlock Text="{Binding IncomingDamage.PerSecond, StringFormat={}{0:0.0}}" FontSize="16" FontWeight="SemiBold" />
-									</StackPanel>
-									<StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2">
-										<TextBlock Text="{Binding Localization[Summary.Hps]}" Foreground="Gray" />
-										<TextBlock Text="{Binding IncomingHealing.PerSecond, StringFormat={}{0:0.0}}" FontSize="16" FontWeight="SemiBold" />
-									</StackPanel>
-								</Grid>
 							</Grid>
-							<Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="3">
-								<TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Localization[Label.CriticalRate]}" FontWeight="Bold" />
-								<TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding IncomingDamage.CriticalSummary}" />
-								<TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Localization[Label.PerfectRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding IncomingDamage.PerfectSummary}" />
-								<TextBlock Grid.Row="0" Grid.Column="4" Text="{Binding Localization[Label.SmiteRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="0" Grid.Column="5" Text="{Binding IncomingDamage.SmiteSummary}" />
-								<TextBlock Grid.Row="0" Grid.Column="6" Text="{Binding Localization[Label.MultiHitRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="0" Grid.Column="7" Text="{Binding IncomingDamage.MultiHitSummary}" />
-								<TextBlock Grid.Row="0" Grid.Column="8" Text="{Binding Localization[Label.BackRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="0" Grid.Column="9" Text="{Binding IncomingDamage.BackSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Localization[Label.ParryRate]}" FontWeight="Bold" />
-								<TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IncomingDamage.ParrySummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Localization[Label.BlockRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding IncomingDamage.BlockSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="4" Text="{Binding Localization[Label.EnduranceRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="5" Text="{Binding IncomingDamage.EnduranceSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="6" Text="{Binding Localization[Label.RegenerationRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="7" Text="{Binding IncomingDamage.RegenerationSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="8" Text="{Binding Localization[Label.EvadeRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="9" Text="{Binding IncomingDamage.EvadeSummary}" />
-								<TextBlock Grid.Row="1" Grid.Column="10" Text="{Binding Localization[Label.InvincibleRate]}" FontWeight="Bold" Margin="8,0,0,0" />
-								<TextBlock Grid.Row="1" Grid.Column="11" Text="{Binding IncomingDamage.InvincibleSummary}" />
+							<Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+								<StackPanel Grid.Column="0" Orientation="Vertical" Spacing="2">
+									<TextBlock Text="{Binding Localization[Summary.Dps]}" Foreground="Gray" />
+									<TextBlock Text="{Binding IncomingDamage.PerSecond, StringFormat={}{0:0.0}}" FontSize="16" FontWeight="SemiBold" />
+								</StackPanel>
+								<StackPanel Grid.Column="1" Orientation="Vertical" Spacing="2">
+									<TextBlock Text="{Binding Localization[Summary.Hps]}" Foreground="Gray" />
+									<TextBlock Text="{Binding IncomingHealing.PerSecond, StringFormat={}{0:0.0}}" FontSize="16" FontWeight="SemiBold" />
+								</StackPanel>
+							</Grid>
+							<Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+								<Border Grid.Column="0" Classes="ScopeFilterCard" IsVisible="{Binding IncomingDamage.HasMultipleScopes}">
+									<StackPanel Orientation="Vertical" Spacing="3">
+										<TextBlock Classes="ScopeFilterLabel" Text="{Binding Localization[Panel.Damage]}" />
+										<ComboBox Classes="ScopeFilterComboBox"
+												  ItemsSource="{Binding IncomingDamage.ScopeOptions}"
+												  SelectedItem="{Binding IncomingDamage.SelectedScope, Mode=TwoWay}"
+												  IsEnabled="{Binding IncomingDamage.HasMultipleScopes}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate x:DataType="vm:SkillDetailScopeOption">
+													<TextBlock Text="{Binding DisplayName}" />
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
+									</StackPanel>
+								</Border>
+								<Border Grid.Column="1" Classes="ScopeFilterCard" IsVisible="{Binding IncomingHealing.HasMultipleScopes}">
+									<StackPanel Orientation="Vertical" Spacing="3">
+										<TextBlock Classes="ScopeFilterLabel" Text="{Binding Localization[Panel.SupportType]}" />
+										<ComboBox Classes="ScopeFilterComboBox"
+												  ItemsSource="{Binding IncomingHealing.ScopeOptions}"
+												  SelectedItem="{Binding IncomingHealing.SelectedScope, Mode=TwoWay}"
+												  IsEnabled="{Binding IncomingHealing.HasMultipleScopes}">
+											<ComboBox.ItemTemplate>
+												<DataTemplate x:DataType="vm:SkillDetailScopeOption">
+													<TextBlock Text="{Binding DisplayName}" />
+												</DataTemplate>
+											</ComboBox.ItemTemplate>
+										</ComboBox>
+									</StackPanel>
+								</Border>
 							</Grid>
 						</StackPanel>
 					</Border>
@@ -225,52 +173,54 @@
 						<StackPanel Margin="0,6,0,0" Orientation="Vertical" Spacing="10">
 							<Border Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
 								<StackPanel Orientation="Vertical" Spacing="6">
-									<Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Panel.Damage]}" FontSize="14" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Summary.Attacks]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="2" Text="{Binding OutgoingDamage.Attempts}" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Summary.DirectHits]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="4" Text="{Binding OutgoingDamage.Hits}" />
-										<TextBlock Grid.Column="5" Text="{Binding Localization[Column.PeriodicHits]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="6" Text="{Binding OutgoingDamage.PeriodicHits}" />
-										<TextBlock Grid.Column="7" Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="8" Text="{Binding OutgoingDamage.SkillCount}" />
-									</Grid>
-									<Grid ColumnDefinitions="2*,76,76,76,64,60,68,96,96,96,96,96,96,96,96,96,96,56" ColumnSpacing="6">
+									<StackPanel Orientation="Vertical" Spacing="4">
+										<TextBlock Text="{Binding Localization[Panel.Damage]}" FontSize="14" FontWeight="Bold" />
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<StackPanel Orientation="Horizontal" Spacing="4">
+												<TextBlock Text="{Binding Localization[Summary.Attacks]}" FontWeight="Bold" />
+												<TextBlock Text="{Binding OutgoingDamage.Attempts}" />
+											</StackPanel>
+											<StackPanel Orientation="Horizontal" Spacing="4">
+												<TextBlock Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
+												<TextBlock Text="{Binding OutgoingDamage.SkillCount}" />
+											</StackPanel>
+										</StackPanel>
+									</StackPanel>
+									<Grid ColumnDefinitions="2*,72,64,64,108,80,96,96,96,96,96,96,96,96,96,96,96,48" ColumnSpacing="4">
 										<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Column.Total]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="2" Text="{Binding Localization[Column.Direct]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Column.PeriodicDamage]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="4" Text="{Binding Localization[Column.Attacks]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="5" Text="{Binding Localization[Column.DirectHits]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="6" Text="{Binding Localization[Column.PeriodicHits]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="7" Text="{Binding Localization[Label.CriticalRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="8" Text="{Binding Localization[Label.PerfectRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="9" Text="{Binding Localization[Label.SmiteRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="10" Text="{Binding Localization[Label.MultiHitRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="11" Text="{Binding Localization[Label.ParryRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="12" Text="{Binding Localization[Label.BlockRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="13" Text="{Binding Localization[Label.EnduranceRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="14" Text="{Binding Localization[Column.Regeneration]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="15" Text="{Binding Localization[Label.EvadeRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="16" Text="{Binding Localization[Column.Invincible]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="17" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" />
+										<TextBlock Grid.Column="1" Text="{Binding Localization[Column.Total]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+										<TextBlock Grid.Column="2" Text="{Binding Localization[Column.Direct]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+										<TextBlock Grid.Column="3" Text="{Binding Localization[Column.PeriodicDamage]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+										<TextBlock Grid.Column="4" Text="{Binding OutgoingDamage.HitCountColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="5" Text="{Binding OutgoingDamage.PeriodicHitsColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="6" Text="{Binding OutgoingDamage.CriticalColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="7" Text="{Binding OutgoingDamage.PerfectColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="8" Text="{Binding OutgoingDamage.SmiteColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="9" Text="{Binding OutgoingDamage.MultiHitColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="10" Text="{Binding OutgoingDamage.BackColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="11" Text="{Binding OutgoingDamage.ParryColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="12" Text="{Binding OutgoingDamage.BlockColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="13" Text="{Binding OutgoingDamage.EnduranceColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="14" Text="{Binding OutgoingDamage.RegenerationColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="15" Text="{Binding OutgoingDamage.EvadeColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="16" Text="{Binding OutgoingDamage.InvincibleColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="17" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
 									</Grid>
 									<ItemsControl ItemsSource="{Binding OutgoingDamage.Rows}">
 										<ItemsControl.ItemTemplate>
 											<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-												<Grid ColumnDefinitions="2*,76,76,76,64,60,68,96,96,96,96,96,96,96,96,96,96,56" ColumnSpacing="6">
+												<Grid ColumnDefinitions="2*,72,64,64,108,80,96,96,96,96,96,96,96,96,96,96,96,48" ColumnSpacing="4">
 													<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
 													<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="2" Text="{Binding DirectAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="3" Text="{Binding PeriodicAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="4" Text="{Binding Attempts}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="5" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="6" Text="{Binding PeriodicHits}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="7" Text="{Binding CriticalSummary}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="8" Text="{Binding PerfectSummary}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="9" Text="{Binding SmiteSummary}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="10" Text="{Binding MultiHitSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="4" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="5" Text="{Binding PeriodicHits}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="6" Text="{Binding CriticalSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="7" Text="{Binding PerfectSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="8" Text="{Binding SmiteSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="9" Text="{Binding MultiHitSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="10" Text="{Binding BackSummary}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="11" Text="{Binding ParrySummary}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="12" Text="{Binding BlockSummary}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="13" Text="{Binding EnduranceSummary}" Margin="0,2" HorizontalAlignment="Right" />
@@ -288,73 +238,72 @@
 
 							<TextBlock Classes="SupportSectionLabel" Margin="2,0,0,0" Text="{Binding Localization[Panel.Support]}" />
 
-							<Border Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
-								<StackPanel Orientation="Vertical" Spacing="6">
-									<Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="10">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Panel.Healing]}" FontSize="14" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Summary.Hits]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="2" Text="{Binding OutgoingHealing.Hits}" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="4" Text="{Binding OutgoingHealing.SkillCount}" />
-									</Grid>
-									<Grid ColumnDefinitions="2*,86,76,76,76,56,56" ColumnSpacing="6">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Column.Total]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="2" Text="{Binding Localization[Column.Heal]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Column.Hot]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="4" Text="{Binding Localization[Column.DrainHeal]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="5" Text="{Binding Localization[Column.Hits]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="6" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" />
-									</Grid>
-									<ItemsControl ItemsSource="{Binding OutgoingHealing.Rows}">
-										<ItemsControl.ItemTemplate>
-											<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-												<Grid ColumnDefinitions="2*,86,76,76,76,56,56" ColumnSpacing="6">
-													<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
-													<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="2" Text="{Binding DirectAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="3" Text="{Binding PeriodicAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="4" Text="{Binding DrainAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="5" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="6" Text="{Binding SharePercent, StringFormat={}{0:P1}}" Margin="0,2" HorizontalAlignment="Right" />
-												</Grid>
-											</DataTemplate>
-										</ItemsControl.ItemTemplate>
-									</ItemsControl>
-									<TextBlock Text="{Binding Localization[Panel.EmptySkills]}" Foreground="Gray" IsVisible="{Binding OutgoingHealing.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
-								</StackPanel>
-							</Border>
-
-							<Border Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
-								<StackPanel Orientation="Vertical" Spacing="6">
-									<Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="10">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Panel.Shield]}" FontSize="14" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Summary.Hits]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="2" Text="{Binding OutgoingShield.Hits}" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="4" Text="{Binding OutgoingShield.SkillCount}" />
-									</Grid>
-									<Grid ColumnDefinitions="2*,84,56,56" ColumnSpacing="6">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Column.Total]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="2" Text="{Binding Localization[Column.Hits]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" />
-									</Grid>
-									<ItemsControl ItemsSource="{Binding OutgoingShield.Rows}">
-										<ItemsControl.ItemTemplate>
-											<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-												<Grid ColumnDefinitions="2*,84,56,56" ColumnSpacing="6">
-													<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
-													<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="2" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="3" Text="{Binding SharePercent, StringFormat={}{0:P1}}" Margin="0,2" HorizontalAlignment="Right" />
-												</Grid>
-											</DataTemplate>
-										</ItemsControl.ItemTemplate>
-									</ItemsControl>
-									<TextBlock Text="{Binding Localization[Panel.EmptySkills]}" Foreground="Gray" IsVisible="{Binding OutgoingShield.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
-								</StackPanel>
-							</Border>
+							<TabControl>
+								<TabItem Header="{Binding Localization[Panel.Healing]}">
+									<Border Margin="0,6,0,0" Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
+										<StackPanel Orientation="Vertical" Spacing="6">
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<TextBlock Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
+												<TextBlock Text="{Binding OutgoingHealing.SkillCount}" />
+											</StackPanel>
+											<Grid ColumnDefinitions="2*,96,86,96,96,80,56" ColumnSpacing="4">
+												<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
+												<TextBlock Grid.Column="1" Text="{Binding OutgoingHealing.TotalColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="2" Text="{Binding OutgoingHealing.HealColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="3" Text="{Binding OutgoingHealing.HotColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="4" Text="{Binding OutgoingHealing.DrainHealColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="5" Text="{Binding OutgoingHealing.HitsColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="6" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+											</Grid>
+											<ItemsControl ItemsSource="{Binding OutgoingHealing.Rows}">
+												<ItemsControl.ItemTemplate>
+													<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
+														<Grid ColumnDefinitions="2*,96,86,96,96,80,56" ColumnSpacing="4">
+															<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
+															<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="2" Text="{Binding DirectAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="3" Text="{Binding PeriodicAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="4" Text="{Binding DrainAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="5" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="6" Text="{Binding SharePercent, StringFormat={}{0:P1}}" Margin="0,2" HorizontalAlignment="Right" />
+														</Grid>
+													</DataTemplate>
+												</ItemsControl.ItemTemplate>
+											</ItemsControl>
+											<TextBlock Text="{Binding Localization[Panel.EmptySkills]}" Foreground="Gray" IsVisible="{Binding OutgoingHealing.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
+										</StackPanel>
+									</Border>
+								</TabItem>
+								<TabItem Header="{Binding Localization[Panel.Shield]}">
+									<Border Margin="0,6,0,0" Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
+										<StackPanel Orientation="Vertical" Spacing="6">
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<TextBlock Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
+												<TextBlock Text="{Binding OutgoingShield.SkillCount}" />
+											</StackPanel>
+											<Grid ColumnDefinitions="2*,96,80,56" ColumnSpacing="4">
+												<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
+												<TextBlock Grid.Column="1" Text="{Binding OutgoingShield.TotalColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="2" Text="{Binding OutgoingShield.HitsColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="3" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+											</Grid>
+											<ItemsControl ItemsSource="{Binding OutgoingShield.Rows}">
+												<ItemsControl.ItemTemplate>
+													<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
+														<Grid ColumnDefinitions="2*,96,80,56" ColumnSpacing="4">
+															<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
+															<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="2" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="3" Text="{Binding SharePercent, StringFormat={}{0:P1}}" Margin="0,2" HorizontalAlignment="Right" />
+														</Grid>
+													</DataTemplate>
+												</ItemsControl.ItemTemplate>
+											</ItemsControl>
+											<TextBlock Text="{Binding Localization[Panel.EmptySkills]}" Foreground="Gray" IsVisible="{Binding OutgoingShield.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
+										</StackPanel>
+									</Border>
+								</TabItem>
+							</TabControl>
 						</StackPanel>
 					</TabItem>
 
@@ -362,52 +311,54 @@
 						<StackPanel Margin="0,6,0,0" Orientation="Vertical" Spacing="10">
 							<Border Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
 								<StackPanel Orientation="Vertical" Spacing="6">
-									<Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Panel.Damage]}" FontSize="14" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Summary.Attacks]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="2" Text="{Binding IncomingDamage.Attempts}" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Summary.DirectHits]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="4" Text="{Binding IncomingDamage.Hits}" />
-										<TextBlock Grid.Column="5" Text="{Binding Localization[Column.PeriodicHits]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="6" Text="{Binding IncomingDamage.PeriodicHits}" />
-										<TextBlock Grid.Column="7" Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="8" Text="{Binding IncomingDamage.SkillCount}" />
-									</Grid>
-									<Grid ColumnDefinitions="2*,76,76,76,64,60,68,96,96,96,96,96,96,96,96,96,96,56" ColumnSpacing="6">
+									<StackPanel Orientation="Vertical" Spacing="4">
+										<TextBlock Text="{Binding Localization[Panel.Damage]}" FontSize="14" FontWeight="Bold" />
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<StackPanel Orientation="Horizontal" Spacing="4">
+												<TextBlock Text="{Binding Localization[Summary.Attacks]}" FontWeight="Bold" />
+												<TextBlock Text="{Binding IncomingDamage.Attempts}" />
+											</StackPanel>
+											<StackPanel Orientation="Horizontal" Spacing="4">
+												<TextBlock Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
+												<TextBlock Text="{Binding IncomingDamage.SkillCount}" />
+											</StackPanel>
+										</StackPanel>
+									</StackPanel>
+									<Grid ColumnDefinitions="2*,72,64,64,108,80,96,96,96,96,96,96,96,96,96,96,96,48" ColumnSpacing="4">
 										<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Column.Total]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="2" Text="{Binding Localization[Column.Direct]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Column.PeriodicDamage]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="4" Text="{Binding Localization[Column.Attacks]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="5" Text="{Binding Localization[Column.DirectHits]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="6" Text="{Binding Localization[Column.PeriodicHits]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="7" Text="{Binding Localization[Label.CriticalRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="8" Text="{Binding Localization[Label.PerfectRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="9" Text="{Binding Localization[Label.SmiteRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="10" Text="{Binding Localization[Label.MultiHitRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="11" Text="{Binding Localization[Label.ParryRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="12" Text="{Binding Localization[Label.BlockRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="13" Text="{Binding Localization[Label.EnduranceRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="14" Text="{Binding Localization[Column.Regeneration]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="15" Text="{Binding Localization[Label.EvadeRate]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="16" Text="{Binding Localization[Column.Invincible]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="17" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" />
+										<TextBlock Grid.Column="1" Text="{Binding Localization[Column.Total]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+										<TextBlock Grid.Column="2" Text="{Binding Localization[Column.Direct]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+										<TextBlock Grid.Column="3" Text="{Binding Localization[Column.PeriodicDamage]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+										<TextBlock Grid.Column="4" Text="{Binding IncomingDamage.HitCountColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="5" Text="{Binding IncomingDamage.PeriodicHitsColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="6" Text="{Binding IncomingDamage.CriticalColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="7" Text="{Binding IncomingDamage.PerfectColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="8" Text="{Binding IncomingDamage.SmiteColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="9" Text="{Binding IncomingDamage.MultiHitColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="10" Text="{Binding IncomingDamage.BackColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="11" Text="{Binding IncomingDamage.ParryColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="12" Text="{Binding IncomingDamage.BlockColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="13" Text="{Binding IncomingDamage.EnduranceColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="14" Text="{Binding IncomingDamage.RegenerationColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="15" Text="{Binding IncomingDamage.EvadeColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="16" Text="{Binding IncomingDamage.InvincibleColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+										<TextBlock Grid.Column="17" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
 									</Grid>
 									<ItemsControl ItemsSource="{Binding IncomingDamage.Rows}">
 										<ItemsControl.ItemTemplate>
 											<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-												<Grid ColumnDefinitions="2*,76,76,76,64,60,68,96,96,96,96,96,96,96,96,96,96,56" ColumnSpacing="6">
+												<Grid ColumnDefinitions="2*,72,64,64,108,80,96,96,96,96,96,96,96,96,96,96,96,48" ColumnSpacing="4">
 													<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
 													<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="2" Text="{Binding DirectAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="3" Text="{Binding PeriodicAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="4" Text="{Binding Attempts}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="5" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="6" Text="{Binding PeriodicHits}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="7" Text="{Binding CriticalSummary}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="8" Text="{Binding PerfectSummary}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="9" Text="{Binding SmiteSummary}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="10" Text="{Binding MultiHitSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="4" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="5" Text="{Binding PeriodicHits}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="6" Text="{Binding CriticalSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="7" Text="{Binding PerfectSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="8" Text="{Binding SmiteSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="9" Text="{Binding MultiHitSummary}" Margin="0,2" HorizontalAlignment="Right" />
+													<TextBlock Grid.Column="10" Text="{Binding BackSummary}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="11" Text="{Binding ParrySummary}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="12" Text="{Binding BlockSummary}" Margin="0,2" HorizontalAlignment="Right" />
 													<TextBlock Grid.Column="13" Text="{Binding EnduranceSummary}" Margin="0,2" HorizontalAlignment="Right" />
@@ -425,75 +376,72 @@
 
 							<TextBlock Classes="SupportSectionLabel" Margin="2,0,0,0" Text="{Binding Localization[Panel.Support]}" />
 
-							<Border Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
-								<StackPanel Orientation="Vertical" Spacing="6">
-									<Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="10">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Panel.Healing]}" FontSize="14" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Summary.Hits]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="2" Text="{Binding IncomingHealing.Hits}" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="4" Text="{Binding IncomingHealing.SkillCount}" />
-									</Grid>
-
-									<Grid ColumnDefinitions="2*,86,76,76,76,56,56" ColumnSpacing="6">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Column.Total]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="2" Text="{Binding Localization[Column.Heal]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Column.Hot]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="4" Text="{Binding Localization[Column.DrainHeal]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="5" Text="{Binding Localization[Column.Hits]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="6" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" />
-									</Grid>
-									<ItemsControl ItemsSource="{Binding IncomingHealing.Rows}">
-										<ItemsControl.ItemTemplate>
-											<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-												<Grid ColumnDefinitions="2*,86,76,76,76,56,56" ColumnSpacing="6">
-													<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
-													<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="2" Text="{Binding DirectAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="3" Text="{Binding PeriodicAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="4" Text="{Binding DrainAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="5" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="6" Text="{Binding SharePercent, StringFormat={}{0:P1}}" Margin="0,2" HorizontalAlignment="Right" />
-												</Grid>
-											</DataTemplate>
-										</ItemsControl.ItemTemplate>
-									</ItemsControl>
-									<TextBlock Text="{Binding Localization[Panel.EmptySkills]}" Foreground="Gray" IsVisible="{Binding IncomingHealing.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
-								</StackPanel>
-							</Border>
-
-							<Border Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
-								<StackPanel Orientation="Vertical" Spacing="6">
-									<Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="10">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Panel.Shield]}" FontSize="14" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Summary.Hits]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="2" Text="{Binding IncomingShield.Hits}" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="4" Text="{Binding IncomingShield.SkillCount}" />
-									</Grid>
-
-									<Grid ColumnDefinitions="2*,84,56,56" ColumnSpacing="6">
-										<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
-										<TextBlock Grid.Column="1" Text="{Binding Localization[Column.Total]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="2" Text="{Binding Localization[Column.Hits]}" FontWeight="Bold" HorizontalAlignment="Right" />
-										<TextBlock Grid.Column="3" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" />
-									</Grid>
-									<ItemsControl ItemsSource="{Binding IncomingShield.Rows}">
-										<ItemsControl.ItemTemplate>
-											<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-												<Grid ColumnDefinitions="2*,84,56,56" ColumnSpacing="6">
-													<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
-													<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="2" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
-													<TextBlock Grid.Column="3" Text="{Binding SharePercent, StringFormat={}{0:P1}}" Margin="0,2" HorizontalAlignment="Right" />
-												</Grid>
-											</DataTemplate>
-										</ItemsControl.ItemTemplate>
-									</ItemsControl>
-									<TextBlock Text="{Binding Localization[Panel.EmptySkills]}" Foreground="Gray" IsVisible="{Binding IncomingShield.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
-								</StackPanel>
-							</Border>
+							<TabControl>
+								<TabItem Header="{Binding Localization[Panel.Healing]}">
+									<Border Margin="0,6,0,0" Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
+										<StackPanel Orientation="Vertical" Spacing="6">
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<TextBlock Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
+												<TextBlock Text="{Binding IncomingHealing.SkillCount}" />
+											</StackPanel>
+											<Grid ColumnDefinitions="2*,96,86,96,96,80,56" ColumnSpacing="4">
+												<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
+												<TextBlock Grid.Column="1" Text="{Binding IncomingHealing.TotalColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="2" Text="{Binding IncomingHealing.HealColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="3" Text="{Binding IncomingHealing.HotColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="4" Text="{Binding IncomingHealing.DrainHealColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="5" Text="{Binding IncomingHealing.HitsColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="6" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+											</Grid>
+											<ItemsControl ItemsSource="{Binding IncomingHealing.Rows}">
+												<ItemsControl.ItemTemplate>
+													<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
+														<Grid ColumnDefinitions="2*,96,86,96,96,80,56" ColumnSpacing="4">
+															<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
+															<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="2" Text="{Binding DirectAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="3" Text="{Binding PeriodicAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="4" Text="{Binding DrainAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="5" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="6" Text="{Binding SharePercent, StringFormat={}{0:P1}}" Margin="0,2" HorizontalAlignment="Right" />
+														</Grid>
+													</DataTemplate>
+												</ItemsControl.ItemTemplate>
+											</ItemsControl>
+											<TextBlock Text="{Binding Localization[Panel.EmptySkills]}" Foreground="Gray" IsVisible="{Binding IncomingHealing.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
+										</StackPanel>
+									</Border>
+								</TabItem>
+								<TabItem Header="{Binding Localization[Panel.Shield]}">
+									<Border Margin="0,6,0,0" Background="#30111111" BorderBrush="#50808080" BorderThickness="1" CornerRadius="8" Padding="8">
+										<StackPanel Orientation="Vertical" Spacing="6">
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<TextBlock Text="{Binding Localization[Summary.Skills]}" FontWeight="Bold" />
+												<TextBlock Text="{Binding IncomingShield.SkillCount}" />
+											</StackPanel>
+											<Grid ColumnDefinitions="2*,96,80,56" ColumnSpacing="4">
+												<TextBlock Grid.Column="0" Text="{Binding Localization[Column.Skill]}" FontWeight="Bold" />
+												<TextBlock Grid.Column="1" Text="{Binding IncomingShield.TotalColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="2" Text="{Binding IncomingShield.HitsColumnHeader}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" TextWrapping="Wrap" />
+												<TextBlock Grid.Column="3" Text="{Binding Localization[Column.Share]}" FontWeight="Bold" HorizontalAlignment="Right" TextAlignment="Right" />
+											</Grid>
+											<ItemsControl ItemsSource="{Binding IncomingShield.Rows}">
+												<ItemsControl.ItemTemplate>
+													<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
+														<Grid ColumnDefinitions="2*,96,80,56" ColumnSpacing="4">
+															<TextBlock Grid.Column="0" Text="{Binding SkillName}" Margin="0,2" />
+															<TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:0}}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="2" Text="{Binding Hits}" Margin="0,2" HorizontalAlignment="Right" />
+															<TextBlock Grid.Column="3" Text="{Binding SharePercent, StringFormat={}{0:P1}}" Margin="0,2" HorizontalAlignment="Right" />
+														</Grid>
+													</DataTemplate>
+												</ItemsControl.ItemTemplate>
+											</ItemsControl>
+											<TextBlock Text="{Binding Localization[Panel.EmptySkills]}" Foreground="Gray" IsVisible="{Binding IncomingShield.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
+										</StackPanel>
+									</Border>
+								</TabItem>
+							</TabControl>
 						</StackPanel>
 					</TabItem>
 				</TabControl>
