@@ -218,7 +218,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             var (battleStart, battleEnd) = ResolveBattleWindow(targetDecision.TargetIds);
             var battleTime = battleEnd - battleStart;
 
-            double totalDamage = 0;
+            long totalDamage = 0;
 
             dataSnapshot.BattleStartTime = battleStart;
             dataSnapshot.BattleEndTime = battleEnd;
@@ -268,10 +268,10 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
             foreach (var data in dataSnapshot.Combatants.Values)
             {
-                data.DamagePerSecond = data.DamageAmount / battleTime * 1000;
-                data.HealingPerSecond = data.HealingAmount / battleTime * 1000;
+                data.DamagePerSecond = (double)data.DamageAmount / battleTime * 1000;
+                data.HealingPerSecond = (double)data.HealingAmount / battleTime * 1000;
                 data.DamageContribution = totalDamage > 0
-                    ? data.DamageAmount / totalDamage * 100
+                    ? (double)data.DamageAmount / totalDamage * 100
                     : 0;
             }
 

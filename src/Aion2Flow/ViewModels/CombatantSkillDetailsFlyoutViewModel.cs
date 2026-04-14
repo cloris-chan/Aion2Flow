@@ -648,7 +648,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
                     0,
                     totalHits,
                     totalHits,
-                    0,
+                    skill.PeriodicHealingTimes,
                     0,
                     0,
                     0,

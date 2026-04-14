@@ -211,44 +211,43 @@ public sealed class SkillMetrics
 
     private CombatValueKind ResolvePrimaryValueKind()
     {
-        var candidates = new (CombatValueKind Kind, long Amount, int Times)[]
-        {
-            (CombatValueKind.DrainHealing, DrainHealingAmount, DrainHealingTimes),
-            (CombatValueKind.PeriodicHealing, PeriodicHealingAmount, PeriodicHealingTimes),
-            (CombatValueKind.Healing, HealingAmount, HealingTimes),
-            (CombatValueKind.PeriodicDamage, PeriodicDamageAmount, PeriodicDamageTimes),
-            (CombatValueKind.Damage, DamageAmount, Times),
-            (CombatValueKind.Shield, ShieldAmount, ShieldTimes),
-            (CombatValueKind.Support, 0, SupportTimes)
-        };
-
         var best = CombatValueKind.Unknown;
         var bestAmount = -1L;
         var bestTimes = -1;
         var bestPriority = int.MinValue;
 
-        foreach (var candidate in candidates)
-        {
-            if (candidate.Amount <= 0 && candidate.Times <= 0)
-            {
-                continue;
-            }
-
-            var priority = GetValueKindPriority(candidate.Kind);
-            if (candidate.Amount > bestAmount ||
-                (candidate.Amount == bestAmount && candidate.Times > bestTimes) ||
-                (candidate.Amount == bestAmount && candidate.Times == bestTimes && priority > bestPriority))
-            {
-                best = candidate.Kind;
-                bestAmount = candidate.Amount;
-                bestTimes = candidate.Times;
-                bestPriority = priority;
-            }
-        }
+        Consider(CombatValueKind.DrainHealing, DrainHealingAmount, DrainHealingTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
+        Consider(CombatValueKind.PeriodicHealing, PeriodicHealingAmount, PeriodicHealingTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
+        Consider(CombatValueKind.Healing, HealingAmount, HealingTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
+        Consider(CombatValueKind.PeriodicDamage, PeriodicDamageAmount, PeriodicDamageTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
+        Consider(CombatValueKind.Damage, DamageAmount, Times, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
+        Consider(CombatValueKind.Shield, ShieldAmount, ShieldTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
+        Consider(CombatValueKind.Support, 0, SupportTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
 
         return best == CombatValueKind.Unknown
             ? PrimaryValueKind
             : best;
+
+        static void Consider(
+            CombatValueKind kind, long amount, int times,
+            ref CombatValueKind best, ref long bestAmount, ref int bestTimes, ref int bestPriority)
+        {
+            if (amount <= 0 && times <= 0)
+            {
+                return;
+            }
+
+            var priority = GetValueKindPriority(kind);
+            if (amount > bestAmount ||
+                (amount == bestAmount && times > bestTimes) ||
+                (amount == bestAmount && times == bestTimes && priority > bestPriority))
+            {
+                best = kind;
+                bestAmount = amount;
+                bestTimes = times;
+                bestPriority = priority;
+            }
+        }
     }
 
     private static int GetValueKindPriority(CombatValueKind kind)

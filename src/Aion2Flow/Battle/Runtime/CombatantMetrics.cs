@@ -11,24 +11,24 @@ public sealed class CombatantMetrics(string nickname)
     public double DamagePerSecond { get; set; }
     public double HealingPerSecond { get; set; }
 
-    public double DamageAmount { get; private set; }
-    public double HealingAmount { get; private set; }
-    public double PeriodicHealingAmount { get; private set; }
-    public double DrainDamageAmount { get; private set; }
-    public double DrainHealingAmount { get; private set; }
-    public double ShieldAmount { get; private set; }
+    public long DamageAmount { get; private set; }
+    public long HealingAmount { get; private set; }
+    public long PeriodicHealingAmount { get; private set; }
+    public long DrainDamageAmount { get; private set; }
+    public long DrainHealingAmount { get; private set; }
+    public long ShieldAmount { get; private set; }
     public int ShieldTimes { get; private set; }
     public double DamageContribution { get; set; }
 
     public Dictionary<int, SkillMetrics> Skills { get; } = [];
     public string Nickname { get; } = nickname;
 
-    private void AddDamageAmount(double amount) => DamageAmount += amount;
-    private void AddHealingAmount(double amount) => HealingAmount += amount;
-    private void AddPeriodicHealingAmount(double amount) => PeriodicHealingAmount += amount;
-    private void AddDrainDamageAmount(double amount) => DrainDamageAmount += amount;
-    private void AddDrainHealingAmount(double amount) => DrainHealingAmount += amount;
-    private void AddShieldAmount(double amount) => ShieldAmount += amount;
+    private void AddDamageAmount(int amount) => DamageAmount += amount;
+    private void AddHealingAmount(int amount) => HealingAmount += amount;
+    private void AddPeriodicHealingAmount(int amount) => PeriodicHealingAmount += amount;
+    private void AddDrainDamageAmount(int amount) => DrainDamageAmount += amount;
+    private void AddDrainHealingAmount(int amount) => DrainHealingAmount += amount;
+    private void AddShieldAmount(int amount) => ShieldAmount += amount;
     private void AddShieldTime() => ShieldTimes++;
 
     public bool ProcessCombatEvent(ParsedCombatPacket packet)
