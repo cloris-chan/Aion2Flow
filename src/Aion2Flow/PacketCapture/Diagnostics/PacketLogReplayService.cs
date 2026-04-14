@@ -335,7 +335,7 @@ public sealed class PacketLogReplayService
             "state-0240" => TryReplay0240(store, packet),
             "state-4636" => TryReplay4636(store, packet),
             "state-4536" => TryReplay4536(store, packet),
-            "state-4036" => Packet4036Parser.TryParse(packet, out _),
+            "state-4036" => TryReplayState4036(store, packet),
             "state-4136" => Packet4136Parser.TryParse(packet, out _),
             "state-1d37" => Packet1D37Parser.TryParse(packet, out _),
             "state-4936" => Packet4936Parser.TryParse(packet, out _),
@@ -770,6 +770,16 @@ public sealed class PacketLogReplayService
         }
 
         return true;
+    }
+
+    private static bool TryReplayState4036(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    {
+        if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
+        {
+            TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value);
+        }
+
+        return Packet4036Parser.TryParse(packet, out _);
     }
 
     private static bool TryParseNpcSpawnMetadata(string metadata, out int entityId, out int npcCode)

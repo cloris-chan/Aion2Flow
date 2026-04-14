@@ -913,19 +913,14 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         var reader = new PacketSpanReader(payload);
         if (!reader.TryAdvance(2)) return false;
         if (!reader.TryReadVarInt(out var summonId)) return false;
-        if (!reader.TryAdvance(28)) return false;
+        if (!reader.TryAdvance(3)) return false;
 
         int? npcCode = null;
-        var summonReader = reader;
-        if (summonReader.TryReadVarInt(out var npc1))
+        if (reader.TryReadUInt32Le(out var npcValue) && npcValue is >= 2_000_000 and <= 2_999_999)
         {
-            var npcReader = summonReader;
-            if (npcReader.TryReadVarInt(out var npc2) && npc1 == npc2)
-            {
-                npcCode = npc1;
-                TryApplyNpcCatalog(summonId, npc1);
-                store.AppendNpcKind(summonId, NpcKind.Summon);
-            }
+            npcCode = npcValue;
+            TryApplyNpcCatalog(summonId, npcValue);
+            store.AppendNpcKind(summonId, NpcKind.Summon);
         }
 
         ReadOnlySpan<byte> keyPattern = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
@@ -1396,6 +1391,11 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
     private bool Parse4036StatePacket(ReadOnlySpan<byte> packet, string family)
     {
+        if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
+        {
+            TryApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value);
+        }
+
         if (!Packet4036Parser.TryParse(packet, out var parsed))
         {
             return false;

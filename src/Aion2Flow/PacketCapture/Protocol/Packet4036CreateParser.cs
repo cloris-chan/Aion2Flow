@@ -31,17 +31,12 @@ internal static class Packet4036CreateParser
 
         if (!reader.TryAdvance(2)) return false;
         if (!reader.TryReadVarInt(out var summonId)) return false;
-        if (!reader.TryAdvance(28)) return false;
+        if (!reader.TryAdvance(3)) return false;
 
         int? npcCode = null;
-        var duplicateReader = reader;
-        if (duplicateReader.TryReadVarInt(out var npc0))
+        if (reader.TryReadUInt32Le(out var npcValue) && npcValue is >= 2_000_000 and <= 2_999_999)
         {
-            var npcReader = duplicateReader;
-            if (npcReader.TryReadVarInt(out var npc1) && npc0 == npc1)
-            {
-                npcCode = npc0;
-            }
+            npcCode = npcValue;
         }
 
         var keyIndex = FindArrayIndex(packet, EightByteMarker);
@@ -129,25 +124,16 @@ internal static class Packet4036CreateParser
         if (packet[reader.Offset] != 0x40 || packet[reader.Offset + 1] != 0x36) return false;
 
         var family = ClassifyFamily(packet.Length);
-        if (family is not "create-198" and not "create-177")
-        {
-            return false;
-        }
 
         if (!reader.TryAdvance(2)) return false;
         if (!reader.TryReadVarInt(out var entityId)) return false;
         if (entityId <= 0) return false;
-        if (!reader.TryAdvance(28)) return false;
+        if (!reader.TryAdvance(3)) return false;
 
         int? npcCode = null;
-        var duplicateReader = reader;
-        if (duplicateReader.TryReadVarInt(out var npc0))
+        if (reader.TryReadUInt32Le(out var npcValue) && npcValue is >= 2_000_000 and <= 2_999_999)
         {
-            var npcReader = duplicateReader;
-            if (npcReader.TryReadVarInt(out var npc1) && npc0 == npc1)
-            {
-                npcCode = npc0;
-            }
+            npcCode = npcValue;
         }
 
         result = new Packet4036NpcSpawn(family, entityId, npcCode);
