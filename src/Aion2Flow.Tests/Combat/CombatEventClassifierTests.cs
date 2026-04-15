@@ -166,6 +166,30 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
+    public void Classifies_Target_Periodic_HoT_With_Mixed_Semantics_As_Healing()
+    {
+        CombatMetricsEngine.SkillMap =
+        [
+            CreateSkill(17091250, "Light of Regeneration", SkillCategory.Cleric, SkillSourceType.PcSkill,
+                SkillKind.PeriodicHealing,
+                SkillSemantics.Damage | SkillSemantics.Healing | SkillSemantics.PeriodicHealing | SkillSemantics.Support)
+        ];
+
+        var packet = new ParsedCombatPacket
+        {
+            TargetId = 14053,
+            SourceId = 12451,
+            SkillCode = 17091250,
+            OriginalSkillCode = 1709125011,
+            EffectFamily = "periodic-target-mode-9",
+            Damage = 6167
+        };
+
+        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.PeriodicHealing, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
     public void Classifies_Target_Periodic_Healing_Sentinel_Overflow_As_Support_Not_Damage()
     {
         CombatMetricsEngine.SkillMap =

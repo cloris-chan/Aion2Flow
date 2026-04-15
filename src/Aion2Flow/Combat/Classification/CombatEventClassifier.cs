@@ -392,9 +392,21 @@ public static class CombatEventClassifier
     }
 
     private static bool HasOffensivePeriodicSignal(SkillSemantics semantics)
-        => (semantics & (SkillSemantics.Damage |
-                         SkillSemantics.PeriodicDamage |
-                         SkillSemantics.DrainOrAbsorb)) != 0;
+    {
+        var offensive = semantics & (SkillSemantics.Damage |
+                                     SkillSemantics.PeriodicDamage |
+                                     SkillSemantics.DrainOrAbsorb);
+        if (offensive == 0)
+            return false;
+
+        if (offensive == SkillSemantics.Damage
+            && (semantics & SkillSemantics.PeriodicHealing) != 0)
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     private static bool IsSupportOnly(SkillSemantics semantics)
     {
