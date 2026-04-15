@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Battle.Archive;
+using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
@@ -935,5 +936,79 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
     {
         var rate = hits > 0 ? count / (double)hits : 0d;
         return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0} ({1:P1})", count, rate);
+    }
+
+    [Fact]
+    public void ScopeOptions_Resolve_Npc_Name_From_Catalog_When_NpcCode_Set()
+    {
+        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), catalog);
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+
+        const int playerId = 1001;
+        const int npcInstanceId = 29994;
+        const int npcCode = 2400032;
+
+        store.AppendNickname(playerId, "Perigee");
+        store.AppendNpcCode(npcInstanceId, npcCode);
+        store.AppendNpcKind(npcInstanceId, NpcKind.Monster);
+
+        AppendPacket(store, playerId, npcInstanceId, 11000010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, npcInstanceId, 11000010, 300, "direct-hit", 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        var snapshot = engine.CreateBattleSnapshot();
+        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+
+        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(2, viewModel.OutgoingDamage.ScopeOptions.Count);
+
+        var npcScope = viewModel.OutgoingDamage.ScopeOptions.FirstOrDefault(x => x.CombatantId == npcInstanceId);
+        Assert.NotNull(npcScope);
+        Assert.True(catalog.TryGetValue(npcCode, out var entry));
+        Assert.Equal(entry.Name, npcScope!.DisplayName);
+    }
+
+    [Fact]
+    public void ScopeOptions_Resolve_Npc_Name_From_Archived_Store()
+    {
+        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), catalog);
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+
+        const int playerId = 1001;
+        const int npcInstanceId = 29994;
+        const int npcCode = 2400032;
+
+        store.AppendNickname(playerId, "Perigee");
+        store.AppendNpcCode(npcInstanceId, npcCode);
+        store.AppendNpcKind(npcInstanceId, NpcKind.Monster);
+        store.AppendNpcName(npcCode, "訓練用稻草人");
+
+        AppendPacket(store, playerId, npcInstanceId, 11000010, 600, "direct-hit", 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, npcInstanceId, 11000010, 400, "direct-hit", 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        var snapshot = engine.CreateBattleSnapshot();
+        var record = archive.Archive(snapshot, store, "manual", isAutomatic: false);
+        Assert.NotNull(record);
+
+        engine.Reset();
+        viewModel.SelectBattleCombatant(record!.BattleId, playerId);
+
+        var npcScope = viewModel.OutgoingDamage.ScopeOptions.FirstOrDefault(x => x.CombatantId == npcInstanceId);
+        Assert.NotNull(npcScope);
+        Assert.True(catalog.TryGetValue(npcCode, out var entry));
+        Assert.Equal(entry.Name, npcScope!.DisplayName);
     }
 }

@@ -593,7 +593,6 @@ public sealed class CombatMetricsStore
         _packetsBySource.Clear();
         _packetsByTarget.Clear();
         _summonOwnerByInstance.Clear();
-        _npcStateByInstance.Clear();
         _recentDrainDamageByTarget.Clear();
         lock (_selfPeriodicHealingPoolLock)
         {

@@ -701,16 +701,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
     internal static string ResolveCombatantDisplayName(CombatMetricsStore store, DamageMeterSnapshot snapshot, int combatantId)
     {
-        if (snapshot.Combatants.TryGetValue(combatantId, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname))
-        {
-            return combatant.Nickname;
-        }
-
-        if (store.Nicknames.TryGetValue(combatantId, out var nickname) && !string.IsNullOrWhiteSpace(nickname))
-        {
-            return nickname;
-        }
-
         if (store.TryGetNpcRuntimeState(combatantId, out var state) &&
             state.NpcCode is int npcCode)
         {
@@ -723,6 +713,16 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             {
                 return npcName;
             }
+        }
+
+        if (snapshot.Combatants.TryGetValue(combatantId, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname))
+        {
+            return combatant.Nickname;
+        }
+
+        if (store.Nicknames.TryGetValue(combatantId, out var nickname) && !string.IsNullOrWhiteSpace(nickname))
+        {
+            return nickname;
         }
 
         return combatantId.ToString(CultureInfo.InvariantCulture);

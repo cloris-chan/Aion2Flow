@@ -252,6 +252,20 @@ public sealed class StatePacketParserTests
     }
 
     [Theory]
+    [MemberData(nameof(FixtureCatalog.NpcSpawn4036Samples), MemberType = typeof(FixtureCatalog))]
+    public void TryParseNpcSpawn_Extracts_Entity_And_NpcCode(FixtureCatalog.NpcSpawn4036Sample sample)
+    {
+        var packet = HexHelper.FromFixture(sample.Path);
+
+        var ok = Packet4036CreateParser.TryParseNpcSpawn(packet, out var result);
+
+        Assert.True(ok);
+        Assert.Equal(sample.Family, result.Family);
+        Assert.Equal(sample.EntityId, result.EntityId);
+        Assert.Equal(sample.NpcCode, result.NpcCode);
+    }
+
+    [Theory]
     [MemberData(nameof(FixtureCatalog.Wrapped8456Samples), MemberType = typeof(FixtureCatalog))]
     public void Parses_8456_Wrapped_Frame(FixtureCatalog.Wrapped8456Sample sample)
     {

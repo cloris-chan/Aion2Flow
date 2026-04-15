@@ -19,6 +19,7 @@ public static class FixtureCatalog
     public sealed record BattleToggleSample(string Path, int NpcId, int TailLength);
 
     public sealed record Create4036Sample(string Path, string Family, int OwnerId, int SummonId, int? NpcCode);
+    public sealed record NpcSpawn4036Sample(string Path, string Family, int EntityId, int? NpcCode);
 
     public sealed record State4136Sample(string Path, int SourceId, byte State0, byte State1);
 
@@ -129,6 +130,16 @@ public static class FixtureCatalog
         yield return [new Create4036Sample("protocol/4036-create-198.hex", "create-198", 1182, 27203, null)];
         yield return [new Create4036Sample("protocol/4036-create-198-summon-skill.hex", "create-198", 12115, 18345, null)];
         yield return [new Create4036Sample("protocol/4036-create-198-summon-skill-20623.hex", "create-198", 2855, 20623, null)];
+    }
+
+    public static IEnumerable<object[]> NpcSpawn4036Samples()
+    {
+        yield return [new NpcSpawn4036Sample("state/4036-state-97.hex", "state-97", 21258, 2701954)];
+        yield return [new NpcSpawn4036Sample("state/4036-state-120-852100.hex", "state-120", 19973, 2910001)];
+        yield return [new NpcSpawn4036Sample("state/4036-state-137-npc-2400032.hex", "state-137", 29994, 2400032)];
+        yield return [new NpcSpawn4036Sample("state/4036-state-152-852100.hex", "state-152", 191528, 2311317)];
+        yield return [new NpcSpawn4036Sample("protocol/4036-create-198.hex", "create-198", 27203, null)];
+        yield return [new NpcSpawn4036Sample("protocol/4036-create-198-summon-skill.hex", "create-198", 18345, null)];
     }
 
     public static IEnumerable<object[]> State4136Samples()

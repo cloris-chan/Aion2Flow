@@ -356,7 +356,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             if (snapshot.Combatants.TryGetValue(row.Id, out var data))
             {
-                row.DisplayName = ResolveDisplayName(row.Id, data.Nickname);
+                row.DisplayName = ResolveDisplayName(snapshot, row.Id);
                 row.CharacterClass = data.CharacterClass;
                 row.DamagePerSecond = data.DamagePerSecond;
                 row.HealingPerSecond = data.HealingPerSecond;
@@ -377,7 +377,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             if (data.CharacterClass is null)
                 continue;
-            var displayName = ResolveDisplayName(id, data.Nickname);
+            var displayName = ResolveDisplayName(snapshot, id);
 
             Combatants.Add(new CombatantRowViewModel
             {
@@ -410,12 +410,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         ApplySnapshot(_displayedSnapshot);
     }
 
-    private static string ResolveDisplayName(int id, string nickname)
+    private string ResolveDisplayName(DamageMeterSnapshot snapshot, int id)
     {
-        if (!string.IsNullOrWhiteSpace(nickname))
-            return nickname;
-
-        return $"ID {id}";
+        var store = IsViewingArchivedBattle && SelectedBattleHistory is not null
+            ? SelectedBattleHistory.Record.Store
+            : _store;
+        return CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, id);
     }
 
     public async ValueTask DisposeAsync()
