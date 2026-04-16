@@ -7,8 +7,6 @@
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 		<PublishAot>true</PublishAot>
 		<IsAotCompatible>true</IsAotCompatible>
-		<AnalysisMode>Recommended</AnalysisMode>
-		<IsAotCompatible>true</IsAotCompatible>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -376,6 +376,14 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         packet.SkillSemantics = CombatEventClassifier.ResolveSkillSemantics(packet.SkillCode);
         packet.ValueKind = CombatEventClassifier.ClassifyValueKind(packet);
         packet.EventKind = CombatEventClassifier.Classify(packet);
+
+        if (packet.ValueKind is CombatValueKind.PeriodicDamage or CombatValueKind.PeriodicHealing
+            && (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) == 0)
+        {
+            packet.HitContribution = 0;
+            packet.AttemptContribution = 0;
+        }
+
         packet.IsNormalized = true;
     }
 

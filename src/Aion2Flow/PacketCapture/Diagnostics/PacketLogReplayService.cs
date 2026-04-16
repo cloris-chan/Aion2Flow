@@ -82,6 +82,7 @@ public sealed class PacketLogReplayService
             }
         }
 
+        store.FlushOrphanCompactHits();
         var snapshot = engine.CreateBattleSnapshot();
         var summaries = BuildCombatantSummaries(store, snapshot);
 
@@ -134,6 +135,8 @@ public sealed class PacketLogReplayService
             }
         }
 
+        store.FlushPendingOutcomeSidecars();
+        store.FlushOrphanCompactHits();
         var snapshot = engine.CreateBattleSnapshot();
         var summaries = BuildCombatantSummaries(store, snapshot);
 
@@ -323,7 +326,7 @@ public sealed class PacketLogReplayService
         {
             "damage" => TryReplayDamage(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "periodic" => TryReplayPeriodic(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "periodic-link" => Packet0538PeriodicValueParser.TryParse(packet, out _),
+            "periodic-link" => TryReplayPeriodicLink(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "compact-value" => TryReplayCompactValue(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "compact-outcome" => TryReplayCompactOutcome(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "compact-0238" => TryReplayCompact0238(store, packet, batchOrdinal),
@@ -450,6 +453,30 @@ public sealed class PacketLogReplayService
         };
 
         store.AppendCombatPacket(combatPacket);
+        return true;
+    }
+
+    private static bool TryReplayPeriodicLink(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    {
+        if (!Packet0538PeriodicValueParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        if (!parsed.IsLinkRecord)
+        {
+            return false;
+        }
+
+        store.RegisterPeriodicLink0538(
+            parsed.TargetId,
+            parsed.SourceId,
+            parsed.LinkId,
+            parsed.Unknown,
+            parsed.TailRaw,
+            timestamp,
+            frameOrdinal,
+            batchOrdinal);
         return true;
     }
 

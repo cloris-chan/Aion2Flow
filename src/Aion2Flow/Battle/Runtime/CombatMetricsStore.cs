@@ -53,7 +53,7 @@ public sealed class CombatMetricsStore
         long FrameOrdinal,
         long BatchOrdinal);
     private readonly record struct AvoidedSignature(int SourceId, int TargetId, int Marker);
-    private readonly record struct PeriodicLinkSignature(int TargetId, int LinkId, int SequenceId, int TailRaw);
+    private readonly record struct PeriodicLinkSignature(int TargetId, int LinkId, int SequenceId, int TailRaw, long BatchOrdinal);
     private sealed record NpcInstanceState
     {
         public int? NpcCode { get; init; }
@@ -100,6 +100,7 @@ public sealed class CombatMetricsStore
     private readonly Queue<PeriodicLinkSignature> _resolvedPeriodicLinkOrder = [];
     private readonly HashSet<int> _currentBatchDodgeTargets = [];
     private readonly HashSet<AvoidedSignature> _resolvedAvoidanceSignatures = [];
+    private readonly List<PendingCompactAvoidance> _pendingCompactDamageEntries = [];
     private int _lastObservedNpcSource;
     private long _observationOrdinal;
     private long _currentAvoidanceBatchOrdinal;
@@ -145,6 +146,75 @@ public sealed class CombatMetricsStore
         }
     }
 
+    public int FlushOrphanCompactHits()
+    {
+        lock (_compactOutcomeLock)
+        {
+            var storedKeys = new HashSet<(long Batch, int Source, int Target, int Marker)>();
+            foreach (var queue in _packetsBySource.Values)
+            {
+                foreach (var p in queue)
+                {
+                    if (p.Marker <= 0 || p.SourceId <= 0 || p.TargetId <= 0 || p.SourceId == p.TargetId)
+                        continue;
+                    if (p.EventKind != CombatEventKind.Damage)
+                        continue;
+                    storedKeys.Add((p.BatchOrdinal, p.SourceId, p.TargetId, p.Marker));
+                    storedKeys.Add((p.BatchOrdinal - 1, p.SourceId, p.TargetId, p.Marker));
+                    storedKeys.Add((p.BatchOrdinal + 1, p.SourceId, p.TargetId, p.Marker));
+                }
+            }
+
+            var totalOrphans = 0;
+            foreach (var entry in _pendingCompactDamageEntries)
+            {
+                if (entry.Marker <= 0)
+                    continue;
+
+                var key = (entry.BatchOrdinal, entry.SourceId, entry.TargetId, entry.Marker);
+                if (storedKeys.Contains(key))
+                    continue;
+
+                var resolvedSkill = CombatMetricsEngine.InferOriginalSkillCode(entry.OriginalSkillCode);
+                if (resolvedSkill is null)
+                    continue;
+
+                if (!CombatMetricsEngine.SkillMap.TryGetValue(resolvedSkill.Value, out var skill))
+                    continue;
+
+                if (skill.SourceType != SkillSourceType.ItemSkill)
+                    continue;
+
+                if ((skill.Semantics & SkillSemantics.PeriodicDamage) != 0)
+                    continue;
+
+                totalOrphans++;
+                var packet = new ParsedCombatPacket
+                {
+                    SourceId = entry.SourceId,
+                    TargetId = entry.TargetId,
+                    OriginalSkillCode = entry.OriginalSkillCode,
+                    SkillCode = entry.OriginalSkillCode,
+                    Marker = entry.Marker,
+                    Timestamp = entry.Timestamp,
+                    FrameOrdinal = entry.FrameOrdinal,
+                    BatchOrdinal = entry.BatchOrdinal,
+                    Damage = 0,
+                    HitContribution = 1,
+                    AttemptContribution = 1,
+                    EventKind = CombatEventKind.Damage,
+                    ValueKind = CombatValueKind.Damage
+                };
+
+                PreparePacketForStorage(packet);
+                StorePacket(packet);
+            }
+
+            _pendingCompactDamageEntries.Clear();
+            return totalOrphans;
+        }
+    }
+
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int type, long timestamp) =>
         RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, 0, type, timestamp, NextObservationOrdinal(), NextObservationOrdinal());
 
@@ -154,6 +224,15 @@ public sealed class CombatMetricsStore
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         RememberNpcObservationSource(sourceId);
+
+        if (type == 2 && sourceId > 0 && targetId > 0 && sourceId != targetId)
+        {
+            lock (_compactOutcomeLock)
+            {
+                _pendingCompactDamageEntries.Add(new PendingCompactAvoidance(
+                    sourceId, targetId, skillCodeRaw, marker, timestamp, frameOrdinal, batchOrdinal));
+            }
+        }
 
         if (!IsCompactEvadeSignal(targetId, sourceId, layoutTag, type) || marker <= 0)
         {
@@ -218,7 +297,7 @@ public sealed class CombatMetricsStore
         {
             EnsureAvoidanceBatch_NoLock(batchOrdinal);
 
-            var signature = new PeriodicLinkSignature(targetId, linkId, sequenceId, tailRaw);
+            var signature = new PeriodicLinkSignature(targetId, linkId, sequenceId, tailRaw, batchOrdinal);
             if (!_resolvedPeriodicLinks.Add(signature))
             {
                 return;

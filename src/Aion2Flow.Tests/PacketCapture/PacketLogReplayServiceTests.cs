@@ -108,6 +108,70 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(primary.IncomingInvincibles == expectedInvincibles, summaryDump);
     }
 
+    [Fact]
+    public void Replay_20260415_Outgoing_Combat_Stats_Match_Game_Ground_Truth()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        var player = replay.Combatants
+            .OrderByDescending(static s => s.OutgoingDamage)
+            .First();
+
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles}\n{summaryDump}";
+
+        Assert.True(player.OutgoingDamage == 20211224, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingInvincibles == 8, $"OutgoingInvincibles={player.OutgoingInvincibles}\n{diagDump}");
+        Assert.True(player.OutgoingHits == 1305, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
+        Assert.True(player.OutgoingAttempts == 1313, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
+    }
+
+    [Fact]
+    public void Replay_20260416021557_Outgoing_Combat_Stats_Match_Game_Ground_Truth()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260416021557.log"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        var player = replay.Combatants
+            .OrderByDescending(static s => s.OutgoingDamage)
+            .First();
+
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles}\n{summaryDump}";
+
+        Assert.True(player.OutgoingDamage == 7920567, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingHits == 1170, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
+        Assert.True(player.OutgoingAttempts == 1170, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
+    }
+
+    [Fact]
+    public void Replay_20260416021406_Outgoing_Combat_Stats_Match_Game_Ground_Truth()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260416021406.log"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        var player = replay.Combatants
+            .OrderByDescending(static s => s.OutgoingDamage)
+            .First();
+
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles} dmg={player.OutgoingDamage}\n{summaryDump}";
+
+        Assert.True(player.OutgoingDamage == 3961239, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingHits == 525, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
+        Assert.True(player.OutgoingAttempts == 525, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
+    }
+
     private static string WriteTempReplayLog(string logKind, params string[] lines)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.{logKind}.log");
