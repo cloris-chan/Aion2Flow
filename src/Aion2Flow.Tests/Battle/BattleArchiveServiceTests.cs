@@ -29,7 +29,7 @@ public sealed class BattleArchiveServiceTests
         var combatant = new CombatantMetrics("Tester")
         {
             DamagePerSecond = 1000,
-            DamageContribution = 100
+            DamageContribution = 1
         };
         snapshot.Combatants[1] = combatant;
         store.AppendNickname(1, "Tester");
@@ -149,7 +149,7 @@ public sealed class BattleArchiveServiceTests
             };
             snapshot.Combatants[i + 1] = new CombatantMetrics($"Tester {i}")
             {
-                DamageContribution = 100,
+                DamageContribution = 1,
                 DamagePerSecond = 1_000 + i
             };
 

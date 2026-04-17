@@ -271,7 +271,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                 data.DamagePerSecond = (double)data.DamageAmount / battleTime * 1000;
                 data.HealingPerSecond = (double)data.HealingAmount / battleTime * 1000;
                 data.DamageContribution = totalDamage > 0
-                    ? (double)data.DamageAmount / totalDamage * 100
+                    ? (double)data.DamageAmount / totalDamage
                     : 0;
             }
 

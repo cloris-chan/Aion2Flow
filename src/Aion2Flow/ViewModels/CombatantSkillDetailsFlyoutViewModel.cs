@@ -51,13 +51,6 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         _battleArchiveService = battleArchiveService;
         _localization = localization;
 
-        OutgoingDamage.SetLocalization(localization);
-        OutgoingHealing.SetLocalization(localization);
-        OutgoingShield.SetLocalization(localization);
-        IncomingDamage.SetLocalization(localization);
-        IncomingHealing.SetLocalization(localization);
-        IncomingShield.SetLocalization(localization);
-
         OutgoingDamage.SelectedScopeChanged += HandleScopeChanged;
         OutgoingHealing.SelectedScopeChanged += HandleScopeChanged;
         IncomingDamage.SelectedScopeChanged += HandleScopeChanged;
@@ -396,18 +389,30 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         }
 
         section.Total = rows.Sum(static x => x.TotalAmount);
+        section.DirectTotal = rows.Sum(static x => x.DirectAmount);
+        section.PeriodicTotal = rows.Sum(static x => x.PeriodicAmount);
+        section.DrainTotal = rows.Sum(static x => x.DrainAmount);
         section.Hits = rows.Sum(static x => x.Hits);
         section.Attempts = rows.Sum(static x => x.Attempts);
         section.PeriodicHits = rows.Sum(static x => x.PeriodicHits);
         section.Evades = rows.Sum(static x => x.Evades);
         section.Invincible = rows.Sum(static x => x.Invincible);
         section.Criticals = rows.Sum(static x => x.Criticals);
+        section.PerfectCount = 0;
+        section.SmiteCount = 0;
+        section.MultiHitCount = 0;
+        section.BackCount = 0;
+        section.ParryCount = 0;
+        section.BlockCount = 0;
+        section.EnduranceCount = 0;
+        section.RegenerationCount = 0;
 
         var battleSeconds = _currentSnapshot.BattleTime > 0
             ? _currentSnapshot.BattleTime / 1000d
             : 0d;
         section.PerSecond = battleSeconds > 0 ? section.Total / battleSeconds : 0d;
 
+        section.HitRate = 0d;
         section.CriticalRate = 0d;
         section.SmiteRate = 0d;
         section.MultiHitRate = 0d;
@@ -419,16 +424,6 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         section.BlockRate = 0d;
         section.EvadeRate = 0d;
         section.InvincibleRate = 0d;
-        section.SetDamageModifierSummaries(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-        if (sectionKind is DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield)
-        {
-            section.UpdateShieldColumnHeaders();
-        }
-        else
-        {
-            section.UpdateHealingColumnHeaders();
-        }
     }
 
     private void ApplyDamageSection(SkillDetailSectionViewModel section, IEnumerable<SkillMetrics> skills)
@@ -469,30 +464,41 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         }
 
         section.Total = total;
+        section.DirectTotal = skills.Sum(static skill => skill.DamageAmount);
+        section.PeriodicTotal = skills.Sum(static skill => skill.PeriodicDamageAmount);
+        section.DrainTotal = 0;
         section.Hits = totalHits;
         section.Attempts = totalAttempts;
         section.PeriodicHits = totalPeriodicHits;
         section.Evades = evades;
         section.Invincible = invincible;
         section.Criticals = critical;
+        section.PerfectCount = perfect;
+        section.SmiteCount = smite;
+        section.MultiHitCount = multiHit;
+        section.BackCount = back;
+        section.ParryCount = parry;
+        section.BlockCount = block;
+        section.EnduranceCount = endurance;
+        section.RegenerationCount = regeneration;
 
         var battleSeconds = _currentSnapshot.BattleTime > 0
             ? _currentSnapshot.BattleTime / 1000d
             : 0d;
         section.PerSecond = battleSeconds > 0 ? section.Total / battleSeconds : 0d;
 
-        section.CriticalRate = totalHits > 0 ? (double)critical / totalHits : 0d;
-        section.PerfectRate = totalHits > 0 ? (double)perfect / totalHits : 0d;
-        section.SmiteRate = totalHits > 0 ? (double)smite / totalHits : 0d;
-        section.MultiHitRate = totalHits > 0 ? (double)multiHit / totalHits : 0d;
-        section.ParryRate = totalHits > 0 ? (double)parry / totalHits : 0d;
-        section.BlockRate = totalHits > 0 ? (double)block / totalHits : 0d;
-        section.EnduranceRate = totalHits > 0 ? (double)endurance / totalHits : 0d;
-        section.RegenerationRate = totalHits > 0 ? (double)regeneration / totalHits : 0d;
-        section.BackRate = totalHits > 0 ? (double)back / totalHits : 0d;
-        section.EvadeRate = totalAttempts > 0 ? (double)evades / totalAttempts : 0d;
-        section.InvincibleRate = totalAttempts > 0 ? (double)invincible / totalAttempts : 0d;
-        section.SetDamageModifierSummaries(critical, perfect, smite, multiHit, parry, block, endurance, regeneration, back, evades, invincible);
+        section.HitRate = totalAttempts > 0 ? totalHits / (double)totalAttempts : 0d;
+        section.CriticalRate = totalHits > 0 ? critical / (double)totalHits : 0d;
+        section.PerfectRate = totalHits > 0 ? perfect / (double)totalHits : 0d;
+        section.SmiteRate = totalHits > 0 ? smite / (double)totalHits : 0d;
+        section.MultiHitRate = totalHits > 0 ? multiHit / (double)totalHits : 0d;
+        section.ParryRate = totalHits > 0 ? parry / (double)totalHits : 0d;
+        section.BlockRate = totalHits > 0 ? block / (double)totalHits : 0d;
+        section.EnduranceRate = totalHits > 0 ? endurance / (double)totalHits : 0d;
+        section.RegenerationRate = totalHits > 0 ? regeneration / (double)totalHits : 0d;
+        section.BackRate = totalHits > 0 ? back / (double)totalHits : 0d;
+        section.EvadeRate = totalAttempts > 0 ? evades / (double)totalAttempts : 0d;
+        section.InvincibleRate = totalAttempts > 0 ? invincible / (double)totalAttempts : 0d;
     }
 
     private static bool MatchesSection(ResolvedDetailPacket packet, DetailSectionKind sectionKind, int combatantId)

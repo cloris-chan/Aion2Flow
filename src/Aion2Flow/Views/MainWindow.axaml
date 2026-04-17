@@ -13,7 +13,7 @@
 		ExtendClientAreaToDecorationsHint="True"
 		TransparencyLevelHint="AcrylicBlur"
 		Background="#80000000"
-		Width="320"
+		Width="280"
 		SizeToContent="Height"
 		CanResize="False"
 		CanMaximize="False"
@@ -30,6 +30,12 @@
 		<Style Selector="TextBlock">
 			<Setter Property="Effect" >
 				<DropShadowEffect  Color="Gray" BlurRadius="4" OffsetX="0" OffsetY="0" />
+			</Setter>
+		</Style>
+
+		<Style Selector="controls|NumericBlock">
+			<Setter Property="Effect" >
+				<DropShadowEffect Color="Gray" BlurRadius="4" OffsetX="0" OffsetY="0" />
 			</Setter>
 		</Style>
 
@@ -336,11 +342,31 @@
 
 							<TextBlock Grid.Column="1" Text="{Binding DisplayName, Mode=OneWay}" VerticalAlignment="Center" Margin="10,0,0,0"/>
 
-							<TextBlock Grid.Column="2" Text="{Binding DamagePerSecond, Mode=OneWay , StringFormat={}{0:0}}" VerticalAlignment="Center" HorizontalAlignment="Stretch" TextAlignment="Right" />
+							<controls:NumericBlock Grid.Column="2"
+													   Value="{Binding DamagePerSecond, Mode=OneWay}"
+													   VerticalAlignment="Center"
+													   HorizontalAlignment="Stretch"
+													   TextAlignment="Right"
+													   UseCompactNotation="True"
+													   CompactThreshold="1000"
+													   CompactSignificantDigits="3" />
 
-							<TextBlock Grid.Column="3" Text="{Binding Damage, Mode=OneWay , StringFormat={}{0:0}}" VerticalAlignment="Center" HorizontalAlignment="Stretch"  TextAlignment="Right" />
+							<controls:NumericBlock Grid.Column="3"
+													   Value="{Binding Damage, Mode=OneWay}"
+													   VerticalAlignment="Center"
+													   HorizontalAlignment="Stretch"
+													   TextAlignment="Right"
+													   UseCompactNotation="True"
+													   CompactThreshold="1000"
+													   CompactSignificantDigits="3" />
 
-							<TextBlock Grid.Column="4" Text="{Binding DamageContribution, Mode=OneWay , StringFormat={}{0:0.0}%}" VerticalAlignment="Center" HorizontalAlignment="Stretch"  TextAlignment="Right" />
+							<controls:NumericBlock Grid.Column="4"
+													   Value="{Binding DamageContribution, Mode=OneWay}"
+													   VerticalAlignment="Center"
+													   HorizontalAlignment="Stretch"
+													   TextAlignment="Right"
+													   FractionDigits="1"
+													   UsePercentageNotation="True" />
 						</Grid>
 					</Border>
 				</DataTemplate>

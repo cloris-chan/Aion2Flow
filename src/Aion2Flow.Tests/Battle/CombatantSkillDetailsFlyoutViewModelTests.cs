@@ -264,14 +264,14 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
         Assert.Equal(3, row.Hits);
-        Assert.Equal(FormatModifierSummary(1, 3), row.CriticalSummary);
-        Assert.Equal(FormatModifierSummary(1, 3), row.PerfectSummary);
-        Assert.Equal(FormatModifierSummary(1, 3), row.SmiteSummary);
-        Assert.Equal(FormatModifierSummary(1, 3), row.ParrySummary);
-        Assert.Equal(FormatModifierSummary(1, 3), row.EnduranceSummary);
-        Assert.Equal(FormatModifierSummary(1, 3), row.BackSummary);
-        Assert.Equal(FormatModifierSummary(0, 3), row.BlockSummary);
-        Assert.Equal(FormatModifierSummary(0, 3), row.EvadeSummary);
+        AssertModifierValues(row.Criticals, row.CriticalRate, 1, 3);
+        AssertModifierValues(row.Perfect, row.PerfectRate, 1, 3);
+        AssertModifierValues(row.Smite, row.SmiteRate, 1, 3);
+        AssertModifierValues(row.Parry, row.ParryRate, 1, 3);
+        AssertModifierValues(row.Endurance, row.EnduranceRate, 1, 3);
+        AssertModifierValues(row.Back, row.BackRate, 1, 3);
+        AssertModifierValues(row.Block, row.BlockRate, 0, 3);
+        AssertModifierValues(row.Evades, row.EvadeRate, 0, 3);
     }
 
     [Fact]
@@ -317,10 +317,10 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
 
         Assert.Equal(2, row.Hits);
         Assert.Equal(188451, row.TotalAmount);
-        Assert.Equal(FormatModifierSummary(1, 2), row.CriticalSummary);
-        Assert.Equal(FormatModifierSummary(1, 2), row.SmiteSummary);
-        Assert.Equal(FormatModifierSummary(1, 2), row.MultiHitSummary);
-        Assert.Equal(FormatModifierSummary(1, 2), row.BackSummary);
+        AssertModifierValues(row.Criticals, row.CriticalRate, 1, 2);
+        AssertModifierValues(row.Smite, row.SmiteRate, 1, 2);
+        AssertModifierValues(row.MultiHit, row.MultiHitRate, 1, 2);
+        AssertModifierValues(row.Back, row.BackRate, 1, 2);
     }
 
     [Fact]
@@ -406,10 +406,10 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
 
         Assert.Equal(2, rows.Length);
         Assert.Equal("大地報應", rows[0].SkillName);
-        Assert.Equal(FormatModifierSummary(2, 2), rows[0].MultiHitSummary);
+        AssertModifierValues(rows[0].MultiHit, rows[0].MultiHitRate, 2, 2);
         Assert.Equal("主神恩寵", rows[1].SkillName);
-        Assert.Equal(FormatModifierSummary(0, 2), rows[1].MultiHitSummary);
-        Assert.Equal(FormatModifierSummary(2, 4), viewModel.OutgoingDamage.MultiHitSummary);
+        AssertModifierValues(rows[1].MultiHit, rows[1].MultiHitRate, 0, 2);
+        AssertModifierValues(viewModel.OutgoingDamage.MultiHitCount, viewModel.OutgoingDamage.MultiHitRate, 2, 4);
     }
 
     [Fact]
@@ -491,8 +491,8 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
 
         Assert.Equal(4, viewModel.OutgoingDamage.Hits);
         Assert.Equal(7, viewModel.OutgoingDamage.PeriodicHits);
-        Assert.Equal(FormatModifierSummary(1, 4), viewModel.OutgoingDamage.CriticalSummary);
-        Assert.Equal(FormatModifierSummary(1, 4), viewModel.OutgoingDamage.BackSummary);
+        AssertModifierValues(viewModel.OutgoingDamage.Criticals, viewModel.OutgoingDamage.CriticalRate, 1, 4);
+        AssertModifierValues(viewModel.OutgoingDamage.BackCount, viewModel.OutgoingDamage.BackRate, 1, 4);
 
         Assert.Collection(
             viewModel.OutgoingDamage.Rows.OrderBy(static row => row.SkillName, StringComparer.Ordinal),
@@ -501,22 +501,22 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
                 Assert.Equal("弱化之印", row.SkillName);
                 Assert.Equal(2, row.Hits);
                 Assert.Equal(3, row.PeriodicHits);
-                Assert.Equal(FormatModifierSummary(0, 2), row.CriticalSummary);
-                Assert.Equal(FormatModifierSummary(1, 2), row.BackSummary);
+                AssertModifierValues(row.Criticals, row.CriticalRate, 0, 2);
+                AssertModifierValues(row.Back, row.BackRate, 1, 2);
             },
             row =>
             {
                 Assert.Equal("痛苦連鎖", row.SkillName);
                 Assert.Equal(1, row.Hits);
                 Assert.Equal(2, row.PeriodicHits);
-                Assert.Equal(FormatModifierSummary(0, 1), row.CriticalSummary);
+                AssertModifierValues(row.Criticals, row.CriticalRate, 0, 1);
             },
             row =>
             {
                 Assert.Equal("破滅之語", row.SkillName);
                 Assert.Equal(1, row.Hits);
                 Assert.Equal(2, row.PeriodicHits);
-                Assert.Equal(FormatModifierSummary(1, 1), row.CriticalSummary);
+                AssertModifierValues(row.Criticals, row.CriticalRate, 1, 1);
             });
     }
 
@@ -563,14 +563,14 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal(3, viewModel.IncomingDamage.Evades);
         Assert.Equal(9, row.Attempts);
         Assert.Equal(6, row.Hits);
-        Assert.Equal(FormatModifierSummary(1, 6), row.ParrySummary);
-        Assert.Equal(FormatModifierSummary(3, 6), row.EnduranceSummary);
-        Assert.Equal(FormatModifierSummary(1, 6), row.RegenerationSummary);
-        Assert.Equal(FormatModifierSummary(2, 6), row.BlockSummary);
-        Assert.Equal(FormatModifierSummary(1, 6), row.PerfectSummary);
-        Assert.Equal(FormatModifierSummary(3, 9), row.EvadeSummary);
-        Assert.Equal(FormatModifierSummary(1, 6), viewModel.IncomingDamage.RegenerationSummary);
-        Assert.Equal(FormatModifierSummary(3, 9), viewModel.IncomingDamage.EvadeSummary);
+        AssertModifierValues(row.Parry, row.ParryRate, 1, 6);
+        AssertModifierValues(row.Endurance, row.EnduranceRate, 3, 6);
+        AssertModifierValues(row.Regeneration, row.RegenerationRate, 1, 6);
+        AssertModifierValues(row.Block, row.BlockRate, 2, 6);
+        AssertModifierValues(row.Perfect, row.PerfectRate, 1, 6);
+        AssertModifierValues(row.Evades, row.EvadeRate, 3, 9);
+        AssertModifierValues(viewModel.IncomingDamage.RegenerationCount, viewModel.IncomingDamage.RegenerationRate, 1, 6);
+        AssertModifierValues(viewModel.IncomingDamage.Evades, viewModel.IncomingDamage.EvadeRate, 3, 9);
     }
 
     [Fact]
@@ -617,8 +617,8 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal(1, viewModel.OutgoingDamage.Hits);
         Assert.Equal(0, viewModel.OutgoingDamage.Evades);
         Assert.Equal(1, viewModel.OutgoingDamage.Invincible);
-        Assert.Equal(FormatModifierSummary(0, 2), viewModel.OutgoingDamage.EvadeSummary);
-        Assert.Equal(FormatModifierSummary(1, 2), viewModel.OutgoingDamage.InvincibleSummary);
+        AssertModifierValues(viewModel.OutgoingDamage.Evades, viewModel.OutgoingDamage.EvadeRate, 0, 2);
+        AssertModifierValues(viewModel.OutgoingDamage.Invincible, viewModel.OutgoingDamage.InvincibleRate, 1, 2);
     }
 
     [Fact]
@@ -667,7 +667,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal(1, viewModel.IncomingDamage.Hits);
         Assert.Equal(1, viewModel.IncomingDamage.Invincible);
         Assert.DoesNotContain(viewModel.IncomingDamage.ScopeOptions, option => option.CombatantId == 0);
-        Assert.Equal(FormatModifierSummary(1, 2), viewModel.IncomingDamage.InvincibleSummary);
+        AssertModifierValues(viewModel.IncomingDamage.Invincible, viewModel.IncomingDamage.InvincibleRate, 1, 2);
     }
 
     [Fact]
@@ -692,8 +692,8 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
 
         Assert.Equal(18, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
-        Assert.Equal(FormatModifierSummary(18, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.EvadeSummary);
-        Assert.Equal(FormatModifierSummary(7, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.InvincibleSummary);
+        AssertModifierValues(viewModel.IncomingDamage.Evades, viewModel.IncomingDamage.EvadeRate, 18, viewModel.IncomingDamage.Attempts);
+        AssertModifierValues(viewModel.IncomingDamage.Invincible, viewModel.IncomingDamage.InvincibleRate, 7, viewModel.IncomingDamage.Attempts);
     }
 
     [Fact]
@@ -722,8 +722,8 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
 
         Assert.Equal(10, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
-        Assert.Equal(FormatModifierSummary(10, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.EvadeSummary);
-        Assert.Equal(FormatModifierSummary(7, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.InvincibleSummary);
+        AssertModifierValues(viewModel.IncomingDamage.Evades, viewModel.IncomingDamage.EvadeRate, 10, viewModel.IncomingDamage.Attempts);
+        AssertModifierValues(viewModel.IncomingDamage.Invincible, viewModel.IncomingDamage.InvincibleRate, 7, viewModel.IncomingDamage.Attempts);
     }
 
     [Fact]
@@ -786,8 +786,8 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
 
         Assert.Equal(18, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
-        Assert.Equal(FormatModifierSummary(18, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.EvadeSummary);
-        Assert.Equal(FormatModifierSummary(7, viewModel.IncomingDamage.Attempts), viewModel.IncomingDamage.InvincibleSummary);
+        AssertModifierValues(viewModel.IncomingDamage.Evades, viewModel.IncomingDamage.EvadeRate, 18, viewModel.IncomingDamage.Attempts);
+        AssertModifierValues(viewModel.IncomingDamage.Invincible, viewModel.IncomingDamage.InvincibleRate, 7, viewModel.IncomingDamage.Attempts);
     }
 
     private static SkillCollection BuildSkillMap()
@@ -932,10 +932,11 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         });
     }
 
-    private static string FormatModifierSummary(int count, int hits)
+    private static void AssertModifierValues(int actualCount, double actualRate, int expectedCount, int denominator)
     {
-        var rate = hits > 0 ? count / (double)hits : 0d;
-        return string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0} ({1:P1})", count, rate);
+        Assert.Equal(expectedCount, actualCount);
+        var expectedRate = denominator > 0 ? expectedCount / (double)denominator : 0d;
+        Assert.Equal(expectedRate, actualRate, 10);
     }
 
     [Fact]

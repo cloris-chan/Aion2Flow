@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed record SkillDetailRowViewModel(
@@ -26,37 +24,25 @@ public sealed record SkillDetailRowViewModel(
     int Block,
     double SharePercent)
 {
-    public string CriticalSummary => FormatHitModifierSummary(Criticals);
+    public double CriticalRate => Hits > 0 ? Criticals / (double)Hits : 0d;
 
-    public string BackSummary => FormatHitModifierSummary(Back);
+    public double BackRate => Hits > 0 ? Back / (double)Hits : 0d;
 
-    public string ParrySummary => FormatHitModifierSummary(Parry);
+    public double ParryRate => Hits > 0 ? Parry / (double)Hits : 0d;
 
-    public string PerfectSummary => FormatHitModifierSummary(Perfect);
+    public double PerfectRate => Hits > 0 ? Perfect / (double)Hits : 0d;
 
-    public string SmiteSummary => FormatHitModifierSummary(Smite);
+    public double SmiteRate => Hits > 0 ? Smite / (double)Hits : 0d;
 
-    public string MultiHitSummary => FormatHitModifierSummary(MultiHit);
+    public double MultiHitRate => Hits > 0 ? MultiHit / (double)Hits : 0d;
 
-    public string EnduranceSummary => FormatHitModifierSummary(Endurance);
+    public double EnduranceRate => Hits > 0 ? Endurance / (double)Hits : 0d;
 
-    public string RegenerationSummary => FormatHitModifierSummary(Regeneration);
+    public double RegenerationRate => Hits > 0 ? Regeneration / (double)Hits : 0d;
 
-    public string BlockSummary => FormatHitModifierSummary(Block);
+    public double BlockRate => Hits > 0 ? Block / (double)Hits : 0d;
 
-    public string EvadeSummary => FormatAttemptModifierSummary(Evades);
+    public double EvadeRate => Attempts > 0 ? Evades / (double)Attempts : 0d;
 
-    public string InvincibleSummary => FormatAttemptModifierSummary(Invincible);
-
-    private string FormatHitModifierSummary(int count)
-    {
-        var rate = Hits > 0 ? count / (double)Hits : 0d;
-        return string.Format(CultureInfo.CurrentCulture, "{0} ({1:P1})", count, rate);
-    }
-
-    private string FormatAttemptModifierSummary(int count)
-    {
-        var rate = Attempts > 0 ? count / (double)Attempts : 0d;
-        return string.Format(CultureInfo.CurrentCulture, "{0} ({1:P1})", count, rate);
-    }
+    public double InvincibleRate => Attempts > 0 ? Invincible / (double)Attempts : 0d;
 }
