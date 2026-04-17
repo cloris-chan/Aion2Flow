@@ -94,6 +94,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public partial CombatantRowViewModel? SelectedCombatant { get; set; }
 
     [ObservableProperty]
+    public partial int MaxVisibleCombatantRows { get; set; } = 4;
+
+    [ObservableProperty]
     public partial bool IsTopMost { get; private set; }
 
     [ObservableProperty]

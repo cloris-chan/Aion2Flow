@@ -13,7 +13,9 @@
 		ExtendClientAreaToDecorationsHint="True"
 		TransparencyLevelHint="AcrylicBlur"
 		Background="#80000000"
-		Width="320" Height="320"
+		Width="320"
+		SizeToContent="Height"
+		CanResize="False"
 		CanMaximize="False"
 		Title="{Binding Localization[Window.Title]}"
 		Icon="/Assets/Images/Aion2Flow.png"
@@ -244,7 +246,7 @@
 		</Style>
 	</Window.Styles>
 
-	<Grid RowDefinitions="Auto, *, Auto">
+	<Grid RowDefinitions="Auto,Auto,Auto">
 		<Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="4,0,4,0">
 			<StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
 				<Button Classes="WindowBtn RefreshBtn"
@@ -267,72 +269,83 @@
 			</StackPanel>
 		</Grid>
 
-		<Grid Grid.Row="1" Margin="6">
-			<ScrollViewer VerticalScrollBarVisibility="Hidden">
-				<controls:AnimatedItemsView ItemsSource="{Binding Combatants}" SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}">
-					<controls:AnimatedItemsView.Styles>
-						<Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#BaseImage">
-							<Setter Property="RenderTransform" >
-								<TranslateTransform Y="0" />
-							</Setter>
-						</Style>
+		<controls:AnimatedItemsView Grid.Row="1"
+									Margin="6"
+									ItemsSource="{Binding Combatants}"
+									SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}"
+									MaxVisibleItems="{Binding MaxVisibleCombatantRows}">
+			<controls:AnimatedItemsView.EmptyTemplate>
+				<DataTemplate x:DataType="vm:MainViewModel">
+					<Border Padding="0,10">
+						<TextBlock Text="{Binding Localization[Panel.EmptyCombatants]}"
+								   HorizontalAlignment="Center"
+								   TextAlignment="Center"
+								   Opacity="0.78" />
+					</Border>
+				</DataTemplate>
+			</controls:AnimatedItemsView.EmptyTemplate>
 
-						<Style Selector="controls|AnimatedItemsViewItem:pointerover Border#RowRoot Image#BaseImage">
-							<Setter Property="RenderTransform" >
-								<TranslateTransform Y="-44" />
-							</Setter>
-						</Style>
+			<controls:AnimatedItemsView.Styles>
+				<Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#BaseImage">
+					<Setter Property="RenderTransform" >
+						<TranslateTransform Y="0" />
+					</Setter>
+				</Style>
 
-						<Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#BaseImage">
-							<Setter Property="RenderTransform" >
-								<TranslateTransform Y="-44" />
-							</Setter>
-						</Style>
+				<Style Selector="controls|AnimatedItemsViewItem:pointerover Border#RowRoot Image#BaseImage">
+					<Setter Property="RenderTransform" >
+						<TranslateTransform Y="-44" />
+					</Setter>
+				</Style>
 
-						<Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#OverlayImage">
-							<Setter Property="IsVisible" Value="False" />
-						</Style>
+				<Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#BaseImage">
+					<Setter Property="RenderTransform" >
+						<TranslateTransform Y="-44" />
+					</Setter>
+				</Style>
 
-						<Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#OverlayImage">
-							<Setter Property="IsVisible" Value="True" />
-						</Style>
-					</controls:AnimatedItemsView.Styles>
+				<Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#OverlayImage">
+					<Setter Property="IsVisible" Value="False" />
+				</Style>
 
-					<controls:AnimatedItemsView.ItemTemplate>
-						<DataTemplate x:DataType="vm:CombatantRowViewModel">
-							<Border Name="RowRoot" Background="Transparent" Tapped="CombatantRowTapped">
-								<Grid ColumnDefinitions="48, 5*, 3*, 4*, 64">
-									<Panel Grid.Column="0" Width="48" Height="48">
-										<Panel  Width="44" Height="44" ClipToBounds="True" HorizontalAlignment="Center" VerticalAlignment="Center">
-											<Image Name="BaseImage"
-												   Width="44" Height="88"
-												   Source="{Binding CharacterClass, Converter={StaticResource ClassToIconConverter}}"
-												   VerticalAlignment="Top" />
-										</Panel>
+				<Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#OverlayImage">
+					<Setter Property="IsVisible" Value="True" />
+				</Style>
+			</controls:AnimatedItemsView.Styles>
 
-										<Image Name="OverlayImage"
-											   Width="46" Height="46"
-											   Source="/Assets/Images/Overlay.webp"
-											   ZIndex="10"
-											   HorizontalAlignment="Center" VerticalAlignment="Center" >
+			<controls:AnimatedItemsView.ItemTemplate>
+				<DataTemplate x:DataType="vm:CombatantRowViewModel">
+					<Border Name="RowRoot" Background="Transparent" Tapped="CombatantRowTapped">
+						<Grid ColumnDefinitions="48, 5*, 3*, 4*, 64">
+							<Panel Grid.Column="0" Width="48" Height="48">
+								<Panel  Width="44" Height="44" ClipToBounds="True" HorizontalAlignment="Center" VerticalAlignment="Center">
+									<Image Name="BaseImage"
+										   Width="44" Height="88"
+										   Source="{Binding CharacterClass, Converter={StaticResource ClassToIconConverter}}"
+										   VerticalAlignment="Top" />
+								</Panel>
 
-										</Image>
-									</Panel>
+								<Image Name="OverlayImage"
+									   Width="46" Height="46"
+									   Source="/Assets/Images/Overlay.webp"
+									   ZIndex="10"
+									   HorizontalAlignment="Center" VerticalAlignment="Center" >
 
-									<TextBlock Grid.Column="1" Text="{Binding DisplayName, Mode=OneWay}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+								</Image>
+							</Panel>
 
-									<TextBlock Grid.Column="2" Text="{Binding DamagePerSecond, Mode=OneWay , StringFormat={}{0:0}}" VerticalAlignment="Center" HorizontalAlignment="Stretch" TextAlignment="Right" />
+							<TextBlock Grid.Column="1" Text="{Binding DisplayName, Mode=OneWay}" VerticalAlignment="Center" Margin="10,0,0,0"/>
 
-									<TextBlock Grid.Column="3" Text="{Binding Damage, Mode=OneWay , StringFormat={}{0:0}}" VerticalAlignment="Center" HorizontalAlignment="Stretch"  TextAlignment="Right" />
+							<TextBlock Grid.Column="2" Text="{Binding DamagePerSecond, Mode=OneWay , StringFormat={}{0:0}}" VerticalAlignment="Center" HorizontalAlignment="Stretch" TextAlignment="Right" />
 
-									<TextBlock Grid.Column="4" Text="{Binding DamageContribution, Mode=OneWay , StringFormat={}{0:0.0}%}" VerticalAlignment="Center" HorizontalAlignment="Stretch"  TextAlignment="Right" />
-								</Grid>
-							</Border>
-						</DataTemplate>
-					</controls:AnimatedItemsView.ItemTemplate>
-				</controls:AnimatedItemsView>
-			</ScrollViewer>
-		</Grid>
+							<TextBlock Grid.Column="3" Text="{Binding Damage, Mode=OneWay , StringFormat={}{0:0}}" VerticalAlignment="Center" HorizontalAlignment="Stretch"  TextAlignment="Right" />
+
+							<TextBlock Grid.Column="4" Text="{Binding DamageContribution, Mode=OneWay , StringFormat={}{0:0.0}%}" VerticalAlignment="Center" HorizontalAlignment="Stretch"  TextAlignment="Right" />
+						</Grid>
+					</Border>
+				</DataTemplate>
+			</controls:AnimatedItemsView.ItemTemplate>
+		</controls:AnimatedItemsView>
 
 		<Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="6,0,6,6">
 			<StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
