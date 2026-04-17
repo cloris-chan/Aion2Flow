@@ -6,83 +6,42 @@
   <a href="./README.md">English</a>
 </p>
 
----
+<p align="center">
+  <a href="https://github.com/cloris-chan/Aion2Flow/releases">
+    <img alt="Release" src="https://img.shields.io/github/v/release/cloris-chan/Aion2Flow?display_name=release&style=flat-square">
+  </a>
+  <a href="./LICENSE.txt">
+    <img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square">
+  </a>
+</p>
 
 **Aion2Flow** 是一款專為 **AION 2 (TW)** 設計的即時戰鬥分析工具。
 
----
+## 特色
 
-## 功能特色
+- 即時戰鬥列表，顯示戰鬥時間、DPS、總傷害與貢獻占比
+- 角色細節面板，可查看造成與承受的傷害、治療與屏障
+- 技能明細統計，包含暴擊、命中率、多段打擊、背後、格擋、迴避、無敵等資訊
+- 自動歸檔最近戰鬥，可快速在歷史與即時視圖間切換
+- 介面支援繁體中文、English、한국어
 
-* **即時 DPS / HPS 統計**
+## 安全性
 
-  * 每秒傷害（DPS）
-  * 每秒治療（HPS）
-  * 總輸出與有效時間
+- 不修改遊戲檔案
+- 不注入遊戲進程
+- 不讀取遊戲記憶體
+- 不需額外安裝 Npcap / WinPcap
+- 僅分析本機流量
 
-* **多維度分析視角**
+## 下載
 
-  * **造成（傷害 / 支援）**
-  * **承受（傷害 / 支援）**
-  * 可自由切換不同視角進行分析
+預編譯版本：[GitHub Releases](https://github.com/cloris-chan/Aion2Flow/releases)
 
-* **技能細節分析**
+## 需求
 
-  * 各技能傷害 / 治療占比
-  * 命中次數、暴擊率與分佈
-
-* **玩家與召喚物歸屬**
-
-  * 自動將召喚物傷害歸屬至玩家
-
-* **歷史戰鬥記錄**
-
-  * 回顧過往戰鬥
-  * 長期表現分析
-
----
-
-## 無外部依賴
-
-* ✅ 無需安裝 Npcap / WinPcap
-* ✅ 開箱即用
-
----
-
-## 安全與非侵入式設計
-
-* ❌ 不修改遊戲檔案
-* ❌ 不注入遊戲進程
-* ❌ 不讀取遊戲記憶體
-
-> 僅基於本地網路資料進行分析
-
----
-
-## 使用方式
-
-1. 啟動遊戲
-2. 啟動 **Aion2Flow**
-3. 工具會自動開始擷取戰鬥資料
-4. 在 UI 中查看即時統計
-
----
-
-## 注意事項
-
-* 本工具僅供**個人數據分析用途**
-* 請依據所在地區與遊戲規範自行判斷使用風險
-* 本專案不對任何帳號相關問題負責
-
----
-
-## 技術說明
-
-* **.NET 10**
-* UI 框架：**Avalonia**
-* 封包擷取：**WinDivert**
-
----
+- Windows x64
+- 啟動需要系統管理員權限
+- 若從原始碼建置，需要 .NET 10 SDK
 
 ## 編譯
 
@@ -90,15 +49,11 @@
 dotnet build -c Release
 ```
 
----
-
 ## 執行
 
 ```bash
-dotnet run --project Aion2Flow
+dotnet run --project src/Aion2Flow
 ```
-
----
 
 ## 測試
 
@@ -106,29 +61,14 @@ dotnet run --project Aion2Flow
 dotnet test
 ```
 
----
-
-## AOT 發佈（可選）
+## AOT 發佈
 
 ```bash
-dotnet publish -c Release -r win-x64 -p:PublishAot=true
+dotnet publish src/Aion2Flow -c Release -r win-x64 -p:PublishAot=true
 ```
 
 輸出目錄：
 
+```text
+src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
 ```
-bin/Release/net10.0/win-x64/publish/
-```
-
----
-
-## 授權
-
-本專案採用 **GPL-3.0** 授權。
-
-你可以自由使用、修改與散佈，但需遵守：
-
-* 修改版本需同樣開源
-* 必須保留原作者資訊
-
----

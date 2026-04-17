@@ -6,83 +6,42 @@
   <a href="./README.zh-TW.md">繁體中文</a>
 </p>
 
----
+<p align="center">
+  <a href="https://github.com/cloris-chan/Aion2Flow/releases">
+    <img alt="Release" src="https://img.shields.io/github/v/release/cloris-chan/Aion2Flow?display_name=release&style=flat-square">
+  </a>
+  <a href="./LICENSE.txt">
+    <img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square">
+  </a>
+</p>
 
 **Aion2Flow** is a real-time combat analysis tool for **AION 2 (TW)**.
 
----
+## Highlights
 
-## Features
+- Live combat list with battle timer, DPS, total damage, and contribution share
+- Per-combatant detail flyout for outgoing and incoming damage, healing, and shield
+- Per-skill breakdown with crits, hit rate, multi-hit, back/parry/block, evade, invincible, and more
+- Auto-archived recent battles with quick switching between history and live view
+- UI localization for Traditional Chinese, English, and Korean
 
-* **Real-time DPS & HPS**
+## Safety
 
-  * Damage per second (DPS)
-  * Healing per second (HPS)
-  * Total output and effective time
+- No game file modification
+- No process injection
+- No memory reading
+- No separate Npcap / WinPcap setup required
+- Traffic analysis stays on the local machine
 
-* **Multiple Analysis Perspectives**
+## Download
 
-  * **Dealt** (Damage / Support)
-  * **Taken** (Damage / Support)
-  * Easily switch between perspectives for deeper insights
+Prebuilt builds: [GitHub Releases](https://github.com/cloris-chan/Aion2Flow/releases)
 
-* **Skill Breakdown**
+## Requirements
 
-  * Per-skill damage & healing contribution
-  * Hit count, critical rate, and distribution
-
-* **Player & Summon Attribution**
-
-  * Automatically attributes summon damage to the owner
-
-* **Combat History**
-
-  * Review previous fights
-  * Analyze performance over time
-
----
-
-## No External Dependencies
-
-* ✅ No Npcap / WinPcap required
-* ✅ Works out of the box
-
----
-
-## Safe & Non-Intrusive
-
-* ❌ Does **not** modify game files
-* ❌ Does **not** inject into the game process
-* ❌ Does **not** access game memory
-
-> Aion2Flow only analyzes network traffic locally.
-
----
-
-## Usage
-
-1. Launch the game
-2. Start **Aion2Flow**
-3. The tool will automatically begin capturing combat data
-4. View real-time statistics in the UI
-
----
-
-## Disclaimer
-
-* This tool is intended for **personal analysis only**
-* Use at your own risk according to your region and game policies
-* The author is not responsible for any account-related issues
-
----
-
-## Technical Overview
-
-* **.NET 10**
-* UI: **Avalonia**
-* Packet capture: **WinDivert**
-
----
+- Windows x64
+- Administrator privileges to start
+- .NET 10 SDK if building from source
 
 ## Build
 
@@ -90,15 +49,11 @@
 dotnet build -c Release
 ```
 
----
-
 ## Run
 
 ```bash
-dotnet run --project Aion2Flow
+dotnet run --project src/Aion2Flow
 ```
-
----
 
 ## Test
 
@@ -106,29 +61,14 @@ dotnet run --project Aion2Flow
 dotnet test
 ```
 
----
-
-## AOT Publish (Optional)
+## AOT Publish
 
 ```bash
-dotnet publish -c Release -r win-x64 -p:PublishAot=true
+dotnet publish src/Aion2Flow -c Release -r win-x64 -p:PublishAot=true
 ```
 
-Output directory:
+Output:
 
+```text
+src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
 ```
-bin/Release/net10.0/win-x64/publish/
-```
-
----
-
-## License
-
-Licensed under **GPL-3.0**.
-
-You are free to use, modify, and distribute this project under GPL terms:
-
-* Modified versions must also be open-source
-* Proper attribution is required
-
----
