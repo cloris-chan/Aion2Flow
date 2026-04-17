@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using System.Globalization;
 
 namespace Cloris.Aion2Flow.Services;
 
@@ -28,9 +27,6 @@ public sealed class LocalizationService : ObservableObject, IDisposable
         };
     }
 
-    public string Format(string key, params object?[] args) =>
-        string.Format(CultureInfo.CurrentCulture, Get(key), args);
-
     public void Dispose()
     {
         _languageService.LanguageChanged -= OnLanguageChanged;
@@ -50,7 +46,6 @@ public sealed class LocalizationService : ObservableObject, IDisposable
         "Battle.Summary" => "本場戰鬥 · {0}名角色",
         "Target.Empty" => "目標: -",
         "Target.WithName" => "目標: {0}",
-        "Battle.Format" => "{0:0.0}s",
         "Scope.AllBattle" => "整場戰鬥",
         "Status.DriverReady" => "WinDivert 已啟用",
         "Status.DriverIdle" => "WinDivert 未啟用",
@@ -145,7 +140,6 @@ public sealed class LocalizationService : ObservableObject, IDisposable
         "Battle.Summary" => "Current Battle · {0} actors",
         "Target.Empty" => "Target: -",
         "Target.WithName" => "Target: {0}",
-        "Battle.Format" => "{0:0.0}s",
         "Scope.AllBattle" => "Whole Battle",
         "Status.DriverReady" => "WinDivert is active",
         "Status.DriverIdle" => "WinDivert is inactive",
@@ -240,7 +234,6 @@ public sealed class LocalizationService : ObservableObject, IDisposable
         "Battle.Summary" => "현재 전투 · {0}명",
         "Target.Empty" => "대상: -",
         "Target.WithName" => "대상: {0}",
-        "Battle.Format" => "{0:0.0}s",
         "Scope.AllBattle" => "전투 전체",
         "Status.DriverReady" => "WinDivert 활성화됨",
         "Status.DriverIdle" => "WinDivert 비활성",

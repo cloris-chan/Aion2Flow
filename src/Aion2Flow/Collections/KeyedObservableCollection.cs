@@ -7,6 +7,7 @@ namespace Cloris.Aion2Flow.Collections;
 
 public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelector, IEqualityComparer<TKey>? comparer = null) : KeyedCollection<TKey, TItem>(comparer), IReadOnlyList<TItem>, INotifyCollectionChanged, INotifyPropertyChanged
     where TKey : notnull
+    where TItem : class
 {
     private int _suspendLevel;
     private bool _isModifiedDuringSuspension;
@@ -93,17 +94,25 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
         return false;
     }
 
-    public NotificationDeferral SuspendNotifications()
+    public NotificationDeferral SuspendNotifications(BatchUpdateMode mode = BatchUpdateMode.Default)
     {
         if (_suspendLevel == 0)
         {
-            _snapshot = [.. Items];
+            if (_snapshot is null)
+            {
+                _snapshot = new List<TItem>(Items);
+            }
+            else
+            {
+                _snapshot.Clear();
+                _snapshot.AddRange(Items);
+            }
         }
         _suspendLevel++;
-        return new NotificationDeferral(this);
+        return new NotificationDeferral(this, mode);
     }
 
-    private void ResumeNotifications()
+    private void ResumeNotifications(BatchUpdateMode mode)
     {
         _suspendLevel--;
 
@@ -111,7 +120,18 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
         {
             if (_isModifiedDuringSuspension && _snapshot != null)
             {
-                ApplyDiffAndNotify(_snapshot, Items);
+                switch (mode)
+                {
+                    case BatchUpdateMode.ForceReset:
+                        NotifyReset();
+                        break;
+                    case BatchUpdateMode.ForceGranular:
+                        ApplyDiffAndNotify(_snapshot, Items, forceGranular: true);
+                        break;
+                    default:
+                        ApplyDiffAndNotify(_snapshot, Items);
+                        break;
+                }
             }
 
             _snapshot = null;
@@ -119,7 +139,7 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
         }
     }
 
-    private void ApplyDiffAndNotify(List<TItem> uiState, IList<TItem> newList)
+    private void ApplyDiffAndNotify(List<TItem> uiState, IList<TItem> newList, bool forceGranular = false)
     {
         var operations = ArrayPool<DiffOperation>.Shared.Rent(ResetThreshold);
         int opCount = 0;
@@ -128,7 +148,14 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
         {
             bool RecordOperation(in DiffOperation op)
             {
-                if (opCount >= ResetThreshold) return true;
+                if (!forceGranular && opCount >= ResetThreshold) return true;
+                if (opCount >= operations.Length)
+                {
+                    ArrayPool<DiffOperation>.Shared.Return(operations, true);
+                    var newOps = ArrayPool<DiffOperation>.Shared.Rent(operations.Length * 2);
+                    Array.Copy(operations, newOps, opCount);
+                    operations = newOps;
+                }
                 operations[opCount++] = op;
                 return false;
             }
@@ -251,10 +278,17 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
         OnCollectionChanged(EventArgsCache.ResetCollectionChanged);
     }
 
-    public readonly struct NotificationDeferral(KeyedObservableCollection<TKey, TItem> collection) : IDisposable
+    public enum BatchUpdateMode
     {
-        public IReadOnlyList<TItem> Snapshot => collection._snapshot ?? [];
-        public void Dispose() => collection.ResumeNotifications();
+        Default,
+        ForceReset,
+        ForceGranular
+    }
+
+    public readonly struct NotificationDeferral(KeyedObservableCollection<TKey, TItem> collection, BatchUpdateMode mode) : IDisposable
+    {
+        public  IReadOnlyList<TItem> Snapshot => collection._snapshot ?? [];
+        public  void Dispose() => collection.ResumeNotifications(mode);
     }
 
     private readonly struct DiffOperation(NotifyCollectionChangedAction action, TItem? oldItem, TItem? newItem, int index, int oldIndex = -1)

@@ -58,10 +58,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public partial int RoundTripTimeMilliseconds { get; set; }
 
     [ObservableProperty]
-    public partial string BattleTimeText { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string RoundTripDisplayText { get; set; } = "--";
+    public partial double BattleTimeSeconds { get; set; }
 
     [ObservableProperty]
     public partial string DriverIndicatorColor { get; set; } = IndicatorIdleColor;
@@ -150,10 +147,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void OnRttResolved(double rtt)
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            RefreshCaptureIndicators();
-        });
+        Dispatcher.UIThread.Post(RefreshCaptureIndicators);
     }
 
     private void OnForegroundChanged(bool isTopMost)
@@ -352,7 +346,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private void ApplySnapshot(DamageMeterSnapshot snapshot)
     {
         var battleSeconds = snapshot.BattleTime / 1000.0;
-        BattleTimeText = Localization.Format("Battle.Format", battleSeconds);
+        BattleTimeSeconds = battleSeconds;
 
         using var deferral = Combatants.SuspendNotifications();
         foreach (var row in deferral.Snapshot)
@@ -442,9 +436,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private void ApplyLocalizedUiText()
     {
         Status = Localization["Status.Ready"];
-        BattleTimeText = Localization.Format("Battle.Format", 0d);
+        BattleTimeSeconds = 0d;
         RoundTripTimeMilliseconds = 0;
-        RoundTripDisplayText = "--";
     }
 
     private void RebuildLanguageOptions()
@@ -561,15 +554,11 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             RoundTripTimeMilliseconds = 0;
             LatencyIndicatorColor = IndicatorIdleColor;
-            RoundTripDisplayText = "--";
             LatencyToolTip = Localization["Status.RttUnavailable"];
             return;
         }
 
-        RoundTripTimeMilliseconds = (int)Math.Round(currentRttMilliseconds.Value);
-        RoundTripDisplayText = currentRttMilliseconds.Value < 1d
-            ? "<1 ms"
-            : $"{RoundTripTimeMilliseconds} ms";
+        RoundTripTimeMilliseconds = Math.Max(1, (int)Math.Round(currentRttMilliseconds.Value));
         if (estimateKind == RoundTripEstimateKind.ProtocolLoopback)
         {
             LatencyIndicatorColor = IndicatorWarnColor;

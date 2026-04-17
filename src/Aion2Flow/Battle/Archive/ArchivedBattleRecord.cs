@@ -5,6 +5,8 @@ namespace Cloris.Aion2Flow.Battle.Archive;
 
 public sealed class ArchivedBattleRecord
 {
+    private string? _displayName;
+
     public Guid Id { get; init; } = Guid.NewGuid();
     public Guid BattleId { get; init; }
     public DateTimeOffset ArchivedAt { get; init; }
@@ -13,13 +15,12 @@ public sealed class ArchivedBattleRecord
     public DamageMeterSnapshot Snapshot { get; init; } = new();
     public CombatMetricsStore Store { get; init; } = new();
 
-    public string DisplayName
+    public string DisplayName => _displayName ??= BuildDisplayName();
+
+    private string BuildDisplayName()
     {
-        get
-        {
-            var battleSeconds = Snapshot.BattleTime / 1000d;
-            return $"{ArchivedAt:HH:mm:ss} {ResolveSceneLabel(Snapshot)} ({battleSeconds:0.0}s)";
-        }
+        var battleSeconds = Snapshot.BattleTime / 1000d;
+        return $"{ArchivedAt:HH:mm:ss} {ResolveSceneLabel(Snapshot)} ({battleSeconds:0.0}s)";
     }
 
     private static string ResolveSceneLabel(DamageMeterSnapshot snapshot)

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
@@ -133,12 +134,53 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
         OnPropertyChanged(nameof(HasMultipleScopes));
     }
 
-    public void ReplaceRows(IReadOnlyCollection<SkillDetailRowViewModel> rows)
+    public void ReplaceRows(List<SkillDetailRowData> dataRows)
     {
-        Rows.Clear();
-        foreach (var row in rows)
+        var existingBySkillCode = new Dictionary<int, SkillDetailRowViewModel>(Rows.Count);
+        foreach (var row in Rows)
         {
-            Rows.Add(row);
+            existingBySkillCode.TryAdd(row.SkillCode, row);
+        }
+
+        var newSkillCodes = new HashSet<int>(dataRows.Count);
+        for (var i = 0; i < dataRows.Count; i++)
+        {
+            newSkillCodes.Add(dataRows[i].SkillCode);
+        }
+
+        for (var i = Rows.Count - 1; i >= 0; i--)
+        {
+            if (!newSkillCodes.Contains(Rows[i].SkillCode))
+            {
+                Rows.RemoveAt(i);
+            }
+        }
+
+        for (var i = 0; i < dataRows.Count; i++)
+        {
+            ref var data = ref CollectionsMarshal.AsSpan(dataRows)[i];
+            if (existingBySkillCode.TryGetValue(data.SkillCode, out var existing))
+            {
+                existing.ApplyFrom(in data);
+                var currentIndex = Rows.IndexOf(existing);
+                if (currentIndex != i && currentIndex >= 0)
+                {
+                    Rows.Move(currentIndex, i);
+                }
+            }
+            else
+            {
+                var vm = new SkillDetailRowViewModel();
+                vm.ApplyFrom(in data);
+                if (i < Rows.Count)
+                {
+                    Rows.Insert(i, vm);
+                }
+                else
+                {
+                    Rows.Add(vm);
+                }
+            }
         }
     }
 

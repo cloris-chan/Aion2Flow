@@ -262,7 +262,7 @@
 						ToolTip.Tip="{Binding Localization[Action.Reset]}">
 					<PathIcon Data="{StaticResource arrows-rotate}" />
 				</Button>
-				<TextBlock Text="{Binding BattleTimeText}" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold" />
+				<controls:NumericBlock Value="{Binding BattleTimeSeconds}" FractionDigits="1" TrimTrailingZeros="False" Suffix="s" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold" />
 			</StackPanel>
 			<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
 				<Button Classes="WindowBtn MinBtn" Click="Minimize">
@@ -414,7 +414,7 @@
 
 						<StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" ToolTip.Tip="{Binding LatencyToolTip}">
 							<PathIcon Classes="BottomBarSignalIcon" Data="{StaticResource wifi}" Foreground="{Binding LatencyIndicatorColor}" />
-							<TextBlock Classes="BottomBarText" Text="{Binding RoundTripDisplayText}" HorizontalAlignment="Right" />
+							<controls:NumericBlock Value="{Binding RoundTripTimeMilliseconds}" Suffix=" ms" Foreground="#E6EBF0" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
 						</StackPanel>
 					</StackPanel>
 				</Border>

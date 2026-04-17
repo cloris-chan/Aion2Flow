@@ -28,7 +28,12 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
     private readonly bool _isDebugBuild;
 #endif
 
-    private sealed record ResolvedDetailPacket(ParsedCombatPacket Packet, int SourceId, int TargetId);
+    private readonly struct ResolvedDetailPacket(ParsedCombatPacket Packet, int SourceId, int TargetId)
+    {
+        public readonly ParsedCombatPacket Packet = Packet;
+        public readonly int SourceId = SourceId;
+        public readonly int TargetId = TargetId;
+    }
 
     private enum DetailSectionKind
     {
@@ -249,7 +254,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         var selectedCombatantId = primarySection.SelectedScope?.CombatantId ?? secondarySection.SelectedScope?.CombatantId;
 
         primarySection.ReplaceScopeOptions(scopes);
-        secondarySection.ReplaceScopeOptions(scopes.Select(static x => new SkillDetailScopeOption(x.CombatantId, x.DisplayName)).ToArray());
+        secondarySection.ReplaceScopeOptions(scopes);
 
         var primarySelectedScope = primarySection.ScopeOptions.FirstOrDefault(x => x.CombatantId == selectedCombatantId) ?? primarySection.ScopeOptions.FirstOrDefault();
         var secondarySelectedScope = secondarySection.ScopeOptions.FirstOrDefault(x => x.CombatantId == selectedCombatantId) ?? secondarySection.ScopeOptions.FirstOrDefault();
@@ -270,12 +275,13 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         }
 
         var combatantDisplayNames = new Dictionary<int, string>();
-        foreach (var detailPacket in _battlePackets)
+        var packetsSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_battlePackets);
+        foreach (ref readonly var detailPacket in packetsSpan)
         {
             var matchesAnySection = false;
             foreach (var sectionKind in sectionKinds)
             {
-                if (!MatchesSection(detailPacket, sectionKind, _combatantId.Value) ||
+                if (!MatchesSection(in detailPacket, sectionKind, _combatantId.Value) ||
                     !ContributesToSection(detailPacket.Packet, sectionKind))
                 {
                     continue;
@@ -290,7 +296,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
                 continue;
             }
 
-            var combatantId = GetCounterpartCombatantId(detailPacket, sectionKinds[0]);
+            var combatantId = GetCounterpartCombatantId(in detailPacket, sectionKinds[0]);
             if (combatantId <= 0)
             {
                 continue;
@@ -336,14 +342,15 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         var selectedScopeCombatantId = section.SelectedScope?.CombatantId;
         var metrics = new Dictionary<int, SkillMetrics>();
 
-        foreach (var detailPacket in _battlePackets)
+        var packetsSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_battlePackets);
+        foreach (ref readonly var detailPacket in packetsSpan)
         {
-            if (!MatchesSection(detailPacket, sectionKind, _combatantId.Value))
+            if (!MatchesSection(in detailPacket, sectionKind, _combatantId.Value))
             {
                 continue;
             }
 
-            if (selectedScopeCombatantId.HasValue && GetCounterpartCombatantId(detailPacket, sectionKind) != selectedScopeCombatantId.Value)
+            if (selectedScopeCombatantId.HasValue && GetCounterpartCombatantId(in detailPacket, sectionKind) != selectedScopeCombatantId.Value)
             {
                 continue;
             }
@@ -374,11 +381,10 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
     private void ApplySectionRows(
         SkillDetailSectionViewModel section,
         IReadOnlyCollection<SkillMetrics> skills,
-        List<SkillDetailRowViewModel> rows,
+        List<SkillDetailRowData> rows,
         DetailSectionKind sectionKind)
     {
         section.ReplaceRows(rows);
-        section.Shield = rows.Sum(static x => x.ShieldAmount);
         section.SkillCount = rows.Count;
         section.HasSkills = rows.Count > 0;
 
@@ -388,16 +394,36 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
             return;
         }
 
-        section.Total = rows.Sum(static x => x.TotalAmount);
-        section.DirectTotal = rows.Sum(static x => x.DirectAmount);
-        section.PeriodicTotal = rows.Sum(static x => x.PeriodicAmount);
-        section.DrainTotal = rows.Sum(static x => x.DrainAmount);
-        section.Hits = rows.Sum(static x => x.Hits);
-        section.Attempts = rows.Sum(static x => x.Attempts);
-        section.PeriodicHits = rows.Sum(static x => x.PeriodicHits);
-        section.Evades = rows.Sum(static x => x.Evades);
-        section.Invincible = rows.Sum(static x => x.Invincible);
-        section.Criticals = rows.Sum(static x => x.Criticals);
+        long totalAmount = 0, directAmount = 0, periodicAmount = 0, drainAmount = 0, shieldAmount = 0;
+        int hits = 0, attempts = 0, periodicHits = 0, evades = 0, invincible = 0, criticals = 0;
+
+        var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows);
+        foreach (ref var row in span)
+        {
+            totalAmount += row.TotalAmount;
+            directAmount += row.DirectAmount;
+            periodicAmount += row.PeriodicAmount;
+            drainAmount += row.DrainAmount;
+            shieldAmount += row.ShieldAmount;
+            hits += row.Hits;
+            attempts += row.Attempts;
+            periodicHits += row.PeriodicHits;
+            evades += row.Evades;
+            invincible += row.Invincible;
+            criticals += row.Criticals;
+        }
+
+        section.Total = totalAmount;
+        section.DirectTotal = directAmount;
+        section.PeriodicTotal = periodicAmount;
+        section.DrainTotal = drainAmount;
+        section.Shield = shieldAmount;
+        section.Hits = hits;
+        section.Attempts = attempts;
+        section.PeriodicHits = periodicHits;
+        section.Evades = evades;
+        section.Invincible = invincible;
+        section.Criticals = criticals;
         section.PerfectCount = 0;
         section.SmiteCount = 0;
         section.MultiHitCount = 0;
@@ -410,7 +436,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         var battleSeconds = _currentSnapshot.BattleTime > 0
             ? _currentSnapshot.BattleTime / 1000d
             : 0d;
-        section.PerSecond = battleSeconds > 0 ? section.Total / battleSeconds : 0d;
+        section.PerSecond = battleSeconds > 0 ? totalAmount / battleSeconds : 0d;
 
         section.HitRate = 0d;
         section.CriticalRate = 0d;
@@ -428,24 +454,16 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
 
     private void ApplyDamageSection(SkillDetailSectionViewModel section, IEnumerable<SkillMetrics> skills)
     {
-        var total = 0L;
-        var totalHits = 0;
-        var totalAttempts = 0;
-        var totalPeriodicHits = 0;
-        var critical = 0;
-        var perfect = 0;
-        var smite = 0;
-        var multiHit = 0;
-        var parry = 0;
-        var block = 0;
-        var endurance = 0;
-        var regeneration = 0;
-        var back = 0;
-        var evades = 0;
-        var invincible = 0;
+        long total = 0, directTotal = 0, periodicTotal = 0;
+        int totalHits = 0, totalAttempts = 0, totalPeriodicHits = 0;
+        int critical = 0, perfect = 0, smite = 0, multiHit = 0;
+        int parry = 0, block = 0, endurance = 0, regeneration = 0, back = 0;
+        int evades = 0, invincible = 0;
 
         foreach (var skill in skills)
         {
+            directTotal += skill.DamageAmount;
+            periodicTotal += skill.PeriodicDamageAmount;
             total += skill.DamageAmount + skill.PeriodicDamageAmount;
             totalHits += skill.Times;
             totalAttempts += skill.AttemptTimes;
@@ -464,8 +482,8 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         }
 
         section.Total = total;
-        section.DirectTotal = skills.Sum(static skill => skill.DamageAmount);
-        section.PeriodicTotal = skills.Sum(static skill => skill.PeriodicDamageAmount);
+        section.DirectTotal = directTotal;
+        section.PeriodicTotal = periodicTotal;
         section.DrainTotal = 0;
         section.Hits = totalHits;
         section.Attempts = totalAttempts;
@@ -501,7 +519,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         section.InvincibleRate = totalAttempts > 0 ? invincible / (double)totalAttempts : 0d;
     }
 
-    private static bool MatchesSection(ResolvedDetailPacket packet, DetailSectionKind sectionKind, int combatantId)
+    private static bool MatchesSection(in ResolvedDetailPacket packet, DetailSectionKind sectionKind, int combatantId)
     {
         return sectionKind switch
         {
@@ -511,7 +529,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         };
     }
 
-    private static int GetCounterpartCombatantId(ResolvedDetailPacket packet, DetailSectionKind sectionKind)
+    private static int GetCounterpartCombatantId(in ResolvedDetailPacket packet, DetailSectionKind sectionKind)
     {
         return sectionKind switch
         {
@@ -566,172 +584,179 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
     private static bool ContributesShield(ParsedCombatPacket packet)
         => packet.ValueKind == CombatValueKind.Shield && packet.Damage > 0;
 
-    private static List<SkillDetailRowViewModel> BuildDamageRows(IEnumerable<SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildDamageRows(IEnumerable<SkillMetrics> skills)
     {
-        var rows = skills
-            .Select(skill =>
-            {
-                if (IsHiddenDamageOutcomeSkill(skill.SkillCode))
-                {
-                    return null;
-                }
-
-                var totalAmount = skill.DamageAmount + skill.PeriodicDamageAmount;
-                var directHits = skill.Times;
-                var attempts = skill.AttemptTimes;
-                var periodicHits = skill.PeriodicDamageTimes;
-                var evades = skill.EvadeTimes;
-                var invincible = skill.InvincibleTimes;
-                if (totalAmount <= 0 && directHits <= 0 && periodicHits <= 0 && attempts <= 0 && evades <= 0 && invincible <= 0)
-                {
-                    return null;
-                }
-
-                return new SkillDetailRowViewModel(
-                    skill.SkillCode,
-                    ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
-                    totalAmount,
-                    skill.DamageAmount,
-                    skill.PeriodicDamageAmount,
-                    0,
-                    0,
-                    directHits,
-                    attempts,
-                    periodicHits,
-                    evades,
-                    invincible,
-                    skill.CriticalTimes,
-                    skill.BackTimes,
-                    skill.ParryTimes,
-                    skill.PerfectTimes,
-                    skill.SmiteTimes,
-                    skill.MultiHitTimes,
-                    skill.EnduranceTimes,
-                    skill.RegenerationTimes,
-                    skill.BlockTimes,
-                    0d);
-            })
-            .Where(static row => row is not null)
-            .Cast<SkillDetailRowViewModel>()
-            .OrderByDescending(static row => row.TotalAmount)
-            .ThenByDescending(static row => row.Hits)
-            .ThenBy(static row => row.SkillName, StringComparer.CurrentCulture)
-            .ToList();
-
-        var sectionTotal = rows.Sum(static row => row.TotalAmount);
-        if (sectionTotal <= 0)
+        var rows = new List<SkillDetailRowData>();
+        foreach (var skill in skills)
         {
-            return rows;
+            if (IsHiddenDamageOutcomeSkill(skill.SkillCode))
+            {
+                continue;
+            }
+
+            var totalAmount = skill.DamageAmount + skill.PeriodicDamageAmount;
+            var directHits = skill.Times;
+            var attempts = skill.AttemptTimes;
+            var periodicHits = skill.PeriodicDamageTimes;
+            var evades = skill.EvadeTimes;
+            var invincible = skill.InvincibleTimes;
+            if (totalAmount <= 0 && directHits <= 0 && periodicHits <= 0 && attempts <= 0 && evades <= 0 && invincible <= 0)
+            {
+                continue;
+            }
+
+            rows.Add(new SkillDetailRowData
+            {
+                SkillCode = skill.SkillCode,
+                SkillName = ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
+                TotalAmount = totalAmount,
+                DirectAmount = skill.DamageAmount,
+                PeriodicAmount = skill.PeriodicDamageAmount,
+                Hits = directHits,
+                Attempts = attempts,
+                PeriodicHits = periodicHits,
+                Evades = evades,
+                Invincible = invincible,
+                Criticals = skill.CriticalTimes,
+                Back = skill.BackTimes,
+                Parry = skill.ParryTimes,
+                Perfect = skill.PerfectTimes,
+                Smite = skill.SmiteTimes,
+                MultiHit = skill.MultiHitTimes,
+                Endurance = skill.EnduranceTimes,
+                Regeneration = skill.RegenerationTimes,
+                Block = skill.BlockTimes,
+            });
         }
 
-        return rows.Select(row => row with { SharePercent = row.TotalAmount / (double)sectionTotal }).ToList();
+        rows.Sort(static (a, b) =>
+        {
+            var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
+            if (cmp != 0) return cmp;
+            cmp = b.Hits.CompareTo(a.Hits);
+            if (cmp != 0) return cmp;
+            return StringComparer.CurrentCulture.Compare(a.SkillName, b.SkillName);
+        });
+
+        var sectionTotal = 0L;
+        foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+        {
+            sectionTotal += row.TotalAmount;
+        }
+
+        if (sectionTotal > 0)
+        {
+            foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+            {
+                row.SharePercent = row.TotalAmount / (double)sectionTotal;
+            }
+        }
+
+        return rows;
     }
 
     private static bool IsHiddenDamageOutcomeSkill(int skillCode)
         => skillCode == SyntheticCombatSkillCodes.UnresolvedInvincible;
 
-    private static List<SkillDetailRowViewModel> BuildHealingRows(IEnumerable<SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildHealingRows(IEnumerable<SkillMetrics> skills)
     {
-        var rows = skills
-            .Select(skill =>
-            {
-                var directHealingAmount = Math.Max(0L, skill.HealingAmount - skill.PeriodicHealingAmount - skill.DrainHealingAmount);
-                var directHealingHits = Math.Max(0, skill.HealingTimes - skill.PeriodicHealingTimes - skill.DrainHealingTimes);
-                var totalAmount = directHealingAmount + skill.PeriodicHealingAmount + skill.DrainHealingAmount;
-                var totalHits = directHealingHits + skill.PeriodicHealingTimes + skill.DrainHealingTimes;
-                if (totalAmount <= 0 && totalHits <= 0)
-                {
-                    return null;
-                }
-
-                return new SkillDetailRowViewModel(
-                    skill.SkillCode,
-                    ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
-                    totalAmount,
-                    directHealingAmount,
-                    skill.PeriodicHealingAmount,
-                    skill.DrainHealingAmount,
-                    0,
-                    totalHits,
-                    totalHits,
-                    skill.PeriodicHealingTimes,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0d);
-            })
-            .Where(static row => row is not null)
-            .Cast<SkillDetailRowViewModel>()
-            .OrderByDescending(static row => row.TotalAmount)
-            .ThenByDescending(static row => row.Hits)
-            .ThenBy(static row => row.SkillName, StringComparer.CurrentCulture)
-            .ToList();
-
-        var sectionTotal = rows.Sum(static row => row.TotalAmount);
-        if (sectionTotal <= 0)
+        var rows = new List<SkillDetailRowData>();
+        foreach (var skill in skills)
         {
-            return rows;
+            var directHealingAmount = Math.Max(0L, skill.HealingAmount - skill.PeriodicHealingAmount - skill.DrainHealingAmount);
+            var directHealingHits = Math.Max(0, skill.HealingTimes - skill.PeriodicHealingTimes - skill.DrainHealingTimes);
+            var totalAmount = directHealingAmount + skill.PeriodicHealingAmount + skill.DrainHealingAmount;
+            var totalHits = directHealingHits + skill.PeriodicHealingTimes + skill.DrainHealingTimes;
+            if (totalAmount <= 0 && totalHits <= 0)
+            {
+                continue;
+            }
+
+            rows.Add(new SkillDetailRowData
+            {
+                SkillCode = skill.SkillCode,
+                SkillName = ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
+                TotalAmount = totalAmount,
+                DirectAmount = directHealingAmount,
+                PeriodicAmount = skill.PeriodicHealingAmount,
+                DrainAmount = skill.DrainHealingAmount,
+                Hits = totalHits,
+                Attempts = totalHits,
+                PeriodicHits = skill.PeriodicHealingTimes,
+            });
         }
 
-        return rows.Select(row => row with { SharePercent = row.TotalAmount / (double)sectionTotal }).ToList();
+        rows.Sort(static (a, b) =>
+        {
+            var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
+            if (cmp != 0) return cmp;
+            cmp = b.Hits.CompareTo(a.Hits);
+            if (cmp != 0) return cmp;
+            return StringComparer.CurrentCulture.Compare(a.SkillName, b.SkillName);
+        });
+
+        var sectionTotal = 0L;
+        foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+        {
+            sectionTotal += row.TotalAmount;
+        }
+
+        if (sectionTotal > 0)
+        {
+            foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+            {
+                row.SharePercent = row.TotalAmount / (double)sectionTotal;
+            }
+        }
+
+        return rows;
     }
 
-    private static List<SkillDetailRowViewModel> BuildShieldRows(IEnumerable<SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildShieldRows(IEnumerable<SkillMetrics> skills)
     {
-        var rows = skills
-            .Select(skill =>
-            {
-                if (skill.ShieldAmount <= 0 && skill.ShieldTimes <= 0)
-                {
-                    return null;
-                }
-
-                return new SkillDetailRowViewModel(
-                    skill.SkillCode,
-                    ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
-                    skill.ShieldAmount,
-                    0,
-                    0,
-                    0,
-                    skill.ShieldAmount,
-                    skill.ShieldTimes,
-                    skill.ShieldTimes,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0d);
-            })
-            .Where(static row => row is not null)
-            .Cast<SkillDetailRowViewModel>()
-            .OrderByDescending(static row => row.TotalAmount)
-            .ThenByDescending(static row => row.Hits)
-            .ThenBy(static row => row.SkillName, StringComparer.CurrentCulture)
-            .ToList();
-
-        var sectionTotal = rows.Sum(static row => row.TotalAmount);
-        if (sectionTotal <= 0)
+        var rows = new List<SkillDetailRowData>();
+        foreach (var skill in skills)
         {
-            return rows;
+            if (skill.ShieldAmount <= 0 && skill.ShieldTimes <= 0)
+            {
+                continue;
+            }
+
+            rows.Add(new SkillDetailRowData
+            {
+                SkillCode = skill.SkillCode,
+                SkillName = ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
+                TotalAmount = skill.ShieldAmount,
+                ShieldAmount = skill.ShieldAmount,
+                Hits = skill.ShieldTimes,
+                Attempts = skill.ShieldTimes,
+            });
         }
 
-        return rows.Select(row => row with { SharePercent = row.TotalAmount / (double)sectionTotal }).ToList();
+        rows.Sort(static (a, b) =>
+        {
+            var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
+            if (cmp != 0) return cmp;
+            cmp = b.Hits.CompareTo(a.Hits);
+            if (cmp != 0) return cmp;
+            return StringComparer.CurrentCulture.Compare(a.SkillName, b.SkillName);
+        });
+
+        var sectionTotal = 0L;
+        foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+        {
+            sectionTotal += row.TotalAmount;
+        }
+
+        if (sectionTotal > 0)
+        {
+            foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+            {
+                row.SharePercent = row.TotalAmount / (double)sectionTotal;
+            }
+        }
+
+        return rows;
     }
 
     private static string ResolveSkillDisplayName(int skillCode, string fallbackName)

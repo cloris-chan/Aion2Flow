@@ -296,62 +296,49 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
     internal static int? InferOriginalSkillCode(int skillCode)
     {
-        foreach (var candidate in EnumerateSkillCodeCandidates(skillCode))
-        {
-            if (Array.BinarySearch(SkillCodes, candidate) >= 0)
-            {
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
-    private static IEnumerable<int> EnumerateSkillCodeCandidates(int skillCode)
-    {
         if (skillCode <= 0)
         {
-            yield break;
+            return null;
         }
 
-        var seen = new HashSet<int>();
-        static bool Push(HashSet<int> set, int value) => value > 0 && set.Add(value);
+        Span<int> candidates = stackalloc int[6];
+        var count = 0;
 
-        if (Push(seen, skillCode))
+        static bool TryPush(Span<int> span, ref int count, int value)
         {
-            yield return skillCode;
+            if (value <= 0) return false;
+            for (var i = 0; i < count; i++)
+            {
+                if (span[i] == value) return false;
+            }
+            span[count++] = value;
+            return true;
         }
+
+        if (TryPush(candidates, ref count, skillCode) && Array.BinarySearch(SkillCodes, skillCode) >= 0)
+            return skillCode;
 
         var directChargeBase = skillCode - (skillCode % 10);
-        if (Push(seen, directChargeBase))
-        {
-            yield return directChargeBase;
-        }
+        if (TryPush(candidates, ref count, directChargeBase) && Array.BinarySearch(SkillCodes, directChargeBase) >= 0)
+            return directChargeBase;
 
         var specializationBase = skillCode - (skillCode % 10000);
-        if (Push(seen, specializationBase))
-        {
-            yield return specializationBase;
-        }
+        if (TryPush(candidates, ref count, specializationBase) && Array.BinarySearch(SkillCodes, specializationBase) >= 0)
+            return specializationBase;
 
         var specializationWithChargeBase = specializationBase + (skillCode % 10);
-        if (Push(seen, specializationWithChargeBase))
-        {
-            yield return specializationWithChargeBase;
-        }
+        if (TryPush(candidates, ref count, specializationWithChargeBase) && Array.BinarySearch(SkillCodes, specializationWithChargeBase) >= 0)
+            return specializationWithChargeBase;
 
         var byHundred = skillCode / 100;
-        if (Push(seen, byHundred))
-        {
-            yield return byHundred;
-        }
+        if (TryPush(candidates, ref count, byHundred) && Array.BinarySearch(SkillCodes, byHundred) >= 0)
+            return byHundred;
 
         var byThousand = skillCode - (skillCode % 1000);
-        if (Push(seen, byThousand))
-        {
-            yield return byThousand;
-        }
+        if (TryPush(candidates, ref count, byThousand) && Array.BinarySearch(SkillCodes, byThousand) >= 0)
+            return byThousand;
 
+        return null;
     }
 
     internal static void NormalizePacketForStorage(ParsedCombatPacket packet)
