@@ -28,7 +28,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly LanguageService _languageService;
     private readonly GameResourceService _gameResourceService;
     private readonly BattleArchiveService _battleArchiveService;
-    private readonly CombatantSkillDetailsFlyoutViewModel _combatantDetails;
+    private readonly CombatantDetailsFlyoutViewModel _combatantDetails;
 
     private PeriodicTimer? _refreshTimer;
     private Task? _refreshTask;
@@ -43,7 +43,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 #endif
 
     public LocalizationService Localization { get; }
-    public CombatantSkillDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
+    public CombatantDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
     public ObservableCollection<LanguageOption> Languages { get; } = [];
     public ObservableCollection<BattleHistoryItemViewModel> BattleHistory { get; } = [];
@@ -116,7 +116,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         LanguageService languageService,
         GameResourceService gameResourceService,
         BattleArchiveService battleArchiveService,
-        CombatantSkillDetailsFlyoutViewModel combatantDetails,
+        CombatantDetailsFlyoutViewModel combatantDetails,
         LocalizationService localization)
     {
         _captureService = captureService;

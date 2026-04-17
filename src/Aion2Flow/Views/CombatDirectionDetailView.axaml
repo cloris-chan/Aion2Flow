@@ -1,0 +1,653 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:conv="clr-namespace:Cloris.Aion2Flow.Converters"
+			 xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
+			 xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
+			 x:Class="Cloris.Aion2Flow.Views.CombatDirectionDetailView"
+			 x:DataType="vm:CombatDirectionDetailViewModel">
+	<UserControl.Resources>
+		<conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+	</UserControl.Resources>
+
+	<UserControl.Styles>
+		<Style Selector="controls|NumericBlock">
+			<Setter Property="UseGrouping" Value="True" />
+		</Style>
+
+		<Style Selector="Border.DetailSummaryCard">
+			<Setter Property="Background" Value="#30111111" />
+			<Setter Property="BorderBrush" Value="#50808080" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="8" />
+			<Setter Property="Padding" Value="12" />
+		</Style>
+
+		<Style Selector="TextBlock.DetailSummaryTitle">
+			<Setter Property="FontSize" Value="14" />
+			<Setter Property="FontWeight" Value="Bold" />
+		</Style>
+
+		<Style Selector="TextBlock.DetailSummaryLabel">
+			<Setter Property="Foreground" Value="Gray" />
+			<Setter Property="FontSize" Value="11" />
+		</Style>
+
+		<Style Selector="StackPanel.DetailSummaryMetric">
+			<Setter Property="Orientation" Value="Vertical" />
+			<Setter Property="Spacing" Value="2" />
+			<Setter Property="Width" Value="124" />
+			<Setter Property="Margin" Value="0,0,10,8" />
+		</Style>
+
+		<Style Selector="controls|NumericBlock.DetailSummaryValue">
+			<Setter Property="FontSize" Value="16" />
+			<Setter Property="FontWeight" Value="SemiBold" />
+		</Style>
+
+		<Style Selector="StackPanel.DetailSummaryPairMetric">
+			<Setter Property="Orientation" Value="Horizontal" />
+			<Setter Property="Spacing" Value="3" />
+		</Style>
+
+		<Style Selector="TextBlock.DetailSummaryMetricSlash">
+			<Setter Property="FontSize" Value="10" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+
+		<Style Selector="controls|NumericBlock.DetailSummaryRate">
+			<Setter Property="FractionDigits" Value="1" />
+			<Setter Property="TrimTrailingZeros" Value="False" />
+			<Setter Property="UsePercentageNotation" Value="True" />
+		</Style>
+
+		<Style Selector="Border.CounterpartTable">
+			<Setter Property="Background" Value="#24171D22" />
+			<Setter Property="BorderBrush" Value="#4A6B7782" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="8" />
+			<Setter Property="Padding" Value="10" />
+		</Style>
+
+		<Style Selector="CheckBox.CounterpartSelectAll">
+			<Setter Property="Foreground" Value="#D7E2EB" />
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="FontWeight" Value="SemiBold" />
+		</Style>
+
+		<Style Selector="ScrollViewer.CounterpartItemsScroller">
+			<Setter Property="MaxHeight" Value="224" />
+			<Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+			<Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+		</Style>
+
+		<Style Selector="TextBlock.CounterpartHeaderText">
+			<Setter Property="Foreground" Value="#AEBECA" />
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="TextAlignment" Value="Right" />
+			<Setter Property="HorizontalAlignment" Value="Stretch" />
+		</Style>
+
+		<Style Selector="Border.CounterpartRow">
+			<Setter Property="CornerRadius" Value="6" />
+			<Setter Property="Padding" Value="8,6" />
+			<Setter Property="Background" Value="#12000000" />
+			<Setter Property="Margin" Value="0,0,0,4" />
+		</Style>
+
+		<Style Selector="Border.CounterpartRow:pointerover">
+			<Setter Property="Background" Value="#1EFFFFFF" />
+		</Style>
+
+		<Style Selector="TextBlock.CounterpartName">
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+
+		<Style Selector="controls|NumericBlock.CounterpartMetricValue">
+			<Setter Property="FontSize" Value="12" />
+			<Setter Property="FontWeight" Value="SemiBold" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="HorizontalAlignment" Value="Stretch" />
+			<Setter Property="TextAlignment" Value="Right" />
+		</Style>
+
+		<Style Selector="controls|NumericBlock.CounterpartMetricRate">
+			<Setter Property="FractionDigits" Value="1" />
+			<Setter Property="TrimTrailingZeros" Value="False" />
+			<Setter Property="UsePercentageNotation" Value="True" />
+		</Style>
+
+		<Style Selector="TextBlock.SectionTitle">
+			<Setter Property="Foreground" Value="#C7D2DC" />
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="Margin" Value="2,0,0,0" />
+		</Style>
+
+		<Style Selector="Border.DetailTableCard">
+			<Setter Property="Background" Value="#30111111" />
+			<Setter Property="BorderBrush" Value="#50808080" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="CornerRadius" Value="8" />
+			<Setter Property="Padding" Value="8" />
+		</Style>
+
+		<Style Selector="TextBlock.DetailTableHeader">
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="HorizontalAlignment" Value="Stretch" />
+			<Setter Property="TextAlignment" Value="Right" />
+			<Setter Property="TextWrapping" Value="Wrap" />
+		</Style>
+
+		<Style Selector="TextBlock.DetailTableHeaderLeft">
+			<Setter Property="FontWeight" Value="Bold" />
+			<Setter Property="FontSize" Value="11" />
+		</Style>
+
+		<Style Selector="StackPanel.DetailMetricPair">
+			<Setter Property="Orientation" Value="Horizontal" />
+			<Setter Property="Spacing" Value="3" />
+			<Setter Property="HorizontalAlignment" Value="Right" />
+		</Style>
+
+		<Style Selector="TextBlock.DetailMetricSlash">
+			<Setter Property="FontSize" Value="10" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+
+		<Style Selector="controls|NumericBlock.DetailMetricValue">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="TextAlignment" Value="Right" />
+		</Style>
+
+		<Style Selector="controls|NumericBlock.DetailMetricRate">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="FractionDigits" Value="1" />
+			<Setter Property="TrimTrailingZeros" Value="False" />
+			<Setter Property="UsePercentageNotation" Value="True" />
+		</Style>
+
+		<Style Selector="TextBlock.DetailRowText">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="Margin" Value="0,2" />
+			<Setter Property="TextTrimming" Value="CharacterEllipsis" />
+		</Style>
+
+		<Style Selector="controls|NumericBlock.DetailRowValue">
+			<Setter Property="FontSize" Value="11" />
+			<Setter Property="Margin" Value="0,2" />
+			<Setter Property="HorizontalAlignment" Value="Stretch" />
+			<Setter Property="TextAlignment" Value="Right" />
+		</Style>
+	</UserControl.Styles>
+
+	<StackPanel Orientation="Vertical" Spacing="14">
+		<Border Classes="DetailSummaryCard">
+			<StackPanel Orientation="Vertical" Spacing="12">
+				<TextBlock Classes="DetailSummaryTitle" Text="{Binding Localization[Panel.Damage]}" />
+
+				<Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+					<WrapPanel Grid.Column="0" Orientation="Horizontal">
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Summary.Total]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.Total}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Summary.Dps]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue"
+												   Value="{Binding DamageSection.PerSecond}"
+												   FractionDigits="1"
+												   TrimTrailingZeros="False" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Column.Direct]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.DirectTotal}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Column.PeriodicDamage]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.PeriodicTotal}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Summary.Attacks]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.Attempts}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Summary.HitCount]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.Hits}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.HitRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Column.PeriodicHits]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.PeriodicHits}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.CriticalRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.Criticals}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.CriticalRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.MultiHitRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.MultiHitCount}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.MultiHitRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.SmiteRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.SmiteCount}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.SmiteRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.BackRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.BackCount}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.BackRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.PerfectRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.PerfectCount}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.PerfectRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.ParryRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.ParryCount}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.ParryRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.BlockRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.BlockCount}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.BlockRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.EnduranceRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.EnduranceCount}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.EnduranceRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.EvadeRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.Evades}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.EvadeRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.RegenerationRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.RegenerationCount}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.RegenerationRate}" />
+							</StackPanel>
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Label.InvincibleRate]}" />
+							<StackPanel Classes="DetailSummaryPairMetric">
+								<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding DamageSection.Invincible}" />
+								<TextBlock Classes="DetailSummaryMetricSlash" Text="/" />
+								<controls:NumericBlock Classes="DetailSummaryValue DetailSummaryRate" Value="{Binding DamageSection.InvincibleRate}" />
+							</StackPanel>
+						</StackPanel>
+					</WrapPanel>
+
+					<Border Grid.Column="1"
+							Classes="CounterpartTable"
+							DataContext="{Binding DamageCounterpartFilter}"
+							x:DataType="vm:DetailCounterpartFilterViewModel"
+							IsVisible="{Binding HasCounterparts}">
+						<StackPanel Orientation="Vertical" Spacing="8">
+							<Grid ColumnDefinitions="Auto,2*,116,72" ColumnSpacing="8">
+								<CheckBox Grid.Column="0"
+										  Grid.ColumnSpan="2"
+										  Classes="CounterpartSelectAll"
+										  Content="{Binding CounterpartTitle}"
+										  ToolTip.Tip="{Binding Localization[Action.SelectAll]}"
+										  IsChecked="{Binding AreAllCounterpartsSelected, Mode=TwoWay}"
+										  IsThreeState="True"
+										  VerticalAlignment="Center" />
+								<TextBlock Grid.Column="2"
+										   Classes="CounterpartHeaderText"
+										   Text="{Binding Localization[Column.Damage]}" />
+								<TextBlock Grid.Column="3"
+										   Classes="CounterpartHeaderText"
+										   Text="{Binding Localization[Column.Share]}" />
+							</Grid>
+							<ScrollViewer Classes="CounterpartItemsScroller">
+								<ItemsControl ItemsSource="{Binding Counterparts}">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate x:DataType="vm:DetailCounterpartSelectionViewModel">
+											<Border Classes="CounterpartRow">
+												<Grid ColumnDefinitions="Auto,2*,116,72" ColumnSpacing="8">
+													<CheckBox Grid.Column="0"
+															  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+															  VerticalAlignment="Center" />
+													<TextBlock Grid.Column="1"
+															   Classes="CounterpartName"
+															   Text="{Binding DisplayName}" />
+													<controls:NumericBlock Grid.Column="2"
+																		   Classes="CounterpartMetricValue"
+																		   Value="{Binding DamageAmount}" />
+													<controls:NumericBlock Grid.Column="3"
+																		   Classes="CounterpartMetricValue CounterpartMetricRate"
+																		   Value="{Binding DamageShare}" />
+												</Grid>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</ScrollViewer>
+						</StackPanel>
+					</Border>
+				</Grid>
+
+				<Border Classes="DetailTableCard">
+					<StackPanel Orientation="Vertical" Spacing="6">
+						<Grid ColumnDefinitions="2*,82,82,90,96,72,86,86,86,86,86,86,86,86,86,86,86,60"
+							  ColumnSpacing="4">
+							<TextBlock Grid.Column="0" Classes="DetailTableHeaderLeft" Text="{Binding Localization[Column.Skill]}" />
+							<TextBlock Grid.Column="1" Classes="DetailTableHeader" Text="{Binding Localization[Column.Total]}" />
+							<TextBlock Grid.Column="2" Classes="DetailTableHeader" Text="{Binding Localization[Column.Direct]}" />
+							<TextBlock Grid.Column="3" Classes="DetailTableHeader" Text="{Binding Localization[Column.PeriodicDamage]}" />
+							<TextBlock Grid.Column="4" Classes="DetailTableHeader" Text="{Binding Localization[Column.HitCount]}" />
+							<TextBlock Grid.Column="5" Classes="DetailTableHeader" Text="{Binding Localization[Column.PeriodicHits]}" />
+							<TextBlock Grid.Column="6" Classes="DetailTableHeader" Text="{Binding Localization[Column.Critical]}" />
+							<TextBlock Grid.Column="7" Classes="DetailTableHeader" Text="{Binding Localization[Column.Perfect]}" />
+							<TextBlock Grid.Column="8" Classes="DetailTableHeader" Text="{Binding Localization[Column.Smite]}" />
+							<TextBlock Grid.Column="9" Classes="DetailTableHeader" Text="{Binding Localization[Column.MultiHit]}" />
+							<TextBlock Grid.Column="10" Classes="DetailTableHeader" Text="{Binding Localization[Column.Back]}" />
+							<TextBlock Grid.Column="11" Classes="DetailTableHeader" Text="{Binding Localization[Column.Parry]}" />
+							<TextBlock Grid.Column="12" Classes="DetailTableHeader" Text="{Binding Localization[Column.Block]}" />
+							<TextBlock Grid.Column="13" Classes="DetailTableHeader" Text="{Binding Localization[Column.Endurance]}" />
+							<TextBlock Grid.Column="14" Classes="DetailTableHeader" Text="{Binding Localization[Column.Regeneration]}" />
+							<TextBlock Grid.Column="15" Classes="DetailTableHeader" Text="{Binding Localization[Column.Evade]}" />
+							<TextBlock Grid.Column="16" Classes="DetailTableHeader" Text="{Binding Localization[Column.Invincible]}" />
+							<TextBlock Grid.Column="17" Classes="DetailTableHeader" Text="{Binding Localization[Column.Share]}" />
+						</Grid>
+						<ItemsControl ItemsSource="{Binding DamageSection.Rows}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
+									<Grid ColumnDefinitions="2*,82,82,90,96,72,86,86,86,86,86,86,86,86,86,86,86,60"
+										  ColumnSpacing="4">
+										<TextBlock Grid.Column="0" Classes="DetailRowText" Text="{Binding SkillName}" />
+										<controls:NumericBlock Grid.Column="1" Classes="DetailRowValue" Value="{Binding TotalAmount}" />
+										<controls:NumericBlock Grid.Column="2" Classes="DetailRowValue" Value="{Binding DirectAmount}" />
+										<controls:NumericBlock Grid.Column="3" Classes="DetailRowValue" Value="{Binding PeriodicAmount}" />
+										<controls:NumericBlock Grid.Column="4" Classes="DetailRowValue" Value="{Binding Hits}" />
+										<controls:NumericBlock Grid.Column="5" Classes="DetailRowValue" Value="{Binding PeriodicHits}" />
+										<StackPanel Grid.Column="6" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Criticals}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding CriticalRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="7" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Perfect}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding PerfectRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="8" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Smite}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding SmiteRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="9" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding MultiHit}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding MultiHitRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="10" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Back}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding BackRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="11" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Parry}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding ParryRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="12" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Block}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding BlockRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="13" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Endurance}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding EnduranceRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="14" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Regeneration}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding RegenerationRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="15" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Evades}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding EvadeRate}" />
+										</StackPanel>
+										<StackPanel Grid.Column="16" Classes="DetailMetricPair" Margin="0,2">
+											<controls:NumericBlock Classes="DetailMetricValue" Value="{Binding Invincible}" />
+											<TextBlock Classes="DetailMetricSlash" Text="/" />
+											<controls:NumericBlock Classes="DetailMetricValue DetailMetricRate" Value="{Binding InvincibleRate}" />
+										</StackPanel>
+										<controls:NumericBlock Grid.Column="17"
+															   Classes="DetailRowValue"
+															   Value="{Binding SharePercent}"
+															   FractionDigits="1"
+															   TrimTrailingZeros="False"
+															   UsePercentageNotation="True" />
+									</Grid>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+						<TextBlock Text="{Binding Localization[Panel.EmptySkills]}"
+								   Foreground="Gray"
+								   IsVisible="{Binding DamageSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
+					</StackPanel>
+				</Border>
+			</StackPanel>
+		</Border>
+
+		<Border Classes="DetailSummaryCard">
+			<StackPanel Orientation="Vertical" Spacing="12">
+				<TextBlock Classes="DetailSummaryTitle" Text="{Binding Localization[Panel.Support]}" />
+
+				<Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+					<WrapPanel Grid.Column="0" Orientation="Horizontal">
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Panel.Healing]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding HealingSection.Total}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Summary.Hps]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue"
+												   Value="{Binding HealingSection.PerSecond}"
+												   FractionDigits="1"
+												   TrimTrailingZeros="False" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Column.Heal]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding HealingSection.DirectTotal}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Column.Hot]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding HealingSection.PeriodicTotal}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Column.DrainHeal]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding HealingSection.DrainTotal}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Summary.HealingHits]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding HealingSection.Hits}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Panel.Shield]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding ShieldSection.Total}" />
+						</StackPanel>
+						<StackPanel Classes="DetailSummaryMetric">
+							<TextBlock Classes="DetailSummaryLabel" Text="{Binding Localization[Summary.ShieldHits]}" />
+							<controls:NumericBlock Classes="DetailSummaryValue" Value="{Binding ShieldSection.Hits}" />
+						</StackPanel>
+					</WrapPanel>
+
+					<Border Grid.Column="1"
+							Classes="CounterpartTable"
+							DataContext="{Binding SupportCounterpartFilter}"
+							x:DataType="vm:DetailCounterpartFilterViewModel"
+							IsVisible="{Binding HasCounterparts}">
+						<StackPanel Orientation="Vertical" Spacing="8">
+							<Grid ColumnDefinitions="Auto,2*,108,68,108,68" ColumnSpacing="8">
+								<CheckBox Grid.Column="0"
+										  Grid.ColumnSpan="2"
+										  Classes="CounterpartSelectAll"
+										  Content="{Binding CounterpartTitle}"
+										  ToolTip.Tip="{Binding Localization[Action.SelectAll]}"
+										  IsChecked="{Binding AreAllCounterpartsSelected, Mode=TwoWay}"
+										  IsThreeState="True"
+										  VerticalAlignment="Center" />
+								<TextBlock Grid.Column="2"
+										   Classes="CounterpartHeaderText"
+										   Text="{Binding Localization[Column.Heal]}" />
+								<TextBlock Grid.Column="3"
+										   Classes="CounterpartHeaderText"
+										   Text="{Binding Localization[Column.Share]}" />
+								<TextBlock Grid.Column="4"
+										   Classes="CounterpartHeaderText"
+										   Text="{Binding Localization[Column.Shield]}" />
+								<TextBlock Grid.Column="5"
+										   Classes="CounterpartHeaderText"
+										   Text="{Binding Localization[Column.Share]}" />
+							</Grid>
+							<ScrollViewer Classes="CounterpartItemsScroller">
+								<ItemsControl ItemsSource="{Binding Counterparts}">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate x:DataType="vm:DetailCounterpartSelectionViewModel">
+											<Border Classes="CounterpartRow">
+												<Grid ColumnDefinitions="Auto,2*,108,68,108,68" ColumnSpacing="8">
+													<CheckBox Grid.Column="0"
+															  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+															  VerticalAlignment="Center" />
+													<TextBlock Grid.Column="1"
+															   Classes="CounterpartName"
+															   Text="{Binding DisplayName}" />
+													<controls:NumericBlock Grid.Column="2"
+																		   Classes="CounterpartMetricValue"
+																		   Value="{Binding HealingAmount}" />
+													<controls:NumericBlock Grid.Column="3"
+																		   Classes="CounterpartMetricValue CounterpartMetricRate"
+																		   Value="{Binding HealingShare}" />
+													<controls:NumericBlock Grid.Column="4"
+																		   Classes="CounterpartMetricValue"
+																		   Value="{Binding ShieldAmount}" />
+													<controls:NumericBlock Grid.Column="5"
+																		   Classes="CounterpartMetricValue CounterpartMetricRate"
+																		   Value="{Binding ShieldShare}" />
+												</Grid>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</ScrollViewer>
+						</StackPanel>
+					</Border>
+				</Grid>
+
+				<TextBlock Classes="SectionTitle" Text="{Binding Localization[Panel.Healing]}" />
+				<Border Classes="DetailTableCard">
+					<StackPanel Orientation="Vertical" Spacing="6">
+						<Grid ColumnDefinitions="2*,96,86,96,96,80,56" ColumnSpacing="4">
+							<TextBlock Grid.Column="0" Classes="DetailTableHeaderLeft" Text="{Binding Localization[Column.Skill]}" />
+							<TextBlock Grid.Column="1" Classes="DetailTableHeader" Text="{Binding Localization[Column.Total]}" />
+							<TextBlock Grid.Column="2" Classes="DetailTableHeader" Text="{Binding Localization[Column.Heal]}" />
+							<TextBlock Grid.Column="3" Classes="DetailTableHeader" Text="{Binding Localization[Column.Hot]}" />
+							<TextBlock Grid.Column="4" Classes="DetailTableHeader" Text="{Binding Localization[Column.DrainHeal]}" />
+							<TextBlock Grid.Column="5" Classes="DetailTableHeader" Text="{Binding Localization[Column.HitCount]}" />
+							<TextBlock Grid.Column="6" Classes="DetailTableHeader" Text="{Binding Localization[Column.Share]}" />
+						</Grid>
+						<ItemsControl ItemsSource="{Binding HealingSection.Rows}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
+									<Grid ColumnDefinitions="2*,96,86,96,96,80,56" ColumnSpacing="4">
+										<TextBlock Grid.Column="0" Classes="DetailRowText" Text="{Binding SkillName}" />
+										<controls:NumericBlock Grid.Column="1" Classes="DetailRowValue" Value="{Binding TotalAmount}" />
+										<controls:NumericBlock Grid.Column="2" Classes="DetailRowValue" Value="{Binding DirectAmount}" />
+										<controls:NumericBlock Grid.Column="3" Classes="DetailRowValue" Value="{Binding PeriodicAmount}" />
+										<controls:NumericBlock Grid.Column="4" Classes="DetailRowValue" Value="{Binding DrainAmount}" />
+										<controls:NumericBlock Grid.Column="5" Classes="DetailRowValue" Value="{Binding Hits}" />
+										<controls:NumericBlock Grid.Column="6"
+															   Classes="DetailRowValue"
+															   Value="{Binding SharePercent}"
+															   FractionDigits="1"
+															   TrimTrailingZeros="False"
+															   UsePercentageNotation="True" />
+									</Grid>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+						<TextBlock Text="{Binding Localization[Panel.EmptySkills]}"
+								   Foreground="Gray"
+								   IsVisible="{Binding HealingSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
+					</StackPanel>
+				</Border>
+
+				<TextBlock Classes="SectionTitle" Text="{Binding Localization[Panel.Shield]}" />
+				<Border Classes="DetailTableCard">
+					<StackPanel Orientation="Vertical" Spacing="6">
+						<Grid ColumnDefinitions="2*,96,80,56" ColumnSpacing="4">
+							<TextBlock Grid.Column="0" Classes="DetailTableHeaderLeft" Text="{Binding Localization[Column.Skill]}" />
+							<TextBlock Grid.Column="1" Classes="DetailTableHeader" Text="{Binding Localization[Column.Total]}" />
+							<TextBlock Grid.Column="2" Classes="DetailTableHeader" Text="{Binding Localization[Column.HitCount]}" />
+							<TextBlock Grid.Column="3" Classes="DetailTableHeader" Text="{Binding Localization[Column.Share]}" />
+						</Grid>
+						<ItemsControl ItemsSource="{Binding ShieldSection.Rows}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate x:DataType="vm:SkillDetailRowViewModel">
+									<Grid ColumnDefinitions="2*,96,80,56" ColumnSpacing="4">
+										<TextBlock Grid.Column="0" Classes="DetailRowText" Text="{Binding SkillName}" />
+										<controls:NumericBlock Grid.Column="1" Classes="DetailRowValue" Value="{Binding TotalAmount}" />
+										<controls:NumericBlock Grid.Column="2" Classes="DetailRowValue" Value="{Binding Hits}" />
+										<controls:NumericBlock Grid.Column="3"
+															   Classes="DetailRowValue"
+															   Value="{Binding SharePercent}"
+															   FractionDigits="1"
+															   TrimTrailingZeros="False"
+															   UsePercentageNotation="True" />
+									</Grid>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+						<TextBlock Text="{Binding Localization[Panel.EmptySkills]}"
+								   Foreground="Gray"
+								   IsVisible="{Binding ShieldSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
+					</StackPanel>
+				</Border>
+			</StackPanel>
+		</Border>
+	</StackPanel>
+</UserControl>

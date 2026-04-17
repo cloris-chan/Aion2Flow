@@ -8,8 +8,16 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObject
+public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 {
+    private struct CounterpartAggregateMetrics
+    {
+        public string DisplayName;
+        public long DamageAmount;
+        public long HealingAmount;
+        public long ShieldAmount;
+    }
+
     private readonly CombatMetricsEngine _engine;
     private readonly CombatMetricsStore _liveStore;
     private readonly BattleArchiveService _battleArchiveService;
@@ -20,7 +28,6 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
     private CombatMetricsStore? _currentStore;
     private Guid _battleContextId;
     private int? _combatantId;
-    private bool _suppressScopeRefresh;
 
 #if DEBUG
     private readonly bool _isDebugBuild = true;
@@ -45,7 +52,7 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         IncomingShield
     }
 
-    public CombatantSkillDetailsFlyoutViewModel(
+    public CombatantDetailsFlyoutViewModel(
         CombatMetricsEngine engine,
         CombatMetricsStore liveStore,
         BattleArchiveService battleArchiveService,
@@ -55,31 +62,69 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         _liveStore = liveStore;
         _battleArchiveService = battleArchiveService;
         _localization = localization;
-
-        OutgoingDamage.SelectedScopeChanged += HandleScopeChanged;
-        OutgoingHealing.SelectedScopeChanged += HandleScopeChanged;
-        IncomingDamage.SelectedScopeChanged += HandleScopeChanged;
-        IncomingHealing.SelectedScopeChanged += HandleScopeChanged;
+        OutgoingDetail = new CombatDirectionDetailViewModel(localization, "Panel.Targets");
+        IncomingDetail = new CombatDirectionDetailViewModel(localization, "Panel.Sources");
+        OutgoingDetail.DamageCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        OutgoingDetail.SupportCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        IncomingDetail.DamageCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        IncomingDetail.SupportCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
     }
 
     public LocalizationService Localization => _localization;
 
     public bool IsDebugBuild => _isDebugBuild;
 
-    public SkillDetailSectionViewModel OutgoingDamage { get; } = new();
+    public CombatDirectionDetailViewModel OutgoingDetail { get; }
 
-    public SkillDetailSectionViewModel OutgoingHealing { get; } = new();
+    public CombatDirectionDetailViewModel IncomingDetail { get; }
 
-    public SkillDetailSectionViewModel OutgoingShield { get; } = new();
+    public SkillDetailSectionViewModel OutgoingDamage => OutgoingDetail.DamageSection;
 
-    public SkillDetailSectionViewModel IncomingDamage { get; } = new();
+    public SkillDetailSectionViewModel OutgoingHealing => OutgoingDetail.HealingSection;
 
-    public SkillDetailSectionViewModel IncomingHealing { get; } = new();
+    public SkillDetailSectionViewModel OutgoingShield => OutgoingDetail.ShieldSection;
 
-    public SkillDetailSectionViewModel IncomingShield { get; } = new();
+    public SkillDetailSectionViewModel IncomingDamage => IncomingDetail.DamageSection;
+
+    public SkillDetailSectionViewModel IncomingHealing => IncomingDetail.HealingSection;
+
+    public SkillDetailSectionViewModel IncomingShield => IncomingDetail.ShieldSection;
 
     [ObservableProperty]
     public partial string CombatantName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial int SelectedDirectionIndex { get; set; }
+
+    public bool IsOutgoingSelected
+    {
+        get => SelectedDirectionIndex == 0;
+        set
+        {
+            if (value)
+            {
+                SelectedDirectionIndex = 0;
+            }
+        }
+    }
+
+    public bool IsIncomingSelected
+    {
+        get => SelectedDirectionIndex == 1;
+        set
+        {
+            if (value)
+            {
+                SelectedDirectionIndex = 1;
+            }
+        }
+    }
+
+    partial void OnSelectedDirectionIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsOutgoingSelected));
+        OnPropertyChanged(nameof(IsIncomingSelected));
+    }
 
     public void SelectBattleCombatant(Guid battleContextId, int? combatantId)
     {
@@ -96,43 +141,36 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         _currentStore = null;
         _battlePackets.Clear();
         CombatantName = string.Empty;
-        OutgoingDamage.Clear();
-        OutgoingHealing.Clear();
-        OutgoingShield.Clear();
-        IncomingDamage.Clear();
-        IncomingHealing.Clear();
-        IncomingShield.Clear();
+        SelectedDirectionIndex = 0;
+        OutgoingDetail.Clear();
+        IncomingDetail.Clear();
     }
 
-    private void HandleScopeChanged(object? sender, EventArgs e)
+    private void HandleCounterpartSelectionChanged(object? sender, EventArgs e)
     {
-        if (_suppressScopeRefresh)
+        if (_combatantId is null)
         {
             return;
         }
 
-        _suppressScopeRefresh = true;
-        try
+        if (ReferenceEquals(sender, OutgoingDetail.DamageCounterpartFilter) ||
+            ReferenceEquals(sender, OutgoingDetail.SupportCounterpartFilter))
         {
-            if (ReferenceEquals(sender, OutgoingHealing) || ReferenceEquals(sender, OutgoingShield))
-            {
-                var combatantId = (ReferenceEquals(sender, OutgoingHealing) ? OutgoingHealing.SelectedScope : OutgoingShield.SelectedScope)?.CombatantId;
-                SyncSectionScope(OutgoingHealing, combatantId);
-                SyncSectionScope(OutgoingShield, combatantId);
-            }
-            else if (ReferenceEquals(sender, IncomingHealing) || ReferenceEquals(sender, IncomingShield))
-            {
-                var combatantId = (ReferenceEquals(sender, IncomingHealing) ? IncomingHealing.SelectedScope : IncomingShield.SelectedScope)?.CombatantId;
-                SyncSectionScope(IncomingHealing, combatantId);
-                SyncSectionScope(IncomingShield, combatantId);
-            }
+            RefreshDirection(
+                OutgoingDetail,
+                DetailSectionKind.OutgoingDamage,
+                DetailSectionKind.OutgoingHealing,
+                DetailSectionKind.OutgoingShield);
         }
-        finally
+        else if (ReferenceEquals(sender, IncomingDetail.DamageCounterpartFilter) ||
+                 ReferenceEquals(sender, IncomingDetail.SupportCounterpartFilter))
         {
-            _suppressScopeRefresh = false;
+            RefreshDirection(
+                IncomingDetail,
+                DetailSectionKind.IncomingDamage,
+                DetailSectionKind.IncomingHealing,
+                DetailSectionKind.IncomingShield);
         }
-
-        RefreshSections();
     }
 
     private void RefreshContext()
@@ -173,8 +211,8 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         _battlePackets.AddRange(CollectBattlePackets(snapshot, store));
         CombatantName = CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, _combatantId.Value);
 
-        RebuildScopeOptions();
-        RefreshSections();
+        RebuildCounterpartSelections();
+        RefreshAllSections();
     }
 
     private bool TryResolveContext(out DamageMeterSnapshot snapshot, out CombatMetricsStore store)
@@ -216,69 +254,36 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
         }
     }
 
-    private void RebuildScopeOptions()
+    private void RebuildCounterpartSelections()
     {
         if (_combatantId is null || _currentStore is null)
         {
             return;
         }
 
-        _suppressScopeRefresh = true;
-        try
-        {
-            RebuildScopeOptionsForSection(OutgoingDamage, DetailSectionKind.OutgoingDamage);
-            RebuildSharedScopeOptions(OutgoingHealing, OutgoingShield, DetailSectionKind.OutgoingHealing, DetailSectionKind.OutgoingShield);
-            RebuildScopeOptionsForSection(IncomingDamage, DetailSectionKind.IncomingDamage);
-            RebuildSharedScopeOptions(IncomingHealing, IncomingShield, DetailSectionKind.IncomingHealing, DetailSectionKind.IncomingShield);
-        }
-        finally
-        {
-            _suppressScopeRefresh = false;
-        }
+        OutgoingDetail.DamageCounterpartFilter.ReplaceCounterparts(BuildCounterpartOptions(
+            DetailSectionKind.OutgoingDamage));
+        OutgoingDetail.SupportCounterpartFilter.ReplaceCounterparts(BuildCounterpartOptions(
+            DetailSectionKind.OutgoingHealing,
+            DetailSectionKind.OutgoingShield));
+        IncomingDetail.DamageCounterpartFilter.ReplaceCounterparts(BuildCounterpartOptions(
+            DetailSectionKind.IncomingDamage));
+        IncomingDetail.SupportCounterpartFilter.ReplaceCounterparts(BuildCounterpartOptions(
+            DetailSectionKind.IncomingHealing,
+            DetailSectionKind.IncomingShield));
     }
 
-    private void RebuildScopeOptionsForSection(SkillDetailSectionViewModel section, DetailSectionKind sectionKind)
+    private List<DetailCounterpartOption> BuildCounterpartOptions(params DetailSectionKind[] sectionKinds)
     {
-        var scopes = BuildScopeOptions(sectionKind);
-        var selectedCombatantId = section.SelectedScope?.CombatantId;
-        section.ReplaceScopeOptions(scopes);
-        section.SelectedScope = scopes.FirstOrDefault(x => x.CombatantId == selectedCombatantId) ?? scopes.FirstOrDefault();
-    }
-
-    private void RebuildSharedScopeOptions(
-        SkillDetailSectionViewModel primarySection,
-        SkillDetailSectionViewModel secondarySection,
-        params DetailSectionKind[] sectionKinds)
-    {
-        var scopes = BuildScopeOptions(sectionKinds);
-        var selectedCombatantId = primarySection.SelectedScope?.CombatantId ?? secondarySection.SelectedScope?.CombatantId;
-
-        primarySection.ReplaceScopeOptions(scopes);
-        secondarySection.ReplaceScopeOptions(scopes);
-
-        var primarySelectedScope = primarySection.ScopeOptions.FirstOrDefault(x => x.CombatantId == selectedCombatantId) ?? primarySection.ScopeOptions.FirstOrDefault();
-        var secondarySelectedScope = secondarySection.ScopeOptions.FirstOrDefault(x => x.CombatantId == selectedCombatantId) ?? secondarySection.ScopeOptions.FirstOrDefault();
-        primarySection.SelectedScope = primarySelectedScope;
-        secondarySection.SelectedScope = secondarySelectedScope;
-    }
-
-    private List<SkillDetailScopeOption> BuildScopeOptions(params DetailSectionKind[] sectionKinds)
-    {
-        var options = new List<SkillDetailScopeOption>
-        {
-            new(null, Localization["Scope.AllBattle"])
-        };
-
         if (_combatantId is null || _currentStore is null)
         {
-            return options;
+            return [];
         }
 
-        var combatantDisplayNames = new Dictionary<int, string>();
+        var combatantMetrics = new Dictionary<int, CounterpartAggregateMetrics>();
         var packetsSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_battlePackets);
         foreach (ref readonly var detailPacket in packetsSpan)
         {
-            var matchesAnySection = false;
             foreach (var sectionKind in sectionKinds)
             {
                 if (!MatchesSection(in detailPacket, sectionKind, _combatantId.Value) ||
@@ -287,51 +292,136 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
                     continue;
                 }
 
-                matchesAnySection = true;
+                var combatantId = GetCounterpartCombatantId(in detailPacket, sectionKind);
+                if (combatantId <= 0)
+                {
+                    break;
+                }
+
+                if (!combatantMetrics.TryGetValue(combatantId, out var metrics))
+                {
+                    metrics = new CounterpartAggregateMetrics
+                    {
+                        DisplayName = CombatMetricsEngine.ResolveCombatantDisplayName(_currentStore, _currentSnapshot, combatantId)
+                    };
+                }
+
+                var amount = GetSectionContributionAmount(detailPacket.Packet, sectionKind);
+                switch (sectionKind)
+                {
+                    case DetailSectionKind.OutgoingDamage:
+                    case DetailSectionKind.IncomingDamage:
+                        metrics.DamageAmount += amount;
+                        break;
+                    case DetailSectionKind.OutgoingHealing:
+                    case DetailSectionKind.IncomingHealing:
+                        metrics.HealingAmount += amount;
+                        break;
+                    case DetailSectionKind.OutgoingShield:
+                    case DetailSectionKind.IncomingShield:
+                        metrics.ShieldAmount += amount;
+                        break;
+                }
+
+                combatantMetrics[combatantId] = metrics;
                 break;
             }
-
-            if (!matchesAnySection)
-            {
-                continue;
-            }
-
-            var combatantId = GetCounterpartCombatantId(in detailPacket, sectionKinds[0]);
-            if (combatantId <= 0)
-            {
-                continue;
-            }
-
-            combatantDisplayNames.TryAdd(combatantId, CombatMetricsEngine.ResolveCombatantDisplayName(_currentStore, _currentSnapshot, combatantId));
         }
 
-        if (combatantDisplayNames.Count == 0)
+        long totalDamage = 0, totalHealing = 0, totalShield = 0;
+        foreach (var metrics in combatantMetrics.Values)
         {
-            return options;
+            totalDamage += metrics.DamageAmount;
+            totalHealing += metrics.HealingAmount;
+            totalShield += metrics.ShieldAmount;
         }
 
-        var sortedCombatantIds = new List<int>(combatantDisplayNames.Keys);
-        sortedCombatantIds.Sort((left, right) => StringComparer.CurrentCulture.Compare(combatantDisplayNames[left], combatantDisplayNames[right]));
+        var sortedCombatantIds = new List<int>(combatantMetrics.Keys);
+        sortedCombatantIds.Sort((left, right) =>
+        {
+            var leftMetrics = combatantMetrics[left];
+            var rightMetrics = combatantMetrics[right];
+            var cmp = (rightMetrics.DamageAmount + rightMetrics.HealingAmount + rightMetrics.ShieldAmount)
+                .CompareTo(leftMetrics.DamageAmount + leftMetrics.HealingAmount + leftMetrics.ShieldAmount);
+            if (cmp != 0)
+            {
+                return cmp;
+            }
 
+            cmp = rightMetrics.DamageAmount.CompareTo(leftMetrics.DamageAmount);
+            if (cmp != 0)
+            {
+                return cmp;
+            }
+
+            cmp = rightMetrics.HealingAmount.CompareTo(leftMetrics.HealingAmount);
+            if (cmp != 0)
+            {
+                return cmp;
+            }
+
+            cmp = rightMetrics.ShieldAmount.CompareTo(leftMetrics.ShieldAmount);
+            if (cmp != 0)
+            {
+                return cmp;
+            }
+
+            return StringComparer.CurrentCulture.Compare(leftMetrics.DisplayName, rightMetrics.DisplayName);
+        });
+
+        var options = new List<DetailCounterpartOption>(sortedCombatantIds.Count);
         foreach (var combatantId in sortedCombatantIds)
         {
-            options.Add(new SkillDetailScopeOption(combatantId, combatantDisplayNames[combatantId]));
+            var metrics = combatantMetrics[combatantId];
+            options.Add(new DetailCounterpartOption(
+                combatantId,
+                metrics.DisplayName,
+                metrics.DamageAmount,
+                totalDamage > 0 ? metrics.DamageAmount / (double)totalDamage : 0d,
+                metrics.HealingAmount,
+                totalHealing > 0 ? metrics.HealingAmount / (double)totalHealing : 0d,
+                metrics.ShieldAmount,
+                totalShield > 0 ? metrics.ShieldAmount / (double)totalShield : 0d));
         }
 
         return options;
     }
 
-    private void RefreshSections()
+    private void RefreshAllSections()
     {
-        RefreshSection(OutgoingDamage, DetailSectionKind.OutgoingDamage);
-        RefreshSection(OutgoingHealing, DetailSectionKind.OutgoingHealing);
-        RefreshSection(OutgoingShield, DetailSectionKind.OutgoingShield);
-        RefreshSection(IncomingDamage, DetailSectionKind.IncomingDamage);
-        RefreshSection(IncomingHealing, DetailSectionKind.IncomingHealing);
-        RefreshSection(IncomingShield, DetailSectionKind.IncomingShield);
+        RefreshDirection(
+            OutgoingDetail,
+            DetailSectionKind.OutgoingDamage,
+            DetailSectionKind.OutgoingHealing,
+            DetailSectionKind.OutgoingShield);
+        RefreshDirection(
+            IncomingDetail,
+            DetailSectionKind.IncomingDamage,
+            DetailSectionKind.IncomingHealing,
+            DetailSectionKind.IncomingShield);
     }
 
-    private void RefreshSection(SkillDetailSectionViewModel section, DetailSectionKind sectionKind)
+    private void RefreshDirection(
+        CombatDirectionDetailViewModel directionDetail,
+        DetailSectionKind damageSectionKind,
+        DetailSectionKind healingSectionKind,
+        DetailSectionKind shieldSectionKind)
+    {
+        var selectedDamageCounterpartIds = directionDetail.DamageCounterpartFilter.GetSelectedCounterpartIds();
+        var selectableDamageCounterpartCount = directionDetail.DamageCounterpartFilter.Counterparts.Count;
+        var selectedSupportCounterpartIds = directionDetail.SupportCounterpartFilter.GetSelectedCounterpartIds();
+        var selectableSupportCounterpartCount = directionDetail.SupportCounterpartFilter.Counterparts.Count;
+
+        RefreshSection(directionDetail.DamageSection, damageSectionKind, selectedDamageCounterpartIds, selectableDamageCounterpartCount);
+        RefreshSection(directionDetail.HealingSection, healingSectionKind, selectedSupportCounterpartIds, selectableSupportCounterpartCount);
+        RefreshSection(directionDetail.ShieldSection, shieldSectionKind, selectedSupportCounterpartIds, selectableSupportCounterpartCount);
+    }
+
+    private void RefreshSection(
+        SkillDetailSectionViewModel section,
+        DetailSectionKind sectionKind,
+        HashSet<int> selectedCounterpartIds,
+        int selectableCounterpartCount)
     {
         if (_combatantId is null)
         {
@@ -339,8 +429,8 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
             return;
         }
 
-        var selectedScopeCombatantId = section.SelectedScope?.CombatantId;
         var metrics = new Dictionary<int, SkillMetrics>();
+        var hasSubsetFilter = selectableCounterpartCount > 0 && selectedCounterpartIds.Count != selectableCounterpartCount;
 
         var packetsSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_battlePackets);
         foreach (ref readonly var detailPacket in packetsSpan)
@@ -350,7 +440,15 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
                 continue;
             }
 
-            if (selectedScopeCombatantId.HasValue && GetCounterpartCombatantId(in detailPacket, sectionKind) != selectedScopeCombatantId.Value)
+            var counterpartCombatantId = GetCounterpartCombatantId(in detailPacket, sectionKind);
+            if (counterpartCombatantId > 0)
+            {
+                if (!selectedCounterpartIds.Contains(counterpartCombatantId))
+                {
+                    continue;
+                }
+            }
+            else if (hasSubsetFilter)
             {
                 continue;
             }
@@ -583,6 +681,17 @@ public sealed partial class CombatantSkillDetailsFlyoutViewModel : ObservableObj
 
     private static bool ContributesShield(ParsedCombatPacket packet)
         => packet.ValueKind == CombatValueKind.Shield && packet.Damage > 0;
+
+    private static long GetSectionContributionAmount(ParsedCombatPacket packet, DetailSectionKind sectionKind)
+    {
+        return sectionKind switch
+        {
+            DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage => Math.Max(0L, packet.Damage),
+            DetailSectionKind.OutgoingHealing or DetailSectionKind.IncomingHealing => Math.Max(0L, packet.Damage),
+            DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield => Math.Max(0L, packet.Damage),
+            _ => 0L
+        };
+    }
 
     private static List<SkillDetailRowData> BuildDamageRows(IEnumerable<SkillMetrics> skills)
     {

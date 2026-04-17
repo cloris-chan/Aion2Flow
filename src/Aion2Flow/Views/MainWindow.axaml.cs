@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Markup.Xaml;
@@ -48,7 +49,11 @@ public partial class MainWindow : Window
         if (sender is Border { DataContext: CombatantRowViewModel combatant })
         {
             DataContext.SelectedCombatant = combatant;
-            FlyoutBase.ShowAttachedFlyout(this);
+            if (TryGetCombatantDetailsFlyout(out var flyout, out var flyoutView))
+            {
+                ConfigureCombatantDetailsFlyout(flyout, flyoutView);
+                flyout.ShowAt(this);
+            }
         }
     }
 
@@ -114,5 +119,56 @@ public partial class MainWindow : Window
         {
             DataContext.SelectedBattleHistory = item;
         }
+    }
+
+    private void ConfigureCombatantDetailsFlyout(Flyout flyout, CombatantDetailsFlyoutView flyoutView)
+    {
+        var screen = Screens.ScreenFromWindow(this);
+        if (screen is null)
+        {
+            return;
+        }
+
+        var topLeft = this.PointToScreen(new Point(0, 0));
+        var bottomRight = this.PointToScreen(new Point(Bounds.Width, Bounds.Height));
+        var workArea = screen.WorkingArea;
+
+        var leftSpace = Math.Max(0, topLeft.X - workArea.X);
+        var rightSpace = Math.Max(0, workArea.Right - bottomRight.X);
+        var topSpace = Math.Max(0, topLeft.Y - workArea.Y);
+        var bottomSpace = Math.Max(0, workArea.Bottom - bottomRight.Y);
+
+        var placeRight = rightSpace >= leftSpace;
+        var alignTop = bottomSpace >= topSpace;
+
+        flyout.Placement = (placeRight, alignTop) switch
+        {
+            (true, true) => PlacementMode.RightEdgeAlignedTop,
+            (true, false) => PlacementMode.RightEdgeAlignedBottom,
+            (false, true) => PlacementMode.LeftEdgeAlignedTop,
+            _ => PlacementMode.LeftEdgeAlignedBottom
+        };
+
+        var renderScale = RenderScaling <= 0 ? 1d : RenderScaling;
+        var availableWidth = Math.Max(0d, (placeRight ? rightSpace : leftSpace) / renderScale - 16d);
+        var availableHeight = Math.Max(
+            0d,
+            (alignTop ? workArea.Bottom - topLeft.Y : bottomRight.Y - workArea.Y) / renderScale - 16d);
+
+        flyoutView.ConfigureViewport(availableWidth, availableHeight);
+    }
+
+    private bool TryGetCombatantDetailsFlyout(out Flyout flyout, out CombatantDetailsFlyoutView flyoutView)
+    {
+        if (GetValue(FlyoutBase.AttachedFlyoutProperty) is Flyout { Content: CombatantDetailsFlyoutView content } attachedFlyout)
+        {
+            flyout = attachedFlyout;
+            flyoutView = content;
+            return true;
+        }
+
+        flyout = null!;
+        flyoutView = null!;
+        return false;
     }
 }

@@ -38,7 +38,7 @@ internal static class Program
         services.AddSingleton<BattleArchiveService>();
         services.AddSingleton<CombatMetricsStore>();
         services.AddSingleton<CombatMetricsEngine>();
-        services.AddSingleton<CombatantSkillDetailsFlyoutViewModel>();
+        services.AddSingleton<CombatantDetailsFlyoutViewModel>();
         services.AddSingleton<ProcessPortDiscoveryService>();
         services.AddSingleton<ProcessForegroundWatcher>();
         services.AddSingleton<WinDivertCaptureService>();

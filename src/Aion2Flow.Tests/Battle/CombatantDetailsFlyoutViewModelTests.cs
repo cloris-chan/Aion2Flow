@@ -13,7 +13,7 @@ using System.Globalization;
 
 namespace Cloris.Aion2Flow.Tests.Battle;
 
-public sealed class CombatantSkillDetailsFlyoutViewModelTests
+public sealed class CombatantDetailsFlyoutViewModelTests
 {
     [Fact]
     public void SelectBattleCombatant_Builds_Live_Battle_Sections_And_Filters_By_Target()
@@ -25,7 +25,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -51,9 +51,10 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal(250, viewModel.OutgoingHealing.Total);
         Assert.Equal(180, viewModel.IncomingDamage.Total);
         Assert.Equal(340, viewModel.IncomingHealing.Total);
-        Assert.Equal(3, viewModel.OutgoingDamage.ScopeOptions.Count);
+        Assert.Equal(2, viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.Count);
+        Assert.Single(viewModel.OutgoingDetail.SupportCounterpartFilter.Counterparts);
 
-        viewModel.OutgoingDamage.SelectedScope = viewModel.OutgoingDamage.ScopeOptions.First(x => x.CombatantId == bossId);
+        SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
 
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
         Assert.Single(viewModel.OutgoingDamage.Rows);
@@ -71,7 +72,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -91,7 +92,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(2, viewModel.OutgoingDamage.Hits);
-        Assert.Equal(2, viewModel.OutgoingDamage.ScopeOptions.Count);
+        Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
     }
 
     [Fact]
@@ -104,7 +105,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -138,7 +139,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int summonId = 5001;
@@ -172,7 +173,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int allyId = 1002;
@@ -193,12 +194,11 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         Assert.Equal(500, viewModel.OutgoingShield.Total);
         Assert.Equal(250, viewModel.IncomingHealing.Total);
         Assert.Equal(300, viewModel.IncomingShield.Total);
-        Assert.Equal(3, viewModel.OutgoingHealing.ScopeOptions.Count);
-        Assert.Equal(3, viewModel.OutgoingShield.ScopeOptions.Count);
+        Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
+        Assert.Equal(2, viewModel.OutgoingDetail.SupportCounterpartFilter.Counterparts.Count);
 
-        viewModel.OutgoingHealing.SelectedScope = viewModel.OutgoingHealing.ScopeOptions.First(x => x.CombatantId == allyId);
+        SelectOnlyCounterpart(viewModel.OutgoingDetail.SupportCounterpartFilter, allyId);
 
-        Assert.Equal(allyId, viewModel.OutgoingShield.SelectedScope?.CombatantId);
         Assert.Equal(0, viewModel.OutgoingHealing.Total);
         Assert.Equal(200, viewModel.OutgoingShield.Total);
         Assert.Single(viewModel.OutgoingShield.Rows);
@@ -215,7 +215,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -227,12 +227,12 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
-        viewModel.OutgoingDamage.SelectedScope = viewModel.OutgoingDamage.ScopeOptions.First(x => x.CombatantId == bossId);
+        SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
 
         AppendPacket(store, playerId, bossId, 11000010, 300, "direct-hit", 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
 
-        Assert.Equal(bossId, viewModel.OutgoingDamage.SelectedScope?.CombatantId);
+        AssertSelectedCounterpartIds(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
         Assert.Single(viewModel.OutgoingDamage.Rows);
     }
@@ -247,7 +247,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -287,7 +287,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -337,7 +337,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -422,7 +422,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -465,7 +465,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -534,7 +534,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -586,7 +586,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -635,7 +635,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -681,7 +681,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, liveStore, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, liveStore, archive, localization);
 
         var record = archive.Archive(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
 
@@ -707,7 +707,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, liveStore, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, liveStore, archive, localization);
         var primary = replay.Combatants
             .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
             .ThenByDescending(static summary => summary.IncomingDamage)
@@ -748,7 +748,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         var snapshot = engine.CreateBattleSnapshot();
         var battlePackets = CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime)
@@ -950,7 +950,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int npcInstanceId = 29994;
@@ -967,12 +967,12 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
-        Assert.Equal(2, viewModel.OutgoingDamage.ScopeOptions.Count);
+        Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
 
-        var npcScope = viewModel.OutgoingDamage.ScopeOptions.FirstOrDefault(x => x.CombatantId == npcInstanceId);
-        Assert.NotNull(npcScope);
+        var counterpart = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.FirstOrDefault(x => x.CombatantId == npcInstanceId);
+        Assert.NotNull(counterpart);
         Assert.True(catalog.TryGetValue(npcCode, out var entry));
-        Assert.Equal(entry.Name, npcScope!.DisplayName);
+        Assert.Equal(entry.Name, counterpart!.DisplayName);
     }
 
     [Fact]
@@ -986,7 +986,7 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantSkillDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
 
         const int playerId = 1001;
         const int npcInstanceId = 29994;
@@ -1007,9 +1007,29 @@ public sealed class CombatantSkillDetailsFlyoutViewModelTests
         engine.Reset();
         viewModel.SelectBattleCombatant(record!.BattleId, playerId);
 
-        var npcScope = viewModel.OutgoingDamage.ScopeOptions.FirstOrDefault(x => x.CombatantId == npcInstanceId);
-        Assert.NotNull(npcScope);
+        var counterpart = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.FirstOrDefault(x => x.CombatantId == npcInstanceId);
+        Assert.NotNull(counterpart);
         Assert.True(catalog.TryGetValue(npcCode, out var entry));
-        Assert.Equal(entry.Name, npcScope!.DisplayName);
+        Assert.Equal(entry.Name, counterpart!.DisplayName);
+    }
+
+    private static void SelectOnlyCounterpart(DetailCounterpartFilterViewModel filter, int combatantId)
+    {
+        foreach (var counterpart in filter.Counterparts)
+        {
+            counterpart.IsSelected = counterpart.CombatantId == combatantId;
+        }
+    }
+
+    private static void AssertSelectedCounterpartIds(DetailCounterpartFilterViewModel filter, params int[] expectedCombatantIds)
+    {
+        var selectedIds = filter.Counterparts
+            .Where(static counterpart => counterpart.IsSelected)
+            .Select(static counterpart => counterpart.CombatantId)
+            .OrderBy(static id => id)
+            .ToArray();
+
+        Array.Sort(expectedCombatantIds);
+        Assert.Equal(expectedCombatantIds, selectedIds);
     }
 }

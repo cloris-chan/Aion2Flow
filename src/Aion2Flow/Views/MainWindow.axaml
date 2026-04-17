@@ -450,8 +450,9 @@
 	</Grid>
 
 	<FlyoutBase.AttachedFlyout>
-		<Flyout Placement="LeftEdgeAlignedTop" ShowMode="Transient" Closed="FlyoutClosed">
-			<views:CombatantSkillDetailsFlyoutView DataContext="{Binding CombatantDetails}" />
+		<Flyout ShowMode="Transient" Closed="FlyoutClosed">
+			<views:CombatantDetailsFlyoutView x:Name="CombatantDetailsFlyoutView"
+											 DataContext="{Binding CombatantDetails}" />
 		</Flyout>
 	</FlyoutBase.AttachedFlyout>
 </Window>
