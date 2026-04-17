@@ -149,6 +149,9 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(player.OutgoingDamage == 7920567, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
         Assert.True(player.OutgoingHits == 1170, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
         Assert.True(player.OutgoingAttempts == 1170, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
+
+        const int gameReportedHealing021557 = 583068;
+        Assert.True(player.IncomingHealing == gameReportedHealing021557, $"IncomingHealing={player.IncomingHealing} expected={gameReportedHealing021557}\n{diagDump}");
     }
 
     [Fact]
@@ -170,6 +173,89 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(player.OutgoingDamage == 3961239, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
         Assert.True(player.OutgoingHits == 525, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
         Assert.True(player.OutgoingAttempts == 525, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
+
+        const int gameReportedHealing021406 = 141564;
+        Assert.True(player.IncomingHealing == gameReportedHealing021406, $"IncomingHealing={player.IncomingHealing} expected={gameReportedHealing021406}\n{diagDump}");
+    }
+
+    [Fact]
+    public void Replay_20260417003456_Ground_AoE_Entities_Attributed_To_Owning_Player()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260417003456.log"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        var snapshot = replay.Snapshot;
+        var combatantDump = string.Join("\n", snapshot.Combatants
+            .OrderByDescending(c => c.Value.DamageAmount)
+            .Select(c => $"id={c.Key} class={c.Value.CharacterClass} dmg={c.Value.DamageAmount} heal={c.Value.HealingAmount} name={c.Value.Nickname}"));
+
+        Assert.False(snapshot.Combatants.ContainsKey(99306), $"Ground AoE entity 99306 should not appear separately.\n{combatantDump}");
+        Assert.False(snapshot.Combatants.ContainsKey(39022), $"Ground AoE entity 39022 should not appear separately.\n{combatantDump}");
+
+        Assert.True(snapshot.Combatants.TryGetValue(664, out var cleric), $"Cleric 664 not found.\n{combatantDump}");
+        Assert.True(cleric.DamageAmount == 3421060, $"Cleric damage={cleric.DamageAmount} expected=3421060\n{combatantDump}");
+    }
+
+    [Fact]
+    public void Replay_20260417023559_Cleric_Healing_No_False_Drain()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260417023559.log"));
+        Assert.True(replay.ReplayedLines > 0);
+
+        var snapshot = replay.Snapshot;
+        var player = snapshot.Combatants
+            .OrderByDescending(c => c.Value.DamageAmount)
+            .First();
+
+        var metrics = player.Value;
+
+        var combatantDump = string.Join("\n", snapshot.Combatants
+            .OrderByDescending(c => c.Value.DamageAmount)
+            .Select(c => $"id={c.Key} class={c.Value.CharacterClass} dmg={c.Value.DamageAmount} heal={c.Value.HealingAmount} name={c.Value.Nickname}"));
+
+        var divineAuraSkillCode = 17150340;
+        if (metrics.Skills.TryGetValue(divineAuraSkillCode, out var divineAura))
+        {
+            Assert.True(divineAura.DrainHealingAmount == 0,
+                $"Divine Aura drain={divineAura.DrainHealingAmount} should be 0\n{combatantDump}");
+        }
+
+        const int gameReportedHealing023559 = 70963;
+        Assert.Equal(gameReportedHealing023559, metrics.HealingAmount);
+    }
+
+    [Fact]
+    public void Replay_20260417141813_Light_Of_Regeneration_Periodic_Healing()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260417141813.log"));
+        Assert.True(replay.ReplayedLines > 0);
+
+        var snapshot = replay.Snapshot;
+        var player = snapshot.Combatants
+            .OrderByDescending(c => c.Value.DamageAmount)
+            .First();
+
+        var metrics = player.Value;
+
+        var lightOfRegenBaseSkill = 17090000;
+        var lightOfRegenSkills = metrics.Skills
+            .Where(kvp => kvp.Key / 10000 * 10000 == lightOfRegenBaseSkill || kvp.Key == lightOfRegenBaseSkill)
+            .ToList();
+
+        var skillDump = string.Join("\n", lightOfRegenSkills
+            .Select(kvp => $"skill={kvp.Key} heal={kvp.Value.HealingAmount} periodic={kvp.Value.PeriodicHealingAmount} drain={kvp.Value.DrainHealingAmount}"));
+
+        const int expectedLightOfRegenHealing = 4599;
+        var totalLightOfRegenHealing = lightOfRegenSkills.Sum(kvp => kvp.Value.HealingAmount);
+        Assert.True(totalLightOfRegenHealing == expectedLightOfRegenHealing,
+            $"LightOfRegen total={totalLightOfRegenHealing} expected={expectedLightOfRegenHealing}\n{skillDump}");
     }
 
     private static string WriteTempReplayLog(string logKind, params string[] lines)

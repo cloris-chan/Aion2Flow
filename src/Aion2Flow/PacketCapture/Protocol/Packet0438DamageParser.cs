@@ -17,7 +17,9 @@ internal readonly record struct Packet0438Damage(
     int Loop,
     int TailLength,
     int TailMultiHitCount,
-    int DrainHealAmount = 0);
+    int DrainHealAmount = 0,
+    int RegenerationAmount = 0,
+    long SpecialsRaw = 0);
 
 internal static class Packet0438DamageParser
 {
@@ -64,7 +66,9 @@ internal static class Packet0438DamageParser
             return false;
         }
 
-        var specials = ParseDamageModifiers(payload.Slice(reader.Offset, specialsLength), type);
+        var specialsSlice = payload.Slice(reader.Offset, specialsLength);
+        var specials = ParseDamageModifiers(specialsSlice, type);
+        var (regenAmount, specialsRaw) = ExtractRegenerationAmount(specialsSlice, specials);
         if (!reader.TryAdvance(specialsLength)) return false;
 
         if (!reader.TryReadVarInt(out var unknown)) return false;
@@ -95,7 +99,9 @@ internal static class Packet0438DamageParser
             loop,
             payload.Length - consumed,
             multiHitCount,
-            drainHealAmount);
+            drainHealAmount,
+            regenAmount,
+            specialsRaw);
         return true;
     }
 
@@ -159,6 +165,25 @@ internal static class Packet0438DamageParser
 
         reader.TryAdvance(tailReader.Offset);
         return drainValue;
+    }
+
+    private static (int RegenAmount, long SpecialsRaw) ExtractRegenerationAmount(ReadOnlySpan<byte> specials, DamageModifiers modifiers)
+    {
+        long raw = 0;
+        for (var i = 0; i < Math.Min(specials.Length, 8); i++)
+            raw |= (long)specials[i] << (i * 8);
+
+        if ((modifiers & DamageModifiers.Regeneration) == 0)
+            return (0, raw);
+
+        if (specials.Length > 1)
+        {
+            var reader = new PacketSpanReader(specials[1..]);
+            if (reader.TryReadVarInt(out var val) && val > 0)
+                return (val, raw);
+        }
+
+        return (0, raw);
     }
 
     private static DamageModifiers ParseDamageModifiers(ReadOnlySpan<byte> packet, int type)

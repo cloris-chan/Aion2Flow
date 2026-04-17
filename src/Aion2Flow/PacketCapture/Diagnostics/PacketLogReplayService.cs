@@ -377,6 +377,8 @@ public sealed class PacketLogReplayService
             Damage = parsed.Damage,
             Loop = parsed.Loop,
             DrainHealAmount = parsed.DrainHealAmount,
+            RegenerationAmount = parsed.RegenerationAmount,
+            SpecialsRaw = parsed.SpecialsRaw,
             Timestamp = timestamp,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
@@ -390,6 +392,24 @@ public sealed class PacketLogReplayService
         }
 
         store.AppendCombatPacket(combatPacket);
+
+        if (parsed.RegenerationAmount > 0)
+        {
+            store.AppendCombatPacket(new ParsedCombatPacket
+            {
+                TargetId = parsed.TargetId,
+                SourceId = parsed.TargetId,
+                OriginalSkillCode = parsed.SkillCodeRaw,
+                SkillCode = parsed.SkillCodeRaw,
+                Damage = parsed.RegenerationAmount,
+                EventKind = CombatEventKind.Healing,
+                ValueKind = CombatValueKind.Healing,
+                IsNormalized = true,
+                Timestamp = timestamp,
+                FrameOrdinal = frameOrdinal,
+                BatchOrdinal = batchOrdinal
+            });
+        }
 
         if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId)
         {
@@ -804,6 +824,11 @@ public sealed class PacketLogReplayService
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
             TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value);
+        }
+
+        if (Packet4036CreateParser.TryParseOwner(packet, out var entityId, out var ownerId))
+        {
+            store.AppendSummon(ownerId, entityId);
         }
 
         return Packet4036Parser.TryParse(packet, out _);

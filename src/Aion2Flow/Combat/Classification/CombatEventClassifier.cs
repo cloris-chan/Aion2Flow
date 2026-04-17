@@ -17,12 +17,22 @@ public static class CombatEventClassifier
 
     public static CombatEventKind Classify(ParsedCombatPacket packet)
     {
+        if (IsDrainHealSynthesis(packet))
+        {
+            return CombatEventKind.Healing;
+        }
+
         if (IsObservedRecoveryTick(packet))
         {
             return CombatEventKind.Healing;
         }
 
         var semantics = ResolveSkillSemantics(packet.SkillCode);
+        if (IsOffensiveHitFromDualPurposeSkill(packet, semantics))
+        {
+            return CombatEventKind.Damage;
+        }
+
         if (IsObservedDirectHealing(packet, semantics))
         {
             return CombatEventKind.Healing;
@@ -92,6 +102,11 @@ public static class CombatEventClassifier
 
     public static CombatValueKind ClassifyValueKind(ParsedCombatPacket packet)
     {
+        if (IsDrainHealSynthesis(packet))
+        {
+            return CombatValueKind.DrainHealing;
+        }
+
         if (IsObservedRecoveryTick(packet))
         {
             return CombatValueKind.PeriodicHealing;
@@ -103,6 +118,11 @@ public static class CombatEventClassifier
         }
 
         var semantics = ResolveSkillSemantics(packet.SkillCode);
+        if (IsOffensiveHitFromDualPurposeSkill(packet, semantics))
+        {
+            return CombatValueKind.Damage;
+        }
+
         if (IsObservedDirectHealing(packet, semantics))
         {
             return CombatValueKind.Healing;
@@ -431,6 +451,18 @@ public static class CombatEventClassifier
         }
 
         return (semantics & SkillSemantics.Healing) != 0
+               && (semantics & (SkillSemantics.DrainOrAbsorb | SkillSemantics.ShieldOrBarrier)) == 0;
+    }
+
+    private static bool IsOffensiveHitFromDualPurposeSkill(ParsedCombatPacket packet, SkillSemantics semantics)
+    {
+        if (packet.IsPeriodicEffect || packet.Damage <= 0 || packet.SourceId == packet.TargetId)
+        {
+            return false;
+        }
+
+        return (semantics & SkillSemantics.Damage) != 0
+               && (semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing)) != 0
                && (semantics & SkillSemantics.DrainOrAbsorb) == 0;
     }
 
@@ -613,6 +645,12 @@ public static class CombatEventClassifier
 
         return true;
     }
+
+    private static bool IsDrainHealSynthesis(ParsedCombatPacket packet) =>
+        packet.SourceId > 0
+        && packet.SourceId == packet.TargetId
+        && packet.Damage > 0
+        && packet.DrainHealAmount > 0;
 
     private static bool IsObservedRecoveryTick(ParsedCombatPacket packet)
     {

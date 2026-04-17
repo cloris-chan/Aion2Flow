@@ -404,7 +404,7 @@ public sealed class CombatMetricsStore
         }
 
         var rawDamage = packet.Damage;
-        if (rawDamage <= 0)
+        if (rawDamage <= 0 && isSeed)
         {
             return;
         }
@@ -439,7 +439,14 @@ public sealed class CombatMetricsStore
                 return;
             }
 
-            _selfPeriodicHealingPools[key] = new SelfPeriodicHealingPoolState(rawDamage, packet.Timestamp);
+            if (rawDamage == 0)
+            {
+                _selfPeriodicHealingPools.Remove(key);
+            }
+            else
+            {
+                _selfPeriodicHealingPools[key] = new SelfPeriodicHealingPoolState(rawDamage, packet.Timestamp);
+            }
         }
     }
 
@@ -475,7 +482,7 @@ public sealed class CombatMetricsStore
         var resolvedSkillKind = packet.SkillKind != SkillKind.Unknown
             ? packet.SkillKind
             : CombatEventClassifier.ResolveSkillKind(CombatMetricsEngine.InferOriginalSkillCode(originalSkillCode) ?? packet.SkillCode);
-        if (resolvedSkillKind != SkillKind.PeriodicHealing)
+        if (resolvedSkillKind != SkillKind.PeriodicHealing && resolvedSkillKind != SkillKind.ShieldOrBarrier)
         {
             return false;
         }

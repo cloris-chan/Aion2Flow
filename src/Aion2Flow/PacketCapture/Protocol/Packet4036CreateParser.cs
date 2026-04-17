@@ -39,6 +39,51 @@ internal static class Packet4036CreateParser
             npcCode = npcValue;
         }
 
+        if (!TryExtractOwnerId(packet, out var ownerId))
+        {
+            return false;
+        }
+
+        result = new Packet4036Create(family, ownerId, summonId, npcCode, packet.Length);
+        return true;
+    }
+
+    public static bool TryParseOwner(ReadOnlySpan<byte> packet, out int entityId, out int ownerId)
+    {
+        entityId = 0;
+        ownerId = 0;
+
+        var reader = new PacketSpanReader(packet);
+        if (!reader.TryReadVarInt(out _)) return false;
+        if (reader.Remaining < 2) return false;
+        if (packet[reader.Offset] != 0x40 || packet[reader.Offset + 1] != 0x36) return false;
+
+        var family = ClassifyFamily(packet.Length);
+        if (family is not "state-152")
+        {
+            return false;
+        }
+
+        if (!reader.TryAdvance(2)) return false;
+        if (!reader.TryReadVarInt(out var parsedEntityId)) return false;
+        if (parsedEntityId <= 0) return false;
+
+        if (!TryExtractOwnerId(packet, out var parsedOwnerId))
+        {
+            return false;
+        }
+
+        if (parsedOwnerId == parsedEntityId) return false;
+
+        entityId = parsedEntityId;
+        ownerId = parsedOwnerId;
+        return true;
+    }
+
+    private static bool TryExtractOwnerId(ReadOnlySpan<byte> packet, out int ownerId)
+    {
+        ownerId = 0;
+
         var keyIndex = FindArrayIndex(packet, EightByteMarker);
         if (keyIndex < 0) return false;
 
@@ -51,11 +96,8 @@ internal static class Packet4036CreateParser
         var ownerOffset = keyIndex + ownerOpcodeIndex + 11;
         if (ownerOffset + 2 > packet.Length) return false;
 
-        var ownerId = packet[ownerOffset] | (packet[ownerOffset + 1] << 8);
-        if (ownerId == 0) return false;
-
-        result = new Packet4036Create(family, ownerId, summonId, npcCode, ownerOffset + 2);
-        return true;
+        ownerId = packet[ownerOffset] | (packet[ownerOffset + 1] << 8);
+        return ownerId != 0;
     }
 
     private static string ClassifyFamily(int payloadLength)

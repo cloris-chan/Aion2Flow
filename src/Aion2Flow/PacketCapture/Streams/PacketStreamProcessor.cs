@@ -829,10 +829,30 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             MultiHitCount = parsed.TailMultiHitCount,
             HasAuthoritativeMultiHitCount = parsed.TailMultiHitCount > 0,
             DrainHealAmount = parsed.DrainHealAmount,
+            RegenerationAmount = parsed.RegenerationAmount,
+            SpecialsRaw = parsed.SpecialsRaw,
             Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
         });
+
+        if (parsed.RegenerationAmount > 0)
+        {
+            store.AppendCombatPacket(new ParsedCombatPacket
+            {
+                TargetId = parsed.TargetId,
+                SourceId = parsed.TargetId,
+                OriginalSkillCode = parsed.SkillCodeRaw,
+                SkillCode = resolvedSkillCode.Value,
+                Damage = parsed.RegenerationAmount,
+                EventKind = CombatEventKind.Healing,
+                ValueKind = CombatValueKind.Healing,
+                IsNormalized = true,
+                Timestamp = CurrentTimestampMilliseconds,
+                FrameOrdinal = frameOrdinal,
+                BatchOrdinal = batchOrdinal
+            });
+        }
 
         if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId
             && IsDrainOrAbsorbSkill(parsed.SkillCodeRaw))
@@ -871,7 +891,11 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (!reader.TryReadVarInt(out var targetId)) return false;
         if (!reader.TryAdvance(1)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
-        if (sourceId == 0 || targetId == 0 || sourceId == targetId) return false;
+        if (sourceId == 0 || targetId == 0) return false;
+        if (sourceId == targetId)
+        {
+            return false;
+        }
         if (!reader.TryReadVarInt(out var unknownInfo)) return false;
         if (!reader.TryReadUInt32Le(out var skillRaw)) return false;
 
@@ -1175,6 +1199,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 Damage = parsed.Damage,
                 Loop = parsed.Loop,
                 DrainHealAmount = parsed.DrainHealAmount,
+                RegenerationAmount = parsed.RegenerationAmount,
+                SpecialsRaw = parsed.SpecialsRaw,
                 Timestamp = CurrentTimestampMilliseconds,
                 FrameOrdinal = frameOrdinal,
                 BatchOrdinal = batchOrdinal
@@ -1188,6 +1214,24 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             }
 
             store.AppendCombatPacket(combatPacket);
+
+            if (parsed.RegenerationAmount > 0)
+            {
+                store.AppendCombatPacket(new ParsedCombatPacket
+                {
+                    TargetId = parsed.TargetId,
+                    SourceId = parsed.TargetId,
+                    OriginalSkillCode = parsed.SkillCodeRaw,
+                    SkillCode = parsed.SkillCodeRaw,
+                    Damage = parsed.RegenerationAmount,
+                    EventKind = CombatEventKind.Healing,
+                    ValueKind = CombatValueKind.Healing,
+                    IsNormalized = true,
+                    Timestamp = CurrentTimestampMilliseconds,
+                    FrameOrdinal = frameOrdinal,
+                    BatchOrdinal = batchOrdinal
+                });
+            }
 
             if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId
                 && IsDrainOrAbsorbSkill(parsed.SkillCodeRaw))
@@ -1394,6 +1438,11 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
             TryApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value);
+        }
+
+        if (Packet4036CreateParser.TryParseOwner(packet, out var entityId, out var ownerId))
+        {
+            store.AppendSummon(ownerId, entityId);
         }
 
         if (!Packet4036Parser.TryParse(packet, out var parsed))
