@@ -8,9 +8,9 @@ using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.ViewModels;
-using Cloris.Aion2Flow.Views;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
+using Velopack;
 
 using MainAppWindow = Cloris.Aion2Flow.Views.MainWindow;
 
@@ -21,6 +21,8 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        VelopackApp.Build().Run();
+
         var serviceProvider = CreateServiceProvider();
         AppBuilder
             .Configure(() => serviceProvider.GetRequiredService<App>())
@@ -35,6 +37,7 @@ internal static class Program
         services.AddSingleton<LanguageService>();
         services.AddSingleton<GameResourceService>();
         services.AddSingleton<LocalizationService>();
+        services.AddSingleton<AppUpdateService>();
         services.AddSingleton<BattleArchiveService>();
         services.AddSingleton<CombatMetricsStore>();
         services.AddSingleton<CombatMetricsEngine>();
@@ -63,9 +66,16 @@ file sealed class App(IServiceProvider serviceProvider) : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            desktop.Exit += OnDesktopExit;
             desktop.MainWindow = serviceProvider.GetRequiredService<MainAppWindow>();
         }
 
+        Task.Run(() => serviceProvider.GetRequiredService<AppUpdateService>().Start());
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void OnDesktopExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
+    {
+        serviceProvider.GetRequiredService<AppUpdateService>()?.PreparePendingUpdateForShutdown();
     }
 }

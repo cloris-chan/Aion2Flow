@@ -1,0 +1,141 @@
+name: Deploy to GitHub Releases
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: pwsh
+
+env:
+  APP_ID: Aion2Flow
+  PACK_TITLE: Aion2Flow
+  MAIN_EXE: Aion2Flow.exe
+  RUNTIME_ID: win-x64
+  PROJECT_PATH: ./src/Aion2Flow/Aion2Flow.csproj
+  PUBLISH_DIR: ./publish
+  RELEASES_DIR: ./Releases
+  ICON_PATH: ./assets/Aion2Flow.ico
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@v4
+
+      - name: Parse release metadata
+        id: meta
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)(?:-(?<channel>[0-9A-Za-z][0-9A-Za-z.-]*))?$') {
+            Write-Error "Invalid tag format. Expected vX.X.X or vX.X.X-<channel>."
+            exit 1
+          }
+
+          $version = $tag -replace '^v', ''
+          $packChannel = if ([string]::IsNullOrWhiteSpace($Matches['channel'])) { 'stable' } else { $Matches['channel'].ToLowerInvariant() }
+          $isPrerelease = $packChannel -ne 'stable'
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "is_prerelease=$($isPrerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "pack_channel=$packChannel" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Tag         : $tag"
+          Write-Host "Version     : $version"
+          Write-Host "Channel     : $packChannel"
+          Write-Host "Prerelease  : $isPrerelease"
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve and install Velopack CLI
+        run: |
+          [xml]$props = Get-Content "./Directory.Packages.props"
+          $version = ($props.Project.ItemGroup.PackageVersion | Where-Object { $_.Include -eq "Velopack" } | Select-Object -First 1).Version
+
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            Write-Error "Unable to resolve the Velopack package version from Directory.Packages.props."
+            exit 1
+          }
+
+          Write-Host "Velopack version: $version"
+          dotnet tool install -g vpk --version $version
+          "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
+
+      - name: Restore
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Publish Release Build
+        run: >
+          dotnet publish ${{ env.PROJECT_PATH }}
+          -c Release
+          -r ${{ env.RUNTIME_ID }}
+          -o ${{ env.PUBLISH_DIR }}
+          --no-restore
+
+      - name: Download previous releases for delta generation
+        run: |
+          $arguments = @(
+            "download",
+            "github",
+            "--outputDir", "${{ env.RELEASES_DIR }}",
+            "--channel", "${{ steps.meta.outputs.pack_channel }}",
+            "--repoUrl", "https://github.com/${{ github.repository }}",
+            "--token", "${{ secrets.GITHUB_TOKEN }}"
+          )
+
+          if ("${{ steps.meta.outputs.is_prerelease }}" -eq "true") {
+            $arguments += "--pre"
+          }
+
+          vpk @arguments
+
+      - name: Pack with Velopack
+        run: |
+          vpk pack `
+            --outputDir "${{ env.RELEASES_DIR }}" `
+            -u "${{ env.APP_ID }}" `
+            -v "${{ steps.meta.outputs.version }}" `
+            -p "${{ env.PUBLISH_DIR }}" `
+            -r "${{ env.RUNTIME_ID }}" `
+            -c "${{ steps.meta.outputs.pack_channel }}" `
+            --packTitle "${{ env.PACK_TITLE }}" `
+            --mainExe "${{ env.MAIN_EXE }}" `
+            --icon "${{ env.ICON_PATH }}" `
+            --delta BestSize `
+            --noInst
+
+      - name: Upload GitHub release
+        run: |
+          $arguments = @(
+            "upload",
+            "github",
+            "--outputDir", "${{ env.RELEASES_DIR }}",
+            "--repoUrl", "https://github.com/${{ github.repository }}",
+            "--token", "${{ secrets.GITHUB_TOKEN }}",
+            "--channel", "${{ steps.meta.outputs.pack_channel }}",
+            "--merge",
+            "--publish"
+          )
+
+          if ("${{ steps.meta.outputs.is_prerelease }}" -eq "true") {
+            $arguments += "--pre"
+          }
+
+          $arguments += @(
+            "--releaseName", "${{ steps.meta.outputs.tag }}",
+            "--tag", "${{ steps.meta.outputs.tag }}",
+            "--targetCommitish", "${{ github.sha }}"
+          )
+
+          vpk @arguments
