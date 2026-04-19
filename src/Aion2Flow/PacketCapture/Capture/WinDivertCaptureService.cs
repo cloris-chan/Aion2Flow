@@ -26,8 +26,6 @@ public sealed class WinDivertCaptureService(
     public PacketCaptureDispatcher Dispatcher { get => field ??= new(store); }
     public bool IsDriverActive => _divert is not null;
     public bool HasDriverError { get; private set; }
-    public bool IsPortMonitoringActive => _processPortDiscoveryService.IsMonitoring;
-    public bool HasTrackedGamePorts => _processPortDiscoveryService.AllPorts.Length > 0;
     public double? CurrentRoundTripTimeMilliseconds
     {
         get
@@ -56,7 +54,6 @@ public sealed class WinDivertCaptureService(
         CaptureConnectionGate.Unlock();
         _tcpRttEstimator.Clear();
         _protocolRttEstimator.Clear();
-        await _processPortDiscoveryService.StartAsync().ConfigureAwait(false);
         try
         {
             _cts = new CancellationTokenSource();
@@ -252,14 +249,6 @@ public sealed class WinDivertCaptureService(
         _tcpRttEstimator.Clear();
         _protocolRttEstimator.Clear();
         RawPacketDump.FrameEventObserved -= OnFrameEventObserved;
-
-        try
-        {
-            await _processPortDiscoveryService.StopAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-        }
 
         if (_worker is not null)
         {

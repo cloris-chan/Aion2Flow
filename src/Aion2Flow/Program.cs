@@ -7,6 +7,7 @@ using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Services.Logging;
 using Cloris.Aion2Flow.ViewModels;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,13 +27,26 @@ internal static class Program
         var serviceProvider = CreateServiceProvider();
         AppBuilder
             .Configure(() => serviceProvider.GetRequiredService<App>())
-           .UsePlatformDetect()
-           .StartWithClassicDesktopLifetime(args);
+            .UsePlatformDetect()
+            .StartWithClassicDesktopLifetime(args);
+
+        serviceProvider.GetRequiredService<AppLogWriter>().Dispose();
     }
 
     private static ServiceProvider CreateServiceProvider()
     {
         var services = new ServiceCollection();
+
+        var logWriter = new AppLogWriter(
+#if DEBUG
+            AppLogLevel.Debug
+#else
+            AppLogLevel.Info
+#endif
+        );
+        services.AddSingleton(logWriter);
+        AppLog.Initialize(logWriter);
+
         services.AddSingleton<App>();
         services.AddSingleton<LanguageService>();
         services.AddSingleton<GameResourceService>();

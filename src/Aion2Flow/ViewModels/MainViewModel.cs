@@ -22,6 +22,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private const string IndicatorInfoColor = "#8DD6FF";
 
     private readonly WinDivertCaptureService _captureService;
+    private readonly ProcessPortDiscoveryService _processPortDiscoveryService;
     private readonly CombatMetricsEngine _engine;
     private readonly CombatMetricsStore _store;
     private readonly ProcessForegroundWatcher _processForegroundWatcher;
@@ -102,6 +103,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public MainViewModel(
         WinDivertCaptureService captureService,
+        ProcessPortDiscoveryService processPortDiscoveryService,
         CombatMetricsEngine engine,
         CombatMetricsStore store,
         ProcessForegroundWatcher processForegroundWatcher,
@@ -112,6 +114,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         LocalizationService localization)
     {
         _captureService = captureService;
+        _processPortDiscoveryService = processPortDiscoveryService;
         _engine = engine;
         _store = store;
         _processForegroundWatcher = processForegroundWatcher;
@@ -197,6 +200,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             _refreshTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
+            await _processPortDiscoveryService.StartAsync();
             await _captureService.StartAsync();
             _refreshTask = RunRefreshLoopAsync(_refreshTimer);
             IsCapturing = true;
@@ -213,6 +217,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         if (!IsCapturing) return;
         await _captureService.StopAsync();
+        await _processPortDiscoveryService.StopAsync();
         _refreshTimer?.Dispose();
         if (_refreshTask is not null)
         {
@@ -423,6 +428,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _battleArchiveService.HistoryChanged -= OnBattleHistoryChanged;
         await StopCaptureAsync().ConfigureAwait(false);
         _processForegroundWatcher.Dispose();
+        await _processPortDiscoveryService.DisposeAsync().ConfigureAwait(false);
     }
 
     private void ApplyLocalizedUiText()
@@ -505,12 +511,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 ? Localization["Status.DriverReady"]
                 : Localization["Status.DriverIdle"];
 
-        if (!_captureService.IsPortMonitoringActive)
+        if (!_processPortDiscoveryService.IsMonitoring)
         {
             GamePortIndicatorColor = IndicatorIdleColor;
             GamePortIndicatorToolTip = Localization["Status.PortIdle"];
         }
-        else if (_captureService.HasTrackedGamePorts)
+        else if (_processPortDiscoveryService.AllPorts.Length > 0)
         {
             GamePortIndicatorColor = IndicatorOkColor;
             GamePortIndicatorToolTip = Localization["Status.PortReady"];
