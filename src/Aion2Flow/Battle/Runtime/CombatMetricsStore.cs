@@ -9,25 +9,11 @@ namespace Cloris.Aion2Flow.Battle.Runtime;
 
 public sealed class CombatMetricsStore
 {
-    private const int RestoreHpSkillCode = 1010000;
-    private const long DrainFollowupWindowMilliseconds = 250;
     private const long SelfPeriodicHealingPoolWindowMilliseconds = 5000;
     private const int MaxTrackedMultiHitCandidates = 64;
     private const int MaxPendingDodgeSignals = 16;
     private const int MaxPendingAvoidancePackets = 32;
     private const int MaxResolvedPeriodicLinks = 128;
-
-    private static readonly HashSet<int> DodgeSkillCodes =
-    [
-        11000100,
-        12000100,
-        13000100,
-        14000100,
-        15000100,
-        16000100,
-        17000100,
-        18000100
-    ];
 
     private readonly record struct SelfPeriodicHealingPoolKey(int SourceId, int TargetId, int OriginalSkillCode);
     private readonly record struct SelfPeriodicHealingPoolState(int LastRawDamage, long LastTimestamp);
@@ -87,7 +73,6 @@ public sealed class CombatMetricsStore
     private readonly ConcurrentDictionary<int, int> _summonOwnerByInstance = new();
     private readonly ConcurrentDictionary<int, string> _npcNameByCode = new();
     private readonly ConcurrentDictionary<int, NpcInstanceState> _npcStateByInstance = new();
-    private readonly ConcurrentDictionary<int, DrainFollowupCandidate> _recentDrainDamageByTarget = new();
     private readonly Lock _selfPeriodicHealingPoolLock = new();
     private readonly Dictionary<SelfPeriodicHealingPoolKey, SelfPeriodicHealingPoolState> _selfPeriodicHealingPools = [];
     private readonly Lock _multiHitLock = new();
@@ -104,13 +89,6 @@ public sealed class CombatMetricsStore
     private int _lastObservedNpcSource;
     private long _observationOrdinal;
     private long _currentAvoidanceBatchOrdinal;
-
-    private readonly record struct DrainFollowupCandidate(
-        int SourceId,
-        int TargetId,
-        int SkillCode,
-        int OriginalSkillCode,
-        long Timestamp);
 
     public int CurrentTarget { get; set; }
 
@@ -381,7 +359,6 @@ public sealed class CombatMetricsStore
 
     private void PreparePacketForStorage(ParsedCombatPacket packet)
     {
-        ApplyDrainFollowupAttribution(packet);
         CombatMetricsEngine.NormalizePacketForStorage(packet);
         NormalizeSelfPeriodicHealingPool(packet);
         ApplyMultiHitAttribution(packet);
@@ -679,7 +656,6 @@ public sealed class CombatMetricsStore
         _packetsBySource.Clear();
         _packetsByTarget.Clear();
         _summonOwnerByInstance.Clear();
-        _recentDrainDamageByTarget.Clear();
         lock (_selfPeriodicHealingPoolLock)
         {
             _selfPeriodicHealingPools.Clear();
@@ -888,67 +864,6 @@ public sealed class CombatMetricsStore
             (_, current) => update(current));
     }
 
-    private void ApplyDrainFollowupAttribution(ParsedCombatPacket packet)
-    {
-        if (TryResolveDrainHealingFollowup(packet, out var followup))
-        {
-            packet.SourceId = followup.SourceId;
-            packet.TargetId = followup.SourceId;
-            packet.OriginalSkillCode = followup.OriginalSkillCode;
-            packet.SkillCode = followup.SkillCode;
-        }
-
-        if (TryBuildDrainFollowupCandidate(packet, out var candidate))
-        {
-            _recentDrainDamageByTarget[candidate.TargetId] = candidate;
-        }
-    }
-
-    private bool TryResolveDrainHealingFollowup(ParsedCombatPacket packet, out DrainFollowupCandidate candidate)
-    {
-        candidate = default;
-
-        if (packet.Damage <= 0 ||
-            packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        if (ResolveTrackedSkillCode(packet) != RestoreHpSkillCode)
-        {
-            return false;
-        }
-
-        var targetId = packet.SourceId;
-        if (!_recentDrainDamageByTarget.TryGetValue(targetId, out candidate))
-        {
-            return false;
-        }
-
-        var delta = packet.Timestamp - candidate.Timestamp;
-        if (delta < 0 || delta > DrainFollowupWindowMilliseconds)
-        {
-            _recentDrainDamageByTarget.TryRemove(targetId, out _);
-            return false;
-        }
-
-        if (candidate.SourceId <= 0 || candidate.SourceId == targetId)
-        {
-            return false;
-        }
-
-        _recentDrainDamageByTarget.TryRemove(targetId, out _);
-        return true;
-    }
-
-    private static bool TryBuildDrainFollowupCandidate(ParsedCombatPacket packet, out DrainFollowupCandidate candidate)
-    {
-        candidate = default;
-        return false;
-    }
-
     private static int ResolveTrackedSkillCode(ParsedCombatPacket packet)
     {
         var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
@@ -1083,16 +998,6 @@ public sealed class CombatMetricsStore
         CombatMetricsEngine.NormalizePacketForStorage(packet);
     }
 
-    private static bool IsInvincibleDodgeSignal(int originalSkillCode, int trackedSkillCode)
-    {
-        if (!IsDodgeSkill(trackedSkillCode) || originalSkillCode <= 0)
-        {
-            return false;
-        }
-
-        return CombatMetricsEngine.ParseSkillVariant(originalSkillCode).ChargeStage > 0;
-    }
-
     private static bool IsCompactEvadeSignal(int targetId, int sourceId, int layoutTag, int type)
     {
         if (targetId <= 0 || sourceId <= 0 || targetId == sourceId)
@@ -1103,7 +1008,14 @@ public sealed class CombatMetricsStore
         return type == 1 && (layoutTag == 0 || layoutTag == 2);
     }
 
-    private static bool IsDodgeSkill(int trackedSkillCode) => DodgeSkillCodes.Contains(trackedSkillCode);
+    private static bool IsDodgeSkill(int trackedSkillCode)
+    {
+        var suffix = trackedSkillCode % 1000000;
+        if (suffix != 100)
+            return false;
+        var classPrefix = trackedSkillCode / 1000000;
+        return classPrefix is >= 11 and <= 18;
+    }
 
     private void ApplyMultiHitAttribution(ParsedCombatPacket packet)
     {
