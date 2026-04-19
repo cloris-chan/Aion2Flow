@@ -1,14 +1,14 @@
+using System.Buffers;
+using System.Buffers.Binary;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Divert.Interop;
 using Cloris.Aion2Flow.Divert.Network;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Services;
-using System.Buffers;
-using System.Buffers.Binary;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
@@ -37,30 +37,9 @@ public sealed class WinDivertCaptureService(
                 return null;
             }
 
-            return lockedConnection.IsLoopback
+            return lockedConnection.IsLocalNetwork
                 ? _protocolRttEstimator.CurrentMilliseconds
                 : _tcpRttEstimator.CurrentMilliseconds;
-        }
-    }
-    public RoundTripEstimateKind CurrentRoundTripEstimateKind
-    {
-        get
-        {
-            if (!CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection))
-            {
-                return RoundTripEstimateKind.None;
-            }
-
-            if (lockedConnection.IsLoopback)
-            {
-                return _protocolRttEstimator.CurrentMilliseconds.HasValue
-                    ? RoundTripEstimateKind.ProtocolLoopback
-                    : RoundTripEstimateKind.None;
-            }
-
-            return _tcpRttEstimator.CurrentMilliseconds.HasValue
-                ? RoundTripEstimateKind.TcpAck
-                : RoundTripEstimateKind.None;
         }
     }
     public string LastStatusMessage { get; private set; } = string.Empty;
@@ -158,6 +137,7 @@ public sealed class WinDivertCaptureService(
 
                     var payloadOffset = ipHeaderLen + tcpHeaderLen;
                     var payloadLength = packetSpan.Length - payloadOffset;
+                    var captureTicks = address.Timestamp;
                     var isLocked = CaptureConnectionGate.IsLocked;
                     bool isOutbound;
 
@@ -178,21 +158,20 @@ public sealed class WinDivertCaptureService(
                         continue;
                     }
 
-                    var isLoopbackLocked = isLocked &&
-                        CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) &&
-                        lockedConnection.IsLoopback;
-
                     if (isLocked)
                     {
-                        if (isLoopbackLocked)
+                        var isLocalLocked = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) &&
+                            lockedConnection.IsLocalNetwork;
+
+                        if (isLocalLocked)
                         {
                             _tcpRttEstimator.Clear();
                         }
                         else if (isOutbound)
                         {
-                            _tcpRttEstimator.TrackOutbound(tcp.HostSequenceNumber, payloadLength);
+                            _tcpRttEstimator.TrackOutbound(tcp.HostSequenceNumber, payloadLength, captureTicks);
                         }
-                        else if (_tcpRttEstimator.TryResolveInbound(tcp.HostAcknowledgmentNumber, out var smoothedRtt))
+                        else if (_tcpRttEstimator.TryResolveInbound(tcp.HostAcknowledgmentNumber, captureTicks, out var smoothedRtt))
                         {
                             RttResolved?.Invoke(smoothedRtt);
                         }
@@ -207,7 +186,7 @@ public sealed class WinDivertCaptureService(
                         continue;
 
                     var direction = isOutbound ? "outbound" : "inbound";
-                    RawPacketDump.Append(direction, srcPort, dstPort, tcp.HostSequenceNumber, tcp.HostAcknowledgmentNumber, packetSpan.Slice(payloadOffset, payloadLength));
+                    RawPacketDump.Append(direction, srcPort, dstPort, tcp.HostSequenceNumber, tcp.HostAcknowledgmentNumber, captureTicks, packetSpan.Slice(payloadOffset, payloadLength));
 
                     var capturedPacket = CapturedPacket.Create(connection, bufferOwner, payloadOffset, payloadLength, tcp.HostSequenceNumber, tcp.HostAcknowledgmentNumber, isOutbound);
                     bufferOwner = null;
@@ -331,7 +310,7 @@ public sealed class WinDivertCaptureService(
             return;
         }
 
-        if (!lockedConnection.IsLoopback)
+        if (!lockedConnection.IsLocalNetwork)
         {
             _protocolRttEstimator.Clear();
             return;

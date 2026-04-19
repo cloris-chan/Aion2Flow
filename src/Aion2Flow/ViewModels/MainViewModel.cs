@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -9,7 +10,6 @@ using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Collections.ObjectModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
@@ -204,7 +204,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         if (IsCapturing) return;
         try
         {
-            _refreshTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+            _refreshTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
             await _captureService.StartAsync();
             _refreshTask = RunRefreshLoopAsync(_refreshTimer);
             IsCapturing = true;
@@ -530,17 +530,17 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var isCaptureLocked = CaptureConnectionGate.IsLocked;
-        var isLoopbackLocked = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) && lockedConnection.IsLoopback;
+        var isProxied = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) && lockedConnection.IsLocalNetwork;
         if (!isCaptureLocked)
         {
             RoundTripTimeMilliseconds = 0;
             CaptureLockIndicatorColor = IndicatorIdleColor;
             CaptureLockIndicatorToolTip = Localization["Status.Unlocked"];
         }
-        else if (isLoopbackLocked)
+        else if (isProxied)
         {
             CaptureLockIndicatorColor = IndicatorWarnColor;
-            CaptureLockIndicatorToolTip = Localization["Status.LockedLoopback"];
+            CaptureLockIndicatorToolTip = Localization["Status.LockedProxy"];
         }
         else
         {
@@ -549,7 +549,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var currentRttMilliseconds = _captureService.CurrentRoundTripTimeMilliseconds;
-        var estimateKind = _captureService.CurrentRoundTripEstimateKind;
         if (!currentRttMilliseconds.HasValue || currentRttMilliseconds.Value <= 0)
         {
             RoundTripTimeMilliseconds = 0;
@@ -559,22 +558,16 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         RoundTripTimeMilliseconds = Math.Max(1, (int)Math.Round(currentRttMilliseconds.Value));
-        if (estimateKind == RoundTripEstimateKind.ProtocolLoopback)
+        if (isProxied)
         {
             LatencyIndicatorColor = IndicatorWarnColor;
             LatencyToolTip = Localization["Status.RttLoopbackProtocol"];
-            return;
         }
-
-        if (isLoopbackLocked)
+        else
         {
-            LatencyIndicatorColor = IndicatorWarnColor;
-            LatencyToolTip = Localization["Status.RttLoopback"];
-            return;
+            LatencyIndicatorColor = IndicatorInfoColor;
+            LatencyToolTip = Localization["Status.RttEstimated"];
         }
-
-        LatencyIndicatorColor = IndicatorInfoColor;
-        LatencyToolTip = Localization["Status.RttEstimated"];
     }
 
     private static Geometry? ResolveIconGeometry(string resourceKey)

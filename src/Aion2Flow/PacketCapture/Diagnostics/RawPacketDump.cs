@@ -1,6 +1,6 @@
-using System.Text;
-using System.Globalization;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -60,7 +60,7 @@ internal static class RawPacketDump
         }
     }
 
-    public static void Append(string direction, ushort srcPort, ushort dstPort, uint sequenceNumber, uint acknowledgmentNumber, ReadOnlySpan<byte> payload)
+    public static void Append(string direction, ushort srcPort, ushort dstPort, uint sequenceNumber, uint acknowledgmentNumber, long captureTicks, ReadOnlySpan<byte> payload)
     {
         if (!IsEnabled || _rawWriter is null)
         {
@@ -69,7 +69,7 @@ internal static class RawPacketDump
 
         try
         {
-            var line = $"{DateTimeOffset.Now:O}|dir={direction}|{srcPort}->{dstPort}|seq={sequenceNumber}|ack={acknowledgmentNumber}|len={payload.Length}|data={Convert.ToHexString(payload)}";
+            var line = $"{DateTimeOffset.Now:O}|dir={direction}|{srcPort}->{dstPort}|seq={sequenceNumber}|ack={acknowledgmentNumber}|len={payload.Length}|qpc={captureTicks}|data={Convert.ToHexString(payload)}";
             lock (SyncRoot)
             {
                 _rawWriter.WriteLine(line);

@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.PacketCapture;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using System.Diagnostics;
 
@@ -38,7 +37,7 @@ public sealed class ProtocolRoundTripEstimatorTests
     }
 
     [Fact]
-    public void Resolves_Idle_Scene_Aux_Events()
+    public void Resolves_Aux_Events()
     {
         var estimator = new ProtocolRoundTripEstimator();
         var startedAt = Stopwatch.GetTimestamp();
@@ -50,6 +49,20 @@ public sealed class ProtocolRoundTripEstimatorTests
 
         Assert.True(resolved);
         Assert.True(smoothedMilliseconds >= 40d);
+    }
+
+    [Fact]
+    public void Ignores_NonCandidate_Frame_Length()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var startedAt = Stopwatch.GetTimestamp();
+
+        estimator.TrackOutboundFrame(frameLength: 99, startedAt);
+
+        var resolved = estimator.TryResolveInboundEvent("remain-hp", startedAt + Stopwatch.Frequency / 40, out _);
+
+        Assert.False(resolved);
+        Assert.Null(estimator.CurrentMilliseconds);
     }
 
     [Fact]
@@ -65,5 +78,31 @@ public sealed class ProtocolRoundTripEstimatorTests
         estimator.Clear();
 
         Assert.Null(estimator.CurrentMilliseconds);
+    }
+
+    [Theory]
+    [InlineData(11)]
+    [InlineData(29)]
+    [InlineData(30)]
+    [InlineData(31)]
+    [InlineData(40)]
+    [InlineData(41)]
+    [InlineData(42)]
+    public void Accepts_All_Candidate_Frame_Lengths(int frameLength)
+    {
+        Assert.True(ProtocolRoundTripEstimator.IsCandidateOutboundFrameLength(frameLength));
+    }
+
+    [Theory]
+    [InlineData("state-1d37")]
+    [InlineData("remain-hp")]
+    [InlineData("compact-value")]
+    [InlineData("compact-0238")]
+    [InlineData("compact-0638")]
+    [InlineData("aux-2a38")]
+    [InlineData("aux-2c38")]
+    public void Accepts_All_Candidate_Inbound_Events(string eventName)
+    {
+        Assert.True(ProtocolRoundTripEstimator.IsCandidateInboundEvent(eventName));
     }
 }

@@ -8,63 +8,44 @@ internal sealed class ProtocolRoundTripEstimator
     private const int MaxPendingSamples = 128;
     private static readonly long SampleExpiryTicks = Stopwatch.Frequency * 120 / 1000;
 
-    private readonly Lock _sync = new();
     private readonly Queue<PendingSample> _pendingSamples = [];
 
-    private double? _currentMilliseconds;
     private double _smoothedMilliseconds;
+    private double _currentMilliseconds = -1.0;
 
     public double? CurrentMilliseconds
     {
         get
         {
-            lock (_sync)
-            {
-                return _currentMilliseconds;
-            }
+            var value = Volatile.Read(ref _currentMilliseconds);
+            return value >= 0 ? value : null;
         }
     }
 
     public void Clear()
     {
-        lock (_sync)
-        {
-            _pendingSamples.Clear();
-            _currentMilliseconds = null;
-            _smoothedMilliseconds = 0;
-        }
+        _pendingSamples.Clear();
+        _smoothedMilliseconds = 0;
+        Volatile.Write(ref _currentMilliseconds, -1.0);
     }
 
-    public void TrackOutboundFrame(int frameLength)
-    {
-        TrackOutboundFrame(frameLength, Stopwatch.GetTimestamp());
-    }
-
-    internal void TrackOutboundFrame(int frameLength, long timestamp)
+    public void TrackOutboundFrame(int frameLength, long timestamp)
     {
         if (!IsCandidateOutboundFrameLength(frameLength))
         {
             return;
         }
 
-        lock (_sync)
+        EvictExpired(timestamp);
+        if (_pendingSamples.Count >= MaxPendingSamples)
         {
-            EvictExpired(timestamp);
-            if (_pendingSamples.Count >= MaxPendingSamples)
-            {
-                _pendingSamples.Dequeue();
-            }
-
-            _pendingSamples.Enqueue(new PendingSample(timestamp, frameLength));
+            _pendingSamples.Dequeue();
         }
+
+        _pendingSamples.Enqueue(new PendingSample(timestamp, frameLength));
     }
 
-    public bool TryResolveInboundEvent(string eventName, out double smoothedMilliseconds)
-    {
-        return TryResolveInboundEvent(eventName, Stopwatch.GetTimestamp(), out smoothedMilliseconds);
-    }
-
-    internal bool TryResolveInboundEvent(string eventName, long timestamp, out double smoothedMilliseconds)
+    public bool TryResolveInboundEvent(string eventName, long timestamp, out double smoothedMilliseconds)
     {
         if (!IsCandidateInboundEvent(eventName))
         {
@@ -72,24 +53,26 @@ internal sealed class ProtocolRoundTripEstimator
             return false;
         }
 
-        lock (_sync)
+        EvictExpired(timestamp);
+        if (_pendingSamples.Count == 0)
         {
-            EvictExpired(timestamp);
-            if (_pendingSamples.Count == 0)
-            {
-                smoothedMilliseconds = 0;
-                return false;
-            }
-
-            var sample = _pendingSamples.Dequeue();
-            var currentMilliseconds = Stopwatch.GetElapsedTime(sample.Timestamp, timestamp).TotalMilliseconds;
-            _smoothedMilliseconds = _smoothedMilliseconds <= 0
-                ? currentMilliseconds
-                : (_smoothedMilliseconds * (1.0 - Alpha)) + (currentMilliseconds * Alpha);
-            _currentMilliseconds = _smoothedMilliseconds;
-            smoothedMilliseconds = _smoothedMilliseconds;
-            return true;
+            smoothedMilliseconds = 0;
+            return false;
         }
+
+        var sample = _pendingSamples.Dequeue();
+        var elapsed = Stopwatch.GetElapsedTime(sample.Timestamp, timestamp).TotalMilliseconds;
+        if (elapsed < 0)
+        {
+            elapsed = 0;
+        }
+
+        _smoothedMilliseconds = _smoothedMilliseconds <= 0
+            ? elapsed
+            : (_smoothedMilliseconds * (1.0 - Alpha)) + (elapsed * Alpha);
+        Volatile.Write(ref _currentMilliseconds, _smoothedMilliseconds);
+        smoothedMilliseconds = _smoothedMilliseconds;
+        return true;
     }
 
     internal static bool IsCandidateOutboundFrameLength(int frameLength)

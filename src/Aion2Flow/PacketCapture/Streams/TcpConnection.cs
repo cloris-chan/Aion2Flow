@@ -4,7 +4,7 @@ namespace Cloris.Aion2Flow.PacketCapture.Streams;
 
 public readonly record struct TcpConnection(uint SourceAddress, uint DestinationAddress, ushort SourcePort, ushort DestinationPort)
 {
-    public bool IsLoopback => IsLoopbackAddress(SourceAddress) || IsLoopbackAddress(DestinationAddress);
+    public bool IsLocalNetwork => IsLocalNetworkAddress(SourceAddress) || IsLocalNetworkAddress(DestinationAddress);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsSameConnection(in TcpConnection other, out bool isReversed)
@@ -23,8 +23,11 @@ public readonly record struct TcpConnection(uint SourceAddress, uint Destination
         return false;
     }
 
-    private static bool IsLoopbackAddress(uint address)
+    private static bool IsLocalNetworkAddress(uint address) => (address & 0xFF) switch
     {
-        return (address & 0xffu) == 127u || ((address >> 24) & 0xffu) == 127u;
-    }
+        127 or 10 => true,
+        172 => (address & 0xF0FF) == 0x10AC,
+        192 => (address & 0xFFFF) == 0xA8C0,
+        _ => false,
+    };
 }

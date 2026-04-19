@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.PacketCapture;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using System.Diagnostics;
 
@@ -38,6 +37,37 @@ public sealed class TcpRoundTripEstimatorTests
     }
 
     [Fact]
+    public void Skips_Stale_Pending_On_Cumulative_Ack()
+    {
+        var estimator = new TcpRoundTripEstimator();
+        var t0 = Stopwatch.GetTimestamp();
+        var t1 = t0 + (Stopwatch.Frequency / 200);
+        var t2 = t0 + (Stopwatch.Frequency / 100);
+
+        estimator.TrackOutbound(sequenceNumber: 100, payloadLength: 10, t0);
+        estimator.TrackOutbound(sequenceNumber: 110, payloadLength: 20, t1);
+
+        var resolved = estimator.TryResolveInbound(acknowledgmentNumber: 130, t2, out var rtt);
+
+        Assert.True(resolved);
+        Assert.True(rtt >= 4d);
+    }
+
+    [Fact]
+    public void Ignores_Zero_Payload_Outbound()
+    {
+        var estimator = new TcpRoundTripEstimator();
+        var t0 = Stopwatch.GetTimestamp();
+
+        estimator.TrackOutbound(sequenceNumber: 500, payloadLength: 0, t0);
+
+        var resolved = estimator.TryResolveInbound(acknowledgmentNumber: 500, t0 + Stopwatch.Frequency / 100, out _);
+
+        Assert.False(resolved);
+        Assert.Null(estimator.CurrentMilliseconds);
+    }
+
+    [Fact]
     public void Clears_Current_Value()
     {
         var estimator = new TcpRoundTripEstimator();
@@ -50,5 +80,24 @@ public sealed class TcpRoundTripEstimatorTests
         estimator.Clear();
 
         Assert.Null(estimator.CurrentMilliseconds);
+    }
+
+    [Fact]
+    public void Ewma_Smooths_Multiple_Samples()
+    {
+        var estimator = new TcpRoundTripEstimator();
+        var t = Stopwatch.GetTimestamp();
+        var tick25ms = Stopwatch.Frequency / 40;
+
+        for (var i = 0; i < 5; i++)
+        {
+            estimator.TrackOutbound(sequenceNumber: (uint)(1000 + i * 100), payloadLength: 10, t);
+            estimator.TryResolveInbound(acknowledgmentNumber: (uint)(1010 + i * 100), t + tick25ms, out _);
+            t += tick25ms * 2;
+        }
+
+        var rtt = estimator.CurrentMilliseconds;
+        Assert.NotNull(rtt);
+        Assert.InRange(rtt.Value, 20d, 30d);
     }
 }
