@@ -29,12 +29,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     private Guid _battleContextId;
     private int? _combatantId;
 
-#if DEBUG
-    private readonly bool _isDebugBuild = true;
-#else
-    private readonly bool _isDebugBuild;
-#endif
-
     private readonly struct ResolvedDetailPacket(ParsedCombatPacket Packet, int SourceId, int TargetId)
     {
         public readonly ParsedCombatPacket Packet = Packet;
@@ -71,8 +65,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     }
 
     public LocalizationService Localization => _localization;
-
-    public bool IsDebugBuild => _isDebugBuild;
 
     public CombatDirectionDetailViewModel OutgoingDetail { get; }
 

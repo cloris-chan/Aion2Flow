@@ -36,20 +36,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private DamageMeterSnapshot _displayedSnapshot = new();
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
-#if DEBUG
-    private readonly bool _isDebugBuild = true;
-#else
-    private readonly bool _isDebugBuild;
-#endif
 
     public LocalizationService Localization { get; }
     public CombatantDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
     public ObservableCollection<LanguageOption> Languages { get; } = [];
     public ObservableCollection<BattleHistoryItemViewModel> BattleHistory { get; } = [];
-
-    public bool IsDebugBuild => _isDebugBuild;
-
 
     [ObservableProperty]
     public partial string Status { get; set; } = string.Empty;
