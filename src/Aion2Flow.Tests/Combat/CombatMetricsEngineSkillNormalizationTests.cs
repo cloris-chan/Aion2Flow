@@ -392,7 +392,8 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
         Assert.True(combatant.Skills.TryGetValue(1900001, out var followupSkill));
         Assert.Equal(0, followupSkill.DamageAmount);
         Assert.Equal(0, followupSkill.Times);
-        Assert.Equal(1, followupSkill.SupportTimes);
+        Assert.Equal(35373, followupSkill.HealingAmount);
+        Assert.Equal(1, followupSkill.HealingTimes);
     }
 
     [Fact]

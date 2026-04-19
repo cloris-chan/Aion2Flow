@@ -8,6 +8,7 @@ namespace Cloris.Aion2Flow.Combat.Classification;
 public static class CombatEventClassifier
 {
     private const int RestoreHpSkillCode = 1010000;
+    private const int InstanceClearRestoreBaseSkillCode = 1900000;
     private static readonly ConcurrentDictionary<int, bool> NonHealthResourceRestoreFamilyCache = [];
 
     internal static void ClearCaches()
@@ -23,6 +24,11 @@ public static class CombatEventClassifier
         }
 
         if (IsObservedRecoveryTick(packet))
+        {
+            return CombatEventKind.Healing;
+        }
+
+        if (IsInstanceClearRestore(packet))
         {
             return CombatEventKind.Healing;
         }
@@ -115,6 +121,11 @@ public static class CombatEventClassifier
         if (IsObservedSelfHealingProc(packet))
         {
             return CombatValueKind.PeriodicHealing;
+        }
+
+        if (IsInstanceClearRestore(packet))
+        {
+            return CombatValueKind.Healing;
         }
 
         var semantics = ResolveSkillSemantics(packet.SkillCode);
@@ -676,6 +687,23 @@ public static class CombatEventClassifier
         }
 
         return skill.Id == RestoreHpSkillCode;
+    }
+
+    private static bool IsInstanceClearRestore(ParsedCombatPacket packet)
+    {
+        if (packet.IsPeriodicEffect || packet.Damage <= 0 || packet.SourceId <= 0 || packet.TargetId <= 0)
+        {
+            return false;
+        }
+
+        if (packet.SourceId != packet.TargetId)
+        {
+            return false;
+        }
+
+        var baseSkillCode = packet.SkillCode - (packet.SkillCode % 10);
+        return baseSkillCode == InstanceClearRestoreBaseSkillCode
+               && packet.ResourceKind != CombatResourceKind.Mana;
     }
 
     private static bool IsObservedSelfHealingProc(ParsedCombatPacket packet)

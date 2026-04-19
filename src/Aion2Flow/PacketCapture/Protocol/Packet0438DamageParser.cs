@@ -19,7 +19,8 @@ internal readonly record struct Packet0438Damage(
     int TailMultiHitCount,
     int DrainHealAmount = 0,
     int RegenerationAmount = 0,
-    long SpecialsRaw = 0);
+    long DetailRaw = 0,
+    CombatResourceKind ResourceKind = CombatResourceKind.Unknown);
 
 internal static class Packet0438DamageParser
 {
@@ -61,15 +62,16 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadVarInt(out var type)) return false;
 
-        if (!Packet0438Layout.TryGetSpecialsLength(layoutTag, out var specialsLength) || reader.Remaining < specialsLength)
+        if (!Packet0438Layout.TryGetDetailLength(layoutTag, out var detailLength) || reader.Remaining < detailLength)
         {
             return false;
         }
 
-        var specialsSlice = payload.Slice(reader.Offset, specialsLength);
-        var specials = ParseDamageModifiers(specialsSlice, type);
-        var (regenAmount, specialsRaw) = ExtractRegenerationAmount(specialsSlice, specials);
-        if (!reader.TryAdvance(specialsLength)) return false;
+        var detailSlice = payload.Slice(reader.Offset, detailLength);
+        var modifiers = ParseDamageModifiers(detailSlice, type);
+        var (regenAmount, detailRaw) = ExtractRegenerationAmount(detailSlice, modifiers);
+        var resourceKind = ExtractResourceKind(detailSlice);
+        if (!reader.TryAdvance(detailLength)) return false;
 
         if (!reader.TryReadVarInt(out var unknown)) return false;
         if (!reader.TryReadVarInt(out var damage)) return false;
@@ -93,7 +95,7 @@ internal static class Packet0438DamageParser
             skillCodeRaw,
             marker,
             type,
-            specials,
+            modifiers,
             unknown,
             damage,
             loop,
@@ -101,7 +103,8 @@ internal static class Packet0438DamageParser
             multiHitCount,
             drainHealAmount,
             regenAmount,
-            specialsRaw);
+            detailRaw,
+            resourceKind);
         return true;
     }
 
@@ -167,18 +170,18 @@ internal static class Packet0438DamageParser
         return drainValue;
     }
 
-    private static (int RegenAmount, long SpecialsRaw) ExtractRegenerationAmount(ReadOnlySpan<byte> specials, DamageModifiers modifiers)
+    private static (int RegenAmount, long DetailRaw) ExtractRegenerationAmount(ReadOnlySpan<byte> detail, DamageModifiers modifiers)
     {
         long raw = 0;
-        for (var i = 0; i < Math.Min(specials.Length, 8); i++)
-            raw |= (long)specials[i] << (i * 8);
+        for (var i = 0; i < Math.Min(detail.Length, 8); i++)
+            raw |= (long)detail[i] << (i * 8);
 
         if ((modifiers & DamageModifiers.Regeneration) == 0)
             return (0, raw);
 
-        if (specials.Length > 1)
+        if (detail.Length > 1)
         {
-            var reader = new PacketSpanReader(specials[1..]);
+            var reader = new PacketSpanReader(detail[1..]);
             if (reader.TryReadVarInt(out var val) && val > 0)
                 return (val, raw);
         }
@@ -186,7 +189,20 @@ internal static class Packet0438DamageParser
         return (0, raw);
     }
 
-    private static DamageModifiers ParseDamageModifiers(ReadOnlySpan<byte> packet, int type)
+    private static CombatResourceKind ExtractResourceKind(ReadOnlySpan<byte> detail)
+    {
+        if (detail.Length != 8)
+            return CombatResourceKind.Unknown;
+
+        return detail[0] switch
+        {
+            0x57 => CombatResourceKind.Health,
+            0x58 => CombatResourceKind.Mana,
+            _ => CombatResourceKind.Unknown
+        };
+    }
+
+    private static DamageModifiers ParseDamageModifiers(ReadOnlySpan<byte> detail, int type)
     {
         DamageModifiers modifiers = DamageModifiers.None;
         if (type == 3)
@@ -194,10 +210,10 @@ internal static class Packet0438DamageParser
             modifiers |= DamageModifiers.Critical;
         }
 
-        if (packet.Length == 8) return modifiers;
-        if (packet.Length < 10) return modifiers;
+        if (detail.Length == 8) return modifiers;
+        if (detail.Length < 10) return modifiers;
 
-        var flagByte = packet[0];
+        var flagByte = detail[0];
         var hasBlock = (flagByte & 0x02) != 0;
         var hasParry = (flagByte & 0x04) != 0;
         var hasPerfect = (flagByte & 0x08) != 0;

@@ -378,7 +378,8 @@ public sealed class PacketLogReplayService
             Loop = parsed.Loop,
             DrainHealAmount = parsed.DrainHealAmount,
             RegenerationAmount = parsed.RegenerationAmount,
-            SpecialsRaw = parsed.SpecialsRaw,
+            DetailRaw = parsed.DetailRaw,
+            ResourceKind = parsed.ResourceKind,
             Timestamp = timestamp,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal

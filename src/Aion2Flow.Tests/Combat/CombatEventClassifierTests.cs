@@ -644,7 +644,7 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
-    public void Classifies_Missing_Unknown_Self_Direct_Followup_As_Support()
+    public void Classifies_Instance_Clear_Restore_As_Healing()
     {
         CombatMetricsEngine.SkillMap = [];
 
@@ -655,7 +655,28 @@ public sealed class CombatEventClassifierTests
             SkillCode = 1900001,
             OriginalSkillCode = 1900911,
             Damage = 29586,
-            EffectFamily = "direct-hit"
+            EffectFamily = "direct-hit",
+            ResourceKind = CombatResourceKind.Health
+        };
+
+        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Classifies_Instance_Clear_Mana_Restore_As_Support()
+    {
+        CombatMetricsEngine.SkillMap = [];
+
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = 9024,
+            TargetId = 9024,
+            SkillCode = 1900001,
+            OriginalSkillCode = 1900911,
+            Damage = 8767,
+            EffectFamily = "direct-hit",
+            ResourceKind = CombatResourceKind.Mana
         };
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));

@@ -623,7 +623,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                 }
 
                 var sourceId = ResolveCombatantId(store, packet.SourceId);
-                var targetId = ResolveCombatantId(store, packet.TargetId);
+                var targetId = packet.TargetId;
                 relevantCombatantIds.Add(sourceId);
                 relevantCombatantIds.Add(targetId);
                 yield return new BattlePacketContext(packet, sourceId, targetId);
@@ -645,7 +645,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                 }
 
                 var sourceId = ResolveCombatantId(store, packet.SourceId);
-                var targetId = ResolveCombatantId(store, packet.TargetId);
+                var targetId = packet.TargetId;
                 if (!IsRelevantRecoveryPacket(packet, sourceId, targetId, relevantCombatantIds))
                 {
                     continue;

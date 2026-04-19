@@ -830,7 +830,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             HasAuthoritativeMultiHitCount = parsed.TailMultiHitCount > 0,
             DrainHealAmount = parsed.DrainHealAmount,
             RegenerationAmount = parsed.RegenerationAmount,
-            SpecialsRaw = parsed.SpecialsRaw,
+            DetailRaw = parsed.DetailRaw,
+            ResourceKind = parsed.ResourceKind,
             Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
@@ -1200,7 +1201,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 Loop = parsed.Loop,
                 DrainHealAmount = parsed.DrainHealAmount,
                 RegenerationAmount = parsed.RegenerationAmount,
-                SpecialsRaw = parsed.SpecialsRaw,
+                DetailRaw = parsed.DetailRaw,
+                ResourceKind = parsed.ResourceKind,
                 Timestamp = CurrentTimestampMilliseconds,
                 FrameOrdinal = frameOrdinal,
                 BatchOrdinal = batchOrdinal

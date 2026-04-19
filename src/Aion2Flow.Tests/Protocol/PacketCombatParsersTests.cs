@@ -36,8 +36,8 @@ public sealed class PacketCombatParsersTests
         var ok = Packet0438DamageParser.TryParsePayload(packet.AsSpan()[reader.Offset..], out var parsed, out var consumed);
 
         Assert.True(ok);
-        Assert.True(Packet0438Layout.TryGetSpecialsLength(parsed.LayoutTag, out var specialsLength));
-        Assert.True(specialsLength > 0);
+        Assert.True(Packet0438Layout.TryGetDetailLength(parsed.LayoutTag, out var detailLength));
+        Assert.True(detailLength > 0);
         Assert.Equal(sample.TargetId, parsed.TargetId);
         Assert.Equal(sample.SourceId, parsed.SourceId);
         Assert.Equal(sample.Damage, parsed.Damage);
