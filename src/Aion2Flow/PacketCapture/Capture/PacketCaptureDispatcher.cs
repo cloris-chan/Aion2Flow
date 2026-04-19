@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Services.Logging;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
@@ -27,8 +28,9 @@ public sealed class PacketCaptureDispatcher(CombatMetricsStore store)
                         {
                             DispatchCapturedPacket(packet);
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            AppLog.Write(AppLogLevel.Error, $"Packet dispatch failed: {ex.Message}");
                         }
                     }
                     finally

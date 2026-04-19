@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Divert.Interop;
+using Cloris.Aion2Flow.Services.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
@@ -86,7 +87,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { Debug.WriteLine($"Stop error: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Write(AppLogLevel.Warning, $"Stop error: {ex.Message}"); }
 
         _divert?.Dispose();
         _divert = null;

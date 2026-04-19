@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using Cloris.Aion2Flow.Services.Logging;
 using Velopack;
 using Velopack.Locators;
 using Velopack.Sources;
@@ -50,7 +50,7 @@ public sealed class AppUpdateService
         }
         catch (Exception ex)
         {
-            Trace.TraceWarning($"Velopack failed to stage the pending update during shutdown: {ex}");
+            AppLog.Write(AppLogLevel.Warning, $"Velopack failed to stage the pending update during shutdown: {ex}");
         }
     }
 
@@ -72,7 +72,7 @@ public sealed class AppUpdateService
         }
         catch (Exception ex)
         {
-            Trace.TraceWarning($"Velopack update check failed: {ex}");
+            AppLog.Write(AppLogLevel.Warning, $"Velopack update check failed: {ex}");
         }
     }
 

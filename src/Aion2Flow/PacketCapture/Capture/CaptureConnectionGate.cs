@@ -1,6 +1,7 @@
+using System.Diagnostics;
 using Cloris.Aion2Flow.Divert.Network;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using System.Diagnostics;
+using Cloris.Aion2Flow.Services.Logging;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
@@ -11,7 +12,6 @@ public static class CaptureConnectionGate
     public static bool IsLocked => _currentState != null;
 
     private static volatile LockState? _currentState;
-
 
     public static bool ShouldProcessPacket(in TcpConnection connection, TcpControlBits flags, out bool isReversed)
     {
@@ -30,7 +30,7 @@ public static class CaptureConnectionGate
         {
             if (Interlocked.CompareExchange(ref _currentState, null, state) == state)
             {
-                Console.WriteLine("[Locker] 连接闲置超时，已安全解锁。");
+                AppLog.Write(AppLogLevel.Info, "Connection idle timeout, unlocked");
             }
             isReversed = false;
             return true;
@@ -44,7 +44,7 @@ public static class CaptureConnectionGate
             {
                 if (Interlocked.CompareExchange(ref _currentState, null, state) == state)
                 {
-                    Console.WriteLine("[Locker] 检测到挥手/重置，已安全解锁。");
+                    AppLog.Write(AppLogLevel.Info, "FIN/RST detected, unlocked");
                 }
             }
             return true;
