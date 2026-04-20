@@ -250,7 +250,10 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     dataSnapshot.Combatants[uid] = personal;
                 }
 
-                if (TryGetClassEvidence(packet, out var inferredClass, out var evidenceScore))
+                if (personal.CharacterClass is null &&
+                    !Store.SummonOwnerByInstance.ContainsKey(uid) &&
+                    (nicknameData.ContainsKey(uid) || !Store.TryGetNpcRuntimeState(uid, out var npcCheck) || !npcCheck.NpcCode.HasValue) &&
+                    TryGetClassEvidence(packet, out var inferredClass, out var evidenceScore))
                 {
                     if (!characterClassEvidenceByCombatant.TryGetValue(uid, out var inferenceState))
                     {
