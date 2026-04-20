@@ -72,6 +72,7 @@ file sealed class App(IServiceProvider serviceProvider) : Application
 {
     public override void Initialize()
     {
+        RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Styles.Add(new SimpleTheme());
         Resources.MergedDictionaries.Add(new IconGeometries());
     }
