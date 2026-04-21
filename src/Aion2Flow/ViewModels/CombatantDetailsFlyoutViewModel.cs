@@ -28,6 +28,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     private CombatMetricsStore? _currentStore;
     private Guid _battleContextId;
     private int? _combatantId;
+    private long _detailRevision = -1;
 
     private readonly struct ResolvedDetailPacket(ParsedCombatPacket Packet, int SourceId, int TargetId)
     {
@@ -118,11 +119,14 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(IsIncomingSelected));
     }
 
-    public void SelectBattleCombatant(Guid battleContextId, int? combatantId)
+    public void SelectBattleCombatant(
+        Guid battleContextId,
+        int? combatantId,
+        DamageMeterSnapshot? snapshot = null,
+        CombatMetricsStore? store = null,
+        bool forceRefresh = false)
     {
-        _battleContextId = battleContextId;
-        _combatantId = combatantId;
-        RefreshContext();
+        RefreshContext(battleContextId, combatantId, snapshot, store, forceRefresh);
     }
 
     public void Clear()
@@ -132,6 +136,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         _currentSnapshot = new DamageMeterSnapshot();
         _currentStore = null;
         _battlePackets.Clear();
+        _detailRevision = -1;
         CombatantName = string.Empty;
         SelectedDirectionIndex = 0;
         OutgoingDetail.Clear();
@@ -165,58 +170,101 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         }
     }
 
-    private void RefreshContext()
+    private void RefreshContext(
+        Guid battleContextId,
+        int? combatantId,
+        DamageMeterSnapshot? snapshotOverride,
+        CombatMetricsStore? storeOverride,
+        bool forceRefresh)
     {
-        if (_combatantId is null || _battleContextId == Guid.Empty)
+        if (combatantId is null || battleContextId == Guid.Empty)
         {
+            _battleContextId = battleContextId;
+            _combatantId = combatantId;
             _currentSnapshot = new DamageMeterSnapshot();
             _currentStore = null;
             _battlePackets.Clear();
+            _detailRevision = -1;
             CombatantName = string.Empty;
             ClearSectionsOnly();
             return;
         }
 
-        if (!TryResolveContext(out var snapshot, out var store))
+        if (!TryResolveContext(battleContextId, snapshotOverride, storeOverride, out var snapshot, out var store))
         {
+            _battleContextId = battleContextId;
+            _combatantId = combatantId;
             _currentSnapshot = new DamageMeterSnapshot();
             _currentStore = null;
             _battlePackets.Clear();
+            _detailRevision = -1;
             CombatantName = string.Empty;
             ClearSectionsOnly();
             return;
         }
 
-        if (!snapshot.Combatants.ContainsKey(_combatantId.Value))
+        if (!snapshot.Combatants.ContainsKey(combatantId.Value))
         {
+            _battleContextId = battleContextId;
+            _combatantId = combatantId;
             _currentSnapshot = new DamageMeterSnapshot();
             _currentStore = null;
             _battlePackets.Clear();
+            _detailRevision = -1;
             CombatantName = string.Empty;
             ClearSectionsOnly();
             return;
         }
 
+        var nextDetailRevision = store.GetCombatantDetailRevision(combatantId.Value);
+        var canReuseExistingSections = !forceRefresh &&
+            _battleContextId == battleContextId &&
+            _combatantId == combatantId &&
+            ReferenceEquals(_currentStore, store) &&
+            _detailRevision == nextDetailRevision;
+
+        _battleContextId = battleContextId;
+        _combatantId = combatantId;
         _currentSnapshot = snapshot;
         _currentStore = store;
+        CombatantName = CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, combatantId.Value);
+
+        if (canReuseExistingSections)
+        {
+            RefreshSectionRatesOnly();
+            return;
+        }
+
+        _detailRevision = nextDetailRevision;
         _battlePackets.Clear();
-        _battlePackets.AddRange(CollectBattlePackets(snapshot, store));
-        CombatantName = CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, _combatantId.Value);
+        _battlePackets.AddRange(CollectBattlePackets(snapshot, store, combatantId.Value));
 
         RebuildCounterpartSelections();
         RefreshAllSections();
     }
 
-    private bool TryResolveContext(out DamageMeterSnapshot snapshot, out CombatMetricsStore store)
+    private bool TryResolveContext(
+        Guid battleContextId,
+        DamageMeterSnapshot? snapshotOverride,
+        CombatMetricsStore? storeOverride,
+        out DamageMeterSnapshot snapshot,
+        out CombatMetricsStore store)
     {
-        if (_battleArchiveService.TryGetBattle(_battleContextId, out var record) && record is not null)
+        if (snapshotOverride is not null && storeOverride is not null)
+        {
+            snapshot = snapshotOverride;
+            store = storeOverride;
+            return true;
+        }
+
+        if (_battleArchiveService.TryGetBattle(battleContextId, out var record) && record is not null)
         {
             snapshot = record.Snapshot;
             store = record.Store;
             return true;
         }
 
-        if (_battleContextId == _engine.CurrentBattleId)
+        if (battleContextId == _engine.CurrentBattleId)
         {
             snapshot = _engine.CreateBattleSnapshot();
             store = _liveStore;
@@ -230,14 +278,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 
     private static IEnumerable<ResolvedDetailPacket> CollectBattlePackets(
         DamageMeterSnapshot snapshot,
-        CombatMetricsStore store)
+        CombatMetricsStore store,
+        int combatantId)
     {
-        if (snapshot.BattleTime <= 0 || snapshot.BattleStartTime <= 0 || snapshot.BattleEndTime < snapshot.BattleStartTime)
-        {
-            yield break;
-        }
-
-        foreach (var battlePacket in CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime))
+        foreach (var battlePacket in store.EnumerateCombatantDetailPackets(snapshot, combatantId))
         {
             yield return new ResolvedDetailPacket(
                 battlePacket.Packet,
@@ -868,6 +912,24 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         }
 
         return CombatEventClassifier.DisplaySkillNameFor(skillCode);
+    }
+
+    private void RefreshSectionRatesOnly()
+    {
+        RefreshSectionPerSecond(OutgoingDamage);
+        RefreshSectionPerSecond(OutgoingHealing);
+        RefreshSectionPerSecond(OutgoingShield);
+        RefreshSectionPerSecond(IncomingDamage);
+        RefreshSectionPerSecond(IncomingHealing);
+        RefreshSectionPerSecond(IncomingShield);
+    }
+
+    private void RefreshSectionPerSecond(SkillDetailSectionViewModel section)
+    {
+        var battleSeconds = _currentSnapshot.BattleTime > 0
+            ? _currentSnapshot.BattleTime / 1000d
+            : 0d;
+        section.PerSecond = battleSeconds > 0 ? section.Total / battleSeconds : 0d;
     }
 
     private void ClearSectionsOnly()

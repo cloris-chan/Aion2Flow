@@ -2,48 +2,53 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed partial class DetailCounterpartSelectionViewModel : ObservableObject
+public sealed partial class DetailCounterpartSelectionViewModel(
+    int combatantId,
+    string displayName,
+    long damageAmount,
+    double damageShare,
+    long healingAmount,
+    double healingShare,
+    long shieldAmount,
+    double shieldShare,
+    bool initiallySelected) : ObservableObject
 {
-    public DetailCounterpartSelectionViewModel(
-        int combatantId,
-        string displayName,
-        long damageAmount,
-        double damageShare,
-        long healingAmount,
-        double healingShare,
-        long shieldAmount,
-        double shieldShare,
-        bool initiallySelected)
-    {
-        CombatantId = combatantId;
-        DisplayName = displayName;
-        DamageAmount = damageAmount;
-        DamageShare = damageShare;
-        HealingAmount = healingAmount;
-        HealingShare = healingShare;
-        ShieldAmount = shieldAmount;
-        ShieldShare = shieldShare;
-        isSelected = initiallySelected;
-    }
-
-    public int CombatantId { get; }
-
-    public string DisplayName { get; }
-
-    public long DamageAmount { get; }
-
-    public double DamageShare { get; }
-
-    public long HealingAmount { get; }
-
-    public double HealingShare { get; }
-
-    public long ShieldAmount { get; }
-
-    public double ShieldShare { get; }
+    public int CombatantId { get; } = combatantId;
 
     [ObservableProperty]
-    private bool isSelected;
+    public partial string DisplayName { get; set; } = displayName;
+
+    [ObservableProperty]
+    public partial long DamageAmount { get; set; } = damageAmount;
+
+    [ObservableProperty]
+    public partial double DamageShare { get; set; } = damageShare;
+
+    [ObservableProperty]
+    public partial long HealingAmount { get; set; } = healingAmount;
+
+    [ObservableProperty]
+    public partial double HealingShare { get; set; } = healingShare;
+
+    [ObservableProperty]
+    public partial long ShieldAmount { get; set; } = shieldAmount;
+
+    [ObservableProperty]
+    public partial double ShieldShare { get; set; } = shieldShare;
+
+    [ObservableProperty]
+    public partial bool IsSelected { get; set; } = initiallySelected;
+
+    public void ApplyFrom(DetailCounterpartOption option)
+    {
+        DisplayName = option.DisplayName;
+        DamageAmount = option.DamageAmount;
+        DamageShare = option.DamageShare;
+        HealingAmount = option.HealingAmount;
+        HealingShare = option.HealingShare;
+        ShieldAmount = option.ShieldAmount;
+        ShieldShare = option.ShieldShare;
+    }
 
     public event EventHandler? SelectionChanged;
 

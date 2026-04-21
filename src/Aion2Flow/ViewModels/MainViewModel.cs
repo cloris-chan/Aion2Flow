@@ -170,7 +170,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             RebuildBattleHistory();
             ApplyLocalizedUiText();
             RefreshCaptureIndicators();
-            RefreshDisplayedSnapshot();
+            RefreshDisplayedSnapshot(forceDetailRefresh: true);
         });
     }
 
@@ -179,7 +179,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         Dispatcher.UIThread.Post(() =>
         {
             RebuildBattleHistory();
-            RefreshDisplayedSnapshot();
+            RefreshDisplayedSnapshot(forceDetailRefresh: true);
         });
     }
 
@@ -340,7 +340,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         ApplySnapshot(_displayedSnapshot);
     }
 
-    private void ApplySnapshot(DamageMeterSnapshot snapshot)
+    private void ApplySnapshot(DamageMeterSnapshot snapshot, bool forceDetailRefresh = false)
     {
         var battleSeconds = snapshot.BattleTime / 1000.0;
         BattleTimeSeconds = battleSeconds;
@@ -388,20 +388,20 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         Combatants.Sort((a, b) => b.Damage.CompareTo(a.Damage));
 
-        RefreshCombatantDetails();
+        RefreshCombatantDetails(forceDetailRefresh);
     }
 
-    private void RefreshDisplayedSnapshot()
+    private void RefreshDisplayedSnapshot(bool forceDetailRefresh = false)
     {
         if (IsViewingArchivedBattle && SelectedBattleHistory is not null)
         {
             _displayedSnapshot = SelectedBattleHistory.Record.Snapshot;
-            ApplySnapshot(_displayedSnapshot);
+            ApplySnapshot(_displayedSnapshot, forceDetailRefresh);
             return;
         }
 
         _displayedSnapshot = _latestLiveDamage;
-        ApplySnapshot(_displayedSnapshot);
+        ApplySnapshot(_displayedSnapshot, forceDetailRefresh);
     }
 
     private string ResolveDisplayName(DamageMeterSnapshot snapshot, int id)
@@ -483,7 +483,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         return false;
     }
 
-    private void RefreshCombatantDetails()
+    private void RefreshCombatantDetails(bool forceRefresh = false)
     {
         if (SelectedCombatant is null)
         {
@@ -495,7 +495,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             ? SelectedBattleHistory?.Record.BattleId ?? Guid.Empty
             : _displayedSnapshot.BattleId;
 
-        CombatantDetails.SelectBattleCombatant(battleContextId, SelectedCombatant.Id);
+        var snapshot = IsViewingArchivedBattle && SelectedBattleHistory is not null
+            ? SelectedBattleHistory.Record.Snapshot
+            : _displayedSnapshot;
+
+        var store = IsViewingArchivedBattle && SelectedBattleHistory is not null
+            ? SelectedBattleHistory.Record.Store
+            : _store;
+
+        CombatantDetails.SelectBattleCombatant(battleContextId, SelectedCombatant.Id, snapshot, store, forceRefresh);
     }
 
     private void RefreshCaptureIndicators()

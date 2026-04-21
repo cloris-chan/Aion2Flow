@@ -69,10 +69,15 @@ public sealed class CombatMetricsStore
 
     private readonly ConcurrentDictionary<int, ConcurrentQueue<ParsedCombatPacket>> _packetsByTarget = new();
     private readonly ConcurrentDictionary<int, ConcurrentQueue<ParsedCombatPacket>> _packetsBySource = new();
+    private readonly ConcurrentDictionary<EntityPairKey, ConcurrentQueue<ParsedCombatPacket>> _packetsByPair = new();
+    private readonly ConcurrentDictionary<int, ConcurrentDictionary<EntityPairKey, byte>> _outgoingPairKeysBySource = new();
+    private readonly ConcurrentDictionary<int, ConcurrentDictionary<EntityPairKey, byte>> _incomingPairKeysByTarget = new();
     private readonly ConcurrentDictionary<int, string> _nicknameStorage = new();
     private readonly ConcurrentDictionary<int, int> _summonOwnerByInstance = new();
+    private readonly ConcurrentDictionary<int, ConcurrentDictionary<int, byte>> _summonInstancesByOwner = new();
     private readonly ConcurrentDictionary<int, string> _npcNameByCode = new();
     private readonly ConcurrentDictionary<int, NpcInstanceState> _npcStateByInstance = new();
+    private readonly ConcurrentDictionary<int, long> _detailRevisionByCombatant = new();
     private readonly Lock _selfPeriodicHealingPoolLock = new();
     private readonly Dictionary<SelfPeriodicHealingPoolKey, SelfPeriodicHealingPoolState> _selfPeriodicHealingPools = [];
     private readonly Lock _multiHitLock = new();
@@ -89,6 +94,7 @@ public sealed class CombatMetricsStore
     private int _lastObservedNpcSource;
     private long _observationOrdinal;
     private long _currentAvoidanceBatchOrdinal;
+    private long _detailRevisionSequence;
 
     public int CurrentTarget { get; set; }
 
@@ -371,6 +377,122 @@ public sealed class CombatMetricsStore
 
         var byTarget = _packetsByTarget.GetOrAdd(packet.TargetId, _ => new ConcurrentQueue<ParsedCombatPacket>());
         byTarget.Enqueue(packet);
+
+        IndexPacketByPair(packet);
+        MarkPacketDetailRevision(packet);
+    }
+
+    private void IndexPacketByPair(ParsedCombatPacket packet)
+    {
+        var pairKey = new EntityPairKey(packet.SourceId, packet.TargetId);
+        var byPair = _packetsByPair.GetOrAdd(pairKey, static _ => new ConcurrentQueue<ParsedCombatPacket>());
+        byPair.Enqueue(packet);
+
+        if (packet.SourceId > 0)
+        {
+            var outgoingPairs = _outgoingPairKeysBySource.GetOrAdd(
+                packet.SourceId,
+                static _ => new ConcurrentDictionary<EntityPairKey, byte>());
+            outgoingPairs[pairKey] = 0;
+        }
+
+        if (packet.TargetId > 0)
+        {
+            var incomingPairs = _incomingPairKeysByTarget.GetOrAdd(
+                packet.TargetId,
+                static _ => new ConcurrentDictionary<EntityPairKey, byte>());
+            incomingPairs[pairKey] = 0;
+        }
+    }
+
+    private void MarkPacketDetailRevision(ParsedCombatPacket packet)
+    {
+        var revision = NextDetailRevision();
+        MarkCombatantDetailRevision(CombatMetricsEngine.ResolveCombatantId(this, packet.SourceId), revision);
+        MarkCombatantDetailRevision(packet.TargetId, revision);
+    }
+
+    private long NextDetailRevision() => Interlocked.Increment(ref _detailRevisionSequence);
+
+    private void MarkCombatantDetailRevision(int combatantId, long revision)
+    {
+        if (combatantId <= 0)
+        {
+            return;
+        }
+
+        _detailRevisionByCombatant.AddOrUpdate(
+            combatantId,
+            revision,
+            (_, currentRevision) => Math.Max(currentRevision, revision));
+    }
+
+    private void MarkCombatantAndAdjacentDetailsDirty(int combatantId)
+    {
+        if (combatantId <= 0)
+        {
+            return;
+        }
+
+        var revision = NextDetailRevision();
+        MarkCombatantDetailRevision(combatantId, revision);
+
+        if (_outgoingPairKeysBySource.TryGetValue(combatantId, out var outgoingPairs))
+        {
+            foreach (var pairKey in outgoingPairs.Keys)
+            {
+                MarkCombatantDetailRevision(pairKey.TargetId, revision);
+            }
+        }
+
+        if (_incomingPairKeysByTarget.TryGetValue(combatantId, out var incomingPairs))
+        {
+            foreach (var pairKey in incomingPairs.Keys)
+            {
+                MarkCombatantDetailRevision(CombatMetricsEngine.ResolveCombatantId(this, pairKey.SourceId), revision);
+            }
+        }
+    }
+
+    private void MarkSummonOwnerAttributionDirty(int ownerId, int summonInstanceId)
+    {
+        if (ownerId <= 0 || summonInstanceId <= 0)
+        {
+            return;
+        }
+
+        var revision = NextDetailRevision();
+        MarkCombatantDetailRevision(ownerId, revision);
+
+        if (_outgoingPairKeysBySource.TryGetValue(summonInstanceId, out var outgoingPairs))
+        {
+            foreach (var pairKey in outgoingPairs.Keys)
+            {
+                MarkCombatantDetailRevision(pairKey.TargetId, revision);
+            }
+        }
+    }
+
+    private void RebuildPairIndexes()
+    {
+        _packetsByPair.Clear();
+        _outgoingPairKeysBySource.Clear();
+        _incomingPairKeysByTarget.Clear();
+        _summonInstancesByOwner.Clear();
+
+        foreach (var (summonInstanceId, ownerId) in _summonOwnerByInstance)
+        {
+            var summons = _summonInstancesByOwner.GetOrAdd(ownerId, static _ => new ConcurrentDictionary<int, byte>());
+            summons[summonInstanceId] = 0;
+        }
+
+        foreach (var queue in _packetsBySource.Values)
+        {
+            foreach (var packet in queue)
+            {
+                IndexPacketByPair(packet);
+            }
+        }
     }
 
     private void NormalizeSelfPeriodicHealingPool(ParsedCombatPacket packet)
@@ -469,8 +591,11 @@ public sealed class CombatMetricsStore
         return true;
     }
 
-    public void AppendNpcCode(int instanceId, int npcCode) =>
+    public void AppendNpcCode(int instanceId, int npcCode)
+    {
         UpdateNpcState(instanceId, state => state with { NpcCode = npcCode });
+        MarkCombatantAndAdjacentDetailsDirty(instanceId);
+    }
 
     public void AppendNpcName(int npcCode, string name) => _npcNameByCode[npcCode] = name;
 
@@ -621,7 +746,10 @@ public sealed class CombatMetricsStore
     public void AppendSummon(int ownerId, int summonInstanceId)
     {
         _summonOwnerByInstance[summonInstanceId] = ownerId;
+        var summons = _summonInstancesByOwner.GetOrAdd(ownerId, static _ => new ConcurrentDictionary<int, byte>());
+        summons[summonInstanceId] = 0;
         AppendNpcKind(summonInstanceId, NpcKind.Summon);
+        MarkSummonOwnerAttributionDirty(ownerId, summonInstanceId);
     }
 
     public void ToggleNpcBattle(int instanceId)
@@ -649,13 +777,19 @@ public sealed class CombatMetricsStore
         }
 
         _nicknameStorage[uid] = nickname;
+        MarkCombatantAndAdjacentDetailsDirty(uid);
     }
 
     public void ResetCombatStorage()
     {
         _packetsBySource.Clear();
         _packetsByTarget.Clear();
+        _packetsByPair.Clear();
+        _outgoingPairKeysBySource.Clear();
+        _incomingPairKeysByTarget.Clear();
         _summonOwnerByInstance.Clear();
+        _summonInstancesByOwner.Clear();
+        _detailRevisionByCombatant.Clear();
         lock (_selfPeriodicHealingPoolLock)
         {
             _selfPeriodicHealingPools.Clear();
@@ -678,6 +812,7 @@ public sealed class CombatMetricsStore
         _lastObservedNpcSource = 0;
         CurrentTarget = 0;
         _observationOrdinal = 0;
+        _detailRevisionSequence = 0;
     }
 
     public ConcurrentDictionary<int, ConcurrentQueue<ParsedCombatPacket>> CombatPacketsByTarget => _packetsByTarget;
@@ -685,6 +820,127 @@ public sealed class CombatMetricsStore
     public ConcurrentDictionary<int, string> Nicknames => _nicknameStorage;
     public ConcurrentDictionary<int, int> SummonOwnerByInstance => _summonOwnerByInstance;
     public ConcurrentDictionary<int, string> NpcNameByCode => _npcNameByCode;
+
+    internal long GetCombatantDetailRevision(int combatantId)
+    {
+        return combatantId > 0 && _detailRevisionByCombatant.TryGetValue(combatantId, out var revision)
+            ? revision
+            : 0;
+    }
+
+    internal IEnumerable<CombatMetricsEngine.BattlePacketContext> EnumerateCombatantDetailPackets(
+        DamageMeterSnapshot snapshot,
+        int combatantId)
+    {
+        if (combatantId <= 0 ||
+            snapshot.BattleTime <= 0 ||
+            snapshot.BattleStartTime <= 0 ||
+            snapshot.BattleEndTime < snapshot.BattleStartTime)
+        {
+            yield break;
+        }
+
+        var relevantCombatantIds = new HashSet<int> { combatantId };
+        var yieldedPairs = new HashSet<EntityPairKey>();
+
+        foreach (var pairKey in EnumerateOutgoingPairKeys(combatantId))
+        {
+            if (!yieldedPairs.Add(pairKey))
+            {
+                continue;
+            }
+
+            foreach (var context in EnumeratePairPackets(pairKey, snapshot.BattleStartTime, snapshot.BattleEndTime, relevantCombatantIds))
+            {
+                yield return context;
+            }
+        }
+
+        foreach (var pairKey in EnumerateIncomingPairKeys(combatantId))
+        {
+            if (!yieldedPairs.Add(pairKey))
+            {
+                continue;
+            }
+
+            foreach (var context in EnumeratePairPackets(pairKey, snapshot.BattleStartTime, snapshot.BattleEndTime, relevantCombatantIds))
+            {
+                yield return context;
+            }
+        }
+    }
+
+    private IEnumerable<EntityPairKey> EnumerateOutgoingPairKeys(int combatantId)
+    {
+        if (_outgoingPairKeysBySource.TryGetValue(combatantId, out var directPairs))
+        {
+            foreach (var pairKey in directPairs.Keys)
+            {
+                yield return pairKey;
+            }
+        }
+
+        if (!_summonInstancesByOwner.TryGetValue(combatantId, out var summonInstances))
+        {
+            yield break;
+        }
+
+        foreach (var summonInstanceId in summonInstances.Keys)
+        {
+            if (!_outgoingPairKeysBySource.TryGetValue(summonInstanceId, out var summonPairs))
+            {
+                continue;
+            }
+
+            foreach (var pairKey in summonPairs.Keys)
+            {
+                yield return pairKey;
+            }
+        }
+    }
+
+    private IEnumerable<EntityPairKey> EnumerateIncomingPairKeys(int combatantId)
+    {
+        if (!_incomingPairKeysByTarget.TryGetValue(combatantId, out var incomingPairs))
+        {
+            yield break;
+        }
+
+        foreach (var pairKey in incomingPairs.Keys)
+        {
+            yield return pairKey;
+        }
+    }
+
+    private IEnumerable<CombatMetricsEngine.BattlePacketContext> EnumeratePairPackets(
+        EntityPairKey pairKey,
+        long battleStart,
+        long battleEnd,
+        HashSet<int> relevantCombatantIds)
+    {
+        if (!_packetsByPair.TryGetValue(pairKey, out var queue))
+        {
+            yield break;
+        }
+
+        foreach (var packet in queue)
+        {
+            var sourceId = CombatMetricsEngine.ResolveCombatantId(this, packet.SourceId);
+            var targetId = packet.TargetId;
+            if (packet.Timestamp >= battleStart && packet.Timestamp <= battleEnd)
+            {
+                yield return new CombatMetricsEngine.BattlePacketContext(packet, sourceId, targetId);
+                continue;
+            }
+
+            if (!CombatMetricsEngine.IsRelevantRecoveryPacket(packet, sourceId, targetId, relevantCombatantIds))
+            {
+                continue;
+            }
+
+            yield return new CombatMetricsEngine.BattlePacketContext(packet, sourceId, targetId);
+        }
+    }
 
     public CombatMetricsStore DeepClone()
     {
@@ -700,6 +956,8 @@ public sealed class CombatMetricsStore
         CloneValues(_summonOwnerByInstance, clone._summonOwnerByInstance);
         CloneValues(_npcNameByCode, clone._npcNameByCode);
         CloneNpcStates(_npcStateByInstance, clone._npcStateByInstance);
+        CloneValues(_detailRevisionByCombatant, clone._detailRevisionByCombatant);
+        clone._detailRevisionSequence = _detailRevisionSequence;
         lock (_compactOutcomeLock)
         {
             foreach (var (sourceId, pendingSignal) in _pendingDodgeSignalsBySource)
@@ -707,6 +965,8 @@ public sealed class CombatMetricsStore
                 clone._pendingDodgeSignalsBySource[sourceId] = pendingSignal;
             }
         }
+
+        clone.RebuildPairIndexes();
         return clone;
     }
 
@@ -777,6 +1037,7 @@ public sealed class CombatMetricsStore
         clone._lastObservedNpcSource = relevantNpcInstanceIds.Contains(_lastObservedNpcSource)
             ? _lastObservedNpcSource
             : 0;
+        clone.RebuildPairIndexes();
 
         return clone;
     }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
@@ -9,7 +10,6 @@ using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Tests.Protocol;
 using Cloris.Aion2Flow.ViewModels;
-using System.Globalization;
 
 namespace Cloris.Aion2Flow.Tests.Battle;
 
@@ -235,6 +235,47 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AssertSelectedCounterpartIds(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
         Assert.Single(viewModel.OutgoingDamage.Rows);
+    }
+
+    [Fact]
+    public void SelectBattleCombatant_Preserves_Counterpart_ViewModel_Identity_Across_Relevant_Refreshes()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+
+        const int playerId = 1001;
+        const int bossId = 9001;
+        const int addId = 9002;
+
+        store.AppendNickname(playerId, "Perigee");
+        AppendPacket(store, playerId, bossId, 11000010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, addId, 11000010, 200, "direct-hit", 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        var snapshot = engine.CreateBattleSnapshot();
+        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+
+        var originalBossCounterpart = Assert.Single(
+            viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts,
+            static counterpart => counterpart.CombatantId == bossId);
+
+        AppendPacket(store, playerId, bossId, 11000010, 300, "direct-hit", 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        snapshot = engine.CreateBattleSnapshot();
+        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+
+        var refreshedBossCounterpart = Assert.Single(
+            viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts,
+            static counterpart => counterpart.CombatantId == bossId);
+
+        Assert.Same(originalBossCounterpart, refreshedBossCounterpart);
+        Assert.Equal(800, refreshedBossCounterpart.DamageAmount);
+        Assert.Equal(1000, viewModel.OutgoingDamage.Total);
     }
 
     [Fact]
