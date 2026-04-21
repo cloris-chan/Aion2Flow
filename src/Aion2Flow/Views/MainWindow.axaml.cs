@@ -2,6 +2,8 @@ using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Cloris.Aion2Flow.ViewModels;
 using CommunityToolkit.Mvvm.DependencyInjection;
@@ -34,17 +36,25 @@ public partial class MainWindow : Window
         DataContext.DisposeAsync().AsTask().ConfigureAwait(false);
     }
 
-    private void Minimize(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void Minimize(object? sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Minimized;
     }
 
-    private void Exit(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void Exit(object? sender, RoutedEventArgs e)
     {
         Close();
     }
 
-    private void CombatantRowTapped(object? sender, Avalonia.Input.TappedEventArgs e)
+    private void TitleBarDragRegionPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            BeginMoveDrag(e);
+        }
+    }
+
+    private void CombatantRowTapped(object? sender, TappedEventArgs e)
     {
         if (sender is Border { DataContext: CombatantRowViewModel combatant })
         {
@@ -62,7 +72,7 @@ public partial class MainWindow : Window
         DataContext.SelectCombatantCommand.Execute(null);
     }
 
-    private void LanguageMenuItemClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void LanguageMenuItemClicked(object? sender, RoutedEventArgs e)
     {
         if (sender is MenuItem { Tag: string languageCode })
         {
@@ -113,7 +123,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void BattleHistoryMenuItemClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void BattleHistoryMenuItemClicked(object? sender, RoutedEventArgs e)
     {
         if (sender is MenuItem { Tag: BattleHistoryItemViewModel item })
         {

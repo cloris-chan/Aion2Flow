@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
+             x:Class="Cloris.Aion2Flow.Controls.MetricTile"
+             x:DataType="controls:MetricTile"
+             x:Name="Root">
+    <Border Classes="MetricCardSurface">
+        <StackPanel Spacing="4">
+            <TextBlock Classes="MetricLabel"
+                       Text="{Binding Label, ElementName=Root}"
+                       TextWrapping="Wrap" />
+            <controls:NumericBlock Classes="MetricValue"
+                                   Value="{Binding Value, ElementName=Root}"
+                                   FractionDigits="{Binding FractionDigits, ElementName=Root}"
+                                   TrimTrailingZeros="{Binding TrimTrailingZeros, ElementName=Root}"
+                                   UseGrouping="{Binding UseGrouping, ElementName=Root}"
+                                   UseCompactNotation="{Binding UseCompactNotation, ElementName=Root}"
+                                   UsePercentageNotation="{Binding UsePercentageNotation, ElementName=Root}"
+                                   CompactThreshold="{Binding CompactThreshold, ElementName=Root}"
+                                   CompactSignificantDigits="{Binding CompactSignificantDigits, ElementName=Root}"
+                                   Prefix="{Binding Prefix, ElementName=Root}"
+                                   Suffix="{Binding Suffix, ElementName=Root}" />
+        </StackPanel>
+    </Border>
+</UserControl>

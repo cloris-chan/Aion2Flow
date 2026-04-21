@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using System;
 
 namespace Cloris.Aion2Flow.Views;
 
@@ -23,8 +22,8 @@ public partial class CombatantDetailsFlyoutView : UserControl
         }
 
         var width = availableWidth > 0
-            ? Math.Min(1800d, availableWidth)
-            : 1560d;
+            ? Math.Min(1080d, availableWidth * 0.92d)
+            : 920d;
         if (availableWidth > 0 && availableWidth < 760d)
         {
             width = availableWidth;
@@ -35,8 +34,16 @@ public partial class CombatantDetailsFlyoutView : UserControl
         }
 
         var height = availableHeight > 0
-            ? Math.Min(920d, availableHeight)
-            : 760d;
+            ? Math.Min(840d, availableHeight * 0.92d)
+            : 720d;
+        if (availableHeight > 0 && availableHeight < 560d)
+        {
+            height = availableHeight;
+        }
+        else
+        {
+            height = Math.Max(560d, height);
+        }
 
         rootCard.Width = width;
         rootCard.MaxWidth = width;

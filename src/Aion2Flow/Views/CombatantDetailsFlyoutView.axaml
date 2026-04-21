@@ -5,71 +5,40 @@
              x:Class="Cloris.Aion2Flow.Views.CombatantDetailsFlyoutView"
              x:DataType="vm:CombatantDetailsFlyoutViewModel">
     <UserControl.Styles>
-        <Style Selector="ToggleButton.DetailDirectionTab">
-            <Setter Property="Background" Value="#14000000" />
-            <Setter Property="BorderBrush" Value="#4A6B7782" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="#B8C7D4" />
-            <Setter Property="Padding" Value="14,7" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="MinWidth" Value="76" />
-            <Setter Property="CornerRadius" Value="999" />
-        </Style>
-
-        <Style Selector="ToggleButton.DetailDirectionTab:pointerover">
-            <Setter Property="Background" Value="#1DFFFFFF" />
-            <Setter Property="Foreground" Value="#E7EEF5" />
-        </Style>
-
-        <Style Selector="ToggleButton.DetailDirectionTab:checked">
-            <Setter Property="Background" Value="#1F6FA3C7" />
-            <Setter Property="BorderBrush" Value="#8BBBE0FF" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
+        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
     </UserControl.Styles>
 
     <Border x:Name="RootCard"
-            Background="#90000000"
-            CornerRadius="12"
-            Padding="12"
-            Width="1080"
-            MaxWidth="1200"
-            MaxHeight="760"
-            ClipToBounds="True">
+            Classes="DetailFlyoutCard"
+            Width="920"
+            MaxWidth="1080"
+            MaxHeight="720">
         <Grid RowDefinitions="Auto,*"
-              RowSpacing="12">
+              RowSpacing="14">
             <Grid Grid.Row="0"
                   ColumnDefinitions="*,Auto"
                   ColumnSpacing="16">
                 <TextBlock Grid.Column="0"
+                           Classes="DetailHeaderName"
                            Text="{Binding CombatantName}"
-                           FontSize="18"
-                           FontWeight="Bold"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" />
 
-                <Border Grid.Column="1"
-                        Background="#14000000"
-                        BorderBrush="#3E5E6F7D"
-                        BorderThickness="1"
-                        CornerRadius="999"
-                        Padding="4">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="6">
-                        <ToggleButton Classes="DetailDirectionTab"
-                                      IsChecked="{Binding IsOutgoingSelected, Mode=TwoWay}"
-                                      Content="{Binding Localization[Panel.Outgoing]}" />
-                        <ToggleButton Classes="DetailDirectionTab"
-                                      IsChecked="{Binding IsIncomingSelected, Mode=TwoWay}"
-                                      Content="{Binding Localization[Panel.Incoming]}" />
-                    </StackPanel>
-                </Border>
+                <StackPanel Grid.Column="1"
+                            Classes="DetailDirectionTabs"
+                            Orientation="Horizontal"
+                            Spacing="2">
+                    <ToggleButton Classes="DetailDirectionTab"
+                                  IsChecked="{Binding IsOutgoingSelected, Mode=TwoWay}"
+                                  Content="{Binding Localization[Panel.Outgoing]}" />
+                    <ToggleButton Classes="DetailDirectionTab"
+                                  IsChecked="{Binding IsIncomingSelected, Mode=TwoWay}"
+                                  Content="{Binding Localization[Panel.Incoming]}" />
+                </StackPanel>
             </Grid>
 
             <ScrollViewer Grid.Row="1"
-                          HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Hidden">
+                          Classes="DetailContentScroller">
                 <Grid>
                     <Border IsVisible="{Binding IsOutgoingSelected}">
                         <views:CombatDirectionDetailView DataContext="{Binding OutgoingDetail}" />

@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
+             x:Class="Cloris.Aion2Flow.Controls.MetricSplitTile"
+             x:DataType="controls:MetricSplitTile"
+             x:Name="Root">
+    <Border Classes="MetricCardSurface">
+        <StackPanel Spacing="4">
+            <TextBlock Classes="MetricLabel"
+                       Text="{Binding Label, ElementName=Root}"
+                       TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal"
+                        Spacing="4">
+                <controls:NumericBlock Classes="MetricSplitValue"
+                                       Value="{Binding PrimaryValue, ElementName=Root}"
+                                       FractionDigits="{Binding PrimaryFractionDigits, ElementName=Root}"
+                                       TrimTrailingZeros="{Binding PrimaryTrimTrailingZeros, ElementName=Root}"
+                                       UseGrouping="{Binding PrimaryUseGrouping, ElementName=Root}"
+                                       UsePercentageNotation="{Binding PrimaryUsePercentageNotation, ElementName=Root}"
+                                       Prefix="{Binding PrimaryPrefix, ElementName=Root}"
+                                       Suffix="{Binding PrimarySuffix, ElementName=Root}" />
+                <TextBlock Classes="MetricSplitSlash"
+                           Text="/" />
+                <controls:NumericBlock Classes="MetricSplitSecondary"
+                                       Value="{Binding SecondaryValue, ElementName=Root}"
+                                       FractionDigits="{Binding SecondaryFractionDigits, ElementName=Root}"
+                                       TrimTrailingZeros="{Binding SecondaryTrimTrailingZeros, ElementName=Root}"
+                                       UseGrouping="{Binding SecondaryUseGrouping, ElementName=Root}"
+                                       UsePercentageNotation="{Binding SecondaryUsePercentageNotation, ElementName=Root}"
+                                       Prefix="{Binding SecondaryPrefix, ElementName=Root}"
+                                       Suffix="{Binding SecondarySuffix, ElementName=Root}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>
