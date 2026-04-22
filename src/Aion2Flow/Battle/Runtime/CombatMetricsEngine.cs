@@ -83,6 +83,8 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
     public CombatMetricsStore Store { get; } = store;
 
     private readonly Dictionary<int, EncounterTargetInfo> _targetInfoMap = [];
+    private readonly Dictionary<int, CharacterClassInferenceState> _characterClassEvidenceByCombatant = [];
+    private readonly Dictionary<int, CharacterClass> _resolvedCharacterClassByCombatant = [];
 
     private int _currentTarget;
     private Guid _currentBattleId = Guid.NewGuid();
@@ -183,7 +185,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             Store.FlushPendingOutcomeSidecars();
             var packetMap = Store.CombatPacketsByTarget;
             var nicknameData = Store.Nicknames;
-            var characterClassEvidenceByCombatant = new Dictionary<int, CharacterClassInferenceState>();
 
             foreach (var (target, data) in packetMap)
             {
@@ -248,19 +249,26 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     dataSnapshot.Combatants[uid] = personal;
                 }
 
-                if (personal.CharacterClass is null &&
-                    !Store.SummonOwnerByInstance.ContainsKey(uid) &&
-                    (nicknameData.ContainsKey(uid) || !Store.TryGetNpcRuntimeState(uid, out var npcCheck) || !npcCheck.NpcCode.HasValue) &&
-                    TryGetClassEvidence(packet, out var inferredClass, out var evidenceScore))
+                if (_resolvedCharacterClassByCombatant.TryGetValue(uid, out var resolvedCharacterClass))
                 {
-                    if (!characterClassEvidenceByCombatant.TryGetValue(uid, out var inferenceState))
+                    personal.CharacterClass = resolvedCharacterClass;
+                }
+                else if (!Store.SummonOwnerByInstance.ContainsKey(uid) &&
+                         (nicknameData.ContainsKey(uid) || !Store.TryGetNpcRuntimeState(uid, out var npcCheck) || !npcCheck.NpcCode.HasValue) &&
+                         TryGetClassEvidence(packet, out var inferredClass, out var evidenceScore))
+                {
+                    if (!_characterClassEvidenceByCombatant.TryGetValue(uid, out var inferenceState))
                     {
                         inferenceState = new CharacterClassInferenceState();
-                        characterClassEvidenceByCombatant[uid] = inferenceState;
+                        _characterClassEvidenceByCombatant[uid] = inferenceState;
                     }
 
                     inferenceState.Add(inferredClass, evidenceScore);
-                    personal.CharacterClass ??= inferenceState.Resolve();
+                    if (inferenceState.Resolve() is { } resolvedClass)
+                    {
+                        _resolvedCharacterClassByCombatant[uid] = resolvedClass;
+                        personal.CharacterClass = resolvedClass;
+                    }
                 }
 
                 personal.ProcessCombatEvent(packet);
@@ -293,6 +301,8 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         {
             Store.ResetCombatStorage();
             _targetInfoMap.Clear();
+            _characterClassEvidenceByCombatant.Clear();
+            _resolvedCharacterClassByCombatant.Clear();
             _currentTarget = 0;
             _currentBattleId = Guid.NewGuid();
         }
