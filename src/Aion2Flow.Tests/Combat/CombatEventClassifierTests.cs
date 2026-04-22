@@ -125,6 +125,36 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
+    public void Classifies_Outcome_Only_Invincible_On_Shield_Skill_As_Damage()
+    {
+        CombatMetricsEngine.SkillMap =
+        [
+            CreateSkill(
+                14000010,
+                "Barrier Ward",
+                SkillCategory.Cleric,
+                SkillSourceType.PcSkill,
+                SkillKind.ShieldOrBarrier,
+                SkillSemantics.ShieldOrBarrier)
+        ];
+
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = 271532,
+            TargetId = 3737,
+            SkillCode = 14000010,
+            OriginalSkillCode = 14000010,
+            Damage = 0,
+            AttemptContribution = 1,
+            Modifiers = DamageModifiers.Invincible
+        };
+        packet.SetEffectTag(PacketEffectTag.PeriodicLinkInvincible);
+
+        Assert.Equal(CombatEventKind.Damage, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Damage, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
     public void Classifies_Target_Periodic_Mode8_As_Support_Not_Dot()
     {
         var packet = new ParsedCombatPacket
@@ -704,6 +734,26 @@ public sealed class CombatEventClassifierTests
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Classifies_Normalized_Instance_Clear_Restore_Variant_As_Healing()
+    {
+        CombatMetricsEngine.SkillMap = [];
+
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = 9024,
+            TargetId = 9024,
+            SkillCode = 1900911,
+            OriginalSkillCode = 1900911,
+            BaseSkillCode = 1900000,
+            Damage = 29586,
+            ResourceKind = CombatResourceKind.Health
+        };
+
+        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
     }
 
     [Fact]

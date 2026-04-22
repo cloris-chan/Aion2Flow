@@ -18,6 +18,11 @@ public static class CombatEventClassifier
 
     public static CombatEventKind Classify(ParsedCombatPacket packet)
     {
+        if (IsOutcomeOnlyAvoidance(packet))
+        {
+            return CombatEventKind.Damage;
+        }
+
         if (IsDrainHealSynthesis(packet))
         {
             return CombatEventKind.Healing;
@@ -113,6 +118,11 @@ public static class CombatEventClassifier
 
     public static CombatValueKind ClassifyValueKind(ParsedCombatPacket packet)
     {
+        if (IsOutcomeOnlyAvoidance(packet))
+        {
+            return CombatValueKind.Damage;
+        }
+
         if (IsDrainHealSynthesis(packet))
         {
             return CombatValueKind.DrainHealing;
@@ -248,6 +258,21 @@ public static class CombatEventClassifier
         return TryGetSkill(skillCode, out var skill)
             ? skill.Semantics
             : SkillSemantics.None;
+    }
+
+    private static bool IsOutcomeOnlyAvoidance(ParsedCombatPacket packet)
+    {
+        if (packet.Damage > 0)
+        {
+            return false;
+        }
+
+        if ((packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) == 0)
+        {
+            return false;
+        }
+
+        return Math.Max(packet.HitContribution, packet.AttemptContribution) > 0;
     }
 
     private static bool TryClassifyPeriodicEvent(
@@ -762,9 +787,18 @@ public static class CombatEventClassifier
             return false;
         }
 
-        var baseSkillCode = packet.SkillCode - (packet.SkillCode % 10);
+        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
+        var variant = originalSkillCode > 0
+            ? CombatMetricsEngine.ParseSkillVariant(originalSkillCode)
+            : default;
+        var baseSkillCode = packet.BaseSkillCode > 0
+            ? packet.BaseSkillCode
+            : variant.BaseSkillCode > 0
+                ? variant.BaseSkillCode
+                : packet.SkillCode - (packet.SkillCode % 10);
+
         return baseSkillCode == InstanceClearRestoreBaseSkillCode
-               && packet.ResourceKind != CombatResourceKind.Mana;
+             && packet.ResourceKind != CombatResourceKind.Mana;
     }
 
     private static bool IsObservedSelfHealingProc(ParsedCombatPacket packet)
