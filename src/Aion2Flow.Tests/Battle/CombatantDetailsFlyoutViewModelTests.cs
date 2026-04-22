@@ -206,6 +206,38 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SelectBattleCombatant_Does_Not_Treat_Hostile_Shield_Absorption_As_Support_Source()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+
+        const int playerId = 1001;
+        const int healerId = 1002;
+        const int bossId = 9001;
+
+        store.AppendNickname(playerId, "Perigee");
+        store.AppendNickname(healerId, "Helper");
+
+        AppendPacket(store, playerId, bossId, 11000010, 450, 500, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, healerId, playerId, 13000010, 90, 1_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(store, bossId, playerId, 14000010, 300, 2_000, CombatEventKind.Support, CombatValueKind.Shield);
+
+        var snapshot = engine.CreateBattleSnapshot();
+        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+
+        Assert.Equal(90, viewModel.IncomingHealing.Total);
+        Assert.Equal(300, viewModel.IncomingShield.Total);
+        Assert.Contains(viewModel.IncomingDetail.SupportCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == healerId);
+        Assert.DoesNotContain(viewModel.IncomingDetail.SupportCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == bossId);
+    }
+
+    [Fact]
     public void SelectBattleCombatant_Preserves_Live_Scope_Filter_Across_Refreshes()
     {
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());

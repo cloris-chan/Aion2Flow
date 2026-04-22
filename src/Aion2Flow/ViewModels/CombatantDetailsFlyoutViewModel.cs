@@ -665,6 +665,17 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 
     private static int GetCounterpartCombatantId(in ResolvedDetailPacket packet, DetailSectionKind sectionKind)
     {
+        if (sectionKind == DetailSectionKind.IncomingShield &&
+            packet.Packet.ValueKind == CombatValueKind.Shield &&
+            packet.SourceId > 0 &&
+            packet.TargetId > 0 &&
+            packet.SourceId != packet.TargetId)
+        {
+            // Shield absorption packets can keep the hostile attacker as SourceId,
+            // which is not the same thing as the support provider.
+            return 0;
+        }
+
         return sectionKind switch
         {
             DetailSectionKind.OutgoingDamage or DetailSectionKind.OutgoingHealing or DetailSectionKind.OutgoingShield => packet.TargetId,
