@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Cloris.Aion2Flow.Divert.Interop;
+namespace Cloris.Aion2Flow.WinDivert;
 
 [StructLayout(LayoutKind.Explicit, Size = 80)]
 public unsafe ref struct WinDivertAddress

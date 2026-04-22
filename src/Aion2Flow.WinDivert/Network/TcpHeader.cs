@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 
-namespace Cloris.Aion2Flow.Divert.Network;
+namespace Cloris.Aion2Flow.WinDivert.Network;
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 public struct TcpHeader

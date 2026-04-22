@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Cloris.Aion2Flow.Divert.Interop;
+namespace Cloris.Aion2Flow.WinDivert.Interop;
 
 [SkipLocalsInit]
 internal static partial class WinDivertInterop

@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.WinDivert.Interop;
 
-namespace Cloris.Aion2Flow.Divert.Interop;
+namespace Cloris.Aion2Flow.WinDivert;
 
 public sealed class WinDivertSession : IDisposable
 {

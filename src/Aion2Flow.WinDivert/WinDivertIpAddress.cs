@@ -1,7 +1,7 @@
 using System.Net;
 using System.Runtime.InteropServices;
 
-namespace Cloris.Aion2Flow.Divert.Interop;
+namespace Cloris.Aion2Flow.WinDivert;
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct WinDivertIpAddress

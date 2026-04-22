@@ -1,4 +1,4 @@
-namespace Cloris.Aion2Flow.Divert.Interop;
+namespace Cloris.Aion2Flow.WinDivert;
 
 [Flags]
 #pragma warning disable CA1711

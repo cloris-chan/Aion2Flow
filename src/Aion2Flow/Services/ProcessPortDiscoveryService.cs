@@ -1,11 +1,11 @@
-using Cloris.Aion2Flow.Divert.Interop;
-using Cloris.Aion2Flow.Services.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using Cloris.Aion2Flow.Services.Logging;
+using Cloris.Aion2Flow.WinDivert;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Networking.WinSock;

@@ -1,6 +1,7 @@
+using Cloris.Aion2Flow.WinDivert.Interop;
 using Microsoft.Win32.SafeHandles;
 
-namespace Cloris.Aion2Flow.Divert.Interop;
+namespace Cloris.Aion2Flow.WinDivert;
 
 public class WinDivertSafeHandle : SafeHandleZeroOrMinusOneIsInvalid
 {

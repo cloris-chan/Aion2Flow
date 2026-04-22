@@ -1,4 +1,4 @@
-namespace Cloris.Aion2Flow.Divert.Network;
+namespace Cloris.Aion2Flow.WinDivert.Network;
 
 public enum IPv4Protocol : byte
 {

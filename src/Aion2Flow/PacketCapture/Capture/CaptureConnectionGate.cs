@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using Cloris.Aion2Flow.Divert.Network;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Services.Logging;
+using Cloris.Aion2Flow.WinDivert.Network;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 

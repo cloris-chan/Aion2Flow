@@ -4,11 +4,11 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Battle.Runtime;
-using Cloris.Aion2Flow.Divert.Interop;
-using Cloris.Aion2Flow.Divert.Network;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.WinDivert;
+using Cloris.Aion2Flow.WinDivert.Network;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
