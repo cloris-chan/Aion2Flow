@@ -304,7 +304,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return null;
         }
 
-        Span<int> candidates = stackalloc int[6];
+        Span<int> candidates = stackalloc int[9];
         var count = 0;
 
         static bool TryPush(Span<int> span, ref int count, int value)
@@ -336,6 +336,18 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         var byHundred = skillCode / 100;
         if (TryPush(candidates, ref count, byHundred) && Array.BinarySearch(SkillCodes, byHundred) >= 0)
             return byHundred;
+
+        var byHundredChargeBase = byHundred - (byHundred % 10);
+        if (TryPush(candidates, ref count, byHundredChargeBase) && Array.BinarySearch(SkillCodes, byHundredChargeBase) >= 0)
+            return byHundredChargeBase;
+
+        var byHundredSpecializationBase = byHundred - (byHundred % 10000);
+        if (TryPush(candidates, ref count, byHundredSpecializationBase) && Array.BinarySearch(SkillCodes, byHundredSpecializationBase) >= 0)
+            return byHundredSpecializationBase;
+
+        var byHundredSpecializationWithChargeBase = byHundredSpecializationBase + (byHundred % 10);
+        if (TryPush(candidates, ref count, byHundredSpecializationWithChargeBase) && Array.BinarySearch(SkillCodes, byHundredSpecializationWithChargeBase) >= 0)
+            return byHundredSpecializationWithChargeBase;
 
         var byThousand = skillCode - (skillCode % 1000);
         if (TryPush(candidates, ref count, byThousand) && Array.BinarySearch(SkillCodes, byThousand) >= 0)

@@ -238,6 +238,113 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SelectBattleCombatant_Does_Not_Count_DamageTagged_Periodic_Support_On_Allies_As_Outgoing_Damage()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+
+        const int playerId = 1001;
+        const int allyOneId = 1002;
+        const int allyTwoId = 1003;
+        const int allyThreeId = 1004;
+        const int bossId = 9001;
+
+        store.AppendNickname(playerId, "Tata");
+        store.AppendNickname(allyOneId, "Alpha");
+        store.AppendNickname(allyTwoId, "Bravo");
+        store.AppendNickname(allyThreeId, "Charlie");
+
+        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        AppendPeriodicTargetPacket(allyOneId, 2_000);
+        AppendPeriodicTargetPacket(allyTwoId, 3_000);
+        AppendPeriodicTargetPacket(allyThreeId, 4_000);
+
+        var snapshot = engine.CreateBattleSnapshot();
+        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+
+        Assert.Equal(500, snapshot.Combatants[playerId].DamageAmount);
+        Assert.Equal(500, viewModel.OutgoingDamage.Total);
+        Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
+        Assert.Contains(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == bossId);
+        Assert.DoesNotContain(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == allyOneId);
+        Assert.DoesNotContain(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == allyTwoId);
+        Assert.DoesNotContain(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == allyThreeId);
+        Assert.Single(viewModel.OutgoingDamage.Rows);
+        Assert.Equal("Strike", viewModel.OutgoingDamage.Rows[0].SkillName);
+
+        void AppendPeriodicTargetPacket(int targetId, long timestamp)
+        {
+            var packet = new ParsedCombatPacket
+            {
+                SourceId = playerId,
+                TargetId = targetId,
+                SkillCode = 17730000,
+                OriginalSkillCode = 17730000,
+                Damage = 11847,
+                Timestamp = timestamp,
+                SkillKind = CombatEventClassifier.ResolveSkillKind(17730000),
+                SkillSemantics = CombatEventClassifier.ResolveSkillSemantics(17730000)
+            };
+
+            packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
+            packet.EventKind = CombatEventClassifier.Classify(packet);
+            packet.ValueKind = CombatEventClassifier.ClassifyValueKind(packet);
+            store.AppendCombatPacket(packet);
+        }
+    }
+
+    [Fact]
+    public void SelectBattleCombatant_Does_Not_Count_DamageTagged_Self_Support_As_Outgoing_Damage()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+
+        const int playerId = 1001;
+        const int bossId = 9001;
+
+        store.AppendNickname(playerId, "RIpplinger");
+
+        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        var selfPacket = new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = playerId,
+            SkillCode = 17730000,
+            OriginalSkillCode = 17730000,
+            Damage = 60321,
+            Timestamp = 2_000,
+            SkillKind = CombatEventClassifier.ResolveSkillKind(17730000),
+            SkillSemantics = CombatEventClassifier.ResolveSkillSemantics(17730000)
+        };
+        selfPacket.EventKind = CombatEventClassifier.Classify(selfPacket);
+        selfPacket.ValueKind = CombatEventClassifier.ClassifyValueKind(selfPacket);
+        store.AppendCombatPacket(selfPacket);
+
+        var snapshot = engine.CreateBattleSnapshot();
+        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+
+        Assert.Equal(500, snapshot.Combatants[playerId].DamageAmount);
+        Assert.Equal(500, viewModel.OutgoingDamage.Total);
+        Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
+        Assert.Contains(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == bossId);
+        Assert.DoesNotContain(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == playerId);
+    }
+
+    [Fact]
     public void SelectBattleCombatant_Preserves_Live_Scope_Filter_Across_Refreshes()
     {
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
@@ -793,6 +900,85 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SelectBattleCombatant_20260422222104_Does_Not_Show_Ally_Targets_In_Outgoing_Damage()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        var logPath = FixtureHelper.GetPath("logs/aion2flow.stream.20260422222104.log");
+        var replay = PacketLogReplayService.Replay(logPath);
+        var liveStore = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(liveStore);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, liveStore, archive, localization);
+
+        const int playerId = 6485;
+        var allyIds = new HashSet<int> { 3738, 4985, 7490 };
+        var record = archive.Archive(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+
+        Assert.NotNull(record);
+        Assert.Contains(playerId, record!.Snapshot.Combatants.Keys);
+
+        viewModel.SelectBattleCombatant(record.BattleId, playerId);
+
+        var damageCounterparts = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts
+            .Select(static counterpart =>
+                $"id={counterpart.CombatantId}|name={counterpart.DisplayName}|damage={counterpart.DamageAmount}|share={counterpart.DamageShare:F4}|selected={counterpart.IsSelected}")
+            .ToArray();
+        var damageRows = viewModel.OutgoingDamage.Rows
+            .Select(static row =>
+                $"skill={row.SkillCode}|name={row.SkillName}|total={row.TotalAmount}|hits={row.Hits}|attempts={row.Attempts}|evades={row.Evades}|invincible={row.Invincible}")
+            .ToArray();
+
+        var sourceIds = replay.Store.SummonOwnerByInstance
+            .Where(static pair => pair.Value == playerId)
+            .Select(static pair => pair.Key)
+            .Append(playerId)
+            .Distinct()
+            .OrderBy(static id => id)
+            .ToArray();
+
+        var relevantPackets = new List<string>();
+        foreach (var sourceId in sourceIds)
+        {
+            if (!replay.Store.CombatPacketsBySource.TryGetValue(sourceId, out var packets))
+            {
+                continue;
+            }
+
+            foreach (var packet in packets)
+            {
+                if (!allyIds.Contains(packet.TargetId))
+                {
+                    continue;
+                }
+
+                relevantPackets.Add(
+                    $"ts={packet.Timestamp}|rawSource={packet.SourceId}|resolvedSource={CombatMetricsEngine.ResolveCombatantId(replay.Store, packet.SourceId)}|target={packet.TargetId}|skillRaw={packet.OriginalSkillCode}|skill={packet.SkillCode}|damage={packet.Damage}|hit={packet.HitContribution}|attempt={packet.AttemptContribution}|event={packet.EventKind}|value={packet.ValueKind}|mods={packet.Modifiers}|effect={DescribePacketEffect(packet)}|detailDamage={ContributesDamageForDetail(packet)}");
+            }
+        }
+
+        relevantPackets.Sort(StringComparer.Ordinal);
+
+        var unexpectedCounterparts = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts
+            .Where(counterpart => allyIds.Contains(counterpart.CombatantId))
+            .Select(static counterpart => counterpart.CombatantId)
+            .ToArray();
+
+        var diagnostic = string.Join(
+            Environment.NewLine,
+            [
+                $"log={logPath}",
+                $"sources=[{string.Join(",", sourceIds)}]",
+                $"damageCounterparts={string.Join(" || ", damageCounterparts)}",
+                $"damageRows={string.Join(" || ", damageRows)}",
+                $"relevantPackets={string.Join(" || ", relevantPackets)}"
+            ]);
+
+        Assert.True(unexpectedCounterparts.Length == 0, diagnostic);
+    }
+
+    [Fact]
     public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412103519_Live_Stream_Path()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
@@ -864,6 +1050,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             new Skill(12000010, "Second Wind", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", SkillKind.Healing, SkillSemantics.Healing, null),
             new Skill(13000010, "Support Heal", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Healing, SkillSemantics.Healing, null),
             new Skill(14000010, "Barrier Ward", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.ShieldOrBarrier, SkillSemantics.ShieldOrBarrier, null),
+            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
             new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null)
         ];
     }

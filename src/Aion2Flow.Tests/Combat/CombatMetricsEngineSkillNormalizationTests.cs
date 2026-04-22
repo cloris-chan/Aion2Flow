@@ -33,6 +33,19 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     }
 
     [Fact]
+    public void InferOriginalSkillCode_Resolves_Periodic_Shield_Variant_To_Base_Skill()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(18730000, "Protection Circle", SkillCategory.Templar, SkillSourceType.PcSkill, "skill", SkillKind.ShieldOrBarrier, SkillSemantics.ShieldOrBarrier | SkillSemantics.Support, null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var resolved = CombatMetricsEngine.InferOriginalSkillCode(1873000211);
+
+        Assert.Equal(18730000, resolved);
+    }
+
+    [Fact]
     public void Remaps_Triggered_Sibling_Skill_Packets_To_Sibling_Skill_Code()
     {
         CombatMetricsEngine.LoadSkillMap("zh-TW");

@@ -296,6 +296,34 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
+    public void Classifies_Target_Periodic_DamageSupport_Buff_As_Support_When_No_Explicit_Offensive_Periodic_Signal()
+    {
+        CombatMetricsEngine.SkillMap =
+        [
+            CreateSkill(
+                17730000,
+                "Empyrean Lord's Grace",
+                SkillCategory.Cleric,
+                SkillSourceType.PcSkill,
+                SkillKind.Damage,
+                SkillSemantics.Damage | SkillSemantics.Support)
+        ];
+
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = 4121,
+            TargetId = 19621,
+            SkillCode = 17730000,
+            OriginalSkillCode = 1773000011,
+            Damage = 2457
+        };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
+
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
     public void Exposes_Resource_Derived_Skill_Kind_On_Packet()
     {
         var packet = new ParsedCombatPacket
@@ -764,6 +792,60 @@ public sealed class CombatEventClassifierTests
         Assert.Equal(SkillSemantics.Support | SkillSemantics.Healing, CombatEventClassifier.ResolveSkillSemantics(17410040));
         Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Classifies_Self_Direct_DamageSupport_Buff_As_Support_When_No_Explicit_Recovery_Signal_Exists()
+    {
+        CombatMetricsEngine.SkillMap =
+        [
+            CreateSkill(
+                17730000,
+                "Empyrean Lord's Grace",
+                SkillCategory.Cleric,
+                SkillSourceType.PcSkill,
+                SkillKind.Damage,
+                SkillSemantics.Damage | SkillSemantics.Support)
+        ];
+
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = 40969,
+            TargetId = 40969,
+            SkillCode = 17730000,
+            OriginalSkillCode = 17730000,
+            Damage = 2022
+        };
+
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Classifies_Self_Direct_Mixed_Healing_Summon_Tick_As_Healing_Flow()
+    {
+        CombatMetricsEngine.SkillMap =
+        [
+            CreateSkill(
+                16120350,
+                "Summon: Wind Spirit",
+                SkillCategory.Elementalist,
+                SkillSourceType.PcSkill,
+                SkillKind.PeriodicHealing,
+                SkillSemantics.Damage | SkillSemantics.Healing | SkillSemantics.PeriodicHealing | SkillSemantics.Support)
+        ];
+
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = 6821,
+            TargetId = 6821,
+            SkillCode = 16120350,
+            OriginalSkillCode = 16120350,
+            Damage = 1173
+        };
+
+        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.PeriodicHealing, CombatEventClassifier.ClassifyValueKind(packet));
     }
 
     [Fact]

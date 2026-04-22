@@ -44,6 +44,11 @@ public static class CombatEventClassifier
             return CombatEventKind.Healing;
         }
 
+        if (IsDamageTaggedDirectSelfSupportSignal(packet, semantics))
+        {
+            return CombatEventKind.Support;
+        }
+
         if (IsObservedSelfResourceSupportProc(packet, semantics))
         {
             return CombatEventKind.Support;
@@ -137,6 +142,11 @@ public static class CombatEventClassifier
         if (IsObservedDirectHealing(packet, semantics))
         {
             return CombatValueKind.Healing;
+        }
+
+        if (IsDamageTaggedDirectSelfSupportSignal(packet, semantics))
+        {
+            return CombatValueKind.Support;
         }
 
         if (IsObservedSelfResourceSupportProc(packet, semantics))
@@ -304,6 +314,12 @@ public static class CombatEventClassifier
             return true;
         }
 
+        if (IsDamageTaggedPeriodicSupportSignal(semantics))
+        {
+            eventKind = CombatEventKind.Support;
+            return true;
+        }
+
         if (HasOffensivePeriodicSignal(semantics))
         {
             eventKind = CombatEventKind.Damage;
@@ -394,6 +410,12 @@ public static class CombatEventClassifier
             return true;
         }
 
+        if (IsDamageTaggedPeriodicSupportSignal(semantics))
+        {
+            valueKind = CombatValueKind.Support;
+            return true;
+        }
+
         if (HasOffensivePeriodicSignal(semantics))
         {
             valueKind = packet.IsPeriodicTargetInitialEffect
@@ -420,6 +442,21 @@ public static class CombatEventClassifier
             ? CombatValueKind.Damage
             : CombatValueKind.PeriodicDamage;
         return true;
+    }
+
+    private static bool IsDamageTaggedPeriodicSupportSignal(SkillSemantics semantics)
+    {
+        if ((semantics & SkillSemantics.Support) == 0 ||
+            (semantics & SkillSemantics.Damage) == 0)
+        {
+            return false;
+        }
+
+        return (semantics & (SkillSemantics.PeriodicDamage |
+                             SkillSemantics.Healing |
+                             SkillSemantics.PeriodicHealing |
+                             SkillSemantics.DrainOrAbsorb |
+                             SkillSemantics.ShieldOrBarrier)) == 0;
     }
 
     private static bool HasOffensivePeriodicSignal(SkillSemantics semantics)
@@ -475,6 +512,31 @@ public static class CombatEventClassifier
         return (semantics & SkillSemantics.Damage) != 0
                && (semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing)) != 0
                && (semantics & SkillSemantics.DrainOrAbsorb) == 0;
+    }
+
+    private static bool IsDamageTaggedDirectSelfSupportSignal(ParsedCombatPacket packet, SkillSemantics semantics)
+    {
+        if (packet.IsPeriodicEffect ||
+            packet.Damage <= 0 ||
+            packet.SourceId <= 0 ||
+            packet.TargetId <= 0 ||
+            packet.SourceId != packet.TargetId)
+        {
+            return false;
+        }
+
+        if ((semantics & (SkillSemantics.Support | SkillSemantics.Damage)) !=
+            (SkillSemantics.Support | SkillSemantics.Damage))
+        {
+            return false;
+        }
+
+        return (semantics & (SkillSemantics.PeriodicDamage |
+                             SkillSemantics.Healing |
+                             SkillSemantics.PeriodicHealing |
+                             SkillSemantics.DrainOrAbsorb |
+                             SkillSemantics.ShieldOrBarrier |
+                             SkillSemantics.NonHealthResourceRestore)) == 0;
     }
 
     private static bool IsObservedSelfResourceSupportProc(ParsedCombatPacket packet, SkillSemantics semantics)
