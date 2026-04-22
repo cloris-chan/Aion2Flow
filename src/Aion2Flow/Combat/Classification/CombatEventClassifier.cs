@@ -9,11 +9,11 @@ public static class CombatEventClassifier
 {
     private const int RestoreHpSkillCode = 1010000;
     private const int InstanceClearRestoreBaseSkillCode = 1900000;
-    private static readonly ConcurrentDictionary<int, bool> NonHealthResourceRestoreFamilyCache = [];
+    private static readonly ConcurrentDictionary<int, bool> NonHealthResourceRestoreBaseSkillCache = [];
 
     internal static void ClearCaches()
     {
-        NonHealthResourceRestoreFamilyCache.Clear();
+        NonHealthResourceRestoreBaseSkillCache.Clear();
     }
 
     public static CombatEventKind Classify(ParsedCombatPacket packet)
@@ -49,7 +49,7 @@ public static class CombatEventClassifier
             return CombatEventKind.Support;
         }
 
-        if (IsObservedFamilyResourceSupportProc(packet, semantics))
+        if (IsObservedBaseSkillResourceSupportProc(packet, semantics))
         {
             return CombatEventKind.Support;
         }
@@ -144,7 +144,7 @@ public static class CombatEventClassifier
             return CombatValueKind.Support;
         }
 
-        if (IsObservedFamilyResourceSupportProc(packet, semantics))
+        if (IsObservedBaseSkillResourceSupportProc(packet, semantics))
         {
             return CombatValueKind.Support;
         }
@@ -251,9 +251,9 @@ public static class CombatEventClassifier
             return false;
         }
 
-        if (packet.EffectFamily.StartsWith("periodic-self", StringComparison.Ordinal))
+        if (packet.IsPeriodicSelfEffect)
         {
-            if (string.Equals(packet.EffectFamily, "periodic-self-mode-10", StringComparison.Ordinal))
+            if (packet.IsPeriodicSelfMode(10))
             {
                 eventKind = CombatEventKind.Support;
                 return true;
@@ -265,7 +265,7 @@ public static class CombatEventClassifier
                 return true;
             }
 
-            if (string.Equals(packet.EffectFamily, "periodic-self-mode-11", StringComparison.Ordinal))
+            if (packet.IsPeriodicSelfMode(11))
             {
                 eventKind = CombatEventKind.Healing;
                 return true;
@@ -281,12 +281,12 @@ public static class CombatEventClassifier
             return true;
         }
 
-        if (!packet.EffectFamily.StartsWith("periodic-target", StringComparison.Ordinal))
+        if (!packet.IsPeriodicTargetEffect)
         {
             return false;
         }
 
-        if (string.Equals(packet.EffectFamily, "periodic-target-mode-8", StringComparison.Ordinal))
+        if (packet.IsPeriodicTargetMode(8))
         {
             eventKind = CombatEventKind.Support;
             return true;
@@ -337,9 +337,9 @@ public static class CombatEventClassifier
             return false;
         }
 
-        if (packet.EffectFamily.StartsWith("periodic-self", StringComparison.Ordinal))
+        if (packet.IsPeriodicSelfEffect)
         {
-            if (string.Equals(packet.EffectFamily, "periodic-self-mode-10", StringComparison.Ordinal))
+            if (packet.IsPeriodicSelfMode(10))
             {
                 valueKind = CombatValueKind.Support;
                 return true;
@@ -351,7 +351,7 @@ public static class CombatEventClassifier
                 return true;
             }
 
-            if (string.Equals(packet.EffectFamily, "periodic-self-mode-11", StringComparison.Ordinal))
+            if (packet.IsPeriodicSelfMode(11))
             {
                 valueKind = (semantics & SkillSemantics.DrainOrAbsorb) != 0
                     ? CombatValueKind.DrainHealing
@@ -371,12 +371,12 @@ public static class CombatEventClassifier
             return true;
         }
 
-        if (!packet.EffectFamily.StartsWith("periodic-target", StringComparison.Ordinal))
+        if (!packet.IsPeriodicTargetEffect)
         {
             return false;
         }
 
-        if (string.Equals(packet.EffectFamily, "periodic-target-mode-8", StringComparison.Ordinal))
+        if (packet.IsPeriodicTargetMode(8))
         {
             valueKind = CombatValueKind.Support;
             return true;
@@ -396,7 +396,7 @@ public static class CombatEventClassifier
 
         if (HasOffensivePeriodicSignal(semantics))
         {
-            valueKind = string.Equals(packet.EffectFamily, "periodic-target-initial", StringComparison.Ordinal)
+            valueKind = packet.IsPeriodicTargetInitialEffect
                 ? CombatValueKind.Damage
                 : CombatValueKind.PeriodicDamage;
             return true;
@@ -404,7 +404,7 @@ public static class CombatEventClassifier
 
         if ((semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing)) != 0)
         {
-            valueKind = string.Equals(packet.EffectFamily, "periodic-target-initial", StringComparison.Ordinal)
+            valueKind = packet.IsPeriodicTargetInitialEffect
                 ? CombatValueKind.Healing
                 : CombatValueKind.PeriodicHealing;
             return true;
@@ -416,7 +416,7 @@ public static class CombatEventClassifier
             return true;
         }
 
-        valueKind = string.Equals(packet.EffectFamily, "periodic-target-initial", StringComparison.Ordinal)
+        valueKind = packet.IsPeriodicTargetInitialEffect
             ? CombatValueKind.Damage
             : CombatValueKind.PeriodicDamage;
         return true;
@@ -511,7 +511,7 @@ public static class CombatEventClassifier
                || skill.Kind == SkillKind.Unknown;
     }
 
-    private static bool IsObservedFamilyResourceSupportProc(ParsedCombatPacket packet, SkillSemantics semantics)
+    private static bool IsObservedBaseSkillResourceSupportProc(ParsedCombatPacket packet, SkillSemantics semantics)
     {
         if (packet.IsPeriodicEffect ||
             packet.Damage <= 0 ||
@@ -562,15 +562,14 @@ public static class CombatEventClassifier
             return false;
         }
 
-        return FamilyHasNonHealthResourceRestoreSkill(baseSkillCode);
+        return BaseSkillHasNonHealthResourceRestoreVariant(baseSkillCode);
     }
 
     private static bool IsObservedPeriodicHealingSentinelOverflowTick(ParsedCombatPacket packet, SkillSemantics semantics)
     {
         if (!packet.IsPeriodicEffect ||
             packet.Damage < 2_000_000_000 ||
-            (!string.Equals(packet.EffectFamily, "periodic-target-mode-9", StringComparison.Ordinal) &&
-             !string.Equals(packet.EffectFamily, "periodic-target-mode-11", StringComparison.Ordinal)))
+            (!packet.IsPeriodicTargetMode(9) && !packet.IsPeriodicTargetMode(11)))
         {
             return false;
         }
@@ -584,14 +583,14 @@ public static class CombatEventClassifier
                && skill.Kind == SkillKind.PeriodicHealing;
     }
 
-    private static bool FamilyHasNonHealthResourceRestoreSkill(int baseSkillCode)
+    private static bool BaseSkillHasNonHealthResourceRestoreVariant(int baseSkillCode)
     {
         if (baseSkillCode <= 0 || CombatMetricsEngine.SkillMap.Count == 0)
         {
             return false;
         }
 
-        return NonHealthResourceRestoreFamilyCache.GetOrAdd(baseSkillCode, static candidateBaseSkillCode =>
+        return NonHealthResourceRestoreBaseSkillCache.GetOrAdd(baseSkillCode, static candidateBaseSkillCode =>
         {
             foreach (var skill in CombatMetricsEngine.SkillMap)
             {

@@ -15,15 +15,16 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
         const int targetId = 9001;
 
         engine.Store.AppendNickname(playerId, "Player");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        var periodicPacket = new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 18160030,
             OriginalSkillCode = 18160030,
-            Damage = 120,
-            EffectFamily = "periodic-self-trigger",
-        });
+            Damage = 120
+        };
+        periodicPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 0);
+        engine.Store.AppendCombatPacket(periodicPacket);
 
         Thread.Sleep(5);
 
@@ -34,7 +35,6 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
             SkillCode = 99999999,
             OriginalSkillCode = 99999999,
             Damage = 1350,
-            EffectFamily = "direct-hit",
         });
 
         var snapshot = engine.CreateSnapshot();
@@ -52,15 +52,16 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
         const int targetId = 9002;
 
         engine.Store.AppendNickname(playerId, "Ranger");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        var periodicPacket = new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 18160030,
             OriginalSkillCode = 18160030,
-            Damage = 90,
-            EffectFamily = "periodic-self-trigger",
-        });
+            Damage = 90
+        };
+        periodicPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 0);
+        engine.Store.AppendCombatPacket(periodicPacket);
 
         Thread.Sleep(5);
 
@@ -71,7 +72,6 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
             SkillCode = 14342350,
             OriginalSkillCode = 14342350,
             Damage = 2450,
-            EffectFamily = "direct-hit",
         });
 
         var snapshot = engine.CreateSnapshot();

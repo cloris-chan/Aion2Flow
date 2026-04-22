@@ -1,11 +1,12 @@
-using Cloris.Aion2Flow.PacketCapture.Readers;
 using System.Buffers.Binary;
+using Cloris.Aion2Flow.PacketCapture.Readers;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
 internal readonly record struct Packet4036State(
-    string Family,
-    string Layout,
+    Packet4036Kind Kind,
+    Packet4036LayoutKind LayoutKind,
+    int PayloadLength,
     int SourceId,
     byte Mode0,
     byte Mode1,
@@ -66,18 +67,19 @@ internal static class Packet4036Parser
         var body = packet[reader.Offset..];
         if (body.Length < 33) return false;
 
-        var family = ClassifyFamily(packet.Length);
-        var layout = ClassifyLayout(family, body.Length, body[0], body[1], body[2]);
-        var useState97Layout = string.Equals(family, "state-97", StringComparison.Ordinal);
-        var sharedOffset = GetShared852100Offset(layout);
-        var heavyOffset = GetHeavy852100Offset(layout);
+        var kind = Packet4036Descriptors.ClassifyKind(packet.Length);
+        var layoutKind = Packet4036Descriptors.ClassifyLayout(kind, body.Length, body[0], body[1], body[2]);
+        var useState97Layout = kind == Packet4036Kind.State97;
+        var sharedOffset = GetShared852100Offset(layoutKind);
+        var heavyOffset = GetHeavy852100Offset(layoutKind);
         var linkedValue = useState97Layout ? ReadRepeatedVarInt(body, 28) : 0;
         var gauge0 = useState97Layout ? ReadUInt32Le(body, 34) : 0;
         var gauge1 = useState97Layout ? ReadUInt32Le(body, 38) : 0;
         var tailOffset = useState97Layout ? Math.Max(body.Length - 15, 0) : -1;
         result = new Packet4036State(
-            family,
-            layout,
+            kind,
+            layoutKind,
+            packet.Length,
             sourceId,
             body[0],
             body[1],
@@ -124,65 +126,22 @@ internal static class Packet4036Parser
         return true;
     }
 
-    private static int GetShared852100Offset(string layout)
+    private static int GetShared852100Offset(Packet4036LayoutKind layoutKind)
     {
-        return layout switch
+        return layoutKind switch
         {
-            "state97-outlier-852100" => 27,
-            "state120-main-852100" => 39,
+            Packet4036LayoutKind.State97Outlier852100 => 27,
+            Packet4036LayoutKind.State120Main852100 => 39,
             _ => -1
         };
     }
 
-    private static int GetHeavy852100Offset(string layout)
+    private static int GetHeavy852100Offset(Packet4036LayoutKind layoutKind)
     {
-        return layout switch
+        return layoutKind switch
         {
-            "state152-main-852100" => 27,
+            Packet4036LayoutKind.State152Main852100 => 27,
             _ => -1
-        };
-    }
-
-    private static string ClassifyFamily(int payloadLength)
-    {
-        return payloadLength switch
-        {
-            >= 175 => "create-177",
-            >= 150 => "state-152",
-            >= 135 => "state-137",
-            >= 118 => "state-120",
-            >= 110 => "state-113",
-            >= 95 => "state-97",
-            _ => $"state-{payloadLength}"
-        };
-    }
-
-    private static string ClassifyLayout(string family, int bodyLength, byte mode0, byte mode1, byte mode2)
-    {
-        return (family, bodyLength, mode0, mode1, mode2) switch
-        {
-            ("state-97", 92, 0x0C, 0x20, 0x00) => "state97-main-0c2000",
-            ("state-97", 93, 0x0C, 0x20, 0x00) => "state97-main-0c2000",
-            ("state-97", 93, 0x0D, 0x20, 0x00) => "state97-main-0d2000",
-            ("state-97", 94, 0x0D, 0x20, 0x00) => "state97-variant-0d2000",
-            ("state-97", 94, 0x0F, 0x20, 0x00) => "state97-variant-0f2000",
-            ("state-97", 102, 0x85, 0x21, 0x00) => "state97-outlier-852100",
-            ("state-113", 105, 0x0D, 0x20, 0x00) => "state113-main-0d2000",
-            ("state-120", 114, 0x85, 0x21, 0x00) => "state120-main-852100",
-            ("state-120", 114, 0x0C, 0x20, 0x00) => "state120-main-0c2000",
-            ("state-120", 126, 0x0C, 0x20, 0x00) => "state120-wide-0c2000",
-            ("state-120", 126, 0x85, 0x21, 0x00) => "state120-wide-852100",
-            ("state-137", 128, 0x0F, 0x20, 0x00) => "state137-main-0f2000",
-            ("state-137", 130, 0x0C, 0x22, 0x00) => "state137-main-0c2200",
-            ("state-137", 130, 0x0C, 0x20, 0x00) => "state137-main-0c2000",
-            ("state-137", 130, 0x0C, 0x30, 0x00) => "state137-variant-0c3000",
-            ("state-137", 131, 0x0D, 0x20, 0x00) => "state137-variant-0d2000",
-            ("state-137", 132, 0x07, 0x20, 0x00) => "state137-main-072000",
-            ("state-137", 142, 0x0C, 0x22, 0x00) => "state137-wide-0c2200",
-            ("state-152", 143, 0x85, 0x21, 0x00) => "state152-main-852100",
-            ("state-152", 148, 0x1F, 0x10, 0x00) => "state152-main-1f1000",
-            ("state-152", 153, 0x1F, 0x10, 0x00) => "state152-wide-1f1000",
-            _ => $"{family}-body{bodyLength}-{mode0:x2}{mode1:x2}{mode2:x2}"
         };
     }
 

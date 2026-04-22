@@ -3,12 +3,26 @@ using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.Combat.Metrics;
 
+public enum PeriodicEffectRelation : byte
+{
+    None,
+    Self,
+    Target
+}
+
+public enum PacketEffectTag : byte
+{
+    None,
+    ActiveDodgeEvade,
+    CompactEvade,
+    PeriodicLinkInvincible
+}
+
 public sealed class ParsedCombatPacket
 {
     public bool IsNormalized { get; set; }
     public int SourceId { get; set; }
     public int TargetId { get; set; }
-    public string EffectFamily { get; set; } = string.Empty;
     public int Flag { get; set; }
     public int Damage { get; set; }
     public int OriginalSkillCode { get; set; }
@@ -38,17 +52,43 @@ public sealed class ParsedCombatPacket
     public CombatValueKind ValueKind { get; set; } = CombatValueKind.Unknown;
     public SkillKind SkillKind { get; set; } = SkillKind.Unknown;
     public SkillSemantics SkillSemantics { get; set; } = SkillSemantics.None;
+    public PeriodicEffectRelation PeriodicRelation { get; private set; }
+    public int PeriodicMode { get; private set; }
+    public PacketEffectTag EffectTag { get; private set; }
     public bool IsCritical => (Modifiers & DamageModifiers.Critical) != 0;
-    public bool IsPeriodicEffect => EffectFamily.StartsWith("periodic-", StringComparison.Ordinal);
+    public bool IsPeriodicEffect => PeriodicRelation != PeriodicEffectRelation.None;
+    public bool IsPeriodicSelfEffect => PeriodicRelation == PeriodicEffectRelation.Self;
+    public bool IsPeriodicTargetEffect => PeriodicRelation == PeriodicEffectRelation.Target;
+    public bool IsPeriodicTargetInitialEffect => IsPeriodicTargetEffect && PeriodicMode == 1;
     public SkillVariantInfo SkillVariant => new(OriginalSkillCode, SkillCode, BaseSkillCode, ChargeStage, SpecializationMask);
+
+    public bool IsPeriodicSelfMode(int mode) => IsPeriodicSelfEffect && PeriodicMode == mode;
+
+    public bool IsPeriodicTargetMode(int mode) => IsPeriodicTargetEffect && PeriodicMode == mode;
+
+    public void SetPeriodicEffect(PeriodicEffectRelation relation, int mode)
+    {
+        PeriodicRelation = relation;
+        PeriodicMode = relation == PeriodicEffectRelation.None ? 0 : Math.Max(mode, 0);
+        EffectTag = PacketEffectTag.None;
+    }
+
+    public void SetEffectTag(PacketEffectTag effectTag)
+    {
+        EffectTag = effectTag;
+        if (effectTag != PacketEffectTag.None)
+        {
+            PeriodicRelation = PeriodicEffectRelation.None;
+            PeriodicMode = 0;
+        }
+    }
 
     public ParsedCombatPacket DeepClone()
     {
-        return new ParsedCombatPacket
+        var clone = new ParsedCombatPacket
         {
             SourceId = SourceId,
             TargetId = TargetId,
-            EffectFamily = EffectFamily,
             Flag = Flag,
             Damage = Damage,
             OriginalSkillCode = OriginalSkillCode,
@@ -79,6 +119,67 @@ public sealed class ParsedCombatPacket
             SkillKind = SkillKind,
             SkillSemantics = SkillSemantics,
             IsNormalized = IsNormalized
+        };
+
+        if (IsPeriodicEffect)
+        {
+            clone.SetPeriodicEffect(PeriodicRelation, PeriodicMode);
+        }
+
+        if (EffectTag != PacketEffectTag.None)
+        {
+            clone.SetEffectTag(EffectTag);
+        }
+
+        return clone;
+    }
+
+    internal string FormatEffectLabel()
+    {
+        if (IsPeriodicEffect)
+        {
+            return FormatPeriodicEffectLabel(PeriodicRelation, PeriodicMode);
+        }
+
+        return EffectTag == PacketEffectTag.None
+            ? string.Empty
+            : FormatEffectTagLabel(EffectTag);
+    }
+
+    private static string FormatPeriodicEffectLabel(PeriodicEffectRelation relation, int mode)
+    {
+        if (relation == PeriodicEffectRelation.None)
+        {
+            return string.Empty;
+        }
+
+        if (relation == PeriodicEffectRelation.Self)
+        {
+            return mode switch
+            {
+                1 => "periodic-self-initial",
+                3 => "periodic-self-tick",
+                _ => $"periodic-self-mode-{mode}"
+            };
+        }
+
+        return mode switch
+        {
+            1 => "periodic-target-initial",
+            2 => "periodic-target-tick",
+            3 => "periodic-target-tick",
+            _ => $"periodic-target-mode-{mode}"
+        };
+    }
+
+    private static string FormatEffectTagLabel(PacketEffectTag effectTag)
+    {
+        return effectTag switch
+        {
+            PacketEffectTag.ActiveDodgeEvade => "active-dodge-evade",
+            PacketEffectTag.CompactEvade => "compact-evade",
+            PacketEffectTag.PeriodicLinkInvincible => "periodic-link-invincible",
+            _ => string.Empty
         };
     }
 }

@@ -2,9 +2,9 @@ using Cloris.Aion2Flow.PacketCapture.Readers;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
-internal readonly record struct Packet4036Create(string Family, int OwnerId, int SummonId, int? NpcCode, int TailOffset);
+internal readonly record struct Packet4036Create(Packet4036Kind Kind, int OwnerId, int SummonId, int? NpcCode, int TailOffset);
 
-internal readonly record struct Packet4036NpcSpawn(string Family, int EntityId, int? NpcCode);
+internal readonly record struct Packet4036NpcSpawn(Packet4036Kind Kind, int EntityId, int? NpcCode);
 
 internal static class Packet4036CreateParser
 {
@@ -23,8 +23,8 @@ internal static class Packet4036CreateParser
         if (reader.Remaining < 2) return false;
         if (packet[reader.Offset] != 0x40 || packet[reader.Offset + 1] != 0x36) return false;
 
-        var family = ClassifyFamily(packet.Length);
-        if (family is not "create-198" and not "create-177")
+        var kind = Packet4036Descriptors.ClassifyKind(packet.Length);
+        if (!Packet4036Descriptors.IsCreateKind(kind))
         {
             return false;
         }
@@ -44,7 +44,7 @@ internal static class Packet4036CreateParser
             return false;
         }
 
-        result = new Packet4036Create(family, ownerId, summonId, npcCode, packet.Length);
+        result = new Packet4036Create(kind, ownerId, summonId, npcCode, packet.Length);
         return true;
     }
 
@@ -58,8 +58,8 @@ internal static class Packet4036CreateParser
         if (reader.Remaining < 2) return false;
         if (packet[reader.Offset] != 0x40 || packet[reader.Offset + 1] != 0x36) return false;
 
-        var family = ClassifyFamily(packet.Length);
-        if (family is not "state-152")
+        var kind = Packet4036Descriptors.ClassifyKind(packet.Length);
+        if (kind != Packet4036Kind.State152)
         {
             return false;
         }
@@ -98,21 +98,6 @@ internal static class Packet4036CreateParser
 
         ownerId = packet[ownerOffset] | (packet[ownerOffset + 1] << 8);
         return ownerId != 0;
-    }
-
-    private static string ClassifyFamily(int payloadLength)
-    {
-        return payloadLength switch
-        {
-            >= 190 => "create-198",
-            >= 175 => "create-177",
-            >= 150 => "state-152",
-            >= 135 => "state-137",
-            >= 118 => "state-120",
-            >= 110 => "state-113",
-            >= 95 => "state-97",
-            _ => $"state-{payloadLength}"
-        };
     }
 
     private static int FindArrayIndex(ReadOnlySpan<byte> data, ReadOnlySpan<byte> needle)
@@ -165,7 +150,7 @@ internal static class Packet4036CreateParser
         if (reader.Remaining < 2) return false;
         if (packet[reader.Offset] != 0x40 || packet[reader.Offset + 1] != 0x36) return false;
 
-        var family = ClassifyFamily(packet.Length);
+        var kind = Packet4036Descriptors.ClassifyKind(packet.Length);
 
         if (!reader.TryAdvance(2)) return false;
         if (!reader.TryReadVarInt(out var entityId)) return false;
@@ -178,7 +163,7 @@ internal static class Packet4036CreateParser
             npcCode = npcValue;
         }
 
-        result = new Packet4036NpcSpawn(family, entityId, npcCode);
+        result = new Packet4036NpcSpawn(kind, entityId, npcCode);
         return true;
     }
 }

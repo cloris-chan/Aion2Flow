@@ -11,8 +11,7 @@ internal readonly record struct Packet0538PeriodicValue(
     int LegacySkillCode,
     int Damage,
     int TailLength,
-    int TailRaw,
-    string Family)
+    int TailRaw)
 {
     public bool IsLinkRecord => Mode == 48;
 
@@ -60,12 +59,11 @@ internal static class Packet0538PeriodicValueParser
             skillCodeRaw / 100,
             damage,
             reader.Remaining,
-            tailRaw,
-            ClassifyFamily(targetId, sourceId, mode));
+            tailRaw);
         return true;
     }
 
-    private static string ClassifyFamily(int targetId, int sourceId, int mode)
+    internal static string FormatEffectLabel(int targetId, int sourceId, int mode)
     {
         if (targetId == sourceId)
         {

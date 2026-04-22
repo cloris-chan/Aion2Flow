@@ -57,9 +57,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 12115,
             SkillCode = 17091250,
             OriginalSkillCode = 1709125011,
-            EffectFamily = "periodic-self-tick",
             Damage = 4273
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 3);
 
         var kind = CombatEventClassifier.Classify(packet);
 
@@ -75,9 +75,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 12115,
             SkillCode = 17080240,
             OriginalSkillCode = 1708024011,
-            EffectFamily = "periodic-target-tick",
             Damage = 1117
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 2);
 
         var kind = CombatEventClassifier.Classify(packet);
 
@@ -100,7 +100,6 @@ public sealed class CombatEventClassifierTests
             SourceId = 12115,
             SkillCode = 17070240,
             OriginalSkillCode = 1707024011,
-            EffectFamily = "direct-hit",
             Damage = 15392
         };
 
@@ -117,9 +116,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 12115,
             SkillCode = 17070240,
             OriginalSkillCode = 1707024011,
-            EffectFamily = "periodic-target-initial",
             Damage = 15392
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 1);
 
         Assert.Equal(CombatEventKind.Damage, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.Damage, CombatEventClassifier.ClassifyValueKind(packet));
@@ -134,9 +133,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 12115,
             SkillCode = 17070240,
             OriginalSkillCode = 1707024011,
-            EffectFamily = "periodic-target-mode-8",
             Damage = 15392
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 8);
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
@@ -157,9 +156,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 12115,
             SkillCode = 17091250,
             OriginalSkillCode = 1709125011,
-            EffectFamily = "periodic-target-mode-11",
             Damage = 4273
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
 
         Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.PeriodicHealing, CombatEventClassifier.ClassifyValueKind(packet));
@@ -181,9 +180,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 12451,
             SkillCode = 17091250,
             OriginalSkillCode = 1709125011,
-            EffectFamily = "periodic-target-mode-9",
             Damage = 6167
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
 
         Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.PeriodicHealing, CombatEventClassifier.ClassifyValueKind(packet));
@@ -209,9 +208,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 4031,
             SkillCode = 12250010,
             OriginalSkillCode = 1225001011,
-            EffectFamily = "periodic-target-mode-9",
             Damage = int.MaxValue
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
@@ -232,9 +231,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 12115,
             SkillCode = 17091250,
             OriginalSkillCode = 1709125011,
-            EffectFamily = "periodic-target-initial",
             Damage = 4747
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 1);
 
         Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
@@ -260,9 +259,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 4121,
             SkillCode = 17300030,
             OriginalSkillCode = 1730003012,
-            EffectFamily = "periodic-target-mode-10",
             Damage = 2457
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
 
         Assert.Equal(CombatEventKind.Damage, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.PeriodicDamage, CombatEventClassifier.ClassifyValueKind(packet));
@@ -288,9 +287,9 @@ public sealed class CombatEventClassifierTests
             SourceId = 4121,
             SkillCode = 13730007,
             OriginalSkillCode = 1373000712,
-            EffectFamily = "periodic-target-mode-10",
             Damage = 2457
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
 
         Assert.Equal(CombatEventKind.Damage, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.PeriodicDamage, CombatEventClassifier.ClassifyValueKind(packet));
@@ -355,13 +354,13 @@ public sealed class CombatEventClassifierTests
 
         var packet = new ParsedCombatPacket
         {
-            EffectFamily = "periodic-self-tick",
             SourceId = 12115,
             TargetId = 12115,
             SkillCode = 22120011,
             OriginalSkillCode = 221200111,
             Damage = 1025
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 3);
 
         var eventKind = CombatEventClassifier.Classify(packet);
         var valueKind = CombatEventClassifier.ClassifyValueKind(packet);
@@ -594,8 +593,7 @@ public sealed class CombatEventClassifierTests
             TargetId = 7166,
             SkillCode = 13360010,
             OriginalSkillCode = 13360017,
-            Damage = 30000,
-            EffectFamily = "direct-hit"
+            Damage = 30000
         };
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
@@ -603,7 +601,7 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
-    public void Classifies_Charge7_Self_Followup_As_Support_When_Base_Family_Has_Resource_Restore_Sibling()
+    public void Classifies_Charge7_Self_Followup_As_Support_When_Base_Skill_Has_Resource_Restore_Variant()
     {
         CombatMetricsEngine.SkillMap =
         [
@@ -635,8 +633,7 @@ public sealed class CombatEventClassifierTests
             OriginalSkillCode = 11360017,
             BaseSkillCode = 11360000,
             ChargeStage = 7,
-            Damage = 30000,
-            EffectFamily = "direct-hit"
+            Damage = 30000
         };
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
@@ -655,7 +652,6 @@ public sealed class CombatEventClassifierTests
             SkillCode = 1900001,
             OriginalSkillCode = 1900911,
             Damage = 29586,
-            EffectFamily = "direct-hit",
             ResourceKind = CombatResourceKind.Health
         };
 
@@ -675,7 +671,6 @@ public sealed class CombatEventClassifierTests
             SkillCode = 1900001,
             OriginalSkillCode = 1900911,
             Damage = 8767,
-            EffectFamily = "direct-hit",
             ResourceKind = CombatResourceKind.Mana
         };
 
@@ -703,8 +698,7 @@ public sealed class CombatEventClassifierTests
             TargetId = 9024,
             SkillCode = 2010302,
             OriginalSkillCode = 2010302,
-            Damage = 400000,
-            EffectFamily = "direct-hit"
+            Damage = 400000
         };
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
@@ -729,13 +723,13 @@ public sealed class CombatEventClassifierTests
 
         var packet = new ParsedCombatPacket
         {
-            EffectFamily = "periodic-self-mode-11",
             SourceId = 12115,
             TargetId = 12115,
             SkillCode = 16190020,
             OriginalSkillCode = 1619002011,
             Damage = 704
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);
 
         Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.PeriodicHealing, CombatEventClassifier.ClassifyValueKind(packet));
@@ -788,13 +782,13 @@ public sealed class CombatEventClassifierTests
 
         var packet = new ParsedCombatPacket
         {
-            EffectFamily = "periodic-self-mode-2",
             SourceId = 40969,
             TargetId = 40969,
             SkillCode = 17150000,
             OriginalSkillCode = 1715000611,
             Damage = 2022
         };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));

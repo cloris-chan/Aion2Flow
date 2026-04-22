@@ -463,7 +463,6 @@ public sealed class PacketLogReplayService
         {
             TargetId = parsed.TargetId,
             SourceId = parsed.SourceId,
-            EffectFamily = parsed.Family,
             OriginalSkillCode = parsed.SkillCodeRaw,
             SkillCode = parsed.LegacySkillCode,
             Unknown = parsed.Unknown,
@@ -472,6 +471,9 @@ public sealed class PacketLogReplayService
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
         };
+        combatPacket.SetPeriodicEffect(
+            parsed.TargetId == parsed.SourceId ? PeriodicEffectRelation.Self : PeriodicEffectRelation.Target,
+            parsed.Mode);
 
         store.AppendCombatPacket(combatPacket);
         return true;

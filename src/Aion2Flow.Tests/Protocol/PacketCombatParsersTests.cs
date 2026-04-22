@@ -1,6 +1,6 @@
+using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
-using Cloris.Aion2Flow.Combat.Classification;
 
 namespace Cloris.Aion2Flow.Tests.Protocol;
 
@@ -126,7 +126,6 @@ public sealed class PacketCombatParsersTests
         Assert.Equal(sample.SkillCodeRaw, parsed.SkillCodeRaw);
         Assert.Equal(sample.LegacySkillCode, parsed.LegacySkillCode);
         Assert.Equal(sample.Damage, parsed.Damage);
-        Assert.Equal(sample.Family, parsed.Family);
         Assert.Equal(sample.LinkId, parsed.LinkId);
         Assert.Equal(sample.TailRaw, parsed.TailRaw);
         Assert.Equal(sample.IsLinkRecord, parsed.IsLinkRecord);
@@ -171,7 +170,7 @@ public sealed class PacketCombatParsersTests
         var ok = Packet4036CreateParser.TryParse(packet, out var parsed);
 
         Assert.True(ok);
-        Assert.Equal(sample.Family, parsed.Family);
+        Assert.Equal(sample.Kind, parsed.Kind);
         Assert.Equal(sample.OwnerId, parsed.OwnerId);
         Assert.Equal(sample.SummonId, parsed.SummonId);
         Assert.Equal(sample.NpcCode, parsed.NpcCode);

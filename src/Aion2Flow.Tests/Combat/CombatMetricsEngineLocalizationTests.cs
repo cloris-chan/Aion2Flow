@@ -57,8 +57,7 @@ public sealed class CombatMetricsEngineLocalizationTests
                 TargetId = targetId,
                 SkillCode = skillCode,
                 OriginalSkillCode = skillCode,
-                Damage = 77669,
-                EffectFamily = "direct-hit"
+                Damage = 77669
             });
             Thread.Sleep(5);
             engine.Store.AppendCombatPacket(new ParsedCombatPacket
@@ -67,8 +66,7 @@ public sealed class CombatMetricsEngineLocalizationTests
                 TargetId = targetId,
                 SkillCode = skillCode,
                 OriginalSkillCode = skillCode,
-                Damage = 77669,
-                EffectFamily = "direct-hit"
+                Damage = 77669
             });
 
             var zhSnapshot = engine.CreateBattleSnapshot();

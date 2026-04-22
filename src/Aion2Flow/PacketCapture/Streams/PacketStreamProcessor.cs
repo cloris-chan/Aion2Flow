@@ -144,11 +144,20 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         {
             TargetId = packet.TargetId,
             SourceId = packet.SourceId,
-            EffectFamily = packet.EffectFamily,
             OriginalSkillCode = packet.OriginalSkillCode,
             SkillCode = normalized,
             Damage = packet.Damage
         };
+
+        if (packet.IsPeriodicEffect)
+        {
+            packetForClassification.SetPeriodicEffect(packet.PeriodicRelation, packet.PeriodicMode);
+        }
+
+        if (packet.EffectTag != PacketEffectTag.None)
+        {
+            packetForClassification.SetEffectTag(packet.EffectTag);
+        }
 
         var kind = CombatEventClassifier.ResolveSkillKind(normalized);
         var semantics = CombatEventClassifier.ResolveSkillSemantics(normalized);
@@ -161,6 +170,14 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         return $"|skill={normalized}{variantHint}|skillKind={kind}|skillSemantics={semantics}|valueKind={valueKind}";
+    }
+
+    private static string FormatEffectHint(ParsedCombatPacket packet)
+    {
+        var effectLabel = packet.FormatEffectLabel();
+        return string.IsNullOrEmpty(effectLabel)
+            ? string.Empty
+            : $"|effect={effectLabel}";
     }
 
     private static string FormatSkillVariantHint(SkillVariantInfo variant)
@@ -890,6 +907,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         var reader = new PacketSpanReader(payload);
         if (!reader.TryAdvance(2)) return false;
         if (!reader.TryReadVarInt(out var targetId)) return false;
+        if (reader.Remaining < 1) return false;
+        var mode = payload[reader.Offset];
         if (!reader.TryAdvance(1)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (sourceId == 0 || targetId == 0) return false;
@@ -906,11 +925,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (damage <= 0) return false;
 
-        store.AppendCombatPacket(new ParsedCombatPacket
+        var combatPacket = new ParsedCombatPacket
         {
             TargetId = targetId,
             SourceId = sourceId,
-            EffectFamily = "periodic-target-tick",
             OriginalSkillCode = skillRaw,
             SkillCode = resolvedSkillCode.Value,
             Unknown = unknownInfo,
@@ -918,10 +936,13 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
-        });
+        };
+        combatPacket.SetPeriodicEffect(PeriodicEffectRelation.Target, mode);
+
+        store.AppendCombatPacket(combatPacket);
 
         consumed = reader.Offset;
-        RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={targetId}|source={sourceId}|skill={resolvedSkillCode.Value}|damage={damage}|family=periodic-target-tick", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={targetId}|source={sourceId}|skill={resolvedSkillCode.Value}|damage={damage}{FormatEffectHint(combatPacket)}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -965,9 +986,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         store.AppendSummon(realSourceId, summonId);
         consumed = Math.Max(offset + 2, reader.Offset);
-        var family = Classify4036Family(consumed > 0 ? consumed : payload.Length);
+        var payloadLength = consumed > 0 ? consumed : payload.Length;
+        var kind = Packet4036Descriptors.ClassifyKind(payloadLength);
         var npcCodeText = npcCode.HasValue ? $"|npcCode={npcCode.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("summon", _connection, $"family={family}|owner={realSourceId}|summon={summonId}{npcCodeText}", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("summon", _connection, $"kind={Packet4036Descriptors.FormatKind(kind, payloadLength)}|owner={realSourceId}|summon={summonId}{npcCodeText}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -1327,7 +1349,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             RawPacketDump.AppendFrameEvent(
                 "periodic-link",
                 _connection,
-                $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|linkId={parsed.LinkId}|unknown={parsed.Unknown}|tailRaw={parsed.TailRaw}|family={parsed.Family}{tailHint}",
+                $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|linkId={parsed.LinkId}|unknown={parsed.Unknown}|tailRaw={parsed.TailRaw}|effect={Packet0538PeriodicValueParser.FormatEffectLabel(parsed.TargetId, parsed.SourceId, parsed.Mode)}{tailHint}",
                 packet);
             return _hasParsed = true;
         }
@@ -1336,7 +1358,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         {
             TargetId = parsed.TargetId,
             SourceId = parsed.SourceId,
-            EffectFamily = parsed.Family,
             OriginalSkillCode = parsed.SkillCodeRaw,
             SkillCode = parsed.LegacySkillCode,
             Unknown = parsed.Unknown,
@@ -1345,9 +1366,12 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
         };
+        combatPacket.SetPeriodicEffect(
+            parsed.TargetId == parsed.SourceId ? PeriodicEffectRelation.Self : PeriodicEffectRelation.Target,
+            parsed.Mode);
 
         store.AppendCombatPacket(combatPacket);
-        RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|damage={parsed.Damage}|family={parsed.Family}{FormatResolvedCombatHint(combatPacket)}", packet[..(packet.Length - parsed.TailLength)]);
+        RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|damage={parsed.Damage}{FormatEffectHint(combatPacket)}{FormatResolvedCombatHint(combatPacket)}", packet[..(packet.Length - parsed.TailLength)]);
         return _hasParsed = true;
     }
 
@@ -1400,10 +1424,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
     private bool ParseSummonPacket(ReadOnlySpan<byte> packet)
     {
-        var family = Classify4036Family(packet.Length);
-        if (!Is4036CreateFamily(family))
+        var kind = Packet4036Descriptors.ClassifyKind(packet.Length);
+        if (!Packet4036Descriptors.IsCreateKind(kind))
         {
-            return Parse4036StatePacket(packet, family);
+            return Parse4036StatePacket(packet);
         }
 
         if (Packet4036CreateParser.TryParse(packet, out var parsed))
@@ -1416,7 +1440,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             store.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
             store.AppendSummon(parsed.OwnerId, parsed.SummonId);
             var npcCodeText = parsed.NpcCode.HasValue ? $"|npcCode={parsed.NpcCode.Value}" : string.Empty;
-            RawPacketDump.AppendFrameEvent("summon", _connection, $"family={parsed.Family}|owner={parsed.OwnerId}|summon={parsed.SummonId}{npcCodeText}", packet[..Math.Min(parsed.TailOffset, packet.Length)]);
+            RawPacketDump.AppendFrameEvent("summon", _connection, $"kind={Packet4036Descriptors.FormatKind(parsed.Kind, parsed.TailOffset)}|owner={parsed.OwnerId}|summon={parsed.SummonId}{npcCodeText}", packet[..Math.Min(parsed.TailOffset, packet.Length)]);
             return _hasParsed = true;
         }
 
@@ -1428,14 +1452,14 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             }
 
             var spawnNpcCodeText = spawn.NpcCode.HasValue ? $"|npcCode={spawn.NpcCode.Value}" : string.Empty;
-            RawPacketDump.AppendFrameEvent("npc-spawn", _connection, $"family={spawn.Family}|entity={spawn.EntityId}{spawnNpcCodeText}", packet);
+            RawPacketDump.AppendFrameEvent("npc-spawn", _connection, $"kind={Packet4036Descriptors.FormatKind(spawn.Kind, packet.Length)}|entity={spawn.EntityId}{spawnNpcCodeText}", packet);
             return _hasParsed = true;
         }
 
         return false;
     }
 
-    private bool Parse4036StatePacket(ReadOnlySpan<byte> packet, string family)
+    private bool Parse4036StatePacket(ReadOnlySpan<byte> packet)
     {
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
@@ -1455,7 +1479,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "state-4036",
             _connection,
-            $"family={parsed.Family}|layout={parsed.Layout}|source={parsed.SourceId}|mode={parsed.Mode0:x2}{parsed.Mode1:x2}{parsed.Mode2:x2}|seed=0x{parsed.Seed:x8}|tag=0x{parsed.Tag:x4}|p0=0x{parsed.P0:x8}|p1=0x{parsed.P1:x8}|p2=0x{parsed.P2:x8}|marker=0x{parsed.Marker:x8}|repeat0={parsed.Repeat0}|repeat1={parsed.Repeat1}|linked={parsed.LinkedValue}|gauge0={parsed.Gauge0}|gauge1={parsed.Gauge1}|tailMode={parsed.TailMode}|tailState={parsed.TailState}|tailFlags={parsed.TailFlag0}/{parsed.TailFlag1}|tailValue={parsed.TailValue}|tailHash=0x{parsed.TailHash:x8}|tailTerm={parsed.TailTerminator}|sharedTag=0x{parsed.SharedTag:x8}|sharedGauge={parsed.SharedGauge0}/{parsed.SharedGauge1}/{parsed.SharedGauge2}/{parsed.SharedGauge3}|sharedFlag={parsed.SharedFlag}|sharedMini0=0x{parsed.SharedMini0:x8}|sharedMini1=0x{parsed.SharedMini1:x8}|heavyGauge={parsed.HeavyGauge0}/{parsed.HeavyGauge1}|heavyValue={parsed.HeavyValue0}/{parsed.HeavyValue1}|heavyFlag={parsed.HeavyFlag}|heavyMini0=0x{parsed.HeavyMini0:x8}|heavySentinel=0x{parsed.HeavySentinel0:x8}/0x{parsed.HeavySentinel1:x8}|heavyTrailer=0x{parsed.HeavyTrailer0:x8}/0x{parsed.HeavyTrailer1:x8}|tail0=0x{parsed.Tail0:x8}|tail1=0x{parsed.Tail1:x8}|bodyLen={parsed.BodyLength}",
+            $"kind={Packet4036Descriptors.FormatKind(parsed.Kind, parsed.PayloadLength)}|layout={Packet4036Descriptors.FormatLayout(parsed.Kind, parsed.LayoutKind, parsed.PayloadLength, parsed.BodyLength, parsed.Mode0, parsed.Mode1, parsed.Mode2)}|source={parsed.SourceId}|mode={parsed.Mode0:x2}{parsed.Mode1:x2}{parsed.Mode2:x2}|seed=0x{parsed.Seed:x8}|tag=0x{parsed.Tag:x4}|p0=0x{parsed.P0:x8}|p1=0x{parsed.P1:x8}|p2=0x{parsed.P2:x8}|marker=0x{parsed.Marker:x8}|repeat0={parsed.Repeat0}|repeat1={parsed.Repeat1}|linked={parsed.LinkedValue}|gauge0={parsed.Gauge0}|gauge1={parsed.Gauge1}|tailMode={parsed.TailMode}|tailState={parsed.TailState}|tailFlags={parsed.TailFlag0}/{parsed.TailFlag1}|tailValue={parsed.TailValue}|tailHash=0x{parsed.TailHash:x8}|tailTerm={parsed.TailTerminator}|sharedTag=0x{parsed.SharedTag:x8}|sharedGauge={parsed.SharedGauge0}/{parsed.SharedGauge1}/{parsed.SharedGauge2}/{parsed.SharedGauge3}|sharedFlag={parsed.SharedFlag}|sharedMini0=0x{parsed.SharedMini0:x8}|sharedMini1=0x{parsed.SharedMini1:x8}|heavyGauge={parsed.HeavyGauge0}/{parsed.HeavyGauge1}|heavyValue={parsed.HeavyValue0}/{parsed.HeavyValue1}|heavyFlag={parsed.HeavyFlag}|heavyMini0=0x{parsed.HeavyMini0:x8}|heavySentinel=0x{parsed.HeavySentinel0:x8}/0x{parsed.HeavySentinel1:x8}|heavyTrailer=0x{parsed.HeavyTrailer0:x8}/0x{parsed.HeavyTrailer1:x8}|tail0=0x{parsed.Tail0:x8}|tail1=0x{parsed.Tail1:x8}|bodyLen={parsed.BodyLength}",
             packet);
 
         return _hasParsed = true;
@@ -1471,7 +1495,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "aux-2b38",
             _connection,
-            $"source={parsed.SourceId}|source2={parsed.SourceIdCopy}|phase={parsed.Phase}|marker={parsed.Marker}|action=0x{parsed.ActionCode:x8}|seq={parsed.Sequence}|state={parsed.StateValue}|detail={parsed.DetailValue}|family={parsed.Family}|tailLen={parsed.TailLength}",
+            $"source={parsed.SourceId}|source2={parsed.SourceIdCopy}|phase={parsed.Phase}|marker={parsed.Marker}|action=0x{parsed.ActionCode:x8}|seq={parsed.Sequence}|state={parsed.StateValue}|detail={parsed.DetailValue}|tailLen={parsed.TailLength}",
             packet);
 
         return _hasParsed = true;
@@ -1529,7 +1553,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "aux-2c38",
             _connection,
-            $"source={parsed.SourceId}|mode={parsed.Mode}|state={parsed.StateCode}|seq={parsed.SequenceId}|result={parsed.ResultCode}|family={parsed.Family}|tailLen={parsed.TailLength}",
+            $"source={parsed.SourceId}|mode={parsed.Mode}|state={parsed.StateCode}|seq={parsed.SequenceId}|result={parsed.ResultCode}|tailLen={parsed.TailLength}",
             packet);
 
         return _hasParsed = true;
@@ -1545,7 +1569,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "state-1d37",
             _connection,
-            $"source={parsed.SourceId}|group={parsed.GroupCode}|state={parsed.StateCode}|family={parsed.Family}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
+            $"source={parsed.SourceId}|group={parsed.GroupCode}|state={parsed.StateCode}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
             packet);
 
         return _hasParsed = true;
@@ -1577,7 +1601,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "wrapped-8456",
             _connection,
-            $"p0=0x{parsed.Prefix0:x2}|p1=0x{parsed.Prefix1:x2}|p2=0x{parsed.Prefix2:x2}|inner={parsed.InnerFamily}|innerValue={parsed.InnerValue}|stamp=0x{parsed.Stamp:x16}|trailer=0x{parsed.Trailer:x2}|tailLen={parsed.TailLength}",
+            $"p0=0x{parsed.Prefix0:x2}|p1=0x{parsed.Prefix1:x2}|p2=0x{parsed.Prefix2:x2}|innerOpcode=0x{parsed.InnerOpcode:x4}|innerValue={parsed.InnerValue}|stamp=0x{parsed.Stamp:x16}|trailer=0x{parsed.Trailer:x2}|tailLen={parsed.TailLength}",
             packet);
 
         return _hasParsed = true;
@@ -1708,30 +1732,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "state-4936",
             _connection,
-            $"source={parsed.SourceId}|mode={parsed.Mode}|group={parsed.GroupCode}|flag={parsed.Flag}|value0=0x{parsed.Value0:x8}|marker=0x{parsed.Marker:x4}|value1=0x{parsed.Value1:x8}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}|family={parsed.Family}",
+            $"source={parsed.SourceId}|mode={parsed.Mode}|group={parsed.GroupCode}|flag={parsed.Flag}|value0=0x{parsed.Value0:x8}|marker=0x{parsed.Marker:x4}|value1=0x{parsed.Value1:x8}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
             packet);
 
         return _hasParsed = true;
-    }
-
-    private static string Classify4036Family(int payloadLength)
-    {
-        return payloadLength switch
-        {
-            >= 190 => "create-198",
-            >= 175 => "create-177",
-            >= 150 => "state-152",
-            >= 135 => "state-137",
-            >= 118 => "state-120",
-            >= 110 => "state-113",
-            >= 95 => "state-97",
-            _ => $"state-{payloadLength}"
-        };
-    }
-
-    private static bool Is4036CreateFamily(string family)
-    {
-        return family is "create-198" or "create-177";
     }
 
     private bool ParseOwnNicknamePacket(ReadOnlySpan<byte> packet)

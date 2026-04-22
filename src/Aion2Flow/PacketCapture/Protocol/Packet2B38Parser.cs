@@ -11,7 +11,6 @@ internal readonly record struct Packet2B38Aux(
     int Sequence,
     int StateValue,
     int DetailValue,
-    string Family,
     int TailLength);
 
 internal static class Packet2B38Parser
@@ -45,18 +44,7 @@ internal static class Packet2B38Parser
             sequence,
             stateValue,
             detailValue,
-            ClassifyFamily(phase, marker, actionCode, stateValue, detailValue),
             reader.Remaining);
         return true;
-    }
-
-    private static string ClassifyFamily(int phase, int marker, int actionCode, int stateValue, int detailValue)
-    {
-        return (phase, marker, (uint)actionCode, stateValue, detailValue) switch
-        {
-            (19, _, >= 0x0A000000 and <= 0x0AFFFFFF, _, _) => "refresh-or-reapply-observed",
-            (17, _, _, _, _) => "action-outcome-observed",
-            _ => $"phase-{phase}-state-{stateValue}-detail-{detailValue}"
-        };
     }
 }

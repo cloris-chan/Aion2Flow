@@ -477,8 +477,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         var semantics = packet.SkillSemantics != SkillSemantics.None
             ? packet.SkillSemantics
             : skill.Semantics;
-        var isPeriodicSelf = packet.IsPeriodicEffect &&
-            packet.EffectFamily.StartsWith("periodic-self", StringComparison.Ordinal);
+        var isPeriodicSelf = packet.IsPeriodicSelfEffect;
         var hasOffensiveSignal = (semantics & (SkillSemantics.Damage | SkillSemantics.PeriodicDamage | SkillSemantics.DrainOrAbsorb)) != 0;
         var hasShieldSignal = (semantics & SkillSemantics.ShieldOrBarrier) != 0;
         var hasHealingSignal = (semantics & SkillSemantics.Healing) != 0;

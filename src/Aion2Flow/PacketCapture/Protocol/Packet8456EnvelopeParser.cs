@@ -1,5 +1,5 @@
-using Cloris.Aion2Flow.PacketCapture.Readers;
 using System.Buffers.Binary;
+using Cloris.Aion2Flow.PacketCapture.Readers;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
@@ -8,7 +8,6 @@ internal readonly record struct Packet8456Envelope(
     byte Prefix1,
     byte Prefix2,
     ushort InnerOpcode,
-    string InnerFamily,
     uint InnerValue,
     ulong Stamp,
     byte Trailer,
@@ -47,21 +46,10 @@ internal static class Packet8456EnvelopeParser
             prefix1,
             prefix2,
             innerOpcode,
-            ClassifyInner(innerOpcode),
             innerValue,
             stamp,
             trailer,
             reader.Remaining);
         return true;
-    }
-
-    private static string ClassifyInner(ushort innerOpcode)
-    {
-        return innerOpcode switch
-        {
-            0x3640 => "4036",
-            0x3641 => "4136",
-            _ => $"0x{innerOpcode:x4}"
-        };
     }
 }

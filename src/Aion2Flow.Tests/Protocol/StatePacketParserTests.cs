@@ -102,7 +102,6 @@ public sealed class StatePacketParserTests
         Assert.Equal(sample.SourceId, parsed.SourceId);
         Assert.Equal(sample.GroupCode, parsed.GroupCode);
         Assert.Equal(sample.StateCode, parsed.StateCode);
-        Assert.Equal(sample.Family, parsed.Family);
         Assert.Equal(sample.TailSignature, parsed.TailSignature);
     }
 
@@ -153,7 +152,6 @@ public sealed class StatePacketParserTests
         Assert.Equal(sample.Phase, parsed.Phase);
         Assert.Equal(sample.Marker, parsed.Marker);
         Assert.Equal(sample.ActionCode, parsed.ActionCode);
-        Assert.Equal(sample.Family, parsed.Family);
     }
 
     [Theory]
@@ -186,7 +184,6 @@ public sealed class StatePacketParserTests
         Assert.Equal(sample.StateCode, parsed.StateCode);
         Assert.Equal(sample.SequenceId, parsed.SequenceId);
         Assert.Equal(sample.ResultCode, parsed.ResultCode);
-        Assert.Equal(sample.Family, parsed.Family);
     }
 
     [Theory]
@@ -205,7 +202,6 @@ public sealed class StatePacketParserTests
         Assert.Equal(sample.Value0, parsed.Value0);
         Assert.Equal(sample.Marker, parsed.Marker);
         Assert.Equal(sample.Value1, parsed.Value1);
-        Assert.Equal(sample.Family, parsed.Family);
     }
 
     [Theory]
@@ -217,8 +213,8 @@ public sealed class StatePacketParserTests
         var ok = Packet4036Parser.TryParse(packet, out var parsed);
 
         Assert.True(ok);
-        Assert.Equal(sample.Family, parsed.Family);
-        Assert.Equal(sample.Layout, parsed.Layout);
+        Assert.Equal(sample.Kind, parsed.Kind);
+        Assert.Equal(sample.LayoutKind, parsed.LayoutKind);
         Assert.Equal(sample.SourceId, parsed.SourceId);
         Assert.Equal(sample.Mode0, parsed.Mode0);
         Assert.Equal(sample.Mode1, parsed.Mode1);
@@ -260,7 +256,7 @@ public sealed class StatePacketParserTests
         var ok = Packet4036CreateParser.TryParseNpcSpawn(packet, out var result);
 
         Assert.True(ok);
-        Assert.Equal(sample.Family, result.Family);
+        Assert.Equal(sample.Kind, result.Kind);
         Assert.Equal(sample.EntityId, result.EntityId);
         Assert.Equal(sample.NpcCode, result.NpcCode);
     }
@@ -277,7 +273,7 @@ public sealed class StatePacketParserTests
         Assert.Equal(sample.Prefix0, parsed.Prefix0);
         Assert.Equal(sample.Prefix1, parsed.Prefix1);
         Assert.Equal(sample.Prefix2, parsed.Prefix2);
-        Assert.Equal(sample.InnerFamily, parsed.InnerFamily);
+        Assert.Equal(sample.InnerOpcode, parsed.InnerOpcode);
         Assert.Equal(sample.InnerValue, parsed.InnerValue);
         Assert.Equal(sample.Trailer, parsed.Trailer);
     }

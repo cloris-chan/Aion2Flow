@@ -1,5 +1,5 @@
-using Cloris.Aion2Flow.PacketCapture.Readers;
 using System.Buffers.Binary;
+using Cloris.Aion2Flow.PacketCapture.Readers;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
@@ -12,8 +12,7 @@ internal readonly record struct Packet4936State(
     ushort Marker,
     uint Value1,
     string TailSignature,
-    int TailLength,
-    string Family);
+    int TailLength);
 
 internal static class Packet4936Parser
 {
@@ -48,24 +47,7 @@ internal static class Packet4936Parser
             marker,
             value1,
             tailSignature,
-            0,
-            ClassifyFamily(mode, groupCode, flag, value0, marker, value1, tail.Length));
+            tail.Length);
         return true;
-    }
-
-    private static string ClassifyFamily(int mode, int groupCode, int flag, uint value0, ushort marker, uint value1, int tailLength)
-    {
-        return (mode, groupCode, flag, value0, marker, value1, tailLength) switch
-        {
-            (2, 19, 0, 0x000001EA, 0x0092, 0x00000A69, 10) => "buff-apply-observed",
-            (2, 19, 0, 0x00000185, 0x0092, 0x00000681, 10) => "buff-remove-observed",
-            (3, 70, 0, 0x00001237, 0x01A9, 0x00001176, 16) => "hot-buff-apply-observed",
-            (3, 70, 0, 0x00000A67, 0x01A9, 0x0000104A, 16) => "hot-buff-remove-observed",
-            (1, _, _, _, _, _, 6) => "state-short-4936",
-            (2, _, _, _, _, _, 10) => "state-mid-4936",
-            (3, _, _, _, _, _, 16) => "state-long-4936",
-            (5, _, _, _, _, _, 32) => "state-xl-4936",
-            _ => $"state-{mode}-{groupCode}-{flag}-{tailLength}"
-        };
     }
 }

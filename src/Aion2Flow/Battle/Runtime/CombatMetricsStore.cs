@@ -298,7 +298,7 @@ public sealed class CombatMetricsStore
                 timestamp,
                 frameOrdinal,
                 batchOrdinal,
-                "periodic-link-invincible");
+                PacketEffectTag.PeriodicLinkInvincible);
         }
     }
 
@@ -564,8 +564,7 @@ public sealed class CombatMetricsStore
             return false;
         }
 
-        if (!string.Equals(packet.EffectFamily, "periodic-self-mode-9", StringComparison.Ordinal) &&
-            !string.Equals(packet.EffectFamily, "periodic-self-mode-11", StringComparison.Ordinal))
+        if (!packet.IsPeriodicSelfMode(9) && !packet.IsPeriodicSelfMode(11))
         {
             return false;
         }
@@ -587,7 +586,7 @@ public sealed class CombatMetricsStore
         }
 
         key = new SelfPeriodicHealingPoolKey(packet.SourceId, packet.TargetId, originalSkillCode);
-        isSeed = string.Equals(packet.EffectFamily, "periodic-self-mode-9", StringComparison.Ordinal);
+        isSeed = packet.IsPeriodicSelfMode(9);
         return true;
     }
 
@@ -1203,7 +1202,7 @@ public sealed class CombatMetricsStore
             if (_currentBatchDodgeTargets.Contains(packet.TargetId))
             {
                 _resolvedAvoidanceSignatures.Add(signature);
-                ApplyAvoidedModifier(packet, DamageModifiers.Evade, "active-dodge-evade");
+                ApplyAvoidedModifier(packet, DamageModifiers.Evade, PacketEffectTag.ActiveDodgeEvade);
             }
         }
 
@@ -1247,14 +1246,14 @@ public sealed class CombatMetricsStore
                || packet.EventKind == CombatEventKind.Damage;
     }
 
-    private static void ApplyAvoidedModifier(ParsedCombatPacket packet, DamageModifiers modifier, string effectFamily)
+    private static void ApplyAvoidedModifier(ParsedCombatPacket packet, DamageModifiers modifier, PacketEffectTag effectTag)
     {
         packet.Damage = 0;
         packet.HitContribution = 0;
         packet.AttemptContribution = Math.Max(packet.AttemptContribution, 1);
         packet.Modifiers &= ~(DamageModifiers.Evade | DamageModifiers.Invincible | DamageModifiers.Critical);
         packet.Modifiers |= modifier;
-        packet.EffectFamily = effectFamily;
+        packet.SetEffectTag(effectTag);
         packet.IsNormalized = false;
         CombatMetricsEngine.NormalizePacketForStorage(packet);
     }
@@ -1353,17 +1352,17 @@ public sealed class CombatMetricsStore
             HitContribution = 0,
             AttemptContribution = 1,
             Modifiers = DamageModifiers.Evade,
-            EffectFamily = "compact-evade",
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage
         };
+        packet.SetEffectTag(PacketEffectTag.CompactEvade);
 
         PreparePacketForStorage(packet);
         StorePacket(packet);
         return packet;
     }
 
-    private void StoreInvincible(int sourceId, int targetId, int originalSkillCode, int marker, long timestamp, long frameOrdinal, long batchOrdinal, string effectFamily)
+    private void StoreInvincible(int sourceId, int targetId, int originalSkillCode, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketEffectTag effectTag)
     {
         if (targetId <= 0)
         {
@@ -1388,10 +1387,10 @@ public sealed class CombatMetricsStore
             HitContribution = 0,
             AttemptContribution = 1,
             Modifiers = DamageModifiers.Invincible,
-            EffectFamily = effectFamily,
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage
         };
+        packet.SetEffectTag(effectTag);
 
         PreparePacketForStorage(packet);
         StorePacket(packet);

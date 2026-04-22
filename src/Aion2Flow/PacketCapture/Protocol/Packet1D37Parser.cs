@@ -7,7 +7,6 @@ internal readonly record struct Packet1D37State(
     int GroupCode,
     int StateCode,
     int TailLength,
-    string Family,
     string TailSignature);
 
 internal static class Packet1D37Parser
@@ -32,28 +31,8 @@ internal static class Packet1D37Parser
             groupCode,
             stateCode,
             tail.Length,
-            ClassifyFamily(groupCode, stateCode),
             BuildTailSignature(tail));
         return true;
-    }
-
-    private static string ClassifyFamily(int groupCode, int stateCode)
-    {
-        return (groupCode, stateCode) switch
-        {
-            (39, 3) => "abnormal-apply-primary",
-            (47, 3) => "abnormal-apply-secondary",
-            (38, 3) => "abnormal-apply-hidden",
-            (46, 3) => "abnormal-sync-active",
-            (46, 4) => "abnormal-sync-refresh",
-            (46, 9) => "abnormal-sync-remove",
-            (3, _) => "system-state-low",
-            (7, _) => "system-state-mid",
-            (_, 3) => $"group-{groupCode}-apply",
-            (_, 4) => $"group-{groupCode}-refresh",
-            (_, 9) => $"group-{groupCode}-remove",
-            _ => $"group-{groupCode}-state-{stateCode}"
-        };
     }
 
     private static string BuildTailSignature(ReadOnlySpan<byte> tail)

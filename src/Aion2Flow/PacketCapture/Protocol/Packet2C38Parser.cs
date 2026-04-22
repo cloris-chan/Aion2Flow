@@ -8,7 +8,6 @@ internal readonly record struct Packet2C38Observation(
     int StateCode,
     int SequenceId,
     int ResultCode,
-    string Family,
     int TailLength);
 
 internal static class Packet2C38Parser
@@ -35,19 +34,7 @@ internal static class Packet2C38Parser
             stateCode,
             sequenceId,
             resultCode,
-            ClassifyFamily(mode, stateCode, resultCode),
             reader.Remaining);
         return true;
-    }
-
-    private static string ClassifyFamily(int mode, int stateCode, int resultCode)
-    {
-        return (mode, stateCode, resultCode) switch
-        {
-            (1, 0, 1) => "natural-expire-observed",
-            (1, 0, 12) => "manual-remove-observed",
-            (1, 0, 19) => "summon-transition-observed",
-            _ => $"mode-{mode}-state-{stateCode}-result-{resultCode}"
-        };
     }
 }

@@ -35,12 +35,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         store.AppendNickname(playerId, "Perigee");
         store.AppendNickname(healerId, "Helper");
 
-        AppendPacket(store, playerId, bossId, 11000010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, playerId, 12000010, 250, "self-heal", 2_000, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, bossId, playerId, 99000010, 180, "boss-hit", 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, healerId, playerId, 13000010, 90, "ally-heal", 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, playerId, bossId, 11000010, 300, "direct-hit", 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, addId, 11000010, 200, "direct-hit", 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(store, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(store, playerId, bossId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, addId, 11000010, 200, 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -78,8 +78,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
 
         store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 600, "direct-hit", 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, bossId, 11000010, 400, "direct-hit", 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
         var record = archive.Archive(snapshot, store, "manual", isAutomatic: false);
@@ -112,9 +112,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         store.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 11000010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, playerId, 12000010, 150, "passive-heal", 1_500, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, playerId, playerId, 13000010, 250, "active-heal", 2_500, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, playerId, 12000010, 150, 1_500, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(store, playerId, playerId, 13000010, 250, 2_500, CombatEventKind.Healing, CombatValueKind.Healing);
 
         var snapshot = engine.CreateBattleSnapshot();
 
@@ -147,8 +147,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         store.AppendNickname(playerId, "Perigee");
         store.AppendSummon(playerId, summonId);
-        AppendPacket(store, summonId, bossId, 11000010, 700, "direct-hit", 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, summonId, bossId, 11000010, 300, "direct-hit", 11_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
         var record = archive.Archive(snapshot, store, "manual", isAutomatic: false);
@@ -182,10 +182,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         store.AppendNickname(playerId, "Perigee");
         store.AppendNickname(allyId, "Helper");
 
-        AppendPacket(store, playerId, bossId, 11000010, 450, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, playerId, 12000010, 250, "self-heal", 2_000, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, playerId, playerId, 14000010, 300, "self-shield", 3_000, CombatEventKind.Healing, CombatValueKind.Shield);
-        AppendPacket(store, playerId, allyId, 14000010, 200, "ally-shield", 4_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(store, playerId, bossId, 11000010, 450, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(store, playerId, playerId, 14000010, 300, 3_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(store, playerId, allyId, 14000010, 200, 4_000, CombatEventKind.Healing, CombatValueKind.Shield);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -222,14 +222,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int addId = 9002;
 
         store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, addId, 11000010, 200, "direct-hit", 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, addId, 11000010, 200, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
         SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
 
-        AppendPacket(store, playerId, bossId, 11000010, 300, "direct-hit", 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
 
         AssertSelectedCounterpartIds(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
@@ -254,8 +254,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int addId = 9002;
 
         store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, addId, 11000010, 200, "direct-hit", 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, addId, 11000010, 200, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -264,7 +264,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts,
             static counterpart => counterpart.CombatantId == bossId);
 
-        AppendPacket(store, playerId, bossId, 11000010, 300, "direct-hit", 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -295,9 +295,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         store.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 11000010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3, modifiers: DamageModifiers.Back | DamageModifiers.Smite);
-        AppendPacket(store, playerId, bossId, 11000010, 400, "direct-hit", 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.Perfect);
-        AppendPacket(store, playerId, bossId, 11000010, 300, "direct-hit", 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
+        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3, modifiers: DamageModifiers.Back | DamageModifiers.Smite);
+        AppendPacket(store, playerId, bossId, 11000010, 400, 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.Perfect);
+        AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -335,14 +335,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         store.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 13060250, 35515, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 2, marker: 1);
+        AppendPacket(store, playerId, bossId, 13060250, 35515, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 2, marker: 1);
         AppendPacket(
             store,
             playerId,
             bossId,
             13060250,
             152936,
-            "direct-hit",
             2_000,
             CombatEventKind.Damage,
             CombatValueKind.Damage,
@@ -391,7 +390,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             bossId,
             17010230,
             19958,
-            "direct-hit",
             1_000,
             CombatEventKind.Damage,
             CombatValueKind.Damage,
@@ -405,7 +403,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             bossId,
             17730000,
             16790,
-            "direct-hit",
             2_000,
             CombatEventKind.Damage,
             CombatValueKind.Damage,
@@ -418,7 +415,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             bossId,
             17010230,
             19322,
-            "direct-hit",
             3_000,
             CombatEventKind.Damage,
             CombatValueKind.Damage,
@@ -432,7 +428,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             bossId,
             17730000,
             16369,
-            "direct-hit",
             4_000,
             CombatEventKind.Damage,
             CombatValueKind.Damage,
@@ -470,10 +465,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         store.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, "periodic-target-mode-9", 1_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
-        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, "periodic-target-mode-9", 2_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
-        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, "periodic-target-mode-9", 3_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
-        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, "periodic-target-mode-9", 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
+        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 1_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 2_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 3_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -513,19 +508,19 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         store.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 17010010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3);
-        AppendPacket(store, playerId, bossId, 17010010, 100, "periodic-target-mode-9", 1_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
-        AppendPacket(store, playerId, bossId, 17010010, 100, "periodic-target-mode-9", 2_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
+        AppendPacket(store, playerId, bossId, 17010010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3);
+        AppendPacket(store, playerId, bossId, 17010010, 100, 1_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(store, playerId, bossId, 17010010, 100, 2_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
-        AppendPacket(store, playerId, bossId, 17020010, 450, "direct-hit", 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, bossId, 17020010, 90, "periodic-target-mode-9", 3_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
-        AppendPacket(store, playerId, bossId, 17020010, 90, "periodic-target-mode-9", 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
+        AppendPacket(store, playerId, bossId, 17020010, 450, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 17020010, 90, 3_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(store, playerId, bossId, 17020010, 90, 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
-        AppendPacket(store, playerId, bossId, 17030010, 300, "direct-hit", 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Back);
-        AppendPacket(store, playerId, bossId, 17030010, 250, "direct-hit", 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, bossId, 17030010, 80, "periodic-target-mode-9", 6_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
-        AppendPacket(store, playerId, bossId, 17030010, 80, "periodic-target-mode-9", 6_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
-        AppendPacket(store, playerId, bossId, 17030010, 80, "periodic-target-mode-9", 7_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
+        AppendPacket(store, playerId, bossId, 17030010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Back);
+        AppendPacket(store, playerId, bossId, 17030010, 250, 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 17030010, 80, 6_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(store, playerId, bossId, 17030010, 80, 6_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(store, playerId, bossId, 17030010, 80, 7_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -581,17 +576,17 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
 
         store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 100, "direct-hit", 500, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 100, 500, CombatEventKind.Damage, CombatValueKind.Damage);
 
-        AppendPacket(store, bossId, playerId, 1100020, 1, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance | DamageModifiers.Regeneration);
-        AppendPacket(store, bossId, playerId, 1100020, 1, "direct-hit", 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
-        AppendPacket(store, bossId, playerId, 1100020, 0, "compact-evade", 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
-        AppendPacket(store, bossId, playerId, 1100020, 0, "compact-evade", 4_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
-        AppendPacket(store, bossId, playerId, 1100020, 11, "direct-hit", 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry);
-        AppendPacket(store, bossId, playerId, 1100020, 1, "direct-hit", 6_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
-        AppendPacket(store, bossId, playerId, 1100020, 0, "compact-evade", 7_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
-        AppendPacket(store, bossId, playerId, 1100020, 11, "direct-hit", 8_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block);
-        AppendPacket(store, bossId, playerId, 1100020, 1, "direct-hit", 9_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block | DamageModifiers.Perfect);
+        AppendPacket(store, bossId, playerId, 1100020, 1, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance | DamageModifiers.Regeneration);
+        AppendPacket(store, bossId, playerId, 1100020, 1, 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
+        AppendPacket(store, bossId, playerId, 1100020, 0, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
+        AppendPacket(store, bossId, playerId, 1100020, 0, 4_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
+        AppendPacket(store, bossId, playerId, 1100020, 11, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry);
+        AppendPacket(store, bossId, playerId, 1100020, 1, 6_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
+        AppendPacket(store, bossId, playerId, 1100020, 0, 7_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
+        AppendPacket(store, bossId, playerId, 1100020, 11, 8_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block);
+        AppendPacket(store, bossId, playerId, 1100020, 1, 9_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block | DamageModifiers.Perfect);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -633,14 +628,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
 
         store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 100, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 100, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
         AppendPacket(
             store,
             playerId,
             bossId,
             SyntheticCombatSkillCodes.UnresolvedInvincible,
             0,
-            "dodge-invincible",
             2_000,
             CombatEventKind.Damage,
             CombatValueKind.Damage,
@@ -682,15 +676,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
 
         store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 100, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, bossId, playerId, 99000010, 25, "boss-hit", 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, bossId, 11000010, 100, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, bossId, playerId, 99000010, 25, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
         AppendPacket(
             store,
             0,
             playerId,
             SyntheticCombatSkillCodes.UnresolvedInvincible,
             0,
-            "dodge-invincible",
             3_000,
             CombatEventKind.Damage,
             CombatValueKind.Damage,
@@ -797,7 +790,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             .ToArray();
         var battleInvincibles = battlePackets
             .Where(static context => context.TargetId == 3737 && (context.Packet.Modifiers & DamageModifiers.Invincible) != 0)
-            .Select(static context => $"ts={context.Packet.Timestamp}|source={context.SourceId}|marker={context.Packet.Marker}|attempt={context.Packet.AttemptContribution}|family={context.Packet.EffectFamily}")
+            .Select(static context => $"ts={context.Packet.Timestamp}|source={context.SourceId}|marker={context.Packet.Marker}|attempt={context.Packet.AttemptContribution}|effect={DescribePacketEffect(context.Packet)}")
             .ToArray();
         var manualIncomingDamageMetrics = new Dictionary<int, SkillMetrics>();
 
@@ -936,13 +929,64 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
     private readonly record struct StreamLogEntry(long TimestampMilliseconds, bool IsInbound, TcpConnection Connection, byte[] Payload);
 
+    private static string DescribePacketEffect(ParsedCombatPacket packet)
+    {
+        if (packet.IsPeriodicEffect)
+        {
+            return $"{packet.PeriodicRelation}:{packet.PeriodicMode}";
+        }
+
+        return packet.EffectTag == PacketEffectTag.None
+            ? "none"
+            : packet.EffectTag.ToString();
+    }
+
     private static void AppendPacket(
         CombatMetricsStore store,
         int sourceId,
         int targetId,
         int skillCode,
         int damage,
-        string effectFamily,
+        long timestamp,
+        CombatEventKind eventKind,
+        CombatValueKind valueKind,
+        PeriodicEffectRelation periodicRelation,
+        int periodicMode,
+        int type = 0,
+        DamageModifiers modifiers = DamageModifiers.None,
+        int marker = 0,
+        int hitContribution = 1,
+        int attemptContribution = 1,
+        int multiHitCount = 0)
+    {
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = skillCode,
+            OriginalSkillCode = skillCode,
+            Damage = damage,
+            Timestamp = timestamp,
+            Marker = marker,
+            Type = type,
+            HitContribution = hitContribution,
+            AttemptContribution = attemptContribution,
+            MultiHitCount = multiHitCount,
+            Modifiers = modifiers,
+            EventKind = eventKind,
+            ValueKind = valueKind
+        };
+
+        packet.SetPeriodicEffect(periodicRelation, periodicMode);
+        store.AppendCombatPacket(packet);
+    }
+
+    private static void AppendPacket(
+        CombatMetricsStore store,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int damage,
         long timestamp,
         CombatEventKind eventKind,
         CombatValueKind valueKind,
@@ -953,14 +997,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         int attemptContribution = 1,
         int multiHitCount = 0)
     {
-        store.AppendCombatPacket(new ParsedCombatPacket
+        var packet = new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
             SkillCode = skillCode,
             OriginalSkillCode = skillCode,
             Damage = damage,
-            EffectFamily = effectFamily,
             Timestamp = timestamp,
             Marker = marker,
             Type = type,
@@ -970,7 +1013,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             Modifiers = modifiers,
             EventKind = eventKind,
             ValueKind = valueKind
-        });
+        };
+
+        store.AppendCombatPacket(packet);
     }
 
     private static void AssertModifierValues(int actualCount, double actualRate, int expectedCount, int denominator)
@@ -1001,8 +1046,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         store.AppendNpcCode(npcInstanceId, npcCode);
         store.AppendNpcKind(npcInstanceId, NpcKind.Monster);
 
-        AppendPacket(store, playerId, npcInstanceId, 11000010, 500, "direct-hit", 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, npcInstanceId, 11000010, 300, "direct-hit", 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, npcInstanceId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, npcInstanceId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
         viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
@@ -1038,8 +1083,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         store.AppendNpcKind(npcInstanceId, NpcKind.Monster);
         store.AppendNpcName(npcCode, "訓練用稻草人");
 
-        AppendPacket(store, playerId, npcInstanceId, 11000010, 600, "direct-hit", 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, npcInstanceId, 11000010, 400, "direct-hit", 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, npcInstanceId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, playerId, npcInstanceId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
         var record = archive.Archive(snapshot, store, "manual", isAutomatic: false);
