@@ -79,4 +79,41 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(CharacterClass.Ranger, combatant.CharacterClass);
     }
+
+    [Fact]
+    public void DamageContribution_Includes_PreInference_Damage_When_Class_Is_Inferred_Later()
+    {
+        CombatMetricsEngine.LoadSkillMap("en-US");
+        var engine = new CombatMetricsEngine();
+        const int playerId = 103;
+        const int targetId = 9003;
+
+        engine.Store.AppendNickname(playerId, "Late Ranger");
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = targetId,
+            SkillCode = 99999999,
+            OriginalSkillCode = 99999999,
+            Damage = 1000,
+        });
+
+        Thread.Sleep(5);
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = targetId,
+            SkillCode = 14342350,
+            OriginalSkillCode = 14342350,
+            Damage = 500,
+        });
+
+        var snapshot = engine.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
+        Assert.Equal(CharacterClass.Ranger, combatant.CharacterClass);
+        Assert.Equal(1500, combatant.DamageAmount);
+        Assert.Equal(1d, combatant.DamageContribution, 10);
+    }
 }

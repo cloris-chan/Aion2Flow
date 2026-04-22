@@ -218,8 +218,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             var (battleStart, battleEnd) = ResolveBattleWindow(targetDecision.TargetIds);
             var battleTime = battleEnd - battleStart;
 
-            long totalDamage = 0;
-
             dataSnapshot.BattleStartTime = battleStart;
             dataSnapshot.BattleEndTime = battleEnd;
 
@@ -265,9 +263,12 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     personal.CharacterClass ??= inferenceState.Resolve();
                 }
 
-                if (personal.ProcessCombatEvent(packet) && personal.CharacterClass is not null)
-                    totalDamage += packet.Damage;
+                personal.ProcessCombatEvent(packet);
             }
+
+            var totalDamage = dataSnapshot.Combatants.Values
+                .Where(static combatant => combatant.CharacterClass is not null)
+                .Sum(static combatant => combatant.DamageAmount);
 
             foreach (var data in dataSnapshot.Combatants.Values)
             {

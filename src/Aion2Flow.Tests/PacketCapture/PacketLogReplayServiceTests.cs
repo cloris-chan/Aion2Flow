@@ -279,6 +279,30 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(player.IncomingHealing == 48630, $"IncomingHealing={player.IncomingHealing} expected=48630 (HP instance-clear restore + Radiant Benediction, excludes MP restore)\n{diagDump}");
     }
 
+    [Fact]
+    public void Replay_20260423001617_Visible_Combatant_Damage_Contribution_Does_Not_Exceed_One_Hundred_Percent()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260423001617.log"));
+        Assert.True(replay.ReplayedLines > 0);
+
+        var visibleCombatants = replay.Snapshot.Combatants
+            .Where(static pair => pair.Value.CharacterClass is not null)
+            .OrderByDescending(static pair => pair.Value.DamageAmount)
+            .ToArray();
+
+        var visibleContributionTotal = visibleCombatants.Sum(static pair => pair.Value.DamageContribution);
+        var combatantDump = string.Join(
+            Environment.NewLine,
+            visibleCombatants.Select(static pair =>
+                $"id={pair.Key} class={pair.Value.CharacterClass} dmg={pair.Value.DamageAmount} dps={pair.Value.DamagePerSecond:F2} share={pair.Value.DamageContribution:P4} name={pair.Value.Nickname}"));
+
+        Assert.True(visibleCombatants.Length >= 2, combatantDump);
+        Assert.True(visibleContributionTotal <= 1.0000000001d,
+            $"visibleContributionTotal={visibleContributionTotal:P8}\n{combatantDump}");
+    }
+
     private static string WriteTempReplayLog(string logKind, params string[] lines)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.{logKind}.log");
