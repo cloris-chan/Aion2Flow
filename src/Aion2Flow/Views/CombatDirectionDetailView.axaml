@@ -415,14 +415,14 @@
 
                     <Border Grid.Column="1"
                             Classes="CounterpartTable CounterpartSplitTable"
-                            Width="336"
+                            Width="396"
                             Height="{Binding Bounds.Height, ElementName=SupportSummaryMetricsHost}"
                             DataContext="{Binding SupportCounterpartFilter}"
                             x:DataType="vm:DetailCounterpartFilterViewModel"
                             IsVisible="{Binding HasCounterparts}">
                         <Grid RowDefinitions="Auto,*"
                               RowSpacing="8">
-                            <Grid ColumnDefinitions="Auto,*,92,56,92,56"
+                            <Grid ColumnDefinitions="Auto,*,84,48,84,48"
                                   ColumnSpacing="8">
                                 <CheckBox Grid.Column="0"
                                           Grid.ColumnSpan="2"
@@ -452,7 +452,7 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:DetailCounterpartSelectionViewModel">
                                             <Border Classes="CounterpartRow">
-                                                <Grid ColumnDefinitions="Auto,*,92,56,92,56"
+                                                <Grid ColumnDefinitions="Auto,*,84,48,84,48"
                                                       ColumnSpacing="8">
                                                     <CheckBox Grid.Column="0"
                                                               Classes="CounterpartRowCheckBox"
