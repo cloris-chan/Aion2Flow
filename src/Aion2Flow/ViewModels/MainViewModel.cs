@@ -536,7 +536,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var isCaptureLocked = CaptureConnectionGate.IsLocked;
-        var isProxied = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) && lockedConnection.IsLocalNetwork;
+        var isProxied = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) && lockedConnection.SourceIsLocal;
         if (!isCaptureLocked)
         {
             RoundTripTimeMilliseconds = 0;

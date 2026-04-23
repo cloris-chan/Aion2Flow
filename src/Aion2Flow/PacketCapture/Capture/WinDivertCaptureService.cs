@@ -7,6 +7,7 @@ using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Services.Logging;
 using Cloris.Aion2Flow.WinDivert;
 using Cloris.Aion2Flow.WinDivert.Network;
 
@@ -35,7 +36,7 @@ public sealed class WinDivertCaptureService(
                 return null;
             }
 
-            return lockedConnection.IsLocalNetwork
+            return lockedConnection.SourceIsLocal
                 ? _protocolRttEstimator.CurrentMilliseconds
                 : _tcpRttEstimator.CurrentMilliseconds;
         }
@@ -67,13 +68,17 @@ public sealed class WinDivertCaptureService(
         catch (Win32Exception ex)
         {
             await StopAsync();
-            PublishStatus($"WinDivert error: {ex.Message}", isError: true);
+            var message = $"WinDivert error: {ex.Message}";
+            AppLog.Write(AppLogLevel.Error, message);
+            PublishStatus(message, isError: true);
             throw;
         }
         catch (Exception ex)
         {
             await StopAsync();
-            PublishStatus($"Failed to start capture: {ex.Message}", isError: true);
+            var message = $"Failed to start capture: {ex.Message}";
+            AppLog.Write(AppLogLevel.Error, message);
+            PublishStatus(message, isError: true);
             throw;
         }
 
@@ -125,7 +130,6 @@ public sealed class WinDivertCaptureService(
 
                     ushort dstPort = BinaryPrimitives.ReverseEndianness(tcp.DestinationPort);
                     ushort srcPort = BinaryPrimitives.ReverseEndianness(tcp.SourcePort);
-                    var trackedPorts = _processPortDiscoveryService.AllPorts.AsSpan();
 
                     var connection = new TcpConnection(ip.SourceAddress, ip.DestinationAddress, srcPort, dstPort);
 
@@ -135,36 +139,21 @@ public sealed class WinDivertCaptureService(
                     var payloadOffset = ipHeaderLen + tcpHeaderLen;
                     var payloadLength = packetSpan.Length - payloadOffset;
                     var captureTicks = address.Timestamp;
-                    var isLocked = CaptureConnectionGate.IsLocked;
-                    bool isOutbound;
 
-                    if (isLocked)
-                    {
-                        isOutbound = isReversed;
-                    }
-                    else if (ContainsTrackedPort(trackedPorts, srcPort))
-                    {
-                        isOutbound = true;
-                    }
-                    else if (ContainsTrackedPort(trackedPorts, dstPort))
-                    {
-                        isOutbound = false;
-                    }
-                    else
-                    {
-                        continue;
-                    }
+                    var isLocal = isReversed ? connection.DestinationIsLocal : connection.SourceIsLocal;
 
-                    if (isLocked)
+                    if (CaptureConnectionGate.IsLocked)
                     {
-                        var isLocalLocked = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) &&
-                            lockedConnection.IsLocalNetwork;
-
-                        if (isLocalLocked)
+                        if (isLocal)
                         {
                             _tcpRttEstimator.Clear();
+
+                            if (isReversed)
+                            {
+                                TrackLocalProtocolOutboundPayload(_protocolRttEstimator, payloadLength, captureTicks);
+                            }
                         }
-                        else if (isOutbound)
+                        else if (isReversed)
                         {
                             _tcpRttEstimator.TrackOutbound(tcp.HostSequenceNumber, payloadLength, captureTicks);
                         }
@@ -177,15 +166,23 @@ public sealed class WinDivertCaptureService(
                     {
                         _tcpRttEstimator.Clear();
                         _protocolRttEstimator.Clear();
+
+                        if (!_processPortDiscoveryService.AllPorts.Contains(dstPort))
+                            continue;
                     }
 
                     if (payloadLength == 0)
                         continue;
 
-                    var direction = isOutbound ? "outbound" : "inbound";
+                    var direction = isReversed ? "outbound" : "inbound";
                     RawPacketDump.Append(direction, srcPort, dstPort, tcp.HostSequenceNumber, tcp.HostAcknowledgmentNumber, captureTicks, packetSpan.Slice(payloadOffset, payloadLength));
 
-                    var capturedPacket = CapturedPacket.Create(connection, bufferOwner, payloadOffset, payloadLength, tcp.HostSequenceNumber, tcp.HostAcknowledgmentNumber, isOutbound);
+                    if (isReversed)
+                    {
+                        continue;
+                    }
+
+                    var capturedPacket = CapturedPacket.Create(connection, bufferOwner, payloadOffset, payloadLength, tcp.HostSequenceNumber);
                     bufferOwner = null;
                     if (!PacketCaptureChannel.TryWrite(capturedPacket))
                     {
@@ -210,33 +207,6 @@ public sealed class WinDivertCaptureService(
 
             bufferOwner?.Dispose();
         }
-    }
-
-    private static bool ContainsTrackedPort(ReadOnlySpan<ushort> sortedPorts, ushort port)
-    {
-        var low = 0;
-        var high = sortedPorts.Length - 1;
-
-        while (low <= high)
-        {
-            var mid = low + ((high - low) / 2);
-            var candidate = sortedPorts[mid];
-            if (candidate == port)
-            {
-                return true;
-            }
-
-            if (candidate < port)
-            {
-                low = mid + 1;
-            }
-            else
-            {
-                high = mid - 1;
-            }
-        }
-
-        return false;
     }
 
     public async Task StopAsync()
@@ -299,7 +269,7 @@ public sealed class WinDivertCaptureService(
             return;
         }
 
-        if (!lockedConnection.IsLocalNetwork)
+        if (!lockedConnection.SourceIsLocal)
         {
             _protocolRttEstimator.Clear();
             return;
@@ -313,12 +283,6 @@ public sealed class WinDivertCaptureService(
 
         if (isReversed)
         {
-            if (observation.EventName == "frame-batch" &&
-                TryExtractFrameLength(observation.Detail, out var frameLength))
-            {
-                _protocolRttEstimator.TrackOutboundFrame(frameLength, observation.TimestampTicks);
-            }
-
             return;
         }
 
@@ -328,19 +292,13 @@ public sealed class WinDivertCaptureService(
         }
     }
 
-    private static bool TryExtractFrameLength(string detail, out int frameLength)
+    internal static void TrackLocalProtocolOutboundPayload(ProtocolRoundTripEstimator estimator, int payloadLength, long timestamp)
     {
-        frameLength = 0;
-        const string pattern = "frameLength=";
-        var start = detail.IndexOf(pattern, StringComparison.Ordinal);
-        if (start < 0)
+        if (payloadLength <= 0)
         {
-            return false;
+            return;
         }
 
-        start += pattern.Length;
-        var end = detail.IndexOf('|', start);
-        var value = end >= 0 ? detail[start..end] : detail[start..];
-        return int.TryParse(value, out frameLength);
+        estimator.TrackOutboundFrame(payloadLength, timestamp);
     }
 }

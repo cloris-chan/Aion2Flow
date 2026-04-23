@@ -55,9 +55,7 @@ public static class CaptureConnectionGate
 
     public static void LockOn(in TcpConnection targetSession)
     {
-        var newState = new LockState(targetSession);
-
-        _currentState = newState;
+        _currentState = new LockState(targetSession);
     }
 
     public static void Unlock()

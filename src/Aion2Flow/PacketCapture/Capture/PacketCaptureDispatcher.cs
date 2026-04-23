@@ -73,11 +73,11 @@ public sealed class PacketCaptureDispatcher(CombatMetricsStore store)
     {
         if (!_tcpStreams.TryGetValue(packet.Connection, out var tcpStream))
         {
-            tcpStream = TcpCaptureStreamState.Create(packet.IsOutbound, store);
+            tcpStream = TcpCaptureStreamState.Create(store);
             _tcpStreams[packet.Connection] = tcpStream;
         }
 
-        var context = new DispatchContext(tcpStream, packet.Connection, packet.IsOutbound);
+        var context = new DispatchContext(tcpStream, packet.Connection);
         tcpStream.Reassembler.Feed(packet.SequenceNumber, packet.Payload, ref context, HandleReassembledChunk);
 
         if (context.HasParsed && !CaptureConnectionGate.IsLocked)
@@ -91,17 +91,9 @@ public sealed class PacketCaptureDispatcher(CombatMetricsStore store)
 
     private static void HandleReassembledChunk(uint sequenceNumber, ReadOnlySpan<byte> chunk, ref DispatchContext context)
     {
-        RawPacketDump.AppendReassembled(context.IsOutbound ? "outbound" : "inbound", context.Connection, sequenceNumber, chunk);
-        if (context.Stream.Processor is null)
-        {
-            return;
-        }
+        RawPacketDump.AppendReassembled("inbound", context.Connection, sequenceNumber, chunk);
 
-        var parsedChunk = context.Stream.Processor.AppendAndProcess(chunk, context.Connection);
-        if (context.Stream.CanLockConnection)
-        {
-            context.HasParsed |= parsedChunk;
-        }
+        context.HasParsed |= context.Stream.Processor.AppendAndProcess(chunk, context.Connection);
     }
 
     private void DisposeOtherStreams(TcpConnection keepConnection)
@@ -114,7 +106,7 @@ public sealed class PacketCaptureDispatcher(CombatMetricsStore store)
                 continue;
             }
 
-            connectionsToRemove ??= new List<TcpConnection>(Math.Max(_tcpStreams.Count - 1, 1));
+            connectionsToRemove ??= new(Math.Max(_tcpStreams.Count - 1, 1));
             connectionsToRemove.Add(connection);
         }
 
@@ -147,34 +139,30 @@ public sealed class PacketCaptureDispatcher(CombatMetricsStore store)
         }
     }
 
-    private struct DispatchContext(TcpCaptureStreamState stream, TcpConnection connection, bool isOutbound)
+    private struct DispatchContext(TcpCaptureStreamState stream, TcpConnection connection)
     {
         public readonly TcpCaptureStreamState Stream = stream;
         public readonly TcpConnection Connection = connection;
-        public readonly bool IsOutbound = isOutbound;
         public bool HasParsed;
     }
 
-    private sealed class TcpCaptureStreamState(TcpStreamReassembler reassembler, PacketStreamProcessor? processor, bool canLockConnection) : IDisposable
+    private sealed class TcpCaptureStreamState(TcpStreamReassembler reassembler, PacketStreamProcessor processor) : IDisposable
     {
         public TcpStreamReassembler Reassembler { get; } = reassembler;
 
-        public PacketStreamProcessor? Processor { get; } = processor;
-
-        public bool CanLockConnection { get; } = canLockConnection;
+        public PacketStreamProcessor Processor { get; } = processor;
 
         public void Dispose()
         {
-            Processor?.Dispose();
+            Processor.Dispose();
             Reassembler.Dispose();
         }
 
-        public static TcpCaptureStreamState Create(bool isOutbound, CombatMetricsStore store)
+        public static TcpCaptureStreamState Create(CombatMetricsStore store)
         {
             return new TcpCaptureStreamState(
                 new TcpStreamReassembler(),
-                isOutbound ? new PacketStreamProcessor(new CombatMetricsStore()) : new PacketStreamProcessor(store),
-                canLockConnection: !isOutbound);
+                new PacketStreamProcessor(store));
         }
     }
 }

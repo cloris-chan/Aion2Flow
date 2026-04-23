@@ -1,6 +1,6 @@
+using System.Buffers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Microsoft.Extensions.ObjectPool;
-using System.Buffers;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
@@ -15,8 +15,6 @@ public sealed class CapturedPacket
     private int _payloadLength; 
     public TcpConnection Connection { get; private set; }
     public uint SequenceNumber { get; private set; }
-    public uint AcknowledgmentNumber { get; private set; }
-    public bool IsOutbound { get; private set; }
 
     public ReadOnlySpan<byte> Payload => _bufferOwner!.Memory.Span.Slice(_payloadOffset, _payloadLength);
 
@@ -34,9 +32,7 @@ public sealed class CapturedPacket
         IMemoryOwner<byte> bufferOwner,
         int payloadOffset,
         int payloadLength,
-        uint sequenceNumber,
-        uint acknowledgmentNumber,
-        bool isOutbound)
+        uint sequenceNumber)
     {
         var instance = _pool.Get();
         instance.Connection = connection;
@@ -44,8 +40,6 @@ public sealed class CapturedPacket
         instance._payloadOffset = payloadOffset;
         instance._payloadLength = payloadLength;
         instance.SequenceNumber = sequenceNumber;
-        instance.AcknowledgmentNumber = acknowledgmentNumber;
-        instance.IsOutbound = isOutbound;
         return instance;
     }
 

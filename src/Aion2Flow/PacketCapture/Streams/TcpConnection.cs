@@ -4,7 +4,9 @@ namespace Cloris.Aion2Flow.PacketCapture.Streams;
 
 public readonly record struct TcpConnection(uint SourceAddress, uint DestinationAddress, ushort SourcePort, ushort DestinationPort)
 {
-    public bool IsLocalNetwork => IsLocalNetworkAddress(SourceAddress) || IsLocalNetworkAddress(DestinationAddress);
+    public bool SourceIsLocal => IsLocalNetworkAddress(SourceAddress);
+
+    public bool DestinationIsLocal => IsLocalNetworkAddress(DestinationAddress);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsSameConnection(in TcpConnection other, out bool isReversed)

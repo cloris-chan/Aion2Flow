@@ -1,5 +1,5 @@
-using Cloris.Aion2Flow.PacketCapture.Capture;
 using System.Diagnostics;
+using Cloris.Aion2Flow.PacketCapture.Capture;
 
 namespace Cloris.Aion2Flow.Tests.PacketCapture;
 
@@ -77,6 +77,35 @@ public sealed class ProtocolRoundTripEstimatorTests
 
         estimator.Clear();
 
+        Assert.Null(estimator.CurrentMilliseconds);
+    }
+
+    [Fact]
+    public void WinDivertCaptureService_Tracks_Local_Outbound_Payload_Length_For_Protocol_Rtt()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var startedAt = Stopwatch.GetTimestamp();
+        var resolvedAt = startedAt + (Stopwatch.Frequency / 40);
+
+        WinDivertCaptureService.TrackLocalProtocolOutboundPayload(estimator, payloadLength: 31, startedAt);
+
+        var resolved = estimator.TryResolveInboundEvent("compact-0638", resolvedAt, out var smoothedMilliseconds);
+
+        Assert.True(resolved);
+        Assert.True(smoothedMilliseconds >= 20d);
+    }
+
+    [Fact]
+    public void WinDivertCaptureService_Ignores_Zero_Length_Local_Outbound_Payload()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var startedAt = Stopwatch.GetTimestamp();
+
+        WinDivertCaptureService.TrackLocalProtocolOutboundPayload(estimator, payloadLength: 0, startedAt);
+
+        var resolved = estimator.TryResolveInboundEvent("remain-hp", startedAt + Stopwatch.Frequency / 40, out _);
+
+        Assert.False(resolved);
         Assert.Null(estimator.CurrentMilliseconds);
     }
 
