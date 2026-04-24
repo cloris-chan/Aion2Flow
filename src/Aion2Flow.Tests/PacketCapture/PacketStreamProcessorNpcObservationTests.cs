@@ -501,6 +501,95 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Empty(store.CombatPacketsBySource);
     }
 
+    [Fact]
+    public void Synthesizes_Invincible_From_2C38_Result11_When_Tail_Matches_Recent_Damage()
+    {
+        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 1734,
+            TargetId = 110150,
+            OriginalSkillCode = 16330000,
+            SkillCode = 16330000,
+            Marker = 209,
+            Damage = 1900,
+            Timestamp = 1_000,
+            FrameOrdinal = 10,
+            BatchOrdinal = 100
+        });
+
+        store.RegisterObservation2C38(1734, 1, 202, 11, 1734, 16330000, 1_010, 11, 100);
+
+        Assert.True(store.CombatPacketsBySource.TryGetValue(1734, out var packets));
+        var invincible = Assert.Single(packets, static packet => (packet.Modifiers & DamageModifiers.Invincible) != 0);
+        Assert.Equal(110150, invincible.TargetId);
+        Assert.Equal(16330000, invincible.SkillCode);
+        Assert.Equal(202, invincible.Marker);
+        Assert.Equal(0, invincible.Damage);
+        Assert.Equal(0, invincible.HitContribution);
+        Assert.Equal(1, invincible.AttemptContribution);
+    }
+
+    [Fact]
+    public void Ignores_2C38_Result11_When_No_Recent_Damage_Target_Matches()
+    {
+        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 1734,
+            TargetId = 110150,
+            OriginalSkillCode = 16330000,
+            SkillCode = 16330000,
+            Marker = 209,
+            Damage = 1900,
+            Timestamp = 1_000,
+            FrameOrdinal = 10,
+            BatchOrdinal = 100
+        });
+
+        store.RegisterObservation2C38(1734, 1, 206, 11, 1734, 16330000, 1_500, 30, 105);
+
+        Assert.True(store.CombatPacketsBySource.TryGetValue(1734, out var packets));
+        Assert.DoesNotContain(packets, static packet => (packet.Modifiers & DamageModifiers.Invincible) != 0);
+    }
+
+    [Fact]
+    public void Does_Not_Treat_Compact_Healing_Value_As_Aggregated_Healing()
+    {
+        CombatMetricsEngine.SetGameResources(
+            [
+                new Skill(16750000, "Spirit Revitalization", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", SkillKind.Healing, SkillSemantics.Healing | SkillSemantics.Support, null)
+            ],
+            new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        store.RegisterCompactValue0438(1734, 1734, 16750002, 198, 0, 2, 12_758, 1_000, 1, 100);
+
+        Assert.False(store.CombatPacketsBySource.TryGetValue(1734, out _));
+    }
+
+    [Fact]
+    public void Does_Not_Flush_Impact_Absorption_Compact_Value_As_Zero_Damage_Hit()
+    {
+        CombatMetricsEngine.SetGameResources(
+            [
+                new Skill(1800055, "Impact Absorption", SkillCategory.Npc, SkillSourceType.ItemSkill, "npc", SkillKind.Unknown, SkillSemantics.None, null)
+            ],
+            new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        store.RegisterCompactValue0438(1734, 168467, 1800055, 16, 0, 2, 1, 1_000, 1, 100);
+
+        var flushed = store.FlushOrphanCompactHits();
+
+        Assert.Equal(0, flushed);
+        Assert.False(store.CombatPacketsBySource.TryGetValue(168467, out _));
+    }
+
     private static SkillCollection BuildMultiHitSkillMap()
     {
         return

@@ -15,7 +15,8 @@ public enum PacketEffectTag : byte
     None,
     ActiveDodgeEvade,
     CompactEvade,
-    PeriodicLinkInvincible
+    PeriodicLinkInvincible,
+    Aux2C38Invincible
 }
 
 public sealed class ParsedCombatPacket
@@ -179,6 +180,7 @@ public sealed class ParsedCombatPacket
             PacketEffectTag.ActiveDodgeEvade => "active-dodge-evade",
             PacketEffectTag.CompactEvade => "compact-evade",
             PacketEffectTag.PeriodicLinkInvincible => "periodic-link-invincible",
+            PacketEffectTag.Aux2C38Invincible => "aux-2c38-invincible",
             _ => string.Empty
         };
     }

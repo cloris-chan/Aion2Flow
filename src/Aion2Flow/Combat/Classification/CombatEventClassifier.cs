@@ -9,6 +9,7 @@ public static class CombatEventClassifier
 {
     private const int RestoreHpSkillCode = 1010000;
     private const int InstanceClearRestoreBaseSkillCode = 1900000;
+    private const int SpiritDescentSummonRestoreSkillCode = 16990004;
     private static readonly ConcurrentDictionary<int, bool> NonHealthResourceRestoreBaseSkillCache = [];
 
     internal static void ClearCaches()
@@ -38,8 +39,18 @@ public static class CombatEventClassifier
             return CombatEventKind.Healing;
         }
 
+        if (IsSpiritDescentSummonRestore(packet))
+        {
+            return CombatEventKind.Healing;
+        }
+
         var semantics = ResolveSkillSemantics(packet.SkillCode);
         if (IsOffensiveHitFromDualPurposeSkill(packet, semantics))
+        {
+            return CombatEventKind.Damage;
+        }
+
+        if (IsObservedOtherTargetSupportDamage(packet, semantics))
         {
             return CombatEventKind.Damage;
         }
@@ -143,8 +154,18 @@ public static class CombatEventClassifier
             return CombatValueKind.Healing;
         }
 
+        if (IsSpiritDescentSummonRestore(packet))
+        {
+            return CombatValueKind.Healing;
+        }
+
         var semantics = ResolveSkillSemantics(packet.SkillCode);
         if (IsOffensiveHitFromDualPurposeSkill(packet, semantics))
+        {
+            return CombatValueKind.Damage;
+        }
+
+        if (IsObservedOtherTargetSupportDamage(packet, semantics))
         {
             return CombatValueKind.Damage;
         }
@@ -539,6 +560,31 @@ public static class CombatEventClassifier
                && (semantics & SkillSemantics.DrainOrAbsorb) == 0;
     }
 
+    private static bool IsObservedOtherTargetSupportDamage(ParsedCombatPacket packet, SkillSemantics semantics)
+    {
+        if (packet.IsPeriodicEffect ||
+            packet.Damage <= 0 ||
+            packet.SourceId <= 0 ||
+            packet.TargetId <= 0 ||
+            packet.SourceId == packet.TargetId)
+        {
+            return false;
+        }
+
+        if ((semantics & SkillSemantics.Support) == 0)
+        {
+            return false;
+        }
+
+        return (semantics & (SkillSemantics.Damage |
+                             SkillSemantics.PeriodicDamage |
+                             SkillSemantics.Healing |
+                             SkillSemantics.PeriodicHealing |
+                             SkillSemantics.DrainOrAbsorb |
+                             SkillSemantics.ShieldOrBarrier |
+                             SkillSemantics.NonHealthResourceRestore)) == 0;
+    }
+
     private static bool IsDamageTaggedDirectSelfSupportSignal(ParsedCombatPacket packet, SkillSemantics semantics)
     {
         if (packet.IsPeriodicEffect ||
@@ -830,5 +876,21 @@ public static class CombatEventClassifier
         }
 
         return true;
+    }
+
+    private static bool IsSpiritDescentSummonRestore(ParsedCombatPacket packet)
+    {
+        if (packet.IsPeriodicEffect ||
+            packet.Damage <= 0 ||
+            packet.SourceId <= 0 ||
+            packet.TargetId <= 0 ||
+            packet.SourceId != packet.TargetId)
+        {
+            return false;
+        }
+
+        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
+        return packet.SkillCode == SpiritDescentSummonRestoreSkillCode ||
+               originalSkillCode == SpiritDescentSummonRestoreSkillCode;
     }
 }

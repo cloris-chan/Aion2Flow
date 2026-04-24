@@ -517,6 +517,7 @@ public sealed class PacketLogReplayService
             parsed.Marker,
             parsed.LayoutTag,
             parsed.Type,
+            parsed.Value,
             timestamp,
             frameOrdinal,
             batchOrdinal);
@@ -686,7 +687,16 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.RegisterObservation2C38(parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, timestamp, frameOrdinal, batchOrdinal);
+        store.RegisterObservation2C38(
+            parsed.SourceId,
+            parsed.Mode,
+            parsed.SequenceId,
+            parsed.ResultCode,
+            parsed.TailSourceId,
+            parsed.TailSkillCodeRaw,
+            timestamp,
+            frameOrdinal,
+            batchOrdinal);
         return true;
     }
 

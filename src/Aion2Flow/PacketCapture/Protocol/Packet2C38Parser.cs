@@ -8,7 +8,9 @@ internal readonly record struct Packet2C38Observation(
     int StateCode,
     int SequenceId,
     int ResultCode,
-    int TailLength);
+    int TailLength,
+    int TailSourceId,
+    int TailSkillCodeRaw);
 
 internal static class Packet2C38Parser
 {
@@ -28,13 +30,30 @@ internal static class Packet2C38Parser
         if (!reader.TryReadVarInt(out var sequenceId)) return false;
         if (!reader.TryReadVarInt(out var resultCode)) return false;
 
+        var tailSourceId = 0;
+        var tailSkillCodeRaw = 0;
+        var tailLength = reader.Remaining;
+        if (tailLength >= 5)
+        {
+            var tailReader = reader;
+            if (tailReader.TryReadVarInt(out var parsedTailSourceId) &&
+                tailReader.Remaining >= 4 &&
+                tailReader.TryReadUInt32Le(out var parsedTailSkillCodeRaw))
+            {
+                tailSourceId = parsedTailSourceId;
+                tailSkillCodeRaw = unchecked((int)parsedTailSkillCodeRaw);
+            }
+        }
+
         result = new Packet2C38Observation(
             sourceId,
             mode,
             stateCode,
             sequenceId,
             resultCode,
-            reader.Remaining);
+            tailLength,
+            tailSourceId,
+            tailSkillCodeRaw);
         return true;
     }
 }

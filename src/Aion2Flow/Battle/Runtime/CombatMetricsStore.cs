@@ -169,6 +169,9 @@ public sealed class CombatMetricsStore
                 if (skill.SourceType != SkillSourceType.ItemSkill)
                     continue;
 
+                if (IsNonCombatCompactItemSkill(skill))
+                    continue;
+
                 if ((skill.Semantics & SkillSemantics.PeriodicDamage) != 0)
                     continue;
 
@@ -200,12 +203,15 @@ public sealed class CombatMetricsStore
     }
 
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int type, long timestamp) =>
-        RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, 0, type, timestamp, NextObservationOrdinal(), NextObservationOrdinal());
+        RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, 0, type, 0, timestamp, NextObservationOrdinal(), NextObservationOrdinal());
 
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp) =>
-        RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, timestamp, NextObservationOrdinal(), NextObservationOrdinal());
+        RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, 0, timestamp, NextObservationOrdinal(), NextObservationOrdinal());
 
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal)
+        => RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, 0, timestamp, frameOrdinal, batchOrdinal);
+
+    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         RememberNpcObservationSource(sourceId);
 
@@ -657,6 +663,18 @@ public sealed class CombatMetricsStore
         => RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, timestamp, frameOrdinal, frameOrdinal);
 
     public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, long timestamp, long frameOrdinal, long batchOrdinal)
+        => RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, 0, 0, timestamp, frameOrdinal, batchOrdinal);
+
+    public void RegisterObservation2C38(
+        int instanceId,
+        int mode,
+        int sequenceId,
+        int resultCode,
+        int tailSourceId,
+        int tailSkillCodeRaw,
+        long timestamp,
+        long frameOrdinal,
+        long batchOrdinal)
     {
         AppendNpc2C38State(instanceId, sequenceId, resultCode);
         RememberNpcObservationSource(instanceId);
@@ -670,10 +688,91 @@ public sealed class CombatMetricsStore
         {
             EnsureAvoidanceBatch_NoLock(batchOrdinal);
         }
+
+        TryStore2C38Invincible(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal);
     }
 
     public void RegisterObservation2C38(int instanceId, int sequenceId, int resultCode, long timestamp) =>
         RegisterObservation2C38(instanceId, 1, sequenceId, resultCode, timestamp, NextObservationOrdinal(), NextObservationOrdinal());
+
+    private void TryStore2C38Invincible(
+        int instanceId,
+        int mode,
+        int sequenceId,
+        int resultCode,
+        int tailSourceId,
+        int tailSkillCodeRaw,
+        long timestamp,
+        long frameOrdinal,
+        long batchOrdinal)
+    {
+        if (mode != 1 ||
+            resultCode != 11 ||
+            instanceId <= 0 ||
+            tailSourceId != instanceId ||
+            tailSkillCodeRaw <= 0)
+        {
+            return;
+        }
+
+        if (!TryResolveRecentDamageTarget(instanceId, tailSkillCodeRaw, timestamp, frameOrdinal, out var targetId))
+        {
+            return;
+        }
+
+        StoreInvincible(
+            instanceId,
+            targetId,
+            tailSkillCodeRaw,
+            sequenceId,
+            timestamp,
+            frameOrdinal,
+            batchOrdinal,
+            PacketEffectTag.Aux2C38Invincible);
+    }
+
+    private bool TryResolveRecentDamageTarget(int sourceId, int skillCodeRaw, long timestamp, long frameOrdinal, out int targetId)
+    {
+        targetId = 0;
+
+        var trackedSkillCode = ResolveTrackedSkillCode(skillCodeRaw);
+        if (trackedSkillCode <= 0)
+        {
+            return false;
+        }
+
+        lock (_multiHitLock)
+        {
+            for (var i = _recentDamageCandidates.Count - 1; i >= 0; i--)
+            {
+                var candidate = _recentDamageCandidates[i];
+                if (candidate.SourceId != sourceId ||
+                    candidate.SkillCode != trackedSkillCode ||
+                    candidate.TargetId <= 0)
+                {
+                    continue;
+                }
+
+                var deltaMilliseconds = timestamp - candidate.Packet.Timestamp;
+                if (deltaMilliseconds < 0 || deltaMilliseconds > 250)
+                {
+                    continue;
+                }
+
+                if (frameOrdinal > 0 &&
+                    candidate.Packet.FrameOrdinal > 0 &&
+                    frameOrdinal - candidate.Packet.FrameOrdinal > 8)
+                {
+                    continue;
+                }
+
+                targetId = candidate.TargetId;
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public bool TryGetNpc2C38State(int instanceId, int? preferredSequenceId, out int sequenceId, out int resultCode)
     {
@@ -801,6 +900,7 @@ public sealed class CombatMetricsStore
         {
             _pendingDodgeSignalsBySource.Clear();
             _pendingCompactAvoidances.Clear();
+            _pendingCompactDamageEntries.Clear();
             _pendingDirectAvoidancePackets.Clear();
             _currentBatchDodgeTargets.Clear();
             _resolvedAvoidanceSignatures.Clear();
@@ -1418,4 +1518,7 @@ public sealed class CombatMetricsStore
         return packet.ValueKind is CombatValueKind.Damage or CombatValueKind.DrainDamage or CombatValueKind.Unknown
                || packet.EventKind == CombatEventKind.Damage;
     }
+
+    private static bool IsNonCombatCompactItemSkill(Skill skill)
+        => skill.Id == 1800055;
 }

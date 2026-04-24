@@ -207,6 +207,8 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                 }
             }
 
+            InferPreexistingSummonOwners();
+
             var dataSnapshot = new DamageMeterSnapshot();
             var targetDecision = DecideTarget();
             dataSnapshot.BattleId = _currentBattleId;
@@ -548,6 +550,134 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             SkillCategory.Chanter => CharacterClass.Chanter,
             _ => null,
         };
+    }
+
+    private void InferPreexistingSummonOwners()
+    {
+        if (SkillMap.Count == 0)
+        {
+            return;
+        }
+
+        var ownerCandidatesByCategory = new Dictionary<SkillCategory, HashSet<int>>();
+        var summonCandidates = new Dictionary<int, SkillCategory>();
+
+        foreach (var (sourceId, packets) in Store.CombatPacketsBySource)
+        {
+            if (sourceId <= 0 || Store.SummonOwnerByInstance.ContainsKey(sourceId))
+            {
+                continue;
+            }
+
+            if (Store.TryGetNpcRuntimeState(sourceId, out var npcState) &&
+                npcState.Kind is { } npcKind &&
+                npcKind is not NpcKind.Unknown and not NpcKind.Summon)
+            {
+                continue;
+            }
+
+            var summonSkillCategories = new HashSet<SkillCategory>();
+            var hasOwnerSkillEvidence = false;
+
+            foreach (var packet in packets)
+            {
+                if (!TryResolveSkill(packet, out var skill))
+                {
+                    continue;
+                }
+
+                if (IsPreexistingSummonSignatureSkill(skill))
+                {
+                    summonSkillCategories.Add(skill.Category);
+                    continue;
+                }
+
+                if (!IsSummonOwnerCandidateSkill(skill))
+                {
+                    continue;
+                }
+
+                hasOwnerSkillEvidence = true;
+                var owners = ownerCandidatesByCategory.GetValueOrDefault(skill.Category);
+                if (owners is null)
+                {
+                    owners = [];
+                    ownerCandidatesByCategory[skill.Category] = owners;
+                }
+
+                owners.Add(sourceId);
+            }
+
+            if (!hasOwnerSkillEvidence &&
+                summonSkillCategories.Count == 1 &&
+                summonSkillCategories.First() != SkillCategory.Unknown)
+            {
+                summonCandidates[sourceId] = summonSkillCategories.First();
+            }
+        }
+
+        foreach (var (summonId, category) in summonCandidates)
+        {
+            if (Store.SummonOwnerByInstance.ContainsKey(summonId) ||
+                !ownerCandidatesByCategory.TryGetValue(category, out var owners))
+            {
+                continue;
+            }
+
+            var ownerId = 0;
+            foreach (var candidateOwnerId in owners)
+            {
+                if (candidateOwnerId == summonId)
+                {
+                    continue;
+                }
+
+                if (ownerId != 0)
+                {
+                    ownerId = 0;
+                    break;
+                }
+
+                ownerId = candidateOwnerId;
+            }
+
+            if (ownerId > 0)
+            {
+                Store.AppendSummon(ownerId, summonId);
+            }
+        }
+    }
+
+    private static bool TryResolveSkill(ParsedCombatPacket packet, out Skill skill)
+    {
+        if (packet.SkillCode > 0 && SkillMap.TryGetValue(packet.SkillCode, out skill))
+        {
+            return true;
+        }
+
+        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
+        if (InferOriginalSkillCode(originalSkillCode) is { } inferredSkillCode &&
+            SkillMap.TryGetValue(inferredSkillCode, out skill))
+        {
+            return true;
+        }
+
+        skill = default;
+        return false;
+    }
+
+    private static bool IsSummonOwnerCandidateSkill(Skill skill)
+        => skill.SourceType == SkillSourceType.PcSkill &&
+           MapSkillCategoryToClass(skill.Category) is not null;
+
+    private static bool IsPreexistingSummonSignatureSkill(Skill skill)
+    {
+        if (skill.Category != SkillCategory.Elementalist)
+        {
+            return false;
+        }
+
+        return skill.Name.Contains("Spirit:", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static SkillVariantInfo ParseSkillVariant(int originalSkillCode)

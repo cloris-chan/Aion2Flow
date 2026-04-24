@@ -86,6 +86,31 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
+    public void Classifies_Other_Target_Support_Only_Direct_Value_As_Damage()
+    {
+        CombatMetricsEngine.SkillMap =
+        [
+            CreateSkill(1800030, "Rush", SkillCategory.Npc, SkillSourceType.Unknown,
+                SkillKind.Support, SkillSemantics.Support)
+        ];
+
+        var packet = new ParsedCombatPacket
+        {
+            TargetId = 1734,
+            SourceId = 45872,
+            SkillCode = 1800030,
+            OriginalSkillCode = 1800033,
+            Damage = 185,
+            Modifiers = DamageModifiers.Back
+        };
+
+        CombatMetricsEngine.NormalizePacketForStorage(packet);
+
+        Assert.Equal(CombatEventKind.Damage, packet.EventKind);
+        Assert.Equal(CombatValueKind.Damage, packet.ValueKind);
+    }
+
+    [Fact]
     public void Classifies_Direct_Hit_On_PeriodicDamage_Skill_As_Direct_Damage()
     {
         CombatMetricsEngine.SkillMap =

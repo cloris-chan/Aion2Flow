@@ -1294,6 +1294,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 compact.Marker,
                 compact.LayoutTag,
                 compact.Type,
+                compact.Value,
                 timestamp,
                 frameOrdinal,
                 batchOrdinal);
@@ -1552,6 +1553,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             parsed.Mode,
             parsed.SequenceId,
             parsed.ResultCode,
+            parsed.TailSourceId,
+            parsed.TailSkillCodeRaw,
             CurrentTimestampMilliseconds,
             frameOrdinal,
             batchOrdinal);
@@ -1559,7 +1562,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "aux-2c38",
             _connection,
-            $"source={parsed.SourceId}|mode={parsed.Mode}|state={parsed.StateCode}|seq={parsed.SequenceId}|result={parsed.ResultCode}|tailLen={parsed.TailLength}",
+            $"source={parsed.SourceId}|mode={parsed.Mode}|state={parsed.StateCode}|seq={parsed.SequenceId}|result={parsed.ResultCode}|tailLen={parsed.TailLength}|tailSource={parsed.TailSourceId}|tailSkillRaw={parsed.TailSkillCodeRaw}{FormatSkillHint((uint)parsed.TailSkillCodeRaw)}",
             packet);
 
         return _hasParsed = true;

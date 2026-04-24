@@ -55,4 +55,105 @@ public sealed class CombatMetricsEngineSummonAttributionTests
         Assert.Equal(8993, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
     }
+
+    [Fact]
+    public void Infers_Preexisting_Elementalist_Summon_From_Signature_Skills()
+    {
+        CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var engine = new CombatMetricsEngine();
+        const int ownerId = 1734;
+        const int summonId = 123483;
+        const int targetId = 110150;
+
+        engine.Store.AppendNickname(ownerId, "Owner");
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 405,
+            Timestamp = 1_000
+        });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = targetId,
+            OriginalSkillCode = 16100003,
+            SkillCode = 16100003,
+            Damage = 1205,
+            Timestamp = 1_010
+        });
+
+        var snapshot = engine.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        Assert.False(snapshot.Combatants.ContainsKey(summonId));
+        Assert.Equal(1610, owner.DamageAmount);
+        Assert.True(engine.Store.SummonOwnerByInstance.TryGetValue(summonId, out var inferredOwnerId));
+        Assert.Equal(ownerId, inferredOwnerId);
+    }
+
+    [Fact]
+    public void Counts_Spirit_Descent_Summon_Restore_As_Owner_Healing()
+    {
+        CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var engine = new CombatMetricsEngine();
+        const int ownerId = 1734;
+        const int summonId = 76631;
+        const int targetId = 110150;
+
+        engine.Store.AppendNickname(ownerId, "Owner");
+        engine.Store.AppendSummon(ownerId, summonId);
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 405,
+            Timestamp = 1_000
+        });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = summonId,
+            OriginalSkillCode = 16990004,
+            SkillCode = 16990004,
+            Damage = 10_921,
+            Timestamp = 1_050
+        });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = summonId,
+            OriginalSkillCode = 16990004,
+            SkillCode = 16990004,
+            Damage = 110_000,
+            Timestamp = 1_051
+        });
+
+        var snapshot = engine.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        Assert.Equal(120_921, owner.HealingAmount);
+        Assert.True(owner.Skills.TryGetValue(16990004, out var restore));
+        Assert.Equal(120_921, restore.HealingAmount);
+        Assert.Equal(2, restore.HealingTimes);
+    }
+
+    private static SkillCollection BuildElementalistSummonSkillMap()
+    {
+        return
+        [
+            new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null),
+            new Skill(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", SkillKind.Unknown, SkillSemantics.None, null),
+            new Skill(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", SkillKind.Support, SkillSemantics.Support, null)
+        ];
+    }
 }
