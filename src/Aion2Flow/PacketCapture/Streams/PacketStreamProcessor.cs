@@ -51,16 +51,22 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         return true;
     }
 
-    private void TryApplyNpcCatalog(int instanceId, int npcCode)
+    private void TryApplyNpcCatalog(int instanceId, int npcCode, bool requireCatalogEntry = false)
     {
         if (instanceId <= 0 || npcCode <= 0)
         {
             return;
         }
 
+        var hasCatalogEntry = CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry);
+        if (requireCatalogEntry && !hasCatalogEntry)
+        {
+            return;
+        }
+
         store.AppendNpcCode(instanceId, npcCode);
 
-        if (!CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry))
+        if (!hasCatalogEntry)
         {
             return;
         }
@@ -1620,7 +1626,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             store.AppendNpc0140Value(targetId, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                TryApplyNpcCatalog(targetId, (int)parsed.Value0);
+                TryApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 
@@ -1646,7 +1652,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             store.AppendNpc2136State(targetId, parsed.Sequence, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                TryApplyNpcCatalog(targetId, (int)parsed.Value0);
+                TryApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 
@@ -1672,7 +1678,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             store.AppendNpc0240Value(targetId, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                TryApplyNpcCatalog(targetId, (int)parsed.Value0);
+                TryApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 

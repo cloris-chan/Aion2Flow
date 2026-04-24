@@ -266,6 +266,39 @@ public sealed class CombatMetricsEngineNpcCatalogTests
         Assert.Equal(catalog[npcCode].Name, archiveName);
     }
 
+    [Fact]
+    public void Replay_State_Catalog_Probe_Does_Not_Overwrite_NpcSpawn_Code_When_Value_Misses_Catalog()
+    {
+        const int entityId = 4370;
+        const int npcCode = 2980049;
+        const int sceneStateValue = 200003;
+
+        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        Assert.True(catalog.ContainsKey(npcCode));
+        Assert.False(catalog.ContainsKey(sceneStateValue));
+        CombatMetricsEngine.SetGameResources([], catalog);
+
+        var npcSpawnLine = $"2026-04-24T23:09:45.3164516+08:00|npc-spawn|16777343:56119->16777343:49300|kind=create-198|entity={entityId}|npcCode={npcCode}|data=00";
+        var observedLine = $"2026-04-24T23:10:13.4000000+08:00|state-4536|16777343:56119->16777343:49300|source={entityId}|value0=0|tailLen=0|data=094536922200";
+        var stateLine = $"2026-04-24T23:10:13.4172863+08:00|state-2136|16777343:56119->16777343:49300|target={entityId}|seq=6|value0={sceneStateValue}|value1=7602133|value2=0|value3=0x41c568f4|value4=0x4537c974|value5=0x42800000|value6=0xc2b40000|value7=2|tailMarker=0x004f|tailLen=7|data=33213606000000430D0300D5FF730000000000F468C54174C93745000080420000B4C202000000000000000000004F00";
+
+        var path = Path.Combine(Path.GetTempPath(), $"replay-npc-state-{Guid.NewGuid()}.log");
+        File.WriteAllLines(path, [npcSpawnLine, observedLine, stateLine]);
+        try
+        {
+            var result = PacketLogReplayService.Replay(path);
+
+            Assert.True(result.Store.TryGetNpcRuntimeState(entityId, out var state),
+                $"Replay store missing NPC state for entity {entityId}");
+            Assert.Equal(npcCode, state.NpcCode);
+            Assert.Equal((uint)sceneStateValue, state.Value2136);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Theory]
     [InlineData(
         16710, 2980179,

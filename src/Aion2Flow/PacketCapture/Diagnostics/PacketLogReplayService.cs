@@ -598,7 +598,7 @@ public sealed class PacketLogReplayService
             store.AppendNpc0140Value(targetId, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0);
+                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 
@@ -618,7 +618,7 @@ public sealed class PacketLogReplayService
             store.AppendNpc2136State(targetId, parsed.Sequence, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0);
+                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 
@@ -638,7 +638,7 @@ public sealed class PacketLogReplayService
             store.AppendNpc0240Value(targetId, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0);
+                TryApplyNpcCatalog(store, targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 
@@ -890,16 +890,26 @@ public sealed class PacketLogReplayService
         return false;
     }
 
-    private static void TryApplyNpcCatalog(CombatMetricsStore store, int instanceId, int npcCode)
+    private static void TryApplyNpcCatalog(
+        CombatMetricsStore store,
+        int instanceId,
+        int npcCode,
+        bool requireCatalogEntry = false)
     {
         if (instanceId <= 0 || npcCode <= 0)
         {
             return;
         }
 
+        var hasCatalogEntry = CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry);
+        if (requireCatalogEntry && !hasCatalogEntry)
+        {
+            return;
+        }
+
         store.AppendNpcCode(instanceId, npcCode);
 
-        if (!CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry))
+        if (!hasCatalogEntry)
         {
             return;
         }

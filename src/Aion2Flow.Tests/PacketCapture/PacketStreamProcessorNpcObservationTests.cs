@@ -30,6 +30,33 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
+    public void State_Catalog_Probe_Does_Not_Overwrite_Known_NpcCode_When_Value_Misses_Catalog()
+    {
+        const int npcInstanceId = 25664;
+        const int npcCode = 2980049;
+        const int sceneStateValue = 200003;
+
+        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        Assert.True(catalog.ContainsKey(npcCode));
+        Assert.False(catalog.ContainsKey(sceneStateValue));
+        CombatMetricsEngine.SetGameResources([], catalog);
+
+        var store = new CombatMetricsStore
+        {
+            CurrentTarget = npcInstanceId
+        };
+        store.AppendNpcCode(npcInstanceId, npcCode);
+
+        var processor = new PacketStreamProcessor(store);
+        var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-200003.hex"), TestConnection);
+
+        Assert.True(parsed);
+        Assert.True(store.TryGetNpcRuntimeState(npcInstanceId, out var state));
+        Assert.Equal(npcCode, state.NpcCode);
+        Assert.Equal((uint)sceneStateValue, state.Value2136);
+    }
+
+    [Fact]
     public void Synthesizes_Invincible_From_Mode48_Periodic_Link_Record()
     {
         var store = new CombatMetricsStore();
