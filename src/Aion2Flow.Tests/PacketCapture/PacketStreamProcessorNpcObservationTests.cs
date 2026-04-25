@@ -529,7 +529,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Equal(202, invincible.Marker);
         Assert.Equal(0, invincible.Damage);
         Assert.Equal(0, invincible.HitContribution);
-        Assert.Equal(1, invincible.AttemptContribution);
+        Assert.Equal(0, invincible.AttemptContribution);
     }
 
     [Fact]

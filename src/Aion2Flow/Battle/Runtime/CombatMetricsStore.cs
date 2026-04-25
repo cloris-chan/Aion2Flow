@@ -17,6 +17,9 @@ public sealed class CombatMetricsStore
     private const int PeriodicSelfRecoveryBaseSkillCode = 190000000;
     private const int SpiritDescentSummonRestoreSkillCode = 16990004;
     private const int WindSpiritOwnerRestoreSkillCode = 16990003;
+    private const int WindSpiritSummonNpcCodeMin = 2920141;
+    private const int WindSpiritSummonNpcCodeMax = 2920155;
+    private static readonly HashSet<int> AdditionalWindSpiritSummonNpcCodes = [2920227, 2920566, 2920705];
 
     private readonly record struct SelfPeriodicHealingPoolKey(int SourceId, int TargetId, int OriginalSkillCode);
     private readonly record struct SelfPeriodicHealingPoolState(int LastRawDamage, long LastTimestamp);
@@ -87,7 +90,7 @@ public sealed class CombatMetricsStore
     private readonly Dictionary<SelfPeriodicHealingPoolKey, SelfPeriodicHealingPoolState> _selfPeriodicHealingPools = [];
     private readonly Dictionary<SystemPeriodicRecoverySeedKey, SystemPeriodicRecoverySeedState> _systemPeriodicRecoverySeeds = [];
     private readonly Lock _spiritDescentRestoreLock = new();
-    private readonly Dictionary<int, int> _acceptedSpiritDescentRestoreMarkerBySource = [];
+    private readonly Dictionary<int, HashSet<int>> _acceptedSpiritDescentRestoreMarkersBySource = [];
     private readonly Lock _multiHitLock = new();
     private readonly List<MultiHitDamageCandidate> _recentDamageCandidates = [];
     private readonly Lock _compactOutcomeLock = new();
@@ -460,14 +463,55 @@ public sealed class CombatMetricsStore
 
         lock (_spiritDescentRestoreLock)
         {
-            if (!_acceptedSpiritDescentRestoreMarkerBySource.TryGetValue(packet.SourceId, out var acceptedMarker))
+            if (!_acceptedSpiritDescentRestoreMarkersBySource.TryGetValue(packet.SourceId, out var acceptedMarkers))
             {
-                _acceptedSpiritDescentRestoreMarkerBySource[packet.SourceId] = packet.Marker;
+                acceptedMarkers = [packet.Marker];
+                _acceptedSpiritDescentRestoreMarkersBySource[packet.SourceId] = acceptedMarkers;
                 return true;
             }
 
-            return acceptedMarker == packet.Marker;
+            if (acceptedMarkers.Contains(packet.Marker))
+            {
+                return true;
+            }
+
+            if (!IsRepeatableSpiritDescentRestoreSource(packet.SourceId))
+            {
+                return false;
+            }
+
+            acceptedMarkers.Add(packet.Marker);
+            return true;
         }
+    }
+
+    private bool IsRepeatableSpiritDescentRestoreSource(int sourceId)
+    {
+        if (!_npcStateByInstance.TryGetValue(sourceId, out var state) ||
+            state.NpcCode is not int npcCode)
+        {
+            return false;
+        }
+
+        if (state.Kind is { } kind && kind is not (NpcKind.Summon or NpcKind.Unknown))
+        {
+            return false;
+        }
+
+        if (npcCode is >= WindSpiritSummonNpcCodeMin and <= WindSpiritSummonNpcCodeMax ||
+            AdditionalWindSpiritSummonNpcCodes.Contains(npcCode))
+        {
+            return true;
+        }
+
+        if (!_npcNameByCode.TryGetValue(npcCode, out var name) &&
+            CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry))
+        {
+            name = entry.Name;
+        }
+
+        return string.Equals(name, "Wind Spirit", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(name, "風之精靈", StringComparison.Ordinal);
     }
 
     private static bool IsSpiritDescentSummonRestorePacket(ParsedCombatPacket packet)
@@ -893,7 +937,8 @@ public sealed class CombatMetricsStore
             timestamp,
             frameOrdinal,
             batchOrdinal,
-            PacketEffectTag.Aux2C38Invincible);
+            PacketEffectTag.Aux2C38Invincible,
+            attemptContribution: 0);
     }
 
     private bool TryResolveRecentDamageTarget(int sourceId, int skillCodeRaw, long timestamp, long frameOrdinal, out int targetId)
@@ -1059,7 +1104,7 @@ public sealed class CombatMetricsStore
         }
         lock (_spiritDescentRestoreLock)
         {
-            _acceptedSpiritDescentRestoreMarkerBySource.Clear();
+            _acceptedSpiritDescentRestoreMarkersBySource.Clear();
         }
         lock (_multiHitLock)
         {
@@ -1631,7 +1676,16 @@ public sealed class CombatMetricsStore
         return packet;
     }
 
-    private void StoreInvincible(int sourceId, int targetId, int originalSkillCode, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketEffectTag effectTag)
+    private void StoreInvincible(
+        int sourceId,
+        int targetId,
+        int originalSkillCode,
+        int marker,
+        long timestamp,
+        long frameOrdinal,
+        long batchOrdinal,
+        PacketEffectTag effectTag,
+        int attemptContribution = 1)
     {
         if (targetId <= 0)
         {
@@ -1654,7 +1708,7 @@ public sealed class CombatMetricsStore
             BatchOrdinal = batchOrdinal,
             Damage = 0,
             HitContribution = 0,
-            AttemptContribution = 1,
+            AttemptContribution = Math.Max(0, attemptContribution),
             Modifiers = DamageModifiers.Invincible,
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage
