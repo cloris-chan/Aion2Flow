@@ -26,7 +26,7 @@ public sealed class AppLogWriter : IDisposable
     public AppLogWriter(AppLogLevel minLevel, string? logDirectory = null)
     {
         MinLevel = minLevel;
-        _logDirectory = logDirectory ?? GetDefaultLogDirectory();
+        _logDirectory = logDirectory ?? LogDirectoryResolver.GetDefaultLogDirectory();
         Directory.CreateDirectory(_logDirectory);
 
         _channel = Channel.CreateUnbounded<LogEntry>(new UnboundedChannelOptions
@@ -161,12 +161,6 @@ public sealed class AppLogWriter : IDisposable
         AppLogLevel.Error => "ERR",
         _ => "???",
     };
-
-    private static string GetDefaultLogDirectory()
-    {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(localAppData, "Aion2Flow", "logs");
-    }
 
     public void Dispose()
     {

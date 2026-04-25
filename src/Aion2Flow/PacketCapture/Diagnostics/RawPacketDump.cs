@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Services.Logging;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
 
@@ -13,7 +13,7 @@ internal static class RawPacketDump
     private static bool IsEnabled => false;
 #endif
     private static readonly Lock SyncRoot = new();
-    private static readonly string _logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+    private static readonly string _logRootDirectory = LogDirectoryResolver.GetDefaultLogDirectory();
     private static string _rawLogPath = string.Empty;
     private static string _streamLogPath = string.Empty;
     private static string _frameLogPath = string.Empty;
@@ -48,11 +48,11 @@ internal static class RawPacketDump
             DisposeWriter(ref _streamWriter);
             DisposeWriter(ref _frameWriter);
 
-            Directory.CreateDirectory(_logDirectory);
-            var stamp = DateTimeOffset.Now.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
-            _rawLogPath = Path.Combine(_logDirectory, $"aion2flow.raw.{stamp}.log");
-            _streamLogPath = Path.Combine(_logDirectory, $"aion2flow.stream.{stamp}.log");
-            _frameLogPath = Path.Combine(_logDirectory, $"aion2flow.frame.{stamp}.log");
+            var sessionDirectory = LogDirectoryResolver.ResolveUniqueDumpLogDirectory(_logRootDirectory, DateTimeOffset.Now);
+            Directory.CreateDirectory(sessionDirectory);
+            _rawLogPath = Path.Combine(sessionDirectory, "raw.log");
+            _streamLogPath = Path.Combine(sessionDirectory, "stream.log");
+            _frameLogPath = Path.Combine(sessionDirectory, "frame.log");
 
             _rawWriter = CreateWriter(_rawLogPath);
             _streamWriter = CreateWriter(_streamLogPath);
@@ -139,7 +139,12 @@ internal static class RawPacketDump
 
     private static StreamWriter CreateWriter(string path)
     {
-        Directory.CreateDirectory(_logDirectory);
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
         var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
         return new StreamWriter(stream, new UTF8Encoding(false))
         {

@@ -992,17 +992,20 @@ public sealed class PacketLogReplayService
 
     private static ReplayLogKind DetectLogKind(IReadOnlyList<string> lines, string sourceName)
     {
-        if (sourceName.Contains(".stream.", StringComparison.OrdinalIgnoreCase))
+        if (sourceName.Contains(".stream.", StringComparison.OrdinalIgnoreCase) ||
+            sourceName.EndsWith("stream.log", StringComparison.OrdinalIgnoreCase))
         {
             return ReplayLogKind.Stream;
         }
 
-        if (sourceName.Contains(".frame.", StringComparison.OrdinalIgnoreCase))
+        if (sourceName.Contains(".frame.", StringComparison.OrdinalIgnoreCase) ||
+            sourceName.EndsWith("frame.log", StringComparison.OrdinalIgnoreCase))
         {
             return ReplayLogKind.Frame;
         }
 
-        if (sourceName.Contains(".raw.", StringComparison.OrdinalIgnoreCase))
+        if (sourceName.Contains(".raw.", StringComparison.OrdinalIgnoreCase) ||
+            sourceName.EndsWith("raw.log", StringComparison.OrdinalIgnoreCase))
         {
             return ReplayLogKind.Raw;
         }
