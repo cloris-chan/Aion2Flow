@@ -88,6 +88,49 @@ public sealed class CombatMetricsEngineNpcCatalogTests
     }
 
     [Fact]
+    public void CreateSnapshot_Clears_Previously_Inferred_Class_When_Combatant_Is_Identified_As_Npc()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var engine = new CombatMetricsEngine();
+        const int npcInstanceId = 19945;
+        const int targetId = 14037;
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = npcInstanceId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 1841,
+            Timestamp = 1_000
+        });
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = npcInstanceId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 1,
+            Timestamp = 1_050
+        });
+
+        var beforeNpcIdentity = engine.CreateSnapshot();
+        Assert.True(beforeNpcIdentity.Combatants.TryGetValue(npcInstanceId, out var initiallyInferred));
+        Assert.Equal(CharacterClass.Elementalist, initiallyInferred.CharacterClass);
+
+        engine.Store.AppendNpcCode(npcInstanceId, 2100350);
+        engine.Store.AppendNpcKind(npcInstanceId, NpcKind.Monster);
+
+        var afterNpcIdentity = engine.CreateSnapshot();
+        Assert.True(afterNpcIdentity.Combatants.TryGetValue(npcInstanceId, out var npcCombatant));
+        Assert.Null(npcCombatant.CharacterClass);
+    }
+
+    [Fact]
     public void ResolveCombatantDisplayName_Returns_Numeric_Id_Without_NpcCode()
     {
         CombatMetricsEngine.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());

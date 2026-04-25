@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Battle.Archive;
+using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.PacketCapture.Capture;
@@ -344,11 +345,13 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var battleSeconds = snapshot.BattleTime / 1000.0;
         BattleTimeSeconds = battleSeconds;
+        var displayStore = ResolveDisplayStore();
 
         using var deferral = Combatants.SuspendNotifications();
         foreach (var row in deferral.Snapshot)
         {
-            if (snapshot.Combatants.TryGetValue(row.Id, out var data))
+            if (snapshot.Combatants.TryGetValue(row.Id, out var data) &&
+                ShouldDisplayCombatant(displayStore, row.Id, data))
             {
                 row.DisplayName = ResolveDisplayName(snapshot, row.Id);
                 row.CharacterClass = data.CharacterClass;
@@ -369,7 +372,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             if (Combatants.Contains(id))
                 continue;
 
-            if (data.CharacterClass is null)
+            if (!ShouldDisplayCombatant(displayStore, id, data))
                 continue;
             var displayName = ResolveDisplayName(snapshot, id);
 
@@ -406,10 +409,32 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private string ResolveDisplayName(DamageMeterSnapshot snapshot, int id)
     {
-        var store = IsViewingArchivedBattle && SelectedBattleHistory is not null
+        return CombatMetricsEngine.ResolveCombatantDisplayName(ResolveDisplayStore(), snapshot, id);
+    }
+
+    private CombatMetricsStore ResolveDisplayStore()
+        => IsViewingArchivedBattle && SelectedBattleHistory is not null
             ? SelectedBattleHistory.Record.Store
             : _store;
-        return CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, id);
+
+    internal static bool ShouldDisplayCombatant(CombatMetricsStore store, int combatantId, CombatantMetrics data)
+    {
+        if (data.CharacterClass is null)
+        {
+            return false;
+        }
+
+        if (!store.TryGetNpcRuntimeState(combatantId, out var npcState))
+        {
+            return true;
+        }
+
+        if (npcState.NpcCode.HasValue)
+        {
+            return false;
+        }
+
+        return npcState.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
     }
 
     public async ValueTask DisposeAsync()

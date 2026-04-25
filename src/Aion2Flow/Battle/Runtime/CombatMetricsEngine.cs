@@ -251,7 +251,12 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     dataSnapshot.Combatants[uid] = personal;
                 }
 
-                if (_resolvedCharacterClassByCombatant.TryGetValue(uid, out var resolvedCharacterClass))
+                if (IsKnownNpcCombatant(uid))
+                {
+                    _resolvedCharacterClassByCombatant.Remove(uid);
+                    _characterClassEvidenceByCombatant.Remove(uid);
+                }
+                else if (_resolvedCharacterClassByCombatant.TryGetValue(uid, out var resolvedCharacterClass))
                 {
                     personal.CharacterClass = resolvedCharacterClass;
                 }
@@ -553,6 +558,26 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             SkillCategory.Chanter => CharacterClass.Chanter,
             _ => null,
         };
+    }
+
+    private bool IsKnownNpcCombatant(int combatantId)
+    {
+        if (combatantId <= 0)
+        {
+            return false;
+        }
+
+        if (!Store.TryGetNpcRuntimeState(combatantId, out var state))
+        {
+            return false;
+        }
+
+        if (state.NpcCode.HasValue)
+        {
+            return true;
+        }
+
+        return state.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon;
     }
 
     private void InferPreexistingSummonOwners()
