@@ -146,6 +146,92 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     }
 
     [Fact]
+    public void Collapses_SameName_NonTriggered_PcSkill_Variants_To_Base_Skill()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
+            new Skill(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
+            new Skill(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var engine = new CombatMetricsEngine();
+        const int sourceId = 3038;
+        const int targetId = 29219;
+
+        engine.Store.AppendNickname(sourceId, "Templar");
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = 12240350,
+            OriginalSkillCode = 12240350,
+            Damage = 23108,
+            Timestamp = 1_000
+        });
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = 12240039,
+            OriginalSkillCode = 12240039,
+            Damage = 15957,
+            Timestamp = 1_100
+        });
+
+        var snapshot = engine.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
+        Assert.True(combatant.Skills.TryGetValue(12240000, out var judgment));
+        Assert.Equal("審判", judgment.SkillName);
+        Assert.Equal(39065, judgment.DamageAmount);
+        Assert.Equal(2, judgment.Times);
+        Assert.DoesNotContain(12240350, combatant.Skills.Keys);
+        Assert.DoesNotContain(12240030, combatant.Skills.Keys);
+    }
+
+    [Fact]
+    public void Keeps_SameName_Variant_When_Runtime_Semantics_Differ()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
+            new Skill(12240150, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.DrainOrAbsorb | SkillSemantics.Support, null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var engine = new CombatMetricsEngine();
+        const int sourceId = 3038;
+        const int targetId = 29219;
+
+        engine.Store.AppendNickname(sourceId, "Templar");
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = 12240150,
+            OriginalSkillCode = 12240150,
+            Damage = 1200,
+            Timestamp = 1_000
+        });
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = 12240150,
+            OriginalSkillCode = 12240150,
+            Damage = 800,
+            Timestamp = 1_100
+        });
+
+        var snapshot = engine.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
+        Assert.True(combatant.Skills.TryGetValue(12240150, out var judgment));
+        Assert.Equal(2000, judgment.DamageAmount);
+        Assert.False(combatant.Skills.ContainsKey(12240000));
+    }
+
+    [Fact]
     public void Counts_MurderousBurst_Triggered_Damage_Sibling_As_Damage()
     {
         CombatMetricsEngine.LoadSkillMap("zh-TW");

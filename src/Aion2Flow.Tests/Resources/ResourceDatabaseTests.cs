@@ -175,6 +175,19 @@ public sealed class ResourceDatabaseTests
     }
 
     [Fact]
+    public void LoadSkills_Does_Not_Misclassify_DoomShield_As_Shield()
+    {
+        var skills = ResourceDatabase.LoadSkills("en-US");
+
+        Assert.True(skills.TryGetValue(12070000, out var skill));
+        Assert.Equal("Doom Shield", skill.Name);
+        Assert.Equal(SkillKind.Damage, skill.Kind);
+        Assert.True((skill.Semantics & SkillSemantics.Damage) != 0);
+        Assert.True((skill.Semantics & SkillSemantics.Support) != 0);
+        Assert.False((skill.Semantics & SkillSemantics.ShieldOrBarrier) != 0);
+    }
+
+    [Fact]
     public void LoadSkills_Uses_LanguageInvariant_Classification_Metadata()
     {
         var englishSkills = ResourceDatabase.LoadSkills("en-US");

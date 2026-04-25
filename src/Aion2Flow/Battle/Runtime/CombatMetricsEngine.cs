@@ -322,7 +322,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return null;
         }
 
-        Span<int> candidates = stackalloc int[9];
+        Span<int> candidates = stackalloc int[12];
         var count = 0;
 
         static bool TryPush(Span<int> span, ref int count, int value)
@@ -332,6 +332,8 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             {
                 if (span[i] == value) return false;
             }
+
+            if (count >= span.Length) return false;
             span[count++] = value;
             return true;
         }
@@ -339,35 +341,36 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         if (TryPush(candidates, ref count, skillCode) && Array.BinarySearch(SkillCodes, skillCode) >= 0)
             return skillCode;
 
-        var directChargeBase = skillCode - (skillCode % 10);
-        if (TryPush(candidates, ref count, directChargeBase) && Array.BinarySearch(SkillCodes, directChargeBase) >= 0)
-            return directChargeBase;
+        var variant = ParseSkillVariant(skillCode);
 
-        var specializationBase = skillCode - (skillCode % 10000);
-        if (TryPush(candidates, ref count, specializationBase) && Array.BinarySearch(SkillCodes, specializationBase) >= 0)
-            return specializationBase;
+        var specializationWithoutCharge = variant.BaseSkillCode + EncodeVariantSuffix(variant.SpecializationMask, 0);
+        if (TryPush(candidates, ref count, specializationWithoutCharge) && Array.BinarySearch(SkillCodes, specializationWithoutCharge) >= 0)
+            return specializationWithoutCharge;
 
-        var specializationWithChargeBase = specializationBase + (skillCode % 10);
-        if (TryPush(candidates, ref count, specializationWithChargeBase) && Array.BinarySearch(SkillCodes, specializationWithChargeBase) >= 0)
-            return specializationWithChargeBase;
+        if (TryPush(candidates, ref count, variant.BaseSkillCode) && Array.BinarySearch(SkillCodes, variant.BaseSkillCode) >= 0)
+            return variant.BaseSkillCode;
+
+        var baseWithCharge = variant.BaseSkillCode + EncodeVariantSuffix(0, variant.ChargeStage);
+        if (TryPush(candidates, ref count, baseWithCharge) && Array.BinarySearch(SkillCodes, baseWithCharge) >= 0)
+            return baseWithCharge;
 
         var byHundred = skillCode / 100;
         if (TryPush(candidates, ref count, byHundred) && Array.BinarySearch(SkillCodes, byHundred) >= 0)
             return byHundred;
 
-        var byHundredChargeBase = byHundred - (byHundred % 10);
-        if (TryPush(candidates, ref count, byHundredChargeBase) && Array.BinarySearch(SkillCodes, byHundredChargeBase) >= 0)
-            return byHundredChargeBase;
+        var byHundredVariant = ParseSkillVariant(byHundred);
+        var byHundredSpecializationWithoutCharge = byHundredVariant.BaseSkillCode + EncodeVariantSuffix(byHundredVariant.SpecializationMask, 0);
+        if (TryPush(candidates, ref count, byHundredSpecializationWithoutCharge) && Array.BinarySearch(SkillCodes, byHundredSpecializationWithoutCharge) >= 0)
+            return byHundredSpecializationWithoutCharge;
 
-        var byHundredSpecializationBase = byHundred - (byHundred % 10000);
-        if (byHundredSpecializationBase >= 100000)
+        if (byHundredVariant.BaseSkillCode >= 100000)
         {
-            if (TryPush(candidates, ref count, byHundredSpecializationBase) && Array.BinarySearch(SkillCodes, byHundredSpecializationBase) >= 0)
-                return byHundredSpecializationBase;
+            if (TryPush(candidates, ref count, byHundredVariant.BaseSkillCode) && Array.BinarySearch(SkillCodes, byHundredVariant.BaseSkillCode) >= 0)
+                return byHundredVariant.BaseSkillCode;
 
-            var byHundredSpecializationWithChargeBase = byHundredSpecializationBase + (byHundred % 10);
-            if (TryPush(candidates, ref count, byHundredSpecializationWithChargeBase) && Array.BinarySearch(SkillCodes, byHundredSpecializationWithChargeBase) >= 0)
-                return byHundredSpecializationWithChargeBase;
+            var byHundredBaseWithCharge = byHundredVariant.BaseSkillCode + EncodeVariantSuffix(0, byHundredVariant.ChargeStage);
+            if (TryPush(candidates, ref count, byHundredBaseWithCharge) && Array.BinarySearch(SkillCodes, byHundredBaseWithCharge) >= 0)
+                return byHundredBaseWithCharge;
         }
 
         var byThousand = skillCode - (skillCode % 1000);
@@ -439,6 +442,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
         var inferredSkillCode = InferOriginalSkillCode(originalSkillCode) ?? variant.NormalizedSkillCode;
         var resolvedSkillCode = ResolveTriggeredSiblingSkillCode(originalSkillCode, inferredSkillCode);
+        resolvedSkillCode = ResolveSameNameVariantGroupSkillCode(resolvedSkillCode, variant);
         ResolvedSkillCodeCache[originalSkillCode] = resolvedSkillCode;
         return resolvedSkillCode;
     }
@@ -484,6 +488,81 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         }
 
         return inferredSkillCode;
+    }
+
+    private static int ResolveSameNameVariantGroupSkillCode(int resolvedSkillCode, SkillVariantInfo variant)
+    {
+        if (resolvedSkillCode <= 0 ||
+            variant.BaseSkillCode <= 0 ||
+            resolvedSkillCode == variant.BaseSkillCode ||
+            !ShouldCollapseSameNameVariantGroup(variant.BaseSkillCode) ||
+            SkillMap.Count == 0)
+        {
+            return resolvedSkillCode;
+        }
+
+        if (!SkillMap.TryGetValue(resolvedSkillCode, out var resolvedSkill) ||
+            !SkillMap.TryGetValue(variant.BaseSkillCode, out var baseSkill))
+        {
+            return resolvedSkillCode;
+        }
+
+        if (resolvedSkill.SourceType != SkillSourceType.PcSkill ||
+            baseSkill.SourceType != resolvedSkill.SourceType ||
+            baseSkill.Category != resolvedSkill.Category ||
+            !string.Equals(baseSkill.Name, resolvedSkill.Name, StringComparison.Ordinal))
+        {
+            return resolvedSkillCode;
+        }
+
+        if (resolvedSkill.Kind != baseSkill.Kind ||
+            !HasSameRuntimeSemantics(resolvedSkill.Semantics, baseSkill.Semantics))
+        {
+            return resolvedSkillCode;
+        }
+
+        if (BaseSkillGroupHasTriggeredSiblings(variant.BaseSkillCode))
+        {
+            return resolvedSkillCode;
+        }
+
+        return variant.BaseSkillCode;
+    }
+
+    private static bool ShouldCollapseSameNameVariantGroup(int baseSkillCode)
+        => baseSkillCode == 12240000;
+
+    private static bool HasSameRuntimeSemantics(SkillSemantics left, SkillSemantics right)
+    {
+        const SkillSemantics runtimeMask =
+            SkillSemantics.Damage |
+            SkillSemantics.PeriodicDamage |
+            SkillSemantics.Healing |
+            SkillSemantics.PeriodicHealing |
+            SkillSemantics.DrainOrAbsorb |
+            SkillSemantics.ShieldOrBarrier |
+            SkillSemantics.NonHealthResourceRestore;
+
+        return (left & runtimeMask) == (right & runtimeMask);
+    }
+
+    private static bool BaseSkillGroupHasTriggeredSiblings(int baseSkillCode)
+    {
+        foreach (var skill in SkillMap)
+        {
+            if (skill.Id <= 0 ||
+                ParseSkillVariant(skill.Id).BaseSkillCode != baseSkillCode)
+            {
+                continue;
+            }
+
+            if (skill.EnumerateTriggeredSkillIds().Any())
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryGetClassEvidence(ParsedCombatPacket packet, out CharacterClass characterClass, out int score)
@@ -733,6 +812,22 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         var baseSkillCode = originalSkillCode - (originalSkillCode % 10000);
         var normalizedSkillCode = baseSkillCode + chargeStage;
         return new SkillVariantInfo(originalSkillCode, normalizedSkillCode, baseSkillCode, chargeStage, specializationMask);
+    }
+
+    // Mirrors the resource generator's fixed specialization/charge suffix rule.
+    private static int EncodeVariantSuffix(int specializationMask, int chargeStage)
+    {
+        var suffix = 0;
+        for (var specialization = 1; specialization <= 5; specialization++)
+        {
+            var bit = 1 << (specialization - 1);
+            if ((specializationMask & bit) != 0)
+            {
+                suffix = (suffix * 10) + specialization;
+            }
+        }
+
+        return (suffix * 10) + chargeStage;
     }
 
     private TargetDecision DecideTarget()
