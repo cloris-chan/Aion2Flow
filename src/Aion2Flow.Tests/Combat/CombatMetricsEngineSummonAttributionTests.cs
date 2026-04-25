@@ -147,6 +147,81 @@ public sealed class CombatMetricsEngineSummonAttributionTests
         Assert.Equal(2, restore.HealingTimes);
     }
 
+    [Fact]
+    public void Counts_Spirit_Descent_Summon_Restore_Only_Once_Per_Summon_Instance()
+    {
+        CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var engine = new CombatMetricsEngine();
+        const int ownerId = 314;
+        const int summonId = 34799;
+        const int targetId = 23089;
+
+        engine.Store.AppendNickname(ownerId, "Owner");
+        engine.Store.AppendSummon(ownerId, summonId);
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 405,
+            Timestamp = 1_000
+        });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = summonId,
+            OriginalSkillCode = 16990004,
+            SkillCode = 16990004,
+            Damage = 9_410,
+            Marker = 1,
+            Timestamp = 1_050
+        });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = summonId,
+            OriginalSkillCode = 16990004,
+            SkillCode = 16990004,
+            Damage = 100_000,
+            Marker = 1,
+            Timestamp = 1_051
+        });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = summonId,
+            OriginalSkillCode = 16990004,
+            SkillCode = 16990004,
+            Damage = 9_410,
+            Marker = 6,
+            Timestamp = 2_050
+        });
+
+        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = summonId,
+            OriginalSkillCode = 16990004,
+            SkillCode = 16990004,
+            Damage = 100_000,
+            Marker = 6,
+            Timestamp = 2_051
+        });
+
+        var snapshot = engine.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        Assert.Equal(109_410, owner.HealingAmount);
+        Assert.True(owner.Skills.TryGetValue(16990004, out var restore));
+        Assert.Equal(109_410, restore.HealingAmount);
+        Assert.Equal(2, restore.HealingTimes);
+    }
+
     private static SkillCollection BuildElementalistSummonSkillMap()
     {
         return

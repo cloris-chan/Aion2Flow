@@ -14,6 +14,7 @@ public sealed class CombatMetricsStore
     private const int MaxPendingDodgeSignals = 16;
     private const int MaxPendingAvoidancePackets = 32;
     private const int MaxResolvedPeriodicLinks = 128;
+    private const int SpiritDescentSummonRestoreSkillCode = 16990004;
 
     private readonly record struct SelfPeriodicHealingPoolKey(int SourceId, int TargetId, int OriginalSkillCode);
     private readonly record struct SelfPeriodicHealingPoolState(int LastRawDamage, long LastTimestamp);
@@ -80,6 +81,8 @@ public sealed class CombatMetricsStore
     private readonly ConcurrentDictionary<int, long> _detailRevisionByCombatant = new();
     private readonly Lock _selfPeriodicHealingPoolLock = new();
     private readonly Dictionary<SelfPeriodicHealingPoolKey, SelfPeriodicHealingPoolState> _selfPeriodicHealingPools = [];
+    private readonly Lock _spiritDescentRestoreLock = new();
+    private readonly Dictionary<int, int> _acceptedSpiritDescentRestoreMarkerBySource = [];
     private readonly Lock _multiHitLock = new();
     private readonly List<MultiHitDamageCandidate> _recentDamageCandidates = [];
     private readonly Lock _compactOutcomeLock = new();
@@ -113,6 +116,11 @@ public sealed class CombatMetricsStore
         var shouldTrackAvoidance = !packet.IsNormalized;
 
         PreparePacketForStorage(packet);
+        if (!ShouldStorePacket(packet))
+        {
+            return;
+        }
+
         StorePacket(packet);
 
         if (shouldTrackAvoidance)
@@ -194,6 +202,11 @@ public sealed class CombatMetricsStore
                 };
 
                 PreparePacketForStorage(packet);
+                if (!ShouldStorePacket(packet))
+                {
+                    continue;
+                }
+
                 StorePacket(packet);
             }
 
@@ -374,6 +387,46 @@ public sealed class CombatMetricsStore
         CombatMetricsEngine.NormalizePacketForStorage(packet);
         NormalizeSelfPeriodicHealingPool(packet);
         ApplyMultiHitAttribution(packet);
+    }
+
+    private bool ShouldStorePacket(ParsedCombatPacket packet)
+    {
+        if (!IsSpiritDescentSummonRestorePacket(packet))
+        {
+            return true;
+        }
+
+        if (packet.SourceId <= 0 ||
+            packet.TargetId <= 0 ||
+            packet.SourceId != packet.TargetId ||
+            packet.Marker <= 0)
+        {
+            return true;
+        }
+
+        lock (_spiritDescentRestoreLock)
+        {
+            if (!_acceptedSpiritDescentRestoreMarkerBySource.TryGetValue(packet.SourceId, out var acceptedMarker))
+            {
+                _acceptedSpiritDescentRestoreMarkerBySource[packet.SourceId] = packet.Marker;
+                return true;
+            }
+
+            return acceptedMarker == packet.Marker;
+        }
+    }
+
+    private static bool IsSpiritDescentSummonRestorePacket(ParsedCombatPacket packet)
+    {
+        if (packet.EventKind != CombatEventKind.Healing ||
+            packet.ValueKind != CombatValueKind.Healing)
+        {
+            return false;
+        }
+
+        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
+        return packet.SkillCode == SpiritDescentSummonRestoreSkillCode ||
+               originalSkillCode == SpiritDescentSummonRestoreSkillCode;
     }
 
     private void StorePacket(ParsedCombatPacket packet)
@@ -891,6 +944,10 @@ public sealed class CombatMetricsStore
         lock (_selfPeriodicHealingPoolLock)
         {
             _selfPeriodicHealingPools.Clear();
+        }
+        lock (_spiritDescentRestoreLock)
+        {
+            _acceptedSpiritDescentRestoreMarkerBySource.Clear();
         }
         lock (_multiHitLock)
         {

@@ -394,7 +394,7 @@ public sealed class PacketLogReplayService
 
         store.AppendCombatPacket(combatPacket);
 
-        if (parsed.RegenerationAmount > 0)
+        if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(store, parsed.TargetId))
         {
             store.AppendCombatPacket(new ParsedCombatPacket
             {
@@ -436,6 +436,21 @@ public sealed class PacketLogReplayService
         }
 
         return true;
+    }
+
+    private static bool ShouldStoreRegenerationHealing(CombatMetricsStore store, int targetId)
+    {
+        if (targetId <= 0)
+        {
+            return false;
+        }
+
+        if (store.SummonOwnerByInstance.ContainsKey(targetId))
+        {
+            return false;
+        }
+
+        return !store.TryGetNpcRuntimeState(targetId, out var state) || state.Kind != NpcKind.Summon;
     }
 
     private static bool TryReplayPeriodic(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)

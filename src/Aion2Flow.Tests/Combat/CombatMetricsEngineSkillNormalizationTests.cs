@@ -33,6 +33,33 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     }
 
     [Fact]
+    public void InferOriginalSkillCode_Does_Not_Collapse_Unmatched_Npc_Code_To_Unrelated_Low_Id_Skill()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(10000, "Account Security", SkillCategory.Etc, SkillSourceType.Unknown, "system", SkillKind.Support, SkillSemantics.Support, null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var resolved = CombatMetricsEngine.InferOriginalSkillCode(1232480);
+
+        Assert.Null(resolved);
+    }
+
+    [Fact]
+    public void InferOriginalSkillCode_Prefers_Nearby_Npc_Base_Over_Unrelated_Low_Id_Skill()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(10000, "Account Security", SkillCategory.Etc, SkillSourceType.Unknown, "system", SkillKind.Support, SkillSemantics.Support, null),
+            new Skill(1232000, "Sting", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var resolved = CombatMetricsEngine.InferOriginalSkillCode(1232480);
+
+        Assert.Equal(1232000, resolved);
+    }
+
+    [Fact]
     public void InferOriginalSkillCode_Resolves_Periodic_Shield_Variant_To_Base_Skill()
     {
         CombatMetricsEngine.SetGameResources(

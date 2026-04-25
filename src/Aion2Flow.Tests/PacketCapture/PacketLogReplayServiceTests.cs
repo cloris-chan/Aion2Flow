@@ -303,6 +303,33 @@ public sealed class PacketLogReplayServiceTests
             $"visibleContributionTotal={visibleContributionTotal:P8}\n{combatantDump}");
     }
 
+    [Fact]
+    public void Replay_Does_Not_Synthesize_Regeneration_Healing_For_Known_Summons()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var summonLine = "2026-04-25T00:58:41.8295743+08:00|summon|16777343:58107->16777343:50695|kind=create-177|owner=314|summon=17755|npcCode=2920107|data=BC014036DB8A015F1000AB8E2C004002003F18C70079064700FC1A461A2C7E42302D01C249C249740B0000740B000000000000D078020064000000F04902000100000000000000A08601000000000090D00300010101110143AA9809FFFFFFFFFFFFFFFF8075D52ABB030000BA0207028FBB18C736A9054700001A460702063A010000FA0200000000EF030641657468657201000200000000000000000000000000000002CD004C040000D000B202000017000000D71D030000";
+        var damageLine = "2026-04-25T00:58:46.2662741+08:00|damage|16777343:58107->16777343:50695|target=17755|source=24468|skillRaw=1232480|damage=16|skill=10000|baseSkill=1230000|charge=0|specs=2+4|skillName=Account Security|skillKind=Support|skillSemantics=Support|valueKind=Damage|data=230438DB8A01060094BF0160CE1200020240038B9D580701000000904E1001";
+        var path = WriteTempReplayLog("frame", summonLine, damageLine);
+        try
+        {
+            var replay = PacketLogReplayService.Replay(path);
+
+            Assert.Equal(1, replay.ReplayedEventCounts["summon"]);
+            Assert.Equal(1, replay.ReplayedEventCounts["damage"]);
+            Assert.False(
+                replay.Store.CombatPacketsBySource.TryGetValue(17755, out var summonPackets) &&
+                summonPackets.Any(static packet => packet.SourceId == 17755 && packet.TargetId == 17755 && packet.Damage == 3));
+            Assert.DoesNotContain(
+                replay.Snapshot.Combatants,
+                static pair => pair.Key == 314 && pair.Value.HealingAmount > 0);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static string WriteTempReplayLog(string logKind, params string[] lines)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.{logKind}.log");

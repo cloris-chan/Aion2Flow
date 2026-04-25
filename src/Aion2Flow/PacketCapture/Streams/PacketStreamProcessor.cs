@@ -828,19 +828,18 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        var resolvedSkillCode = ResolveSkillCode(parsed.SkillCodeRaw);
-        if (resolvedSkillCode is null) return false;
+        var resolvedSkillCode = ResolveSkillCode(parsed.SkillCodeRaw) ?? parsed.SkillCodeRaw;
 
         if (parsed.Damage <= 0) return false;
 
-        store.AppendCombatPacket(new ParsedCombatPacket
+        var combatPacket = new ParsedCombatPacket
         {
             TargetId = parsed.TargetId,
             LayoutTag = parsed.LayoutTag,
             Flag = parsed.Flag,
             SourceId = parsed.SourceId,
             OriginalSkillCode = parsed.SkillCodeRaw,
-            SkillCode = resolvedSkillCode.Value,
+            SkillCode = resolvedSkillCode,
             Marker = parsed.Marker,
             Type = parsed.Type,
             Modifiers = parsed.TailMultiHitCount > 0
@@ -858,16 +857,18 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             Timestamp = CurrentTimestampMilliseconds,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
-        });
+        };
 
-        if (parsed.RegenerationAmount > 0)
+        store.AppendCombatPacket(combatPacket);
+
+        if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId))
         {
             store.AppendCombatPacket(new ParsedCombatPacket
             {
                 TargetId = parsed.TargetId,
                 SourceId = parsed.TargetId,
                 OriginalSkillCode = parsed.SkillCodeRaw,
-                SkillCode = resolvedSkillCode.Value,
+                SkillCode = resolvedSkillCode,
                 Damage = parsed.RegenerationAmount,
                 EventKind = CombatEventKind.Healing,
                 ValueKind = CombatValueKind.Healing,
@@ -886,7 +887,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 TargetId = parsed.SourceId,
                 SourceId = parsed.SourceId,
                 OriginalSkillCode = parsed.SkillCodeRaw,
-                SkillCode = resolvedSkillCode.Value,
+                SkillCode = resolvedSkillCode,
                 Damage = parsed.DrainHealAmount,
                 Timestamp = CurrentTimestampMilliseconds,
                 FrameOrdinal = frameOrdinal,
@@ -894,7 +895,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             });
         }
 
-        RawPacketDump.AppendFrameEvent("damage", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|skill={resolvedSkillCode.Value}|damage={parsed.Damage}", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("damage", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|skillRaw={parsed.SkillCodeRaw}|damage={parsed.Damage}{FormatResolvedCombatHint(combatPacket)}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -1007,6 +1008,21 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         return CombatMetricsEngine.InferOriginalSkillCode(skillCode);
+    }
+
+    private bool ShouldStoreRegenerationHealing(int targetId)
+    {
+        if (targetId <= 0)
+        {
+            return false;
+        }
+
+        if (store.SummonOwnerByInstance.ContainsKey(targetId))
+        {
+            return false;
+        }
+
+        return !store.TryGetNpcRuntimeState(targetId, out var state) || state.Kind != NpcKind.Summon;
     }
 
     private static bool IsDrainOrAbsorbSkill(int skillCodeRaw)
@@ -1245,7 +1261,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
             store.AppendCombatPacket(combatPacket);
 
-            if (parsed.RegenerationAmount > 0)
+            if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId))
             {
                 store.AppendCombatPacket(new ParsedCombatPacket
                 {

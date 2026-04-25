@@ -355,12 +355,15 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return byHundredChargeBase;
 
         var byHundredSpecializationBase = byHundred - (byHundred % 10000);
-        if (TryPush(candidates, ref count, byHundredSpecializationBase) && Array.BinarySearch(SkillCodes, byHundredSpecializationBase) >= 0)
-            return byHundredSpecializationBase;
+        if (byHundredSpecializationBase >= 100000)
+        {
+            if (TryPush(candidates, ref count, byHundredSpecializationBase) && Array.BinarySearch(SkillCodes, byHundredSpecializationBase) >= 0)
+                return byHundredSpecializationBase;
 
-        var byHundredSpecializationWithChargeBase = byHundredSpecializationBase + (byHundred % 10);
-        if (TryPush(candidates, ref count, byHundredSpecializationWithChargeBase) && Array.BinarySearch(SkillCodes, byHundredSpecializationWithChargeBase) >= 0)
-            return byHundredSpecializationWithChargeBase;
+            var byHundredSpecializationWithChargeBase = byHundredSpecializationBase + (byHundred % 10);
+            if (TryPush(candidates, ref count, byHundredSpecializationWithChargeBase) && Array.BinarySearch(SkillCodes, byHundredSpecializationWithChargeBase) >= 0)
+                return byHundredSpecializationWithChargeBase;
+        }
 
         var byThousand = skillCode - (skillCode % 1000);
         if (TryPush(candidates, ref count, byThousand) && Array.BinarySearch(SkillCodes, byThousand) >= 0)
