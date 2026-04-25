@@ -288,9 +288,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
                 SkillCode = 17730000,
                 OriginalSkillCode = 17730000,
                 Damage = 11847,
-                Timestamp = timestamp,
-                SkillKind = CombatEventClassifier.ResolveSkillKind(17730000),
-                SkillSemantics = CombatEventClassifier.ResolveSkillSemantics(17730000)
+                Timestamp = timestamp
             };
 
             packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
@@ -326,9 +324,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             SkillCode = 17730000,
             OriginalSkillCode = 17730000,
             Damage = 60321,
-            Timestamp = 2_000,
-            SkillKind = CombatEventClassifier.ResolveSkillKind(17730000),
-            SkillSemantics = CombatEventClassifier.ResolveSkillSemantics(17730000)
+            Timestamp = 2_000
         };
         selfPacket.EventKind = CombatEventClassifier.Classify(selfPacket);
         selfPacket.ValueKind = CombatEventClassifier.ClassifyValueKind(selfPacket);
@@ -459,7 +455,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(13060250, "突襲", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null)
+            new Skill(13060250, "突襲", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
@@ -507,8 +503,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(17010230, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
-            new Skill(17730000, "主神恩寵", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null)
+            new Skill(17010230, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17730000, "主神恩寵", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
@@ -630,9 +626,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(17010010, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(17020010, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.PeriodicDamage, null),
-            new Skill(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.PeriodicDamage, null)
+            new Skill(17010010, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17020010, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
@@ -700,8 +696,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null)
+            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new Skill(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
@@ -753,7 +749,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null)
+            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
@@ -800,8 +796,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null)
+            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
@@ -1046,12 +1042,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         return
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(12000010, "Second Wind", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", SkillKind.Healing, SkillSemantics.Healing, null),
-            new Skill(13000010, "Support Heal", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Healing, SkillSemantics.Healing, null),
-            new Skill(14000010, "Barrier Ward", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.ShieldOrBarrier, SkillSemantics.ShieldOrBarrier, null),
-            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
-            new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null)
+            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new Skill(12000010, "Second Wind", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new Skill(13000010, "Support Heal", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(14000010, "Barrier Ward", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ];
     }
 

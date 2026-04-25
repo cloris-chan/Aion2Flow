@@ -9,20 +9,16 @@ namespace Cloris.Aion2Flow.Battle.Runtime;
 
 public sealed class CombatMetricsStore
 {
-    private const long SelfPeriodicHealingPoolWindowMilliseconds = 5000;
+    private const long PeriodicHealingPoolWindowMilliseconds = 5000;
     private const int MaxTrackedMultiHitCandidates = 64;
     private const int MaxPendingDodgeSignals = 16;
     private const int MaxPendingAvoidancePackets = 32;
     private const int MaxResolvedPeriodicLinks = 128;
     private const int PeriodicSelfRecoveryBaseSkillCode = 190000000;
-    private const int SpiritDescentSummonRestoreSkillCode = 16990004;
     private const int WindSpiritOwnerRestoreSkillCode = 16990003;
-    private const int WindSpiritSummonNpcCodeMin = 2920141;
-    private const int WindSpiritSummonNpcCodeMax = 2920155;
-    private static readonly HashSet<int> AdditionalWindSpiritSummonNpcCodes = [2920227, 2920566, 2920705];
 
-    private readonly record struct SelfPeriodicHealingPoolKey(int SourceId, int TargetId, int OriginalSkillCode);
-    private readonly record struct SelfPeriodicHealingPoolState(int LastRawDamage, long LastTimestamp);
+    private readonly record struct PeriodicHealingPoolKey(int SourceId, int TargetId, int OriginalSkillCode);
+    private readonly record struct PeriodicHealingPoolState(int LastRawDamage, long LastTimestamp);
     private readonly record struct SystemPeriodicRecoverySeedKey(int SourceId, int TargetId, int OriginalSkillCode);
     private readonly record struct SystemPeriodicRecoverySeedState(int LastRawDamage, long LastTimestamp);
     private readonly record struct MultiHitDamageCandidate(
@@ -86,11 +82,9 @@ public sealed class CombatMetricsStore
     private readonly ConcurrentDictionary<int, string> _npcNameByCode = new();
     private readonly ConcurrentDictionary<int, NpcInstanceState> _npcStateByInstance = new();
     private readonly ConcurrentDictionary<int, long> _detailRevisionByCombatant = new();
-    private readonly Lock _selfPeriodicHealingPoolLock = new();
-    private readonly Dictionary<SelfPeriodicHealingPoolKey, SelfPeriodicHealingPoolState> _selfPeriodicHealingPools = [];
+    private readonly Lock _periodicHealingPoolLock = new();
+    private readonly Dictionary<PeriodicHealingPoolKey, PeriodicHealingPoolState> _periodicHealingPools = [];
     private readonly Dictionary<SystemPeriodicRecoverySeedKey, SystemPeriodicRecoverySeedState> _systemPeriodicRecoverySeeds = [];
-    private readonly Lock _spiritDescentRestoreLock = new();
-    private readonly Dictionary<int, HashSet<int>> _acceptedSpiritDescentRestoreMarkersBySource = [];
     private readonly Lock _multiHitLock = new();
     private readonly List<MultiHitDamageCandidate> _recentDamageCandidates = [];
     private readonly Lock _compactOutcomeLock = new();
@@ -124,11 +118,6 @@ public sealed class CombatMetricsStore
         var shouldTrackAvoidance = !packet.IsNormalized;
 
         PreparePacketForStorage(packet);
-        if (!ShouldStorePacket(packet))
-        {
-            return;
-        }
-
         StorePacket(packet);
 
         if (shouldTrackAvoidance)
@@ -188,9 +177,6 @@ public sealed class CombatMetricsStore
                 if (IsNonCombatCompactItemSkill(skill))
                     continue;
 
-                if ((skill.Semantics & SkillSemantics.PeriodicDamage) != 0)
-                    continue;
-
                 totalOrphans++;
                 var packet = new ParsedCombatPacket
                 {
@@ -210,11 +196,6 @@ public sealed class CombatMetricsStore
                 };
 
                 PreparePacketForStorage(packet);
-                if (!ShouldStorePacket(packet))
-                {
-                    continue;
-                }
-
                 StorePacket(packet);
             }
 
@@ -395,7 +376,7 @@ public sealed class CombatMetricsStore
         CombatMetricsEngine.NormalizePacketForStorage(packet);
         NormalizeOwnerTargetSummonRestore(packet);
         NormalizeSystemPeriodicRecovery(packet);
-        NormalizeSelfPeriodicHealingPool(packet);
+        NormalizePeriodicHealingPool(packet);
         ApplyMultiHitAttribution(packet);
     }
 
@@ -417,7 +398,7 @@ public sealed class CombatMetricsStore
             return;
         }
 
-        lock (_selfPeriodicHealingPoolLock)
+        lock (_periodicHealingPoolLock)
         {
             if (isSeed)
             {
@@ -435,7 +416,7 @@ public sealed class CombatMetricsStore
             _systemPeriodicRecoverySeeds.Remove(key);
             var delta = packet.Timestamp - state.LastTimestamp;
             if (delta < 0 ||
-                delta > SelfPeriodicHealingPoolWindowMilliseconds ||
+                delta > PeriodicHealingPoolWindowMilliseconds ||
                 packet.Damage != state.LastRawDamage)
             {
                 return;
@@ -444,87 +425,6 @@ public sealed class CombatMetricsStore
             packet.EventKind = CombatEventKind.Healing;
             packet.ValueKind = CombatValueKind.PeriodicHealing;
         }
-    }
-
-    private bool ShouldStorePacket(ParsedCombatPacket packet)
-    {
-        if (!IsSpiritDescentSummonRestorePacket(packet))
-        {
-            return true;
-        }
-
-        if (packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId != packet.TargetId ||
-            packet.Marker <= 0)
-        {
-            return true;
-        }
-
-        lock (_spiritDescentRestoreLock)
-        {
-            if (!_acceptedSpiritDescentRestoreMarkersBySource.TryGetValue(packet.SourceId, out var acceptedMarkers))
-            {
-                acceptedMarkers = [packet.Marker];
-                _acceptedSpiritDescentRestoreMarkersBySource[packet.SourceId] = acceptedMarkers;
-                return true;
-            }
-
-            if (acceptedMarkers.Contains(packet.Marker))
-            {
-                return true;
-            }
-
-            if (!IsRepeatableSpiritDescentRestoreSource(packet.SourceId))
-            {
-                return false;
-            }
-
-            acceptedMarkers.Add(packet.Marker);
-            return true;
-        }
-    }
-
-    private bool IsRepeatableSpiritDescentRestoreSource(int sourceId)
-    {
-        if (!_npcStateByInstance.TryGetValue(sourceId, out var state) ||
-            state.NpcCode is not int npcCode)
-        {
-            return false;
-        }
-
-        if (state.Kind is { } kind && kind is not (NpcKind.Summon or NpcKind.Unknown))
-        {
-            return false;
-        }
-
-        if (npcCode is >= WindSpiritSummonNpcCodeMin and <= WindSpiritSummonNpcCodeMax ||
-            AdditionalWindSpiritSummonNpcCodes.Contains(npcCode))
-        {
-            return true;
-        }
-
-        if (!_npcNameByCode.TryGetValue(npcCode, out var name) &&
-            CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry))
-        {
-            name = entry.Name;
-        }
-
-        return string.Equals(name, "Wind Spirit", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(name, "風之精靈", StringComparison.Ordinal);
-    }
-
-    private static bool IsSpiritDescentSummonRestorePacket(ParsedCombatPacket packet)
-    {
-        if (packet.EventKind != CombatEventKind.Healing ||
-            packet.ValueKind != CombatValueKind.Healing)
-        {
-            return false;
-        }
-
-        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
-        return packet.SkillCode == SpiritDescentSummonRestoreSkillCode ||
-               originalSkillCode == SpiritDescentSummonRestoreSkillCode;
     }
 
     private bool IsOwnerTargetSummonRestorePacket(ParsedCombatPacket packet)
@@ -668,9 +568,9 @@ public sealed class CombatMetricsStore
         }
     }
 
-    private void NormalizeSelfPeriodicHealingPool(ParsedCombatPacket packet)
+    private void NormalizePeriodicHealingPool(ParsedCombatPacket packet)
     {
-        if (!TryGetSelfPeriodicHealingPoolKey(packet, out var key, out var isSeed))
+        if (!TryGetPeriodicHealingPoolKey(packet, out var key, out var isSeed))
         {
             return;
         }
@@ -681,63 +581,66 @@ public sealed class CombatMetricsStore
             return;
         }
 
-        lock (_selfPeriodicHealingPoolLock)
+        lock (_periodicHealingPoolLock)
         {
             if (isSeed)
             {
                 packet.Damage = 0;
-                _selfPeriodicHealingPools[key] = new SelfPeriodicHealingPoolState(rawDamage, packet.Timestamp);
+                _periodicHealingPools[key] = new PeriodicHealingPoolState(rawDamage, packet.Timestamp);
                 return;
             }
 
-            if (!_selfPeriodicHealingPools.TryGetValue(key, out var state))
+            if (!_periodicHealingPools.TryGetValue(key, out var state))
             {
                 return;
             }
 
             var delta = packet.Timestamp - state.LastTimestamp;
             if (delta < 0 ||
-                delta > SelfPeriodicHealingPoolWindowMilliseconds ||
+                delta > PeriodicHealingPoolWindowMilliseconds ||
                 rawDamage >= state.LastRawDamage)
             {
-                _selfPeriodicHealingPools.Remove(key);
+                _periodicHealingPools.Remove(key);
                 return;
             }
 
             packet.Damage = state.LastRawDamage - rawDamage;
             if (packet.Damage <= 0)
             {
-                _selfPeriodicHealingPools.Remove(key);
+                _periodicHealingPools.Remove(key);
                 return;
             }
 
             if (rawDamage == 0)
             {
-                _selfPeriodicHealingPools.Remove(key);
+                _periodicHealingPools.Remove(key);
             }
             else
             {
-                _selfPeriodicHealingPools[key] = new SelfPeriodicHealingPoolState(rawDamage, packet.Timestamp);
+                _periodicHealingPools[key] = new PeriodicHealingPoolState(rawDamage, packet.Timestamp);
             }
         }
     }
 
-    private static bool TryGetSelfPeriodicHealingPoolKey(
+    private static bool TryGetPeriodicHealingPoolKey(
         ParsedCombatPacket packet,
-        out SelfPeriodicHealingPoolKey key,
+        out PeriodicHealingPoolKey key,
         out bool isSeed)
     {
         key = default;
         isSeed = false;
 
         if (packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId != packet.TargetId)
+            packet.TargetId <= 0)
         {
             return false;
         }
 
-        if (!packet.IsPeriodicSelfMode(9) && !packet.IsPeriodicSelfMode(11))
+        var isSelfPool = packet.SourceId == packet.TargetId &&
+            (packet.IsPeriodicSelfMode(9) || packet.IsPeriodicSelfMode(11));
+        var isTargetPool = (packet.IsPeriodicTargetMode(9) || packet.IsPeriodicTargetMode(11)) &&
+            PacketSkillTraits.IsKnownPeriodicHealingPool(packet);
+        if (!isSelfPool && !isTargetPool)
         {
             return false;
         }
@@ -750,16 +653,13 @@ public sealed class CombatMetricsStore
             return false;
         }
 
-        var resolvedSkillKind = packet.SkillKind != SkillKind.Unknown
-            ? packet.SkillKind
-            : CombatEventClassifier.ResolveSkillKind(CombatMetricsEngine.InferOriginalSkillCode(originalSkillCode) ?? packet.SkillCode);
-        if (resolvedSkillKind != SkillKind.PeriodicHealing && resolvedSkillKind != SkillKind.ShieldOrBarrier)
+        if (packet.ValueKind is not CombatValueKind.PeriodicHealing and not CombatValueKind.Shield)
         {
             return false;
         }
 
-        key = new SelfPeriodicHealingPoolKey(packet.SourceId, packet.TargetId, originalSkillCode);
-        isSeed = packet.IsPeriodicSelfMode(9);
+        key = new PeriodicHealingPoolKey(packet.SourceId, packet.TargetId, originalSkillCode);
+        isSeed = packet.IsPeriodicSelfMode(9) || packet.IsPeriodicTargetMode(9);
         return true;
     }
 
@@ -1098,13 +998,10 @@ public sealed class CombatMetricsStore
         _summonOwnerByInstance.Clear();
         _summonInstancesByOwner.Clear();
         _detailRevisionByCombatant.Clear();
-        lock (_selfPeriodicHealingPoolLock)
+        lock (_periodicHealingPoolLock)
         {
-            _selfPeriodicHealingPools.Clear();
-        }
-        lock (_spiritDescentRestoreLock)
-        {
-            _acceptedSpiritDescentRestoreMarkersBySource.Clear();
+            _periodicHealingPools.Clear();
+            _systemPeriodicRecoverySeeds.Clear();
         }
         lock (_multiHitLock)
         {

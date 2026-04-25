@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.Combat.Metrics;
 
@@ -51,8 +50,6 @@ public sealed class ParsedCombatPacket
     public DamageModifiers Modifiers { get; set; }
     public CombatEventKind EventKind { get; set; } = CombatEventKind.Damage;
     public CombatValueKind ValueKind { get; set; } = CombatValueKind.Unknown;
-    public SkillKind SkillKind { get; set; } = SkillKind.Unknown;
-    public SkillSemantics SkillSemantics { get; set; } = SkillSemantics.None;
     public PeriodicEffectRelation PeriodicRelation { get; private set; }
     public int PeriodicMode { get; private set; }
     public PacketEffectTag EffectTag { get; private set; }
@@ -117,8 +114,6 @@ public sealed class ParsedCombatPacket
             Modifiers = Modifiers,
             EventKind = EventKind,
             ValueKind = ValueKind,
-            SkillKind = SkillKind,
-            SkillSemantics = SkillSemantics,
             IsNormalized = IsNormalized
         };
 

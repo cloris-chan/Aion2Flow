@@ -7,7 +7,6 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
-using Cloris.Aion2Flow.Resources;
 using K4os.Compression.LZ4;
 
 namespace Cloris.Aion2Flow.PacketCapture.Streams;
@@ -97,7 +96,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (CombatMetricsEngine.SkillMap is not null && CombatMetricsEngine.SkillMap.TryGetValue(normalized.Value, out var skill))
         {
-            return $"|skill={normalized.Value}{variantHint}|skillName={skill.Name}|skillKind={skill.Kind}|skillSemantics={skill.Semantics}";
+            return $"|skill={normalized.Value}{variantHint}|skillName={skill.Name}";
         }
 
         return $"|skill={normalized.Value}{variantHint}";
@@ -115,7 +114,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         var normalized = CombatMetricsEngine.InferOriginalSkillCode(skillCode) ?? skillCode;
         if (CombatMetricsEngine.SkillMap is not null && CombatMetricsEngine.SkillMap.TryGetValue(normalized, out var skill))
         {
-            return $"|skill={normalized}{variantHint}|skillName={skill.Name}|skillKind={skill.Kind}|skillSemantics={skill.Semantics}";
+            return $"|skill={normalized}{variantHint}|skillName={skill.Name}";
         }
 
         return $"|skill={normalized}{variantHint}";
@@ -131,7 +130,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         var normalized = CombatMetricsEngine.InferOriginalSkillCode(rawSkillCode) ?? rawSkillCode;
         if (CombatMetricsEngine.SkillMap is not null && CombatMetricsEngine.SkillMap.TryGetValue(normalized, out var skill))
         {
-            return $"|{prefix}={normalized}|{prefix}Name={skill.Name}|{prefix}Kind={skill.Kind}|{prefix}Semantics={skill.Semantics}";
+            return $"|{prefix}={normalized}|{prefix}Name={skill.Name}";
         }
 
         return $"|{prefix}={normalized}";
@@ -146,36 +145,21 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         var normalized = CombatMetricsEngine.InferOriginalSkillCode(skillCode) ?? skillCode;
-        var packetForClassification = new ParsedCombatPacket
-        {
-            TargetId = packet.TargetId,
-            SourceId = packet.SourceId,
-            OriginalSkillCode = packet.OriginalSkillCode,
-            SkillCode = normalized,
-            Damage = packet.Damage
-        };
+        var packetForClassification = packet.DeepClone();
+        packetForClassification.SkillCode = normalized;
+        packetForClassification.EventKind = CombatEventKind.Damage;
+        packetForClassification.ValueKind = CombatValueKind.Unknown;
+        packetForClassification.IsNormalized = false;
 
-        if (packet.IsPeriodicEffect)
-        {
-            packetForClassification.SetPeriodicEffect(packet.PeriodicRelation, packet.PeriodicMode);
-        }
-
-        if (packet.EffectTag != PacketEffectTag.None)
-        {
-            packetForClassification.SetEffectTag(packet.EffectTag);
-        }
-
-        var kind = CombatEventClassifier.ResolveSkillKind(normalized);
-        var semantics = CombatEventClassifier.ResolveSkillSemantics(normalized);
         var valueKind = CombatEventClassifier.ClassifyValueKind(packetForClassification);
         var variantHint = FormatSkillVariantHint(packet.SkillVariant);
 
         if (CombatMetricsEngine.SkillMap is not null && CombatMetricsEngine.SkillMap.TryGetValue(normalized, out var skill))
         {
-            return $"|skill={normalized}{variantHint}|skillName={skill.Name}|skillKind={kind}|skillSemantics={semantics}|valueKind={valueKind}";
+            return $"|skill={normalized}{variantHint}|skillName={skill.Name}|valueKind={valueKind}";
         }
 
-        return $"|skill={normalized}{variantHint}|skillKind={kind}|skillSemantics={semantics}|valueKind={valueKind}";
+        return $"|skill={normalized}{variantHint}|valueKind={valueKind}";
     }
 
     private static string FormatEffectHint(ParsedCombatPacket packet)
@@ -879,8 +863,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             });
         }
 
-        if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId
-            && IsDrainOrAbsorbSkill(parsed.SkillCodeRaw))
+        if (ShouldStoreDrainHealing(parsed))
         {
             store.AppendCombatPacket(new ParsedCombatPacket
             {
@@ -889,6 +872,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 OriginalSkillCode = parsed.SkillCodeRaw,
                 SkillCode = resolvedSkillCode,
                 Damage = parsed.DrainHealAmount,
+                DrainHealAmount = parsed.DrainHealAmount,
                 Timestamp = CurrentTimestampMilliseconds,
                 FrameOrdinal = frameOrdinal,
                 BatchOrdinal = batchOrdinal
@@ -1023,14 +1007,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         return !store.TryGetNpcRuntimeState(targetId, out var state) || state.Kind != NpcKind.Summon;
-    }
-
-    private static bool IsDrainOrAbsorbSkill(int skillCodeRaw)
-    {
-        var resolved = ResolveSkillCode(skillCodeRaw);
-        if (resolved is null) return false;
-        var semantics = CombatEventClassifier.ResolveSkillSemantics(resolved.Value);
-        return (semantics & SkillSemantics.DrainOrAbsorb) != 0;
     }
 
     private void ParseRecoveryPacket(ReadOnlySpan<byte> packet, bool flag = true)
@@ -1279,8 +1255,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 });
             }
 
-            if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId
-                && IsDrainOrAbsorbSkill(parsed.SkillCodeRaw))
+            if (ShouldStoreDrainHealing(parsed))
             {
                 store.AppendCombatPacket(new ParsedCombatPacket
                 {
@@ -1289,6 +1264,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                     OriginalSkillCode = parsed.SkillCodeRaw,
                     SkillCode = parsed.SkillCodeRaw,
                     Damage = parsed.DrainHealAmount,
+                    DrainHealAmount = parsed.DrainHealAmount,
                     Timestamp = CurrentTimestampMilliseconds,
                     FrameOrdinal = frameOrdinal,
                     BatchOrdinal = batchOrdinal
@@ -1879,6 +1855,16 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         packetLength = totalLength;
+        return true;
+    }
+
+    private static bool ShouldStoreDrainHealing(Packet0438Damage parsed)
+    {
+        if (parsed.DrainHealAmount <= 0 || parsed.SourceId == parsed.TargetId)
+        {
+            return false;
+        }
+
         return true;
     }
 }

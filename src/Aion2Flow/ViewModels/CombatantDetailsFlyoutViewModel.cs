@@ -671,8 +671,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             packet.TargetId > 0 &&
             packet.SourceId != packet.TargetId)
         {
-            // Shield absorption packets can keep the hostile attacker as SourceId,
-            // which is not the same thing as the support provider.
             return 0;
         }
 

@@ -16,8 +16,8 @@ public sealed class PacketLogReplayServiceTests
     {
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var firstLine = "2026-04-10T16:15:36.2148073+08:00|damage|16777343:62420->16777343:52250|target=200287|source=16039|skillRaw=17010230|damage=3593|skill=17010230|baseSkill=17010000|charge=0|specs=2+3|skillName=Earth's Retribution|skillKind=Damage|skillSemantics=Damage, Support|valueKind=Damage|data=230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01";
-        var secondLine = "2026-04-10T16:15:36.3112138+08:00|damage|16777343:62420->16777343:52250|target=200287|source=16039|skillRaw=17730001|damage=2875|skill=17730000|baseSkill=17730000|charge=1|skillName=Empyrean Lord's Grace|skillKind=Damage|skillSemantics=Damage, Support|valueKind=Damage|data=220438DF9C0C0400A77DD1890E015002AFD5AD6901000000D88501BB1601";
+        var firstLine = "2026-04-10T16:15:36.2148073+08:00|damage|16777343:62420->16777343:52250|target=200287|source=16039|skillRaw=17010230|damage=3593|skill=17010230|baseSkill=17010000|charge=0|specs=2+3|skillName=Earth's Retribution|valueKind=Damage|data=230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01";
+        var secondLine = "2026-04-10T16:15:36.3112138+08:00|damage|16777343:62420->16777343:52250|target=200287|source=16039|skillRaw=17730001|damage=2875|skill=17730000|baseSkill=17730000|charge=1|skillName=Empyrean Lord's Grace|valueKind=Damage|data=220438DF9C0C0400A77DD1890E015002AFD5AD6901000000D88501BB1601";
         var metaLine = "2026-04-10T16:15:36.1000000+08:00|frame-batch|16777343:62420->16777343:52250|offset=0|frameLength=35|data=230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01";
 
         var firstPacket = ParseDamagePacket("230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01");
@@ -310,7 +310,7 @@ public sealed class PacketLogReplayServiceTests
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var summonLine = "2026-04-25T00:58:41.8295743+08:00|summon|16777343:58107->16777343:50695|kind=create-177|owner=314|summon=17755|npcCode=2920107|data=BC014036DB8A015F1000AB8E2C004002003F18C70079064700FC1A461A2C7E42302D01C249C249740B0000740B000000000000D078020064000000F04902000100000000000000A08601000000000090D00300010101110143AA9809FFFFFFFFFFFFFFFF8075D52ABB030000BA0207028FBB18C736A9054700001A460702063A010000FA0200000000EF030641657468657201000200000000000000000000000000000002CD004C040000D000B202000017000000D71D030000";
-        var damageLine = "2026-04-25T00:58:46.2662741+08:00|damage|16777343:58107->16777343:50695|target=17755|source=24468|skillRaw=1232480|damage=16|skill=10000|baseSkill=1230000|charge=0|specs=2+4|skillName=Account Security|skillKind=Support|skillSemantics=Support|valueKind=Damage|data=230438DB8A01060094BF0160CE1200020240038B9D580701000000904E1001";
+        var damageLine = "2026-04-25T00:58:46.2662741+08:00|damage|16777343:58107->16777343:50695|target=17755|source=24468|skillRaw=1232480|damage=16|skill=10000|baseSkill=1230000|charge=0|specs=2+4|skillName=Account Security|valueKind=Damage|data=230438DB8A01060094BF0160CE1200020240038B9D580701000000904E1001";
         var path = WriteTempReplayLog("frame", summonLine, damageLine);
         try
         {
@@ -421,6 +421,63 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(7634, metrics.PeriodicHealingAmount);
     }
 
+    [Fact]
+    public void Replay_20260426031332_EnhanceSpiritBenediction_Self_And_Summon_Healing_Match_Game_Ground_Truth()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426031332.log"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        const int playerId = 10277;
+        const int summonId = 37299;
+        const int enhanceSpiritBenedictionSkillCode = 16190000;
+        var healingPackets = replay.Store.CombatPacketsBySource[playerId]
+            .Where(packet =>
+                packet.SkillCode == enhanceSpiritBenedictionSkillCode &&
+                packet.ValueKind == CombatValueKind.PeriodicHealing)
+            .ToArray();
+        var packetDump = string.Join(
+            Environment.NewLine,
+            healingPackets.Select(static packet =>
+                $"target={packet.TargetId} damage={packet.Damage} mode={packet.PeriodicRelation}:{packet.PeriodicMode} value={packet.ValueKind}"));
+
+        Assert.Equal(20, healingPackets.Length);
+        Assert.True(healingPackets.Sum(static packet => packet.Damage) == 3438, packetDump);
+        Assert.True(healingPackets.Where(static packet => packet.TargetId == playerId).Sum(static packet => packet.Damage) == 1737, packetDump);
+        Assert.True(healingPackets.Where(static packet => packet.TargetId == summonId).Sum(static packet => packet.Damage) == 1701, packetDump);
+        Assert.All(healingPackets, static packet => Assert.Equal(CombatEventKind.Healing, packet.EventKind));
+
+        var combatantDump = string.Join(
+            Environment.NewLine,
+            replay.Snapshot.Combatants
+                .OrderByDescending(static pair => pair.Value.HealingAmount)
+                .Select(static pair => $"id={pair.Key} heal={pair.Value.HealingAmount} damage={pair.Value.DamageAmount} name={pair.Value.Nickname}"));
+        Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), combatantDump);
+        var skillDump = string.Join(
+            Environment.NewLine,
+            playerMetrics.Skills
+                .Where(static pair => pair.Value.HealingAmount > 0)
+                .OrderByDescending(static pair => pair.Value.HealingAmount)
+                .Select(static pair =>
+                    $"skill={pair.Key} heal={pair.Value.HealingAmount} periodic={pair.Value.PeriodicHealingAmount} drain={pair.Value.DrainHealingAmount} times={pair.Value.HealingTimes}"));
+        Assert.True(playerMetrics.HealingAmount == 3438, $"HealingAmount={playerMetrics.HealingAmount} expected=3438\n{skillDump}\n{combatantDump}");
+        Assert.True(playerMetrics.Skills.TryGetValue(enhanceSpiritBenedictionSkillCode, out var skill), combatantDump);
+        Assert.Equal(3438, skill.HealingAmount);
+        Assert.Equal(3438, skill.PeriodicHealingAmount);
+
+        var summaryDump = string.Join(
+            Environment.NewLine,
+            replay.Combatants.Select(static summary =>
+                $"id={summary.CombatantId} outgoingHealing={summary.OutgoingHealing} incomingHealing={summary.IncomingHealing} outgoingDamage={summary.OutgoingDamage} incomingDamage={summary.IncomingDamage}"));
+        var playerSummary = Assert.Single(replay.Combatants, static summary => summary.CombatantId == playerId);
+        var summonSummary = Assert.Single(replay.Combatants, static summary => summary.CombatantId == summonId);
+        Assert.True(playerSummary.OutgoingHealing == 3438, summaryDump);
+        Assert.True(playerSummary.IncomingHealing == 1737, summaryDump);
+        Assert.True(summonSummary.IncomingHealing == 1701, summaryDump);
+    }
+
     private static string WriteTempReplayLog(string logKind, params string[] lines)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.{logKind}.log");
@@ -469,10 +526,10 @@ public sealed class PacketLogReplayServiceTests
     {
         return
         [
-            new Skill(1230000, "Fangs", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Support, SkillSemantics.Support, null),
-            new Skill(17010230, "Earth's Retribution", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
-            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null)
+            new Skill(1230000, "Fangs", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
+            new Skill(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17010230, "Earth's Retribution", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];
     }
 }

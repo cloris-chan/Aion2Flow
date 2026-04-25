@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Resources;
@@ -7,256 +6,9 @@ namespace Cloris.Aion2Flow.Combat.Classification;
 
 public static class CombatEventClassifier
 {
-    private const int RestoreHpSkillCode = 1010000;
-    private const int InstanceClearRestoreBaseSkillCode = 1900000;
-    private const int SpiritDescentSummonRestoreSkillCode = 16990004;
-    private static readonly ConcurrentDictionary<int, bool> NonHealthResourceRestoreBaseSkillCache = [];
+    public static CombatEventKind Classify(ParsedCombatPacket packet) => ClassifyPacket(packet).EventKind;
 
-    internal static void ClearCaches()
-    {
-        NonHealthResourceRestoreBaseSkillCache.Clear();
-    }
-
-    public static CombatEventKind Classify(ParsedCombatPacket packet)
-    {
-        if (IsOutcomeOnlyAvoidance(packet))
-        {
-            return CombatEventKind.Damage;
-        }
-
-        if (IsDrainHealSynthesis(packet))
-        {
-            return CombatEventKind.Healing;
-        }
-
-        if (IsObservedRecoveryTick(packet))
-        {
-            return CombatEventKind.Healing;
-        }
-
-        if (IsInstanceClearRestore(packet))
-        {
-            return CombatEventKind.Healing;
-        }
-
-        if (IsSpiritDescentSummonRestore(packet))
-        {
-            return CombatEventKind.Healing;
-        }
-
-        var semantics = ResolveSkillSemantics(packet.SkillCode);
-        if (IsOffensiveHitFromDualPurposeSkill(packet, semantics))
-        {
-            return CombatEventKind.Damage;
-        }
-
-        if (IsObservedOtherTargetSupportDamage(packet, semantics))
-        {
-            return CombatEventKind.Damage;
-        }
-
-        if (IsObservedDirectHealing(packet, semantics))
-        {
-            return CombatEventKind.Healing;
-        }
-
-        if (IsDamageTaggedDirectSelfSupportSignal(packet, semantics))
-        {
-            return CombatEventKind.Support;
-        }
-
-        if (IsObservedSelfResourceSupportProc(packet, semantics))
-        {
-            return CombatEventKind.Support;
-        }
-
-        if (IsObservedBaseSkillResourceSupportProc(packet, semantics))
-        {
-            return CombatEventKind.Support;
-        }
-
-        if (TryClassifyPeriodicEvent(packet, semantics, out var periodicEventKind))
-        {
-            return periodicEventKind;
-        }
-
-        if ((semantics & SkillSemantics.ShieldOrBarrier) != 0)
-        {
-            return CombatEventKind.Support;
-        }
-
-        if ((semantics & SkillSemantics.DrainOrAbsorb) != 0)
-        {
-            return packet.TargetId == packet.SourceId
-                ? CombatEventKind.Healing
-                : CombatEventKind.Damage;
-        }
-
-        if ((semantics & SkillSemantics.Healing) != 0 || (semantics & SkillSemantics.PeriodicHealing) != 0)
-        {
-            return CombatEventKind.Healing;
-        }
-
-        if (IsObservedUnknownSelfSupportProc(packet, semantics))
-        {
-            return CombatEventKind.Support;
-        }
-
-        if (!TryGetSkill(packet.SkillCode, out var skill))
-        {
-            return CombatEventKind.Damage;
-        }
-
-        switch (skill.Kind)
-        {
-            case SkillKind.Healing:
-            case SkillKind.PeriodicHealing:
-                return CombatEventKind.Healing;
-            case SkillKind.ShieldOrBarrier:
-            case SkillKind.Support:
-                return CombatEventKind.Support;
-            case SkillKind.DrainOrAbsorb:
-                return packet.TargetId == packet.SourceId
-                    ? CombatEventKind.Healing
-                    : CombatEventKind.Damage;
-            case SkillKind.Damage:
-            case SkillKind.PeriodicDamage:
-                return CombatEventKind.Damage;
-        }
-
-        return CombatEventKind.Damage;
-    }
-
-    public static CombatValueKind ClassifyValueKind(ParsedCombatPacket packet)
-    {
-        if (IsOutcomeOnlyAvoidance(packet))
-        {
-            return CombatValueKind.Damage;
-        }
-
-        if (IsDrainHealSynthesis(packet))
-        {
-            return CombatValueKind.DrainHealing;
-        }
-
-        if (IsObservedRecoveryTick(packet))
-        {
-            return CombatValueKind.PeriodicHealing;
-        }
-
-        if (IsObservedSelfHealingProc(packet))
-        {
-            return CombatValueKind.PeriodicHealing;
-        }
-
-        if (IsInstanceClearRestore(packet))
-        {
-            return CombatValueKind.Healing;
-        }
-
-        if (IsSpiritDescentSummonRestore(packet))
-        {
-            return CombatValueKind.Healing;
-        }
-
-        var semantics = ResolveSkillSemantics(packet.SkillCode);
-        if (IsOffensiveHitFromDualPurposeSkill(packet, semantics))
-        {
-            return CombatValueKind.Damage;
-        }
-
-        if (IsObservedOtherTargetSupportDamage(packet, semantics))
-        {
-            return CombatValueKind.Damage;
-        }
-
-        if (IsObservedDirectHealing(packet, semantics))
-        {
-            return CombatValueKind.Healing;
-        }
-
-        if (IsDamageTaggedDirectSelfSupportSignal(packet, semantics))
-        {
-            return CombatValueKind.Support;
-        }
-
-        if (IsObservedSelfResourceSupportProc(packet, semantics))
-        {
-            return CombatValueKind.Support;
-        }
-
-        if (IsObservedBaseSkillResourceSupportProc(packet, semantics))
-        {
-            return CombatValueKind.Support;
-        }
-
-        if (TryClassifyPeriodicValueKind(packet, semantics, out var periodicValueKind))
-        {
-            return periodicValueKind;
-        }
-
-        if ((semantics & SkillSemantics.ShieldOrBarrier) != 0)
-        {
-            return CombatValueKind.Shield;
-        }
-
-        if ((semantics & SkillSemantics.DrainOrAbsorb) != 0)
-        {
-            return packet.TargetId == packet.SourceId
-                ? CombatValueKind.DrainHealing
-                : CombatValueKind.Damage;
-        }
-
-        if ((semantics & SkillSemantics.PeriodicHealing) != 0 && packet.IsPeriodicEffect)
-        {
-            return CombatValueKind.PeriodicHealing;
-        }
-
-        if ((semantics & SkillSemantics.PeriodicDamage) != 0)
-        {
-            return packet.IsPeriodicEffect
-                ? CombatValueKind.PeriodicDamage
-                : CombatValueKind.Damage;
-        }
-
-        if ((semantics & SkillSemantics.Healing) != 0)
-        {
-            return CombatValueKind.Healing;
-        }
-
-        if ((semantics & SkillSemantics.Support) != 0 && semantics == SkillSemantics.Support)
-        {
-            return CombatValueKind.Support;
-        }
-
-        if (IsObservedUnknownSelfSupportProc(packet, semantics))
-        {
-            return CombatValueKind.Support;
-        }
-
-        if (!TryGetSkill(packet.SkillCode, out var skill))
-        {
-            return CombatValueKind.Damage;
-        }
-
-        return skill.Kind switch
-        {
-            SkillKind.Healing => CombatValueKind.Healing,
-            SkillKind.PeriodicHealing => packet.IsPeriodicEffect
-                ? CombatValueKind.PeriodicHealing
-                : CombatValueKind.Healing,
-            SkillKind.ShieldOrBarrier => CombatValueKind.Shield,
-            SkillKind.Support => CombatValueKind.Support,
-            SkillKind.DrainOrAbsorb => packet.TargetId == packet.SourceId
-                ? CombatValueKind.DrainHealing
-                : CombatValueKind.Damage,
-            SkillKind.PeriodicDamage => packet.IsPeriodicEffect
-                ? CombatValueKind.PeriodicDamage
-                : CombatValueKind.Damage,
-            SkillKind.Damage => CombatValueKind.Damage,
-            _ => CombatValueKind.Damage
-        };
-    }
+    public static CombatValueKind ClassifyValueKind(ParsedCombatPacket packet) => ClassifyPacket(packet).ValueKind;
 
     public static bool CountsTowardsDamage(ParsedCombatPacket packet) => packet.EventKind == CombatEventKind.Damage;
 
@@ -267,18 +19,136 @@ public static class CombatEventClassifier
             : string.Empty;
     }
 
-    public static SkillKind ResolveSkillKind(int skillCode)
+    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyPacket(ParsedCombatPacket packet)
     {
-        return TryGetSkill(skillCode, out var skill)
-            ? skill.Kind
-            : SkillKind.Unknown;
+        if (IsOutcomeOnlyAvoidance(packet))
+        {
+            return (CombatEventKind.Damage, CombatValueKind.Damage);
+        }
+
+        if (IsDrainHealSynthesis(packet))
+        {
+            return (CombatEventKind.Healing, CombatValueKind.DrainHealing);
+        }
+
+        if (packet.IsPeriodicEffect)
+        {
+            return ClassifyPeriodicPacket(packet);
+        }
+
+        return ClassifyDirectPacket(packet);
     }
 
-    public static SkillSemantics ResolveSkillSemantics(int skillCode)
+    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyDirectPacket(ParsedCombatPacket packet)
     {
-        return TryGetSkill(skillCode, out var skill)
-            ? skill.Semantics
-            : SkillSemantics.None;
+        if (PacketSkillTraits.IsKnownDirectSupport(packet))
+        {
+            return (CombatEventKind.Support, CombatValueKind.Support);
+        }
+
+        if (packet.ResourceKind == CombatResourceKind.Mana)
+        {
+            return (CombatEventKind.Support, CombatValueKind.Support);
+        }
+
+        if (packet.ResourceKind == CombatResourceKind.Health)
+        {
+            return (CombatEventKind.Healing, CombatValueKind.Healing);
+        }
+
+        if (PacketSkillTraits.IsRestoreHp(packet))
+        {
+            return (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
+        }
+
+        if (PacketSkillTraits.IsKnownDirectPeriodicHealing(packet))
+        {
+            return (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
+        }
+
+        if (PacketSkillTraits.IsKnownDirectHealing(packet))
+        {
+            return (CombatEventKind.Healing, CombatValueKind.Healing);
+        }
+
+        if (PacketSkillTraits.IsKnownShield(packet))
+        {
+            return (CombatEventKind.Support, CombatValueKind.Shield);
+        }
+
+        if (packet.SourceId > 0 &&
+            packet.TargetId > 0 &&
+            packet.SourceId == packet.TargetId)
+        {
+            return (CombatEventKind.Support, CombatValueKind.Support);
+        }
+
+        return (CombatEventKind.Damage, CombatValueKind.Damage);
+    }
+
+    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyPeriodicPacket(ParsedCombatPacket packet)
+    {
+        if (packet.IsPeriodicSelfEffect)
+        {
+            if (packet.IsPeriodicSelfMode(10))
+            {
+                return (CombatEventKind.Support, CombatValueKind.Support);
+            }
+
+            if (PacketSkillTraits.IsKnownShield(packet))
+            {
+                return (CombatEventKind.Support, CombatValueKind.Shield);
+            }
+
+            if (packet.ResourceKind == CombatResourceKind.Mana)
+            {
+                return (CombatEventKind.Support, CombatValueKind.Support);
+            }
+
+            if (packet.ResourceKind == CombatResourceKind.Health ||
+                packet.IsPeriodicSelfMode(11) ||
+                PacketSkillTraits.IsRestoreHp(packet) ||
+                PacketSkillTraits.IsKnownPeriodicHealing(packet))
+            {
+                return (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
+            }
+
+            return (CombatEventKind.Support, CombatValueKind.Support);
+        }
+
+        if (!packet.IsPeriodicTargetEffect)
+        {
+            return (CombatEventKind.Damage, CombatValueKind.Damage);
+        }
+
+        if (packet.IsPeriodicTargetMode(8) ||
+            PacketSkillTraits.IsObservedPeriodicSentinelSupport(packet) ||
+            PacketSkillTraits.IsKnownTargetPeriodicSupport(packet))
+        {
+            return (CombatEventKind.Support, CombatValueKind.Support);
+        }
+
+        if (PacketSkillTraits.IsKnownShield(packet))
+        {
+            return (CombatEventKind.Support, CombatValueKind.Shield);
+        }
+
+        if (packet.ResourceKind == CombatResourceKind.Mana)
+        {
+            return (CombatEventKind.Support, CombatValueKind.Support);
+        }
+
+        if (packet.ResourceKind == CombatResourceKind.Health ||
+            PacketSkillTraits.IsKnownPeriodicHealing(packet))
+        {
+            return packet.IsPeriodicTargetInitialEffect
+                ? (CombatEventKind.Healing, CombatValueKind.Healing)
+                : (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
+        }
+
+        return packet.IsPeriodicTargetInitialEffect
+            ? (CombatEventKind.Damage, CombatValueKind.Damage)
+            : (CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
     }
 
     private static bool IsOutcomeOnlyAvoidance(ParsedCombatPacket packet)
@@ -296,453 +166,11 @@ public static class CombatEventClassifier
         return Math.Max(packet.HitContribution, packet.AttemptContribution) > 0;
     }
 
-    private static bool TryClassifyPeriodicEvent(
-        ParsedCombatPacket packet,
-        SkillSemantics semantics,
-        out CombatEventKind eventKind)
-    {
-        eventKind = default;
-        if (!packet.IsPeriodicEffect)
-        {
-            return false;
-        }
-
-        if (packet.IsPeriodicSelfEffect)
-        {
-            if (packet.IsPeriodicSelfMode(10))
-            {
-                eventKind = CombatEventKind.Support;
-                return true;
-            }
-
-            if ((semantics & SkillSemantics.ShieldOrBarrier) != 0)
-            {
-                eventKind = CombatEventKind.Support;
-                return true;
-            }
-
-            if (packet.IsPeriodicSelfMode(11))
-            {
-                eventKind = CombatEventKind.Healing;
-                return true;
-            }
-
-            if ((semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing | SkillSemantics.DrainOrAbsorb | SkillSemantics.ShieldOrBarrier)) == 0)
-            {
-                eventKind = CombatEventKind.Support;
-                return true;
-            }
-
-            eventKind = CombatEventKind.Healing;
-            return true;
-        }
-
-        if (!packet.IsPeriodicTargetEffect)
-        {
-            return false;
-        }
-
-        if (packet.IsPeriodicTargetMode(8))
-        {
-            eventKind = CombatEventKind.Support;
-            return true;
-        }
-
-        if (IsObservedPeriodicHealingSentinelOverflowTick(packet, semantics))
-        {
-            eventKind = CombatEventKind.Support;
-            return true;
-        }
-
-        if ((semantics & SkillSemantics.ShieldOrBarrier) != 0)
-        {
-            eventKind = CombatEventKind.Support;
-            return true;
-        }
-
-        if (IsDamageTaggedPeriodicSupportSignal(semantics))
-        {
-            eventKind = CombatEventKind.Support;
-            return true;
-        }
-
-        if (HasOffensivePeriodicSignal(semantics))
-        {
-            eventKind = CombatEventKind.Damage;
-            return true;
-        }
-
-        if ((semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing)) != 0)
-        {
-            eventKind = CombatEventKind.Healing;
-            return true;
-        }
-
-        if (IsSupportOnly(semantics))
-        {
-            eventKind = CombatEventKind.Support;
-            return true;
-        }
-
-        eventKind = CombatEventKind.Damage;
-        return true;
-    }
-
-    private static bool TryClassifyPeriodicValueKind(
-        ParsedCombatPacket packet,
-        SkillSemantics semantics,
-        out CombatValueKind valueKind)
-    {
-        valueKind = default;
-        if (!packet.IsPeriodicEffect)
-        {
-            return false;
-        }
-
-        if (packet.IsPeriodicSelfEffect)
-        {
-            if (packet.IsPeriodicSelfMode(10))
-            {
-                valueKind = CombatValueKind.Support;
-                return true;
-            }
-
-            if ((semantics & SkillSemantics.ShieldOrBarrier) != 0)
-            {
-                valueKind = CombatValueKind.Shield;
-                return true;
-            }
-
-            if (packet.IsPeriodicSelfMode(11))
-            {
-                valueKind = (semantics & SkillSemantics.DrainOrAbsorb) != 0
-                    ? CombatValueKind.DrainHealing
-                    : CombatValueKind.PeriodicHealing;
-                return true;
-            }
-
-            if ((semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing | SkillSemantics.DrainOrAbsorb | SkillSemantics.ShieldOrBarrier)) == 0)
-            {
-                valueKind = CombatValueKind.Support;
-                return true;
-            }
-
-            valueKind = (semantics & SkillSemantics.DrainOrAbsorb) != 0
-                ? CombatValueKind.DrainHealing
-                : CombatValueKind.PeriodicHealing;
-            return true;
-        }
-
-        if (!packet.IsPeriodicTargetEffect)
-        {
-            return false;
-        }
-
-        if (packet.IsPeriodicTargetMode(8))
-        {
-            valueKind = CombatValueKind.Support;
-            return true;
-        }
-
-        if (IsObservedPeriodicHealingSentinelOverflowTick(packet, semantics))
-        {
-            valueKind = CombatValueKind.Support;
-            return true;
-        }
-
-        if ((semantics & SkillSemantics.ShieldOrBarrier) != 0)
-        {
-            valueKind = CombatValueKind.Shield;
-            return true;
-        }
-
-        if (IsDamageTaggedPeriodicSupportSignal(semantics))
-        {
-            valueKind = CombatValueKind.Support;
-            return true;
-        }
-
-        if (HasOffensivePeriodicSignal(semantics))
-        {
-            valueKind = packet.IsPeriodicTargetInitialEffect
-                ? CombatValueKind.Damage
-                : CombatValueKind.PeriodicDamage;
-            return true;
-        }
-
-        if ((semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing)) != 0)
-        {
-            valueKind = packet.IsPeriodicTargetInitialEffect
-                ? CombatValueKind.Healing
-                : CombatValueKind.PeriodicHealing;
-            return true;
-        }
-
-        if (IsSupportOnly(semantics))
-        {
-            valueKind = CombatValueKind.Support;
-            return true;
-        }
-
-        valueKind = packet.IsPeriodicTargetInitialEffect
-            ? CombatValueKind.Damage
-            : CombatValueKind.PeriodicDamage;
-        return true;
-    }
-
-    private static bool IsDamageTaggedPeriodicSupportSignal(SkillSemantics semantics)
-    {
-        if ((semantics & SkillSemantics.Support) == 0 ||
-            (semantics & SkillSemantics.Damage) == 0)
-        {
-            return false;
-        }
-
-        return (semantics & (SkillSemantics.PeriodicDamage |
-                             SkillSemantics.Healing |
-                             SkillSemantics.PeriodicHealing |
-                             SkillSemantics.DrainOrAbsorb |
-                             SkillSemantics.ShieldOrBarrier)) == 0;
-    }
-
-    private static bool HasOffensivePeriodicSignal(SkillSemantics semantics)
-    {
-        var offensive = semantics & (SkillSemantics.Damage |
-                                     SkillSemantics.PeriodicDamage |
-                                     SkillSemantics.DrainOrAbsorb);
-        if (offensive == 0)
-            return false;
-
-        if (offensive == SkillSemantics.Damage
-            && (semantics & SkillSemantics.PeriodicHealing) != 0)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool IsSupportOnly(SkillSemantics semantics)
-    {
-        if ((semantics & SkillSemantics.Support) == 0)
-        {
-            return false;
-        }
-
-        return (semantics & (SkillSemantics.Damage |
-                             SkillSemantics.PeriodicDamage |
-                             SkillSemantics.Healing |
-                             SkillSemantics.PeriodicHealing |
-                             SkillSemantics.DrainOrAbsorb |
-                             SkillSemantics.ShieldOrBarrier)) == 0;
-    }
-
-    private static bool IsObservedDirectHealing(ParsedCombatPacket packet, SkillSemantics semantics)
-    {
-        if (packet.IsPeriodicEffect || packet.Damage <= 0)
-        {
-            return false;
-        }
-
-        return (semantics & SkillSemantics.Healing) != 0
-               && (semantics & (SkillSemantics.DrainOrAbsorb | SkillSemantics.ShieldOrBarrier)) == 0;
-    }
-
-    private static bool IsOffensiveHitFromDualPurposeSkill(ParsedCombatPacket packet, SkillSemantics semantics)
-    {
-        if (packet.IsPeriodicEffect || packet.Damage <= 0 || packet.SourceId == packet.TargetId)
-        {
-            return false;
-        }
-
-        return (semantics & SkillSemantics.Damage) != 0
-               && (semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing)) != 0
-               && (semantics & SkillSemantics.DrainOrAbsorb) == 0;
-    }
-
-    private static bool IsObservedOtherTargetSupportDamage(ParsedCombatPacket packet, SkillSemantics semantics)
-    {
-        if (packet.IsPeriodicEffect ||
-            packet.Damage <= 0 ||
-            packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId == packet.TargetId)
-        {
-            return false;
-        }
-
-        if ((semantics & SkillSemantics.Support) == 0)
-        {
-            return false;
-        }
-
-        return (semantics & (SkillSemantics.Damage |
-                             SkillSemantics.PeriodicDamage |
-                             SkillSemantics.Healing |
-                             SkillSemantics.PeriodicHealing |
-                             SkillSemantics.DrainOrAbsorb |
-                             SkillSemantics.ShieldOrBarrier |
-                             SkillSemantics.NonHealthResourceRestore)) == 0;
-    }
-
-    private static bool IsDamageTaggedDirectSelfSupportSignal(ParsedCombatPacket packet, SkillSemantics semantics)
-    {
-        if (packet.IsPeriodicEffect ||
-            packet.Damage <= 0 ||
-            packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        if ((semantics & (SkillSemantics.Support | SkillSemantics.Damage)) !=
-            (SkillSemantics.Support | SkillSemantics.Damage))
-        {
-            return false;
-        }
-
-        return (semantics & (SkillSemantics.PeriodicDamage |
-                             SkillSemantics.Healing |
-                             SkillSemantics.PeriodicHealing |
-                             SkillSemantics.DrainOrAbsorb |
-                             SkillSemantics.ShieldOrBarrier |
-                             SkillSemantics.NonHealthResourceRestore)) == 0;
-    }
-
-    private static bool IsObservedSelfResourceSupportProc(ParsedCombatPacket packet, SkillSemantics semantics)
-    {
-        if (packet.IsPeriodicEffect ||
-            packet.Damage <= 0 ||
-            packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        return (semantics & SkillSemantics.NonHealthResourceRestore) != 0;
-    }
-
-    private static bool IsObservedUnknownSelfSupportProc(ParsedCombatPacket packet, SkillSemantics semantics)
-    {
-        if (packet.IsPeriodicEffect ||
-            packet.Damage <= 0 ||
-            packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        if (semantics != SkillSemantics.None)
-        {
-            return false;
-        }
-
-        return !TryGetSkill(packet.SkillCode, out var skill)
-               || skill.Kind == SkillKind.Unknown;
-    }
-
-    private static bool IsObservedBaseSkillResourceSupportProc(ParsedCombatPacket packet, SkillSemantics semantics)
-    {
-        if (packet.IsPeriodicEffect ||
-            packet.Damage <= 0 ||
-            packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        if ((semantics & (SkillSemantics.NonHealthResourceRestore |
-                          SkillSemantics.Healing |
-                          SkillSemantics.PeriodicHealing |
-                          SkillSemantics.DrainOrAbsorb |
-                          SkillSemantics.ShieldOrBarrier)) != 0)
-        {
-            return false;
-        }
-
-        if (!TryGetSkill(packet.SkillCode, out var skill))
-        {
-            return false;
-        }
-
-        if (skill.SourceType != SkillSourceType.PcSkill)
-        {
-            return false;
-        }
-
-        if (skill.Kind != SkillKind.Damage && skill.Kind != SkillKind.Unknown)
-        {
-            return false;
-        }
-
-        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
-        var variant = originalSkillCode > 0
-            ? CombatMetricsEngine.ParseSkillVariant(originalSkillCode)
-            : default;
-        var chargeStage = packet.ChargeStage > 0 ? packet.ChargeStage : variant.ChargeStage;
-        if (chargeStage != 7)
-        {
-            return false;
-        }
-
-        var baseSkillCode = packet.BaseSkillCode > 0 ? packet.BaseSkillCode : variant.BaseSkillCode;
-        if (baseSkillCode <= 0)
-        {
-            return false;
-        }
-
-        return BaseSkillHasNonHealthResourceRestoreVariant(baseSkillCode);
-    }
-
-    private static bool IsObservedPeriodicHealingSentinelOverflowTick(ParsedCombatPacket packet, SkillSemantics semantics)
-    {
-        if (!packet.IsPeriodicEffect ||
-            packet.Damage < 2_000_000_000 ||
-            (!packet.IsPeriodicTargetMode(9) && !packet.IsPeriodicTargetMode(11)))
-        {
-            return false;
-        }
-
-        if ((semantics & (SkillSemantics.Healing | SkillSemantics.PeriodicHealing | SkillSemantics.Support)) == 0)
-        {
-            return false;
-        }
-
-        return TryGetSkill(packet.SkillCode, out var skill)
-               && skill.Kind == SkillKind.PeriodicHealing;
-    }
-
-    private static bool BaseSkillHasNonHealthResourceRestoreVariant(int baseSkillCode)
-    {
-        if (baseSkillCode <= 0 || CombatMetricsEngine.SkillMap.Count == 0)
-        {
-            return false;
-        }
-
-        return NonHealthResourceRestoreBaseSkillCache.GetOrAdd(baseSkillCode, static candidateBaseSkillCode =>
-        {
-            foreach (var skill in CombatMetricsEngine.SkillMap)
-            {
-                if ((skill.Semantics & SkillSemantics.NonHealthResourceRestore) == 0)
-                {
-                    continue;
-                }
-
-                if (CombatMetricsEngine.ParseSkillVariant(skill.Id).BaseSkillCode != candidateBaseSkillCode)
-                {
-                    continue;
-                }
-
-                return true;
-            }
-
-            return false;
-        });
-    }
+    private static bool IsDrainHealSynthesis(ParsedCombatPacket packet) =>
+        packet.SourceId > 0
+        && packet.SourceId == packet.TargetId
+        && packet.Damage > 0
+        && packet.DrainHealAmount > 0;
 
     private static bool TryGetDisplaySkillName(int skillCode, out string skillName)
     {
@@ -781,116 +209,132 @@ public static class CombatEventClassifier
             return false;
         }
 
-        if (!CombatMetricsEngine.SkillMap.TryGetValue(skillCode, out skill))
-        {
-            return false;
-        }
-
-        return true;
+        return CombatMetricsEngine.SkillMap.TryGetValue(skillCode, out skill);
     }
+}
 
-    private static bool IsDrainHealSynthesis(ParsedCombatPacket packet) =>
-        packet.SourceId > 0
-        && packet.SourceId == packet.TargetId
-        && packet.Damage > 0
-        && packet.DrainHealAmount > 0;
+internal static class PacketSkillTraits
+{
+    private const int RestoreHpSkillCode = 1010000;
+    private const int RestSkillCode = 10001;
+    private const int SpiritDescentSummonRestoreSkillCode = 16990004;
+    private const int EnhanceSpiritBenedictionBaseSkillCode = 16190000;
+    private const int LightOfProtectionSkillCode = 17410040;
+    private const long LightOfProtectionDirectHealingDetailRaw = 0x0000000267C58D55L;
 
-    private static bool IsObservedRecoveryTick(ParsedCombatPacket packet)
+    public static bool IsRestoreHp(ParsedCombatPacket packet) =>
+        MatchesExact(packet, RestoreHpSkillCode, RestSkillCode);
+
+    public static bool IsKnownDirectHealing(ParsedCombatPacket packet) =>
+        IsLightOfProtectionDirectHealing(packet) ||
+        MatchesExact(
+            packet,
+            17800000) ||
+        MatchesBase(packet, 13710000, 13790000, 17090000, 17100000, 17120000, 18120000);
+
+    public static bool IsKnownDirectPeriodicHealing(ParsedCombatPacket packet) =>
+        MatchesExact(packet, 16120350, 2011101) ||
+        MatchesBase(packet, 18160000);
+
+    public static bool IsKnownDirectSupport(ParsedCombatPacket packet) =>
+        packet.Damage > 0 &&
+        !packet.IsPeriodicEffect &&
+        (MatchesExact(packet, SpiritDescentSummonRestoreSkillCode) ||
+         IsEnhanceSpiritBenediction(packet));
+
+    public static bool IsKnownPeriodicHealing(ParsedCombatPacket packet) =>
+        IsRestoreHp(packet) ||
+        IsKnownDirectHealing(packet) ||
+        IsKnownDirectPeriodicHealing(packet) ||
+        IsKnownPeriodicHealingPool(packet) ||
+        MatchesBase(packet, 17090000, 17120000, 18120000);
+
+    public static bool IsKnownShield(ParsedCombatPacket packet) =>
+        MatchesExact(packet, 2212001, 22120011, 15160000, 18730000);
+
+    public static bool IsKnownTargetPeriodicSupport(ParsedCombatPacket packet) =>
+        MatchesExact(packet, 17730000, 17410000);
+
+    public static bool IsKnownPeriodicHealingPool(ParsedCombatPacket packet) =>
+        (packet.IsPeriodicSelfMode(9) ||
+         packet.IsPeriodicSelfMode(11) ||
+         packet.IsPeriodicTargetMode(9) ||
+         packet.IsPeriodicTargetMode(11)) &&
+        IsEnhanceSpiritBenediction(packet);
+
+    public static bool IsObservedPeriodicSentinelSupport(ParsedCombatPacket packet) =>
+        packet.IsPeriodicTargetEffect &&
+        packet.Damage >= 2_000_000_000 &&
+        (packet.IsPeriodicTargetMode(9) || packet.IsPeriodicTargetMode(11));
+
+    private static bool IsLightOfProtectionDirectHealing(ParsedCombatPacket packet) =>
+        MatchesExact(packet, LightOfProtectionSkillCode) &&
+        packet.Damage > 0 &&
+        packet.LayoutTag == 4 &&
+        packet.Flag == 0 &&
+        packet.Type == 2 &&
+        packet.Loop == 2 &&
+        packet.DetailRaw == LightOfProtectionDirectHealingDetailRaw;
+
+    private static bool IsEnhanceSpiritBenediction(ParsedCombatPacket packet) =>
+        MatchesBase(packet, EnhanceSpiritBenedictionBaseSkillCode) ||
+        MatchesExact(packet, EnhanceSpiritBenedictionBaseSkillCode, 16190010, 16190020, 16190030) ||
+        MatchesByHundred(packet, EnhanceSpiritBenedictionBaseSkillCode);
+
+    private static bool MatchesExact(ParsedCombatPacket packet, params int[] skillCodes)
     {
-        if (packet.IsPeriodicEffect || packet.Damage <= 0 || packet.SourceId <= 0 || packet.TargetId <= 0)
+        foreach (var skillCode in skillCodes)
         {
-            return false;
+            if (skillCode <= 0)
+            {
+                continue;
+            }
+
+            if (packet.SkillCode == skillCode || packet.OriginalSkillCode == skillCode)
+            {
+                return true;
+            }
+
+            if (CombatMetricsEngine.InferOriginalSkillCode(packet.OriginalSkillCode) == skillCode ||
+                CombatMetricsEngine.InferOriginalSkillCode(packet.SkillCode) == skillCode)
+            {
+                return true;
+            }
         }
 
-        if (packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        if (!TryGetSkill(packet.SkillCode, out var skill))
-        {
-            return false;
-        }
-
-        if (skill.SourceType != SkillSourceType.ItemSkill ||
-            skill.Category != SkillCategory.Npc)
-        {
-            return false;
-        }
-
-        return skill.Id == RestoreHpSkillCode;
+        return false;
     }
 
-    private static bool IsInstanceClearRestore(ParsedCombatPacket packet)
+    private static bool MatchesBase(ParsedCombatPacket packet, params int[] baseSkillCodes)
     {
-        if (packet.IsPeriodicEffect || packet.Damage <= 0 || packet.SourceId <= 0 || packet.TargetId <= 0)
+        foreach (var baseSkillCode in baseSkillCodes)
         {
-            return false;
+            if (baseSkillCode <= 0)
+            {
+                continue;
+            }
+
+            if (packet.BaseSkillCode == baseSkillCode)
+            {
+                return true;
+            }
+
+            if (CombatMetricsEngine.ParseSkillVariant(packet.OriginalSkillCode).BaseSkillCode == baseSkillCode ||
+                CombatMetricsEngine.ParseSkillVariant(packet.SkillCode).BaseSkillCode == baseSkillCode)
+            {
+                return true;
+            }
         }
 
-        if (packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
-        var variant = originalSkillCode > 0
-            ? CombatMetricsEngine.ParseSkillVariant(originalSkillCode)
-            : default;
-        var baseSkillCode = packet.BaseSkillCode > 0
-            ? packet.BaseSkillCode
-            : variant.BaseSkillCode > 0
-                ? variant.BaseSkillCode
-                : packet.SkillCode - (packet.SkillCode % 10);
-
-        return baseSkillCode == InstanceClearRestoreBaseSkillCode
-             && packet.ResourceKind != CombatResourceKind.Mana;
+        return false;
     }
 
-    private static bool IsObservedSelfHealingProc(ParsedCombatPacket packet)
-    {
-        if (packet.IsPeriodicEffect || packet.Damage <= 0 || packet.SourceId <= 0 || packet.TargetId <= 0)
-        {
-            return false;
-        }
+    private static bool MatchesByHundred(ParsedCombatPacket packet, int skillCode) =>
+        MatchesByHundred(packet.SkillCode, skillCode) ||
+        MatchesByHundred(packet.OriginalSkillCode, skillCode);
 
-        if (packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        if (!TryGetSkill(packet.SkillCode, out var skill))
-        {
-            return false;
-        }
-
-        if (skill.Kind != SkillKind.PeriodicHealing)
-        {
-            return false;
-        }
-
-        if (skill.SourceType != SkillSourceType.PcSkill &&
-            skill.SourceType != SkillSourceType.Abnormal)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool IsSpiritDescentSummonRestore(ParsedCombatPacket packet)
-    {
-        if (packet.IsPeriodicEffect ||
-            packet.Damage <= 0 ||
-            packet.SourceId <= 0 ||
-            packet.TargetId <= 0 ||
-            packet.SourceId != packet.TargetId)
-        {
-            return false;
-        }
-
-        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
-        return packet.SkillCode == SpiritDescentSummonRestoreSkillCode ||
-               originalSkillCode == SpiritDescentSummonRestoreSkillCode;
-    }
+    private static bool MatchesByHundred(int candidateSkillCode, int skillCode) =>
+        candidateSkillCode > 0 &&
+        skillCode > 0 &&
+        candidateSkillCode / 100 == skillCode;
 }

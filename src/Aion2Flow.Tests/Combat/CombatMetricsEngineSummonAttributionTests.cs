@@ -97,7 +97,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
     }
 
     [Fact]
-    public void Counts_Spirit_Descent_Summon_Restore_As_Owner_Healing()
+    public void Treats_Spirit_Descent_Summon_Restore_As_Support()
     {
         CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -141,14 +141,15 @@ public sealed class CombatMetricsEngineSummonAttributionTests
         var snapshot = engine.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        Assert.Equal(120_921, owner.HealingAmount);
+        Assert.Equal(0, owner.HealingAmount);
         Assert.True(owner.Skills.TryGetValue(16990004, out var restore));
-        Assert.Equal(120_921, restore.HealingAmount);
-        Assert.Equal(2, restore.HealingTimes);
+        Assert.Equal(0, restore.HealingAmount);
+        Assert.Equal(0, restore.HealingTimes);
+        Assert.Equal(2, restore.SupportTimes);
     }
 
     [Fact]
-    public void Counts_Spirit_Descent_Summon_Restore_Only_Once_Per_Summon_Instance()
+    public void Treats_Repeated_Spirit_Descent_Summon_Restore_As_Support()
     {
         CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -216,14 +217,15 @@ public sealed class CombatMetricsEngineSummonAttributionTests
         var snapshot = engine.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        Assert.Equal(109_410, owner.HealingAmount);
+        Assert.Equal(0, owner.HealingAmount);
         Assert.True(owner.Skills.TryGetValue(16990004, out var restore));
-        Assert.Equal(109_410, restore.HealingAmount);
-        Assert.Equal(2, restore.HealingTimes);
+        Assert.Equal(0, restore.HealingAmount);
+        Assert.Equal(0, restore.HealingTimes);
+        Assert.Equal(4, restore.SupportTimes);
     }
 
     [Fact]
-    public void Counts_Wind_Spirit_Descent_Restore_As_Separate_Marker_Windows()
+    public void Treats_Wind_Spirit_Descent_Restore_As_Support()
     {
         CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -253,10 +255,11 @@ public sealed class CombatMetricsEngineSummonAttributionTests
         var snapshot = engine.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        Assert.Equal(217_176, owner.HealingAmount);
+        Assert.Equal(0, owner.HealingAmount);
         Assert.True(owner.Skills.TryGetValue(16990004, out var restore));
-        Assert.Equal(217_176, restore.HealingAmount);
-        Assert.Equal(4, restore.HealingTimes);
+        Assert.Equal(0, restore.HealingAmount);
+        Assert.Equal(0, restore.HealingTimes);
+        Assert.Equal(4, restore.SupportTimes);
     }
 
     private static void AppendSpiritDescentRestore(
@@ -282,9 +285,9 @@ public sealed class CombatMetricsEngineSummonAttributionTests
     {
         return
         [
-            new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", SkillKind.Unknown, SkillSemantics.None, null),
-            new Skill(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", SkillKind.Support, SkillSemantics.Support, null)
+            new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new Skill(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
+            new Skill(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
         ];
     }
 }

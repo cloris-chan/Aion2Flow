@@ -37,7 +37,9 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadVarInt(out var length)) return false;
         if (length <= 3 || length > packet.Length + 3) return false;
         if (reader.Remaining < 2) return false;
-        return TryParsePayload(packet[reader.Offset..], out result, out _);
+        var payloadLength = length - 3 - reader.Offset;
+        if (payloadLength < 2 || payloadLength > reader.Remaining) return false;
+        return TryParsePayload(packet.Slice(reader.Offset, payloadLength), out result, out _);
     }
 
     public static bool TryParsePayload(ReadOnlySpan<byte> payload, out Packet0438Damage result, out int consumed)
@@ -166,9 +168,60 @@ internal static class Packet0438DamageParser
             return 0;
         }
 
+        if (!IsPayloadBoundary(remaining[tailReader.Offset..]))
+        {
+            return 0;
+        }
+
         reader.TryAdvance(tailReader.Offset);
         return drainValue;
     }
+
+    private static bool IsPayloadBoundary(ReadOnlySpan<byte> remaining)
+    {
+        if (remaining.IsEmpty)
+        {
+            return true;
+        }
+
+        var reader = new PacketSpanReader(remaining);
+        if (!reader.TryReadVarInt(out var length) || length <= 3 || length > remaining.Length + 3)
+        {
+            return false;
+        }
+
+        if (reader.Remaining < 2)
+        {
+            return false;
+        }
+
+        return IsKnownOpcode(remaining[reader.Offset], remaining[reader.Offset + 1]);
+    }
+
+    private static bool IsKnownOpcode(byte first, byte second) => (first, second) switch
+    {
+        (0x00, 0x8d) or
+        (0x01, 0x40) or
+        (0x02, 0x38) or
+        (0x02, 0x40) or
+        (0x04, 0x38) or
+        (0x05, 0x38) or
+        (0x06, 0x00) or
+        (0x06, 0x38) or
+        (0x21, 0x36) or
+        (0x21, 0x8d) or
+        (0x2a, 0x38) or
+        (0x2b, 0x38) or
+        (0x2c, 0x38) or
+        (0x33, 0x36) or
+        (0x40, 0x36) or
+        (0x41, 0x36) or
+        (0x44, 0x36) or
+        (0x45, 0x36) or
+        (0x46, 0x36) or
+        (0x49, 0x36) => true,
+        _ => false
+    };
 
     private static (int RegenAmount, long DetailRaw) ExtractRegenerationAmount(ReadOnlySpan<byte> detail, DamageModifiers modifiers)
     {

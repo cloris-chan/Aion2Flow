@@ -73,6 +73,45 @@ public sealed class PacketCombatParsersTests
         Assert.Equal(DamageModifiers.Critical | DamageModifiers.Back | DamageModifiers.Smite, parsed.Modifiers);
     }
 
+    [Fact]
+    public void Parses_0438_Drain_Heal_Tail_Inside_Declared_Frame()
+    {
+        var packet = HexHelper.Parse("280438C49F011604B5409A48C700020311005C02D84D01000000C88301CC9309010100AC3E14008DC49F010201000100000000000000");
+
+        var ok = Packet0438DamageParser.TryParse(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal(13060250, parsed.SkillCodeRaw);
+        Assert.Equal(7980, parsed.DrainHealAmount);
+        Assert.Equal(0, parsed.TailLength);
+    }
+
+    [Fact]
+    public void Does_Not_Read_Next_Frame_Length_As_0438_Drain_Heal_Tail()
+    {
+        var packet = HexHelper.Parse("250438FA84021600DE4432D4C6001703010093E3AA4D01000000B29901F32901010014008DFA84020201007E7E6E0000000000");
+
+        var ok = Packet0438DamageParser.TryParse(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal(13030450, parsed.SkillCodeRaw);
+        Assert.Equal(0, parsed.DrainHealAmount);
+        Assert.Equal(2, parsed.TailLength);
+    }
+
+    [Fact]
+    public void Payload_Drain_Heal_Tail_Must_End_At_Frame_Boundary()
+    {
+        var realDrainPayload = HexHelper.Parse("0438C49F011604B5409A48C700020311005C02D84D01000000C88301CC9309010100AC3E14008DC49F010201000100000000000000");
+        var falseTailPayload = HexHelper.Parse("0438FA84021600DE4432D4C6001703010093E3AA4D01000000B29901F32901010014008DFA84020201007E7E6E0000000000");
+
+        Assert.True(Packet0438DamageParser.TryParsePayload(realDrainPayload, out var realDrain, out _));
+        Assert.True(Packet0438DamageParser.TryParsePayload(falseTailPayload, out var falseTail, out _));
+
+        Assert.Equal(7980, realDrain.DrainHealAmount);
+        Assert.Equal(0, falseTail.DrainHealAmount);
+    }
+
     [Theory]
     [InlineData("2804388B7F4610A5A00DF4C81000250204005B7F8E0601000000904E0101", DamageModifiers.Parry)]
     [InlineData("2804388B7F4610A5A00DF4C81000280202005B7F8E0601000000904E0101", DamageModifiers.Block)]

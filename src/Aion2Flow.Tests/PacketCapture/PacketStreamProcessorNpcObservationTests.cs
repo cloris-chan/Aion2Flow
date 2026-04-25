@@ -143,11 +143,13 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.True(store.CombatPacketsBySource.TryGetValue(8811, out var packets));
 
-        var packet = Assert.Single(packets);
+        var packet = Assert.Single(packets, static packet => packet.EventKind == CombatEventKind.Damage);
         Assert.Equal(4, packet.Marker);
         Assert.Equal(1, packet.HitContribution);
         Assert.Equal(1, packet.MultiHitCount);
         Assert.True((packet.Modifiers & DamageModifiers.MultiHit) != 0);
+
+        Assert.Contains(packets, static packet => packet.ValueKind == CombatValueKind.DrainHealing);
     }
 
     [Fact]
@@ -562,7 +564,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     {
         CombatMetricsEngine.SetGameResources(
             [
-                new Skill(16750000, "Spirit Revitalization", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", SkillKind.Healing, SkillSemantics.Healing | SkillSemantics.Support, null)
+                new Skill(16750000, "Spirit Revitalization", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null)
             ],
             new Dictionary<int, NpcCatalogEntry>());
 
@@ -577,7 +579,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     {
         CombatMetricsEngine.SetGameResources(
             [
-                new Skill(1800055, "Impact Absorption", SkillCategory.Npc, SkillSourceType.ItemSkill, "npc", SkillKind.Unknown, SkillSemantics.None, null)
+                new Skill(1800055, "Impact Absorption", SkillCategory.Npc, SkillSourceType.ItemSkill, "npc", null)
             ],
             new Dictionary<int, NpcCatalogEntry>());
 
@@ -594,10 +596,10 @@ public sealed class PacketStreamProcessorNpcObservationTests
     {
         return
         [
-            new Skill(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(13350000, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(17010230, "Earth's Retribution", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
-            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null)
+            new Skill(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null),
+            new Skill(13350000, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17010230, "Earth's Retribution", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];
     }
 
@@ -605,11 +607,11 @@ public sealed class PacketStreamProcessorNpcObservationTests
     {
         return
         [
-            new Skill(1216310, "Attack", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(1216350, "Vine Swipe", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null),
-            new Skill(12000100, "Dodge", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Support, SkillSemantics.Support, null),
-            new Skill(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", SkillKind.Support, SkillSemantics.Support, null)
+            new Skill(1216310, "Attack", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
+            new Skill(1216350, "Vine Swipe", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
+            new Skill(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
+            new Skill(12000100, "Dodge", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
+            new Skill(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];
     }
 }

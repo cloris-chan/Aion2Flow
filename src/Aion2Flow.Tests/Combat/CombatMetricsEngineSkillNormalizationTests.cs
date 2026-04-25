@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Resources;
 
@@ -11,7 +12,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill", SkillKind.Support, SkillSemantics.Support, null)
+            new Skill(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var resolved = CombatMetricsEngine.InferOriginalSkillCode(17750010);
@@ -24,7 +25,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(1910261, "Black Hole", SkillCategory.Elementalist, SkillSourceType.PcSkill, "skill", SkillKind.Support, SkillSemantics.Support, null)
+            new Skill(1910261, "Black Hole", SkillCategory.Elementalist, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var resolved = CombatMetricsEngine.InferOriginalSkillCode(1910501);
@@ -37,7 +38,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(10000, "Account Security", SkillCategory.Etc, SkillSourceType.Unknown, "system", SkillKind.Support, SkillSemantics.Support, null)
+            new Skill(10000, "Account Security", SkillCategory.Etc, SkillSourceType.Unknown, "system", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var resolved = CombatMetricsEngine.InferOriginalSkillCode(1232480);
@@ -50,8 +51,8 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(10000, "Account Security", SkillCategory.Etc, SkillSourceType.Unknown, "system", SkillKind.Support, SkillSemantics.Support, null),
-            new Skill(1232000, "Sting", SkillCategory.Npc, SkillSourceType.Unknown, "npc", SkillKind.Damage, SkillSemantics.Damage, null)
+            new Skill(10000, "Account Security", SkillCategory.Etc, SkillSourceType.Unknown, "system", null),
+            new Skill(1232000, "Sting", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var resolved = CombatMetricsEngine.InferOriginalSkillCode(1232480);
@@ -64,7 +65,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(18730000, "Protection Circle", SkillCategory.Templar, SkillSourceType.PcSkill, "skill", SkillKind.ShieldOrBarrier, SkillSemantics.ShieldOrBarrier | SkillSemantics.Support, null)
+            new Skill(18730000, "Protection Circle", SkillCategory.Templar, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var resolved = CombatMetricsEngine.InferOriginalSkillCode(1873000211);
@@ -150,9 +151,9 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
-            new Skill(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
-            new Skill(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null)
+            new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
+            new Skill(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
+            new Skill(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var engine = new CombatMetricsEngine();
@@ -191,12 +192,12 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     }
 
     [Fact]
-    public void Keeps_SameName_Variant_When_Runtime_Semantics_Differ()
+    public void Collapses_SameName_Variant_Without_Resource_Semantics()
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.Support, null),
-            new Skill(12240150, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.DrainOrAbsorb | SkillSemantics.Support, null)
+            new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
+            new Skill(12240150, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var engine = new CombatMetricsEngine();
@@ -226,9 +227,9 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
         var snapshot = engine.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
-        Assert.True(combatant.Skills.TryGetValue(12240150, out var judgment));
+        Assert.True(combatant.Skills.TryGetValue(12240000, out var judgment));
         Assert.Equal(2000, judgment.DamageAmount);
-        Assert.False(combatant.Skills.ContainsKey(12240000));
+        Assert.False(combatant.Skills.ContainsKey(12240150));
     }
 
     [Fact]
@@ -273,8 +274,8 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", SkillKind.Damage, SkillSemantics.Damage | SkillSemantics.DrainOrAbsorb, null),
-            new Skill(1010000, "Restore HP", SkillCategory.Npc, SkillSourceType.ItemSkill, "npc", SkillKind.PeriodicHealing, SkillSemantics.PeriodicHealing, null)
+            new Skill(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null),
+            new Skill(1010000, "Restore HP", SkillCategory.Npc, SkillSourceType.ItemSkill, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var engine = new CombatMetricsEngine();
@@ -300,6 +301,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             SkillCode = 13060250,
             OriginalSkillCode = 13060250,
             Damage = 240,
+            DrainHealAmount = 240,
             Timestamp = 1_000
         });
 
@@ -382,28 +384,12 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     }
 
     [Fact]
-    public void Classifies_Self_ActionPoint_Restore_Followup_As_Support_When_Metadata_Declares_Resource_Restore()
+    public void Classifies_Self_ActionPoint_Restore_Followup_As_Support_By_Packet_Trait()
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(
-                13360010,
-                "入侵",
-                SkillCategory.Assassin,
-                SkillSourceType.PcSkill,
-                "skill",
-                SkillKind.Damage,
-                SkillSemantics.Damage | SkillSemantics.Support | SkillSemantics.NonHealthResourceRestore,
-                null),
-            new Skill(
-                13360120,
-                "入侵",
-                SkillCategory.Assassin,
-                SkillSourceType.PcSkill,
-                "skill",
-                SkillKind.Damage,
-                SkillSemantics.Damage,
-                null)
+            new Skill(13360010, "入侵", SkillCategory.Assassin, SkillSourceType.PcSkill, "skill", null),
+            new Skill(13360120, "入侵", SkillCategory.Assassin, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var engine = new CombatMetricsEngine();
@@ -455,7 +441,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     }
 
     [Fact]
-    public void Classifies_Missing_Unknown_Self_Followup_As_Support_Without_Inflating_Damage_Totals()
+    public void Classifies_Packet_Tagged_Instance_Clear_Health_Restore_As_Healing_Without_Inflating_Damage_Totals()
     {
         CombatMetricsEngine.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
 
@@ -489,6 +475,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             SkillCode = 1900001,
             OriginalSkillCode = 1900911,
             Damage = 35373,
+            ResourceKind = CombatResourceKind.Health,
             Timestamp = 1_100
         });
 
@@ -513,24 +500,8 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     {
         CombatMetricsEngine.SetGameResources(
         [
-            new Skill(
-                11360017,
-                "Rush Strike",
-                SkillCategory.Gladiator,
-                SkillSourceType.PcSkill,
-                "skill",
-                SkillKind.Damage,
-                SkillSemantics.Damage,
-                null),
-            new Skill(
-                11360120,
-                "Rush Strike",
-                SkillCategory.Gladiator,
-                SkillSourceType.PcSkill,
-                "skill",
-                SkillKind.Damage,
-                SkillSemantics.Damage | SkillSemantics.Support | SkillSemantics.NonHealthResourceRestore,
-                null)
+            new Skill(11360017, "Rush Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "skill", null),
+            new Skill(11360120, "Rush Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var engine = new CombatMetricsEngine();

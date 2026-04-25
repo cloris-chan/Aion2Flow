@@ -1,6 +1,6 @@
 namespace Cloris.Aion2Flow.Resources;
 
-public readonly record struct Skill(int Id, string Name, SkillCategory Category, SkillSourceType SourceType, string SourceKey, SkillKind Kind, SkillSemantics Semantics, string? TriggeredSkillIdsCsv)
+public readonly record struct Skill(int Id, string Name, SkillCategory Category, SkillSourceType SourceType, string SourceKey, string? TriggeredSkillIdsCsv)
 {
     public IEnumerable<int> EnumerateTriggeredSkillIds()
     {

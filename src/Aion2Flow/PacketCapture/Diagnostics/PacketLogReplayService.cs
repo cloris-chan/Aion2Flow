@@ -6,7 +6,6 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
 
@@ -412,27 +411,30 @@ public sealed class PacketLogReplayService
             });
         }
 
-        if (parsed.DrainHealAmount > 0 && parsed.SourceId != parsed.TargetId)
+        if (ShouldStoreDrainHealing(parsed))
         {
-            var resolvedCode = CombatMetricsEngine.InferOriginalSkillCode(parsed.SkillCodeRaw);
-            if (resolvedCode is not null)
+            store.AppendCombatPacket(new ParsedCombatPacket
             {
-                var semantics = CombatEventClassifier.ResolveSkillSemantics(resolvedCode.Value);
-                if ((semantics & SkillSemantics.DrainOrAbsorb) != 0)
-                {
-                    store.AppendCombatPacket(new ParsedCombatPacket
-                    {
-                        TargetId = parsed.SourceId,
-                        SourceId = parsed.SourceId,
-                        OriginalSkillCode = parsed.SkillCodeRaw,
-                        SkillCode = parsed.SkillCodeRaw,
-                        Damage = parsed.DrainHealAmount,
-                        Timestamp = timestamp,
-                        FrameOrdinal = frameOrdinal,
-                        BatchOrdinal = batchOrdinal
-                    });
-                }
-            }
+                TargetId = parsed.SourceId,
+                SourceId = parsed.SourceId,
+                OriginalSkillCode = parsed.SkillCodeRaw,
+                SkillCode = parsed.SkillCodeRaw,
+                Damage = parsed.DrainHealAmount,
+                DrainHealAmount = parsed.DrainHealAmount,
+                Timestamp = timestamp,
+                FrameOrdinal = frameOrdinal,
+                BatchOrdinal = batchOrdinal
+            });
+        }
+
+        return true;
+    }
+
+    private static bool ShouldStoreDrainHealing(Packet0438Damage parsed)
+    {
+        if (parsed.DrainHealAmount <= 0 || parsed.SourceId == parsed.TargetId)
+        {
+            return false;
         }
 
         return true;

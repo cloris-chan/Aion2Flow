@@ -12,7 +12,7 @@ public static class ResourceDatabase
         using var cmd = connection.CreateCommand();
         var nameColumn = GetLocalizedColumn("Name", lang);
         cmd.CommandText = $"""
-            SELECT Id, {nameColumn}, Category, SourceType, SourceKey, Kind, Semantics, TriggeredSkillIdsCsv
+            SELECT Id, {nameColumn}, Category, SourceType, SourceKey, TriggeredSkillIdsCsv
             FROM Skills
             WHERE {nameColumn} IS NOT NULL
             """;
@@ -32,8 +32,6 @@ public static class ResourceDatabase
                    Category,
                    SourceType,
                    SourceKey,
-                   Kind,
-                   Semantics,
                    TriggeredSkillIdsCsv
             FROM Skills
             WHERE Id IS NOT NULL
@@ -55,8 +53,6 @@ public static class ResourceDatabase
             }
 
             var name = reader.GetString(1);
-            var kind = (SkillKind)Convert.ToByte(reader.GetValue(5));
-            var semantics = (SkillSemantics)Convert.ToUInt16(reader.GetValue(6));
 
             skills.Add(new Skill(
                 reader.GetInt32(0),
@@ -64,9 +60,7 @@ public static class ResourceDatabase
                 (SkillCategory)reader.GetByte(2),
                 (SkillSourceType)reader.GetByte(3),
                 reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                kind,
-                semantics,
-                reader.IsDBNull(7) ? null : reader.GetString(7)));
+                reader.IsDBNull(5) ? null : reader.GetString(5)));
         }
 
         return skills;

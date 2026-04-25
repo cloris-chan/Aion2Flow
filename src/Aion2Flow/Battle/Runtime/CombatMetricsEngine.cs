@@ -102,7 +102,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             SkillDisplayMap = _skillMap;
             SkillCodes = [.. _skillMap.Select(x => x.Id).OrderBy(x => x)];
             ResolvedSkillCodeCache.Clear();
-            CombatEventClassifier.ClearCaches();
         }
     }
 
@@ -398,10 +397,11 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             packet.Modifiers |= DamageModifiers.Critical;
         }
         packet.SkillCode = ResolveSkillCode(packet.SkillCode, originalSkillCode, variant);
-        packet.SkillKind = CombatEventClassifier.ResolveSkillKind(packet.SkillCode);
-        packet.SkillSemantics = CombatEventClassifier.ResolveSkillSemantics(packet.SkillCode);
-        packet.ValueKind = CombatEventClassifier.ClassifyValueKind(packet);
-        packet.EventKind = CombatEventClassifier.Classify(packet);
+        if (packet.ValueKind == CombatValueKind.Unknown)
+        {
+            packet.ValueKind = CombatEventClassifier.ClassifyValueKind(packet);
+            packet.EventKind = CombatEventClassifier.Classify(packet);
+        }
 
         if (packet.ValueKind is CombatValueKind.PeriodicDamage or CombatValueKind.PeriodicHealing
             && (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) == 0)
@@ -515,12 +515,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return resolvedSkillCode;
         }
 
-        if (resolvedSkill.Kind != baseSkill.Kind ||
-            !HasSameRuntimeSemantics(resolvedSkill.Semantics, baseSkill.Semantics))
-        {
-            return resolvedSkillCode;
-        }
-
         if (BaseSkillGroupHasTriggeredSiblings(variant.BaseSkillCode))
         {
             return resolvedSkillCode;
@@ -531,20 +525,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
     private static bool ShouldCollapseSameNameVariantGroup(int baseSkillCode)
         => baseSkillCode == 12240000;
-
-    private static bool HasSameRuntimeSemantics(SkillSemantics left, SkillSemantics right)
-    {
-        const SkillSemantics runtimeMask =
-            SkillSemantics.Damage |
-            SkillSemantics.PeriodicDamage |
-            SkillSemantics.Healing |
-            SkillSemantics.PeriodicHealing |
-            SkillSemantics.DrainOrAbsorb |
-            SkillSemantics.ShieldOrBarrier |
-            SkillSemantics.NonHealthResourceRestore;
-
-        return (left & runtimeMask) == (right & runtimeMask);
-    }
 
     private static bool BaseSkillGroupHasTriggeredSiblings(int baseSkillCode)
     {
@@ -586,31 +566,25 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return false;
         }
 
-        var semantics = packet.SkillSemantics != SkillSemantics.None
-            ? packet.SkillSemantics
-            : skill.Semantics;
         var isPeriodicSelf = packet.IsPeriodicSelfEffect;
-        var hasOffensiveSignal = (semantics & (SkillSemantics.Damage | SkillSemantics.PeriodicDamage | SkillSemantics.DrainOrAbsorb)) != 0;
-        var hasShieldSignal = (semantics & SkillSemantics.ShieldOrBarrier) != 0;
-        var hasHealingSignal = (semantics & SkillSemantics.Healing) != 0;
-        var hasPeriodicHealingSignal = (semantics & SkillSemantics.PeriodicHealing) != 0;
-        var hasSupportSignal = (semantics & SkillSemantics.Support) != 0;
 
         if (isPeriodicSelf)
         {
             return false;
         }
 
-        if (hasSupportSignal && !hasOffensiveSignal && !hasShieldSignal && packet.TargetId == packet.SourceId)
+        if (packet.EventKind == CombatEventKind.Support && packet.TargetId == packet.SourceId)
         {
             return false;
         }
 
-        score = hasOffensiveSignal
+        score = packet.EventKind == CombatEventKind.Damage
             ? 6
-            : hasShieldSignal && !packet.IsPeriodicEffect
+            : packet.ValueKind == CombatValueKind.Shield && !packet.IsPeriodicEffect
                 ? 4
-                : hasHealingSignal && !hasPeriodicHealingSignal && !packet.IsPeriodicEffect
+                : packet.EventKind == CombatEventKind.Healing
+                  && packet.ValueKind == CombatValueKind.Healing
+                  && !packet.IsPeriodicEffect
                     ? 3
                     : 0;
 
@@ -814,7 +788,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         return new SkillVariantInfo(originalSkillCode, normalizedSkillCode, baseSkillCode, chargeStage, specializationMask);
     }
 
-    // Mirrors the resource generator's fixed specialization/charge suffix rule.
     private static int EncodeVariantSuffix(int specializationMask, int chargeStage)
     {
         var suffix = 0;
