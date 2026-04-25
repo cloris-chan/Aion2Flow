@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
@@ -328,6 +329,96 @@ public sealed class PacketLogReplayServiceTests
         {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void Store_Treats_Owner_Target_Wind_Spirit_Restore_As_Healing()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        store.AppendSummon(4086, 38013);
+        store.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 38013,
+            TargetId = 4086,
+            OriginalSkillCode = 16990003,
+            SkillCode = 16990003,
+            Damage = 114,
+            Timestamp = 1_000
+        });
+
+        var packet = Assert.Single(store.CombatPacketsBySource[38013]);
+        Assert.Equal(CombatEventKind.Healing, packet.EventKind);
+        Assert.Equal(CombatValueKind.Healing, packet.ValueKind);
+
+        var metrics = new CombatantMetrics("player");
+        Assert.False(metrics.ProcessCombatEvent(packet));
+        Assert.Equal(0, metrics.DamageAmount);
+        Assert.Equal(114, metrics.HealingAmount);
+    }
+
+    [Fact]
+    public void Store_Treats_System_Periodic_Self_Recovery_Tick_As_Healing()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var unseededTick = new ParsedCombatPacket
+        {
+            SourceId = 4086,
+            TargetId = 4086,
+            OriginalSkillCode = 190000151,
+            SkillCode = 190000151,
+            Damage = 2934,
+            Timestamp = 500
+        };
+        unseededTick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
+
+        var seed = new ParsedCombatPacket
+        {
+            SourceId = 4086,
+            TargetId = 4086,
+            OriginalSkillCode = 190000131,
+            SkillCode = 190000131,
+            Damage = 7634,
+            Timestamp = 1_000
+        };
+        seed.SetPeriodicEffect(PeriodicEffectRelation.Self, 1);
+
+        var tick = new ParsedCombatPacket
+        {
+            SourceId = 4086,
+            TargetId = 4086,
+            OriginalSkillCode = 190000131,
+            SkillCode = 190000131,
+            Damage = 7634,
+            Timestamp = 1_500
+        };
+        tick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
+
+        store.AppendCombatPacket(unseededTick);
+        store.AppendCombatPacket(seed);
+        store.AppendCombatPacket(tick);
+
+        var packets = store.CombatPacketsBySource[4086].ToArray();
+        Assert.Equal(3, packets.Length);
+        Assert.Equal(CombatEventKind.Support, packets[0].EventKind);
+        Assert.Equal(CombatValueKind.Support, packets[0].ValueKind);
+        Assert.Equal(CombatEventKind.Support, packets[1].EventKind);
+        Assert.Equal(CombatValueKind.Support, packets[1].ValueKind);
+        Assert.Equal(CombatEventKind.Healing, packets[2].EventKind);
+        Assert.Equal(CombatValueKind.PeriodicHealing, packets[2].ValueKind);
+
+        var metrics = new CombatantMetrics("player");
+        foreach (var packet in packets)
+        {
+            metrics.ProcessCombatEvent(packet);
+        }
+
+        Assert.Equal(0, metrics.DamageAmount);
+        Assert.Equal(7634, metrics.HealingAmount);
+        Assert.Equal(7634, metrics.PeriodicHealingAmount);
     }
 
     private static string WriteTempReplayLog(string logKind, params string[] lines)

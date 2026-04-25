@@ -14,10 +14,14 @@ public sealed class CombatMetricsStore
     private const int MaxPendingDodgeSignals = 16;
     private const int MaxPendingAvoidancePackets = 32;
     private const int MaxResolvedPeriodicLinks = 128;
+    private const int PeriodicSelfRecoveryBaseSkillCode = 190000000;
     private const int SpiritDescentSummonRestoreSkillCode = 16990004;
+    private const int WindSpiritOwnerRestoreSkillCode = 16990003;
 
     private readonly record struct SelfPeriodicHealingPoolKey(int SourceId, int TargetId, int OriginalSkillCode);
     private readonly record struct SelfPeriodicHealingPoolState(int LastRawDamage, long LastTimestamp);
+    private readonly record struct SystemPeriodicRecoverySeedKey(int SourceId, int TargetId, int OriginalSkillCode);
+    private readonly record struct SystemPeriodicRecoverySeedState(int LastRawDamage, long LastTimestamp);
     private readonly record struct MultiHitDamageCandidate(
         ParsedCombatPacket Packet,
         int SourceId,
@@ -81,6 +85,7 @@ public sealed class CombatMetricsStore
     private readonly ConcurrentDictionary<int, long> _detailRevisionByCombatant = new();
     private readonly Lock _selfPeriodicHealingPoolLock = new();
     private readonly Dictionary<SelfPeriodicHealingPoolKey, SelfPeriodicHealingPoolState> _selfPeriodicHealingPools = [];
+    private readonly Dictionary<SystemPeriodicRecoverySeedKey, SystemPeriodicRecoverySeedState> _systemPeriodicRecoverySeeds = [];
     private readonly Lock _spiritDescentRestoreLock = new();
     private readonly Dictionary<int, int> _acceptedSpiritDescentRestoreMarkerBySource = [];
     private readonly Lock _multiHitLock = new();
@@ -385,8 +390,57 @@ public sealed class CombatMetricsStore
     private void PreparePacketForStorage(ParsedCombatPacket packet)
     {
         CombatMetricsEngine.NormalizePacketForStorage(packet);
+        NormalizeOwnerTargetSummonRestore(packet);
+        NormalizeSystemPeriodicRecovery(packet);
         NormalizeSelfPeriodicHealingPool(packet);
         ApplyMultiHitAttribution(packet);
+    }
+
+    private void NormalizeOwnerTargetSummonRestore(ParsedCombatPacket packet)
+    {
+        if (!IsOwnerTargetSummonRestorePacket(packet))
+        {
+            return;
+        }
+
+        packet.EventKind = CombatEventKind.Healing;
+        packet.ValueKind = CombatValueKind.Healing;
+    }
+
+    private void NormalizeSystemPeriodicRecovery(ParsedCombatPacket packet)
+    {
+        if (!TryGetSystemPeriodicRecoverySeedKey(packet, out var key, out var isSeed))
+        {
+            return;
+        }
+
+        lock (_selfPeriodicHealingPoolLock)
+        {
+            if (isSeed)
+            {
+                packet.EventKind = CombatEventKind.Support;
+                packet.ValueKind = CombatValueKind.Support;
+                _systemPeriodicRecoverySeeds[key] = new SystemPeriodicRecoverySeedState(packet.Damage, packet.Timestamp);
+                return;
+            }
+
+            if (!_systemPeriodicRecoverySeeds.TryGetValue(key, out var state))
+            {
+                return;
+            }
+
+            _systemPeriodicRecoverySeeds.Remove(key);
+            var delta = packet.Timestamp - state.LastTimestamp;
+            if (delta < 0 ||
+                delta > SelfPeriodicHealingPoolWindowMilliseconds ||
+                packet.Damage != state.LastRawDamage)
+            {
+                return;
+            }
+
+            packet.EventKind = CombatEventKind.Healing;
+            packet.ValueKind = CombatValueKind.PeriodicHealing;
+        }
     }
 
     private bool ShouldStorePacket(ParsedCombatPacket packet)
@@ -427,6 +481,22 @@ public sealed class CombatMetricsStore
         var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
         return packet.SkillCode == SpiritDescentSummonRestoreSkillCode ||
                originalSkillCode == SpiritDescentSummonRestoreSkillCode;
+    }
+
+    private bool IsOwnerTargetSummonRestorePacket(ParsedCombatPacket packet)
+    {
+        if (packet.Damage <= 0 ||
+            packet.SourceId <= 0 ||
+            packet.TargetId <= 0 ||
+            !_summonOwnerByInstance.TryGetValue(packet.SourceId, out var ownerId) ||
+            ownerId != packet.TargetId)
+        {
+            return false;
+        }
+
+        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
+        return packet.SkillCode == WindSpiritOwnerRestoreSkillCode ||
+               originalSkillCode == WindSpiritOwnerRestoreSkillCode;
     }
 
     private void StorePacket(ParsedCombatPacket packet)
@@ -646,6 +716,48 @@ public sealed class CombatMetricsStore
 
         key = new SelfPeriodicHealingPoolKey(packet.SourceId, packet.TargetId, originalSkillCode);
         isSeed = packet.IsPeriodicSelfMode(9);
+        return true;
+    }
+
+    private static bool TryGetSystemPeriodicRecoverySeedKey(
+        ParsedCombatPacket packet,
+        out SystemPeriodicRecoverySeedKey key,
+        out bool isSeed)
+    {
+        key = default;
+        isSeed = false;
+
+        if (packet.SourceId <= 0 ||
+            packet.TargetId <= 0 ||
+            packet.SourceId != packet.TargetId ||
+            packet.Damage <= 0)
+        {
+            return false;
+        }
+
+        if (!packet.IsPeriodicSelfMode(1) && !packet.IsPeriodicSelfMode(2))
+        {
+            return false;
+        }
+
+        var originalSkillCode = packet.OriginalSkillCode != 0
+            ? packet.OriginalSkillCode
+            : packet.SkillCode;
+        if (originalSkillCode <= 0)
+        {
+            return false;
+        }
+
+        var baseSkillCode = packet.BaseSkillCode > 0
+            ? packet.BaseSkillCode
+            : CombatMetricsEngine.ParseSkillVariant(originalSkillCode).BaseSkillCode;
+        if (baseSkillCode != PeriodicSelfRecoveryBaseSkillCode)
+        {
+            return false;
+        }
+
+        key = new SystemPeriodicRecoverySeedKey(packet.SourceId, packet.TargetId, originalSkillCode);
+        isSeed = packet.IsPeriodicSelfMode(1);
         return true;
     }
 
