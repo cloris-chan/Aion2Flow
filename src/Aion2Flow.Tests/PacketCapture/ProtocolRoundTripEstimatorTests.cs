@@ -12,7 +12,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var startedAt = Stopwatch.GetTimestamp();
         var resolvedAt = startedAt + (Stopwatch.Frequency / 40);
 
-        estimator.TrackOutboundFrame(frameLength: 11, startedAt);
+        estimator.TrackOutboundFrame(frameLength: 31, startedAt);
 
         var resolved = estimator.TryResolveInboundEvent("state-1d37", resolvedAt, out var smoothedMilliseconds);
 
@@ -110,7 +110,6 @@ public sealed class ProtocolRoundTripEstimatorTests
     }
 
     [Theory]
-    [InlineData(11)]
     [InlineData(29)]
     [InlineData(30)]
     [InlineData(31)]
@@ -120,6 +119,30 @@ public sealed class ProtocolRoundTripEstimatorTests
     public void Accepts_All_Candidate_Frame_Lengths(int frameLength)
     {
         Assert.True(ProtocolRoundTripEstimator.IsCandidateOutboundFrameLength(frameLength));
+    }
+
+    [Fact]
+    public void Rejects_Heartbeat_Length_Outbound_Frame()
+    {
+        Assert.False(ProtocolRoundTripEstimator.IsCandidateOutboundFrameLength(11));
+    }
+
+    [Fact]
+    public void Resolves_Newest_Pending_When_Multiple_Outbound_Frames_Are_Queued()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var t0 = Stopwatch.GetTimestamp();
+        var olderSampleAt = t0;
+        var newerSampleAt = t0 + (Stopwatch.Frequency / 50);
+        var inboundAt = newerSampleAt + (Stopwatch.Frequency / 100);
+
+        estimator.TrackOutboundFrame(frameLength: 31, olderSampleAt);
+        estimator.TrackOutboundFrame(frameLength: 31, newerSampleAt);
+
+        var resolved = estimator.TryResolveInboundEvent("state-1d37", inboundAt, out var smoothedMilliseconds);
+
+        Assert.True(resolved);
+        Assert.True(smoothedMilliseconds < 20d, $"expected smoothed < 20 ms, got {smoothedMilliseconds}");
     }
 
     [Theory]
