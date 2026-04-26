@@ -171,10 +171,7 @@ public sealed class CombatMetricsStore
                 if (!CombatMetricsEngine.SkillMap.TryGetValue(resolvedSkill.Value, out var skill))
                     continue;
 
-                if (skill.SourceType != SkillSourceType.ItemSkill)
-                    continue;
-
-                if (IsNonCombatCompactItemSkill(skill))
+                if (!IsPlayerOrphanItemSkillCandidate(skill))
                     continue;
 
                 totalOrphans++;
@@ -1639,6 +1636,7 @@ public sealed class CombatMetricsStore
                || packet.EventKind == CombatEventKind.Damage;
     }
 
-    private static bool IsNonCombatCompactItemSkill(Skill skill)
-        => skill.Id == 1800055;
+    private static bool IsPlayerOrphanItemSkillCandidate(Skill skill)
+        => skill.SourceType == SkillSourceType.ItemSkill &&
+           skill.Category != SkillCategory.Npc;
 }
