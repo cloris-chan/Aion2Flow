@@ -521,6 +521,119 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260426140354_SummonRestores_And_TargetSupport_Are_Classified_From_PacketShape()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426140354.log"));
+
+        const int playerId = 4156;
+        var playerOwnedIds = replay.Store.SummonOwnerByInstance
+            .Where(static pair => pair.Value == playerId)
+            .Select(static pair => pair.Key)
+            .Append(playerId)
+            .ToHashSet();
+        var combatantDump = string.Join(
+            Environment.NewLine,
+            replay.Snapshot.Combatants
+                .OrderByDescending(static pair => pair.Value.DamageAmount + pair.Value.HealingAmount)
+                .Select(static pair =>
+                    $"id={pair.Key} name={pair.Value.Nickname} class={pair.Value.CharacterClass} damage={pair.Value.DamageAmount} heal={pair.Value.HealingAmount} shield={pair.Value.ShieldAmount}"));
+        var summaryDump = string.Join(
+            Environment.NewLine,
+            replay.Combatants
+                .OrderByDescending(static summary => summary.OutgoingDamage + summary.OutgoingHealing + summary.IncomingDamage)
+                .Select(static summary =>
+                    $"id={summary.CombatantId} name={summary.DisplayName} outDmg={summary.OutgoingDamage} inDmg={summary.IncomingDamage} outHeal={summary.OutgoingHealing} inHeal={summary.IncomingHealing} outShield={summary.OutgoingShield} inShield={summary.IncomingShield} attempts={summary.OutgoingAttempts}/{summary.IncomingAttempts} hits={summary.OutgoingHits}/{summary.IncomingHits}"));
+        var summonDump = string.Join(
+            Environment.NewLine,
+            replay.Store.SummonOwnerByInstance
+                .OrderBy(static pair => pair.Key)
+                .Select(static pair => $"summon={pair.Key} owner={pair.Value}"));
+        var targetDump = string.Join(
+            Environment.NewLine,
+            replay.Store.CombatPacketsByTarget
+                .Select(static pair => new
+                {
+                    Target = pair.Key,
+                    Damage = pair.Value.Where(static packet => packet.EventKind == CombatEventKind.Damage).Sum(static packet => packet.Damage),
+                    Count = pair.Value.Count
+                })
+                .OrderByDescending(static entry => entry.Damage)
+                .Select(entry => $"target={entry.Target} damage={entry.Damage} packets={entry.Count}"));
+        var playerIncomingDump = string.Join(
+            Environment.NewLine,
+            replay.Store.CombatPacketsByTarget[playerId]
+                .Where(static packet => packet.EventKind == CombatEventKind.Damage)
+                .GroupBy(static packet => new { packet.SourceId, packet.SkillCode, packet.OriginalSkillCode })
+                .Select(static group => new
+                {
+                    group.Key.SourceId,
+                    group.Key.SkillCode,
+                    group.Key.OriginalSkillCode,
+                    Damage = group.Sum(static packet => packet.Damage),
+                    Attempts = group.Sum(static packet => packet.AttemptContribution),
+                    Hits = group.Sum(static packet => packet.HitContribution),
+                    Count = group.Count()
+                })
+                .OrderByDescending(static entry => entry.Damage)
+                .Select(entry => $"source={entry.SourceId} skill={entry.SkillCode} raw={entry.OriginalSkillCode} damage={entry.Damage} attempts={entry.Attempts} hits={entry.Hits} packets={entry.Count}"));
+        var playerHealingGroupDump = string.Join(
+            Environment.NewLine,
+            CombatMetricsEngine.EnumerateBattlePackets(replay.Store, replay.Snapshot.BattleStartTime, replay.Snapshot.BattleEndTime)
+                .Where(context => context.SourceId == playerId &&
+                                  context.Packet.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing)
+                .GroupBy(context => new
+                {
+                    context.Packet.SkillCode,
+                    context.Packet.OriginalSkillCode,
+                    context.Packet.ValueKind,
+                    InWindow = context.Packet.Timestamp >= replay.Snapshot.BattleStartTime && context.Packet.Timestamp <= replay.Snapshot.BattleEndTime,
+                    RawSource = context.Packet.SourceId,
+                    IsSelfTarget = context.Packet.TargetId == playerId,
+                    IsSummonTarget = playerOwnedIds.Contains(context.Packet.TargetId) && context.Packet.TargetId != playerId
+                })
+                .Select(group => new
+                {
+                    group.Key.SkillCode,
+                    group.Key.OriginalSkillCode,
+                    group.Key.ValueKind,
+                    group.Key.InWindow,
+                    group.Key.RawSource,
+                    group.Key.IsSelfTarget,
+                    group.Key.IsSummonTarget,
+                    Damage = group.Sum(context => context.Packet.Damage),
+                    Count = group.Count()
+                })
+                .OrderByDescending(entry => entry.Damage)
+                .Select(entry =>
+                    $"skill={entry.SkillCode} raw={entry.OriginalSkillCode} value={entry.ValueKind} inWindow={entry.InWindow} rawSource={entry.RawSource} self={entry.IsSelfTarget} summonTarget={entry.IsSummonTarget} damage={entry.Damage} count={entry.Count}"));
+        var spiritDescentPacketDump = string.Join(
+            Environment.NewLine,
+            replay.Store.CombatPacketsBySource.Values
+                .SelectMany(static queue => queue)
+                .Where(static packet => packet.SkillCode == 16990004 || packet.OriginalSkillCode == 16990004)
+                .OrderBy(static packet => packet.Timestamp)
+                .Select(packet =>
+                    $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} sourceSummon={replay.Store.SummonOwnerByInstance.ContainsKey(packet.SourceId)} targetSummon={replay.Store.SummonOwnerByInstance.ContainsKey(packet.TargetId)}"));
+        var diagnostics =
+            $"target={replay.Snapshot.TargetObservation?.InstanceId} targetName={replay.Snapshot.TargetName} battle={replay.Snapshot.BattleStartTime}-{replay.Snapshot.BattleEndTime}\ncombatants:\n{combatantDump}\nsummaries:\n{summaryDump}\nsummons:\n{summonDump}\ntargets:\n{targetDump}\nplayer-healing-groups:\n{playerHealingGroupDump}\nspirit-descent-packets:\n{spiritDescentPacketDump}\nplayer-incoming:\n{playerIncomingDump}";
+
+        Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), diagnostics);
+        Assert.True(playerMetrics.Skills.TryGetValue(16990004, out var spiritDescentRestore), diagnostics);
+        Assert.Equal(1_000_000, spiritDescentRestore.HealingAmount);
+
+        var playerSummary = Assert.Single(replay.Combatants, static summary => summary.CombatantId == playerId);
+        Assert.True(playerSummary.IncomingDamage == 13_347, diagnostics);
+
+        foreach (var summonId in playerOwnedIds.Where(static id => id != playerId))
+        {
+            var summonSummary = Assert.Single(replay.Combatants, summary => summary.CombatantId == summonId);
+            Assert.True(summonSummary.IncomingDamage == 0, diagnostics);
+        }
+    }
+
+    [Fact]
     public void Replay_20260426031332_EnhanceSpiritBenediction_Self_And_Summon_Healing_Match_Game_Ground_Truth()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
@@ -561,7 +674,15 @@ public sealed class PacketLogReplayServiceTests
                 .OrderByDescending(static pair => pair.Value.HealingAmount)
                 .Select(static pair =>
                     $"skill={pair.Key} heal={pair.Value.HealingAmount} periodic={pair.Value.PeriodicHealingAmount} drain={pair.Value.DrainHealingAmount} times={pair.Value.HealingTimes}"));
-        Assert.True(playerMetrics.HealingAmount == 3438, $"HealingAmount={playerMetrics.HealingAmount} expected=3438\n{skillDump}\n{combatantDump}");
+        var spiritDump = string.Join(
+            Environment.NewLine,
+            replay.Store.CombatPacketsBySource.Values
+                .SelectMany(static queue => queue)
+                .Where(static packet => packet.SkillCode == 16990004 || packet.OriginalSkillCode == 16990004)
+                .OrderBy(static packet => packet.Timestamp)
+                .Select(packet =>
+                    $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} sourceSummon={replay.Store.SummonOwnerByInstance.ContainsKey(packet.SourceId)} targetSummon={replay.Store.SummonOwnerByInstance.ContainsKey(packet.TargetId)}"));
+        Assert.True(playerMetrics.HealingAmount == 3438, $"HealingAmount={playerMetrics.HealingAmount} expected=3438 battle={replay.Snapshot.BattleStartTime}-{replay.Snapshot.BattleEndTime}\n{skillDump}\n{spiritDump}\n{combatantDump}");
         Assert.True(playerMetrics.Skills.TryGetValue(enhanceSpiritBenedictionSkillCode, out var skill), combatantDump);
         Assert.Equal(3438, skill.HealingAmount);
         Assert.Equal(3438, skill.PeriodicHealingAmount);

@@ -185,6 +185,8 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             var packetMap = Store.CombatPacketsByTarget;
             var nicknameData = Store.Nicknames;
 
+            InferPreexistingSummonOwners();
+
             foreach (var (target, data) in packetMap)
             {
                 var flag = false;
@@ -196,6 +198,12 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                 foreach (var packet in data)
                 {
                     NormalizePacketForStorage(packet);
+                    if (!CombatEventClassifier.CountsTowardsDamage(packet) ||
+                        IsSummonDamageTarget(Store, packet))
+                    {
+                        continue;
+                    }
+
                     if (flag)
                     {
                         flag = false;
@@ -206,7 +214,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                 }
             }
 
-            InferPreexistingSummonOwners();
+            PruneSummonDamageTargets();
 
             var dataSnapshot = new DamageMeterSnapshot();
             var targetDecision = DecideTarget();
@@ -836,6 +844,22 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
         return new TargetDecision(targetIds, ResolveTargetName(mostDamageTarget), mostRecentTarget);
     }
 
+    private void PruneSummonDamageTargets()
+    {
+        if (_targetInfoMap.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var targetId in _targetInfoMap.Keys.ToArray())
+        {
+            if (IsKnownSummonInstance(Store, targetId))
+            {
+                _targetInfoMap.Remove(targetId);
+            }
+        }
+    }
+
     private string ResolveTargetName(int target)
     {
         if (!Store.TryGetNpcRuntimeState(target, out var state) ||
@@ -873,6 +897,12 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     continue;
                 }
 
+                if (IsSummonDamageTarget(store, packet))
+                {
+                    continue;
+                }
+
+                NormalizeBattleWindowPacket(store, packet);
                 var sourceId = ResolveCombatantId(store, packet.SourceId);
                 var targetId = packet.TargetId;
                 relevantCombatantIds.Add(sourceId);
@@ -895,6 +925,11 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     continue;
                 }
 
+                if (IsSummonDamageTarget(store, packet))
+                {
+                    continue;
+                }
+
                 var sourceId = ResolveCombatantId(store, packet.SourceId);
                 var targetId = packet.TargetId;
                 if (!IsRelevantRecoveryPacket(packet, sourceId, targetId, relevantCombatantIds))
@@ -909,6 +944,50 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
     private static bool IsWithinBattleWindow(ParsedCombatPacket packet, long battleStart, long battleEnd)
         => packet.Timestamp >= battleStart && packet.Timestamp <= battleEnd;
+
+    private static void NormalizeBattleWindowPacket(CombatMetricsStore store, ParsedCombatPacket packet)
+    {
+        if (!PacketSkillTraits.IsDirectSummonHpRestoreShape(packet) ||
+            !IsKnownSummonInstance(store, packet.SourceId))
+        {
+            return;
+        }
+
+        packet.EventKind = CombatEventKind.Healing;
+        packet.ValueKind = CombatValueKind.Healing;
+    }
+
+    private static bool IsSummonDamageTarget(CombatMetricsStore store, ParsedCombatPacket packet)
+    {
+        if (packet.TargetId <= 0 || !CombatEventClassifier.CountsTowardsDamage(packet))
+        {
+            return false;
+        }
+
+        if (store.SummonOwnerByInstance.ContainsKey(packet.TargetId))
+        {
+            return true;
+        }
+
+        return store.TryGetNpcRuntimeState(packet.TargetId, out var state) &&
+               state.Kind == NpcKind.Summon;
+    }
+
+    private static bool IsKnownSummonInstance(CombatMetricsStore store, int instanceId)
+    {
+        if (instanceId <= 0)
+        {
+            return false;
+        }
+
+        if (store.SummonOwnerByInstance.ContainsKey(instanceId))
+        {
+            return true;
+        }
+
+        return store.TryGetNpcRuntimeState(instanceId, out var state) &&
+               state.Kind == NpcKind.Summon;
+    }
 
     private (long Start, long End) ResolveBattleWindow(HashSet<int> targetIds)
     {
@@ -935,7 +1014,76 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             }
         }
 
-        return found ? (start, end) : (0, 0);
+        if (!found)
+        {
+            return (0, 0);
+        }
+
+        if (start == end)
+        {
+            ExpandSinglePointBattleWindowFromRelevantRecovery(targetIds, ref start, ref end);
+        }
+
+        return (start, end);
+    }
+
+    private void ExpandSinglePointBattleWindowFromRelevantRecovery(HashSet<int> targetIds, ref long start, ref long end)
+    {
+        var relevantCombatantIds = new HashSet<int>();
+
+        foreach (var targetId in targetIds)
+        {
+            if (!Store.CombatPacketsByTarget.TryGetValue(targetId, out var packets))
+            {
+                continue;
+            }
+
+            foreach (var packet in packets)
+            {
+                if (!CombatEventClassifier.CountsTowardsDamage(packet) ||
+                    IsSummonDamageTarget(Store, packet))
+                {
+                    continue;
+                }
+
+                relevantCombatantIds.Add(ResolveCombatantId(Store, packet.SourceId));
+                relevantCombatantIds.Add(packet.TargetId);
+            }
+        }
+
+        if (relevantCombatantIds.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var queue in Store.CombatPacketsBySource.Values)
+        {
+            foreach (var packet in queue)
+            {
+                if (IsWithinBattleWindow(packet, start, end) ||
+                    IsSummonDamageTarget(Store, packet))
+                {
+                    continue;
+                }
+
+                var sourceId = ResolveCombatantId(Store, packet.SourceId);
+                var targetId = packet.TargetId;
+                if (!IsRelevantRecoveryPacket(packet, sourceId, targetId, relevantCombatantIds))
+                {
+                    continue;
+                }
+
+                if (packet.Timestamp < start)
+                {
+                    start = packet.Timestamp;
+                }
+
+                if (packet.Timestamp > end)
+                {
+                    end = packet.Timestamp;
+                }
+            }
+        }
     }
 
     internal static int ResolveCombatantId(CombatMetricsStore store, int combatantId)

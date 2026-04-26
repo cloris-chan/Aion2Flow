@@ -187,6 +187,45 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
+    public void Classifies_DirectHpRestore0438_DetailFamily_As_Healing()
+    {
+        var packet = DirectPacket(4156, 34135, 16770001, 198);
+        packet.LayoutTag = 4;
+        packet.Type = 2;
+        packet.Loop = 1;
+        packet.DetailRaw = 0x0000000163F4FDAFL;
+
+        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Keeps_DirectSummonHpRestore0438_Shape_As_Support_Without_SummonContext()
+    {
+        var packet = DirectPacket(76550, 76550, 16990004, 100_000);
+        packet.LayoutTag = 4;
+        packet.Type = 2;
+        packet.Loop = 1;
+        packet.DetailRaw = 0x000000016544B05CL;
+
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Keeps_DirectSummonSupportNeighbor0438_Shape_As_Support()
+    {
+        var packet = DirectPacket(76550, 76550, 16990004, 10_000);
+        packet.LayoutTag = 4;
+        packet.Type = 2;
+        packet.Loop = 1;
+        packet.DetailRaw = 0x000000016544B05BL;
+
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
     public void Classifies_SpiritDescent_Self_Restore_As_Support()
     {
         var packet = DirectPacket(38013, 38013, 16990004, 10_000);
@@ -199,6 +238,18 @@ public sealed class CombatEventClassifierTests
     public void Classifies_SpiritDescent_Other_Target_Value_As_Support()
     {
         var packet = DirectPacket(38013, 4086, 16990004, 10_000);
+
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Theory]
+    [InlineData(9)]
+    [InlineData(11)]
+    public void Classifies_Target_Periodic_Mode9_And_Mode11_As_Support_Seed(int mode)
+    {
+        var packet = DirectPacket(23467, 4156, 1232000011, 3373);
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, mode);
 
         Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
         Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));

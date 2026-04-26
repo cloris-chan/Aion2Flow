@@ -41,16 +41,6 @@ public static class CombatEventClassifier
 
     private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyDirectPacket(ParsedCombatPacket packet)
     {
-        if (PacketSkillTraits.IsKnownDirectSupport(packet))
-        {
-            return (CombatEventKind.Support, CombatValueKind.Support);
-        }
-
-        if (packet.ResourceKind == CombatResourceKind.Mana)
-        {
-            return (CombatEventKind.Support, CombatValueKind.Support);
-        }
-
         if (packet.ResourceKind == CombatResourceKind.Health)
         {
             return (CombatEventKind.Healing, CombatValueKind.Healing);
@@ -59,6 +49,21 @@ public static class CombatEventClassifier
         if (PacketSkillTraits.IsRestoreHp(packet))
         {
             return (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
+        }
+
+        if (PacketSkillTraits.IsDirectHpRestoreShape(packet))
+        {
+            return (CombatEventKind.Healing, CombatValueKind.Healing);
+        }
+
+        if (PacketSkillTraits.IsKnownDirectSupport(packet))
+        {
+            return (CombatEventKind.Support, CombatValueKind.Support);
+        }
+
+        if (packet.ResourceKind == CombatResourceKind.Mana)
+        {
+            return (CombatEventKind.Support, CombatValueKind.Support);
         }
 
         if (PacketSkillTraits.IsKnownDirectPeriodicHealing(packet))
@@ -146,6 +151,11 @@ public static class CombatEventClassifier
                 : (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
         }
 
+        if (PacketSkillTraits.IsTargetPeriodicSupportSeed(packet))
+        {
+            return (CombatEventKind.Support, CombatValueKind.Support);
+        }
+
         return packet.IsPeriodicTargetInitialEffect
             ? (CombatEventKind.Damage, CombatValueKind.Damage)
             : (CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
@@ -224,6 +234,9 @@ internal static class PacketSkillTraits
     private const int HpAbsorptionEffectBaseSkillCode = 10000000;
     private const ulong HpAbsorptionDirectHealingDetailPrefix = 0x000000013B9A0000UL;
     private const ulong HpAbsorptionDirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
+    private const ulong DirectHpRestoreDetailPrefix = 0x0000000163F40000UL;
+    private const ulong DirectHpRestoreDetailMask = 0xFFFFFFFFFFFF0000UL;
+    private const long DirectSummonHpRestoreDetailRaw = 0x000000016544B05CL;
     private const int WardingStrikeBaseSkillCode = 12350000;
 
     public static bool IsRestoreHp(ParsedCombatPacket packet) =>
@@ -259,6 +272,20 @@ internal static class PacketSkillTraits
 
     public static bool IsKnownTargetPeriodicSupport(ParsedCombatPacket packet) =>
         MatchesExact(packet, 17730000, 17410000);
+
+    public static bool IsDirectHpRestoreShape(ParsedCombatPacket packet) =>
+        IsPositiveDirect0438Value(packet) &&
+        packet.Loop == 1 &&
+        HasDetailPrefix(packet.DetailRaw, DirectHpRestoreDetailPrefix, DirectHpRestoreDetailMask);
+
+    public static bool IsDirectSummonHpRestoreShape(ParsedCombatPacket packet) =>
+        IsPositiveSelfDirect0438Value(packet) &&
+        packet.Loop == 1 &&
+        packet.DetailRaw == DirectSummonHpRestoreDetailRaw;
+
+    public static bool IsTargetPeriodicSupportSeed(ParsedCombatPacket packet) =>
+        packet.IsPeriodicTargetMode(9) ||
+        packet.IsPeriodicTargetMode(11);
 
     public static bool IsKnownPeriodicHealingPool(ParsedCombatPacket packet) =>
         (packet.IsPeriodicSelfMode(9) ||
@@ -298,10 +325,14 @@ internal static class PacketSkillTraits
         MatchesBase(packet, WardingStrikeBaseSkillCode);
 
     private static bool IsPositiveSelfDirect0438Value(ParsedCombatPacket packet) =>
+        IsPositiveDirect0438Value(packet) &&
+        packet.SourceId == packet.TargetId;
+
+    private static bool IsPositiveDirect0438Value(ParsedCombatPacket packet) =>
         packet.Damage > 0 &&
         !packet.IsPeriodicEffect &&
         packet.SourceId > 0 &&
-        packet.SourceId == packet.TargetId &&
+        packet.TargetId > 0 &&
         packet.LayoutTag == 4 &&
         packet.Flag == 0 &&
         packet.Type == 2;
