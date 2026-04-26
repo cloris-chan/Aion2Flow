@@ -422,6 +422,60 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260426110459_Templar_DirectSelfHpRecovery_Packets_Are_Healing()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426110459.log"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        const int playerId = 6774;
+        const int hpAbsorptionEffectSkillCode = 10000013;
+        const int wardingStrikeSkillCode = 12351450;
+        const int punishingStrikeSkillCode = 12060240;
+        var selfHealingPackets = replay.Store.CombatPacketsBySource[playerId]
+            .Where(packet =>
+                packet.SourceId == playerId &&
+                packet.TargetId == playerId &&
+                packet.EventKind == CombatEventKind.Healing)
+            .ToArray();
+        var packetDump = string.Join(
+            Environment.NewLine,
+            replay.Store.CombatPacketsBySource[playerId]
+                .Where(static packet => packet.SourceId == packet.TargetId)
+                .Select(static packet =>
+                    $"skill={packet.SkillCode} raw={packet.OriginalSkillCode} damage={packet.Damage} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} detail={packet.DetailRaw}"));
+
+        var hpAbsorptionRecovery = selfHealingPackets
+            .Where(static packet => packet.SkillCode == hpAbsorptionEffectSkillCode)
+            .Sum(static packet => packet.Damage);
+        var wardingStrikeRecovery = selfHealingPackets
+            .Where(static packet => packet.SkillCode == wardingStrikeSkillCode)
+            .Sum(static packet => packet.Damage);
+        var punishingStrikeRecovery = selfHealingPackets
+            .Where(static packet =>
+                packet.OriginalSkillCode == punishingStrikeSkillCode &&
+                packet.ValueKind == CombatValueKind.DrainHealing)
+            .Sum(static packet => packet.Damage);
+        Assert.True(hpAbsorptionRecovery == 5372, packetDump);
+        Assert.True(wardingStrikeRecovery == 2492, packetDump);
+        Assert.True(punishingStrikeRecovery == 1563, packetDump);
+
+        var recognizedSelfRecovery = hpAbsorptionRecovery + wardingStrikeRecovery + punishingStrikeRecovery;
+        Assert.Equal(9427, recognizedSelfRecovery);
+
+        var combatantDump = string.Join(
+            Environment.NewLine,
+            replay.Snapshot.Combatants
+                .OrderByDescending(static pair => pair.Value.HealingAmount)
+                .Select(static pair => $"id={pair.Key} heal={pair.Value.HealingAmount} damage={pair.Value.DamageAmount} name={pair.Value.Nickname}"));
+        Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), combatantDump);
+        Assert.True(playerMetrics.HealingAmount == recognizedSelfRecovery,
+            $"HealingAmount={playerMetrics.HealingAmount} expected={recognizedSelfRecovery}\n{packetDump}\n{combatantDump}");
+    }
+
+    [Fact]
     public void Replay_20260426031332_EnhanceSpiritBenediction_Self_And_Summon_Healing_Match_Game_Ground_Truth()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());

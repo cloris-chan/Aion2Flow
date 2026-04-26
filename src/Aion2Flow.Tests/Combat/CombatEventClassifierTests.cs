@@ -90,6 +90,64 @@ public sealed class CombatEventClassifierTests
         Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
     }
 
+    [Theory]
+    [InlineData(10000001, 0x000000013B9ACA6FL)]
+    [InlineData(10000002, 0x000000013B9ACAD3L)]
+    [InlineData(10000007, 0x000000013B9ACCC7L)]
+    [InlineData(10000011, 0x000000013B9ACA6FL)]
+    [InlineData(10000013, 0x000000013B9ACB37L)]
+    public void Classifies_HpAbsorption_DirectSelf0438_DetailFamily_As_PeriodicHealing(
+        int skillCode,
+        long detailRaw)
+    {
+        var packet = DirectPacket(6774, 6774, skillCode, 1343);
+        packet.BaseSkillCode = 10000000;
+        packet.LayoutTag = 4;
+        packet.Type = 2;
+        packet.DetailRaw = detailRaw;
+
+        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.PeriodicHealing, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Keeps_CommonEffect_DirectSelf0438_Without_HpAbsorption_Detail_As_Support()
+    {
+        var packet = DirectPacket(6774, 6774, 10000013, 1343);
+        packet.BaseSkillCode = 10000000;
+        packet.LayoutTag = 4;
+        packet.Type = 2;
+        packet.DetailRaw = 0x00000002499ED13DL;
+
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Classifies_WardingStrike_DirectSelf0438_As_PeriodicHealing()
+    {
+        var packet = DirectPacket(6774, 6774, 12351450, 2492);
+        packet.BaseSkillCode = 12350000;
+        packet.LayoutTag = 4;
+        packet.Type = 2;
+        packet.DetailRaw = 0x00000002499ED13DL;
+
+        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.PeriodicHealing, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
+    public void Keeps_WardingStrike_OtherTarget0438_As_Damage()
+    {
+        var packet = DirectPacket(6774, 29219, 12351450, 46901);
+        packet.BaseSkillCode = 12350000;
+        packet.LayoutTag = 4;
+        packet.Type = 2;
+
+        Assert.Equal(CombatEventKind.Damage, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Damage, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
     [Fact]
     public void Classifies_LightOfProtection_State_Value_As_Support()
     {

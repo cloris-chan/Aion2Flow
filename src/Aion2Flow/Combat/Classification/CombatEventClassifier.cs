@@ -221,6 +221,10 @@ internal static class PacketSkillTraits
     private const int EnhanceSpiritBenedictionBaseSkillCode = 16190000;
     private const int LightOfProtectionSkillCode = 17410040;
     private const long LightOfProtectionDirectHealingDetailRaw = 0x0000000267C58D55L;
+    private const int HpAbsorptionEffectBaseSkillCode = 10000000;
+    private const ulong HpAbsorptionDirectHealingDetailPrefix = 0x000000013B9A0000UL;
+    private const ulong HpAbsorptionDirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
+    private const int WardingStrikeBaseSkillCode = 12350000;
 
     public static bool IsRestoreHp(ParsedCombatPacket packet) =>
         MatchesExact(packet, RestoreHpSkillCode, RestSkillCode);
@@ -233,6 +237,7 @@ internal static class PacketSkillTraits
         MatchesBase(packet, 13710000, 13790000, 17090000, 17100000, 17120000, 18120000);
 
     public static bool IsKnownDirectPeriodicHealing(ParsedCombatPacket packet) =>
+        IsDirectSelfHpRecoveryEffect(packet) ||
         MatchesExact(packet, 16120350, 2011101) ||
         MatchesBase(packet, 18160000);
 
@@ -275,6 +280,35 @@ internal static class PacketSkillTraits
         packet.Type == 2 &&
         packet.Loop == 2 &&
         packet.DetailRaw == LightOfProtectionDirectHealingDetailRaw;
+
+    private static bool IsDirectSelfHpRecoveryEffect(ParsedCombatPacket packet) =>
+        IsHpAbsorptionDirectSelfRestore(packet) ||
+        IsWardingStrikeDirectSelfRestore(packet);
+
+    private static bool IsHpAbsorptionDirectSelfRestore(ParsedCombatPacket packet) =>
+        IsPositiveSelfDirect0438Value(packet) &&
+        MatchesBase(packet, HpAbsorptionEffectBaseSkillCode) &&
+        HasDetailPrefix(
+            packet.DetailRaw,
+            HpAbsorptionDirectHealingDetailPrefix,
+            HpAbsorptionDirectHealingDetailMask);
+
+    private static bool IsWardingStrikeDirectSelfRestore(ParsedCombatPacket packet) =>
+        IsPositiveSelfDirect0438Value(packet) &&
+        MatchesBase(packet, WardingStrikeBaseSkillCode);
+
+    private static bool IsPositiveSelfDirect0438Value(ParsedCombatPacket packet) =>
+        packet.Damage > 0 &&
+        !packet.IsPeriodicEffect &&
+        packet.SourceId > 0 &&
+        packet.SourceId == packet.TargetId &&
+        packet.LayoutTag == 4 &&
+        packet.Flag == 0 &&
+        packet.Type == 2;
+
+    private static bool HasDetailPrefix(long detailRaw, ulong prefix, ulong mask) =>
+        detailRaw > 0 &&
+        (((ulong)detailRaw) & mask) == prefix;
 
     private static bool IsEnhanceSpiritBenediction(ParsedCombatPacket packet) =>
         MatchesBase(packet, EnhanceSpiritBenedictionBaseSkillCode) ||

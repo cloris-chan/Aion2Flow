@@ -87,6 +87,15 @@ internal static class Packet0438DamageParser
         }
 
         var drainHealAmount = TryParseDrainHealTail(ref reader);
+        if (drainHealAmount <= 0)
+        {
+            drainHealAmount = TryParsePunishingStrikeAbsorbTail(
+                ref reader,
+                targetId,
+                sourceId,
+                skillCodeRaw,
+                damage);
+        }
 
         consumed = reader.Offset;
         result = new Packet0438Damage(
@@ -175,6 +184,94 @@ internal static class Packet0438DamageParser
 
         reader.TryAdvance(tailReader.Offset);
         return drainValue;
+    }
+
+    private static int TryParsePunishingStrikeAbsorbTail(
+        ref PacketSpanReader reader,
+        int targetId,
+        int sourceId,
+        int skillCodeRaw,
+        int damage)
+    {
+        var remaining = reader.RemainingSpan;
+        if (remaining.Length is < 2 or > 8 ||
+            targetId <= 0 ||
+            sourceId <= 0 ||
+            targetId == sourceId ||
+            damage <= 0 ||
+            !IsPunishingStrikeHpAbsorbVariant(skillCodeRaw))
+        {
+            return 0;
+        }
+
+        for (var start = remaining.Length - 1; start >= 0; start--)
+        {
+            var tailReader = new PacketSpanReader(remaining[start..]);
+            if (!tailReader.TryReadVarInt(out var drainValue) ||
+                tailReader.Offset != remaining.Length - start ||
+                drainValue <= 0 ||
+                drainValue >= damage ||
+                !IsPunishingStrikeAbsorbTailPrefix(remaining[..start]))
+            {
+                continue;
+            }
+
+            reader.TryAdvance(remaining.Length);
+            return drainValue;
+        }
+
+        return 0;
+    }
+
+    private static bool IsPunishingStrikeHpAbsorbVariant(int skillCodeRaw)
+    {
+        const int punishingStrikeBaseSkillCode = 12060000;
+
+        if (skillCodeRaw <= 0 ||
+            skillCodeRaw - (skillCodeRaw % 10000) != punishingStrikeBaseSkillCode)
+        {
+            return false;
+        }
+
+        var specializationDigits = (skillCodeRaw / 10) % 1000;
+        while (specializationDigits > 0)
+        {
+            if (specializationDigits % 10 == 2)
+            {
+                return true;
+            }
+
+            specializationDigits /= 10;
+        }
+
+        return false;
+    }
+
+    private static bool IsPunishingStrikeAbsorbTailPrefix(ReadOnlySpan<byte> prefix)
+    {
+        if (prefix.IsEmpty)
+        {
+            return true;
+        }
+
+        if (prefix.Length == 1)
+        {
+            return prefix[0] == 0;
+        }
+
+        if (prefix.Length != 4)
+        {
+            return false;
+        }
+
+        var reader = new PacketSpanReader(prefix);
+        return reader.TryReadVarInt(out var first) &&
+            first > 0 &&
+            reader.TryReadVarInt(out var second) &&
+            second == 1 &&
+            reader.TryReadVarInt(out var third) &&
+            third == 0 &&
+            reader.Offset == prefix.Length;
     }
 
     private static bool IsPayloadBoundary(ReadOnlySpan<byte> remaining)
