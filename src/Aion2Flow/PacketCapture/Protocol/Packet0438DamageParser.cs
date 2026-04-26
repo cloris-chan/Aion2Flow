@@ -89,11 +89,11 @@ internal static class Packet0438DamageParser
         var drainHealAmount = TryParseDrainHealTail(ref reader);
         if (drainHealAmount <= 0)
         {
-            drainHealAmount = TryParsePunishingStrikeAbsorbTail(
+            drainHealAmount = TryParseSpecializedHpAbsorbTail(
                 ref reader,
                 targetId,
                 sourceId,
-                skillCodeRaw,
+                flag,
                 damage);
         }
 
@@ -186,32 +186,32 @@ internal static class Packet0438DamageParser
         return drainValue;
     }
 
-    private static int TryParsePunishingStrikeAbsorbTail(
+    private static int TryParseSpecializedHpAbsorbTail(
         ref PacketSpanReader reader,
         int targetId,
         int sourceId,
-        int skillCodeRaw,
+        int flag,
         int damage)
     {
         var remaining = reader.RemainingSpan;
-        if (remaining.Length is < 2 or > 8 ||
+        if (remaining.Length is < 2 or > 16 ||
             targetId <= 0 ||
             sourceId <= 0 ||
             targetId == sourceId ||
             damage <= 0 ||
-            !IsPunishingStrikeHpAbsorbVariant(skillCodeRaw))
+            flag != 4)
         {
             return 0;
         }
 
-        for (var start = remaining.Length - 1; start >= 0; start--)
+        for (var start = remaining.Length - 1; start >= 1; start--)
         {
             var tailReader = new PacketSpanReader(remaining[start..]);
             if (!tailReader.TryReadVarInt(out var drainValue) ||
                 tailReader.Offset != remaining.Length - start ||
                 drainValue <= 0 ||
                 drainValue >= damage ||
-                !IsPunishingStrikeAbsorbTailPrefix(remaining[..start]))
+                !IsSpecializedHpAbsorbTailPrefix(remaining[..start]))
             {
                 continue;
             }
@@ -223,55 +223,40 @@ internal static class Packet0438DamageParser
         return 0;
     }
 
-    private static bool IsPunishingStrikeHpAbsorbVariant(int skillCodeRaw)
+    private static bool IsSpecializedHpAbsorbTailPrefix(ReadOnlySpan<byte> prefix)
     {
-        const int punishingStrikeBaseSkillCode = 12060000;
-
-        if (skillCodeRaw <= 0 ||
-            skillCodeRaw - (skillCodeRaw % 10000) != punishingStrikeBaseSkillCode)
-        {
-            return false;
-        }
-
-        var specializationDigits = (skillCodeRaw / 10) % 1000;
-        while (specializationDigits > 0)
-        {
-            if (specializationDigits % 10 == 2)
-            {
-                return true;
-            }
-
-            specializationDigits /= 10;
-        }
-
-        return false;
-    }
-
-    private static bool IsPunishingStrikeAbsorbTailPrefix(ReadOnlySpan<byte> prefix)
-    {
-        if (prefix.IsEmpty)
-        {
-            return true;
-        }
-
         if (prefix.Length == 1)
         {
             return prefix[0] == 0;
         }
 
-        if (prefix.Length != 4)
+        if (prefix.Length < 3)
         {
             return false;
         }
 
         var reader = new PacketSpanReader(prefix);
-        return reader.TryReadVarInt(out var first) &&
-            first > 0 &&
-            reader.TryReadVarInt(out var second) &&
-            second == 1 &&
-            reader.TryReadVarInt(out var third) &&
-            third == 0 &&
-            reader.Offset == prefix.Length;
+        var valueCount = 0;
+        while (reader.Remaining > 0)
+        {
+            if (!reader.TryReadVarInt(out var value))
+            {
+                return false;
+            }
+
+            valueCount++;
+            if (reader.Remaining == 0)
+            {
+                return value == 0 && valueCount >= 3;
+            }
+
+            if (value <= 0)
+            {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsPayloadBoundary(ReadOnlySpan<byte> remaining)

@@ -476,6 +476,51 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260426121726_Templar_Healing_Matches_Game_Ground_Truth()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426121726.log"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        const int playerId = 15980;
+        var combatantDump = string.Join(
+            Environment.NewLine,
+            replay.Snapshot.Combatants
+                .OrderByDescending(static pair => pair.Value.HealingAmount)
+                .Select(static pair => $"id={pair.Key} heal={pair.Value.HealingAmount} damage={pair.Value.DamageAmount} name={pair.Value.Nickname}"));
+        Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), combatantDump);
+
+        var skillDump = string.Join(
+            Environment.NewLine,
+            playerMetrics.Skills
+                .Where(static pair => pair.Value.HealingAmount > 0 || pair.Value.DrainHealingAmount > 0)
+                .OrderByDescending(static pair => pair.Value.HealingAmount)
+                .Select(static pair =>
+                    $"skill={pair.Key} heal={pair.Value.HealingAmount} periodic={pair.Value.PeriodicHealingAmount} drain={pair.Value.DrainHealingAmount} times={pair.Value.HealingTimes}"));
+        var packetDump = string.Join(
+            Environment.NewLine,
+            replay.Store.CombatPacketsBySource[playerId]
+                .Where(static packet => packet.SourceId == packet.TargetId || packet.DrainHealAmount > 0)
+                .Select(static packet =>
+                    $"skill={packet.SkillCode} raw={packet.OriginalSkillCode} damage={packet.Damage} drain={packet.DrainHealAmount} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} type={packet.Type} detail={packet.DetailRaw}"));
+
+        long SkillDrainHealing(int skillCode) =>
+            playerMetrics.Skills.TryGetValue(skillCode, out var metrics)
+                ? metrics.DrainHealingAmount
+                : 0;
+
+        Assert.True(SkillDrainHealing(12010250) == 858, skillDump);
+        Assert.True(SkillDrainHealing(12020250) == 911, skillDump);
+        Assert.True(SkillDrainHealing(12030250) == 897, skillDump);
+        Assert.True(SkillDrainHealing(12440250) == 2395, skillDump);
+        Assert.True(SkillDrainHealing(12060240) == 784, skillDump);
+        Assert.True(playerMetrics.HealingAmount == 31531,
+            $"HealingAmount={playerMetrics.HealingAmount} expected=31531\n{skillDump}\n{packetDump}\n{combatantDump}");
+    }
+
+    [Fact]
     public void Replay_20260426031332_EnhanceSpiritBenediction_Self_And_Summon_Healing_Match_Game_Ground_Truth()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());

@@ -116,20 +116,23 @@ public sealed class PacketCombatParsersTests
     [InlineData("260438A3E4010604F6345006B8006D0201004B77E24701000000BF8401C65E0100EB02", 363)]
     [InlineData("2A0438A3E4012604F6345006B800960301004B77E24701000000BF84018EBE0101F3030100DA05", 730)]
     [InlineData("270438A3E4010604F6345006B800A10311004B77E24701000000BF8401FBED020100D603", 470)]
-    public void Parses_0438_PunishingStrike_Absorb_Tail_As_Drain_Healing(string hex, int expectedDrainHeal)
+    [InlineData("250438C7DF010604EC7C0A43B700050218001BD6954701000000D77CFE420100AB01", 171)]
+    [InlineData("2B0438C7DF012604EC7C0A43B700150310001BD6954701000000BF8401D07E02CC02CC020100C402", 324)]
+    [InlineData("2A0438C7DF012404EC7CBAD2BD000F03B350264A01000000BF840184AF0102CB03CB030100BD01", 189)]
+    [InlineData("300438C7DF012604EC7CBAD2BD000F031000BD50264A02000000BF8401DD820304F707F707F707F7070200BD01", 189)]
+    public void Parses_0438_Specialized_Hp_Absorb_Tail_As_Drain_Healing(string hex, int expectedDrainHeal)
     {
         var packet = HexHelper.Parse(hex);
 
         var ok = Packet0438DamageParser.TryParse(packet, out var parsed);
 
         Assert.True(ok);
-        Assert.Equal(12060240, parsed.SkillCodeRaw);
         Assert.Equal(expectedDrainHeal, parsed.DrainHealAmount);
         Assert.Equal(0, parsed.TailLength);
     }
 
     [Fact]
-    public void Does_Not_Synthesize_PunishingStrike_Absorb_When_No_Absorb_Tail_Is_Present()
+    public void Does_Not_Synthesize_Specialized_Hp_Absorb_When_No_Absorb_Tail_Is_Present()
     {
         var packet = HexHelper.Parse("240438A3E4010600F6345006B800AF0201004B77E24701000000BF8401ED620100");
 
