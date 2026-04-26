@@ -56,7 +56,7 @@ public static class CombatEventClassifier
             return (CombatEventKind.Healing, CombatValueKind.Healing);
         }
 
-        if (PacketSkillTraits.IsKnownDirectSupport(packet))
+        if (PacketSkillTraits.IsDirectSupportValueShape(packet))
         {
             return (CombatEventKind.Support, CombatValueKind.Support);
         }
@@ -126,9 +126,7 @@ public static class CombatEventClassifier
             return (CombatEventKind.Damage, CombatValueKind.Damage);
         }
 
-        if (packet.IsPeriodicTargetMode(8) ||
-            PacketSkillTraits.IsObservedPeriodicSentinelSupport(packet) ||
-            PacketSkillTraits.IsKnownTargetPeriodicSupport(packet))
+        if (packet.IsPeriodicTargetMode(8))
         {
             return (CombatEventKind.Support, CombatValueKind.Support);
         }
@@ -236,6 +234,7 @@ internal static class PacketSkillTraits
     private const ulong HpAbsorptionDirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
     private const ulong DirectHpRestoreDetailPrefix = 0x0000000163F40000UL;
     private const ulong DirectHpRestoreDetailMask = 0xFFFFFFFFFFFF0000UL;
+    private const long DirectSummonSupportDetailRaw = 0x000000016544B05BL;
     private const long DirectSummonHpRestoreDetailRaw = 0x000000016544B05CL;
     private const int WardingStrikeBaseSkillCode = 12350000;
 
@@ -254,11 +253,10 @@ internal static class PacketSkillTraits
         MatchesExact(packet, 16120350, 2011101) ||
         MatchesBase(packet, 18160000);
 
-    public static bool IsKnownDirectSupport(ParsedCombatPacket packet) =>
-        packet.Damage > 0 &&
-        !packet.IsPeriodicEffect &&
-        (MatchesExact(packet, SpiritDescentSummonRestoreSkillCode) ||
-         IsEnhanceSpiritBenediction(packet));
+    public static bool IsDirectSupportValueShape(ParsedCombatPacket packet) =>
+        IsPositiveDirect0438Value(packet) &&
+        (IsSpiritDescentSummonRestoreValueShape(packet) ||
+         IsEnhanceSpiritBenedictionDirectSupportShape(packet));
 
     public static bool IsKnownPeriodicHealing(ParsedCombatPacket packet) =>
         IsRestoreHp(packet) ||
@@ -269,9 +267,6 @@ internal static class PacketSkillTraits
 
     public static bool IsKnownShield(ParsedCombatPacket packet) =>
         MatchesExact(packet, 2212001, 22120011, 15160000, 18730000);
-
-    public static bool IsKnownTargetPeriodicSupport(ParsedCombatPacket packet) =>
-        MatchesExact(packet, 17730000, 17410000);
 
     public static bool IsDirectHpRestoreShape(ParsedCombatPacket packet) =>
         IsPositiveDirect0438Value(packet) &&
@@ -293,11 +288,6 @@ internal static class PacketSkillTraits
          packet.IsPeriodicTargetMode(9) ||
          packet.IsPeriodicTargetMode(11)) &&
         IsEnhanceSpiritBenediction(packet);
-
-    public static bool IsObservedPeriodicSentinelSupport(ParsedCombatPacket packet) =>
-        packet.IsPeriodicTargetEffect &&
-        packet.Damage >= 2_000_000_000 &&
-        (packet.IsPeriodicTargetMode(9) || packet.IsPeriodicTargetMode(11));
 
     private static bool IsLightOfProtectionDirectHealing(ParsedCombatPacket packet) =>
         MatchesExact(packet, LightOfProtectionSkillCode) &&
@@ -323,6 +313,17 @@ internal static class PacketSkillTraits
     private static bool IsWardingStrikeDirectSelfRestore(ParsedCombatPacket packet) =>
         IsPositiveSelfDirect0438Value(packet) &&
         MatchesBase(packet, WardingStrikeBaseSkillCode);
+
+    private static bool IsSpiritDescentSummonRestoreValueShape(ParsedCombatPacket packet) =>
+        MatchesExact(packet, SpiritDescentSummonRestoreSkillCode) &&
+        packet.SourceId == packet.TargetId &&
+        packet.Loop == 1 &&
+        (packet.DetailRaw == DirectSummonSupportDetailRaw ||
+         packet.DetailRaw == DirectSummonHpRestoreDetailRaw);
+
+    private static bool IsEnhanceSpiritBenedictionDirectSupportShape(ParsedCombatPacket packet) =>
+        IsEnhanceSpiritBenediction(packet) &&
+        packet.Loop == 2;
 
     private static bool IsPositiveSelfDirect0438Value(ParsedCombatPacket packet) =>
         IsPositiveDirect0438Value(packet) &&

@@ -58,7 +58,7 @@ public sealed class CombatEventClassifierTests
     [Theory]
     [InlineData(8)]
     [InlineData(9)]
-    public void Classifies_Known_Target_Periodic_Support_As_Support(int periodicMode)
+    public void Classifies_Target_Periodic_Mode8_And_Mode9_As_Support_Seed(int periodicMode)
     {
         var packet = DirectPacket(4121, 19621, 17730000, 2457);
         packet.SetPeriodicEffect(PeriodicEffectRelation.Target, periodicMode);
@@ -235,12 +235,12 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
-    public void Classifies_SpiritDescent_Other_Target_Value_As_Support()
+    public void Keeps_SpiritDescent_Other_Target_WithoutSupportShape_As_Damage()
     {
         var packet = DirectPacket(38013, 4086, 16990004, 10_000);
 
-        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
-        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
+        Assert.Equal(CombatEventKind.Damage, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Damage, CombatEventClassifier.ClassifyValueKind(packet));
     }
 
     [Theory]
