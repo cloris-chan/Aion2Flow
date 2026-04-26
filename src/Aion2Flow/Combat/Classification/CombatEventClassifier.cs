@@ -225,7 +225,6 @@ internal static class PacketSkillTraits
 {
     private const int RestoreHpSkillCode = 1010000;
     private const int RestSkillCode = 10001;
-    private const int SpiritDescentSummonRestoreSkillCode = 16990004;
     private const int EnhanceSpiritBenedictionBaseSkillCode = 16190000;
     private const int LightOfProtectionSkillCode = 17410040;
     private const long LightOfProtectionDirectHealingDetailRaw = 0x0000000267C58D55L;
@@ -234,7 +233,6 @@ internal static class PacketSkillTraits
     private const ulong HpAbsorptionDirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
     private const ulong DirectHpRestoreDetailPrefix = 0x0000000163F40000UL;
     private const ulong DirectHpRestoreDetailMask = 0xFFFFFFFFFFFF0000UL;
-    private const long DirectSummonSupportDetailRaw = 0x000000016544B05BL;
     private const long DirectSummonHpRestoreDetailRaw = 0x000000016544B05CL;
     private const int WardingStrikeBaseSkillCode = 12350000;
 
@@ -255,8 +253,7 @@ internal static class PacketSkillTraits
 
     public static bool IsDirectSupportValueShape(ParsedCombatPacket packet) =>
         IsPositiveDirect0438Value(packet) &&
-        (IsSpiritDescentSummonRestoreValueShape(packet) ||
-         IsEnhanceSpiritBenedictionDirectSupportShape(packet));
+        IsEnhanceSpiritBenedictionDirectSupportShape(packet);
 
     public static bool IsKnownPeriodicHealing(ParsedCombatPacket packet) =>
         IsRestoreHp(packet) ||
@@ -313,13 +310,6 @@ internal static class PacketSkillTraits
     private static bool IsWardingStrikeDirectSelfRestore(ParsedCombatPacket packet) =>
         IsPositiveSelfDirect0438Value(packet) &&
         MatchesBase(packet, WardingStrikeBaseSkillCode);
-
-    private static bool IsSpiritDescentSummonRestoreValueShape(ParsedCombatPacket packet) =>
-        MatchesExact(packet, SpiritDescentSummonRestoreSkillCode) &&
-        packet.SourceId == packet.TargetId &&
-        packet.Loop == 1 &&
-        (packet.DetailRaw == DirectSummonSupportDetailRaw ||
-         packet.DetailRaw == DirectSummonHpRestoreDetailRaw);
 
     private static bool IsEnhanceSpiritBenedictionDirectSupportShape(ParsedCombatPacket packet) =>
         IsEnhanceSpiritBenediction(packet) &&
