@@ -969,6 +969,11 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return true;
         }
 
+        if (ResolveCombatantId(store, packet.SourceId) == ResolveCombatantId(store, packet.TargetId))
+        {
+            return true;
+        }
+
         return store.TryGetNpcRuntimeState(packet.TargetId, out var state) &&
                state.Kind == NpcKind.Summon;
     }
