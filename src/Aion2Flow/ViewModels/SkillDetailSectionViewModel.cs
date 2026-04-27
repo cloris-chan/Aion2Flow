@@ -29,6 +29,9 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
     public partial long DrainTotal { get; set; }
 
     [ObservableProperty]
+    public partial long RegenerationTotal { get; set; }
+
+    [ObservableProperty]
     public partial int Hits { get; set; }
 
     [ObservableProperty]
@@ -193,6 +196,7 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
         DirectTotal = 0;
         PeriodicTotal = 0;
         DrainTotal = 0;
+        RegenerationTotal = 0;
         Hits = 0;
         Attempts = 0;
         PeriodicHits = 0;

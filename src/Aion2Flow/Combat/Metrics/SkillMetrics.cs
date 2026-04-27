@@ -19,6 +19,8 @@ public sealed class SkillMetrics
     public int DrainDamageTimes { get; set; }
     public long DrainHealingAmount { get; set; }
     public int DrainHealingTimes { get; set; }
+    public long RegenerationHealingAmount { get; set; }
+    public int RegenerationHealingTimes { get; set; }
     public long ShieldAmount { get; set; }
     public int ShieldTimes { get; set; }
     public int CriticalTimes { get; set; }
@@ -67,6 +69,8 @@ public sealed class SkillMetrics
             DrainDamageTimes = DrainDamageTimes,
             DrainHealingAmount = DrainHealingAmount,
             DrainHealingTimes = DrainHealingTimes,
+            RegenerationHealingAmount = RegenerationHealingAmount,
+            RegenerationHealingTimes = RegenerationHealingTimes,
             ShieldAmount = ShieldAmount,
             ShieldTimes = ShieldTimes,
             CriticalTimes = CriticalTimes,
@@ -131,6 +135,11 @@ public sealed class SkillMetrics
             case CombatValueKind.Healing:
                 HealingTimes++;
                 HealingAmount += packet.Damage;
+                if (packet.EffectTag == PacketEffectTag.RegenerationHealing)
+                {
+                    RegenerationHealingTimes++;
+                    RegenerationHealingAmount += packet.Damage;
+                }
                 PrimaryValueKind = ResolvePrimaryValueKind();
                 return;
             case CombatValueKind.Shield:

@@ -847,7 +847,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId))
         {
-            store.AppendCombatPacket(new ParsedCombatPacket
+            var regenPacket = new ParsedCombatPacket
             {
                 TargetId = parsed.TargetId,
                 SourceId = parsed.TargetId,
@@ -860,7 +860,9 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 Timestamp = CurrentTimestampMilliseconds,
                 FrameOrdinal = frameOrdinal,
                 BatchOrdinal = batchOrdinal
-            });
+            };
+            regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
+            store.AppendCombatPacket(regenPacket);
         }
 
         if (ShouldStoreDrainHealing(parsed))
@@ -1239,7 +1241,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
             if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId))
             {
-                store.AppendCombatPacket(new ParsedCombatPacket
+                var regenPacket = new ParsedCombatPacket
                 {
                     TargetId = parsed.TargetId,
                     SourceId = parsed.TargetId,
@@ -1252,7 +1254,9 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                     Timestamp = CurrentTimestampMilliseconds,
                     FrameOrdinal = frameOrdinal,
                     BatchOrdinal = batchOrdinal
-                });
+                };
+                regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
+                store.AppendCombatPacket(regenPacket);
             }
 
             if (ShouldStoreDrainHealing(parsed))

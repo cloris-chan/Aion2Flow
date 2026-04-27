@@ -262,6 +262,10 @@ public sealed class PacketLogReplayService
         if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
             target.IncomingHealing += packet.Damage;
+            if (packet.EffectTag == PacketEffectTag.RegenerationHealing)
+            {
+                target.RegenerationHealing += packet.Damage;
+            }
         }
     }
 
@@ -395,7 +399,7 @@ public sealed class PacketLogReplayService
 
         if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(store, parsed.TargetId))
         {
-            store.AppendCombatPacket(new ParsedCombatPacket
+            var regenPacket = new ParsedCombatPacket
             {
                 TargetId = parsed.TargetId,
                 SourceId = parsed.TargetId,
@@ -408,7 +412,9 @@ public sealed class PacketLogReplayService
                 Timestamp = timestamp,
                 FrameOrdinal = frameOrdinal,
                 BatchOrdinal = batchOrdinal
-            });
+            };
+            regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
+            store.AppendCombatPacket(regenPacket);
         }
 
         if (ShouldStoreDrainHealing(parsed))
@@ -1309,6 +1315,7 @@ public sealed class PacketLogReplayService
         public long IncomingHealing { get; set; }
         public long OutgoingShield { get; set; }
         public long IncomingShield { get; set; }
+        public long RegenerationHealing { get; set; }
         public int OutgoingHits { get; set; }
         public int IncomingHits { get; set; }
         public int OutgoingAttempts { get; set; }
@@ -1331,6 +1338,7 @@ public sealed class PacketLogReplayService
                 IncomingHealing,
                 OutgoingShield,
                 IncomingShield,
+                RegenerationHealing,
                 OutgoingHits,
                 IncomingHits,
                 OutgoingAttempts,
@@ -1365,6 +1373,7 @@ public sealed record PacketLogCombatantSummary(
     long IncomingHealing,
     long OutgoingShield,
     long IncomingShield,
+    long RegenerationHealing,
     int OutgoingHits,
     int IncomingHits,
     int OutgoingAttempts,

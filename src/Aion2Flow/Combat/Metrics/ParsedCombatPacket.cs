@@ -15,7 +15,8 @@ public enum PacketEffectTag : byte
     ActiveDodgeEvade,
     CompactEvade,
     PeriodicLinkInvincible,
-    Aux2C38Invincible
+    Aux2C38Invincible,
+    RegenerationHealing
 }
 
 public sealed class ParsedCombatPacket

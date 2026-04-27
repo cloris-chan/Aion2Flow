@@ -528,7 +528,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             return;
         }
 
-        long totalAmount = 0, directAmount = 0, periodicAmount = 0, drainAmount = 0, shieldAmount = 0;
+        long totalAmount = 0, directAmount = 0, periodicAmount = 0, drainAmount = 0, regenerationAmount = 0, shieldAmount = 0;
         int hits = 0, attempts = 0, periodicHits = 0, evades = 0, invincible = 0, criticals = 0;
 
         var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows);
@@ -538,6 +538,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             directAmount += row.DirectAmount;
             periodicAmount += row.PeriodicAmount;
             drainAmount += row.DrainAmount;
+            regenerationAmount += row.RegenerationAmount;
             shieldAmount += row.ShieldAmount;
             hits += row.Hits;
             attempts += row.Attempts;
@@ -551,6 +552,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         section.DirectTotal = directAmount;
         section.PeriodicTotal = periodicAmount;
         section.DrainTotal = drainAmount;
+        section.RegenerationTotal = regenerationAmount;
         section.Shield = shieldAmount;
         section.Hits = hits;
         section.Attempts = attempts;
@@ -817,10 +819,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         var rows = new List<SkillDetailRowData>();
         foreach (var skill in skills)
         {
-            var directHealingAmount = Math.Max(0L, skill.HealingAmount - skill.PeriodicHealingAmount - skill.DrainHealingAmount);
-            var directHealingHits = Math.Max(0, skill.HealingTimes - skill.PeriodicHealingTimes - skill.DrainHealingTimes);
-            var totalAmount = directHealingAmount + skill.PeriodicHealingAmount + skill.DrainHealingAmount;
-            var totalHits = directHealingHits + skill.PeriodicHealingTimes + skill.DrainHealingTimes;
+            var directHealingAmount = Math.Max(0L, skill.HealingAmount - skill.PeriodicHealingAmount - skill.DrainHealingAmount - skill.RegenerationHealingAmount);
+            var directHealingHits = Math.Max(0, skill.HealingTimes - skill.PeriodicHealingTimes - skill.DrainHealingTimes - skill.RegenerationHealingTimes);
+            var totalAmount = directHealingAmount + skill.PeriodicHealingAmount + skill.DrainHealingAmount + skill.RegenerationHealingAmount;
+            var totalHits = directHealingHits + skill.PeriodicHealingTimes + skill.DrainHealingTimes + skill.RegenerationHealingTimes;
             if (totalAmount <= 0 && totalHits <= 0)
             {
                 continue;
@@ -834,6 +836,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                 DirectAmount = directHealingAmount,
                 PeriodicAmount = skill.PeriodicHealingAmount,
                 DrainAmount = skill.DrainHealingAmount,
+                RegenerationAmount = skill.RegenerationHealingAmount,
                 Hits = totalHits,
                 Attempts = totalHits,
                 PeriodicHits = skill.PeriodicHealingTimes,

@@ -16,6 +16,7 @@ public sealed class CombatantMetrics(string nickname)
     public long PeriodicHealingAmount { get; private set; }
     public long DrainDamageAmount { get; private set; }
     public long DrainHealingAmount { get; private set; }
+    public long RegenerationHealingAmount { get; private set; }
     public long ShieldAmount { get; private set; }
     public int ShieldTimes { get; private set; }
     public double DamageContribution { get; set; }
@@ -28,6 +29,7 @@ public sealed class CombatantMetrics(string nickname)
     private void AddPeriodicHealingAmount(int amount) => PeriodicHealingAmount += amount;
     private void AddDrainDamageAmount(int amount) => DrainDamageAmount += amount;
     private void AddDrainHealingAmount(int amount) => DrainHealingAmount += amount;
+    private void AddRegenerationHealingAmount(int amount) => RegenerationHealingAmount += amount;
     private void AddShieldAmount(int amount) => ShieldAmount += amount;
     private void AddShieldTime() => ShieldTimes++;
 
@@ -66,6 +68,10 @@ public sealed class CombatantMetrics(string nickname)
                 return false;
             case CombatValueKind.Healing:
                 AddHealingAmount(packet.Damage);
+                if (packet.EffectTag == PacketEffectTag.RegenerationHealing)
+                {
+                    AddRegenerationHealingAmount(packet.Damage);
+                }
                 return false;
             case CombatValueKind.Shield:
                 AddShieldAmount(packet.Damage);
@@ -107,6 +113,7 @@ public sealed class CombatantMetrics(string nickname)
             PeriodicHealingAmount = PeriodicHealingAmount,
             DrainDamageAmount = DrainDamageAmount,
             DrainHealingAmount = DrainHealingAmount,
+            RegenerationHealingAmount = RegenerationHealingAmount,
             ShieldAmount = ShieldAmount,
             ShieldTimes = ShieldTimes
         };
