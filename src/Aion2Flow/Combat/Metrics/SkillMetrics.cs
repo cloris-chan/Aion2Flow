@@ -23,6 +23,8 @@ public sealed class SkillMetrics
     public int RegenerationHealingTimes { get; set; }
     public long ShieldAmount { get; set; }
     public int ShieldTimes { get; set; }
+    public long ShieldAbsorbedAmount { get; set; }
+    public int ShieldAbsorbedTimes { get; set; }
     public int CriticalTimes { get; set; }
     public int Times { get; set; }
     public int AttemptTimes { get; set; }
@@ -73,6 +75,8 @@ public sealed class SkillMetrics
             RegenerationHealingTimes = RegenerationHealingTimes,
             ShieldAmount = ShieldAmount,
             ShieldTimes = ShieldTimes,
+            ShieldAbsorbedAmount = ShieldAbsorbedAmount,
+            ShieldAbsorbedTimes = ShieldAbsorbedTimes,
             CriticalTimes = CriticalTimes,
             Times = Times,
             AttemptTimes = AttemptTimes,
@@ -147,8 +151,19 @@ public sealed class SkillMetrics
                 SupportTimes++;
                 if (packet.ValueKind == CombatValueKind.Shield)
                 {
-                    ShieldAmount += packet.Damage;
-                    ShieldTimes++;
+                    if (packet.EffectTag == PacketEffectTag.ShieldAbsorbed)
+                    {
+                        if (packet.Damage > 0)
+                        {
+                            ShieldAbsorbedAmount += packet.Damage;
+                            ShieldAbsorbedTimes++;
+                        }
+                    }
+                    else
+                    {
+                        ShieldAmount += packet.Damage;
+                        ShieldTimes++;
+                    }
                 }
 
                 PrimaryValueKind = ResolvePrimaryValueKind();

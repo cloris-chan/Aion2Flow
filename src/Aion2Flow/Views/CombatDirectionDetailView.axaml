@@ -408,6 +408,8 @@
                                                  Value="{Binding HealingSection.SkillCount}" />
                             <controls:MetricTile Label="{Binding Localization[Panel.Shield]}"
                                                  Value="{Binding ShieldSection.Total}" />
+                            <controls:MetricTile Label="{Binding Localization[Column.ShieldAbsorbed]}"
+                                                 Value="{Binding ShieldSection.ShieldAbsorbed}" />
                             <controls:MetricTile Label="{Binding Localization[Summary.ShieldHits]}"
                                                  Value="{Binding ShieldSection.Hits}" />
                             <controls:MetricTile Label="{Binding Localization[Summary.ShieldSkills]}"
@@ -574,10 +576,10 @@
                     <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller">
                             <StackPanel Orientation="Vertical"
-                                        MinWidth="488"
+                                        MinWidth="584"
                                         Spacing="6">
                                 <Border Classes="DetailTableHeaderBand">
-                                    <Grid ColumnDefinitions="240,96,80,56"
+                                    <Grid ColumnDefinitions="240,96,96,80,56"
                                           ColumnSpacing="4">
                                         <TextBlock Grid.Column="0"
                                                    Classes="DetailTableHeaderLeft"
@@ -587,8 +589,11 @@
                                                    Text="{Binding Localization[Column.Total]}" />
                                         <TextBlock Grid.Column="2"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.HitCount]}" />
+                                                   Text="{Binding Localization[Column.ShieldAbsorbed]}" />
                                         <TextBlock Grid.Column="3"
+                                                   Classes="DetailTableHeader"
+                                                   Text="{Binding Localization[Column.HitCount]}" />
+                                        <TextBlock Grid.Column="4"
                                                    Classes="DetailTableHeader"
                                                    Text="{Binding Localization[Column.Share]}" />
                                     </Grid>
@@ -598,7 +603,7 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
                                             <Border Classes="DetailTableRow">
-                                                <Grid ColumnDefinitions="240,96,80,56"
+                                                <Grid ColumnDefinitions="240,96,96,80,56"
                                                       ColumnSpacing="4">
                                             <TextBlock Grid.Column="0"
                                                        Classes="DetailRowText"
@@ -608,8 +613,11 @@
                                                                    Value="{Binding TotalAmount}" />
                                             <controls:NumericBlock Grid.Column="2"
                                                                    Classes="DetailRowValue"
-                                                                   Value="{Binding Hits}" />
+                                                                   Value="{Binding ShieldAbsorbedAmount}" />
                                             <controls:NumericBlock Grid.Column="3"
+                                                                   Classes="DetailRowValue"
+                                                                   Value="{Binding Hits}" />
+                                            <controls:NumericBlock Grid.Column="4"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding SharePercent}"
                                                                    FractionDigits="1"

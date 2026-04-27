@@ -263,7 +263,8 @@ internal static class PacketSkillTraits
         IsKnownPeriodicHealingPool(packet);
 
     public static bool IsKnownShield(ParsedCombatPacket packet) =>
-        MatchesExact(packet, 2212001, 22120011, 15160000, 18730000);
+        MatchesExact(packet, 2212001, 22120011, 15160000, 18730000) ||
+        MatchesBase(packet, 1742000000);
 
     public static bool IsDirectHpRestoreShape(ParsedCombatPacket packet) =>
         IsPositiveDirect0438Value(packet) &&

@@ -528,7 +528,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             return;
         }
 
-        long totalAmount = 0, directAmount = 0, periodicAmount = 0, drainAmount = 0, regenerationAmount = 0, shieldAmount = 0;
+        long totalAmount = 0, directAmount = 0, periodicAmount = 0, drainAmount = 0, regenerationAmount = 0, shieldAmount = 0, shieldAbsorbedAmount = 0;
         int hits = 0, attempts = 0, periodicHits = 0, evades = 0, invincible = 0, criticals = 0;
 
         var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows);
@@ -540,6 +540,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             drainAmount += row.DrainAmount;
             regenerationAmount += row.RegenerationAmount;
             shieldAmount += row.ShieldAmount;
+            shieldAbsorbedAmount += row.ShieldAbsorbedAmount;
             hits += row.Hits;
             attempts += row.Attempts;
             periodicHits += row.PeriodicHits;
@@ -554,6 +555,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         section.DrainTotal = drainAmount;
         section.RegenerationTotal = regenerationAmount;
         section.Shield = shieldAmount;
+        section.ShieldAbsorbed = shieldAbsorbedAmount;
         section.Hits = hits;
         section.Attempts = attempts;
         section.PeriodicHits = periodicHits;
@@ -874,7 +876,8 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         var rows = new List<SkillDetailRowData>();
         foreach (var skill in skills)
         {
-            if (skill.ShieldAmount <= 0 && skill.ShieldTimes <= 0)
+            if (skill.ShieldAmount <= 0 && skill.ShieldTimes <= 0 &&
+                skill.ShieldAbsorbedAmount <= 0 && skill.ShieldAbsorbedTimes <= 0)
             {
                 continue;
             }
@@ -885,6 +888,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                 SkillName = ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
                 TotalAmount = skill.ShieldAmount,
                 ShieldAmount = skill.ShieldAmount,
+                ShieldAbsorbedAmount = skill.ShieldAbsorbedAmount,
                 Hits = skill.ShieldTimes,
                 Attempts = skill.ShieldTimes,
             });

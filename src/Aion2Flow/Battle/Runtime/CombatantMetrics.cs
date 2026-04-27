@@ -19,6 +19,8 @@ public sealed class CombatantMetrics(string nickname)
     public long RegenerationHealingAmount { get; private set; }
     public long ShieldAmount { get; private set; }
     public int ShieldTimes { get; private set; }
+    public long ShieldAbsorbedAmount { get; private set; }
+    public int ShieldAbsorbedTimes { get; private set; }
     public double DamageContribution { get; set; }
 
     public Dictionary<int, SkillMetrics> Skills { get; } = [];
@@ -32,6 +34,8 @@ public sealed class CombatantMetrics(string nickname)
     private void AddRegenerationHealingAmount(int amount) => RegenerationHealingAmount += amount;
     private void AddShieldAmount(int amount) => ShieldAmount += amount;
     private void AddShieldTime() => ShieldTimes++;
+    private void AddShieldAbsorbedAmount(int amount) => ShieldAbsorbedAmount += amount;
+    private void AddShieldAbsorbedTime() => ShieldAbsorbedTimes++;
 
     public bool ProcessCombatEvent(ParsedCombatPacket packet)
     {
@@ -74,8 +78,19 @@ public sealed class CombatantMetrics(string nickname)
                 }
                 return false;
             case CombatValueKind.Shield:
-                AddShieldAmount(packet.Damage);
-                AddShieldTime();
+                if (packet.EffectTag == PacketEffectTag.ShieldAbsorbed)
+                {
+                    if (packet.Damage > 0)
+                    {
+                        AddShieldAbsorbedAmount(packet.Damage);
+                        AddShieldAbsorbedTime();
+                    }
+                }
+                else
+                {
+                    AddShieldAmount(packet.Damage);
+                    AddShieldTime();
+                }
                 return false;
             case CombatValueKind.Support:
                 return false;
@@ -115,7 +130,9 @@ public sealed class CombatantMetrics(string nickname)
             DrainHealingAmount = DrainHealingAmount,
             RegenerationHealingAmount = RegenerationHealingAmount,
             ShieldAmount = ShieldAmount,
-            ShieldTimes = ShieldTimes
+            ShieldTimes = ShieldTimes,
+            ShieldAbsorbedAmount = ShieldAbsorbedAmount,
+            ShieldAbsorbedTimes = ShieldAbsorbedTimes
         };
 
         foreach (var (skillCode, skill) in Skills)

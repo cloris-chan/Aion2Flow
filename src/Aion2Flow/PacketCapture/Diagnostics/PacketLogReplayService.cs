@@ -275,6 +275,25 @@ public sealed class PacketLogReplayService
         int targetId,
         ParsedCombatPacket packet)
     {
+        if (packet.EffectTag == PacketEffectTag.ShieldAbsorbed)
+        {
+            if (packet.Damage <= 0)
+            {
+                return;
+            }
+
+            if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var absorbSource))
+            {
+                absorbSource.OutgoingShieldAbsorbed += packet.Damage;
+            }
+
+            if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var absorbTarget))
+            {
+                absorbTarget.IncomingShieldAbsorbed += packet.Damage;
+            }
+            return;
+        }
+
         if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
             source.OutgoingShield += packet.Damage;
@@ -1315,6 +1334,8 @@ public sealed class PacketLogReplayService
         public long IncomingHealing { get; set; }
         public long OutgoingShield { get; set; }
         public long IncomingShield { get; set; }
+        public long OutgoingShieldAbsorbed { get; set; }
+        public long IncomingShieldAbsorbed { get; set; }
         public long RegenerationHealing { get; set; }
         public int OutgoingHits { get; set; }
         public int IncomingHits { get; set; }
@@ -1338,6 +1359,8 @@ public sealed class PacketLogReplayService
                 IncomingHealing,
                 OutgoingShield,
                 IncomingShield,
+                OutgoingShieldAbsorbed,
+                IncomingShieldAbsorbed,
                 RegenerationHealing,
                 OutgoingHits,
                 IncomingHits,
@@ -1373,6 +1396,8 @@ public sealed record PacketLogCombatantSummary(
     long IncomingHealing,
     long OutgoingShield,
     long IncomingShield,
+    long OutgoingShieldAbsorbed,
+    long IncomingShieldAbsorbed,
     long RegenerationHealing,
     int OutgoingHits,
     int IncomingHits,

@@ -77,6 +77,9 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
     public partial long Shield { get; set; }
 
     [ObservableProperty]
+    public partial long ShieldAbsorbed { get; set; }
+
+    [ObservableProperty]
     public partial int SkillCount { get; set; }
 
     [ObservableProperty]
@@ -212,6 +215,7 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
         EnduranceCount = 0;
         RegenerationCount = 0;
         Shield = 0;
+        ShieldAbsorbed = 0;
         SkillCount = 0;
         HasSkills = false;
         PerSecond = 0d;

@@ -16,7 +16,9 @@ public enum PacketEffectTag : byte
     CompactEvade,
     PeriodicLinkInvincible,
     Aux2C38Invincible,
-    RegenerationHealing
+    RegenerationHealing,
+    ShieldGrant,
+    ShieldAbsorbed
 }
 
 public sealed class ParsedCombatPacket
@@ -75,11 +77,13 @@ public sealed class ParsedCombatPacket
     public void SetEffectTag(PacketEffectTag effectTag)
     {
         EffectTag = effectTag;
-        if (effectTag != PacketEffectTag.None)
+        if (effectTag is PacketEffectTag.None or PacketEffectTag.ShieldGrant or PacketEffectTag.ShieldAbsorbed)
         {
-            PeriodicRelation = PeriodicEffectRelation.None;
-            PeriodicMode = 0;
+            return;
         }
+
+        PeriodicRelation = PeriodicEffectRelation.None;
+        PeriodicMode = 0;
     }
 
     public ParsedCombatPacket DeepClone()

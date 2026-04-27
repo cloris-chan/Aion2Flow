@@ -96,6 +96,8 @@ public sealed class CombatMetricsStore
     private readonly HashSet<int> _currentBatchDodgeTargets = [];
     private readonly HashSet<AvoidedSignature> _resolvedAvoidanceSignatures = [];
     private readonly List<PendingCompactAvoidance> _pendingCompactDamageEntries = [];
+    private readonly Lock _shieldStateLock = new();
+    private readonly Dictionary<(int TargetId, int BaseSkillCode), ShieldChainState> _shieldRemainingByKey = [];
     private int _lastObservedNpcSource;
     private long _observationOrdinal;
     private long _currentAvoidanceBatchOrdinal;
@@ -374,7 +376,60 @@ public sealed class CombatMetricsStore
         NormalizeOwnerTargetSummonRestore(packet);
         NormalizeSystemPeriodicRecovery(packet);
         NormalizePeriodicHealingPool(packet);
+        NormalizeShieldChainEvent(packet);
         ApplyMultiHitAttribution(packet);
+    }
+
+    private readonly record struct ShieldChainState(int Remaining, int CasterId);
+
+    private void NormalizeShieldChainEvent(ParsedCombatPacket packet)
+    {
+        if (packet.ValueKind != CombatValueKind.Shield || !packet.IsPeriodicEffect)
+        {
+            return;
+        }
+
+        var baseSkill = packet.BaseSkillCode;
+        if (baseSkill == 0 || packet.TargetId <= 0)
+        {
+            return;
+        }
+
+        var key = (packet.TargetId, baseSkill);
+        lock (_shieldStateLock)
+        {
+            if (packet.PeriodicMode == 9)
+            {
+                _shieldRemainingByKey[key] = new ShieldChainState(packet.Damage, packet.SourceId);
+                packet.SetEffectTag(PacketEffectTag.ShieldGrant);
+                return;
+            }
+
+            if (packet.PeriodicMode is 11 or 10)
+            {
+                var newRemaining = Math.Max(0, packet.Damage);
+                var caster = packet.SourceId;
+                var absorbed = 0;
+                if (_shieldRemainingByKey.TryGetValue(key, out var state))
+                {
+                    absorbed = Math.Max(0, state.Remaining - newRemaining);
+                    caster = state.CasterId;
+                }
+
+                packet.Damage = absorbed;
+                packet.SourceId = caster;
+                packet.SetEffectTag(PacketEffectTag.ShieldAbsorbed);
+
+                if (packet.PeriodicMode == 10)
+                {
+                    _shieldRemainingByKey.Remove(key);
+                }
+                else
+                {
+                    _shieldRemainingByKey[key] = new ShieldChainState(newRemaining, caster);
+                }
+            }
+        }
     }
 
     private void NormalizeOwnerTargetSummonRestore(ParsedCombatPacket packet)
@@ -650,7 +705,7 @@ public sealed class CombatMetricsStore
             return false;
         }
 
-        if (packet.ValueKind is not CombatValueKind.PeriodicHealing and not CombatValueKind.Shield)
+        if (packet.ValueKind is not CombatValueKind.PeriodicHealing)
         {
             return false;
         }
@@ -1015,6 +1070,10 @@ public sealed class CombatMetricsStore
             _resolvedPeriodicLinks.Clear();
             _resolvedPeriodicLinkOrder.Clear();
             _currentAvoidanceBatchOrdinal = 0;
+        }
+        lock (_shieldStateLock)
+        {
+            _shieldRemainingByKey.Clear();
         }
         _lastObservedNpcSource = 0;
         CurrentTarget = 0;

@@ -28,6 +28,9 @@ public sealed partial class SkillDetailRowViewModel : ObservableObject
     public partial long ShieldAmount { get; set; }
 
     [ObservableProperty]
+    public partial long ShieldAbsorbedAmount { get; set; }
+
+    [ObservableProperty]
     public partial int Hits { get; set; }
 
     [ObservableProperty]
@@ -115,6 +118,7 @@ public sealed partial class SkillDetailRowViewModel : ObservableObject
         DrainAmount = data.DrainAmount;
         RegenerationAmount = data.RegenerationAmount;
         ShieldAmount = data.ShieldAmount;
+        ShieldAbsorbedAmount = data.ShieldAbsorbedAmount;
         Hits = data.Hits;
         Attempts = data.Attempts;
         PeriodicHits = data.PeriodicHits;
@@ -155,6 +159,7 @@ public struct SkillDetailRowData
     public long DrainAmount;
     public long RegenerationAmount;
     public long ShieldAmount;
+    public long ShieldAbsorbedAmount;
     public int Hits;
     public int Attempts;
     public int PeriodicHits;
