@@ -878,7 +878,7 @@ public sealed class PacketLogReplayService
     {
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
-            TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value);
+            TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value, requireCatalogEntry: true);
         }
 
         if (Packet4036CreateParser.TryParseOwner(packet, out var entityId, out var ownerId))

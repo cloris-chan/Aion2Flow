@@ -1476,7 +1476,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     {
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
-            TryApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value);
+            TryApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value, requireCatalogEntry: true);
         }
 
         if (Packet4036CreateParser.TryParseOwner(packet, out var entityId, out var ownerId))

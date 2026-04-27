@@ -155,10 +155,16 @@ internal static class Packet4036CreateParser
         if (!reader.TryAdvance(2)) return false;
         if (!reader.TryReadVarInt(out var entityId)) return false;
         if (entityId <= 0) return false;
+        if (reader.Remaining < 3) return false;
+        var spawnTag1 = packet[reader.Offset + 1];
+        var spawnTag2 = packet[reader.Offset + 2];
+        var spawnTagLikelyCarriesNpcCode = (spawnTag1 == 0x20 || spawnTag1 == 0x21 || spawnTag1 == 0x30) && spawnTag2 == 0x00;
         if (!reader.TryAdvance(3)) return false;
 
         int? npcCode = null;
-        if (reader.TryReadUInt32Le(out var npcValue) && npcValue is >= 2_000_000 and <= 2_999_999)
+        if (spawnTagLikelyCarriesNpcCode &&
+            reader.TryReadUInt32Le(out var npcValue) &&
+            npcValue is >= 2_000_000 and <= 2_999_999)
         {
             npcCode = npcValue;
         }
