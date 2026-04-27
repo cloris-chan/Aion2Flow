@@ -816,6 +816,11 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (parsed.Damage <= 0) return false;
 
+        if (!store.IsKnownEntity(parsed.SourceId) && !store.IsKnownEntity(parsed.TargetId))
+        {
+            return false;
+        }
+
         var combatPacket = new ParsedCombatPacket
         {
             TargetId = parsed.TargetId,
@@ -917,6 +922,11 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (damage <= 0) return false;
+
+        if (!store.IsKnownEntity(sourceId) && !store.IsKnownEntity(targetId))
+        {
+            return false;
+        }
 
         var combatPacket = new ParsedCombatPacket
         {

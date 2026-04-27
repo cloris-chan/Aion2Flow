@@ -96,6 +96,7 @@ public sealed class CombatMetricsStore
     private readonly HashSet<int> _currentBatchDodgeTargets = [];
     private readonly HashSet<AvoidedSignature> _resolvedAvoidanceSignatures = [];
     private readonly List<PendingCompactAvoidance> _pendingCompactDamageEntries = [];
+    private readonly HashSet<(int Target, int Skill)> _confirmedCompactDamageTriples = [];
     private readonly Lock _shieldStateLock = new();
     private readonly Dictionary<(int TargetId, int BaseSkillCode), ShieldChainState> _shieldRemainingByKey = [];
     private int _lastObservedNpcSource;
@@ -222,6 +223,10 @@ public sealed class CombatMetricsStore
             {
                 _pendingCompactDamageEntries.Add(new PendingCompactAvoidance(
                     sourceId, targetId, skillCodeRaw, marker, timestamp, frameOrdinal, batchOrdinal));
+                if (_confirmedCompactDamageTriples.Add((targetId, skillCodeRaw)))
+                {
+                    CancelPendingAndStoredCompactEvade_NoLock(targetId, skillCodeRaw);
+                }
             }
         }
 
@@ -1064,6 +1069,7 @@ public sealed class CombatMetricsStore
             _pendingDodgeSignalsBySource.Clear();
             _pendingCompactAvoidances.Clear();
             _pendingCompactDamageEntries.Clear();
+            _confirmedCompactDamageTriples.Clear();
             _pendingDirectAvoidancePackets.Clear();
             _currentBatchDodgeTargets.Clear();
             _resolvedAvoidanceSignatures.Clear();
@@ -1086,6 +1092,20 @@ public sealed class CombatMetricsStore
     public ConcurrentDictionary<int, string> Nicknames => _nicknameStorage;
     public ConcurrentDictionary<int, int> SummonOwnerByInstance => _summonOwnerByInstance;
     public ConcurrentDictionary<int, string> NpcNameByCode => _npcNameByCode;
+
+    public bool IsKnownEntity(int id)
+    {
+        if (id <= 0)
+        {
+            return false;
+        }
+
+        return _packetsBySource.ContainsKey(id)
+            || _packetsByTarget.ContainsKey(id)
+            || _nicknameStorage.ContainsKey(id)
+            || _npcStateByInstance.ContainsKey(id)
+            || _summonOwnerByInstance.ContainsKey(id);
+    }
 
     internal long GetCombatantDetailRevision(int combatantId)
     {
@@ -1481,6 +1501,12 @@ public sealed class CombatMetricsStore
                 continue;
             }
 
+            if (_confirmedCompactDamageTriples.Contains((pending.TargetId, pending.OriginalSkillCode)))
+            {
+                _resolvedAvoidanceSignatures.Add(signature);
+                continue;
+            }
+
             _resolvedAvoidanceSignatures.Add(signature);
             StoreCompactEvade(
                 pending.SourceId,
@@ -1600,6 +1626,38 @@ public sealed class CombatMetricsStore
         while (_pendingDirectAvoidancePackets.Count > MaxPendingAvoidancePackets)
         {
             _pendingDirectAvoidancePackets.RemoveAt(0);
+        }
+    }
+
+    private void CancelPendingAndStoredCompactEvade_NoLock(int targetId, int skillCode)
+    {
+        for (var i = _pendingCompactAvoidances.Count - 1; i >= 0; i--)
+        {
+            var pending = _pendingCompactAvoidances[i];
+            if (pending.TargetId == targetId &&
+                pending.OriginalSkillCode == skillCode)
+            {
+                _pendingCompactAvoidances.RemoveAt(i);
+            }
+        }
+
+        if (_packetsByTarget.TryGetValue(targetId, out var queue))
+        {
+            foreach (var packet in queue)
+            {
+                if (packet.OriginalSkillCode != skillCode ||
+                    (packet.Modifiers & DamageModifiers.Evade) == 0 ||
+                    packet.EffectTag != PacketEffectTag.CompactEvade)
+                {
+                    continue;
+                }
+
+                packet.Modifiers &= ~DamageModifiers.Evade;
+                packet.AttemptContribution = 0;
+                packet.HitContribution = 0;
+                packet.SetEffectTag(PacketEffectTag.None);
+                MarkCombatantAndAdjacentDetailsDirty(targetId);
+            }
         }
     }
 
