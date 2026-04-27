@@ -355,19 +355,14 @@ internal static class Packet0438DamageParser
         if (detail.Length < 10) return modifiers;
 
         var flagByte = detail[0];
-        var hasBlock = (flagByte & 0x02) != 0;
-        var hasParry = (flagByte & 0x04) != 0;
-        var hasPerfect = (flagByte & 0x08) != 0;
-        var hasDefensivePerfect = (flagByte & 0x80) != 0 && (hasBlock || hasParry);
-
         if ((flagByte & 0x01) != 0) modifiers |= DamageModifiers.Back;
-        if (hasBlock) modifiers |= DamageModifiers.Block;
-        if (hasParry) modifiers |= DamageModifiers.Parry;
-        if (hasPerfect || hasDefensivePerfect) modifiers |= DamageModifiers.Perfect;
+        if ((flagByte & 0x02) != 0) modifiers |= DamageModifiers.Block;
+        if ((flagByte & 0x04) != 0) modifiers |= DamageModifiers.Parry;
+        if ((flagByte & 0x08) != 0) modifiers |= DamageModifiers.Perfect;
         if ((flagByte & 0x10) != 0) modifiers |= DamageModifiers.Smite;
         if ((flagByte & 0x20) != 0) modifiers |= DamageModifiers.Endurance;
         if ((flagByte & 0x40) != 0) modifiers |= DamageModifiers.Regeneration;
-        if ((flagByte & 0x80) != 0 && !hasDefensivePerfect) modifiers |= DamageModifiers.DefensivePerfect;
+        if ((flagByte & 0x80) != 0) modifiers |= DamageModifiers.DefensivePerfect;
         return modifiers;
     }
 }

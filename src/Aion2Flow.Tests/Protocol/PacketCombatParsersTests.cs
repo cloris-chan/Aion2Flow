@@ -147,8 +147,8 @@ public sealed class PacketCombatParsersTests
     [Theory]
     [InlineData("2804388B7F4610A5A00DF4C81000250204005B7F8E0601000000904E0101", DamageModifiers.Parry)]
     [InlineData("2804388B7F4610A5A00DF4C81000280202005B7F8E0601000000904E0101", DamageModifiers.Block)]
-    [InlineData("2804388B7F4610A5A00DF4C81000290282005B7F8E0601000000904E0101", DamageModifiers.Block | DamageModifiers.Perfect)]
-    [InlineData("2804388B7F4610A5A00DF4C810000E0284005B7F8E0601000000904E0101", DamageModifiers.Parry | DamageModifiers.Perfect)]
+    [InlineData("2804388B7F4610A5A00DF4C81000290282005B7F8E0601000000904E0101", DamageModifiers.Block | DamageModifiers.DefensivePerfect)]
+    [InlineData("2804388B7F4610A5A00DF4C810000E0284005B7F8E0601000000904E0101", DamageModifiers.Parry | DamageModifiers.DefensivePerfect)]
     public void Parses_0438_Defensive_Modifiers_Semantically(string hex, DamageModifiers expectedModifiers)
     {
         var packet = HexHelper.Parse(hex);
