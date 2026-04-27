@@ -79,6 +79,12 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (!reader.TryReadVarInt(out var loop)) return false;
 
+        if (unknown == 0 && damage == 10000)
+        {
+            damage = loop;
+            loop = 0;
+        }
+
         var multiHitCount = 0;
         if (Packet0438Layout.HasMultiHitData(layoutTag))
         {
