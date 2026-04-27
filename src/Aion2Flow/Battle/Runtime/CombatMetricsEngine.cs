@@ -902,7 +902,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     continue;
                 }
 
-                NormalizeBattleWindowPacket(store, packet);
                 var sourceId = ResolveCombatantId(store, packet.SourceId);
                 var targetId = packet.TargetId;
                 relevantCombatantIds.Add(sourceId);
@@ -944,18 +943,6 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
     private static bool IsWithinBattleWindow(ParsedCombatPacket packet, long battleStart, long battleEnd)
         => packet.Timestamp >= battleStart && packet.Timestamp <= battleEnd;
-
-    private static void NormalizeBattleWindowPacket(CombatMetricsStore store, ParsedCombatPacket packet)
-    {
-        if (!PacketSkillTraits.IsDirectSummonHpRestoreShape(packet) ||
-            !IsKnownSummonInstance(store, packet.SourceId))
-        {
-            return;
-        }
-
-        packet.EventKind = CombatEventKind.Healing;
-        packet.ValueKind = CombatValueKind.Healing;
-    }
 
     private static bool IsSummonDamageTarget(CombatMetricsStore store, ParsedCombatPacket packet)
     {

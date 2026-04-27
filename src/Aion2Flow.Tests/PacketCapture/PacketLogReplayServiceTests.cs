@@ -620,8 +620,9 @@ public sealed class PacketLogReplayServiceTests
             $"target={replay.Snapshot.TargetObservation?.InstanceId} targetName={replay.Snapshot.TargetName} battle={replay.Snapshot.BattleStartTime}-{replay.Snapshot.BattleEndTime}\ncombatants:\n{combatantDump}\nsummaries:\n{summaryDump}\nsummons:\n{summonDump}\ntargets:\n{targetDump}\nplayer-healing-groups:\n{playerHealingGroupDump}\nspirit-descent-packets:\n{spiritDescentPacketDump}\nplayer-incoming:\n{playerIncomingDump}";
 
         Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), diagnostics);
-        Assert.True(playerMetrics.Skills.TryGetValue(16990004, out var spiritDescentRestore), diagnostics);
-        Assert.Equal(1_000_000, spiritDescentRestore.HealingAmount);
+        Assert.False(
+            playerMetrics.Skills.TryGetValue(16990004, out var spiritDescentRestore) && spiritDescentRestore.HealingAmount > 0,
+            diagnostics);
 
         var playerSummary = Assert.Single(replay.Combatants, static summary => summary.CombatantId == playerId);
         Assert.True(playerSummary.IncomingDamage == 13_347, diagnostics);

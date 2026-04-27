@@ -233,7 +233,6 @@ internal static class PacketSkillTraits
     private const ulong HpAbsorptionDirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
     private const ulong DirectHpRestoreDetailPrefix = 0x0000000163F40000UL;
     private const ulong DirectHpRestoreDetailMask = 0xFFFFFFFFFFFF0000UL;
-    private const long DirectSummonHpRestoreDetailRaw = 0x000000016544B05CL;
     private const int WardingStrikeBaseSkillCode = 12350000;
 
     public static bool IsRestoreHp(ParsedCombatPacket packet) =>
@@ -270,11 +269,6 @@ internal static class PacketSkillTraits
         IsPositiveDirect0438Value(packet) &&
         packet.Loop == 1 &&
         HasDetailPrefix(packet.DetailRaw, DirectHpRestoreDetailPrefix, DirectHpRestoreDetailMask);
-
-    public static bool IsDirectSummonHpRestoreShape(ParsedCombatPacket packet) =>
-        IsPositiveSelfDirect0438Value(packet) &&
-        packet.Loop == 1 &&
-        packet.DetailRaw == DirectSummonHpRestoreDetailRaw;
 
     public static bool IsTargetPeriodicSupportSeed(ParsedCombatPacket packet) =>
         packet.IsPeriodicTargetMode(9) ||
