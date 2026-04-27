@@ -99,15 +99,61 @@ public sealed class CombatMetricsStore
     private readonly HashSet<(int Target, int Skill)> _confirmedCompactDamageTriples = [];
     private readonly Lock _shieldStateLock = new();
     private readonly Dictionary<(int TargetId, int BaseSkillCode), ShieldChainState> _shieldRemainingByKey = [];
+    private readonly ConcurrentDictionary<int, int> _instanceLifecycleRemap = new();
+    private int _nextSyntheticLifecycleId = int.MaxValue;
     private int _lastObservedNpcSource;
     private long _observationOrdinal;
     private long _currentAvoidanceBatchOrdinal;
     private long _detailRevisionSequence;
 
-    public int CurrentTarget { get; set; }
+    public int CurrentTarget
+    {
+        get => _currentTarget;
+        set => _currentTarget = ResolveLifecycleId(value);
+    }
+    private int _currentTarget;
+
+    public int ResolveLifecycleId(int rawInstanceId)
+    {
+        if (rawInstanceId <= 0)
+        {
+            return rawInstanceId;
+        }
+
+        return _instanceLifecycleRemap.TryGetValue(rawInstanceId, out var mapped) ? mapped : rawInstanceId;
+    }
+
+    public int RebindInstanceLifecycle(int rawInstanceId)
+    {
+        if (rawInstanceId <= 0)
+        {
+            return rawInstanceId;
+        }
+
+        var newId = Interlocked.Decrement(ref _nextSyntheticLifecycleId);
+        _instanceLifecycleRemap[rawInstanceId] = newId;
+        if (_lastObservedNpcSource == ResolveLifecycleId(rawInstanceId) || _lastObservedNpcSource == rawInstanceId)
+        {
+            _lastObservedNpcSource = newId;
+        }
+        if (_currentTarget == rawInstanceId)
+        {
+            _currentTarget = newId;
+        }
+        return newId;
+    }
 
     public void AppendCombatPacket(ParsedCombatPacket packet)
     {
+        if (packet.SourceId > 0)
+        {
+            packet.SourceId = ResolveLifecycleId(packet.SourceId);
+        }
+        if (packet.TargetId > 0)
+        {
+            packet.TargetId = ResolveLifecycleId(packet.TargetId);
+        }
+
         if (packet.FrameOrdinal <= 0)
         {
             packet.FrameOrdinal = NextObservationOrdinal();
@@ -215,6 +261,8 @@ public sealed class CombatMetricsStore
 
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        targetId = ResolveLifecycleId(targetId);
+        sourceId = ResolveLifecycleId(sourceId);
         RememberNpcObservationSource(sourceId);
 
         if (type == 2 && sourceId > 0 && targetId > 0 && sourceId != targetId)
@@ -282,6 +330,8 @@ public sealed class CombatMetricsStore
 
     public void RegisterPeriodicLink0538(int targetId, int sourceId, int linkId, int sequenceId, int tailRaw, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        targetId = ResolveLifecycleId(targetId);
+        sourceId = ResolveLifecycleId(sourceId);
         RememberNpcObservationSource(targetId);
 
         if (targetId <= 0 || sourceId <= 0 || targetId != sourceId || linkId <= 0 || sequenceId <= 0)
@@ -316,6 +366,7 @@ public sealed class CombatMetricsStore
 
     private void RegisterCompactAvoidanceSignal(int sourceId, int skillCodeRaw, int marker, long batchOrdinal)
     {
+        sourceId = ResolveLifecycleId(sourceId);
         var observationOrdinal = NextObservationOrdinal();
         RememberNpcObservationSource(sourceId);
 
@@ -357,6 +408,7 @@ public sealed class CombatMetricsStore
 
     public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        sourceId = ResolveLifecycleId(sourceId);
         RememberNpcObservationSource(sourceId);
 
         if (sourceId <= 0)
@@ -764,6 +816,7 @@ public sealed class CombatMetricsStore
 
     public void AppendNpcCode(int instanceId, int npcCode)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         UpdateNpcState(instanceId, state => state with { NpcCode = npcCode });
         MarkCombatantAndAdjacentDetailsDirty(instanceId);
     }
@@ -800,6 +853,8 @@ public sealed class CombatMetricsStore
         {
             return;
         }
+
+        instanceId = ResolveLifecycleId(instanceId);
 
         _npcStateByInstance.AddOrUpdate(
             instanceId,
@@ -842,6 +897,8 @@ public sealed class CombatMetricsStore
         long frameOrdinal,
         long batchOrdinal)
     {
+        instanceId = ResolveLifecycleId(instanceId);
+        tailSourceId = ResolveLifecycleId(tailSourceId);
         AppendNpc2C38State(instanceId, sequenceId, resultCode);
         RememberNpcObservationSource(instanceId);
 
@@ -999,17 +1056,19 @@ public sealed class CombatMetricsStore
     {
         if (instanceId > 0)
         {
-            _lastObservedNpcSource = instanceId;
+            _lastObservedNpcSource = ResolveLifecycleId(instanceId);
         }
     }
 
     public int ResolveNpcObservationSource()
     {
-        return CurrentTarget > 0 ? CurrentTarget : _lastObservedNpcSource;
+        return _currentTarget > 0 ? _currentTarget : _lastObservedNpcSource;
     }
 
     public void AppendSummon(int ownerId, int summonInstanceId)
     {
+        ownerId = ResolveLifecycleId(ownerId);
+        summonInstanceId = ResolveLifecycleId(summonInstanceId);
         _summonOwnerByInstance[summonInstanceId] = ownerId;
         var summons = _summonInstancesByOwner.GetOrAdd(ownerId, static _ => new ConcurrentDictionary<int, byte>());
         summons[summonInstanceId] = 0;
@@ -1085,6 +1144,8 @@ public sealed class CombatMetricsStore
         CurrentTarget = 0;
         _observationOrdinal = 0;
         _detailRevisionSequence = 0;
+        _instanceLifecycleRemap.Clear();
+        _nextSyntheticLifecycleId = int.MaxValue;
     }
 
     public ConcurrentDictionary<int, ConcurrentQueue<ParsedCombatPacket>> CombatPacketsByTarget => _packetsByTarget;
@@ -1233,9 +1294,11 @@ public sealed class CombatMetricsStore
         var clone = new CombatMetricsStore
         {
             CurrentTarget = CurrentTarget,
-            _lastObservedNpcSource = _lastObservedNpcSource
+            _lastObservedNpcSource = _lastObservedNpcSource,
+            _nextSyntheticLifecycleId = _nextSyntheticLifecycleId
         };
 
+        CloneValues(_instanceLifecycleRemap, clone._instanceLifecycleRemap);
         CloneQueues(_packetsByTarget, clone._packetsByTarget);
         CloneQueues(_packetsBySource, clone._packetsBySource);
         CloneValues(_nicknameStorage, clone._nicknameStorage);
@@ -1404,6 +1467,8 @@ public sealed class CombatMetricsStore
         {
             return;
         }
+
+        instanceId = ResolveLifecycleId(instanceId);
 
         _npcStateByInstance.AddOrUpdate(
             instanceId,

@@ -959,6 +959,16 @@ public sealed class PacketLogReplayService
             return;
         }
 
+        var lifecycleId = store.ResolveLifecycleId(instanceId);
+        if (hasCatalogEntry &&
+            store.TryGetNpcRuntimeState(lifecycleId, out var existing) &&
+            existing.NpcCode is int existingCode &&
+            existingCode != npcCode &&
+            CombatMetricsEngine.TryResolveNpcCatalogEntry(existingCode, out _))
+        {
+            store.RebindInstanceLifecycle(instanceId);
+        }
+
         store.AppendNpcCode(instanceId, npcCode);
 
         if (!hasCatalogEntry)
