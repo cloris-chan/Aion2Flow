@@ -242,6 +242,7 @@ internal static class PacketSkillTraits
         IsLightOfProtectionDirectHealing(packet) ||
         MatchesExact(
             packet,
+            16120000,
             17720000,
             17800000) ||
         MatchesBase(packet, 13710000, 13790000, 17090000, 17100000, 17120000, 18120000);
