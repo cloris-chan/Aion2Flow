@@ -502,6 +502,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             ArchiveSnapshot(previousLiveSnapshot, latestLiveSnapshot.Encounter.Reason, isAutomatic: true);
             _engine.Reset();
+            RawPacketDump.RotateLogs();
             return true;
         }
 
