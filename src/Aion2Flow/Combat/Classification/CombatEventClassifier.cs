@@ -199,8 +199,6 @@ public static class CombatEventClassifier
 
     private static bool TryGetDisplaySkill(int skillCode, out Skill skill)
     {
-        skill = default;
-
         if (CombatMetricsEngine.SkillDisplayMap.TryGetValue(skillCode, out skill))
         {
             return true;
@@ -226,9 +224,7 @@ internal static class PacketSkillTraits
     private const int RestoreHpSkillCode = 1010000;
     private const int RestSkillCode = 10001;
     private const int EnhanceSpiritBenedictionBaseSkillCode = 16190000;
-    private const int LightOfProtectionSkillCode = 17410040;
     private const long LightOfProtectionDirectHealingDetailRaw = 0x0000000267C58D55L;
-    private const int HpAbsorptionEffectBaseSkillCode = 10000000;
     private const ulong HpAbsorptionDirectHealingDetailPrefix = 0x000000013B9A0000UL;
     private const ulong HpAbsorptionDirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
     private const ulong DirectHpRestoreDetailPrefix = 0x0000000163F40000UL;
@@ -283,7 +279,6 @@ internal static class PacketSkillTraits
         IsEnhanceSpiritBenediction(packet);
 
     private static bool IsLightOfProtectionDirectHealing(ParsedCombatPacket packet) =>
-        MatchesExact(packet, LightOfProtectionSkillCode) &&
         packet.Damage > 0 &&
         packet.LayoutTag == 4 &&
         packet.Flag == 0 &&
@@ -297,7 +292,6 @@ internal static class PacketSkillTraits
 
     private static bool IsHpAbsorptionDirectSelfRestore(ParsedCombatPacket packet) =>
         IsPositiveSelfDirect0438Value(packet) &&
-        MatchesBase(packet, HpAbsorptionEffectBaseSkillCode) &&
         HasDetailPrefix(
             packet.DetailRaw,
             HpAbsorptionDirectHealingDetailPrefix,

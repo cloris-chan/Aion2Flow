@@ -237,7 +237,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         var packet = Assert.Single(packets);
         Assert.Equal(241, packet.Marker);
         Assert.Equal(1, packet.MultiHitCount);
-        Assert.True(packet.HasAuthoritativeMultiHitCount);
         Assert.True((packet.Modifiers & DamageModifiers.MultiHit) != 0);
     }
 
@@ -265,12 +264,10 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.Equal(17010230, parsedPackets[0].SkillCode);
         Assert.Equal(2, parsedPackets[0].MultiHitCount);
-        Assert.True(parsedPackets[0].HasAuthoritativeMultiHitCount);
         Assert.True((parsedPackets[0].Modifiers & DamageModifiers.MultiHit) != 0);
 
         Assert.Equal(17730000, parsedPackets[1].SkillCode);
         Assert.Equal(0, parsedPackets[1].MultiHitCount);
-        Assert.False(parsedPackets[1].HasAuthoritativeMultiHitCount);
         Assert.True((parsedPackets[1].Modifiers & DamageModifiers.MultiHit) == 0);
     }
 
@@ -290,7 +287,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         var packet = Assert.Single(packets);
         Assert.Equal(196, packet.Marker);
         Assert.Equal(0, packet.MultiHitCount);
-        Assert.False(packet.HasAuthoritativeMultiHitCount);
         Assert.False((packet.Modifiers & DamageModifiers.MultiHit) != 0);
     }
 

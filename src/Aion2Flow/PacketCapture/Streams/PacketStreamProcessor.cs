@@ -848,7 +848,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             Damage = parsed.Damage,
             Loop = parsed.Loop,
             MultiHitCount = parsed.TailMultiHitCount,
-            HasAuthoritativeMultiHitCount = parsed.TailMultiHitCount > 0,
             DrainHealAmount = parsed.DrainHealAmount,
             RegenerationAmount = parsed.RegenerationAmount,
             DetailRaw = parsed.DetailRaw,
@@ -1253,7 +1252,6 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             if (parsed.TailMultiHitCount > 0)
             {
                 combatPacket.MultiHitCount = parsed.TailMultiHitCount;
-                combatPacket.HasAuthoritativeMultiHitCount = true;
                 combatPacket.Modifiers |= DamageModifiers.MultiHit;
             }
 

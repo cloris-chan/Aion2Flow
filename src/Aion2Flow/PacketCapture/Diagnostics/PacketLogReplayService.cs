@@ -410,7 +410,6 @@ public sealed class PacketLogReplayService
         if (parsed.TailMultiHitCount > 0)
         {
             combatPacket.MultiHitCount = parsed.TailMultiHitCount;
-            combatPacket.HasAuthoritativeMultiHitCount = true;
             combatPacket.Modifiers |= DamageModifiers.MultiHit;
         }
 

@@ -41,7 +41,6 @@ public sealed class ParsedCombatPacket
     public int HitContribution { get; set; } = 1;
     public int AttemptContribution { get; set; } = 1;
     public int MultiHitCount { get; set; }
-    public bool HasAuthoritativeMultiHitCount { get; set; }
     public int DrainHealAmount { get; set; }
     public int RegenerationAmount { get; set; }
     public long DetailRaw { get; set; }
@@ -107,7 +106,6 @@ public sealed class ParsedCombatPacket
             HitContribution = HitContribution,
             AttemptContribution = AttemptContribution,
             MultiHitCount = MultiHitCount,
-            HasAuthoritativeMultiHitCount = HasAuthoritativeMultiHitCount,
             DrainHealAmount = DrainHealAmount,
             RegenerationAmount = RegenerationAmount,
             DetailRaw = DetailRaw,

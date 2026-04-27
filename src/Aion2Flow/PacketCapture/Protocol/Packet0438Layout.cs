@@ -3,6 +3,10 @@ namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 internal static class Packet0438Layout
 {
     private const int DetailLayoutMask = 0x0f;
+    private const int DetailBaseFlag = 0x04;
+    private const int DetailExtraFourFlag = 0x01;
+    private const int DetailExtraTwoFlag = 0x02;
+    private const int DetailBaseLength = 8;
     private const int MultiHitFlag = 0x20;
 
     public static int GetDetailLayoutKey(int layoutTag) => layoutTag & DetailLayoutMask;
@@ -11,15 +15,16 @@ internal static class Packet0438Layout
 
     public static bool TryGetDetailLength(int layoutTag, out int detailLength)
     {
-        detailLength = GetDetailLayoutKey(layoutTag) switch
+        var key = GetDetailLayoutKey(layoutTag);
+        if ((key & DetailBaseFlag) == 0)
         {
-            4 => 8,
-            5 => 12,
-            6 => 10,
-            7 => 14,
-            _ => 0
-        };
+            detailLength = 0;
+            return false;
+        }
 
-        return detailLength > 0;
+        detailLength = DetailBaseLength
+            + ((key & DetailExtraFourFlag) != 0 ? 4 : 0)
+            + ((key & DetailExtraTwoFlag) != 0 ? 2 : 0);
+        return true;
     }
 }

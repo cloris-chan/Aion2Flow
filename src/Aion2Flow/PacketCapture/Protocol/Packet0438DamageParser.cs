@@ -86,25 +86,10 @@ internal static class Packet0438DamageParser
         }
 
         var multiHitCount = 0;
-        var drainHealAmount = 0;
+        var drainHealAmount = ParseTail(ref reader, layoutTag, loop, out var multiHitAmounts);
         if (Packet0438Layout.HasMultiHitData(layoutTag))
         {
-            ParseMultiHitAndDrainTail(ref reader, out var segmentCount, out drainHealAmount);
-            multiHitCount = Math.Max(1, segmentCount);
-        }
-        else
-        {
-            drainHealAmount = TryParseDrainHealTail(ref reader);
-        }
-
-        if (drainHealAmount <= 0)
-        {
-            drainHealAmount = TryParseSpecializedHpAbsorbTail(
-                ref reader,
-                targetId,
-                sourceId,
-                flag,
-                damage);
+            multiHitCount = Math.Max(1, multiHitAmounts);
         }
 
         consumed = reader.Offset;
@@ -129,79 +114,81 @@ internal static class Packet0438DamageParser
         return true;
     }
 
-    private static void ParseMultiHitAndDrainTail(
-        ref PacketSpanReader reader,
-        out int multiHitCount,
-        out int drainHealAmount)
+    private static int ParseTail(ref PacketSpanReader reader, int layoutTag, int loop, out int multiHitAmounts)
     {
-        multiHitCount = 0;
-        drainHealAmount = 0;
+        multiHitAmounts = 0;
+        var origin = reader.RemainingSpan;
 
-        var remaining = reader.RemainingSpan;
-        if (remaining.IsEmpty)
+        if (!Packet0438Layout.HasMultiHitData(layoutTag))
+        {
+            return TryConsumeDrainSubTail(ref reader, origin, 0, out _);
+        }
+
+        var bestDrain = 0;
+        var bestAmounts = 0;
+        var bestConsumed = 0;
+        var bestRank = -1;
+
+        TryMultiHitInterpretation(origin, hasLeadingByte: true, leadingCount: -1, ref bestRank, ref bestDrain, ref bestAmounts, ref bestConsumed);
+        TryMultiHitInterpretation(origin, hasLeadingByte: false, leadingCount: loop, ref bestRank, ref bestDrain, ref bestAmounts, ref bestConsumed);
+
+        if (bestRank < 0)
+        {
+            return 0;
+        }
+
+        reader.TryAdvance(bestConsumed);
+        multiHitAmounts = bestAmounts;
+        return bestDrain;
+    }
+
+    private static void TryMultiHitInterpretation(
+        ReadOnlySpan<byte> tail,
+        bool hasLeadingByte,
+        int leadingCount,
+        ref int bestRank,
+        ref int bestDrain,
+        ref int bestAmounts,
+        ref int bestConsumed)
+    {
+        if (tail.IsEmpty)
         {
             return;
         }
 
-        var count = remaining[0];
-        if (count == 0 || count > 16)
+        var probe = new PacketSpanReader(tail);
+        int amountCount;
+        if (hasLeadingByte)
         {
-            return;
+            if (!probe.TryReadByte(out var raw)) return;
+            amountCount = raw;
+        }
+        else
+        {
+            amountCount = leadingCount;
         }
 
-        var probe = new PacketSpanReader(remaining);
-        probe.TryAdvance(1);
-        for (var i = 0; i < count; i++)
+        if (amountCount < 0 || amountCount > 16) return;
+
+        for (var i = 0; i < amountCount; i++)
         {
-            if (!probe.TryReadVarInt(out var amount) || amount <= 0)
-            {
-                return;
-            }
+            if (!probe.TryReadVarInt(out var amount) || amount <= 0) return;
         }
 
-        var segmentLength = probe.Offset;
-        var tailSpan = remaining[segmentLength..];
-        var tailDrain = TryReadDrainHealTail(tailSpan, out var tailConsumed);
-        var totalConsumed = segmentLength + (tailDrain > 0 ? tailConsumed : 0);
+        var subTailDrain = TryConsumeDrainSubTailFromSpan(tail, probe.Offset, out var subTailConsumed);
+        var consumed = probe.Offset + subTailConsumed;
+        var rank = (subTailDrain > 0 ? 2 : 0) + (consumed == tail.Length ? 1 : 0);
+        if (rank <= bestRank) return;
 
-        reader.TryAdvance(totalConsumed);
-        multiHitCount = count;
-        drainHealAmount = tailDrain;
+        bestRank = rank;
+        bestDrain = subTailDrain;
+        bestAmounts = amountCount;
+        bestConsumed = consumed;
     }
 
-    private static int TryReadDrainHealTail(ReadOnlySpan<byte> tail, out int consumed)
+    private static int TryConsumeDrainSubTail(ref PacketSpanReader reader, ReadOnlySpan<byte> origin, int offset, out int consumed)
     {
-        consumed = 0;
-        if (tail.Length < 3)
-        {
-            return 0;
-        }
-
-        var tailReader = new PacketSpanReader(tail);
-        if (!tailReader.TryReadVarInt(out var count) || count <= 0)
-        {
-            return 0;
-        }
-        if (!tailReader.TryReadVarInt(out _))
-        {
-            return 0;
-        }
-        if (!tailReader.TryReadVarInt(out var drainValue) || drainValue <= 0)
-        {
-            return 0;
-        }
-        if (!IsPayloadBoundary(tail[tailReader.Offset..]))
-        {
-            return 0;
-        }
-
-        consumed = tailReader.Offset;
-        return drainValue;
-    }
-
-    private static int TryParseDrainHealTail(ref PacketSpanReader reader)
-    {
-        var drain = TryReadDrainHealTail(reader.RemainingSpan, out var consumed);
+        var drain = TryConsumeDrainSubTailFromSpan(origin, offset, out consumed);
         if (drain > 0)
         {
             reader.TryAdvance(consumed);
@@ -209,77 +196,27 @@ internal static class Packet0438DamageParser
         return drain;
     }
 
-    private static int TryParseSpecializedHpAbsorbTail(
-        ref PacketSpanReader reader,
-        int targetId,
-        int sourceId,
-        int flag,
-        int damage)
+    private static int TryConsumeDrainSubTailFromSpan(ReadOnlySpan<byte> origin, int offset, out int consumed)
     {
-        var remaining = reader.RemainingSpan;
-        if (remaining.Length is < 2 or > 16 ||
-            targetId <= 0 ||
-            sourceId <= 0 ||
-            targetId == sourceId ||
-            damage <= 0 ||
-            flag != 4)
+        consumed = 0;
+        if (offset > origin.Length) return 0;
+        var span = origin[offset..];
+        if (span.IsEmpty) return 0;
+
+        var reader = new PacketSpanReader(span);
+        if (!reader.TryReadVarInt(out var count) || count < 0) return 0;
+
+        if (count > 0)
         {
-            return 0;
+            if (!reader.TryReadVarInt(out _)) return 0;
         }
 
-        for (var start = remaining.Length - 1; start >= 1; start--)
-        {
-            var tailReader = new PacketSpanReader(remaining[start..]);
-            if (!tailReader.TryReadVarInt(out var drainValue) ||
-                tailReader.Offset != remaining.Length - start ||
-                drainValue <= 0 ||
-                drainValue >= damage ||
-                !IsSpecializedHpAbsorbTailPrefix(remaining[..start]))
-            {
-                continue;
-            }
+        if (!reader.TryReadVarInt(out var drain) || drain <= 0) return 0;
 
-            reader.TryAdvance(remaining.Length);
-            return drainValue;
-        }
+        if (!IsPayloadBoundary(span[reader.Offset..])) return 0;
 
-        return 0;
-    }
-
-    private static bool IsSpecializedHpAbsorbTailPrefix(ReadOnlySpan<byte> prefix)
-    {
-        if (prefix.Length == 1)
-        {
-            return prefix[0] == 0;
-        }
-
-        if (prefix.Length < 3)
-        {
-            return false;
-        }
-
-        var reader = new PacketSpanReader(prefix);
-        var valueCount = 0;
-        while (reader.Remaining > 0)
-        {
-            if (!reader.TryReadVarInt(out var value))
-            {
-                return false;
-            }
-
-            valueCount++;
-            if (reader.Remaining == 0)
-            {
-                return value == 0 && valueCount >= 3;
-            }
-
-            if (value <= 0)
-            {
-                return false;
-            }
-        }
-
-        return false;
+        consumed = reader.Offset;
+        return drain;
     }
 
     private static bool IsPayloadBoundary(ReadOnlySpan<byte> remaining)
@@ -295,38 +232,8 @@ internal static class Packet0438DamageParser
             return false;
         }
 
-        if (reader.Remaining < 2)
-        {
-            return false;
-        }
-
-        return IsKnownOpcode(remaining[reader.Offset], remaining[reader.Offset + 1]);
+        return reader.Remaining >= 2;
     }
-
-    private static bool IsKnownOpcode(byte first, byte second) => (first, second) switch
-    {
-        (0x00, 0x8d) or
-        (0x01, 0x40) or
-        (0x02, 0x38) or
-        (0x02, 0x40) or
-        (0x04, 0x38) or
-        (0x05, 0x38) or
-        (0x06, 0x00) or
-        (0x06, 0x38) or
-        (0x21, 0x36) or
-        (0x21, 0x8d) or
-        (0x2a, 0x38) or
-        (0x2b, 0x38) or
-        (0x2c, 0x38) or
-        (0x33, 0x36) or
-        (0x40, 0x36) or
-        (0x41, 0x36) or
-        (0x44, 0x36) or
-        (0x45, 0x36) or
-        (0x46, 0x36) or
-        (0x49, 0x36) => true,
-        _ => false
-    };
 
     private static (int RegenAmount, long DetailRaw) ExtractRegenerationAmount(ReadOnlySpan<byte> detail, DamageModifiers modifiers)
     {
