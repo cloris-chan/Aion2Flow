@@ -158,7 +158,7 @@ internal static class Packet4036CreateParser
         if (reader.Remaining < 3) return false;
         var spawnTag1 = packet[reader.Offset + 1];
         var spawnTag2 = packet[reader.Offset + 2];
-        var spawnTagLikelyCarriesNpcCode = (spawnTag1 == 0x20 || spawnTag1 == 0x21 || spawnTag1 == 0x30) && spawnTag2 == 0x00;
+        var spawnTagLikelyCarriesNpcCode = (spawnTag1 == 0x20 || spawnTag1 == 0x21 || spawnTag1 == 0x22 || spawnTag1 == 0x30) && spawnTag2 == 0x00;
         if (!reader.TryAdvance(3)) return false;
 
         int? npcCode = null;

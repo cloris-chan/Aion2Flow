@@ -141,6 +141,7 @@ public static class FixtureCatalog
         yield return [new NpcSpawn4036Sample("state/4036-state-152-852100.hex", Packet4036Kind.State152, 191528, 2311317)];
         yield return [new NpcSpawn4036Sample("protocol/4036-create-198.hex", Packet4036Kind.Create198, 27203, null)];
         yield return [new NpcSpawn4036Sample("protocol/4036-create-198-summon-skill.hex", Packet4036Kind.Create198, 18345, null)];
+        yield return [new NpcSpawn4036Sample("state/4036-create-198-boss-2702396.hex", Packet4036Kind.Create198, 21544, 2702396)];
     }
 
     public static IEnumerable<object[]> State4136Samples()
