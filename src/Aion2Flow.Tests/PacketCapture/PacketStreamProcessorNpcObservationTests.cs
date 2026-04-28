@@ -440,6 +440,18 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
+    public void Leaves_Unresolved_Self_PeriodicLink_Invincible_As_Buff_Tick()
+    {
+        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        store.RegisterPeriodicLink0538(14190, 14190, 14190, 313, 11800008, 1_000, 10, 100);
+
+        Assert.False(store.CombatPacketsBySource.ContainsKey(14190));
+        Assert.False(store.CombatPacketsByTarget.ContainsKey(14190));
+    }
+
+    [Fact]
     public void Leaves_DefensivePerfect_Blocked_Damage_Unchanged_Without_Explicit_Avoided_Evidence()
     {
         CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
@@ -606,6 +618,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
             new Skill(1216310, "Attack", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
             new Skill(1216350, "Vine Swipe", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
             new Skill(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
+            new Skill(11800008, "Murderous Burst", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
             new Skill(12000100, "Dodge", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
             new Skill(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];

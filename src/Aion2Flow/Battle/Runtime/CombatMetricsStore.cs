@@ -355,6 +355,11 @@ public sealed class CombatMetricsStore
             _resolvedPeriodicLinkOrder.Enqueue(signature);
             TrimResolvedPeriodicLinks_NoLock();
 
+            if (linkId == targetId)
+            {
+                return;
+            }
+
             StoreInvincible(
                 linkId,
                 targetId,
