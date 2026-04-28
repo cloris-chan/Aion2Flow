@@ -101,7 +101,7 @@ public partial class MainWindow : Window
         {
             var placeholder = new MenuItem
             {
-                Header = DataContext.Localization["Panel.EmptyHistory"],
+                Header = DataContext.Localization["Empty_History"],
                 IsEnabled = false
             };
             placeholder.Classes.Add("FlyoutMenuItem");

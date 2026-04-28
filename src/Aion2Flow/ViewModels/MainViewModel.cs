@@ -458,7 +458,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void ApplyLocalizedUiText()
     {
-        Status = Localization["Status.Ready"];
+        Status = Localization["Status_Ready"];
         BattleTimeSeconds = 0d;
         RoundTripTimeMilliseconds = 0;
     }
@@ -542,23 +542,23 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         DriverIndicatorToolTip = _captureService.HasDriverError && !string.IsNullOrWhiteSpace(_captureService.LastStatusMessage)
             ? _captureService.LastStatusMessage
             : _captureService.IsDriverActive
-                ? Localization["Status.DriverReady"]
-                : Localization["Status.DriverIdle"];
+                ? Localization["Status_DriverReady"]
+                : Localization["Status_DriverIdle"];
 
         if (!_processPortDiscoveryService.IsMonitoring)
         {
             GamePortIndicatorColor = IndicatorIdleColor;
-            GamePortIndicatorToolTip = Localization["Status.PortIdle"];
+            GamePortIndicatorToolTip = Localization["Status_PortIdle"];
         }
         else if (_processPortDiscoveryService.AllPorts.Length > 0)
         {
             GamePortIndicatorColor = IndicatorOkColor;
-            GamePortIndicatorToolTip = Localization["Status.PortReady"];
+            GamePortIndicatorToolTip = Localization["Status_PortReady"];
         }
         else
         {
             GamePortIndicatorColor = IndicatorWarnColor;
-            GamePortIndicatorToolTip = Localization["Status.PortWaiting"];
+            GamePortIndicatorToolTip = Localization["Status_PortWaiting"];
         }
 
         var isCaptureLocked = CaptureConnectionGate.IsLocked;
@@ -567,17 +567,17 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             RoundTripTimeMilliseconds = 0;
             CaptureLockIndicatorColor = IndicatorIdleColor;
-            CaptureLockIndicatorToolTip = Localization["Status.Unlocked"];
+            CaptureLockIndicatorToolTip = Localization["Status_Unlocked"];
         }
         else if (isProxied)
         {
             CaptureLockIndicatorColor = IndicatorWarnColor;
-            CaptureLockIndicatorToolTip = Localization["Status.LockedProxy"];
+            CaptureLockIndicatorToolTip = Localization["Status_LockedProxy"];
         }
         else
         {
             CaptureLockIndicatorColor = IndicatorOkColor;
-            CaptureLockIndicatorToolTip = Localization["Status.Locked"];
+            CaptureLockIndicatorToolTip = Localization["Status_Locked"];
         }
 
         var currentRttMilliseconds = _captureService.CurrentRoundTripTimeMilliseconds;
@@ -585,7 +585,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             RoundTripTimeMilliseconds = 0;
             LatencyIndicatorColor = IndicatorIdleColor;
-            LatencyToolTip = Localization["Status.RttUnavailable"];
+            LatencyToolTip = Localization["Status_RttUnavailable"];
             return;
         }
 
@@ -593,12 +593,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         if (isProxied)
         {
             LatencyIndicatorColor = IndicatorWarnColor;
-            LatencyToolTip = Localization["Status.RttLoopbackProtocol"];
+            LatencyToolTip = Localization["Status_LatencyEstimatedFromCombat"];
         }
         else
         {
             LatencyIndicatorColor = IndicatorInfoColor;
-            LatencyToolTip = Localization["Status.RttEstimated"];
+            LatencyToolTip = Localization["Status_RttEstimated"];
         }
     }
 

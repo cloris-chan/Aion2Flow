@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Action -->
+  <data name="Action_Reset" xml:space="preserve"><value>重置</value></data>
+  <data name="Action_Live" xml:space="preserve"><value>即時</value></data>
+  <data name="Action_SelectAll" xml:space="preserve"><value>全選</value></data>
+
+  <!-- Status -->
+  <data name="Status_Ready" xml:space="preserve"><value>就緒</value></data>
+  <data name="Status_DriverReady" xml:space="preserve"><value>WinDivert 已啟用</value></data>
+  <data name="Status_DriverIdle" xml:space="preserve"><value>WinDivert 未啟用</value></data>
+  <data name="Status_PortReady" xml:space="preserve"><value>已發現遊戲連線埠</value></data>
+  <data name="Status_PortWaiting" xml:space="preserve"><value>等待遊戲連線埠</value></data>
+  <data name="Status_PortIdle" xml:space="preserve"><value>未監視遊戲連線埠</value></data>
+  <data name="Status_Locked" xml:space="preserve"><value>已鎖定戰鬥連線</value></data>
+  <data name="Status_LockedProxy" xml:space="preserve"><value>已鎖定戰鬥連線（代理模式）</value></data>
+  <data name="Status_Unlocked" xml:space="preserve"><value>尚未鎖定戰鬥連線</value></data>
+  <data name="Status_RttEstimated" xml:space="preserve"><value>TCP 往返延遲</value></data>
+  <data name="Status_LatencyEstimatedFromCombat" xml:space="preserve"><value>基於戰鬥封包推算的延遲（代理模式）</value></data>
+  <data name="Status_RttUnavailable" xml:space="preserve"><value>尚未取得延遲估計</value></data>
+
+  <!-- Direction -->
+  <data name="Direction_Outgoing" xml:space="preserve"><value>造成</value></data>
+  <data name="Direction_Incoming" xml:space="preserve"><value>承受</value></data>
+  <data name="Direction_Targets" xml:space="preserve"><value>目標</value></data>
+  <data name="Direction_Sources" xml:space="preserve"><value>來源</value></data>
+
+  <!-- Combat category -->
+  <data name="Category_Damage" xml:space="preserve"><value>傷害</value></data>
+  <data name="Category_Healing" xml:space="preserve"><value>治療</value></data>
+  <data name="Category_Shield" xml:space="preserve"><value>屏障</value></data>
+  <data name="Category_Support" xml:space="preserve"><value>支援</value></data>
+
+  <!-- Empty-state placeholders -->
+  <data name="Empty_History" xml:space="preserve"><value>沒有歸檔戰鬥</value></data>
+  <data name="Empty_Combatants" xml:space="preserve"><value>暫無戰鬥數據</value></data>
+  <data name="Empty_Skills" xml:space="preserve"><value>沒有技能資料</value></data>
+
+  <!-- Aggregate metrics -->
+  <data name="Metric_Total" xml:space="preserve"><value>總量</value></data>
+  <data name="Metric_Dps" xml:space="preserve"><value>DPS</value></data>
+  <data name="Metric_Hps" xml:space="preserve"><value>HPS</value></data>
+  <data name="Metric_Attacks" xml:space="preserve"><value>攻擊次數</value></data>
+  <data name="Metric_HitCount" xml:space="preserve"><value>命中次數</value></data>
+  <data name="Metric_Skills" xml:space="preserve"><value>技能</value></data>
+  <data name="Metric_HealingSkills" xml:space="preserve"><value>治療技能</value></data>
+  <data name="Metric_ShieldSkills" xml:space="preserve"><value>屏障技能</value></data>
+  <data name="Metric_HealingHits" xml:space="preserve"><value>治療次數</value></data>
+  <data name="Metric_ShieldHits" xml:space="preserve"><value>屏障次數</value></data>
+
+  <!-- Short metric names -->
+  <data name="MetricShort_Damage" xml:space="preserve"><value>傷害</value></data>
+  <data name="MetricShort_Heal" xml:space="preserve"><value>治療</value></data>
+  <data name="MetricShort_Hot" xml:space="preserve"><value>持續治療</value></data>
+  <data name="MetricShort_DrainHeal" xml:space="preserve"><value>吸收治療</value></data>
+  <data name="MetricShort_ShieldAbsorbed" xml:space="preserve"><value>屏障吸收</value></data>
+  <data name="MetricShort_PeriodicDamage" xml:space="preserve"><value>持續傷害</value></data>
+  <data name="MetricShort_PeriodicHits" xml:space="preserve"><value>持續次數</value></data>
+
+  <!-- Combat stats -->
+  <data name="Stat_Critical" xml:space="preserve"><value>致命</value></data>
+  <data name="Stat_Perfect" xml:space="preserve"><value>完美</value></data>
+  <data name="Stat_Smite" xml:space="preserve"><value>強擊</value></data>
+  <data name="Stat_MultiHit" xml:space="preserve"><value>多段打擊</value></data>
+  <data name="Stat_Parry" xml:space="preserve"><value>武器格擋</value></data>
+  <data name="Stat_Endurance" xml:space="preserve"><value>鐵壁</value></data>
+  <data name="Stat_Regeneration" xml:space="preserve"><value>再生</value></data>
+  <data name="Stat_Back" xml:space="preserve"><value>背後</value></data>
+  <data name="Stat_Block" xml:space="preserve"><value>盾牌格擋</value></data>
+  <data name="Stat_Evade" xml:space="preserve"><value>迴避</value></data>
+  <data name="Stat_Invincible" xml:space="preserve"><value>無敵</value></data>
+
+  <!-- UI-specific column headers -->
+  <data name="Column_History" xml:space="preserve"><value>歷史</value></data>
+  <data name="Column_Skill" xml:space="preserve"><value>技能</value></data>
+  <data name="Column_Direct" xml:space="preserve"><value>直擊</value></data>
+  <data name="Column_Share" xml:space="preserve"><value>佔比</value></data>
+</root>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Action -->
+  <data name="Action_Reset" xml:space="preserve"><value>Reset</value></data>
+  <data name="Action_Live" xml:space="preserve"><value>Live</value></data>
+  <data name="Action_SelectAll" xml:space="preserve"><value>Select All</value></data>
+
+  <!-- Status -->
+  <data name="Status_Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Status_DriverReady" xml:space="preserve"><value>WinDivert is active</value></data>
+  <data name="Status_DriverIdle" xml:space="preserve"><value>WinDivert is inactive</value></data>
+  <data name="Status_PortReady" xml:space="preserve"><value>Game ports detected</value></data>
+  <data name="Status_PortWaiting" xml:space="preserve"><value>Waiting for game ports</value></data>
+  <data name="Status_PortIdle" xml:space="preserve"><value>Game ports are not being monitored</value></data>
+  <data name="Status_Locked" xml:space="preserve"><value>Battle connection locked</value></data>
+  <data name="Status_LockedProxy" xml:space="preserve"><value>Battle connection locked (proxy mode)</value></data>
+  <data name="Status_Unlocked" xml:space="preserve"><value>Battle connection not locked</value></data>
+  <data name="Status_RttEstimated" xml:space="preserve"><value>TCP round-trip estimate</value></data>
+  <data name="Status_LatencyEstimatedFromCombat" xml:space="preserve"><value>Latency estimated from combat packets (proxy mode)</value></data>
+  <data name="Status_RttUnavailable" xml:space="preserve"><value>No RTT estimate yet</value></data>
+
+  <!-- Direction (Outgoing/Incoming and their counterpart aliases) -->
+  <data name="Direction_Outgoing" xml:space="preserve"><value>Outgoing</value></data>
+  <data name="Direction_Incoming" xml:space="preserve"><value>Incoming</value></data>
+  <data name="Direction_Targets" xml:space="preserve"><value>Targets</value></data>
+  <data name="Direction_Sources" xml:space="preserve"><value>Sources</value></data>
+
+  <!-- Combat category -->
+  <data name="Category_Damage" xml:space="preserve"><value>Damage</value></data>
+  <data name="Category_Healing" xml:space="preserve"><value>Healing</value></data>
+  <data name="Category_Shield" xml:space="preserve"><value>Protective Shield</value></data>
+  <data name="Category_Support" xml:space="preserve"><value>Support</value></data>
+
+  <!-- Empty-state placeholders -->
+  <data name="Empty_History" xml:space="preserve"><value>No archived battles</value></data>
+  <data name="Empty_Combatants" xml:space="preserve"><value>No combat data yet</value></data>
+  <data name="Empty_Skills" xml:space="preserve"><value>No skill data</value></data>
+
+  <!-- Aggregate metrics (full names, used as labels and table headers) -->
+  <data name="Metric_Total" xml:space="preserve"><value>Total</value></data>
+  <data name="Metric_Dps" xml:space="preserve"><value>DPS</value></data>
+  <data name="Metric_Hps" xml:space="preserve"><value>HPS</value></data>
+  <data name="Metric_Attacks" xml:space="preserve"><value>Attacks</value></data>
+  <data name="Metric_HitCount" xml:space="preserve"><value>Hit Count</value></data>
+  <data name="Metric_Skills" xml:space="preserve"><value>Skills</value></data>
+  <data name="Metric_HealingSkills" xml:space="preserve"><value>Healing Skills</value></data>
+  <data name="Metric_ShieldSkills" xml:space="preserve"><value>Shield Skills</value></data>
+  <data name="Metric_HealingHits" xml:space="preserve"><value>Healing Hits</value></data>
+  <data name="Metric_ShieldHits" xml:space="preserve"><value>Shield Hits</value></data>
+
+  <!-- Short metric names (column headers / metric tiles where space is tight) -->
+  <data name="MetricShort_Damage" xml:space="preserve"><value>DMG</value></data>
+  <data name="MetricShort_Heal" xml:space="preserve"><value>Heal</value></data>
+  <data name="MetricShort_Hot" xml:space="preserve"><value>HoT</value></data>
+  <data name="MetricShort_DrainHeal" xml:space="preserve"><value>Drain Heal</value></data>
+  <data name="MetricShort_ShieldAbsorbed" xml:space="preserve"><value>Shield Absorbed</value></data>
+  <data name="MetricShort_PeriodicDamage" xml:space="preserve"><value>Periodic DMG</value></data>
+  <data name="MetricShort_PeriodicHits" xml:space="preserve"><value>Periodic Hits</value></data>
+
+  <!-- Combat stats (shared between summary tiles and column headers) -->
+  <data name="Stat_Critical" xml:space="preserve"><value>Critical</value></data>
+  <data name="Stat_Perfect" xml:space="preserve"><value>Perfect</value></data>
+  <data name="Stat_Smite" xml:space="preserve"><value>Smite</value></data>
+  <data name="Stat_MultiHit" xml:space="preserve"><value>Multi-Hit</value></data>
+  <data name="Stat_Parry" xml:space="preserve"><value>Weapon Parry</value></data>
+  <data name="Stat_Endurance" xml:space="preserve"><value>Endurance</value></data>
+  <data name="Stat_Regeneration" xml:space="preserve"><value>Regeneration</value></data>
+  <data name="Stat_Back" xml:space="preserve"><value>Back Attack</value></data>
+  <data name="Stat_Block" xml:space="preserve"><value>Shield Block</value></data>
+  <data name="Stat_Evade" xml:space="preserve"><value>Evade</value></data>
+  <data name="Stat_Invincible" xml:space="preserve"><value>Invincible</value></data>
+
+  <!-- UI-specific column headers that don't fit other categories -->
+  <data name="Column_History" xml:space="preserve"><value>History</value></data>
+  <data name="Column_Skill" xml:space="preserve"><value>Skill</value></data>
+  <data name="Column_Direct" xml:space="preserve"><value>Direct</value></data>
+  <data name="Column_Share" xml:space="preserve"><value>Share</value></data>
+</root>

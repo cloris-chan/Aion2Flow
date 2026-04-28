@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
              xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.CombatantDetailsFlyoutView"
@@ -30,10 +31,10 @@
                             Spacing="2">
                     <ToggleButton Classes="DetailDirectionTab"
                                   IsChecked="{Binding IsOutgoingSelected, Mode=TwoWay}"
-                                  Content="{Binding Localization[Panel.Outgoing]}" />
+                                  Content="{markups:Translate Direction_Outgoing}" />
                     <ToggleButton Classes="DetailDirectionTab"
                                   IsChecked="{Binding IsIncomingSelected, Mode=TwoWay}"
-                                  Content="{Binding Localization[Panel.Incoming]}" />
+                                  Content="{markups:Translate Direction_Incoming}" />
                 </StackPanel>
             </Grid>
 

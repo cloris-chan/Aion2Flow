@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:fa="using:Cloris.Aion2Flow.Assets.FontAwesome"
-        xmlns:shimskiasharp="using:ShimSkiaSharp"
+        xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
         xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
         xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
         xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
@@ -15,7 +14,7 @@
         SizeToContent="Height"
         CanResize="False"
         CanMaximize="False"
-        Title="{Binding Localization[Window.Title]}"
+        Title="Aion2Flow"
         Icon="/Assets/Images/Aion2Flow.png"
         Topmost="{Binding IsTopMost}">
 
@@ -39,7 +38,7 @@
                     Command="{Binding ResetCommand}"
                     IsEnabled="{Binding IsCapturing}"
                     VerticalAlignment="Center"
-                    ToolTip.Tip="{Binding Localization[Action.Reset]}">
+                    ToolTip.Tip="{markups:Translate Action_Reset}">
                 <PathIcon Data="{StaticResource arrows-rotate}" />
             </Button>
 
@@ -80,7 +79,7 @@
                 <DataTemplate x:DataType="vm:MainViewModel">
                     <Border Padding="0,10">
                         <TextBlock Classes="OverlayMutedText OverlayEmptyStateText"
-                                   Text="{Binding Localization[Panel.EmptyCombatants]}"
+                                   Text="{markups:Translate Empty_Combatants}"
                                    HorizontalAlignment="Center"
                                    TextAlignment="Center" />
                     </Border>
@@ -255,7 +254,7 @@
                         MinWidth="26"
                         IsEnabled="{Binding IsViewingArchivedBattle}"
                         Command="{Binding ReturnToLiveCommand}"
-                        ToolTip.Tip="{Binding Localization[Action.Live]}">
+                        ToolTip.Tip="{markups:Translate Action_Live}">
                     <PathIcon Data="{StaticResource podcast-line}"
                               Width="13"
                               Height="13" />
@@ -269,7 +268,7 @@
                         CornerRadius="0,999,999,0"
                         MinWidth="26"
                         IsEnabled="{Binding HasArchivedBattles}"
-                        ToolTip.Tip="{Binding Localization[Column.History]}">
+                        ToolTip.Tip="{markups:Translate Column_History}">
                     <PathIcon Data="{StaticResource angle-down}"
                               Width="11"
                               Height="11" />

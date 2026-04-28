@@ -13,22 +13,11 @@ public readonly record struct DetailCounterpartOption(
     long ShieldAmount,
     double ShieldShare);
 
-public sealed partial class CombatDirectionDetailViewModel : ObservableObject
+public sealed partial class CombatDirectionDetailViewModel(LocalizationService localization, string counterpartTitleKey) : ObservableObject
 {
-    private readonly LocalizationService _localization;
+    public DetailCounterpartFilterViewModel DamageCounterpartFilter { get; } = new DetailCounterpartFilterViewModel(localization, counterpartTitleKey);
 
-    public CombatDirectionDetailViewModel(LocalizationService localization, string counterpartTitleKey)
-    {
-        _localization = localization;
-        DamageCounterpartFilter = new DetailCounterpartFilterViewModel(localization, counterpartTitleKey);
-        SupportCounterpartFilter = new DetailCounterpartFilterViewModel(localization, counterpartTitleKey);
-    }
-
-    public LocalizationService Localization => _localization;
-
-    public DetailCounterpartFilterViewModel DamageCounterpartFilter { get; }
-
-    public DetailCounterpartFilterViewModel SupportCounterpartFilter { get; }
+    public DetailCounterpartFilterViewModel SupportCounterpartFilter { get; } = new DetailCounterpartFilterViewModel(localization, counterpartTitleKey);
 
     public SkillDetailSectionViewModel DamageSection { get; } = new();
 

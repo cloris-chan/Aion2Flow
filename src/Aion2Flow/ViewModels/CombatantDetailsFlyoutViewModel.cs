@@ -21,7 +21,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     private readonly CombatMetricsEngine _engine;
     private readonly CombatMetricsStore _liveStore;
     private readonly BattleArchiveService _battleArchiveService;
-    private readonly LocalizationService _localization;
 
     private readonly List<ResolvedDetailPacket> _battlePackets = [];
     private DamageMeterSnapshot _currentSnapshot = new();
@@ -56,16 +55,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         _engine = engine;
         _liveStore = liveStore;
         _battleArchiveService = battleArchiveService;
-        _localization = localization;
-        OutgoingDetail = new CombatDirectionDetailViewModel(localization, "Panel.Targets");
-        IncomingDetail = new CombatDirectionDetailViewModel(localization, "Panel.Sources");
+        OutgoingDetail = new CombatDirectionDetailViewModel(localization, "Direction_Targets");
+        IncomingDetail = new CombatDirectionDetailViewModel(localization, "Direction_Sources");
         OutgoingDetail.DamageCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
         OutgoingDetail.SupportCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
         IncomingDetail.DamageCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
         IncomingDetail.SupportCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
     }
-
-    public LocalizationService Localization => _localization;
 
     public CombatDirectionDetailViewModel OutgoingDetail { get; }
 

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Action -->
+  <data name="Action_Reset" xml:space="preserve"><value>초기화</value></data>
+  <data name="Action_Live" xml:space="preserve"><value>실시간</value></data>
+  <data name="Action_SelectAll" xml:space="preserve"><value>전체 선택</value></data>
+
+  <!-- Status -->
+  <data name="Status_Ready" xml:space="preserve"><value>준비</value></data>
+  <data name="Status_DriverReady" xml:space="preserve"><value>WinDivert 활성화됨</value></data>
+  <data name="Status_DriverIdle" xml:space="preserve"><value>WinDivert 비활성</value></data>
+  <data name="Status_PortReady" xml:space="preserve"><value>게임 포트 감지됨</value></data>
+  <data name="Status_PortWaiting" xml:space="preserve"><value>게임 포트 대기 중</value></data>
+  <data name="Status_PortIdle" xml:space="preserve"><value>게임 포트를 감시하지 않음</value></data>
+  <data name="Status_Locked" xml:space="preserve"><value>전투 연결 잠금됨</value></data>
+  <data name="Status_LockedProxy" xml:space="preserve"><value>전투 연결 잠금됨 (프록시 모드)</value></data>
+  <data name="Status_Unlocked" xml:space="preserve"><value>전투 연결이 아직 잠기지 않음</value></data>
+  <data name="Status_RttEstimated" xml:space="preserve"><value>TCP 왕복 추정</value></data>
+  <data name="Status_LatencyEstimatedFromCombat" xml:space="preserve"><value>전투 패킷 기반 지연 추정 (프록시 모드)</value></data>
+  <data name="Status_RttUnavailable" xml:space="preserve"><value>RTT 추정값 없음</value></data>
+
+  <!-- Direction -->
+  <data name="Direction_Outgoing" xml:space="preserve"><value>가한 것</value></data>
+  <data name="Direction_Incoming" xml:space="preserve"><value>받은 것</value></data>
+  <data name="Direction_Targets" xml:space="preserve"><value>대상</value></data>
+  <data name="Direction_Sources" xml:space="preserve"><value>출처</value></data>
+
+  <!-- Combat category -->
+  <data name="Category_Damage" xml:space="preserve"><value>피해</value></data>
+  <data name="Category_Healing" xml:space="preserve"><value>치유</value></data>
+  <data name="Category_Shield" xml:space="preserve"><value>보호막</value></data>
+  <data name="Category_Support" xml:space="preserve"><value>지원</value></data>
+
+  <!-- Empty-state placeholders -->
+  <data name="Empty_History" xml:space="preserve"><value>보관된 전투 없음</value></data>
+  <data name="Empty_Combatants" xml:space="preserve"><value>전투 데이터 없음</value></data>
+  <data name="Empty_Skills" xml:space="preserve"><value>스킬 데이터 없음</value></data>
+
+  <!-- Aggregate metrics -->
+  <data name="Metric_Total" xml:space="preserve"><value>총량</value></data>
+  <data name="Metric_Dps" xml:space="preserve"><value>DPS</value></data>
+  <data name="Metric_Hps" xml:space="preserve"><value>HPS</value></data>
+  <data name="Metric_Attacks" xml:space="preserve"><value>공격 횟수</value></data>
+  <data name="Metric_HitCount" xml:space="preserve"><value>적중 횟수</value></data>
+  <data name="Metric_Skills" xml:space="preserve"><value>스킬</value></data>
+  <data name="Metric_HealingSkills" xml:space="preserve"><value>치유 스킬</value></data>
+  <data name="Metric_ShieldSkills" xml:space="preserve"><value>보호막 스킬</value></data>
+  <data name="Metric_HealingHits" xml:space="preserve"><value>치유 횟수</value></data>
+  <data name="Metric_ShieldHits" xml:space="preserve"><value>보호막 횟수</value></data>
+
+  <!-- Short metric names -->
+  <data name="MetricShort_Damage" xml:space="preserve"><value>피해</value></data>
+  <data name="MetricShort_Heal" xml:space="preserve"><value>치유</value></data>
+  <data name="MetricShort_Hot" xml:space="preserve"><value>지속 치유</value></data>
+  <data name="MetricShort_DrainHeal" xml:space="preserve"><value>흡수 치유</value></data>
+  <data name="MetricShort_ShieldAbsorbed" xml:space="preserve"><value>보호막 흡수</value></data>
+  <data name="MetricShort_PeriodicDamage" xml:space="preserve"><value>지속 피해</value></data>
+  <data name="MetricShort_PeriodicHits" xml:space="preserve"><value>지속 횟수</value></data>
+
+  <!-- Combat stats -->
+  <data name="Stat_Critical" xml:space="preserve"><value>치명타</value></data>
+  <data name="Stat_Perfect" xml:space="preserve"><value>완벽</value></data>
+  <data name="Stat_Smite" xml:space="preserve"><value>강타</value></data>
+  <data name="Stat_MultiHit" xml:space="preserve"><value>다단타격</value></data>
+  <data name="Stat_Parry" xml:space="preserve"><value>무기막기</value></data>
+  <data name="Stat_Endurance" xml:space="preserve"><value>철벽</value></data>
+  <data name="Stat_Regeneration" xml:space="preserve"><value>재생</value></data>
+  <data name="Stat_Back" xml:space="preserve"><value>후방 공격</value></data>
+  <data name="Stat_Block" xml:space="preserve"><value>방패막기</value></data>
+  <data name="Stat_Evade" xml:space="preserve"><value>회피</value></data>
+  <data name="Stat_Invincible" xml:space="preserve"><value>무적</value></data>
+
+  <!-- UI-specific column headers -->
+  <data name="Column_History" xml:space="preserve"><value>기록</value></data>
+  <data name="Column_Skill" xml:space="preserve"><value>스킬</value></data>
+  <data name="Column_Direct" xml:space="preserve"><value>직격</value></data>
+  <data name="Column_Share" xml:space="preserve"><value>비율</value></data>
+</root>

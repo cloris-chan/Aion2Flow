@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
              xmlns:conv="clr-namespace:Cloris.Aion2Flow.Converters"
              xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
@@ -19,7 +20,7 @@
             <StackPanel Orientation="Vertical"
                         Spacing="12">
                 <TextBlock Classes="DetailSummaryTitle"
-                           Text="{Binding Localization[Panel.Damage]}" />
+                           Text="{markups:Translate Category_Damage}" />
 
                 <Grid Classes="DetailSummarySplitGrid"
                       ColumnDefinitions="*,Auto">
@@ -28,67 +29,67 @@
                             Background="Transparent">
                         <WrapPanel Classes="DetailSummaryMetricsWrap"
                                    Orientation="Horizontal">
-                            <controls:MetricTile Label="{Binding Localization[Summary.Total]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_Total}"
                                                  Value="{Binding DamageSection.Total}" />
-                            <controls:MetricTile Label="{Binding Localization[Summary.Dps]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_Dps}"
                                                  Value="{Binding DamageSection.PerSecond}"
                                                  FractionDigits="1"
                                                  TrimTrailingZeros="False" />
-                            <controls:MetricTile Label="{Binding Localization[Column.Direct]}"
+                            <controls:MetricTile Label="{markups:Translate Column_Direct}"
                                                  Value="{Binding DamageSection.DirectTotal}" />
-                            <controls:MetricTile Label="{Binding Localization[Column.PeriodicDamage]}"
+                            <controls:MetricTile Label="{markups:Translate MetricShort_PeriodicDamage}"
                                                  Value="{Binding DamageSection.PeriodicTotal}" />
-                            <controls:MetricTile Label="{Binding Localization[Summary.Attacks]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_Attacks}"
                                                  Value="{Binding DamageSection.Attempts}" />
-                            <controls:MetricTile Label="{Binding Localization[Summary.Skills]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_Skills}"
                                                  Value="{Binding DamageSection.SkillCount}" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Summary.HitCount]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Metric_HitCount}"
                                                       PrimaryValue="{Binding DamageSection.Hits}"
                                                       SecondaryValue="{Binding DamageSection.HitRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricTile Label="{Binding Localization[Column.PeriodicHits]}"
+                            <controls:MetricTile Label="{markups:Translate MetricShort_PeriodicHits}"
                                                  Value="{Binding DamageSection.PeriodicHits}" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.CriticalRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Critical}"
                                                       PrimaryValue="{Binding DamageSection.Criticals}"
                                                       SecondaryValue="{Binding DamageSection.CriticalRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.PerfectRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Perfect}"
                                                       PrimaryValue="{Binding DamageSection.PerfectCount}"
                                                       SecondaryValue="{Binding DamageSection.PerfectRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.SmiteRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Smite}"
                                                       PrimaryValue="{Binding DamageSection.SmiteCount}"
                                                       SecondaryValue="{Binding DamageSection.SmiteRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.MultiHitRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_MultiHit}"
                                                       PrimaryValue="{Binding DamageSection.MultiHitCount}"
                                                       SecondaryValue="{Binding DamageSection.MultiHitRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.BackRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Back}"
                                                       PrimaryValue="{Binding DamageSection.BackCount}"
                                                       SecondaryValue="{Binding DamageSection.BackRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.ParryRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Parry}"
                                                       PrimaryValue="{Binding DamageSection.ParryCount}"
                                                       SecondaryValue="{Binding DamageSection.ParryRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.BlockRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Block}"
                                                       PrimaryValue="{Binding DamageSection.BlockCount}"
                                                       SecondaryValue="{Binding DamageSection.BlockRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.EnduranceRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Endurance}"
                                                       PrimaryValue="{Binding DamageSection.EnduranceCount}"
                                                       SecondaryValue="{Binding DamageSection.EnduranceRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.RegenerationRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Regeneration}"
                                                       PrimaryValue="{Binding DamageSection.RegenerationCount}"
                                                       SecondaryValue="{Binding DamageSection.RegenerationRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.EvadeRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Evade}"
                                                       PrimaryValue="{Binding DamageSection.Evades}"
                                                       SecondaryValue="{Binding DamageSection.EvadeRate}"
                                                       SecondaryUsePercentageNotation="True" />
-                            <controls:MetricSplitTile Label="{Binding Localization[Label.InvincibleRate]}"
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Invincible}"
                                                       PrimaryValue="{Binding DamageSection.Invincible}"
                                                       SecondaryValue="{Binding DamageSection.InvincibleRate}"
                                                       SecondaryUsePercentageNotation="True" />
@@ -110,16 +111,16 @@
                                           Grid.ColumnSpan="2"
                                           Classes="CounterpartSelectAll"
                                           Content="{Binding CounterpartTitle}"
-                                          ToolTip.Tip="{Binding Localization[Action.SelectAll]}"
+                                          ToolTip.Tip="{markups:Translate Action_SelectAll}"
                                           IsChecked="{Binding AreAllCounterpartsSelected, Mode=TwoWay}"
                                           IsThreeState="True"
                                           VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="2"
                                            Classes="CounterpartHeaderText"
-                                           Text="{Binding Localization[Column.Damage]}" />
+                                           Text="{markups:Translate MetricShort_Damage}" />
                                 <TextBlock Grid.Column="3"
                                            Classes="CounterpartHeaderText"
-                                           Text="{Binding Localization[Column.Share]}" />
+                                           Text="{markups:Translate Column_Share}" />
                             </Grid>
 
                             <ScrollViewer Grid.Row="1"
@@ -163,58 +164,58 @@
                                       ColumnSpacing="4">
                                     <TextBlock Grid.Column="0"
                                                Classes="DetailTableHeaderLeft"
-                                               Text="{Binding Localization[Column.Skill]}" />
+                                               Text="{markups:Translate Column_Skill}" />
                                     <TextBlock Grid.Column="1"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Total]}" />
+                                               Text="{markups:Translate Metric_Total}" />
                                     <TextBlock Grid.Column="2"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Direct]}" />
+                                               Text="{markups:Translate Column_Direct}" />
                                     <TextBlock Grid.Column="3"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.PeriodicDamage]}" />
+                                               Text="{markups:Translate MetricShort_PeriodicDamage}" />
                                     <TextBlock Grid.Column="4"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.HitCount]}" />
+                                               Text="{markups:Translate Metric_HitCount}" />
                                     <TextBlock Grid.Column="5"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.PeriodicHits]}" />
+                                               Text="{markups:Translate MetricShort_PeriodicHits}" />
                                     <TextBlock Grid.Column="6"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Critical]}" />
+                                               Text="{markups:Translate Stat_Critical}" />
                                     <TextBlock Grid.Column="7"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Perfect]}" />
+                                               Text="{markups:Translate Stat_Perfect}" />
                                     <TextBlock Grid.Column="8"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Smite]}" />
+                                               Text="{markups:Translate Stat_Smite}" />
                                     <TextBlock Grid.Column="9"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.MultiHit]}" />
+                                               Text="{markups:Translate Stat_MultiHit}" />
                                     <TextBlock Grid.Column="10"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Back]}" />
+                                               Text="{markups:Translate Stat_Back}" />
                                     <TextBlock Grid.Column="11"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Parry]}" />
+                                               Text="{markups:Translate Stat_Parry}" />
                                     <TextBlock Grid.Column="12"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Block]}" />
+                                               Text="{markups:Translate Stat_Block}" />
                                     <TextBlock Grid.Column="13"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Endurance]}" />
+                                               Text="{markups:Translate Stat_Endurance}" />
                                     <TextBlock Grid.Column="14"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Regeneration]}" />
+                                               Text="{markups:Translate Stat_Regeneration}" />
                                     <TextBlock Grid.Column="15"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Evade]}" />
+                                               Text="{markups:Translate Stat_Evade}" />
                                     <TextBlock Grid.Column="16"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Invincible]}" />
+                                               Text="{markups:Translate Stat_Invincible}" />
                                     <TextBlock Grid.Column="17"
                                                Classes="DetailTableHeader"
-                                               Text="{Binding Localization[Column.Share]}" />
+                                               Text="{markups:Translate Column_Share}" />
                                 </Grid>
                             </Border>
 
@@ -365,7 +366,7 @@
                             </ItemsControl>
 
                             <TextBlock Classes="OverlayMutedText"
-                                       Text="{Binding Localization[Panel.EmptySkills]}"
+                                       Text="{markups:Translate Empty_Skills}"
                                        IsVisible="{Binding DamageSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
                         </StackPanel>
                     </ScrollViewer>
@@ -377,7 +378,7 @@
             <StackPanel Orientation="Vertical"
                         Spacing="12">
                 <TextBlock Classes="DetailSummaryTitle"
-                           Text="{Binding Localization[Panel.Support]}" />
+                           Text="{markups:Translate Category_Support}" />
 
                 <Grid Classes="DetailSummarySplitGrid"
                       ColumnDefinitions="*,Auto">
@@ -386,33 +387,33 @@
                             Background="Transparent">
                         <WrapPanel Classes="DetailSummaryMetricsWrap"
                                    Orientation="Horizontal">
-                            <controls:MetricTile Label="{Binding Localization[Panel.Healing]}"
+                            <controls:MetricTile Label="{markups:Translate Category_Healing}"
                                                  Value="{Binding HealingSection.Total}" />
-                            <controls:MetricTile Label="{Binding Localization[Summary.Hps]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_Hps}"
                                                  Value="{Binding HealingSection.PerSecond}"
                                                  FractionDigits="1"
                                                  TrimTrailingZeros="False" />
-                            <controls:MetricTile Label="{Binding Localization[Column.Heal]}"
+                            <controls:MetricTile Label="{markups:Translate MetricShort_Heal}"
                                                  Value="{Binding HealingSection.DirectTotal}" />
-                            <controls:MetricTile Label="{Binding Localization[Column.Hot]}"
+                            <controls:MetricTile Label="{markups:Translate MetricShort_Hot}"
                                                  Value="{Binding HealingSection.PeriodicTotal}" />
-                            <controls:MetricTile Label="{Binding Localization[Column.DrainHeal]}"
+                            <controls:MetricTile Label="{markups:Translate MetricShort_DrainHeal}"
                                                  Value="{Binding HealingSection.DrainTotal}" />
-                            <controls:MetricTile Label="{Binding Localization[Column.Regeneration]}"
+                            <controls:MetricTile Label="{markups:Translate Stat_Regeneration}"
                                                  Value="{Binding HealingSection.RegenerationTotal}" />
-                            <controls:MetricTile Label="{Binding Localization[Column.PeriodicHits]}"
+                            <controls:MetricTile Label="{markups:Translate MetricShort_PeriodicHits}"
                                                  Value="{Binding HealingSection.PeriodicHits}" />
-                            <controls:MetricTile Label="{Binding Localization[Summary.HealingHits]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_HealingHits}"
                                                  Value="{Binding HealingSection.Hits}" />
-                            <controls:MetricTile Label="{Binding Localization[Summary.HealingSkills]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_HealingSkills}"
                                                  Value="{Binding HealingSection.SkillCount}" />
-                            <controls:MetricTile Label="{Binding Localization[Panel.Shield]}"
+                            <controls:MetricTile Label="{markups:Translate Category_Shield}"
                                                  Value="{Binding ShieldSection.Total}" />
-                            <controls:MetricTile Label="{Binding Localization[Column.ShieldAbsorbed]}"
+                            <controls:MetricTile Label="{markups:Translate MetricShort_ShieldAbsorbed}"
                                                  Value="{Binding ShieldSection.ShieldAbsorbed}" />
-                            <controls:MetricTile Label="{Binding Localization[Summary.ShieldHits]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_ShieldHits}"
                                                  Value="{Binding ShieldSection.Hits}" />
-                            <controls:MetricTile Label="{Binding Localization[Summary.ShieldSkills]}"
+                            <controls:MetricTile Label="{markups:Translate Metric_ShieldSkills}"
                                                  Value="{Binding ShieldSection.SkillCount}" />
                         </WrapPanel>
                     </Border>
@@ -432,22 +433,22 @@
                                           Grid.ColumnSpan="2"
                                           Classes="CounterpartSelectAll"
                                           Content="{Binding CounterpartTitle}"
-                                          ToolTip.Tip="{Binding Localization[Action.SelectAll]}"
+                                          ToolTip.Tip="{markups:Translate Action_SelectAll}"
                                           IsChecked="{Binding AreAllCounterpartsSelected, Mode=TwoWay}"
                                           IsThreeState="True"
                                           VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="2"
                                            Classes="CounterpartHeaderText"
-                                           Text="{Binding Localization[Column.Heal]}" />
+                                           Text="{markups:Translate MetricShort_Heal}" />
                                 <TextBlock Grid.Column="3"
                                            Classes="CounterpartHeaderText"
-                                           Text="{Binding Localization[Column.Share]}" />
+                                           Text="{markups:Translate Column_Share}" />
                                 <TextBlock Grid.Column="4"
                                            Classes="CounterpartHeaderText"
-                                           Text="{Binding Localization[Column.Shield]}" />
+                                           Text="{markups:Translate Category_Shield}" />
                                 <TextBlock Grid.Column="5"
                                            Classes="CounterpartHeaderText"
-                                           Text="{Binding Localization[Column.Share]}" />
+                                           Text="{markups:Translate Column_Share}" />
                             </Grid>
 
                             <ScrollViewer Grid.Row="1"
@@ -490,7 +491,7 @@
                 <StackPanel IsVisible="{Binding HealingSection.HasSkills}"
                             Spacing="6">
                     <TextBlock Classes="SectionTitle"
-                               Text="{Binding Localization[Panel.Healing]}" />
+                               Text="{markups:Translate Category_Healing}" />
                     <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller">
                             <StackPanel Orientation="Vertical"
@@ -501,28 +502,28 @@
                                           ColumnSpacing="4">
                                         <TextBlock Grid.Column="0"
                                                    Classes="DetailTableHeaderLeft"
-                                                   Text="{Binding Localization[Column.Skill]}" />
+                                                   Text="{markups:Translate Column_Skill}" />
                                         <TextBlock Grid.Column="1"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.Total]}" />
+                                                   Text="{markups:Translate Metric_Total}" />
                                         <TextBlock Grid.Column="2"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.Heal]}" />
+                                                   Text="{markups:Translate MetricShort_Heal}" />
                                         <TextBlock Grid.Column="3"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.Hot]}" />
+                                                   Text="{markups:Translate MetricShort_Hot}" />
                                         <TextBlock Grid.Column="4"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.DrainHeal]}" />
+                                                   Text="{markups:Translate MetricShort_DrainHeal}" />
                                         <TextBlock Grid.Column="5"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.Regeneration]}" />
+                                                   Text="{markups:Translate Stat_Regeneration}" />
                                         <TextBlock Grid.Column="6"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.HitCount]}" />
+                                                   Text="{markups:Translate Metric_HitCount}" />
                                         <TextBlock Grid.Column="7"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.Share]}" />
+                                                   Text="{markups:Translate Column_Share}" />
                                     </Grid>
                                 </Border>
 
@@ -572,7 +573,7 @@
                 <StackPanel IsVisible="{Binding ShieldSection.HasSkills}"
                             Spacing="6">
                     <TextBlock Classes="SectionTitle"
-                               Text="{Binding Localization[Panel.Shield]}" />
+                               Text="{markups:Translate Category_Shield}" />
                     <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller">
                             <StackPanel Orientation="Vertical"
@@ -583,19 +584,19 @@
                                           ColumnSpacing="4">
                                         <TextBlock Grid.Column="0"
                                                    Classes="DetailTableHeaderLeft"
-                                                   Text="{Binding Localization[Column.Skill]}" />
+                                                   Text="{markups:Translate Column_Skill}" />
                                         <TextBlock Grid.Column="1"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.Total]}" />
+                                                   Text="{markups:Translate Metric_Total}" />
                                         <TextBlock Grid.Column="2"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.ShieldAbsorbed]}" />
+                                                   Text="{markups:Translate MetricShort_ShieldAbsorbed}" />
                                         <TextBlock Grid.Column="3"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.HitCount]}" />
+                                                   Text="{markups:Translate Metric_HitCount}" />
                                         <TextBlock Grid.Column="4"
                                                    Classes="DetailTableHeader"
-                                                   Text="{Binding Localization[Column.Share]}" />
+                                                   Text="{markups:Translate Column_Share}" />
                                     </Grid>
                                 </Border>
 
