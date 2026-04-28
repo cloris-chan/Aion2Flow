@@ -352,7 +352,7 @@ public sealed class PacketLogReplayService
             "compact-value" => TryReplayCompactValue(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "compact-outcome" => TryReplayCompactOutcome(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "compact-0238" => TryReplayCompact0238(store, packet, batchOrdinal),
-            "compact-0638" => TryReplayCompact0638(store, packet, batchOrdinal),
+            "compact-0638" => TryReplayCompact0638(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "sidecar-3538" => TryReplay3538(store, packet),
             "wrapped-8456" => TryReplay8456(store, packet),
             "state-0140" => TryReplay0140(store, packet),
@@ -596,14 +596,14 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayCompact0638(CombatMetricsStore store, ReadOnlySpan<byte> packet, long batchOrdinal)
+    private static bool TryReplayCompact0638(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet0638CompactControlParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, batchOrdinal);
+        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, timestamp, frameOrdinal, batchOrdinal);
         return true;
     }
 

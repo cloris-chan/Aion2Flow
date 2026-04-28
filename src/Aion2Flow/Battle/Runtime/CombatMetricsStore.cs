@@ -17,7 +17,7 @@ public sealed class CombatMetricsStore
     private const int PeriodicSelfRecoveryBaseSkillCode = 190000000;
     private const int WindSpiritOwnerRestoreSkillCode = 16990003;
 
-    private readonly record struct PeriodicChainKey(int TargetId, int ChainId);
+    private readonly record struct PeriodicChainKey(int TargetId, int ChainId, int OriginalSkillCode);
     private readonly record struct PeriodicChainState(
         CombatValueKind GrantKind,
         int Remaining,
@@ -102,6 +102,7 @@ public sealed class CombatMetricsStore
     private readonly HashSet<AvoidedSignature> _resolvedAvoidanceSignatures = [];
     private readonly List<PendingCompactAvoidance> _pendingCompactDamageEntries = [];
     private readonly HashSet<(int Target, int Skill)> _confirmedCompactDamageTriples = [];
+    private readonly List<PendingCompactAvoidance> _pendingCompact0638Controls = [];
     private readonly ConcurrentDictionary<int, int> _instanceLifecycleRemap = new();
     private int _nextSyntheticLifecycleId = int.MaxValue;
     private int _lastObservedNpcSource;
@@ -192,13 +193,32 @@ public sealed class CombatMetricsStore
         lock (_compactOutcomeLock)
         {
             var storedKeys = new HashSet<(long Batch, int Source, int Target, int Marker)>();
+            var damageMarkersBySource = new HashSet<(int Source, int Marker)>();
+            var lastDamageTargetBySourceBaseSkill = new Dictionary<(int Source, int BaseSkill), int>();
+            var damageHitsBySourceBaseSkill = new Dictionary<(int Source, int BaseSkill), int>();
             foreach (var queue in _packetsBySource.Values)
             {
                 foreach (var p in queue)
                 {
-                    if (p.Marker <= 0 || p.SourceId <= 0 || p.TargetId <= 0 || p.SourceId == p.TargetId)
-                        continue;
                     if (p.EventKind != CombatEventKind.Damage)
+                        continue;
+                    if (p.SourceId <= 0 || p.Marker <= 0)
+                        continue;
+
+                    damageMarkersBySource.Add((p.SourceId, p.Marker));
+
+                    var pBaseSkill = p.BaseSkillCode > 0
+                        ? p.BaseSkillCode
+                        : ResolveBaseSkillCode(p.OriginalSkillCode != 0 ? p.OriginalSkillCode : p.SkillCode);
+                    if (pBaseSkill > 0 && p.TargetId > 0)
+                    {
+                        lastDamageTargetBySourceBaseSkill[(p.SourceId, pBaseSkill)] = p.TargetId;
+                        var key = (p.SourceId, pBaseSkill);
+                        damageHitsBySourceBaseSkill.TryGetValue(key, out var prev);
+                        damageHitsBySourceBaseSkill[key] = prev + 1;
+                    }
+
+                    if (p.TargetId <= 0 || p.SourceId == p.TargetId)
                         continue;
                     storedKeys.Add((p.BatchOrdinal, p.SourceId, p.TargetId, p.Marker));
                     storedKeys.Add((p.BatchOrdinal - 1, p.SourceId, p.TargetId, p.Marker));
@@ -248,7 +268,99 @@ public sealed class CombatMetricsStore
                 StorePacket(packet);
             }
 
+            var coveredMarkers = new HashSet<(int Source, int Marker)>(damageMarkersBySource);
+            foreach (var pending in _pendingCompactDamageEntries)
+            {
+                if (pending.SourceId > 0 && pending.Marker > 0)
+                {
+                    coveredMarkers.Add((pending.SourceId, pending.Marker));
+                }
+            }
+            foreach (var pending in _pendingCompactAvoidances)
+            {
+                if (pending.SourceId > 0 && pending.Marker > 0)
+                {
+                    coveredMarkers.Add((pending.SourceId, pending.Marker));
+                }
+            }
+
+            var seenOrphan0638Markers = new HashSet<(int Source, int Marker)>();
+            var orphan0638EmittedBySourceBaseSkill = new Dictionary<(int Source, int BaseSkill), int>();
+            var orphan0638CountBySourceBaseSkill = new Dictionary<(int Source, int BaseSkill), int>();
+            foreach (var entry in _pendingCompact0638Controls)
+            {
+                if (entry.Marker <= 0 || entry.SourceId <= 0)
+                    continue;
+                var b = ResolveBaseSkillCode(entry.OriginalSkillCode);
+                if (b <= 0)
+                    continue;
+                var k = (entry.SourceId, b);
+                orphan0638CountBySourceBaseSkill.TryGetValue(k, out var prev);
+                orphan0638CountBySourceBaseSkill[k] = prev + 1;
+            }
+
+            foreach (var entry in _pendingCompact0638Controls)
+            {
+                if (entry.Marker <= 0 || entry.SourceId <= 0)
+                    continue;
+
+                if (coveredMarkers.Contains((entry.SourceId, entry.Marker)))
+                    continue;
+
+                var resolvedSkill = CombatMetricsEngine.InferOriginalSkillCode(entry.OriginalSkillCode);
+                if (resolvedSkill is null)
+                    continue;
+
+                if (!CombatMetricsEngine.SkillMap.TryGetValue(resolvedSkill.Value, out var skill))
+                    continue;
+
+                if (!IsPlayerOrphanItemSkillCandidate(skill))
+                    continue;
+
+                if (!seenOrphan0638Markers.Add((entry.SourceId, entry.Marker)))
+                    continue;
+
+                var baseSkillCode = ResolveBaseSkillCode(entry.OriginalSkillCode);
+                if (baseSkillCode <= 0)
+                    continue;
+
+                if (!lastDamageTargetBySourceBaseSkill.TryGetValue((entry.SourceId, baseSkillCode), out var targetId) ||
+                    targetId <= 0)
+                {
+                    continue;
+                }
+
+                var sbKey = (entry.SourceId, baseSkillCode);
+                damageHitsBySourceBaseSkill.TryGetValue(sbKey, out var damageCount);
+                orphan0638EmittedBySourceBaseSkill.TryGetValue(sbKey, out var emittedCount);
+                orphan0638CountBySourceBaseSkill.TryGetValue(sbKey, out var totalControls);
+                if (damageCount + emittedCount >= totalControls)
+                    continue;
+
+                totalOrphans++;
+                var packet = new ParsedCombatPacket
+                {
+                    SourceId = entry.SourceId,
+                    TargetId = targetId,
+                    OriginalSkillCode = entry.OriginalSkillCode,
+                    SkillCode = entry.OriginalSkillCode,
+                    Marker = entry.Marker,
+                    Timestamp = entry.Timestamp,
+                    FrameOrdinal = entry.FrameOrdinal,
+                    BatchOrdinal = entry.BatchOrdinal,
+                    Damage = 0,
+                    HitContribution = 1,
+                    AttemptContribution = 1,
+                    EventKind = CombatEventKind.Damage,
+                    ValueKind = CombatValueKind.Damage
+                };
+
+                PreparePacketForStorage(packet);
+                StorePacket(packet);
+                orphan0638EmittedBySourceBaseSkill[sbKey] = emittedCount + 1;
+            }
             _pendingCompactDamageEntries.Clear();
+            _pendingCompact0638Controls.Clear();
             return totalOrphans;
         }
     }
@@ -323,11 +435,23 @@ public sealed class CombatMetricsStore
     public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal) =>
         RegisterCompactAvoidanceSignal(sourceId, skillCodeRaw, marker, batchOrdinal);
 
-    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker) =>
-        RegisterCompactControl0638(sourceId, skillCodeRaw, marker, 0);
-
-    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long batchOrdinal)
+    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        var resolvedSourceId = ResolveLifecycleId(sourceId);
+        if (resolvedSourceId > 0 && marker > 0 && skillCodeRaw > 0)
+        {
+            lock (_compactOutcomeLock)
+            {
+                _pendingCompact0638Controls.Add(new PendingCompactAvoidance(
+                    resolvedSourceId,
+                    0,
+                    skillCodeRaw,
+                    marker,
+                    timestamp,
+                    frameOrdinal,
+                    batchOrdinal));
+            }
+        }
         RegisterCompactAvoidanceSignal(sourceId, skillCodeRaw, marker, batchOrdinal);
     }
 
@@ -458,7 +582,8 @@ public sealed class CombatMetricsStore
         }
 
         var mode = packet.PeriodicMode;
-        var key = new PeriodicChainKey(packet.TargetId, chainId);
+        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
+        var key = new PeriodicChainKey(packet.TargetId, chainId, originalSkillCode);
 
         lock (_periodicChainLock)
         {
@@ -1131,6 +1256,7 @@ public sealed class CombatMetricsStore
             _pendingCompactAvoidances.Clear();
             _pendingCompactDamageEntries.Clear();
             _confirmedCompactDamageTriples.Clear();
+            _pendingCompact0638Controls.Clear();
             _pendingDirectAvoidancePackets.Clear();
             _currentBatchDodgeTargets.Clear();
             _resolvedAvoidanceSignatures.Clear();
@@ -1626,6 +1752,16 @@ public sealed class CombatMetricsStore
         }
 
         return type == 1 && (layoutTag == 0 || layoutTag == 2);
+    }
+
+    private static int ResolveBaseSkillCode(int skillCodeRaw)
+    {
+        if (skillCodeRaw <= 0)
+        {
+            return 0;
+        }
+
+        return CombatMetricsEngine.ParseSkillVariant(skillCodeRaw).BaseSkillCode;
     }
 
     private static bool IsDodgeSkill(int trackedSkillCode)

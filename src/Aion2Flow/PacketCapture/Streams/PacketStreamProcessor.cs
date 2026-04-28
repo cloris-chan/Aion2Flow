@@ -1422,7 +1422,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentBatchOrdinal);
+        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentTimestampMilliseconds, CurrentFrameOrdinal, CurrentBatchOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-0638",
             _connection,
