@@ -297,18 +297,23 @@ public sealed class NumericBlock : Control
             : 1d;
 
         EnsureGlyphBufferCapacity(characterCount);
+        var characterToGlyphMap = glyphTypeface.CharacterToGlyphMap;
         for (var index = 0; index < characterCount; index++)
         {
             var character = _characterBuffer[index];
-            if (!glyphTypeface.TryGetGlyph(character, out var glyphIndex))
+            if (!characterToGlyphMap.TryGetGlyph(character, out var glyphIndex))
             {
-                glyphIndex = glyphTypeface.GetGlyph('?');
+                glyphIndex = characterToGlyphMap.GetGlyph('?');
             }
+
+            var glyphAdvance = glyphTypeface.TryGetHorizontalGlyphAdvance(glyphIndex, out var advance)
+                ? advance
+                : 0d;
 
             _glyphInfoBuffer[index] = new GlyphInfo(
                 glyphIndex,
                 index,
-                glyphTypeface.GetGlyphAdvance(glyphIndex) * glyphAdvanceScale,
+                glyphAdvance * glyphAdvanceScale,
                 default);
         }
 
