@@ -18,7 +18,11 @@ public sealed class CombatMetricsStore
     private const int WindSpiritOwnerRestoreSkillCode = 16990003;
 
     private readonly record struct PeriodicChainKey(int TargetId, int ChainId);
-    private readonly record struct PeriodicChainState(CombatValueKind GrantKind, int Remaining, int CasterId);
+    private readonly record struct PeriodicChainState(
+        CombatValueKind GrantKind,
+        int Remaining,
+        int CasterId,
+        ParsedCombatPacket? AmbiguousGrant = null);
     private readonly record struct SystemPeriodicRecoverySeedKey(int SourceId, int TargetId, int OriginalSkillCode);
     private readonly record struct SystemPeriodicRecoverySeedState(int LastRawDamage, long LastTimestamp);
     private readonly record struct MultiHitDamageCandidate(
@@ -455,16 +459,20 @@ public sealed class CombatMetricsStore
         {
             if (mode == 9)
             {
-                if (packet.ValueKind == CombatValueKind.Shield)
-                {
-                    OpenShieldChain(packet, key);
-                    return;
-                }
-
                 if (packet.ValueKind == CombatValueKind.PeriodicHealing &&
                     IsPeriodicHealingPoolPacket(packet))
                 {
                     OpenPeriodicHealingChain(packet, key);
+                    return;
+                }
+
+                if (packet.Damage > 0 && packet.SourceId > 0)
+                {
+                    _periodicChainByKey[key] = new PeriodicChainState(
+                        CombatValueKind.Unknown,
+                        packet.Damage,
+                        packet.SourceId,
+                        packet);
                 }
                 return;
             }
@@ -472,6 +480,18 @@ public sealed class CombatMetricsStore
             if (mode is 11 or 10 &&
                 _periodicChainByKey.TryGetValue(key, out var state))
             {
+                if (state.GrantKind == CombatValueKind.Unknown)
+                {
+                    if (mode != 11)
+                    {
+                        _periodicChainByKey.Remove(key);
+                        return;
+                    }
+
+                    state = PromoteAmbiguousChain(packet, state);
+                    _periodicChainByKey[key] = state;
+                }
+
                 if (state.GrantKind == CombatValueKind.Shield)
                 {
                     ApplyShieldChainContinuation(packet, key, state, mode);
@@ -482,6 +502,24 @@ public sealed class CombatMetricsStore
                 }
             }
         }
+    }
+
+    private static PeriodicChainState PromoteAmbiguousChain(ParsedCombatPacket continuation, PeriodicChainState state)
+    {
+        var grant = state.AmbiguousGrant!;
+        if (continuation.SourceId != continuation.TargetId)
+        {
+            grant.EventKind = CombatEventKind.Support;
+            grant.ValueKind = CombatValueKind.Shield;
+            grant.SetEffectTag(PacketEffectTag.ShieldGrant);
+            return new PeriodicChainState(CombatValueKind.Shield, state.Remaining, state.CasterId);
+        }
+
+        grant.EventKind = CombatEventKind.Healing;
+        grant.ValueKind = CombatValueKind.PeriodicHealing;
+        var rawDamage = grant.Damage;
+        grant.Damage = 0;
+        return new PeriodicChainState(CombatValueKind.PeriodicHealing, rawDamage, state.CasterId);
     }
 
     private static bool IsPeriodicHealingPoolPacket(ParsedCombatPacket packet)
@@ -496,12 +534,6 @@ public sealed class CombatMetricsStore
         var isTargetPool = (packet.IsPeriodicTargetMode(9) || packet.IsPeriodicTargetMode(11)) &&
             PacketSkillTraits.IsKnownPeriodicHealingPool(packet);
         return isSelfPool || isTargetPool;
-    }
-
-    private void OpenShieldChain(ParsedCombatPacket packet, PeriodicChainKey key)
-    {
-        _periodicChainByKey[key] = new PeriodicChainState(CombatValueKind.Shield, packet.Damage, packet.SourceId);
-        packet.SetEffectTag(PacketEffectTag.ShieldGrant);
     }
 
     private void OpenPeriodicHealingChain(ParsedCombatPacket packet, PeriodicChainKey key)

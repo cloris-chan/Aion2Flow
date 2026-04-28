@@ -100,11 +100,6 @@ public static class CombatEventClassifier
                 return (CombatEventKind.Support, CombatValueKind.Support);
             }
 
-            if (PacketSkillTraits.IsKnownShield(packet))
-            {
-                return (CombatEventKind.Support, CombatValueKind.Shield);
-            }
-
             if (packet.ResourceKind == CombatResourceKind.Mana)
             {
                 return (CombatEventKind.Support, CombatValueKind.Support);
@@ -129,11 +124,6 @@ public static class CombatEventClassifier
         if (packet.IsPeriodicTargetMode(8))
         {
             return (CombatEventKind.Support, CombatValueKind.Support);
-        }
-
-        if (PacketSkillTraits.IsKnownShield(packet))
-        {
-            return (CombatEventKind.Support, CombatValueKind.Shield);
         }
 
         if (packet.ResourceKind == CombatResourceKind.Mana)
