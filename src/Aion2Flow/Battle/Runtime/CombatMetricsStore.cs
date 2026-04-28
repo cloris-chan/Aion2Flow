@@ -9,7 +9,7 @@ namespace Cloris.Aion2Flow.Battle.Runtime;
 
 public sealed class CombatMetricsStore
 {
-    private const long PeriodicHealingPoolWindowMilliseconds = 5000;
+    private const long SystemPeriodicRecoveryPairWindowMilliseconds = 5000;
     private const int MaxTrackedMultiHitCandidates = 64;
     private const int MaxPendingDodgeSignals = 16;
     private const int MaxPendingAvoidancePackets = 32;
@@ -17,8 +17,8 @@ public sealed class CombatMetricsStore
     private const int PeriodicSelfRecoveryBaseSkillCode = 190000000;
     private const int WindSpiritOwnerRestoreSkillCode = 16990003;
 
-    private readonly record struct PeriodicHealingPoolKey(int SourceId, int TargetId, int OriginalSkillCode);
-    private readonly record struct PeriodicHealingPoolState(int LastRawDamage, long LastTimestamp);
+    private readonly record struct PeriodicChainKey(int TargetId, int ChainId);
+    private readonly record struct PeriodicChainState(CombatValueKind GrantKind, int Remaining, int CasterId);
     private readonly record struct SystemPeriodicRecoverySeedKey(int SourceId, int TargetId, int OriginalSkillCode);
     private readonly record struct SystemPeriodicRecoverySeedState(int LastRawDamage, long LastTimestamp);
     private readonly record struct MultiHitDamageCandidate(
@@ -82,8 +82,9 @@ public sealed class CombatMetricsStore
     private readonly ConcurrentDictionary<int, string> _npcNameByCode = new();
     private readonly ConcurrentDictionary<int, NpcInstanceState> _npcStateByInstance = new();
     private readonly ConcurrentDictionary<int, long> _detailRevisionByCombatant = new();
-    private readonly Lock _periodicHealingPoolLock = new();
-    private readonly Dictionary<PeriodicHealingPoolKey, PeriodicHealingPoolState> _periodicHealingPools = [];
+    private readonly Lock _periodicChainLock = new();
+    private readonly Dictionary<PeriodicChainKey, PeriodicChainState> _periodicChainByKey = [];
+    private readonly Lock _systemPeriodicRecoveryLock = new();
     private readonly Dictionary<SystemPeriodicRecoverySeedKey, SystemPeriodicRecoverySeedState> _systemPeriodicRecoverySeeds = [];
     private readonly Lock _multiHitLock = new();
     private readonly List<MultiHitDamageCandidate> _recentDamageCandidates = [];
@@ -97,8 +98,6 @@ public sealed class CombatMetricsStore
     private readonly HashSet<AvoidedSignature> _resolvedAvoidanceSignatures = [];
     private readonly List<PendingCompactAvoidance> _pendingCompactDamageEntries = [];
     private readonly HashSet<(int Target, int Skill)> _confirmedCompactDamageTriples = [];
-    private readonly Lock _shieldStateLock = new();
-    private readonly Dictionary<(int TargetId, int BaseSkillCode), ShieldChainState> _shieldRemainingByKey = [];
     private readonly ConcurrentDictionary<int, int> _instanceLifecycleRemap = new();
     private int _nextSyntheticLifecycleId = int.MaxValue;
     private int _lastObservedNpcSource;
@@ -432,61 +431,123 @@ public sealed class CombatMetricsStore
         CombatMetricsEngine.NormalizePacketForStorage(packet);
         NormalizeOwnerTargetSummonRestore(packet);
         NormalizeSystemPeriodicRecovery(packet);
-        NormalizePeriodicHealingPool(packet);
-        NormalizeShieldChainEvent(packet);
+        NormalizePeriodicChainEvent(packet);
         ApplyMultiHitAttribution(packet);
     }
 
-    private readonly record struct ShieldChainState(int Remaining, int CasterId);
-
-    private void NormalizeShieldChainEvent(ParsedCombatPacket packet)
+    private void NormalizePeriodicChainEvent(ParsedCombatPacket packet)
     {
-        if (packet.ValueKind != CombatValueKind.Shield || !packet.IsPeriodicEffect)
+        if (!packet.IsPeriodicEffect || packet.TargetId <= 0)
         {
             return;
         }
 
-        var baseSkill = packet.BaseSkillCode;
-        if (baseSkill == 0 || packet.TargetId <= 0)
+        var chainId = packet.Unknown;
+        if (chainId == 0)
         {
             return;
         }
 
-        var key = (packet.TargetId, baseSkill);
-        lock (_shieldStateLock)
+        var mode = packet.PeriodicMode;
+        var key = new PeriodicChainKey(packet.TargetId, chainId);
+
+        lock (_periodicChainLock)
         {
-            if (packet.PeriodicMode == 9)
+            if (mode == 9)
             {
-                _shieldRemainingByKey[key] = new ShieldChainState(packet.Damage, packet.SourceId);
-                packet.SetEffectTag(PacketEffectTag.ShieldGrant);
+                if (packet.ValueKind == CombatValueKind.Shield)
+                {
+                    OpenShieldChain(packet, key);
+                    return;
+                }
+
+                if (packet.ValueKind == CombatValueKind.PeriodicHealing &&
+                    IsPeriodicHealingPoolPacket(packet))
+                {
+                    OpenPeriodicHealingChain(packet, key);
+                }
                 return;
             }
 
-            if (packet.PeriodicMode is 11 or 10)
+            if (mode is 11 or 10 &&
+                _periodicChainByKey.TryGetValue(key, out var state))
             {
-                var newRemaining = Math.Max(0, packet.Damage);
-                var caster = packet.SourceId;
-                var absorbed = 0;
-                if (_shieldRemainingByKey.TryGetValue(key, out var state))
+                if (state.GrantKind == CombatValueKind.Shield)
                 {
-                    absorbed = Math.Max(0, state.Remaining - newRemaining);
-                    caster = state.CasterId;
+                    ApplyShieldChainContinuation(packet, key, state, mode);
                 }
-
-                packet.Damage = absorbed;
-                packet.SourceId = caster;
-                packet.SetEffectTag(PacketEffectTag.ShieldAbsorbed);
-
-                if (packet.PeriodicMode == 10)
+                else if (state.GrantKind == CombatValueKind.PeriodicHealing && mode == 11)
                 {
-                    _shieldRemainingByKey.Remove(key);
-                }
-                else
-                {
-                    _shieldRemainingByKey[key] = new ShieldChainState(newRemaining, caster);
+                    ApplyPeriodicHealingChainContinuation(packet, key, state);
                 }
             }
         }
+    }
+
+    private static bool IsPeriodicHealingPoolPacket(ParsedCombatPacket packet)
+    {
+        if (packet.SourceId <= 0 || packet.TargetId <= 0)
+        {
+            return false;
+        }
+
+        var isSelfPool = packet.SourceId == packet.TargetId &&
+            (packet.IsPeriodicSelfMode(9) || packet.IsPeriodicSelfMode(11));
+        var isTargetPool = (packet.IsPeriodicTargetMode(9) || packet.IsPeriodicTargetMode(11)) &&
+            PacketSkillTraits.IsKnownPeriodicHealingPool(packet);
+        return isSelfPool || isTargetPool;
+    }
+
+    private void OpenShieldChain(ParsedCombatPacket packet, PeriodicChainKey key)
+    {
+        _periodicChainByKey[key] = new PeriodicChainState(CombatValueKind.Shield, packet.Damage, packet.SourceId);
+        packet.SetEffectTag(PacketEffectTag.ShieldGrant);
+    }
+
+    private void OpenPeriodicHealingChain(ParsedCombatPacket packet, PeriodicChainKey key)
+    {
+        var rawDamage = packet.Damage;
+        packet.Damage = 0;
+        _periodicChainByKey[key] = new PeriodicChainState(CombatValueKind.PeriodicHealing, rawDamage, packet.SourceId);
+    }
+
+    private void ApplyShieldChainContinuation(ParsedCombatPacket packet, PeriodicChainKey key, PeriodicChainState state, int mode)
+    {
+        var newRemaining = Math.Max(0, packet.Damage);
+        var absorbed = Math.Max(0, state.Remaining - newRemaining);
+        var caster = state.CasterId;
+
+        packet.Damage = absorbed;
+        packet.SourceId = caster;
+        packet.SetEffectTag(PacketEffectTag.ShieldAbsorbed);
+
+        if (mode == 10)
+        {
+            _periodicChainByKey.Remove(key);
+        }
+        else
+        {
+            _periodicChainByKey[key] = new PeriodicChainState(CombatValueKind.Shield, newRemaining, caster);
+        }
+    }
+
+    private void ApplyPeriodicHealingChainContinuation(ParsedCombatPacket packet, PeriodicChainKey key, PeriodicChainState state)
+    {
+        var rawDamage = packet.Damage;
+        if (rawDamage >= state.Remaining)
+        {
+            _periodicChainByKey.Remove(key);
+            return;
+        }
+
+        packet.Damage = state.Remaining - rawDamage;
+        if (packet.Damage <= 0 || rawDamage == 0)
+        {
+            _periodicChainByKey.Remove(key);
+            return;
+        }
+
+        _periodicChainByKey[key] = new PeriodicChainState(CombatValueKind.PeriodicHealing, rawDamage, state.CasterId);
     }
 
     private void NormalizeOwnerTargetSummonRestore(ParsedCombatPacket packet)
@@ -507,7 +568,7 @@ public sealed class CombatMetricsStore
             return;
         }
 
-        lock (_periodicHealingPoolLock)
+        lock (_systemPeriodicRecoveryLock)
         {
             if (isSeed)
             {
@@ -525,7 +586,7 @@ public sealed class CombatMetricsStore
             _systemPeriodicRecoverySeeds.Remove(key);
             var delta = packet.Timestamp - state.LastTimestamp;
             if (delta < 0 ||
-                delta > PeriodicHealingPoolWindowMilliseconds ||
+                delta > SystemPeriodicRecoveryPairWindowMilliseconds ||
                 packet.Damage != state.LastRawDamage)
             {
                 return;
@@ -675,101 +736,6 @@ public sealed class CombatMetricsStore
                 IndexPacketByPair(packet);
             }
         }
-    }
-
-    private void NormalizePeriodicHealingPool(ParsedCombatPacket packet)
-    {
-        if (!TryGetPeriodicHealingPoolKey(packet, out var key, out var isSeed))
-        {
-            return;
-        }
-
-        var rawDamage = packet.Damage;
-        if (rawDamage <= 0 && isSeed)
-        {
-            return;
-        }
-
-        lock (_periodicHealingPoolLock)
-        {
-            if (isSeed)
-            {
-                packet.Damage = 0;
-                _periodicHealingPools[key] = new PeriodicHealingPoolState(rawDamage, packet.Timestamp);
-                return;
-            }
-
-            if (!_periodicHealingPools.TryGetValue(key, out var state))
-            {
-                return;
-            }
-
-            var delta = packet.Timestamp - state.LastTimestamp;
-            if (delta < 0 ||
-                delta > PeriodicHealingPoolWindowMilliseconds ||
-                rawDamage >= state.LastRawDamage)
-            {
-                _periodicHealingPools.Remove(key);
-                return;
-            }
-
-            packet.Damage = state.LastRawDamage - rawDamage;
-            if (packet.Damage <= 0)
-            {
-                _periodicHealingPools.Remove(key);
-                return;
-            }
-
-            if (rawDamage == 0)
-            {
-                _periodicHealingPools.Remove(key);
-            }
-            else
-            {
-                _periodicHealingPools[key] = new PeriodicHealingPoolState(rawDamage, packet.Timestamp);
-            }
-        }
-    }
-
-    private static bool TryGetPeriodicHealingPoolKey(
-        ParsedCombatPacket packet,
-        out PeriodicHealingPoolKey key,
-        out bool isSeed)
-    {
-        key = default;
-        isSeed = false;
-
-        if (packet.SourceId <= 0 ||
-            packet.TargetId <= 0)
-        {
-            return false;
-        }
-
-        var isSelfPool = packet.SourceId == packet.TargetId &&
-            (packet.IsPeriodicSelfMode(9) || packet.IsPeriodicSelfMode(11));
-        var isTargetPool = (packet.IsPeriodicTargetMode(9) || packet.IsPeriodicTargetMode(11)) &&
-            PacketSkillTraits.IsKnownPeriodicHealingPool(packet);
-        if (!isSelfPool && !isTargetPool)
-        {
-            return false;
-        }
-
-        var originalSkillCode = packet.OriginalSkillCode != 0
-            ? packet.OriginalSkillCode
-            : packet.SkillCode;
-        if (originalSkillCode <= 0)
-        {
-            return false;
-        }
-
-        if (packet.ValueKind is not CombatValueKind.PeriodicHealing)
-        {
-            return false;
-        }
-
-        key = new PeriodicHealingPoolKey(packet.SourceId, packet.TargetId, originalSkillCode);
-        isSeed = packet.IsPeriodicSelfMode(9) || packet.IsPeriodicTargetMode(9);
-        return true;
     }
 
     private static bool TryGetSystemPeriodicRecoverySeedKey(
@@ -1114,9 +1080,8 @@ public sealed class CombatMetricsStore
         _summonOwnerByInstance.Clear();
         _summonInstancesByOwner.Clear();
         _detailRevisionByCombatant.Clear();
-        lock (_periodicHealingPoolLock)
+        lock (_systemPeriodicRecoveryLock)
         {
-            _periodicHealingPools.Clear();
             _systemPeriodicRecoverySeeds.Clear();
         }
         lock (_multiHitLock)
@@ -1136,9 +1101,9 @@ public sealed class CombatMetricsStore
             _resolvedPeriodicLinkOrder.Clear();
             _currentAvoidanceBatchOrdinal = 0;
         }
-        lock (_shieldStateLock)
+        lock (_periodicChainLock)
         {
-            _shieldRemainingByKey.Clear();
+            _periodicChainByKey.Clear();
         }
         _lastObservedNpcSource = 0;
         CurrentTarget = 0;

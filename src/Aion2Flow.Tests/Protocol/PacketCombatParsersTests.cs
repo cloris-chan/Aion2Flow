@@ -198,8 +198,25 @@ public sealed class PacketCombatParsersTests
         Assert.Equal(sample.LegacySkillCode, parsed.LegacySkillCode);
         Assert.Equal(sample.Damage, parsed.Damage);
         Assert.Equal(sample.LinkId, parsed.LinkId);
+        Assert.Equal(sample.TailLength, parsed.TailLength);
         Assert.Equal(sample.TailRaw, parsed.TailRaw);
+        Assert.Equal(sample.TailSkillCodeRaw, parsed.TailSkillCodeRaw);
+        Assert.Equal(sample.TailPrefixValue, parsed.TailPrefixValue);
         Assert.Equal(sample.IsLinkRecord, parsed.IsLinkRecord);
+    }
+
+    [Fact]
+    public void Parses_0538_Periodic_Value_Tail_Skill_From_Extended_Tail()
+    {
+        var packet = HexHelper.Parse("140538010B012A785634120709EFCDAB00");
+
+        var ok = Packet0538PeriodicValueParser.TryParse(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal(5, parsed.TailLength);
+        Assert.Equal(0, parsed.TailRaw);
+        Assert.Equal(0x00ABCDEF, parsed.TailSkillCodeRaw);
+        Assert.Equal(9, parsed.TailPrefixValue);
     }
 
     [Theory]

@@ -11,7 +11,9 @@ internal readonly record struct Packet0538PeriodicValue(
     int LegacySkillCode,
     int Damage,
     int TailLength,
-    int TailRaw)
+    int TailRaw,
+    int TailSkillCodeRaw,
+    int TailPrefixValue)
 {
     public bool IsLinkRecord => Mode == 48;
 
@@ -40,13 +42,31 @@ internal static class Packet0538PeriodicValueParser
         if (!reader.TryReadVarInt(out var unknown)) return false;
         if (!reader.TryReadUInt32Le(out var skillCodeRaw)) return false;
         if (!reader.TryReadVarInt(out var damage)) return false;
+        var tailLength = reader.Remaining;
         var tailRaw = 0;
-        if (reader.Remaining == 4)
+        var tailSkillCodeRaw = 0;
+        var tailPrefixValue = 0;
+        if (tailLength >= 4)
         {
-            var tailReader = new PacketSpanReader(reader.RemainingSpan);
-            if (!tailReader.TryReadUInt32Le(out tailRaw))
+            var tail = reader.RemainingSpan;
+            var tailSkillReader = new PacketSpanReader(tail[^4..]);
+            if (!tailSkillReader.TryReadUInt32Le(out tailSkillCodeRaw))
             {
                 return false;
+            }
+
+            if (tailLength == 4)
+            {
+                tailRaw = tailSkillCodeRaw;
+            }
+            else
+            {
+                var tailPrefixReader = new PacketSpanReader(tail[..^4]);
+                if (tailPrefixReader.TryReadVarInt(out var parsedTailPrefixValue) &&
+                    tailPrefixReader.Remaining == 0)
+                {
+                    tailPrefixValue = parsedTailPrefixValue;
+                }
             }
         }
 
@@ -58,8 +78,10 @@ internal static class Packet0538PeriodicValueParser
             skillCodeRaw,
             skillCodeRaw / 100,
             damage,
-            reader.Remaining,
-            tailRaw);
+            tailLength,
+            tailRaw,
+            tailSkillCodeRaw,
+            tailPrefixValue);
         return true;
     }
 

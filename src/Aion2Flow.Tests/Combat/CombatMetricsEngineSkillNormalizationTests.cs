@@ -347,6 +347,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
         var store = new CombatMetricsStore();
 
         store.AppendNickname(playerId, "Perigee");
+        const int chainId = 4242;
         var seedPacket = new ParsedCombatPacket
         {
             SourceId = playerId,
@@ -354,6 +355,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             SkillCode = 17091250,
             OriginalSkillCode = 1709125011,
             Damage = 4676,
+            Unknown = chainId,
             Timestamp = 1_000
         };
         seedPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
@@ -369,6 +371,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
                 SkillCode = 17091250,
                 OriginalSkillCode = 1709125011,
                 Damage = remainingTotals[index],
+                Unknown = chainId,
                 Timestamp = 3_000 + (index * 2_000L)
             };
             tickPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);

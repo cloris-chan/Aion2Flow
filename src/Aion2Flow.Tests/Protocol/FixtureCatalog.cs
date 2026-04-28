@@ -13,7 +13,7 @@ public static class FixtureCatalog
 
     public sealed record Compact0438Sample(string Path, int TargetId, int SourceId, int SkillCodeRaw, int Marker, int Type, int Unknown, int Value, int Loop, int TailLength);
 
-    public sealed record PeriodicValueSample(string Path, int TargetId, int Mode, int SourceId, int SkillCodeRaw, int LegacySkillCode, int Damage, int LinkId = 0, int TailRaw = 0, bool IsLinkRecord = false);
+    public sealed record PeriodicValueSample(string Path, int TargetId, int Mode, int SourceId, int SkillCodeRaw, int LegacySkillCode, int Damage, int LinkId = 0, int TailRaw = 0, bool IsLinkRecord = false, int TailLength = 0, int TailSkillCodeRaw = 0, int TailPrefixValue = 0);
 
     public sealed record RemainHpSample(string Path, int NpcId, int Value0, int Value1, int Value2, uint Hp, int TailLength);
 
@@ -108,11 +108,11 @@ public static class FixtureCatalog
     {
         yield return [new PeriodicValueSample("combat/0538-dot.hex", 17640, 2, 1724, 1707024011, 17070240, 1713)];
         yield return [new PeriodicValueSample("combat/0538-hot-initial.hex", 12115, 1, 12115, 1709125011, 17091250, 4747)];
-        yield return [new PeriodicValueSample("combat/0538-hot-tick.hex", 12115, 3, 12115, 1709125011, 17091250, 4273)];
+        yield return [new PeriodicValueSample("combat/0538-hot-tick.hex", 12115, 3, 12115, 1709125011, 17091250, 4273, TailLength: 2)];
         yield return [new PeriodicValueSample("combat/0538-dot-tick-17080240.hex", 22090, 2, 12115, 1708024011, 17080240, 1117)];
         yield return [new PeriodicValueSample("combat/0538-summon-self-tick.hex", 18345, 2, 18345, 1715000611, 17150006, 1621)];
         yield return [new PeriodicValueSample("combat/0538-summon-self-terminal.hex", 18029, 2, 18029, 1715000611, 17150006, 1434)];
-        yield return [new PeriodicValueSample("combat/0538-mode48-link.hex", 16047, 48, 16047, 2001, 20, 29240, 29240, 1237540, true)];
+        yield return [new PeriodicValueSample("combat/0538-mode48-link.hex", 16047, 48, 16047, 2001, 20, 29240, 29240, 1237540, true, 4, 1237540)];
     }
 
     public static IEnumerable<object[]> RemainHpSamples()
