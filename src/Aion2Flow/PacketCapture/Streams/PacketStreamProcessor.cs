@@ -1395,7 +1395,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         var periodicTailHint = parsed.TailLength > 0
             ? $"|tailLen={parsed.TailLength}|tailRaw={parsed.TailRaw}|tailSkillRaw={parsed.TailSkillCodeRaw}|tailPrefix={parsed.TailPrefixValue}{FormatResolvedReferenceHint("tailSkill", parsed.TailSkillCodeRaw)}"
             : string.Empty;
-        RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|damage={parsed.Damage}{periodicTailHint}{FormatEffectHint(combatPacket)}{FormatResolvedCombatHint(combatPacket)}", packet);
+        RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|unknown={parsed.Unknown}|damage={parsed.Damage}{periodicTailHint}{FormatEffectHint(combatPacket)}{FormatResolvedCombatHint(combatPacket)}", packet);
         return _hasParsed = true;
     }
 
