@@ -147,7 +147,7 @@ public sealed class AnimatedItemsView : Panel
             container.Measure(measureSize);
             maxWidth = Math.Max(maxWidth, container.DesiredSize.Width);
 
-            if (_items.Count == 0)
+            if (_items.Count == 0 && removingCount < visibleItemLimit)
             {
                 if (removingCount > 0)
                 {
