@@ -39,7 +39,7 @@
                     IsEnabled="{Binding IsCapturing}"
                     VerticalAlignment="Center"
                     ToolTip.Tip="{markups:Translate Action_Reset}">
-                <PathIcon Data="{StaticResource arrows-rotate}" />
+                <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
             </Button>
 
             <Border Grid.Column="1"
@@ -60,12 +60,12 @@
                         Spacing="2">
                 <Button Classes="WindowBtn MinBtn"
                         Click="Minimize">
-                    <PathIcon Data="{StaticResource window-minimize}" />
+                    <Path Classes="Glyph GlyphSm" Data="{StaticResource minus}" />
                 </Button>
 
                 <Button Classes="WindowBtn CloseBtn"
                         Click="Exit">
-                    <PathIcon Data="{StaticResource xmark}" />
+                    <Path Classes="Glyph GlyphSm" Data="{StaticResource x}" />
                 </Button>
             </StackPanel>
         </Grid>
@@ -165,7 +165,7 @@
                     MinWidth="26"
                     VerticalAlignment="Center"
                     ToolTip.Tip="{Binding SelectedLanguage.DisplayName}">
-                <PathIcon Data="{Binding SelectedLanguage.IconGeometry}" />
+                <Path Classes="Glyph GlyphMd" Data="{StaticResource globe}" />
                 <Button.Flyout>
                     <MenuFlyout Placement="TopEdgeAlignedLeft"
                                 ShowMode="Transient"
@@ -175,9 +175,7 @@
                                   Tag="zh-TW"
                                   Click="LanguageMenuItemClicked">
                             <MenuItem.Icon>
-                                <PathIcon Data="{StaticResource language-zh}"
-                                          Width="16"
-                                          Height="16" />
+                                <Path Classes="Glyph GlyphLg" Data="{StaticResource globe}" />
                             </MenuItem.Icon>
                         </MenuItem>
                         <MenuItem Classes="FlyoutMenuItem"
@@ -185,9 +183,7 @@
                                   Tag="en-US"
                                   Click="LanguageMenuItemClicked">
                             <MenuItem.Icon>
-                                <PathIcon Data="{StaticResource language-en}"
-                                          Width="16"
-                                          Height="16" />
+                                <Path Classes="Glyph GlyphLg" Data="{StaticResource globe}" />
                             </MenuItem.Icon>
                         </MenuItem>
                         <MenuItem Classes="FlyoutMenuItem"
@@ -195,9 +191,7 @@
                                   Tag="ko-KR"
                                   Click="LanguageMenuItemClicked">
                             <MenuItem.Icon>
-                                <PathIcon Data="{StaticResource language-ko}"
-                                          Width="16"
-                                          Height="16" />
+                                <Path Classes="Glyph GlyphLg" Data="{StaticResource globe}" />
                             </MenuItem.Icon>
                         </MenuItem>
                     </MenuFlyout>
@@ -229,9 +223,9 @@
                             Spacing="4"
                             VerticalAlignment="Center"
                             ToolTip.Tip="{Binding LatencyToolTip}">
-                    <PathIcon Classes="BottomBarSignalIcon"
-                              Data="{StaticResource wifi}"
-                              Foreground="{Binding LatencyIndicatorColor}" />
+                    <Path Classes="Glyph GlyphMd BottomBarSignalGlyph"
+                          Data="{StaticResource wifi}"
+                          Stroke="{Binding LatencyIndicatorColor}" />
                     <controls:NumericBlock Classes="BottomBarMetric"
                                            Value="{Binding RoundTripTimeMilliseconds}"
                                            Suffix=" ms"
@@ -251,7 +245,7 @@
                         IsEnabled="{Binding IsViewingArchivedBattle}"
                         Command="{Binding ReturnToLiveCommand}"
                         ToolTip.Tip="{markups:Translate Action_Live}">
-                    <PathIcon Data="{StaticResource podcast-line}" />
+                    <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
                 </Button>
 
                 <Border Classes="BottomBarDivider"
@@ -263,7 +257,7 @@
                         MinWidth="26"
                         IsEnabled="{Binding HasArchivedBattles}"
                         ToolTip.Tip="{markups:Translate Column_History}">
-                    <PathIcon Data="{StaticResource angle-down}" />
+                    <Path Classes="Glyph GlyphMd" Data="{StaticResource history}" />
                     <Button.Flyout>
                         <MenuFlyout Placement="TopEdgeAlignedRight"
                                     ShowMode="Transient"

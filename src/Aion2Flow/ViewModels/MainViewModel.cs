@@ -1,6 +1,4 @@
 using System.Collections.ObjectModel;
-using Avalonia;
-using Avalonia.Media;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Model;
@@ -467,9 +465,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var selectedCode = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
         Languages.Clear();
-        Languages.Add(new LanguageOption(LanguageService.TraditionalChinese, "繁體中文", ResolveIconGeometry("language-zh")));
-        Languages.Add(new LanguageOption(LanguageService.English, "English", ResolveIconGeometry("language-en")));
-        Languages.Add(new LanguageOption(LanguageService.Korean, "한국어", ResolveIconGeometry("language-ko")));
+        Languages.Add(new LanguageOption(LanguageService.TraditionalChinese, "繁體中文"));
+        Languages.Add(new LanguageOption(LanguageService.English, "English"));
+        Languages.Add(new LanguageOption(LanguageService.Korean, "한국어"));
         SelectedLanguage = Languages.FirstOrDefault(x => x.Code == selectedCode) ?? Languages.FirstOrDefault();
     }
 
@@ -601,17 +599,5 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             LatencyToolTip = Localization["Status_RttEstimated"];
         }
     }
-
-    private static Geometry? ResolveIconGeometry(string resourceKey)
-    {
-        if (Application.Current is null)
-        {
-            return null;
-        }
-
-        return Application.Current.Resources.TryGetResource(resourceKey, Application.Current.ActualThemeVariant, out var resource) &&
-               resource is Geometry geometry
-            ? geometry
-            : null;
-    }
 }
+
