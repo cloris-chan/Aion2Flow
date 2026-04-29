@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
+             xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
+             x:Class="Cloris.Aion2Flow.Views.SettingsFlyoutView"
+             x:DataType="vm:SettingsFlyoutViewModel">
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
+    </UserControl.Styles>
+
+    <Border Classes="SettingsCard">
+        <StackPanel Spacing="0">
+            <Menu Classes="SettingsMenu">
+                <Menu.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" />
+                    </ItemsPanelTemplate>
+                </Menu.ItemsPanel>
+                <MenuItem x:Name="TopmostMenuItem"
+                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Loaded="TopmostMenuItemLoaded" />
+                <MenuItem x:Name="VisibleRowsMenuItem"
+                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Loaded="VisibleRowsMenuItemLoaded" />
+                <MenuItem x:Name="LanguageMenuItem"
+                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Loaded="LanguageMenuItemLoaded" />
+            </Menu>
+
+            <Border Classes="SettingsDivider"
+                    IsVisible="{Binding IsUpdateSectionVisible}" />
+
+            <Grid IsVisible="{Binding IsUpdateSectionVisible}"
+                  Margin="9,4,9,4"
+                  RowDefinitions="Auto,Auto,Auto"
+                  RowSpacing="4">
+                <TextBlock Grid.Row="0"
+                           Classes="SettingsUpdateVersion"
+                           Text="{Binding CurrentVersionText}"
+                           IsVisible="{Binding CurrentVersionText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <TextBlock Grid.Row="1"
+                           Classes="SettingsUpdateStatus"
+                           Text="{Binding UpdateStatusText}"
+                           IsVisible="{Binding UpdateStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <Grid Grid.Row="2"
+                      ColumnDefinitions="*,Auto"
+                      ColumnSpacing="6">
+                    <ProgressBar Grid.Column="0"
+                                 Classes="SettingsUpdateProgress"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding DownloadProgress}"
+                                 IsIndeterminate="{Binding IsCheckingUpdate}"
+                                 IsVisible="{Binding IsBusyOrChecking}" />
+
+                    <Button Grid.Column="1"
+                            Classes="SettingsUpdateButton"
+                            Command="{Binding RestartCommand}"
+                            IsVisible="{Binding CanRestartToUpdate}"
+                            Content="{markups:Translate Settings_Update_Restart}" />
+
+                    <Button Grid.Column="1"
+                            Classes="SettingsUpdateButton"
+                            Command="{Binding CheckForUpdatesCommand}"
+                            IsVisible="{Binding ShowCheckButton}"
+                            Content="{markups:Translate Settings_Update_Check}" />
+                </Grid>
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -24,7 +24,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService;
     private readonly CombatMetricsEngine _engine;
     private readonly CombatMetricsStore _store;
-    private readonly ProcessForegroundWatcher _processForegroundWatcher;
     private readonly LanguageService _languageService;
     private readonly GameResourceService _gameResourceService;
     private readonly BattleArchiveService _battleArchiveService;
@@ -39,8 +38,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public LocalizationService Localization { get; }
     public CombatantDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
+    public SettingsFlyoutViewModel SettingsFlyout { get; }
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
-    public ObservableCollection<LanguageOption> Languages { get; } = [];
     public ObservableCollection<BattleHistoryItemViewModel> BattleHistory { get; } = [];
 
     [ObservableProperty]
@@ -83,15 +82,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public partial CombatantRowViewModel? SelectedCombatant { get; set; }
 
     [ObservableProperty]
-    public partial int MaxVisibleCombatantRows { get; set; } = 4;
-
-    [ObservableProperty]
-    public partial bool IsTopMost { get; private set; }
-
-    [ObservableProperty]
-    public partial LanguageOption? SelectedLanguage { get; set; }
-
-    [ObservableProperty]
     public partial BattleHistoryItemViewModel? SelectedBattleHistory { get; set; }
 
     [ObservableProperty]
@@ -105,36 +95,33 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         ProcessPortDiscoveryService processPortDiscoveryService,
         CombatMetricsEngine engine,
         CombatMetricsStore store,
-        ProcessForegroundWatcher processForegroundWatcher,
         LanguageService languageService,
         GameResourceService gameResourceService,
         BattleArchiveService battleArchiveService,
         CombatantDetailsFlyoutViewModel combatantDetails,
-        LocalizationService localization)
+        LocalizationService localization,
+        SettingsFlyoutViewModel settingsFlyout)
     {
         _captureService = captureService;
         _processPortDiscoveryService = processPortDiscoveryService;
         _engine = engine;
         _store = store;
-        _processForegroundWatcher = processForegroundWatcher;
         _languageService = languageService;
         _gameResourceService = gameResourceService;
         _battleArchiveService = battleArchiveService;
         _combatantDetails = combatantDetails;
         Localization = localization;
+        SettingsFlyout = settingsFlyout;
 
         _captureService.StatusChanged += OnCaptureStatusChanged;
         _captureService.RttResolved += OnRttResolved;
-        _processForegroundWatcher.ForegroundChanged += OnForegroundChanged;
         _languageService.LanguageChanged += OnLanguageChanged;
         _gameResourceService.ResourcesChanged += OnResourcesChanged;
         _battleArchiveService.HistoryChanged += OnBattleHistoryChanged;
 
-        RebuildLanguageOptions();
         RebuildBattleHistory();
         ApplyLocalizedUiText();
         RefreshCaptureIndicators();
-        SelectedLanguage = Languages.FirstOrDefault(x => string.Equals(x.Code, _languageService.CurrentLanguage, StringComparison.Ordinal));
     }
 
     public Task InitializeAsync() => StartCaptureAsync();
@@ -142,14 +129,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private void OnRttResolved(double rtt)
     {
         Dispatcher.UIThread.Post(RefreshCaptureIndicators);
-    }
-
-    private void OnForegroundChanged(bool isTopMost)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            IsTopMost = isTopMost;
-        });
     }
 
     private void OnCaptureStatusChanged(string message)
@@ -165,7 +144,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
-            RebuildLanguageOptions();
             RebuildBattleHistory();
             ApplyLocalizedUiText();
             RefreshCaptureIndicators();
@@ -270,14 +248,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     partial void OnSelectedCombatantChanged(CombatantRowViewModel? oldValue, CombatantRowViewModel? newValue)
     {
         RefreshCombatantDetails();
-    }
-
-    partial void OnSelectedLanguageChanged(LanguageOption? value)
-    {
-        if (value is not null)
-        {
-            _languageService.SetLanguage(value.Code);
-        }
     }
 
     partial void OnSelectedBattleHistoryChanged(BattleHistoryItemViewModel? value)
@@ -445,12 +415,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _isDisposed = true;
         _captureService.StatusChanged -= OnCaptureStatusChanged;
         _captureService.RttResolved -= OnRttResolved;
-        _processForegroundWatcher.ForegroundChanged -= OnForegroundChanged;
         _languageService.LanguageChanged -= OnLanguageChanged;
         _gameResourceService.ResourcesChanged -= OnResourcesChanged;
         _battleArchiveService.HistoryChanged -= OnBattleHistoryChanged;
         await StopCaptureAsync().ConfigureAwait(false);
-        _processForegroundWatcher.Dispose();
         await _processPortDiscoveryService.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -459,16 +427,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         Status = Localization["Status_Ready"];
         BattleTimeSeconds = 0d;
         RoundTripTimeMilliseconds = 0;
-    }
-
-    private void RebuildLanguageOptions()
-    {
-        var selectedCode = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
-        Languages.Clear();
-        Languages.Add(new LanguageOption(LanguageService.TraditionalChinese, "繁體中文"));
-        Languages.Add(new LanguageOption(LanguageService.English, "English"));
-        Languages.Add(new LanguageOption(LanguageService.Korean, "한국어"));
-        SelectedLanguage = Languages.FirstOrDefault(x => x.Code == selectedCode) ?? Languages.FirstOrDefault();
     }
 
     private void RebuildBattleHistory()

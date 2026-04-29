@@ -1,21 +1,14 @@
 using System.Globalization;
-using Velopack.Locators;
 
 namespace Cloris.Aion2Flow.Services.Logging;
 
 internal static class LogDirectoryResolver
 {
+    private const string LogDirectoryName = "logs";
     private const string DumpLogDirectoryName = "dumps";
 
     public static string GetDefaultLogDirectory()
-    {
-        if (TryResolveVelopackLogDirectory(out var logDirectory))
-        {
-            return logDirectory;
-        }
-
-        return ResolveLogDirectory(AppContext.BaseDirectory);
-    }
+        => Path.Combine(WorkingDirectoryResolver.GetWorkingDirectory(), LogDirectoryName);
 
     public static string FormatLogSessionTimestamp(DateTimeOffset timestamp)
         => timestamp.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
@@ -49,39 +42,8 @@ internal static class LogDirectoryResolver
     }
 
     internal static string ResolveLogDirectory(string baseDirectory)
-    {
-        var appDirectory = new DirectoryInfo(Path.GetFullPath(baseDirectory));
-        return Path.Combine(appDirectory.FullName, "logs");
-    }
+        => Path.Combine(WorkingDirectoryResolver.GetWorkingDirectory(baseDirectory), LogDirectoryName);
 
     internal static string ResolveLogDirectory(string baseDirectory, string? velopackRootAppDirectory)
-    {
-        if (!string.IsNullOrWhiteSpace(velopackRootAppDirectory))
-        {
-            return Path.Combine(Path.GetFullPath(velopackRootAppDirectory), "logs");
-        }
-
-        return ResolveLogDirectory(baseDirectory);
-    }
-
-    private static bool TryResolveVelopackLogDirectory(out string logDirectory)
-    {
-        logDirectory = string.Empty;
-
-        try
-        {
-            var locator = VelopackLocator.Current;
-            if (locator.CurrentlyInstalledVersion is null)
-            {
-                return false;
-            }
-
-            logDirectory = ResolveLogDirectory(AppContext.BaseDirectory, locator.RootAppDir);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
+        => Path.Combine(WorkingDirectoryResolver.GetWorkingDirectory(baseDirectory, velopackRootAppDirectory), LogDirectoryName);
 }

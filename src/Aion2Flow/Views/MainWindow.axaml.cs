@@ -72,18 +72,6 @@ public partial class MainWindow : Window
         DataContext.SelectCombatantCommand.Execute(null);
     }
 
-    private void LanguageMenuItemClicked(object? sender, RoutedEventArgs e)
-    {
-        if (sender is MenuItem { Tag: string languageCode })
-        {
-            var option = DataContext.Languages.FirstOrDefault(x => string.Equals(x.Code, languageCode, StringComparison.Ordinal));
-            if (option is not null)
-            {
-                DataContext.SelectedLanguage = option;
-            }
-        }
-    }
-
     private void OnBattleHistoryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         RebuildBattleHistoryMenuItems();

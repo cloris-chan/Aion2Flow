@@ -14,12 +14,12 @@ public sealed class LocalizationServicesTests
         languageService.SetLanguage(LanguageService.TraditionalChinese);
         using var localization = new LocalizationService(languageService);
 
-        Assert.Equal("就緒", localization["Status.Ready"]);
+        Assert.Equal("就緒", localization["Status_Ready"]);
 
         var changed = languageService.SetLanguage(LanguageService.English);
 
         Assert.True(changed);
-        Assert.Equal("Ready", localization["Status.Ready"]);
+        Assert.Equal("Ready", localization["Status_Ready"]);
     }
 
     [Fact]

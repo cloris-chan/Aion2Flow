@@ -8,6 +8,7 @@ using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Logging;
+using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,6 +48,7 @@ internal static class Program
         services.AddSingleton(logWriter);
         AppLog.Initialize(logWriter);
 
+        services.AddSingleton<SettingsService>();
         services.AddSingleton<App>();
         services.AddSingleton<LanguageService>();
         services.AddSingleton<GameResourceService>();
@@ -59,6 +61,7 @@ internal static class Program
         services.AddSingleton<ProcessPortDiscoveryService>();
         services.AddSingleton<ProcessForegroundWatcher>();
         services.AddSingleton<WinDivertCaptureService>();
+        services.AddSingleton<SettingsFlyoutViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainAppWindow>();
 
