@@ -71,7 +71,7 @@
   <data name="MetricShort_PeriodicHits" xml:space="preserve"><value>持續次數</value></data>
 
   <!-- Combat stats -->
-  <data name="Stat_Critical" xml:space="preserve"><value>致命</value></data>
+  <data name="Stat_Critical" xml:space="preserve"><value>暴擊</value></data>
   <data name="Stat_Perfect" xml:space="preserve"><value>完美</value></data>
   <data name="Stat_Smite" xml:space="preserve"><value>強擊</value></data>
   <data name="Stat_MultiHit" xml:space="preserve"><value>多段打擊</value></data>

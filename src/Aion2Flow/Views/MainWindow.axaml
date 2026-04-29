@@ -34,7 +34,7 @@
               ColumnSpacing="2"
               Margin="1,0,1,2">
             <Button Grid.Column="0"
-                    Classes="WindowBtn MainWindowBtn RefreshBtn"
+                    Classes="WindowBtn RefreshBtn"
                     Command="{Binding ResetCommand}"
                     IsEnabled="{Binding IsCapturing}"
                     VerticalAlignment="Center"
@@ -58,12 +58,12 @@
                         Classes="TitleBarActions"
                         Orientation="Horizontal"
                         Spacing="2">
-                <Button Classes="WindowBtn MainWindowBtn MinBtn"
+                <Button Classes="WindowBtn MinBtn"
                         Click="Minimize">
                     <PathIcon Data="{StaticResource window-minimize}" />
                 </Button>
 
-                <Button Classes="WindowBtn MainWindowBtn CloseBtn"
+                <Button Classes="WindowBtn CloseBtn"
                         Click="Exit">
                     <PathIcon Data="{StaticResource xmark}" />
                 </Button>
@@ -97,9 +97,7 @@
                                     Name="RowAccent"
                                     Classes="MainRowAccent" />
 
-                            <Panel Grid.Column="1"
-                                   Width="34"
-                                   Height="34">
+                            <Panel Grid.Column="1">
                                 <Panel Width="30"
                                        Height="30"
                                        ClipToBounds="True"
@@ -163,13 +161,11 @@
               ColumnSpacing="6"
               Margin="1,2,1,0">
             <Button Grid.Column="0"
-                    Classes="BottomBarButton MainBottomBarButton"
+                    Classes="BottomBarButton"
                     MinWidth="26"
                     VerticalAlignment="Center"
                     ToolTip.Tip="{Binding SelectedLanguage.DisplayName}">
-                <PathIcon Data="{Binding SelectedLanguage.IconGeometry}"
-                          Width="15"
-                          Height="15" />
+                <PathIcon Data="{Binding SelectedLanguage.IconGeometry}" />
                 <Button.Flyout>
                     <MenuFlyout Placement="TopEdgeAlignedLeft"
                                 ShowMode="Transient"
@@ -249,29 +245,25 @@
                         Spacing="0"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Right">
-                <Button Classes="BottomBarButton MainBottomBarButton"
+                <Button Classes="BottomBarButton"
                         CornerRadius="999,0,0,999"
                         MinWidth="26"
                         IsEnabled="{Binding IsViewingArchivedBattle}"
                         Command="{Binding ReturnToLiveCommand}"
                         ToolTip.Tip="{markups:Translate Action_Live}">
-                    <PathIcon Data="{StaticResource podcast-line}"
-                              Width="13"
-                              Height="13" />
+                    <PathIcon Data="{StaticResource podcast-line}" />
                 </Button>
 
                 <Border Classes="BottomBarDivider"
                         IsHitTestVisible="False" />
 
                 <Button x:Name="BattleHistoryButton"
-                        Classes="BottomBarButton MainBottomBarButton"
+                        Classes="BottomBarButton"
                         CornerRadius="0,999,999,0"
                         MinWidth="26"
                         IsEnabled="{Binding HasArchivedBattles}"
                         ToolTip.Tip="{markups:Translate Column_History}">
-                    <PathIcon Data="{StaticResource angle-down}"
-                              Width="11"
-                              Height="11" />
+                    <PathIcon Data="{StaticResource angle-down}" />
                     <Button.Flyout>
                         <MenuFlyout Placement="TopEdgeAlignedRight"
                                     ShowMode="Transient"

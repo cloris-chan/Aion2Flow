@@ -19,14 +19,10 @@
         <SolidColorBrush x:Key="OverlayBrush.RowShareText">#9FB0BE</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.Share">#2C85A8C4</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.ShellBorder">#22596570</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.MainPill">#0C000000</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.MainPillBorder">#14FFFFFF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowCard">#07000000</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowCardStrong">#10000000</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowCardBorder">#00000000</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowCardBorderStrong">#0CFFFFFF</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.ShareSoft">#10000000</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.ShareSoftBorder">#16FFFFFF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainAccent">#E3C78C</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailBackdrop">#5A060A0D</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSurface">#24060A0D</SolidColorBrush>
@@ -101,8 +97,8 @@
 
     <Style Selector="controls|NumericBlock.OverlayHeaderMetric">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="12" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
     <Style Selector="Border.BottomBarPill">
@@ -115,16 +111,6 @@
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
-    <Style Selector="Border.OverlayHeaderPill">
-        <Setter Property="Padding" Value="8,0" />
-        <Setter Property="MinHeight" Value="30" />
-    </Style>
-
-    <Style Selector="Border.MainTitleBar">
-        <Setter Property="Padding" Value="2" />
-        <Setter Property="MinHeight" Value="28" />
-    </Style>
-
     <Style Selector="Border.TitleBarDragRegion">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Padding" Value="5,0,2,0" />
@@ -132,16 +118,8 @@
         <Setter Property="VerticalAlignment" Value="Stretch" />
     </Style>
 
-    <Style Selector="Border.OverlayWindowActionsPill">
-        <Setter Property="Padding" Value="2" />
-    </Style>
-
     <Style Selector="StackPanel.TitleBarActions">
         <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="Border.BottomBarInfoPill">
-        <Setter Property="Padding" Value="8,0" />
     </Style>
 
     <Style Selector="Border.BottomBarDivider">
@@ -166,8 +144,8 @@
 
     <Style Selector="Button.WindowBtn PathIcon">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
-        <Setter Property="Width" Value="11" />
-        <Setter Property="Height" Value="11" />
+        <Setter Property="Width" Value="12" />
+        <Setter Property="Height" Value="12" />
         <Setter Property="RenderTransformOrigin" Value="50%,50%" />
         <Setter Property="Transitions">
             <Transitions>
@@ -227,8 +205,8 @@
 
     <Style Selector="Button.BottomBarButton PathIcon">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="Width" Value="13" />
-        <Setter Property="Height" Value="13" />
+        <Setter Property="Width" Value="14" />
+        <Setter Property="Height" Value="14" />
     </Style>
 
     <Style Selector="Button.BottomBarButton:pointerover">
@@ -302,8 +280,8 @@
     </Style>
 
     <Style Selector="PathIcon.BottomBarSignalIcon">
-        <Setter Property="Width" Value="13" />
-        <Setter Property="Height" Value="13" />
+        <Setter Property="Width" Value="14" />
+        <Setter Property="Height" Value="14" />
         <Setter Property="Margin" Value="0,0,1,0" />
     </Style>
 
@@ -318,21 +296,6 @@
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-
-    <Style Selector="Border.MainWindowPill">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.MainPill}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.MainPillBorder}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="999" />
-    </Style>
-
-    <Style Selector="Button.MainWindowBtn:pointerover">
-        <Setter Property="Background" Value="#14FFFFFF" />
-    </Style>
-
-    <Style Selector="Button.MainBottomBarButton:pointerover">
-        <Setter Property="Background" Value="#12FFFFFF" />
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem Border#RowRoot">
@@ -477,13 +440,6 @@
         <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
-    <Style Selector="Border.MainShareBadge">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.ShareSoft}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.ShareSoftBorder}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="5,1" />
-    </Style>
-
     <Style Selector="Border.DetailFlyoutCard">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailBackdrop}" />
         <Setter Property="BorderBrush" Value="#22FFFFFF" />
@@ -602,28 +558,28 @@
         <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailCard}" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Padding" Value="10,8" />
-        <Setter Property="MinWidth" Value="104" />
-        <Setter Property="Margin" Value="0,0,6,6" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="7,5" />
+        <Setter Property="MinWidth" Value="84" />
+        <Setter Property="Margin" Value="0,0,4,4" />
     </Style>
 
     <Style Selector="TextBlock.MetricLabel">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="10" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="controls|NumericBlock.MetricValue">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="UseGrouping" Value="True" />
     </Style>
 
     <Style Selector="controls|NumericBlock.MetricSplitValue">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="UseGrouping" Value="True" />
     </Style>
@@ -636,7 +592,7 @@
 
     <Style Selector="controls|NumericBlock.MetricSplitSecondary">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
-        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>

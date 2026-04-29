@@ -420,7 +420,7 @@
 
                     <Border Grid.Column="1"
                             Classes="CounterpartTable CounterpartSplitTable"
-                            Width="396"
+                            Width="464"
                             Height="{Binding Bounds.Height, ElementName=SupportSummaryMetricsHost}"
                             DataContext="{Binding SupportCounterpartFilter}"
                             x:DataType="vm:DetailCounterpartFilterViewModel"
