@@ -38,7 +38,7 @@
                     Command="{Binding ResetCommand}"
                     IsEnabled="{Binding IsCapturing}"
                     VerticalAlignment="Center"
-                    ToolTip.Tip="{markups:Translate Action_Reset}">
+                    ToolTip.Tip="{markups:Translate Action_BattleReset}">
                 <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
             </Button>
 

@@ -14,7 +14,7 @@
   </resheader>
 
   <!-- Action -->
-  <data name="Action_Reset" xml:space="preserve"><value>Reset</value></data>
+    <data name="Action_BattleReset" xml:space="preserve"><value>Reset battle</value></data>
   <data name="Action_Live" xml:space="preserve"><value>Live</value></data>
   <data name="Action_SelectAll" xml:space="preserve"><value>Select All</value></data>
 
@@ -26,6 +26,10 @@
   <data name="Settings_Topmost_Never" xml:space="preserve"><value>Never</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>Visible rows</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>Language</value></data>
+  <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>Battle reset hotkey</value></data>
+  <data name="Settings_Hotkey_None" xml:space="preserve"><value>None</value></data>
+  <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>Press keys…</value></data>
+  <data name="Settings_Hotkey_Clear" xml:space="preserve"><value>Clear hotkey</value></data>
   <data name="Settings_Update_Check" xml:space="preserve"><value>Check for updates</value></data>
   <data name="Settings_Update_Restart" xml:space="preserve"><value>Restart to update</value></data>
   <data name="Settings_Update_Checking" xml:space="preserve"><value>Checking for updates…</value></data>

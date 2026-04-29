@@ -5,6 +5,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.ViewModels;
 using CommunityToolkit.Mvvm.DependencyInjection;
 
@@ -12,26 +13,73 @@ namespace Cloris.Aion2Flow.Views;
 
 public partial class MainWindow : Window
 {
+    private readonly GlobalHotkeyService _globalHotkeyService;
+    private bool _hotkeyAttached;
+
     public new MainViewModel DataContext { get => (MainViewModel)base.DataContext!; set => base.DataContext = value; }
 
     public MainWindow()
     {
         DataContext = Ioc.Default.GetRequiredService<MainViewModel>();
+        _globalHotkeyService = Ioc.Default.GetRequiredService<GlobalHotkeyService>();
         DataContext.InitializeAsync().ConfigureAwait(false);
         AvaloniaXamlLoader.Load(this);
         DataContext.BattleHistory.CollectionChanged += OnBattleHistoryCollectionChanged;
         RebuildBattleHistoryMenuItems();
+        _globalHotkeyService.Triggered += OnGlobalHotkeyTriggered;
     }
 
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
         RebuildBattleHistoryMenuItems();
+        AttachGlobalHotkeyHook();
+    }
+
+    private void AttachGlobalHotkeyHook()
+    {
+        if (_hotkeyAttached)
+        {
+            return;
+        }
+
+        var hwnd = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        Win32Properties.AddWndProcHookCallback(this, WndProcHook);
+        _globalHotkeyService.AttachWindow(hwnd);
+        _hotkeyAttached = true;
+    }
+
+    private nint WndProcHook(nint hWnd, uint msg, nint wParam, nint lParam, ref bool handled)
+    {
+        if (msg == GlobalHotkeyService.WmHotkey)
+        {
+            _globalHotkeyService.HandleWindowMessage(msg, wParam);
+        }
+        return default;
+    }
+
+    private void OnGlobalHotkeyTriggered()
+    {
+        if (!DataContext.IsCapturing)
+        {
+            return;
+        }
+        if (DataContext.ResetCommand.CanExecute(null))
+        {
+            DataContext.ResetCommand.Execute(null);
+        }
     }
 
     protected override void OnClosed(EventArgs e)
     {
         DataContext.BattleHistory.CollectionChanged -= OnBattleHistoryCollectionChanged;
+        _globalHotkeyService.Triggered -= OnGlobalHotkeyTriggered;
+        _globalHotkeyService.SetHotkey(null);
         base.OnClosed(e);
         DataContext.DisposeAsync().AsTask().ConfigureAwait(false);
     }

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,6 +15,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     private readonly SettingsService _settingsService;
     private readonly AppUpdateService _updateService;
     private readonly ProcessForegroundWatcher _processForegroundWatcher;
+    private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly bool _isApplyingPersistedSettings;
 
     public SettingsFlyoutViewModel(
@@ -21,13 +23,15 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         LanguageService languageService,
         SettingsService settingsService,
         AppUpdateService updateService,
-        ProcessForegroundWatcher processForegroundWatcher)
+        ProcessForegroundWatcher processForegroundWatcher,
+        GlobalHotkeyService globalHotkeyService)
     {
         Localization = localization;
         _languageService = languageService;
         _settingsService = settingsService;
         _updateService = updateService;
         _processForegroundWatcher = processForegroundWatcher;
+        _globalHotkeyService = globalHotkeyService;
 
         var persisted = _settingsService.Current;
         if (!string.IsNullOrWhiteSpace(persisted.Language))
@@ -40,11 +44,17 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         {
             TopmostMode = persisted.TopmostMode;
             MaxVisibleCombatantRows = persisted.MaxVisibleCombatantRows;
+            if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
+            {
+                BattleResetHotkey = new HotkeyDefinition((HotkeyModifiers)mods, vk);
+            }
         }
         finally
         {
             _isApplyingPersistedSettings = false;
         }
+
+        _globalHotkeyService.SetHotkey(BattleResetHotkey);
 
         RebuildLanguageOptions();
         SelectedLanguage = Languages.FirstOrDefault(x => string.Equals(x.Code, _languageService.CurrentLanguage, StringComparison.Ordinal));
@@ -80,6 +90,29 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
     public partial LanguageOption? SelectedLanguage { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ResetHotkeyDisplay))]
+    [NotifyPropertyChangedFor(nameof(HasResetHotkey))]
+    public partial HotkeyDefinition? BattleResetHotkey { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ResetHotkeyDisplay))]
+    public partial bool IsCapturingResetHotkey { get; set; }
+
+    public string ResetHotkeyDisplay
+    {
+        get
+        {
+            if (IsCapturingResetHotkey)
+            {
+                return Localization["Settings_Hotkey_PressKeys"];
+            }
+            return BattleResetHotkey?.Display ?? Localization["Settings_Hotkey_None"];
+        }
+    }
+
+    public bool HasResetHotkey => BattleResetHotkey is not null;
 
     public bool IsAlwaysOnTop => TopmostMode switch
     {
@@ -154,6 +187,31 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         }
     }
 
+    partial void OnBattleResetHotkeyChanged(HotkeyDefinition? value)
+    {
+        _globalHotkeyService.SetHotkey(value);
+        PersistSettings();
+    }
+
+    [RelayCommand]
+    private void BeginCaptureBattleResetHotkey() => IsCapturingResetHotkey = true;
+
+    [RelayCommand]
+    private void CancelCaptureBattleResetHotkey() => IsCapturingResetHotkey = false;
+
+    [RelayCommand]
+    private void ClearBattleResetHotkey()
+    {
+        IsCapturingResetHotkey = false;
+        BattleResetHotkey = null;
+    }
+
+    public void ApplyCapturedHotkey(HotkeyDefinition definition)
+    {
+        IsCapturingResetHotkey = false;
+        BattleResetHotkey = definition;
+    }
+
     private void PersistSettings()
     {
         if (_isApplyingPersistedSettings)
@@ -166,6 +224,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.TopmostMode = TopmostMode;
             s.MaxVisibleCombatantRows = MaxVisibleCombatantRows;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
+            s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
+            s.BattleResetHotkeyVirtualKey = BattleResetHotkey?.VirtualKey;
         });
     }
 
@@ -185,6 +245,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(LanguageDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(CurrentVersionText));
+        OnPropertyChanged(nameof(ResetHotkeyDisplay));
     }
 
     private void RebuildLanguageOptions()

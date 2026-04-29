@@ -27,6 +27,28 @@
                           Loaded="LanguageMenuItemLoaded" />
             </Menu>
 
+            <Border Classes="SettingsHotkeyRow"
+                    Focusable="True"
+                    PointerPressed="BattleResetHotkeyRowPressed"
+                    KeyDown="BattleResetHotkeyRowKeyDown"
+                    LostFocus="BattleResetHotkeyRowLostFocus">
+                <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+                    <TextBlock Grid.Column="0"
+                               Classes="SettingsRowLabel"
+                               Text="{markups:Translate Settings_Hotkey_BattleReset}" />
+                    <TextBlock Grid.Column="1"
+                               Classes="SettingsRowValue"
+                               Text="{Binding ResetHotkeyDisplay}" />
+                    <Button Grid.Column="2"
+                            Classes="HotkeyClearButton"
+                            Command="{Binding ClearBattleResetHotkeyCommand}"
+                            IsVisible="{Binding HasResetHotkey}"
+                            ToolTip.Tip="{markups:Translate Settings_Hotkey_Clear}">
+                        <Path Classes="Glyph GlyphSm" Data="{StaticResource x}" />
+                    </Button>
+                </Grid>
+            </Border>
+
             <Border Classes="SettingsDivider"
                     IsVisible="{Binding IsUpdateSectionVisible}" />
 

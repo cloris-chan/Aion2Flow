@@ -353,6 +353,41 @@
         <Setter Property="Margin" Value="9,4,9,4" />
     </Style>
 
+    <Style Selector="Border.SettingsHotkeyRow">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="9,6" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Margin" Value="3,1" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="Border.SettingsHotkeyRow:pointerover">
+        <Setter Property="Background" Value="#28FFFFFF" />
+    </Style>
+
+    <Style Selector="Border.SettingsHotkeyRow:focus">
+        <Setter Property="Background" Value="#30FFFFFF" />
+    </Style>
+
+    <Style Selector="Button.HotkeyClearButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="2" />
+        <Setter Property="Margin" Value="6,0,0,0" />
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+    </Style>
+
+    <Style Selector="Button.HotkeyClearButton:pointerover">
+        <Setter Property="Background" Value="#28FFFFFF" />
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+    </Style>
+
     <Style Selector="TextBlock.SettingsUpdateVersion">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
         <Setter Property="FontSize" Value="11" />

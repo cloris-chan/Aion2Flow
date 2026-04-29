@@ -1,9 +1,11 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Views;
@@ -31,10 +33,7 @@ public partial class SettingsFlyoutView : UserControl
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             _viewModel.Languages.CollectionChanged -= OnLanguagesCollectionChanged;
         }
-        if (_localization is not null)
-        {
-            _localization.LanguageChanged -= OnLocalizationLanguageChanged;
-        }
+        _localization?.LanguageChanged -= OnLocalizationLanguageChanged;
 
         _viewModel = ViewModel;
         _localization = _viewModel?.Localization;
@@ -44,10 +43,7 @@ public partial class SettingsFlyoutView : UserControl
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             _viewModel.Languages.CollectionChanged += OnLanguagesCollectionChanged;
         }
-        if (_localization is not null)
-        {
-            _localization.LanguageChanged += OnLocalizationLanguageChanged;
-        }
+        _localization?.LanguageChanged += OnLocalizationLanguageChanged;
 
         RebuildTopmostMenuItems();
         RebuildVisibleRowsMenuItems();
@@ -292,7 +288,7 @@ public partial class SettingsFlyoutView : UserControl
     {
         var grid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto)],
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         var labelText = new TextBlock { Text = label };
@@ -325,5 +321,60 @@ public partial class SettingsFlyoutView : UserControl
         path.Classes.Add("Glyph");
         path.Classes.Add("GlyphLg");
         return path;
+    }
+
+    private void BattleResetHotkeyRowPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border border || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        border.Focus();
+        if (!vm.IsCapturingResetHotkey)
+        {
+            vm.BeginCaptureBattleResetHotkeyCommand.Execute(null);
+        }
+        e.Handled = true;
+    }
+
+    private void BattleResetHotkeyRowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (ViewModel is not { } vm || !vm.IsCapturingResetHotkey)
+        {
+            return;
+        }
+
+        if (e.Key is Key.Escape)
+        {
+            vm.CancelCaptureBattleResetHotkeyCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl
+            or Key.LeftAlt or Key.RightAlt
+            or Key.LeftShift or Key.RightShift
+            or Key.LWin or Key.RWin)
+        {
+            return;
+        }
+
+        var definition = HotkeyDefinition.FromKeyEvent(e.KeyModifiers, e.Key);
+        if (definition is null)
+        {
+            return;
+        }
+
+        vm.ApplyCapturedHotkey(definition);
+        e.Handled = true;
+    }
+
+    private void BattleResetHotkeyRowLostFocus(object? sender, FocusChangedEventArgs e)
+    {
+        if (ViewModel is { IsCapturingResetHotkey: true } vm)
+        {
+            vm.CancelCaptureBattleResetHotkeyCommand.Execute(null);
+        }
     }
 }

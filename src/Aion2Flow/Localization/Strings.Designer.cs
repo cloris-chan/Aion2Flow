@@ -61,20 +61,20 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Reset battle.
+        /// </summary>
+        internal static string Action_BattleReset {
+            get {
+                return ResourceManager.GetString("Action_BattleReset", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Live.
         /// </summary>
         internal static string Action_Live {
             get {
                 return ResourceManager.GetString("Action_Live", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Reset.
-        /// </summary>
-        internal static string Action_Reset {
-            get {
-                return ResourceManager.GetString("Action_Reset", resourceCulture);
             }
         }
         
@@ -372,6 +372,177 @@ namespace Cloris.Aion2Flow.Localization {
         internal static string MetricShort_ShieldAbsorbed {
             get {
                 return ResourceManager.GetString("MetricShort_ShieldAbsorbed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Battle reset hotkey.
+        /// </summary>
+        internal static string Settings_Hotkey_BattleReset {
+            get {
+                return ResourceManager.GetString("Settings_Hotkey_BattleReset", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Clear hotkey.
+        /// </summary>
+        internal static string Settings_Hotkey_Clear {
+            get {
+                return ResourceManager.GetString("Settings_Hotkey_Clear", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to None.
+        /// </summary>
+        internal static string Settings_Hotkey_None {
+            get {
+                return ResourceManager.GetString("Settings_Hotkey_None", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Press keys….
+        /// </summary>
+        internal static string Settings_Hotkey_PressKeys {
+            get {
+                return ResourceManager.GetString("Settings_Hotkey_PressKeys", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Language.
+        /// </summary>
+        internal static string Settings_Language {
+            get {
+                return ResourceManager.GetString("Settings_Language", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Settings.
+        /// </summary>
+        internal static string Settings_Title {
+            get {
+                return ResourceManager.GetString("Settings_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Topmost mode.
+        /// </summary>
+        internal static string Settings_Topmost {
+            get {
+                return ResourceManager.GetString("Settings_Topmost", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Always.
+        /// </summary>
+        internal static string Settings_Topmost_Always {
+            get {
+                return ResourceManager.GetString("Settings_Topmost_Always", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to While game is active.
+        /// </summary>
+        internal static string Settings_Topmost_GameForeground {
+            get {
+                return ResourceManager.GetString("Settings_Topmost_GameForeground", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Never.
+        /// </summary>
+        internal static string Settings_Topmost_Never {
+            get {
+                return ResourceManager.GetString("Settings_Topmost_Never", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Check for updates.
+        /// </summary>
+        internal static string Settings_Update_Check {
+            get {
+                return ResourceManager.GetString("Settings_Update_Check", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Checking for updates….
+        /// </summary>
+        internal static string Settings_Update_Checking {
+            get {
+                return ResourceManager.GetString("Settings_Update_Checking", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to v{0}.
+        /// </summary>
+        internal static string Settings_Update_CurrentVersionFormat {
+            get {
+                return ResourceManager.GetString("Settings_Update_CurrentVersionFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Downloading… {0}%.
+        /// </summary>
+        internal static string Settings_Update_DownloadingFormat {
+            get {
+                return ResourceManager.GetString("Settings_Update_DownloadingFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Update failed.
+        /// </summary>
+        internal static string Settings_Update_Failed {
+            get {
+                return ResourceManager.GetString("Settings_Update_Failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Update {0} ready — restart to apply.
+        /// </summary>
+        internal static string Settings_Update_ReadyFormat {
+            get {
+                return ResourceManager.GetString("Settings_Update_ReadyFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Restart to update.
+        /// </summary>
+        internal static string Settings_Update_Restart {
+            get {
+                return ResourceManager.GetString("Settings_Update_Restart", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Up to date.
+        /// </summary>
+        internal static string Settings_Update_UpToDate {
+            get {
+                return ResourceManager.GetString("Settings_Update_UpToDate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Visible rows.
+        /// </summary>
+        internal static string Settings_VisibleRows {
+            get {
+                return ResourceManager.GetString("Settings_VisibleRows", resourceCulture);
             }
         }
         

@@ -7,6 +7,7 @@ using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Logging;
 using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
@@ -27,7 +28,7 @@ internal static class Program
 
         var serviceProvider = CreateServiceProvider();
         AppBuilder
-            .Configure(() => serviceProvider.GetRequiredService<App>())
+            .Configure(serviceProvider.GetRequiredService<App>)
             .UsePlatformDetect()
             .StartWithClassicDesktopLifetime(args);
 
@@ -61,6 +62,7 @@ internal static class Program
         services.AddSingleton<ProcessPortDiscoveryService>();
         services.AddSingleton<ProcessForegroundWatcher>();
         services.AddSingleton<WinDivertCaptureService>();
+        services.AddSingleton<GlobalHotkeyService>();
         services.AddSingleton<SettingsFlyoutViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainAppWindow>();

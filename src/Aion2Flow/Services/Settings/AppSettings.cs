@@ -9,4 +9,8 @@ public sealed class AppSettings
     public int MaxVisibleCombatantRows { get; set; } = 4;
 
     public string? Language { get; set; }
+
+    public uint? BattleResetHotkeyModifiers { get; set; }
+
+    public uint? BattleResetHotkeyVirtualKey { get; set; }
 }

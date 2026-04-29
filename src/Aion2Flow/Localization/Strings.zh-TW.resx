@@ -14,7 +14,7 @@
   </resheader>
 
   <!-- Action -->
-  <data name="Action_Reset" xml:space="preserve"><value>重置</value></data>
+    <data name="Action_BattleReset" xml:space="preserve"><value>重置戰鬥</value></data>
   <data name="Action_Live" xml:space="preserve"><value>即時</value></data>
   <data name="Action_SelectAll" xml:space="preserve"><value>全選</value></data>
 
@@ -26,6 +26,10 @@
   <data name="Settings_Topmost_Never" xml:space="preserve"><value>從不</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>顯示行數</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
+  <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戰鬥重置快捷鍵</value></data>
+  <data name="Settings_Hotkey_None" xml:space="preserve"><value>未設定</value></data>
+  <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>請按下按鍵…</value></data>
+  <data name="Settings_Hotkey_Clear" xml:space="preserve"><value>清除熱鍵</value></data>
   <data name="Settings_Update_Check" xml:space="preserve"><value>檢查更新</value></data>
   <data name="Settings_Update_Restart" xml:space="preserve"><value>重啟以更新</value></data>
   <data name="Settings_Update_Checking" xml:space="preserve"><value>正在檢查更新…</value></data>
