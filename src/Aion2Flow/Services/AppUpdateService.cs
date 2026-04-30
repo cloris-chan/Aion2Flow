@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Services.Logging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -27,6 +29,7 @@ public sealed partial class AppUpdateService : ObservableObject
 
     private Task? _activeTask;
     private VelopackAsset? _pendingUpdate;
+    private volatile bool _restartUpdateRequested;
 
     [ObservableProperty]
     public partial AppUpdateState State { get; private set; } = AppUpdateState.Idle;
@@ -67,6 +70,8 @@ public sealed partial class AppUpdateService : ObservableObject
             try
             {
                 _updateManager.WaitExitThenApplyUpdates(pending, true, true, []);
+                _restartUpdateRequested = true;
+                Dispatcher.UIThread.Post(RequestShutdown);
             }
             catch (Exception ex)
             {
@@ -83,6 +88,11 @@ public sealed partial class AppUpdateService : ObservableObject
     public void PreparePendingUpdateForShutdown()
     {
         _shutdown.Cancel();
+
+        if (_restartUpdateRequested)
+        {
+            return;
+        }
 
         var updateToApply = _pendingUpdate ?? _updateManager.UpdatePendingRestart;
         if (updateToApply is null)
@@ -186,5 +196,16 @@ public sealed partial class AppUpdateService : ObservableObject
         {
             return false;
         }
+    }
+
+    private static void RequestShutdown()
+    {
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown();
+            return;
+        }
+
+        Environment.Exit(0);
     }
 }
