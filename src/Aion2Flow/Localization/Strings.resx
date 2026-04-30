@@ -109,4 +109,11 @@
   <data name="Column_Skill" xml:space="preserve"><value>Skill</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>Direct</value></data>
   <data name="Column_Share" xml:space="preserve"><value>Share</value></data>
+
+  <!-- Battle scene labels (used in archived battle history) -->
+  <data name="Scene_Activation" xml:space="preserve"><value>Scene Activation</value></data>
+  <data name="Scene_Combat" xml:space="preserve"><value>Combat Scene</value></data>
+  <data name="Scene_Teardown" xml:space="preserve"><value>Scene Teardown</value></data>
+  <data name="Scene_Archive" xml:space="preserve"><value>Scene Archive</value></data>
+  <data name="Scene_Unknown" xml:space="preserve"><value>Unknown Scene</value></data>
 </root>

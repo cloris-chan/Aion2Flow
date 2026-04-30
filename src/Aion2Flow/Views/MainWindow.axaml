@@ -45,13 +45,22 @@
             <Border Grid.Column="1"
                     Classes="TitleBarDragRegion"
                     PointerPressed="TitleBarDragRegionPointerPressed">
-                <controls:NumericBlock Classes="OverlayHeaderMetric"
-                                       Value="{Binding BattleTimeSeconds}"
-                                       FractionDigits="1"
-                                       TrimTrailingZeros="False"
-                                       Suffix="s"
-                                       IsHitTestVisible="False"
-                                       VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal"
+                            Spacing="6"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            IsHitTestVisible="False">
+                    <TextBlock Classes="OverlayHeaderScene"
+                               Text="{Binding LiveSceneName}"
+                               VerticalAlignment="Center" />
+                    <controls:NumericBlock Classes="OverlayHeaderMetric"
+                                           Value="{Binding BattleTimeSeconds}"
+                                           FractionDigits="1"
+                                           TrimTrailingZeros="False"
+                                           Suffix="s"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center" />
+                </StackPanel>
             </Border>
 
             <StackPanel Grid.Column="2"

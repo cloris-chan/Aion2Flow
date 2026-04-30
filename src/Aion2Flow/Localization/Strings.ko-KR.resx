@@ -109,4 +109,10 @@
   <data name="Column_Skill" xml:space="preserve"><value>스킬</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>직격</value></data>
   <data name="Column_Share" xml:space="preserve"><value>비율</value></data>
+
+  <data name="Scene_Activation" xml:space="preserve"><value>장면 활성화</value></data>
+  <data name="Scene_Combat" xml:space="preserve"><value>전투 장면</value></data>
+  <data name="Scene_Teardown" xml:space="preserve"><value>장면 종료</value></data>
+  <data name="Scene_Archive" xml:space="preserve"><value>장면 보관</value></data>
+  <data name="Scene_Unknown" xml:space="preserve"><value>알 수 없는 장면</value></data>
 </root>

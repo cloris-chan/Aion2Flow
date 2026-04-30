@@ -220,6 +220,8 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             var targetDecision = DecideTarget();
             dataSnapshot.BattleId = _currentBattleId;
             dataSnapshot.TargetName = targetDecision.TargetName;
+            dataSnapshot.MapId = Store.CurrentMapId;
+            dataSnapshot.MapInstanceId = Store.CurrentMapInstanceId;
 
             _currentTarget = targetDecision.TrackingTargetId;
             Store.CurrentTarget = _currentTarget;

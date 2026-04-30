@@ -13,6 +13,8 @@ public sealed class DamageMeterSnapshot
     public long BattleEndTime { get; set; }
     public NpcRuntimeObservation? TargetObservation { get; set; }
     public EncounterSummary Encounter { get; set; } = new();
+    public uint MapId { get; set; }
+    public uint MapInstanceId { get; set; }
 
     public DamageMeterSnapshot DeepClone()
     {
@@ -24,7 +26,9 @@ public sealed class DamageMeterSnapshot
             BattleStartTime = BattleStartTime,
             BattleEndTime = BattleEndTime,
             TargetObservation = TargetObservation?.DeepClone(),
-            Encounter = Encounter.DeepClone()
+            Encounter = Encounter.DeepClone(),
+            MapId = MapId,
+            MapInstanceId = MapInstanceId
         };
 
         foreach (var (id, combatant) in Combatants)

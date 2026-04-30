@@ -52,6 +52,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public partial double BattleTimeSeconds { get; set; }
 
     [ObservableProperty]
+    public partial string LiveSceneName { get; set; } = string.Empty;
+
+    [ObservableProperty]
     public partial string DriverIndicatorColor { get; set; } = IndicatorIdleColor;
 
     [ObservableProperty]
@@ -292,7 +295,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         var previousLiveSnapshot = _latestLiveDamage;
         var nextLiveSnapshot = _engine.CreateBattleSnapshot();
-        if (TryAutoArchive(previousLiveSnapshot, nextLiveSnapshot))
+        if (TryAutoResetBattle(previousLiveSnapshot, nextLiveSnapshot))
         {
             nextLiveSnapshot = _engine.CreateBattleSnapshot();
         }
@@ -313,6 +316,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var battleSeconds = snapshot.BattleTime / 1000.0;
         BattleTimeSeconds = battleSeconds;
+        LiveSceneName = ResolveSceneDisplayName(snapshot.MapId);
         var displayStore = ResolveDisplayStore();
 
         using var deferral = Combatants.SuspendNotifications();
@@ -427,6 +431,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         Status = Localization["Status_Ready"];
         BattleTimeSeconds = 0d;
         RoundTripTimeMilliseconds = 0;
+        LiveSceneName = ResolveSceneDisplayName(_displayedSnapshot.MapId);
     }
 
     private void RebuildBattleHistory()
@@ -435,11 +440,32 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         BattleHistory.Clear();
         foreach (var record in _battleArchiveService.History)
         {
-            BattleHistory.Add(new BattleHistoryItemViewModel(record, record.DisplayName));
+            BattleHistory.Add(new BattleHistoryItemViewModel(record, BuildHistoryDisplayName(record)));
         }
 
         HasArchivedBattles = BattleHistory.Count > 0;
         SelectedBattleHistory = BattleHistory.FirstOrDefault(x => x.Record.Id == selectedId);
+    }
+
+    private string BuildHistoryDisplayName(ArchivedBattleRecord record)
+        => $"{ResolveSceneDisplayName(record.Snapshot.MapId)} {record.ArchivedAt:HH:mm:ss}";
+
+    private string ResolveSceneDisplayName(uint mapId)
+    {
+        var mapName = mapId == 0
+            ? string.Empty
+            : _gameResourceService.ResolveMapName(mapId);
+
+        if (string.IsNullOrEmpty(mapName))
+        {
+            mapName = Localization["Scene_Unknown"];
+            if (string.IsNullOrEmpty(mapName))
+            {
+                mapName = "Scene_Unknown";
+            }
+        }
+
+        return $"[{mapName}]";
     }
 
     private ArchivedBattleRecord? ArchiveSnapshot(DamageMeterSnapshot snapshot, string trigger, bool isAutomatic)
@@ -447,8 +473,16 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         return _battleArchiveService.Archive(snapshot, _store, trigger, isAutomatic);
     }
 
-    private bool TryAutoArchive(DamageMeterSnapshot previousLiveSnapshot, DamageMeterSnapshot latestLiveSnapshot)
+    private bool TryAutoResetBattle(DamageMeterSnapshot previousLiveSnapshot, DamageMeterSnapshot latestLiveSnapshot)
     {
+        if (TryResolveMapTransitionResetReason(previousLiveSnapshot, latestLiveSnapshot, out var mapTransitionReason))
+        {
+            ArchiveSnapshot(previousLiveSnapshot, mapTransitionReason, isAutomatic: true);
+            _engine.Reset();
+            RawPacketDump.RotateLogs();
+            return true;
+        }
+
         if (previousLiveSnapshot.BattleTime <= 0 || previousLiveSnapshot.Combatants.Count == 0)
         {
             return false;
@@ -459,6 +493,34 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             ArchiveSnapshot(previousLiveSnapshot, latestLiveSnapshot.Encounter.Reason, isAutomatic: true);
             _engine.Reset();
             RawPacketDump.RotateLogs();
+            return true;
+        }
+
+        return false;
+    }
+
+    internal static bool TryResolveMapTransitionResetReason(
+        DamageMeterSnapshot previousLiveSnapshot,
+        DamageMeterSnapshot latestLiveSnapshot,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (previousLiveSnapshot.MapId == 0 || latestLiveSnapshot.MapId == 0)
+        {
+            return false;
+        }
+
+        if (previousLiveSnapshot.MapId != latestLiveSnapshot.MapId)
+        {
+            reason = "map-transition";
+            return true;
+        }
+
+        if (previousLiveSnapshot.MapInstanceId != 0 &&
+            latestLiveSnapshot.MapInstanceId != 0 &&
+            previousLiveSnapshot.MapInstanceId != latestLiveSnapshot.MapInstanceId)
+        {
+            reason = "map-instance-transition";
             return true;
         }
 

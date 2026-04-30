@@ -109,4 +109,10 @@
   <data name="Column_Skill" xml:space="preserve"><value>技能</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>直擊</value></data>
   <data name="Column_Share" xml:space="preserve"><value>佔比</value></data>
+
+  <data name="Scene_Activation" xml:space="preserve"><value>場景啟動</value></data>
+  <data name="Scene_Combat" xml:space="preserve"><value>戰鬥場景</value></data>
+  <data name="Scene_Teardown" xml:space="preserve"><value>場景結束</value></data>
+  <data name="Scene_Archive" xml:space="preserve"><value>場景歸檔</value></data>
+  <data name="Scene_Unknown" xml:space="preserve"><value>未知場景</value></data>
 </root>

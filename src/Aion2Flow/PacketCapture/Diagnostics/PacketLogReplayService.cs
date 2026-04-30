@@ -357,6 +357,7 @@ public sealed class PacketLogReplayService
             "wrapped-8456" => TryReplay8456(store, packet),
             "state-0140" => TryReplay0140(store, packet),
             "state-2136" => TryReplay2136(store, packet),
+            "map-2e92" => TryReplayMap2E92(store, packet),
             "state-0240" => TryReplay0240(store, packet),
             "state-4636" => TryReplay4636(store, packet),
             "state-4536" => TryReplay4536(store, packet),
@@ -634,6 +635,8 @@ public sealed class PacketLogReplayService
             return false;
         }
 
+        UpdateCurrentMapFromSceneState(store, parsed.Value0);
+
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -654,6 +657,8 @@ public sealed class PacketLogReplayService
             return false;
         }
 
+        UpdateCurrentMapFromSceneState(store, parsed.Value0);
+
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -667,12 +672,25 @@ public sealed class PacketLogReplayService
         return true;
     }
 
+    private static bool TryReplayMap2E92(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    {
+        if (!Packet2E92Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.UpdateCurrentMapInstance(parsed.InstanceId);
+        return true;
+    }
+
     private static bool TryReplay0240(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {
         if (!Packet0240Parser.TryParse(packet, out var parsed))
         {
             return false;
         }
+
+        UpdateCurrentMapFromSceneState(store, parsed.Value0);
 
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -686,6 +704,19 @@ public sealed class PacketLogReplayService
 
         return true;
     }
+
+    private static void UpdateCurrentMapFromSceneState(CombatMetricsStore store, uint value)
+    {
+        if (IsSceneStateMapId(value))
+        {
+            store.UpdateCurrentMap(value);
+        }
+    }
+
+    private static bool IsSceneStateMapId(uint value)
+        => value is >= 1000 and < 2000
+            or >= 200000 and < 300000
+            or >= 600000 and < 700000;
 
     private static bool TryReplay4636(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {

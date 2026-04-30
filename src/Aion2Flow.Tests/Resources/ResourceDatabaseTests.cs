@@ -72,6 +72,45 @@ public sealed class ResourceDatabaseTests
         Assert.Contains(17050250, judgmentLightning.EnumerateTriggeredSkillIds());
     }
 
+    [Theory]
+    [InlineData(1010u, "斐爾特朗")]
+    [InlineData(200003u, "惡夢")]
+    [InlineData(600002u, "克勞洞穴")]
+    [InlineData(600011u, "烏努庫庫峽谷")]
+    [InlineData(600091u, "凶猛的角岩窟")]
+    [InlineData(600121u, "無之搖籃")]
+    public void LoadMaps_Resolves_Client_Table_Scene_Id_Aliases(uint mapId, string expectedName)
+    {
+        var maps = ResourceDatabase.LoadMaps("zh-TW");
+
+        Assert.Equal(expectedName, ResourceDatabase.ResolveMapName(mapId, maps));
+    }
+
+    [Fact]
+    public void Maps_Table_Uses_Numeric_Map_Id_As_Runtime_Key()
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = ResolveDatabasePath(),
+            Mode = SqliteOpenMode.ReadOnly,
+            Cache = SqliteCacheMode.Shared
+        }.ConnectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info(Maps)";
+
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        Assert.Contains("MapId", columns);
+        Assert.DoesNotContain("MapKey", columns);
+    }
+
     [Fact]
     public void Skills_Table_Does_Not_Persist_Runtime_Semantic_Columns()
     {

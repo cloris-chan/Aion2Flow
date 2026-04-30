@@ -6,6 +6,38 @@ namespace Cloris.Aion2Flow.Tests.Battle;
 
 public sealed class MainViewModelCombatantFilterTests
 {
+    [Theory]
+    [InlineData(1010, 0, 200003, 113515, true, "map-transition")]
+    [InlineData(1010, 0, 1010, 0, false, "")]
+    [InlineData(200003, 113515, 200003, 113515, false, "")]
+    [InlineData(200003, 113515, 200003, 113526, true, "map-instance-transition")]
+    [InlineData(0, 0, 1010, 0, false, "")]
+    [InlineData(600002, 396972, 1010, 0, true, "map-transition")]
+    public void Map_Transitions_Select_Automatic_Reset_Scope(
+        uint previousMapId,
+        uint previousInstanceId,
+        uint latestMapId,
+        uint latestInstanceId,
+        bool expected,
+        string expectedReason)
+    {
+        var previous = new DamageMeterSnapshot
+        {
+            MapId = previousMapId,
+            MapInstanceId = previousInstanceId
+        };
+        var latest = new DamageMeterSnapshot
+        {
+            MapId = latestMapId,
+            MapInstanceId = latestInstanceId
+        };
+
+        var result = MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason);
+
+        Assert.Equal(expected, result);
+        Assert.Equal(expectedReason, reason);
+    }
+
     [Fact]
     public void ShouldDisplayCombatant_Hides_Known_Npc_Even_If_Class_Was_Previously_Inferred()
     {

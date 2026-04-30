@@ -17,6 +17,8 @@ public sealed class BattleArchiveServiceTests
         {
             TargetName = "Test Boss",
             BattleTime = 12_000,
+            MapId = 200003,
+            MapInstanceId = 113515,
             Encounter = new EncounterSummary
             {
                 TrackingTargetId = 123,
@@ -32,6 +34,8 @@ public sealed class BattleArchiveServiceTests
             DamageContribution = 1
         };
         snapshot.Combatants[1] = combatant;
+        store.UpdateCurrentMap(200003);
+        store.UpdateCurrentMapInstance(113515);
         store.AppendNickname(1, "Tester");
 
         var record = service.Archive(snapshot, store, "manual", isAutomatic: false);
@@ -39,6 +43,9 @@ public sealed class BattleArchiveServiceTests
         Assert.NotNull(record);
         Assert.Single(service.History);
         Assert.Equal("Test Boss", record!.Snapshot.TargetName);
+        Assert.Equal((uint)200003, record.Snapshot.MapId);
+        Assert.Equal((uint)113515, record.Snapshot.MapInstanceId);
+        Assert.Equal((uint)113515, record.Store.CurrentMapInstanceId);
         Assert.True(service.TryGetBattle(record.BattleId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
 
@@ -164,27 +171,5 @@ public sealed class BattleArchiveServiceTests
 
         Assert.Equal(100, service.History.Count);
         Assert.False(service.TryGetBattle(firstBattleId, out _));
-    }
-
-    [Fact]
-    public void ArchivedRecord_DisplayName_Uses_Scene_Label_Instead_Of_Target_Name()
-    {
-        var record = new ArchivedBattleRecord
-        {
-            ArchivedAt = new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero),
-            Snapshot = new DamageMeterSnapshot
-            {
-                TargetName = "Test Boss",
-                BattleTime = 15_000,
-                Encounter = new EncounterSummary
-                {
-                    PhaseHint = NpcRuntimePhaseHint.Teardown,
-                    Reason = "teardown-hint"
-                }
-            }
-        };
-
-        Assert.Contains("Scene Teardown", record.DisplayName, StringComparison.Ordinal);
-        Assert.DoesNotContain("Test Boss", record.DisplayName, StringComparison.Ordinal);
     }
 }

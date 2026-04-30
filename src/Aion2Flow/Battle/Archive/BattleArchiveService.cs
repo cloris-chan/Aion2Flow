@@ -1,6 +1,6 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using Cloris.Aion2Flow.Battle.Runtime;
 
 namespace Cloris.Aion2Flow.Battle.Archive;
 
@@ -80,6 +80,8 @@ public sealed class BattleArchiveService
         return left.BattleTime == right.BattleTime &&
                left.BattleId == right.BattleId &&
                string.Equals(left.TargetName, right.TargetName, StringComparison.Ordinal) &&
+               left.MapId == right.MapId &&
+               left.MapInstanceId == right.MapInstanceId &&
                left.Combatants.Count == right.Combatants.Count &&
                SumDamage(left) == SumDamage(right);
     }

@@ -29,6 +29,44 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Equal((uint)200003, state.Value0240);
     }
 
+    [Theory]
+    [InlineData("state/2136-boss-scene-1010.hex", 1010)]
+    [InlineData("state/0140-boss-tail-f203.hex", 1010)]
+    [InlineData("state/0240-boss-tail-f203.hex", 1010)]
+    [InlineData("state/2136-boss-scene-200003.hex", 200003)]
+    [InlineData("state/0140-boss-tail-430d03.hex", 200003)]
+    [InlineData("state/0240-boss-tail-430d03.hex", 200003)]
+    public void Scene_State_Frames_Update_Current_Map_Id(string fixture, uint expectedMapId)
+    {
+        var store = new CombatMetricsStore();
+        var processor = new PacketStreamProcessor(store);
+
+        var parsed = processor.AppendAndProcess(HexHelper.FromFixture(fixture), TestConnection);
+
+        Assert.True(parsed);
+        Assert.Equal(expectedMapId, store.CurrentMapId);
+    }
+
+    [Fact]
+    public void Map_Instance_Frame_Updates_Instance_And_Is_Cleared_On_Map_Change()
+    {
+        var store = new CombatMetricsStore();
+        var processor = new PacketStreamProcessor(store);
+
+        store.UpdateCurrentMap(200003);
+        var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2e92-bosschallenge-map-event.hex"), TestConnection);
+
+        Assert.True(parsed);
+        Assert.Equal((uint)200003, store.CurrentMapId);
+        Assert.Equal((uint)113515, store.CurrentMapInstanceId);
+
+        parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-1010.hex"), TestConnection);
+
+        Assert.True(parsed);
+        Assert.Equal((uint)1010, store.CurrentMapId);
+        Assert.Equal((uint)0, store.CurrentMapInstanceId);
+    }
+
     [Fact]
     public void State_Catalog_Probe_Does_Not_Overwrite_Known_NpcCode_When_Value_Misses_Catalog()
     {

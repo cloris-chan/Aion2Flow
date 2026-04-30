@@ -101,6 +101,14 @@
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
+    <Style Selector="TextBlock.OverlayHeaderScene">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.85" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
     <Style Selector="Border.BottomBarPill">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.Surface}" />
         <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.Border}" />

@@ -117,6 +117,26 @@ public sealed class CombatMetricsStore
     }
     private int _currentTarget;
 
+    public uint CurrentMapId { get; private set; }
+    public uint CurrentMapInstanceId { get; private set; }
+
+    public void UpdateCurrentMap(uint mapId)
+    {
+        if (mapId != 0 && mapId != CurrentMapId)
+        {
+            CurrentMapId = mapId;
+            CurrentMapInstanceId = 0;
+        }
+    }
+
+    public void UpdateCurrentMapInstance(uint instanceId)
+    {
+        if (instanceId != 0)
+        {
+            CurrentMapInstanceId = instanceId;
+        }
+    }
+
     public int ResolveLifecycleId(int rawInstanceId)
     {
         if (rawInstanceId <= 0)
@@ -1422,6 +1442,8 @@ public sealed class CombatMetricsStore
         var clone = new CombatMetricsStore
         {
             CurrentTarget = CurrentTarget,
+            CurrentMapId = CurrentMapId,
+            CurrentMapInstanceId = CurrentMapInstanceId,
             _lastObservedNpcSource = _lastObservedNpcSource,
             _nextSyntheticLifecycleId = _nextSyntheticLifecycleId
         };
@@ -1449,7 +1471,11 @@ public sealed class CombatMetricsStore
 
     public CombatMetricsStore CreateArchiveSlice(DamageMeterSnapshot snapshot)
     {
-        var clone = new CombatMetricsStore();
+        var clone = new CombatMetricsStore
+        {
+            CurrentMapId = CurrentMapId,
+            CurrentMapInstanceId = CurrentMapInstanceId
+        };
         var relevantCombatantIds = new HashSet<int>(snapshot.Combatants.Keys);
         var relevantNpcInstanceIds = new HashSet<int>();
         var battleStart = snapshot.BattleStartTime;

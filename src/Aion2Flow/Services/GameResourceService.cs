@@ -1,6 +1,6 @@
+using System.Globalization;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Resources;
-using System.Globalization;
 
 namespace Cloris.Aion2Flow.Services;
 
@@ -17,6 +17,8 @@ public sealed class GameResourceService : IDisposable
         new Dictionary<int, NpcCatalogEntry>();
     public IReadOnlyDictionary<string, NpcName> NpcNames { get; private set; } =
         new Dictionary<string, NpcName>(StringComparer.Ordinal);
+    public IReadOnlyDictionary<uint, string> Maps { get; private set; } =
+        new Dictionary<uint, string>();
 
     public GameResourceService(LanguageService languageService)
     {
@@ -55,6 +57,22 @@ public sealed class GameResourceService : IDisposable
         return false;
     }
 
+    public string ResolveMapName(uint mapId)
+    {
+        if (mapId == 0)
+        {
+            return string.Empty;
+        }
+
+        IReadOnlyDictionary<uint, string> snapshot;
+        lock (_lock)
+        {
+            snapshot = Maps;
+        }
+
+        return ResourceDatabase.ResolveMapName(mapId, snapshot);
+    }
+
     private void OnLanguageChanged(object? sender, string language)
     {
         Reload(language);
@@ -65,6 +83,7 @@ public sealed class GameResourceService : IDisposable
         var skills = ResourceDatabase.LoadSkills(language);
         var npcCatalog = ResourceDatabase.LoadNpcCatalog(language);
         var npcNames = ResourceDatabase.LoadNpcNames(language);
+        var maps = ResourceDatabase.LoadMaps(language);
 
         lock (_lock)
         {
@@ -72,6 +91,7 @@ public sealed class GameResourceService : IDisposable
             Skills = skills;
             NpcCatalog = npcCatalog;
             NpcNames = npcNames;
+            Maps = maps;
         }
 
         CombatMetricsEngine.UpdateDisplayResources(skills, npcCatalog);

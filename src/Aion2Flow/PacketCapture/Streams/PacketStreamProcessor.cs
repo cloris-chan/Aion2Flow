@@ -146,6 +146,22 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         return $"|{prefix}={normalized}";
     }
 
+    private bool UpdateCurrentMapFromSceneState(uint value)
+    {
+        if (!IsSceneStateMapId(value))
+        {
+            return false;
+        }
+
+        store.UpdateCurrentMap(value);
+        return true;
+    }
+
+    private static bool IsSceneStateMapId(uint value)
+        => value is >= 1000 and < 2000
+            or >= 200000 and < 300000
+            or >= 600000 and < 700000;
+
     private static string FormatResolvedCombatHint(ParsedCombatPacket packet)
     {
         var skillCode = packet.SkillCode > 0 ? packet.SkillCode : packet.OriginalSkillCode;
@@ -565,6 +581,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             (0x05, 0x38) => ParsePeriodicValuePacket(packet),
             (0x06, 0x38) => ParseCompactControl0638Packet(packet),
             (0x21, 0x36) => ParseState2136Packet(packet),
+            (0x2e, 0x92) => ParseMap2E92Packet(packet),
             (0x01, 0x40) => ParseState0140Packet(packet),
             (0x02, 0x40) => ParseState0240Packet(packet),
             (0x2a, 0x38) => ParseAux2A38Packet(packet),
@@ -1640,6 +1657,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
+        var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -1653,7 +1671,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "state-0140",
             _connection,
-            $"target={targetId}|value0={parsed.Value0}|value1={parsed.Value1}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
+            $"target={targetId}|value0={parsed.Value0}|value1={parsed.Value1}|sceneMap={sceneMap}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
             packet);
 
         return _hasParsed = true;
@@ -1665,6 +1683,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         {
             return false;
         }
+
+        var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
 
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -1679,7 +1699,25 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "state-2136",
             _connection,
-            $"target={targetId}|seq={parsed.Sequence}|value0={parsed.Value0}|value1={parsed.Value1}|value2={parsed.Value2}|value3=0x{parsed.Value3:x8}|value4=0x{parsed.Value4:x8}|value5=0x{parsed.Value5:x8}|value6=0x{parsed.Value6:x8}|value7={parsed.Value7}|tailMarker=0x{parsed.TailMarker:x4}|tailLen={parsed.TailLength}",
+            $"target={targetId}|seq={parsed.Sequence}|value0={parsed.Value0}|value1={parsed.Value1}|value2={parsed.Value2}|sceneMap={sceneMap}|value3=0x{parsed.Value3:x8}|value4=0x{parsed.Value4:x8}|value5=0x{parsed.Value5:x8}|value6=0x{parsed.Value6:x8}|value7={parsed.Value7}|tailMarker=0x{parsed.TailMarker:x4}|tailLen={parsed.TailLength}",
+            packet);
+
+        return _hasParsed = true;
+    }
+
+    private bool ParseMap2E92Packet(ReadOnlySpan<byte> packet)
+    {
+        if (!Packet2E92Parser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.UpdateCurrentMapInstance(parsed.InstanceId);
+
+        RawPacketDump.AppendFrameEvent(
+            "map-2e92",
+            _connection,
+            $"instance={parsed.InstanceId}|contentKey={parsed.ContentKey}",
             packet);
 
         return _hasParsed = true;
@@ -1692,6 +1730,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
+        var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -1705,7 +1744,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         RawPacketDump.AppendFrameEvent(
             "state-0240",
             _connection,
-            $"target={targetId}|value0={parsed.Value0}|value1={parsed.Value1}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
+            $"target={targetId}|value0={parsed.Value0}|value1={parsed.Value1}|sceneMap={sceneMap}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
             packet);
 
         return _hasParsed = true;

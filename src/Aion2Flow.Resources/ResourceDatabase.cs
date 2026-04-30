@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 
 namespace Cloris.Aion2Flow.Resources;
@@ -129,6 +130,40 @@ public static class ResourceDatabase
         }
 
         return npcs;
+    }
+
+    public static IReadOnlyDictionary<uint, string> LoadMaps(string lang = "en-US")
+    {
+        using var connection = CreateConnection();
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        var nameColumn = GetLocalizedColumn("Name", lang);
+        cmd.CommandText = $"SELECT MapId, {nameColumn} FROM Maps WHERE {nameColumn} IS NOT NULL";
+
+        var maps = new Dictionary<uint, string>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1))
+            {
+                continue;
+            }
+
+            maps[(uint)reader.GetInt64(0)] = reader.GetString(1);
+        }
+
+        return maps;
+    }
+
+    public static string ResolveMapName(uint mapId, IReadOnlyDictionary<uint, string> mapNames)
+    {
+        if (mapId == 0)
+        {
+            return string.Empty;
+        }
+
+        return mapNames.TryGetValue(mapId, out var name) ? name : mapId.ToString(CultureInfo.InvariantCulture);
     }
 
     private static string GetLocalizedColumn(string baseName, string lang) => lang switch
