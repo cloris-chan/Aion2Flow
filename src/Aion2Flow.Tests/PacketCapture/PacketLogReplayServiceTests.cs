@@ -359,7 +359,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Store_Treats_System_Periodic_Self_Recovery_Tick_As_Healing()
+    public void Store_Treats_System_Periodic_Self_Recovery_Tick_As_Healing_By_Packet_Continuation()
     {
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -371,7 +371,9 @@ public sealed class PacketLogReplayServiceTests
             OriginalSkillCode = 190000151,
             SkillCode = 190000151,
             Damage = 2934,
-            Timestamp = 500
+            Timestamp = 500,
+            FrameOrdinal = 1,
+            BatchOrdinal = 1
         };
         unseededTick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
 
@@ -382,7 +384,9 @@ public sealed class PacketLogReplayServiceTests
             OriginalSkillCode = 190000131,
             SkillCode = 190000131,
             Damage = 7634,
-            Timestamp = 1_000
+            Timestamp = 1_000,
+            FrameOrdinal = 10,
+            BatchOrdinal = 10
         };
         seed.SetPeriodicEffect(PeriodicEffectRelation.Self, 1);
 
@@ -393,7 +397,9 @@ public sealed class PacketLogReplayServiceTests
             OriginalSkillCode = 190000131,
             SkillCode = 190000131,
             Damage = 7634,
-            Timestamp = 1_500
+            Timestamp = 60_000,
+            FrameOrdinal = 11,
+            BatchOrdinal = 11
         };
         tick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
 
@@ -419,6 +425,64 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(0, metrics.DamageAmount);
         Assert.Equal(7634, metrics.HealingAmount);
         Assert.Equal(7634, metrics.PeriodicHealingAmount);
+    }
+
+    [Fact]
+    public void Store_Consumes_System_Periodic_Self_Recovery_Seed_On_First_Tick()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var seed = new ParsedCombatPacket
+        {
+            SourceId = 4086,
+            TargetId = 4086,
+            OriginalSkillCode = 190000131,
+            SkillCode = 190000131,
+            Damage = 7634,
+            Timestamp = 1_000,
+            FrameOrdinal = 10,
+            BatchOrdinal = 10
+        };
+        seed.SetPeriodicEffect(PeriodicEffectRelation.Self, 1);
+
+        var mismatchedTick = new ParsedCombatPacket
+        {
+            SourceId = 4086,
+            TargetId = 4086,
+            OriginalSkillCode = 190000131,
+            SkillCode = 190000131,
+            Damage = 1111,
+            Timestamp = 2_000,
+            FrameOrdinal = 11,
+            BatchOrdinal = 11
+        };
+        mismatchedTick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
+
+        var laterMatchingTick = new ParsedCombatPacket
+        {
+            SourceId = 4086,
+            TargetId = 4086,
+            OriginalSkillCode = 190000131,
+            SkillCode = 190000131,
+            Damage = 7634,
+            Timestamp = 3_000,
+            FrameOrdinal = 12,
+            BatchOrdinal = 12
+        };
+        laterMatchingTick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
+
+        store.AppendCombatPacket(seed);
+        store.AppendCombatPacket(mismatchedTick);
+        store.AppendCombatPacket(laterMatchingTick);
+
+        var packets = store.CombatPacketsBySource[4086].ToArray();
+        Assert.Equal(3, packets.Length);
+        Assert.All(packets, static packet =>
+        {
+            Assert.Equal(CombatEventKind.Support, packet.EventKind);
+            Assert.Equal(CombatValueKind.Support, packet.ValueKind);
+        });
     }
 
     [Fact]

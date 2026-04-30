@@ -568,7 +568,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
             BatchOrdinal = 100
         });
 
-        store.RegisterObservation2C38(1734, 1, 202, 11, 1734, 16330000, 1_010, 11, 100);
+        store.RegisterObservation2C38(1734, 1, 202, 11, 1734, 16330000, 10_000, 11, 100);
 
         Assert.True(store.CombatPacketsBySource.TryGetValue(1734, out var packets));
         var invincible = Assert.Single(packets, static packet => (packet.Modifiers & DamageModifiers.Invincible) != 0);
@@ -599,7 +599,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
             BatchOrdinal = 100
         });
 
-        store.RegisterObservation2C38(1734, 1, 206, 11, 1734, 16330000, 1_500, 30, 105);
+        store.RegisterObservation2C38(1734, 1, 206, 11, 1734, 16330000, 1_010, 30, 105);
 
         Assert.True(store.CombatPacketsBySource.TryGetValue(1734, out var packets));
         Assert.DoesNotContain(packets, static packet => (packet.Modifiers & DamageModifiers.Invincible) != 0);

@@ -9,7 +9,6 @@ namespace Cloris.Aion2Flow.Battle.Runtime;
 
 public sealed class CombatMetricsStore
 {
-    private const long SystemPeriodicRecoveryPairWindowMilliseconds = 5000;
     private const int MaxTrackedMultiHitCandidates = 64;
     private const int MaxPendingDodgeSignals = 16;
     private const int MaxPendingAvoidancePackets = 32;
@@ -24,7 +23,7 @@ public sealed class CombatMetricsStore
         int CasterId,
         ParsedCombatPacket? AmbiguousGrant = null);
     private readonly record struct SystemPeriodicRecoverySeedKey(int SourceId, int TargetId, int OriginalSkillCode);
-    private readonly record struct SystemPeriodicRecoverySeedState(int LastRawDamage, long LastTimestamp);
+    private readonly record struct SystemPeriodicRecoverySeedState(int LastRawDamage, long FrameOrdinal, long BatchOrdinal);
     private readonly record struct MultiHitDamageCandidate(
         ParsedCombatPacket Packet,
         int SourceId,
@@ -756,7 +755,10 @@ public sealed class CombatMetricsStore
             {
                 packet.EventKind = CombatEventKind.Support;
                 packet.ValueKind = CombatValueKind.Support;
-                _systemPeriodicRecoverySeeds[key] = new SystemPeriodicRecoverySeedState(packet.Damage, packet.Timestamp);
+                _systemPeriodicRecoverySeeds[key] = new SystemPeriodicRecoverySeedState(
+                    packet.Damage,
+                    packet.FrameOrdinal,
+                    packet.BatchOrdinal);
                 return;
             }
 
@@ -766,9 +768,7 @@ public sealed class CombatMetricsStore
             }
 
             _systemPeriodicRecoverySeeds.Remove(key);
-            var delta = packet.Timestamp - state.LastTimestamp;
-            if (delta < 0 ||
-                delta > SystemPeriodicRecoveryPairWindowMilliseconds ||
+            if (!IsContinuationAfterSeed(packet, state) ||
                 packet.Damage != state.LastRawDamage)
             {
                 return;
@@ -777,6 +777,21 @@ public sealed class CombatMetricsStore
             packet.EventKind = CombatEventKind.Healing;
             packet.ValueKind = CombatValueKind.PeriodicHealing;
         }
+    }
+
+    private static bool IsContinuationAfterSeed(ParsedCombatPacket packet, SystemPeriodicRecoverySeedState state)
+    {
+        if (packet.BatchOrdinal > 0 && state.BatchOrdinal > 0)
+        {
+            return packet.BatchOrdinal >= state.BatchOrdinal;
+        }
+
+        if (packet.FrameOrdinal > 0 && state.FrameOrdinal > 0)
+        {
+            return packet.FrameOrdinal >= state.FrameOrdinal;
+        }
+
+        return true;
     }
 
     private bool IsOwnerTargetSummonRestorePacket(ParsedCombatPacket packet)
@@ -1086,7 +1101,7 @@ public sealed class CombatMetricsStore
             return;
         }
 
-        if (!TryResolveRecentDamageTarget(instanceId, tailSkillCodeRaw, timestamp, frameOrdinal, out var targetId))
+        if (!TryResolveRecentDamageTarget(instanceId, tailSkillCodeRaw, frameOrdinal, out var targetId))
         {
             return;
         }
@@ -1103,7 +1118,7 @@ public sealed class CombatMetricsStore
             attemptContribution: 0);
     }
 
-    private bool TryResolveRecentDamageTarget(int sourceId, int skillCodeRaw, long timestamp, long frameOrdinal, out int targetId)
+    private bool TryResolveRecentDamageTarget(int sourceId, int skillCodeRaw, long frameOrdinal, out int targetId)
     {
         targetId = 0;
 
@@ -1125,17 +1140,14 @@ public sealed class CombatMetricsStore
                     continue;
                 }
 
-                var deltaMilliseconds = timestamp - candidate.Packet.Timestamp;
-                if (deltaMilliseconds < 0 || deltaMilliseconds > 250)
-                {
-                    continue;
-                }
-
                 if (frameOrdinal > 0 &&
-                    candidate.Packet.FrameOrdinal > 0 &&
-                    frameOrdinal - candidate.Packet.FrameOrdinal > 8)
+                    candidate.Packet.FrameOrdinal > 0)
                 {
-                    continue;
+                    var frameDelta = frameOrdinal - candidate.Packet.FrameOrdinal;
+                    if (frameDelta < 0 || frameDelta > 8)
+                    {
+                        continue;
+                    }
                 }
 
                 targetId = candidate.TargetId;
