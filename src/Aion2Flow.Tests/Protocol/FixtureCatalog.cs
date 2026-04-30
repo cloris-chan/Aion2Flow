@@ -85,6 +85,13 @@ public static class FixtureCatalog
     {
         yield return [new NicknameSample("nickname/4436-apogee.hex", 9417, "Apogee")];
         yield return [new NicknameSample("nickname/4436-flower-water-flower.hex", 6017, "花氵花")];
+        yield return [new NicknameSample("nickname/4436-single-han.hex", 11145, "溾")];
+    }
+
+    public static IEnumerable<object[]> RosterNicknameSamples()
+    {
+        yield return [new NicknameSample("nickname/0994-single-han.hex", 11145, "溾")];
+        yield return [new NicknameSample("nickname/0b94-single-han.hex", 11145, "溾")];
     }
 
     public static IEnumerable<object[]> DamageSamples()

@@ -792,6 +792,12 @@ public sealed class PacketLogReplayService
             return true;
         }
 
+        if (Packet0994NicknameParser.TryParse(packet, out var rosterParsed))
+        {
+            store.AppendNickname(rosterParsed.PlayerId, rosterParsed.Nickname);
+            return true;
+        }
+
         return false;
     }
 
@@ -948,6 +954,12 @@ public sealed class PacketLogReplayService
 
     private static bool TryReplayRecoveryPath(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata)
     {
+        if (Packet0994NicknameParser.TryParse(packet, out var nickname))
+        {
+            store.AppendNickname(nickname.PlayerId, nickname.Nickname);
+            return true;
+        }
+
         if (Packet4036CreateParser.TryParse(packet, out var summon))
         {
             store.AppendSummon(summon.OwnerId, summon.SummonId);

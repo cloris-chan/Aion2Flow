@@ -591,6 +591,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             (0x1d, 0x37) => ParseState1D37Packet(packet),
             (0x33, 0x36) => ParseOwnNicknamePacket(packet),
             (0x44, 0x36) => ParseOtherNicknamePacket(packet),
+            (0x09, 0x94) => Parse0994NicknamePacket(packet),
+            (0x0b, 0x94) => Parse0994NicknamePacket(packet),
             (0x49, 0x36) => ParseState4936Packet(packet),
             (0x84, 0x56) => ParseWrapped8456Packet(packet),
             (0x40, 0x36) => ParseSummonPacket(packet),
@@ -975,7 +977,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         return _hasParsed = true;
     }
 
-    private  bool TryParseSummonPacketAt(ReadOnlySpan<byte> packet, int opcodeOffset, out int consumed)
+    private bool TryParseSummonPacketAt(ReadOnlySpan<byte> packet, int opcodeOffset, out int consumed)
     {
         consumed = 0;
 
@@ -1225,7 +1227,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (trimmed.Length == 0) return null;
         if (trimmed.Length < 3 && !hasHan) return null;
         if (onlyNumbers) return null;
-        if (trimmed.Length == 1 && char.IsLetter(trimmed[0])) return null;
+        if (trimmed.Length == 1 && char.IsLetter(trimmed[0]) && !hasHan) return null;
 
         return trimmed;
     }
@@ -1832,6 +1834,18 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         return false;
+    }
+
+    private bool Parse0994NicknamePacket(ReadOnlySpan<byte> packet)
+    {
+        if (!Packet0994NicknameParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        store.AppendNickname(parsed.PlayerId, parsed.Nickname);
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=roster|len={parsed.NicknameLength}", packet[..parsed.TailOffset]);
+        return _hasParsed = true;
     }
 
     private bool ParseRemainHpPacket(ReadOnlySpan<byte> packet)

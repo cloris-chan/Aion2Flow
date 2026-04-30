@@ -49,7 +49,7 @@ internal static class NicknameSanitizer
         if (trimmed.Length == 0) return null;
         if (trimmed.Length < 3 && !hasHan) return null;
         if (onlyNumbers) return null;
-        if (trimmed.Length == 1 && char.IsLetter(trimmed[0])) return null;
+        if (trimmed.Length == 1 && char.IsLetter(trimmed[0]) && !hasHan) return null;
 
         return trimmed;
     }
