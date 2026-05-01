@@ -505,7 +505,18 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         out string reason)
     {
         reason = string.Empty;
-        if (previousLiveSnapshot.MapId == 0 || latestLiveSnapshot.MapId == 0)
+        if (previousLiveSnapshot.MapId == 0)
+        {
+            if (latestLiveSnapshot.MapId != 0 && HasArchivableBattle(previousLiveSnapshot))
+            {
+                reason = "map-transition";
+                return true;
+            }
+
+            return false;
+        }
+
+        if (latestLiveSnapshot.MapId == 0)
         {
             return false;
         }
@@ -526,6 +537,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         return false;
     }
+
+    private static bool HasArchivableBattle(DamageMeterSnapshot snapshot)
+        => snapshot.BattleTime > 0 && snapshot.Combatants.Count > 0;
 
     private void RefreshCombatantDetails(bool forceRefresh = false)
     {

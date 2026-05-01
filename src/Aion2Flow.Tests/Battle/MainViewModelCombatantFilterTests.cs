@@ -39,6 +39,27 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void Unknown_To_Known_Map_With_Existing_Battle_Selects_Automatic_Reset()
+    {
+        var previous = new DamageMeterSnapshot
+        {
+            MapId = 0,
+            BattleTime = 12_000
+        };
+        previous.Combatants[1] = new CombatantMetrics("Tester");
+
+        var latest = new DamageMeterSnapshot
+        {
+            MapId = 600091
+        };
+
+        var result = MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason);
+
+        Assert.True(result);
+        Assert.Equal("map-transition", reason);
+    }
+
+    [Fact]
     public void ShouldDisplayCombatant_Hides_Known_Npc_Even_If_Class_Was_Previously_Inferred()
     {
         var store = new CombatMetricsStore();

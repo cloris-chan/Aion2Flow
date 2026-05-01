@@ -1485,8 +1485,8 @@ public sealed class CombatMetricsStore
     {
         var clone = new CombatMetricsStore
         {
-            CurrentMapId = CurrentMapId,
-            CurrentMapInstanceId = CurrentMapInstanceId
+            CurrentMapId = snapshot.MapId,
+            CurrentMapInstanceId = snapshot.MapInstanceId
         };
         var relevantCombatantIds = new HashSet<int>(snapshot.Combatants.Keys);
         var relevantNpcInstanceIds = new HashSet<int>();

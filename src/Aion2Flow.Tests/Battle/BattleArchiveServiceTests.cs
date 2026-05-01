@@ -45,6 +45,7 @@ public sealed class BattleArchiveServiceTests
         Assert.Equal("Test Boss", record!.Snapshot.TargetName);
         Assert.Equal((uint)200003, record.Snapshot.MapId);
         Assert.Equal((uint)113515, record.Snapshot.MapInstanceId);
+        Assert.Equal((uint)200003, record.Store.CurrentMapId);
         Assert.Equal((uint)113515, record.Store.CurrentMapInstanceId);
         Assert.True(service.TryGetBattle(record.BattleId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
@@ -117,6 +118,31 @@ public sealed class BattleArchiveServiceTests
         Assert.Equal(unrelatedNpcCode, liveUnrelatedNpcState.NpcCode);
         Assert.True(store.NpcNameByCode.ContainsKey(bossCode));
         Assert.True(store.NpcNameByCode.ContainsKey(unrelatedNpcCode));
+    }
+
+    [Fact]
+    public void Archive_Slice_Uses_Snapshot_Map_When_Live_Store_Has_Advanced()
+    {
+        var service = new BattleArchiveService();
+        var store = new CombatMetricsStore();
+        store.UpdateCurrentMap(600091);
+        store.UpdateCurrentMapInstance(410001);
+
+        var snapshot = new DamageMeterSnapshot
+        {
+            BattleTime = 12_000,
+            MapId = 0,
+            MapInstanceId = 0
+        };
+        snapshot.Combatants[1] = new CombatantMetrics("Tester");
+
+        var record = service.Archive(snapshot, store, "map-transition", isAutomatic: true);
+
+        Assert.NotNull(record);
+        Assert.Equal((uint)0, record!.Snapshot.MapId);
+        Assert.Equal((uint)0, record.Snapshot.MapInstanceId);
+        Assert.Equal((uint)0, record.Store.CurrentMapId);
+        Assert.Equal((uint)0, record.Store.CurrentMapInstanceId);
     }
 
     [Fact]
