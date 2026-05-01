@@ -54,19 +54,25 @@
 
             <Grid IsVisible="{Binding IsUpdateSectionVisible}"
                   Margin="9,4,9,4"
-                  RowDefinitions="Auto,Auto,Auto"
+                  RowDefinitions="Auto,Auto"
                   RowSpacing="4">
-                <TextBlock Grid.Row="0"
-                           Classes="SettingsUpdateVersion"
-                           Text="{Binding CurrentVersionText}"
-                           IsVisible="{Binding CurrentVersionText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Grid Grid.Row="0"
+                      ColumnDefinitions="Auto,*"
+                      ColumnSpacing="8">
+                    <TextBlock Grid.Column="0"
+                               Classes="SettingsUpdateVersion"
+                               Text="{Binding CurrentVersionText}"
+                               IsVisible="{Binding CurrentVersionText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-                <TextBlock Grid.Row="1"
-                           Classes="SettingsUpdateStatus"
-                           Text="{Binding UpdateStatusText}"
-                           IsVisible="{Binding UpdateStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Grid.Column="1"
+                               Classes="SettingsUpdateStatus"
+                               Text="{Binding UpdateStatusText}"
+                               HorizontalAlignment="Right"
+                               TextAlignment="Right"
+                               IsVisible="{Binding UpdateStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </Grid>
 
-                <Grid Grid.Row="2"
+                <Grid Grid.Row="1"
                       ColumnDefinitions="*,Auto"
                       ColumnSpacing="6">
                     <ProgressBar Grid.Column="0"

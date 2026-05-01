@@ -449,7 +449,8 @@
     <Style Selector="TextBlock.SettingsUpdateStatus">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
         <Setter Property="FontSize" Value="11" />
-        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="ProgressBar.SettingsUpdateProgress">
