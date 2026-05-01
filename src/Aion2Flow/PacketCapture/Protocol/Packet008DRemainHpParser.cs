@@ -7,6 +7,9 @@ internal readonly record struct Packet008DRemainHp(int NpcId, int Value0, int Va
 
 internal static class Packet008DRemainHpParser
 {
+    public static bool IsHealthValue(Packet008DRemainHp packet)
+        => packet.Value0 == 2 && packet.Value1 == 1 && packet.Value2 == 0;
+
     public static bool TryParse(ReadOnlySpan<byte> packet, out Packet008DRemainHp result)
     {
         result = default;

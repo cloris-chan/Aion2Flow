@@ -26,7 +26,7 @@
         <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,Auto"
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
           RowSpacing="2"
           Margin="3">
         <Grid Grid.Row="0"
@@ -79,7 +79,44 @@
             </StackPanel>
         </Grid>
 
-        <controls:AnimatedItemsView Grid.Row="1"
+        <Border Grid.Row="1"
+                Classes="BossFocusPanel"
+                IsVisible="{Binding BossFocus.IsVisible}">
+            <Grid>
+                <ProgressBar Classes="BossFocusHpBar"
+                         Minimum="0"
+                         Maximum="1"
+                         Value="{Binding BossFocus.HpRatio}"
+                         IsHitTestVisible="False" />
+
+                <Grid ColumnDefinitions="*,Auto"
+                    ColumnSpacing="8"
+                    Margin="6,4">
+                    <TextBlock Grid.Column="0"
+                               Classes="BossFocusName"
+                               Text="{Binding BossFocus.DisplayName}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="2"
+                                VerticalAlignment="Center">
+                        <TextBlock Classes="BossFocusHp"
+                                   Text="{Binding BossFocus.HpText}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Classes="BossFocusHpSlash"
+                                   Text="/"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Classes="BossFocusHpMuted"
+                                   Text="{Binding BossFocus.MaxHpText}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <controls:AnimatedItemsView Grid.Row="2"
                                      ItemSpacing="1"
                                      ItemsSource="{Binding Combatants}"
                                      SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}"
@@ -165,7 +202,7 @@
             </controls:AnimatedItemsView.ItemTemplate>
         </controls:AnimatedItemsView>
 
-        <Grid Grid.Row="2"
+        <Grid Grid.Row="3"
               ColumnDefinitions="Auto,*,Auto"
               ColumnSpacing="6"
               Margin="1,2,1,0">

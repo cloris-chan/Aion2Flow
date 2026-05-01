@@ -19,6 +19,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private const string IndicatorWarnColor = "#F3C969";
     private const string IndicatorErrorColor = "#F07C82";
     private const string IndicatorInfoColor = "#8DD6FF";
+    private const long BossFocusVisibilityTimeoutMilliseconds = 2_000;
 
     private readonly WinDivertCaptureService _captureService;
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService;
@@ -39,6 +40,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public LocalizationService Localization { get; }
     public CombatantDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
     public SettingsFlyoutViewModel SettingsFlyout { get; }
+    public BossFocusViewModel BossFocus { get; } = new();
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
     public ObservableCollection<BattleHistoryItemViewModel> BattleHistory { get; } = [];
 
@@ -236,6 +238,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             _displayedSnapshot = new DamageMeterSnapshot();
             Combatants.Clear();
             CombatantDetails.Clear();
+            BossFocus.Clear();
             SelectedCombatant = null;
             SelectedBattleHistory = null;
             IsViewingArchivedBattle = false;
@@ -318,6 +321,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         BattleTimeSeconds = battleSeconds;
         LiveSceneName = ResolveSceneDisplayName(snapshot.MapId);
         var displayStore = ResolveDisplayStore();
+        RefreshBossFocus(displayStore);
 
         using var deferral = Combatants.SuspendNotifications();
         foreach (var row in deferral.Snapshot)
@@ -388,6 +392,25 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         => IsViewingArchivedBattle && SelectedBattleHistory is not null
             ? SelectedBattleHistory.Record.Store
             : _store;
+
+    private void RefreshBossFocus(CombatMetricsStore displayStore)
+    {
+        if (IsViewingArchivedBattle || displayStore != _store)
+        {
+            BossFocus.Clear();
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        if (!_store.TryGetObservedBoss(now, BossFocusVisibilityTimeoutMilliseconds, out var boss))
+        {
+            BossFocus.Clear();
+            return;
+        }
+
+        var displayName = CombatMetricsEngine.ResolveCombatantDisplayName(_store, _latestLiveDamage, boss.InstanceId);
+        BossFocus.Update(displayName, boss.Hp, boss.MaxHp, boss.HasHp);
+    }
 
     internal static bool ShouldDisplayCombatant(CombatMetricsStore store, int combatantId, CombatantMetrics data)
     {

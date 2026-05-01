@@ -353,7 +353,7 @@ public sealed class PacketLogReplayService
             "compact-outcome" => TryReplayCompactOutcome(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "compact-0238" => TryReplayCompact0238(store, packet, batchOrdinal),
             "compact-0638" => TryReplayCompact0638(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "sidecar-3538" => TryReplay3538(store, packet),
+            "sidecar-3538" => TryReplay3538(store, packet, timestamp),
             "wrapped-8456" => TryReplay8456(store, packet),
             "state-0140" => TryReplay0140(store, packet),
             "state-2136" => TryReplay2136(store, packet),
@@ -361,7 +361,7 @@ public sealed class PacketLogReplayService
             "state-0240" => TryReplay0240(store, packet),
             "state-4636" => TryReplay4636(store, packet),
             "state-4536" => TryReplay4536(store, packet),
-            "state-4036" => TryReplayState4036(store, packet),
+            "state-4036" => TryReplayState4036(store, packet, timestamp),
             "state-4136" => Packet4136Parser.TryParse(packet, out _),
             "state-1d37" => Packet1D37Parser.TryParse(packet, out _),
             "state-4936" => Packet4936Parser.TryParse(packet, out _),
@@ -369,11 +369,12 @@ public sealed class PacketLogReplayService
             "aux-2b38" => Packet2B38Parser.TryParse(packet, out _),
             "aux-2c38" => TryReplay2C38(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "nickname" => TryReplayNickname(store, packet),
-            "remain-hp" => TryReplayRemainHp(store, packet),
-            "battle-toggle" => TryReplayBattleToggle(store, packet),
+            "remain-hp" => TryReplayRemainHp(store, packet, timestamp),
+            "entity-value-008d" => Packet008DRemainHpParser.TryParse(packet, out _),
+            "battle-toggle" => TryReplayBattleToggle(store, packet, timestamp),
             "summon" => TryReplaySummon(store, packet, entry.Metadata),
-            "npc-spawn" => TryReplayNpcSpawn(store, packet, entry.Metadata),
-            "recovery-path" => TryReplayRecoveryPath(store, packet, entry.Metadata),
+            "npc-spawn" => TryReplayNpcSpawn(store, packet, entry.Metadata, timestamp),
+            "recovery-path" => TryReplayRecoveryPath(store, packet, timestamp),
             _ => false
         };
     }
@@ -608,13 +609,14 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay3538(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplay3538(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (!Packet3538SidecarParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
+        store.ObserveBossFocusPulse(parsed.TargetId, timestamp);
         return true;
     }
 
@@ -801,25 +803,37 @@ public sealed class PacketLogReplayService
         return false;
     }
 
-    private static bool TryReplayRemainHp(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplayRemainHp(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (!Packet008DRemainHpParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp));
+        if (Packet008DRemainHpParser.IsHealthValue(parsed))
+        {
+            store.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp), timestamp);
+        }
+
         return true;
     }
 
-    private static bool TryReplayBattleToggle(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplayBattleToggle(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (!Packet218DBattleToggleParser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        store.ToggleNpcBattle(parsed.NpcId);
+        if (parsed.IsActive is bool isActive)
+        {
+            store.SetNpcBattle(parsed.NpcId, isActive, timestamp);
+        }
+        else
+        {
+            store.ToggleNpcBattle(parsed.NpcId);
+        }
+
         return true;
     }
 
@@ -885,36 +899,52 @@ public sealed class PacketLogReplayService
         return ownerId > 0 && summonId > 0;
     }
 
-    private static bool TryReplayNpcSpawn(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata)
+    private static bool TryReplayNpcSpawn(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata, long timestamp)
     {
-        if (TryParseNpcSpawnMetadata(metadata, out var entityId, out var npcCode))
+        if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn))
         {
-            if (npcCode > 0)
+            if (spawn.NpcCode.HasValue)
             {
-                TryApplyNpcCatalog(store, entityId, npcCode);
+                TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value);
+            }
+
+            if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
+            {
+                store.AppendNpcHp(spawn.EntityId, currentHp, maxHp, timestamp);
             }
 
             return true;
         }
 
-        if (!Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn))
+        if (!TryParseNpcSpawnMetadata(metadata, out var entityId, out var npcCode, out var metadataCurrentHp, out var metadataMaxHp))
         {
             return false;
         }
 
-        if (spawn.NpcCode.HasValue)
+        if (npcCode > 0)
         {
-            TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value);
+            TryApplyNpcCatalog(store, entityId, npcCode);
+        }
+
+        if (metadataCurrentHp is int parsedCurrentHp &&
+            metadataMaxHp is int parsedMaxHp &&
+            parsedMaxHp >= parsedCurrentHp)
+        {
+            store.AppendNpcHp(entityId, parsedCurrentHp, parsedMaxHp, timestamp);
         }
 
         return true;
     }
 
-    private static bool TryReplayState4036(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplayState4036(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
             TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value, requireCatalogEntry: true);
+            if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
+            {
+                store.AppendNpcHp(spawn.EntityId, currentHp, maxHp, timestamp);
+            }
         }
 
         if (Packet4036CreateParser.TryParseOwner(packet, out var entityId, out var ownerId))
@@ -925,10 +955,12 @@ public sealed class PacketLogReplayService
         return Packet4036Parser.TryParse(packet, out _);
     }
 
-    private static bool TryParseNpcSpawnMetadata(string metadata, out int entityId, out int npcCode)
+    private static bool TryParseNpcSpawnMetadata(string metadata, out int entityId, out int npcCode, out int? currentHp, out int? maxHp)
     {
         entityId = 0;
         npcCode = 0;
+        currentHp = null;
+        maxHp = null;
 
         if (string.IsNullOrEmpty(metadata))
         {
@@ -947,12 +979,22 @@ public sealed class PacketLogReplayService
             {
                 npcCode = m;
             }
+            else if (segment.StartsWith("currentHp=", StringComparison.Ordinal) &&
+                     int.TryParse(segment.AsSpan("currentHp=".Length), CultureInfo.InvariantCulture, out var hp))
+            {
+                currentHp = hp;
+            }
+            else if (segment.StartsWith("maxHp=", StringComparison.Ordinal) &&
+                     int.TryParse(segment.AsSpan("maxHp=".Length), CultureInfo.InvariantCulture, out var mhp))
+            {
+                maxHp = mhp;
+            }
         }
 
         return entityId > 0;
     }
 
-    private static bool TryReplayRecoveryPath(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata)
+    private static bool TryReplayRecoveryPath(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (Packet0994NicknameParser.TryParse(packet, out var nickname))
         {
@@ -976,6 +1018,31 @@ public sealed class PacketLogReplayService
             if (spawn.NpcCode.HasValue)
             {
                 TryApplyNpcCatalog(store, spawn.EntityId, spawn.NpcCode.Value);
+            }
+
+            if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
+            {
+                store.AppendNpcHp(spawn.EntityId, currentHp, maxHp, timestamp);
+            }
+
+            return true;
+        }
+
+        if (Packet3538SidecarParser.TryParse(packet, out var sidecar))
+        {
+            store.ObserveBossFocusPulse(sidecar.TargetId, timestamp);
+            return true;
+        }
+
+        if (Packet218DBattleToggleParser.TryParse(packet, out var battleToggle))
+        {
+            if (battleToggle.IsActive is bool isActive)
+            {
+                store.SetNpcBattle(battleToggle.NpcId, isActive, timestamp);
+            }
+            else
+            {
+                store.ToggleNpcBattle(battleToggle.NpcId);
             }
 
             return true;

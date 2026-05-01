@@ -261,6 +261,21 @@ public sealed class StatePacketParserTests
         Assert.Equal(sample.NpcCode, result.NpcCode);
     }
 
+    [Fact]
+    public void TryParseNpcSpawn_Extracts_Current_And_Max_Hp()
+    {
+        var packet = HexHelper.Parse("BB014036F0BA030C2200DC3F230000021E6D28C7A8157F4600000B4300003441000801B08003B0800364000000640000000000000000000000000000000000000001000000000000000000000000000000000000000602110181969800FFFFFFFFFFFFFFFF8075D52ABB030000F0BA0301141E6D28C7A8157F4600000B431102BC060000FFFFFFFFFFFFFFFF8075D52ABB030000F0BA03011E6D28C7A8157F4600000B430100160000000301960000009600000098308BB500");
+
+        var ok = Packet4036CreateParser.TryParseNpcSpawn(packet, out var result);
+
+        Assert.True(ok);
+        Assert.Equal(Packet4036Kind.Create177, result.Kind);
+        Assert.Equal(56_688, result.EntityId);
+        Assert.Equal(2_310_108, result.NpcCode);
+        Assert.Equal(49_200, result.CurrentHp);
+        Assert.Equal(49_200, result.MaxHp);
+    }
+
     [Theory]
     [MemberData(nameof(FixtureCatalog.Wrapped8456Samples), MemberType = typeof(FixtureCatalog))]
     public void Parses_8456_Wrapped_Frame(FixtureCatalog.Wrapped8456Sample sample)

@@ -57,6 +57,69 @@ public sealed class PacketLogReplayServiceTests
         }
     }
 
+    [Fact]
+    public void Replay_Reconstructs_Boss_Activity_From_Sidecar_And_Health_Frame()
+    {
+        CombatMetricsEngine.SetGameResources(
+            BuildReplaySkillMap(),
+            new Dictionary<int, NpcCatalogEntry>
+            {
+                [2310108] = new NpcCatalogEntry(2310108, "Boss", NpcCatalogKind.Boss)
+            });
+
+        var spawnLine = "2026-05-01T21:36:18.6000332+08:00|npc-spawn|16777343:60154->16777343:65518|kind=create-177|entity=56688|npcCode=2310108|data=BB014036F0BA030C2200DC3F230000021E6D28C7A8157F4600000B4300003441000801B08003B0800364000000640000000000000000000000000000000000000001000000000000000000000000000000000000000602110181969800FFFFFFFFFFFFFFFF8075D52ABB030000F0BA0301141E6D28C7A8157F4600000B431102BC060000FFFFFFFFFFFFFFFF8075D52ABB030000F0BA03011E6D28C7A8157F4600000B430100160000000301960000009600000098308BB500";
+        var pulseLine = "2026-05-01T21:37:31.3028167+08:00|sidecar-3538|16777343:60154->16777343:65518|target=56688|state=0|source=0|data=0B3538F0BA030000";
+        var activeSidecarLine = "2026-05-01T21:37:40.6643590+08:00|sidecar-3538|16777343:60154->16777343:65518|target=56688|state=0|source=11946|data=0C3538F0BA0300AA5D";
+        var activeLine = "2026-05-01T21:37:40.6646403+08:00|battle-toggle|16777343:60154->16777343:65518|npcId=56688|active=True|tailLen=2|data=0B218DF0BA030001";
+        var hpLine = "2026-05-01T21:37:41.4785243+08:00|remain-hp|16777343:60154->16777343:65518|npcId=56688|value0=2|value1=1|value2=0|value=22847|data=14008DF0BA030201003F590000";
+        var exitLine = "2026-05-01T21:38:08.1582599+08:00|battle-toggle|16777343:60154->16777343:65518|npcId=56688|active=False|tailLen=2|data=0B218DF0BA030000";
+        var spawnOnlyPath = WriteTempReplayLog("frame", spawnLine);
+        var pulsePath = WriteTempReplayLog("frame", spawnLine, pulseLine);
+        var hpPath = WriteTempReplayLog("frame", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine);
+        var exitPath = WriteTempReplayLog("frame", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine, exitLine);
+        try
+        {
+            var spawnOnlyReplay = PacketLogReplayService.Replay(spawnOnlyPath);
+            var afterSpawn = DateTimeOffset.Parse("2026-05-01T21:36:18.7000332+08:00").ToUnixTimeMilliseconds();
+            Assert.False(spawnOnlyReplay.Store.TryGetObservedBoss(afterSpawn, 2_000, out _));
+
+            var pulseReplay = PacketLogReplayService.Replay(pulsePath);
+            var afterPulse = DateTimeOffset.Parse("2026-05-01T21:37:31.4028167+08:00").ToUnixTimeMilliseconds();
+            var afterPulseTimeout = DateTimeOffset.Parse("2026-05-01T21:37:33.4038167+08:00").ToUnixTimeMilliseconds();
+
+            Assert.True(pulseReplay.Store.TryGetObservedBoss(afterPulse, 2_000, out var pulseBoss));
+            Assert.True(pulseBoss.HasHp);
+            Assert.Equal(56_688, pulseBoss.InstanceId);
+            Assert.Equal(49_200, pulseBoss.Hp);
+            Assert.Equal(49_200, pulseBoss.MaxHp);
+            Assert.False(pulseReplay.Store.TryGetObservedBoss(afterPulseTimeout, 2_000, out _));
+
+            var replay = PacketLogReplayService.Replay(hpPath);
+            var afterHp = DateTimeOffset.Parse("2026-05-01T21:37:41.5785243+08:00").ToUnixTimeMilliseconds();
+
+            Assert.Equal(1, replay.ReplayedEventCounts["npc-spawn"]);
+            Assert.Equal(2, replay.ReplayedEventCounts["sidecar-3538"]);
+            Assert.Equal(1, replay.ReplayedEventCounts["battle-toggle"]);
+            Assert.Equal(1, replay.ReplayedEventCounts["remain-hp"]);
+            Assert.True(replay.Store.TryGetObservedBoss(afterHp, 2_000, out var boss));
+            Assert.True(boss.HasHp);
+            Assert.Equal(56_688, boss.InstanceId);
+            Assert.Equal(22_847, boss.Hp);
+            Assert.Equal(49_200, boss.MaxHp);
+
+            var exitReplay = PacketLogReplayService.Replay(exitPath);
+            var afterExit = DateTimeOffset.Parse("2026-05-01T21:38:08.2582599+08:00").ToUnixTimeMilliseconds();
+            Assert.False(exitReplay.Store.TryGetObservedBoss(afterExit, 2_000, out _));
+        }
+        finally
+        {
+            File.Delete(spawnOnlyPath);
+            File.Delete(pulsePath);
+            File.Delete(hpPath);
+            File.Delete(exitPath);
+        }
+    }
+
     [Theory]
     [InlineData("aion2flow.stream.20260411174533.log", 3, 0)]
     [InlineData("aion2flow.stream.20260411174739.log", 0, 3)]

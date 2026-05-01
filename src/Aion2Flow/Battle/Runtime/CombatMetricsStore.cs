@@ -51,6 +51,8 @@ public sealed class CombatMetricsStore
     {
         public int? NpcCode { get; init; }
         public int? Hp { get; init; }
+        public int? MaxHp { get; init; }
+        public long? HpObservedAtMilliseconds { get; init; }
         public bool? BattleToggledOn { get; init; }
         public NpcKind? Kind { get; init; }
         public uint? Value2136 { get; init; }
@@ -65,6 +67,8 @@ public sealed class CombatMetricsStore
     public readonly record struct NpcInstanceStateSnapshot(
         int? NpcCode,
         int? Hp,
+        int? MaxHp,
+        long? HpObservedAtMilliseconds,
         bool? BattleToggledOn,
         NpcKind? Kind,
         uint? Value2136,
@@ -73,6 +77,13 @@ public sealed class CombatMetricsStore
         uint? Value0240,
         (byte State0, byte State1)? State4636,
         (int SequenceId, int ResultCode)? Latest2C38);
+
+    public readonly record struct ObservedBossSnapshot(
+        int InstanceId,
+        int Hp,
+        int MaxHp,
+        long LastObservedAtMilliseconds,
+        bool HasHp);
 
     private readonly ConcurrentDictionary<int, ConcurrentQueue<ParsedCombatPacket>> _packetsByTarget = new();
     private readonly ConcurrentDictionary<int, ConcurrentQueue<ParsedCombatPacket>> _packetsBySource = new();
@@ -102,7 +113,10 @@ public sealed class CombatMetricsStore
     private readonly List<PendingCompactAvoidance> _pendingCompactDamageEntries = [];
     private readonly HashSet<(int Target, int Skill)> _confirmedCompactDamageTriples = [];
     private readonly List<PendingCompactAvoidance> _pendingCompact0638Controls = [];
+    private readonly Lock _observedBossLock = new();
+    private readonly ConcurrentDictionary<int, byte> _bossFocusInstances = new();
     private readonly ConcurrentDictionary<int, int> _instanceLifecycleRemap = new();
+    private ObservedBossSnapshot? _observedBoss;
     private int _nextSyntheticLifecycleId = int.MaxValue;
     private int _lastObservedNpcSource;
     private long _observationOrdinal;
@@ -153,15 +167,29 @@ public sealed class CombatMetricsStore
             return rawInstanceId;
         }
 
+        var previousId = ResolveLifecycleId(rawInstanceId);
         var newId = Interlocked.Decrement(ref _nextSyntheticLifecycleId);
         _instanceLifecycleRemap[rawInstanceId] = newId;
-        if (_lastObservedNpcSource == ResolveLifecycleId(rawInstanceId) || _lastObservedNpcSource == rawInstanceId)
+        if (_lastObservedNpcSource == previousId || _lastObservedNpcSource == rawInstanceId)
         {
             _lastObservedNpcSource = newId;
         }
-        if (_currentTarget == rawInstanceId)
+        if (_currentTarget == previousId || _currentTarget == rawInstanceId)
         {
             _currentTarget = newId;
+        }
+        if (_bossFocusInstances.TryRemove(previousId, out var focusValue) ||
+            _bossFocusInstances.TryRemove(rawInstanceId, out focusValue))
+        {
+            _bossFocusInstances[newId] = focusValue;
+        }
+        lock (_observedBossLock)
+        {
+            if (_observedBoss is { } observedBoss &&
+                (observedBoss.InstanceId == previousId || observedBoss.InstanceId == rawInstanceId))
+            {
+                _observedBoss = observedBoss with { InstanceId = newId };
+            }
         }
         return newId;
     }
@@ -986,11 +1014,182 @@ public sealed class CombatMetricsStore
 
     public void AppendNpcName(int npcCode, string name) => _npcNameByCode[npcCode] = name;
 
-    public void AppendNpcKind(int instanceId, NpcKind kind) =>
-        UpdateNpcState(instanceId, state => state with { Kind = kind });
+    public void AppendNpcKind(int instanceId, NpcKind kind)
+    {
+        if (instanceId <= 0)
+        {
+            return;
+        }
+
+        var resolvedInstanceId = ResolveLifecycleId(instanceId);
+        UpdateNpcState(resolvedInstanceId, state => state with { Kind = kind });
+        if (kind != NpcKind.Boss)
+        {
+            _bossFocusInstances.TryRemove(resolvedInstanceId, out _);
+            ClearObservedBoss(resolvedInstanceId);
+            return;
+        }
+
+        if (!_bossFocusInstances.ContainsKey(resolvedInstanceId) ||
+            !_npcStateByInstance.TryGetValue(resolvedInstanceId, out var state) ||
+            state.Hp is not int hp ||
+            state.HpObservedAtMilliseconds is not long observedAt)
+        {
+            return;
+        }
+
+        RememberObservedBoss(resolvedInstanceId, hp, Math.Max(state.MaxHp ?? hp, hp), observedAt);
+    }
 
     public void AppendNpcHp(int instanceId, int hp) =>
-        UpdateNpcState(instanceId, state => state with { Hp = hp });
+        AppendNpcHp(instanceId, hp, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+    public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds)
+        => AppendNpcHp(instanceId, hp, maxHp: null, observedAtMilliseconds);
+
+    public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
+        => AppendNpcHp(instanceId, hp, (int?)maxHp, observedAtMilliseconds);
+
+    private void AppendNpcHp(int instanceId, int hp, int? maxHp, long observedAtMilliseconds)
+    {
+        var hasExplicitMaxHp = maxHp.HasValue;
+        var explicitMaxHp = maxHp.GetValueOrDefault();
+        if (instanceId <= 0 || hp < 0 || (hasExplicitMaxHp && explicitMaxHp < hp))
+        {
+            return;
+        }
+
+        var resolvedInstanceId = ResolveLifecycleId(instanceId);
+        var observedAt = observedAtMilliseconds > 0
+            ? observedAtMilliseconds
+            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        NpcInstanceState updated = null!;
+        _npcStateByInstance.AddOrUpdate(
+            resolvedInstanceId,
+            _ =>
+            {
+                updated = new NpcInstanceState
+                {
+                    Hp = hp,
+                    MaxHp = hasExplicitMaxHp ? Math.Max(explicitMaxHp, hp) : hp,
+                    HpObservedAtMilliseconds = observedAt
+                };
+                return updated;
+            },
+            (_, current) =>
+            {
+                updated = current with
+                {
+                    Hp = hp,
+                    MaxHp = hasExplicitMaxHp
+                        ? Math.Max(explicitMaxHp, hp)
+                        : Math.Max(current.MaxHp ?? 0, hp),
+                    HpObservedAtMilliseconds = observedAt
+                };
+                return updated;
+            });
+
+        if (_bossFocusInstances.ContainsKey(resolvedInstanceId) || IsObservedBoss(resolvedInstanceId))
+        {
+            RememberObservedBoss(resolvedInstanceId, hp, Math.Max(updated.MaxHp ?? hp, hp), observedAt);
+        }
+    }
+
+    public void AppendBossFocusEnter(int instanceId, long observedAtMilliseconds)
+    {
+        if (instanceId <= 0)
+        {
+            return;
+        }
+
+        var resolvedInstanceId = ResolveLifecycleId(instanceId);
+        if (!IsBossInstance(resolvedInstanceId))
+        {
+            return;
+        }
+
+        _bossFocusInstances[resolvedInstanceId] = 0;
+        RememberObservedBossActivity(resolvedInstanceId, observedAtMilliseconds);
+    }
+
+    public void ObserveBossFocusPulse(int instanceId, long observedAtMilliseconds)
+    {
+        if (instanceId <= 0)
+        {
+            return;
+        }
+
+        var resolvedInstanceId = ResolveLifecycleId(instanceId);
+        if (!IsBossInstance(resolvedInstanceId))
+        {
+            return;
+        }
+
+        RememberObservedBossActivity(resolvedInstanceId, observedAtMilliseconds);
+    }
+
+    public void AppendBossFocusExit(int instanceId)
+    {
+        if (instanceId <= 0)
+        {
+            return;
+        }
+
+        var resolvedInstanceId = ResolveLifecycleId(instanceId);
+        _bossFocusInstances.TryRemove(resolvedInstanceId, out _);
+        ClearObservedBoss(resolvedInstanceId);
+    }
+
+    public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds)
+    {
+        if (instanceId <= 0)
+        {
+            return;
+        }
+
+        var resolvedInstanceId = ResolveLifecycleId(instanceId);
+        UpdateNpcState(resolvedInstanceId, state => state with { BattleToggledOn = isActive });
+        if (!IsBossInstance(resolvedInstanceId))
+        {
+            return;
+        }
+
+        if (isActive)
+        {
+            AppendBossFocusEnter(resolvedInstanceId, observedAtMilliseconds);
+        }
+        else
+        {
+            AppendBossFocusExit(resolvedInstanceId);
+        }
+    }
+
+    public bool TryGetObservedBoss(
+        long nowMilliseconds,
+        long visibilityTimeoutMilliseconds,
+        out ObservedBossSnapshot snapshot)
+    {
+        lock (_observedBossLock)
+        {
+            if (_observedBoss is not { } current)
+            {
+                snapshot = default;
+                return false;
+            }
+
+            var elapsed = Math.Max(0, nowMilliseconds - current.LastObservedAtMilliseconds);
+            if (elapsed <= visibilityTimeoutMilliseconds ||
+                _bossFocusInstances.ContainsKey(current.InstanceId))
+            {
+                snapshot = current;
+                return true;
+            }
+
+            _observedBoss = null;
+            snapshot = default;
+            return false;
+        }
+    }
 
     public void AppendNpc2136State(int instanceId, uint sequence, uint value0)
     {
@@ -1197,6 +1396,8 @@ public sealed class CombatMetricsStore
             state = new NpcInstanceStateSnapshot(
                 current.NpcCode,
                 current.Hp,
+                current.MaxHp,
+                current.HpObservedAtMilliseconds,
                 current.BattleToggledOn,
                 current.Kind,
                 current.Value2136,
@@ -1238,12 +1439,27 @@ public sealed class CombatMetricsStore
 
     public void ToggleNpcBattle(int instanceId)
     {
+        var resolvedInstanceId = ResolveLifecycleId(instanceId);
+        bool? toggledOn = null;
         UpdateNpcState(
-            instanceId,
-            state => state with
+            resolvedInstanceId,
+            state =>
             {
-                BattleToggledOn = !(state.BattleToggledOn ?? false)
+                toggledOn = !(state.BattleToggledOn ?? false);
+                return state with
+                {
+                    BattleToggledOn = toggledOn
+                };
             });
+
+        if (toggledOn is true)
+        {
+            AppendBossFocusEnter(resolvedInstanceId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        }
+        else if (toggledOn is false && IsBossInstance(resolvedInstanceId))
+        {
+            AppendBossFocusExit(resolvedInstanceId);
+        }
     }
 
     public void AppendNickname(int uid, string nickname)
@@ -1301,6 +1517,8 @@ public sealed class CombatMetricsStore
             _periodicChainByKey.Clear();
         }
         _lastObservedNpcSource = 0;
+        ClearObservedBoss();
+        _bossFocusInstances.Clear();
         CurrentTarget = 0;
         _observationOrdinal = 0;
         _detailRevisionSequence = 0;
@@ -1451,16 +1669,24 @@ public sealed class CombatMetricsStore
 
     public CombatMetricsStore DeepClone()
     {
+        ObservedBossSnapshot? observedBoss;
+        lock (_observedBossLock)
+        {
+            observedBoss = _observedBoss;
+        }
+
         var clone = new CombatMetricsStore
         {
             CurrentTarget = CurrentTarget,
             CurrentMapId = CurrentMapId,
             CurrentMapInstanceId = CurrentMapInstanceId,
             _lastObservedNpcSource = _lastObservedNpcSource,
+            _observedBoss = observedBoss,
             _nextSyntheticLifecycleId = _nextSyntheticLifecycleId
         };
 
         CloneValues(_instanceLifecycleRemap, clone._instanceLifecycleRemap);
+        CloneValues(_bossFocusInstances, clone._bossFocusInstances);
         CloneQueues(_packetsByTarget, clone._packetsByTarget);
         CloneQueues(_packetsBySource, clone._packetsBySource);
         CloneValues(_nicknameStorage, clone._nicknameStorage);
@@ -1640,6 +1866,95 @@ public sealed class CombatMetricsStore
             instanceId,
             _ => update(new NpcInstanceState()),
             (_, current) => update(current));
+    }
+
+    private bool IsBossInstance(int instanceId)
+    {
+        instanceId = ResolveLifecycleId(instanceId);
+        return instanceId > 0 &&
+            _npcStateByInstance.TryGetValue(instanceId, out var state) &&
+            state.Kind == NpcKind.Boss;
+    }
+
+    private bool IsObservedBoss(int instanceId)
+    {
+        lock (_observedBossLock)
+        {
+            return _observedBoss?.InstanceId == instanceId;
+        }
+    }
+
+    private void RememberObservedBossActivity(int instanceId, long observedAtMilliseconds)
+    {
+        var observedAt = observedAtMilliseconds > 0
+            ? observedAtMilliseconds
+            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        if (_npcStateByInstance.TryGetValue(instanceId, out var state) &&
+            state.Hp is int hp)
+        {
+            RememberObservedBoss(instanceId, hp, Math.Max(state.MaxHp ?? hp, hp), observedAt);
+            return;
+        }
+
+        lock (_observedBossLock)
+        {
+            if (_observedBoss is { } current &&
+                current.InstanceId == instanceId &&
+                current.HasHp)
+            {
+                _observedBoss = current with { LastObservedAtMilliseconds = observedAt };
+                return;
+            }
+
+            if (_observedBoss is { } other &&
+                other.InstanceId != instanceId &&
+                other.LastObservedAtMilliseconds > observedAt)
+            {
+                return;
+            }
+
+            _observedBoss = new ObservedBossSnapshot(instanceId, 0, 1, observedAt, HasHp: false);
+        }
+    }
+
+    private void RememberObservedBoss(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
+    {
+        lock (_observedBossLock)
+        {
+            if (_observedBoss is { } current &&
+                current.InstanceId != instanceId &&
+                current.LastObservedAtMilliseconds > observedAtMilliseconds)
+            {
+                return;
+            }
+
+            _observedBoss = new ObservedBossSnapshot(
+                instanceId,
+                hp,
+                Math.Max(1, maxHp),
+                observedAtMilliseconds,
+                HasHp: true);
+        }
+    }
+
+    private void ClearObservedBoss()
+    {
+        lock (_observedBossLock)
+        {
+            _observedBoss = null;
+        }
+    }
+
+    private void ClearObservedBoss(int instanceId)
+    {
+        lock (_observedBossLock)
+        {
+            if (_observedBoss?.InstanceId == instanceId)
+            {
+                _observedBoss = null;
+            }
+        }
     }
 
     private static int ResolveTrackedSkillCode(ParsedCombatPacket packet)

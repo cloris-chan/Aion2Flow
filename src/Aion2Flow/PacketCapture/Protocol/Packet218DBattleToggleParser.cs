@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.PacketCapture.Readers;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
-internal readonly record struct Packet218DBattleToggle(int NpcId, int TailLength);
+internal readonly record struct Packet218DBattleToggle(int NpcId, bool? IsActive, int TailLength);
 
 internal static class Packet218DBattleToggleParser
 {
@@ -19,7 +19,15 @@ internal static class Packet218DBattleToggleParser
         if (!reader.TryReadVarInt(out var npcId)) return false;
         if (npcId == 0) return false;
 
-        result = new Packet218DBattleToggle(npcId, reader.Remaining);
+        bool? isActive = null;
+        if (reader.Remaining >= 2 &&
+            packet[reader.Offset] == 0x00 &&
+            packet[reader.Offset + 1] is 0x00 or 0x01)
+        {
+            isActive = packet[reader.Offset + 1] == 0x01;
+        }
+
+        result = new Packet218DBattleToggle(npcId, isActive, reader.Remaining);
         return true;
     }
 }

@@ -799,14 +799,18 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (!reader.TryReadVarInt(out var npcId)) return false;
         if (npcId == 0) return false;
 
-        if (!reader.TryReadVarInt(out _)) return false;
-        if (!reader.TryReadVarInt(out _)) return false;
-        if (!reader.TryReadVarInt(out _)) return false;
+        if (!reader.TryReadVarInt(out var value0)) return false;
+        if (!reader.TryReadVarInt(out var value1)) return false;
+        if (!reader.TryReadVarInt(out var value2)) return false;
         if (!reader.TryReadUInt32Le(out var npcHp)) return false;
 
-        store.AppendNpcHp(npcId, npcHp);
+        if (value0 == 2 && value1 == 1 && value2 == 0)
+        {
+            store.AppendNpcHp(npcId, checked((int)npcHp), CurrentTimestampMilliseconds);
+        }
         consumed = reader.Offset;
-        RawPacketDump.AppendFrameEvent("remain-hp", _connection, $"npcId={npcId}|hp={npcHp}", payload[..consumed]);
+        var eventName = value0 == 2 && value1 == 1 && value2 == 0 ? "remain-hp" : "entity-value-008d";
+        RawPacketDump.AppendFrameEvent(eventName, _connection, $"npcId={npcId}|value0={value0}|value1={value1}|value2={value2}|value={npcHp}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -825,9 +829,26 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (!reader.TryReadVarInt(out var npcId)) return false;
         if (npcId == 0) return false;
 
-        store.ToggleNpcBattle(npcId);
+        bool? isActive = null;
+        if (reader.Remaining >= 2 &&
+            payload[reader.Offset] == 0x00 &&
+            payload[reader.Offset + 1] is 0x00 or 0x01)
+        {
+            isActive = payload[reader.Offset + 1] == 0x01;
+            if (!reader.TryAdvance(2)) return false;
+        }
+
+        if (isActive is bool active)
+        {
+            store.SetNpcBattle(npcId, active, CurrentTimestampMilliseconds);
+        }
+        else
+        {
+            store.ToggleNpcBattle(npcId);
+        }
         consumed = reader.Offset;
-        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={npcId}", payload[..consumed]);
+        var activeText = isActive.HasValue ? $"|active={isActive.Value}" : string.Empty;
+        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={npcId}{activeText}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -1457,6 +1478,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
+        store.ObserveBossFocusPulse(parsed.TargetId, CurrentTimestampMilliseconds);
         RawPacketDump.AppendFrameEvent(
             "sidecar-3538",
             _connection,
@@ -1494,8 +1516,14 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 TryApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value);
             }
 
+            if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
+            {
+                store.AppendNpcHp(spawn.EntityId, currentHp, maxHp, CurrentTimestampMilliseconds);
+            }
+
             var spawnNpcCodeText = spawn.NpcCode.HasValue ? $"|npcCode={spawn.NpcCode.Value}" : string.Empty;
-            RawPacketDump.AppendFrameEvent("npc-spawn", _connection, $"kind={Packet4036Descriptors.FormatKind(spawn.Kind, packet.Length)}|entity={spawn.EntityId}{spawnNpcCodeText}", packet);
+            var spawnHpText = spawn.CurrentHp is int hp && spawn.MaxHp is int hpMax ? $"|currentHp={hp}|maxHp={hpMax}" : string.Empty;
+            RawPacketDump.AppendFrameEvent("npc-spawn", _connection, $"kind={Packet4036Descriptors.FormatKind(spawn.Kind, packet.Length)}|entity={spawn.EntityId}{spawnNpcCodeText}{spawnHpText}", packet);
             return _hasParsed = true;
         }
 
@@ -1507,6 +1535,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
             TryApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value, requireCatalogEntry: true);
+            if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
+            {
+                store.AppendNpcHp(spawn.EntityId, currentHp, maxHp, CurrentTimestampMilliseconds);
+            }
         }
 
         if (Packet4036CreateParser.TryParseOwner(packet, out var entityId, out var ownerId))
@@ -1855,8 +1887,14 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp));
-        RawPacketDump.AppendFrameEvent("remain-hp", _connection, $"npcId={parsed.NpcId}|hp={parsed.Hp}", packet[..(packet.Length - parsed.TailLength)]);
+        var isHealth = Packet008DRemainHpParser.IsHealthValue(parsed);
+        if (isHealth)
+        {
+            store.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp), CurrentTimestampMilliseconds);
+        }
+
+        var eventName = isHealth ? "remain-hp" : "entity-value-008d";
+        RawPacketDump.AppendFrameEvent(eventName, _connection, $"npcId={parsed.NpcId}|value0={parsed.Value0}|value1={parsed.Value1}|value2={parsed.Value2}|value={parsed.Hp}", packet[..(packet.Length - parsed.TailLength)]);
         return _hasParsed = true;
     }
 
@@ -1867,8 +1905,17 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.ToggleNpcBattle(parsed.NpcId);
-        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={parsed.NpcId}", packet[..(packet.Length - parsed.TailLength)]);
+        if (parsed.IsActive is bool isActive)
+        {
+            store.SetNpcBattle(parsed.NpcId, isActive, CurrentTimestampMilliseconds);
+        }
+        else
+        {
+            store.ToggleNpcBattle(parsed.NpcId);
+        }
+
+        var activeText = parsed.IsActive.HasValue ? $"|active={parsed.IsActive.Value}" : string.Empty;
+        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={parsed.NpcId}{activeText}|tailLen={parsed.TailLength}", packet);
         return _hasParsed = true;
     }
 

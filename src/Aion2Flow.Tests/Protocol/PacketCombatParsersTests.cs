@@ -237,6 +237,20 @@ public sealed class PacketCombatParsersTests
     }
 
     [Theory]
+    [InlineData("14008D80E209020100358D0000", true)]
+    [InlineData("0F008DE11D01010248650200", false)]
+    [InlineData("0F008DE11D010105107A0700", false)]
+    public void Classifies_008D_Health_Channel(string hex, bool expectedHealth)
+    {
+        var packet = HexHelper.Parse(hex);
+
+        var ok = Packet008DRemainHpParser.TryParse(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal(expectedHealth, Packet008DRemainHpParser.IsHealthValue(parsed));
+    }
+
+    [Theory]
     [MemberData(nameof(FixtureCatalog.BattleToggleSamples), MemberType = typeof(FixtureCatalog))]
     public void Parses_218D_Battle_Toggle_Frame(FixtureCatalog.BattleToggleSample sample)
     {
@@ -247,6 +261,21 @@ public sealed class PacketCombatParsersTests
         Assert.True(ok);
         Assert.Equal(sample.NpcId, parsed.NpcId);
         Assert.Equal(sample.TailLength, parsed.TailLength);
+    }
+
+    [Theory]
+    [InlineData("0B218D80E2090001", true)]
+    [InlineData("0B218D80E2090000", false)]
+    public void Parses_218D_Battle_Toggle_Explicit_State(string hex, bool expectedActive)
+    {
+        var packet = HexHelper.Parse(hex);
+
+        var ok = Packet218DBattleToggleParser.TryParse(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal(160000, parsed.NpcId);
+        Assert.Equal(expectedActive, parsed.IsActive);
+        Assert.Equal(2, parsed.TailLength);
     }
 
     [Theory]

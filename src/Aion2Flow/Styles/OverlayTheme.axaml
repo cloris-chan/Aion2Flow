@@ -109,6 +109,51 @@
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
+    <Style Selector="Border.BossFocusPanel">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.RowCardBorderStrong}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="1,0,1,1" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+
+    <Style Selector="TextBlock.BossFocusName">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="TextBlock.BossFocusHp">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <Style Selector="TextBlock.BossFocusHpMuted">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.88" />
+    </Style>
+
+    <Style Selector="TextBlock.BossFocusHpSlash">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.72" />
+    </Style>
+
+    <Style Selector="ProgressBar.BossFocusHpBar">
+        <Setter Property="Foreground" Value="#A90109" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.SurfaceStrong}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+    </Style>
+
     <Style Selector="Border.BottomBarPill">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.Surface}" />
         <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.Border}" />
