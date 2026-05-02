@@ -91,6 +91,7 @@ public sealed class CombatMetricsStore
     private readonly ConcurrentDictionary<int, ConcurrentDictionary<EntityPairKey, byte>> _outgoingPairKeysBySource = new();
     private readonly ConcurrentDictionary<int, ConcurrentDictionary<EntityPairKey, byte>> _incomingPairKeysByTarget = new();
     private readonly ConcurrentDictionary<int, string> _nicknameStorage = new();
+    private readonly ConcurrentDictionary<int, int> _playerOriginServerStorage = new();
     private readonly ConcurrentDictionary<int, int> _summonOwnerByInstance = new();
     private readonly ConcurrentDictionary<int, ConcurrentDictionary<int, byte>> _summonInstancesByOwner = new();
     private readonly ConcurrentDictionary<int, string> _npcNameByCode = new();
@@ -1462,8 +1463,13 @@ public sealed class CombatMetricsStore
         }
     }
 
-    public void AppendNickname(int uid, string nickname)
+    public void AppendNickname(int uid, string nickname, int? originServerId = null)
     {
+        if (originServerId is > 0)
+        {
+            _playerOriginServerStorage[uid] = originServerId.Value;
+        }
+
         if (_nicknameStorage.TryGetValue(uid, out var existing) && existing == nickname)
             return;
 
@@ -1529,6 +1535,7 @@ public sealed class CombatMetricsStore
     public ConcurrentDictionary<int, ConcurrentQueue<ParsedCombatPacket>> CombatPacketsByTarget => _packetsByTarget;
     public ConcurrentDictionary<int, ConcurrentQueue<ParsedCombatPacket>> CombatPacketsBySource => _packetsBySource;
     public ConcurrentDictionary<int, string> Nicknames => _nicknameStorage;
+    public ConcurrentDictionary<int, int> PlayerOriginServerIds => _playerOriginServerStorage;
     public ConcurrentDictionary<int, int> SummonOwnerByInstance => _summonOwnerByInstance;
     public ConcurrentDictionary<int, string> NpcNameByCode => _npcNameByCode;
 
@@ -1690,6 +1697,7 @@ public sealed class CombatMetricsStore
         CloneQueues(_packetsByTarget, clone._packetsByTarget);
         CloneQueues(_packetsBySource, clone._packetsBySource);
         CloneValues(_nicknameStorage, clone._nicknameStorage);
+        CloneValues(_playerOriginServerStorage, clone._playerOriginServerStorage);
         CloneValues(_summonOwnerByInstance, clone._summonOwnerByInstance);
         CloneValues(_npcNameByCode, clone._npcNameByCode);
         CloneNpcStates(_npcStateByInstance, clone._npcStateByInstance);
@@ -1753,6 +1761,11 @@ public sealed class CombatMetricsStore
             if (_nicknameStorage.TryGetValue(combatantId, out var nickname))
             {
                 clone._nicknameStorage[combatantId] = nickname;
+            }
+
+            if (_playerOriginServerStorage.TryGetValue(combatantId, out var originServerId))
+            {
+                clone._playerOriginServerStorage[combatantId] = originServerId;
             }
 
             if (_summonOwnerByInstance.TryGetValue(combatantId, out var ownerId))

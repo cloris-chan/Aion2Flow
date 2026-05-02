@@ -374,10 +374,14 @@ public sealed class PacketLogReplayService
             "battle-toggle" => TryReplayBattleToggle(store, packet, timestamp),
             "summon" => TryReplaySummon(store, packet, entry.Metadata),
             "npc-spawn" => TryReplayNpcSpawn(store, packet, entry.Metadata, timestamp),
+            "frame-batch" => TryReplayFrameBatch(store, packet),
             "recovery-path" => TryReplayRecoveryPath(store, packet, timestamp),
             _ => false
         };
     }
+
+    private static bool TryReplayFrameBatch(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+        => TryReplayNickname(store, packet);
 
     private static bool TryReplayDamage(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
@@ -776,19 +780,19 @@ public sealed class PacketLogReplayService
     {
         if (Packet3336NicknameParser.TryParse(packet, out var ownParsed))
         {
-            store.AppendNickname(ownParsed.PlayerId, ownParsed.Nickname);
+            store.AppendNickname(ownParsed.PlayerId, ownParsed.Nickname, ownParsed.OriginServerId);
             return true;
         }
 
         if (Packet4436NicknameParser.TryParse(packet, out var otherParsed))
         {
-            store.AppendNickname(otherParsed.PlayerId, otherParsed.Nickname);
+            store.AppendNickname(otherParsed.PlayerId, otherParsed.Nickname, otherParsed.OriginServerId);
             return true;
         }
 
         if (Packet048DNicknameParser.TryParse(packet, out var parsed))
         {
-            store.AppendNickname(parsed.PlayerId, parsed.Nickname);
+            store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
             return true;
         }
 
@@ -994,11 +998,7 @@ public sealed class PacketLogReplayService
 
     private static bool TryReplayRecoveryPath(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
     {
-        if (Packet0994NicknameParser.TryParse(packet, out var nickname))
-        {
-            store.AppendNickname(nickname.PlayerId, nickname.Nickname);
-            return true;
-        }
+        if (TryReplayNickname(store, packet)) return true;
 
         if (Packet4036CreateParser.TryParse(packet, out var summon))
         {

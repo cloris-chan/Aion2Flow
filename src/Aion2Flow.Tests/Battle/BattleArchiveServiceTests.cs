@@ -36,7 +36,7 @@ public sealed class BattleArchiveServiceTests
         snapshot.Combatants[1] = combatant;
         store.UpdateCurrentMap(200003);
         store.UpdateCurrentMapInstance(113515);
-        store.AppendNickname(1, "Tester");
+        store.AppendNickname(1, "Tester", 420);
 
         var record = service.Archive(snapshot, store, "manual", isAutomatic: false);
 
@@ -55,6 +55,7 @@ public sealed class BattleArchiveServiceTests
 
         Assert.Equal("Test Boss", record.Snapshot.TargetName);
         Assert.Equal("Tester", record.Store.Nicknames[1]);
+        Assert.Equal(420, record.Store.PlayerOriginServerIds[1]);
     }
 
     [Fact]
@@ -69,8 +70,8 @@ public sealed class BattleArchiveServiceTests
         const int bossCode = 2000002;
         const int unrelatedNpcCode = 2000003;
 
-        store.AppendNickname(playerId, "Tester");
-        store.AppendNickname(unrelatedPlayerId, "Other");
+        store.AppendNickname(playerId, "Tester", 420);
+        store.AppendNickname(unrelatedPlayerId, "Other", 160);
         store.AppendNpcCode(bossInstanceId, bossCode);
         store.AppendNpcName(bossCode, "Battle Boss");
         store.AppendNpcCode(unrelatedNpcInstanceId, unrelatedNpcCode);
@@ -104,6 +105,8 @@ public sealed class BattleArchiveServiceTests
 
         Assert.True(record!.Store.Nicknames.ContainsKey(playerId));
         Assert.False(record.Store.Nicknames.ContainsKey(unrelatedPlayerId));
+        Assert.True(record.Store.PlayerOriginServerIds.ContainsKey(playerId));
+        Assert.False(record.Store.PlayerOriginServerIds.ContainsKey(unrelatedPlayerId));
         Assert.True(record.Store.TryGetNpcRuntimeState(bossInstanceId, out var archivedBossState));
         Assert.Equal(bossCode, archivedBossState.NpcCode);
         Assert.False(record.Store.TryGetNpcRuntimeState(unrelatedNpcInstanceId, out _));

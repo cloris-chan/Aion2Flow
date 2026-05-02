@@ -709,27 +709,15 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        var reader = new PacketSpanReader(payload);
-        if (!reader.TryAdvance(9)) return false;
-        if (!reader.TryReadVarInt(out var playerId)) return false;
-        if (!reader.TryReadByte(out var nicknameLengthByte)) return false;
-
-        var nicknameLength = nicknameLengthByte;
-        if (nicknameLength == 0 || nicknameLength > 72 || reader.Remaining < nicknameLength)
+        if (!Packet048DNicknameParser.TryParsePayload(payload, out var parsed))
         {
             return false;
         }
 
-        var nameBytes = payload.Slice(reader.Offset, nicknameLength);
-        var sanitizedName = SanitizeNickname(Encoding.UTF8.GetString(nameBytes));
-        if (sanitizedName is null)
-        {
-            return false;
-        }
-
-        consumed = reader.Offset + nicknameLength;
-        store.AppendNickname(playerId, sanitizedName);
-        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={playerId}|len={nicknameLength}", payload[..consumed]);
+        consumed = parsed.TailOffset;
+        store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{originServerText}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -743,9 +731,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.AppendNickname(parsed.PlayerId, parsed.Nickname);
+        store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
         consumed = parsed.TailOffset;
-        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}|embedded=true", payload[..consumed]);
+        var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{originServerText}|embedded=true", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -1849,8 +1838,9 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         var tailOffset = Math.Min(packet.Length, reader.Offset + parsed.TailOffset);
-        store.AppendNickname(parsed.PlayerId, parsed.Nickname);
-        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}", packet[..tailOffset]);
+        store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{originServerText}", packet[..tailOffset]);
         return _hasParsed = true;
     }
 
@@ -1858,8 +1848,9 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     {
         if (Packet4436NicknameParser.TryParse(packet, out var parsed))
         {
-            store.AppendNickname(parsed.PlayerId, parsed.Nickname);
-            RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=other|len={parsed.NicknameLength}|delta={parsed.Delta}", packet);
+            store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+            var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
+            RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=other|len={parsed.NicknameLength}|delta={parsed.Delta}{originServerText}", packet);
             return _hasParsed = true;
         }
 
@@ -1924,8 +1915,9 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.AppendNickname(parsed.PlayerId, parsed.Nickname);
-        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}", packet[..parsed.TailOffset]);
+        store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{originServerText}", packet[..parsed.TailOffset]);
         return _hasParsed = true;
     }
 

@@ -39,5 +39,19 @@ public sealed class Packet3336NicknameParserTests
         Assert.True(ok);
         Assert.Equal(2007, parsed.PlayerId);
         Assert.Equal("Perigee", parsed.Nickname);
+        Assert.Equal(495, parsed.OriginServerId);
+    }
+
+    [Fact]
+    public void Parses_Cross_Server_Own_Nickname_With_0f_Marker()
+    {
+        var packet = Convert.FromHexString("3336D84C5FB171000F06E99B85E69882EF0312000000012D000000");
+
+        var ok = Packet3336NicknameParser.TryParsePayload(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal(9816, parsed.PlayerId);
+        Assert.Equal("雅昂", parsed.Nickname);
+        Assert.Equal(495, parsed.OriginServerId);
     }
 }

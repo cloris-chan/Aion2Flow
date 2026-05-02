@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.PacketCapture.Readers;
-using System.Text;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
@@ -7,7 +6,8 @@ internal readonly record struct Packet3336Nickname(
     int PlayerId,
     string Nickname,
     int NicknameLength,
-    int TailOffset);
+    int TailOffset,
+    int? OriginServerId);
 
 internal static class Packet3336NicknameParser
 {
@@ -30,21 +30,30 @@ internal static class Packet3336NicknameParser
         reader.TryAdvance(2);
 
         if (!reader.TryReadVarInt(out var playerId)) return false;
-        var scan = payload[reader.Offset..Math.Min(reader.Offset + 10, payload.Length)];
-        var splitIndex = scan.IndexOf((byte)0x07);
-        if (splitIndex < 0) return false;
+        var searchEnd = Math.Min(reader.Offset + 10, payload.Length - 1);
+        for (var markerOffset = reader.Offset; markerOffset < searchEnd; markerOffset++)
+        {
+            if (payload[markerOffset] is not (0x07 or 0x0f))
+            {
+                continue;
+            }
 
-        if (!reader.TryAdvance(splitIndex + 1)) return false;
-        if (!reader.TryReadVarInt(out var nicknameLength)) return false;
-        if (nicknameLength is < 1 or > 71) return false;
-        if (reader.Remaining < nicknameLength) return false;
+            if (!NicknameParserUtil.TryReadLengthPrefixedNickname(
+                    payload,
+                    markerOffset + 1,
+                    strict: true,
+                    out var sanitizedName,
+                    out var nicknameLength,
+                    out var tailOffset))
+            {
+                continue;
+            }
 
-        var nicknameSpan = payload.Slice(reader.Offset, nicknameLength);
-        var sanitizedName = NicknameSanitizer.SanitizeStrict(Encoding.UTF8.GetString(nicknameSpan));
-        if (sanitizedName is null) return false;
-        if (!reader.TryAdvance(nicknameLength)) return false;
+            var originServerId = NicknameParserUtil.TryReadPossibleOriginServerAt(payload, tailOffset);
+            result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, tailOffset, originServerId);
+            return true;
+        }
 
-        result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, reader.Offset);
-        return true;
+        return false;
     }
 }
