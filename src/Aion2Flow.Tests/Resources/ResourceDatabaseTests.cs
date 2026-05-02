@@ -73,8 +73,14 @@ public sealed class ResourceDatabaseTests
     }
 
     [Theory]
+    [InlineData(20u, "渾沌艾雷修藍塔下層")]
+    [InlineData(22u, "渾沌艾雷修藍塔中層")]
+    [InlineData(50u, "萬神殿")]
     [InlineData(1010u, "斐爾特朗")]
     [InlineData(200003u, "惡夢")]
+    [InlineData(503001u, "深淵迴廊")]
+    [InlineData(503006u, "深淵迴廊")]
+    [InlineData(504006u, "深淵迴廊")]
     [InlineData(600002u, "克勞洞穴")]
     [InlineData(600011u, "烏努庫庫峽谷")]
     [InlineData(600091u, "凶猛的角岩窟")]

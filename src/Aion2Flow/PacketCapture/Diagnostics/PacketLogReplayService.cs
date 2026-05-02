@@ -716,9 +716,7 @@ public sealed class PacketLogReplayService
     }
 
     private static bool IsSceneStateMapId(uint value)
-        => value is >= 1000 and < 2000
-            or >= 200000 and < 300000
-            or >= 600000 and < 700000;
+        => SceneMapIdClassifier.IsSceneStateMapId(value);
 
     private static bool TryReplay4636(CombatMetricsStore store, ReadOnlySpan<byte> packet)
     {

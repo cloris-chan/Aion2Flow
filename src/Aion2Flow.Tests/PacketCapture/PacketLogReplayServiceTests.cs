@@ -58,6 +58,30 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_Tracks_Cross_Server_And_Artifact_Dungeon_Scene_Ids()
+    {
+        var lowerReshantaLine = "2026-05-02T15:18:07.1029891+08:00|state-0140|16777343:60154->16777343:65518|target=8709|value0=20|value1=1|sceneMap=True|data=150140140000000000000000000000000100";
+        var crossServerLine = "2026-05-02T15:18:11.3272281+08:00|state-0140|16777343:60154->16777343:65518|target=8709|value0=22|value1=1|sceneMap=True|data=150140160000000000000000000000000100";
+        var artifactDungeonLine = "2026-05-02T15:18:45.0172805+08:00|state-0140|16777343:60154->16777343:65518|target=21120|value0=503006|value1=1|sceneMap=True|data=150140DEAC07000000000000000000000100";
+        var pantheonLine = "2026-05-02T15:52:39.1861829+08:00|state-0140|16777343:51528->16777343:53941|target=15498|value0=50|value1=1|sceneMap=True|data=150140320000000000000000000000000100";
+
+        var path = WriteTempReplayLog("frame", lowerReshantaLine, crossServerLine, artifactDungeonLine, pantheonLine);
+        try
+        {
+            var replay = PacketLogReplayService.Replay(path);
+
+            Assert.Equal(4, replay.ReplayedLines);
+            Assert.Equal(4, replay.ReplayedEventCounts["state-0140"]);
+            Assert.Equal(50u, replay.Store.CurrentMapId);
+            Assert.Equal(50u, replay.Snapshot.MapId);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Replay_Reconstructs_Boss_Activity_From_Sidecar_And_Health_Frame()
     {
         CombatMetricsEngine.SetGameResources(
