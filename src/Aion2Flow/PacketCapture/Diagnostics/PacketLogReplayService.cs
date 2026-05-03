@@ -6,6 +6,8 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Scene.Compatibility;
+using Cloris.Aion2Flow.Scene.Observation;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
 
@@ -56,6 +58,7 @@ public sealed class PacketLogReplayService
     private static PacketLogReplayResult ReplayFrameLines(List<string> lines, string sourceName)
     {
         var store = new CombatMetricsStore();
+        IRuntimeObservationSink sink = new LegacyRuntimeObservationSink(store);
         var engine = new CombatMetricsEngine(store);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -71,7 +74,7 @@ public sealed class PacketLogReplayService
 
             frameOrdinal++;
             var batchOrdinal = entry.Timestamp.UtcDateTime.Ticks;
-            if (TryReplayEntry(store, entry, frameOrdinal, batchOrdinal))
+            if (TryReplayEntry(sink, entry, frameOrdinal, batchOrdinal))
             {
                 IncrementCount(replayedEventCounts, entry.EventName);
             }
@@ -100,10 +103,11 @@ public sealed class PacketLogReplayService
     private static PacketLogReplayResult ReplayStreamLines(List<string> lines, string sourceName)
     {
         var store = new CombatMetricsStore();
+        IRuntimeObservationSink sink = new LegacyRuntimeObservationSink(store);
         var engine = new CombatMetricsEngine(store);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        using var inboundProcessor = new PacketStreamProcessor(store);
+        using var inboundProcessor = new PacketStreamProcessor(sink);
 
         foreach (var line in lines)
         {
@@ -339,7 +343,7 @@ public sealed class PacketLogReplayService
     private static bool ContributesShield(ParsedCombatPacket packet)
         => packet.ValueKind == CombatValueKind.Shield && packet.Damage > 0;
 
-    private static bool TryReplayEntry(CombatMetricsStore store, FrameReplayEntry entry, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplayEntry(IRuntimeObservationSink store, FrameReplayEntry entry, long frameOrdinal, long batchOrdinal)
     {
         var timestamp = entry.Timestamp.ToUnixTimeMilliseconds();
         var packet = entry.Payload;
@@ -380,10 +384,10 @@ public sealed class PacketLogReplayService
         };
     }
 
-    private static bool TryReplayFrameBatch(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplayFrameBatch(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
         => TryReplayNickname(store, packet);
 
-    private static bool TryReplayDamage(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplayDamage(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!TryParseDamagePacket(packet, out var parsed) || parsed.Damage <= 0)
         {
@@ -469,14 +473,14 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool ShouldStoreRegenerationHealing(CombatMetricsStore store, int targetId)
+    private static bool ShouldStoreRegenerationHealing(IRuntimeObservationSink store, int targetId)
     {
         if (targetId <= 0)
         {
             return false;
         }
 
-        if (store.SummonOwnerByInstance.ContainsKey(targetId))
+        if (store.HasSummonOwner(targetId))
         {
             return false;
         }
@@ -484,7 +488,7 @@ public sealed class PacketLogReplayService
         return !store.TryGetNpcRuntimeState(targetId, out var state) || state.Kind != NpcKind.Summon;
     }
 
-    private static bool TryReplayPeriodic(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplayPeriodic(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet0538PeriodicValueParser.TryParse(packet, out var parsed))
         {
@@ -525,7 +529,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayPeriodicLink(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplayPeriodicLink(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet0538PeriodicValueParser.TryParse(packet, out var parsed))
         {
@@ -549,7 +553,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayCompactValue(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplayCompactValue(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!TryParseCompactValuePacket(packet, out var parsed))
         {
@@ -570,7 +574,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayCompactOutcome(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplayCompactOutcome(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!TryParseCompactOutcomePacket(packet, out var parsed))
         {
@@ -590,7 +594,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayCompact0238(CombatMetricsStore store, ReadOnlySpan<byte> packet, long batchOrdinal)
+    private static bool TryReplayCompact0238(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long batchOrdinal)
     {
         if (!Packet0238CompactControlParser.TryParse(packet, out var parsed))
         {
@@ -601,7 +605,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayCompact0638(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplayCompact0638(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet0638CompactControlParser.TryParse(packet, out var parsed))
         {
@@ -612,7 +616,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay3538(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplay3538(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (!Packet3538SidecarParser.TryParse(packet, out var parsed))
         {
@@ -623,7 +627,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay8456(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplay8456(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
         if (!Packet8456EnvelopeParser.TryParse(packet, out var parsed))
         {
@@ -633,7 +637,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay0140(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplay0140(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
         if (!Packet0140Parser.TryParse(packet, out var parsed))
         {
@@ -655,7 +659,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay2136(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplay2136(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
         if (!Packet2136Parser.TryParse(packet, out var parsed))
         {
@@ -677,7 +681,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayMap2E92(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplayMap2E92(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
         if (!Packet2E92Parser.TryParse(packet, out var parsed))
         {
@@ -688,7 +692,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay0240(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplay0240(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
         if (!Packet0240Parser.TryParse(packet, out var parsed))
         {
@@ -710,7 +714,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static void StageDestinationMapFromSceneState(CombatMetricsStore store, uint value)
+    private static void StageDestinationMapFromSceneState(IRuntimeObservationSink store, uint value)
     {
         if (IsSceneStateMapId(value))
         {
@@ -721,7 +725,7 @@ public sealed class PacketLogReplayService
     private static bool IsSceneStateMapId(uint value)
         => SceneMapIdClassifier.IsSceneStateMapId(value);
 
-    private static bool TryReplay4636(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplay4636(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
         if (!Packet4636Parser.TryParse(packet, out var parsed))
         {
@@ -733,7 +737,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay4536(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplay4536(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
         if (!Packet4536Parser.TryParse(packet, out var parsed))
         {
@@ -744,7 +748,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay2A38(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplay2A38(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet2A38Parser.TryParse(packet, out var parsed))
         {
@@ -755,7 +759,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay2C38(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
+    private static bool TryReplay2C38(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         if (!Packet2C38Parser.TryParse(packet, out var parsed))
         {
@@ -775,7 +779,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayNickname(CombatMetricsStore store, ReadOnlySpan<byte> packet)
+    private static bool TryReplayNickname(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
         if (Packet3336NicknameParser.TryParse(packet, out var ownParsed))
         {
@@ -805,7 +809,7 @@ public sealed class PacketLogReplayService
         return false;
     }
 
-    private static bool TryReplayRemainHp(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplayRemainHp(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (!Packet008DRemainHpParser.TryParse(packet, out var parsed))
         {
@@ -820,7 +824,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayBattleToggle(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplayBattleToggle(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (!Packet218DBattleToggleParser.TryParse(packet, out var parsed))
         {
@@ -839,7 +843,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplaySummon(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata)
+    private static bool TryReplaySummon(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, string metadata)
     {
         if (TryParseSummonMetadata(metadata, out var ownerId, out var summonId, out var npcCode))
         {
@@ -901,7 +905,7 @@ public sealed class PacketLogReplayService
         return ownerId > 0 && summonId > 0;
     }
 
-    private static bool TryReplayNpcSpawn(CombatMetricsStore store, ReadOnlySpan<byte> packet, string metadata, long timestamp)
+    private static bool TryReplayNpcSpawn(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, string metadata, long timestamp)
     {
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn))
         {
@@ -938,7 +942,7 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplayState4036(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplayState4036(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
@@ -996,7 +1000,7 @@ public sealed class PacketLogReplayService
         return entityId > 0;
     }
 
-    private static bool TryReplayRecoveryPath(CombatMetricsStore store, ReadOnlySpan<byte> packet, long timestamp)
+    private static bool TryReplayRecoveryPath(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp)
     {
         if (TryReplayNickname(store, packet)) return true;
 
@@ -1050,7 +1054,7 @@ public sealed class PacketLogReplayService
     }
 
     private static void TryApplyNpcCatalog(
-        CombatMetricsStore store,
+        IRuntimeObservationSink store,
         int instanceId,
         int npcCode,
         bool requireCatalogEntry = false)

@@ -84,6 +84,35 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Frame_Replay_Stages_Scene_Map_Until_Nickname_Arrival()
+    {
+        var pantheonLine = "2026-05-02T15:52:39.1861829+08:00|state-0140|16777343:51528->16777343:53941|target=15498|value0=50|value1=1|sceneMap=True|data=150140320000000000000000000000000100";
+        var ownNicknameLine = "2026-05-02T15:52:40.0000000+08:00|nickname|16777343:51528->16777343:53941|playerId=2007|kind=own|len=7|originServer=495|data=D1143336D70F5FB17904070750657269676565EF0306000000012D000000";
+
+        var stagedPath = WriteTempReplayLog("frame", pantheonLine);
+        var arrivedPath = WriteTempReplayLog("frame", pantheonLine, ownNicknameLine);
+        try
+        {
+            var stagedReplay = PacketLogReplayService.Replay(stagedPath);
+
+            Assert.Equal(1, stagedReplay.ReplayedLines);
+            Assert.Equal(0u, stagedReplay.Store.CurrentMapId);
+            Assert.Equal(0u, stagedReplay.Snapshot.MapId);
+
+            var arrivedReplay = PacketLogReplayService.Replay(arrivedPath);
+
+            Assert.Equal(2, arrivedReplay.ReplayedLines);
+            Assert.Equal(50u, arrivedReplay.Store.CurrentMapId);
+            Assert.Equal(50u, arrivedReplay.Snapshot.MapId);
+        }
+        finally
+        {
+            File.Delete(stagedPath);
+            File.Delete(arrivedPath);
+        }
+    }
+
+    [Fact]
     public void Replay_Reconstructs_Boss_Activity_From_Sidecar_And_Health_Frame()
     {
         CombatMetricsEngine.SetGameResources(
