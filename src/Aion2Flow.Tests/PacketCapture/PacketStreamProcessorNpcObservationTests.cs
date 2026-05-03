@@ -3,6 +3,7 @@ using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Scene.Compatibility;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.PacketCapture;
@@ -10,6 +11,18 @@ namespace Cloris.Aion2Flow.Tests.PacketCapture;
 public sealed class PacketStreamProcessorNpcObservationTests
 {
     private static readonly TcpConnection TestConnection = new(0x0100007f, 0x0100007f, 49820, 57080);
+
+    [Fact]
+    public void Runtime_Sink_Constructor_Writes_To_Legacy_Store()
+    {
+        var store = new CombatMetricsStore();
+        using var processor = new PacketStreamProcessor(new LegacyRuntimeObservationSink(store));
+
+        var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-200003.hex"), TestConnection);
+
+        Assert.True(parsed);
+        Assert.Equal((uint)200003, store.CurrentMapId);
+    }
 
     [Fact]
     public void Uses_Recent_4536_Source_As_Fallback_For_SourceLess_Runtime_State_Frames()

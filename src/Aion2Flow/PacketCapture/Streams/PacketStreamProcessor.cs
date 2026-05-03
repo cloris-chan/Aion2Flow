@@ -7,16 +7,18 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
+using Cloris.Aion2Flow.Scene.Compatibility;
+using Cloris.Aion2Flow.Scene.Observation;
 using K4os.Compression.LZ4;
 
 namespace Cloris.Aion2Flow.PacketCapture.Streams;
 
-public sealed class PacketStreamProcessor(CombatMetricsStore store)
-    : IDisposable
+public sealed class PacketStreamProcessor : IDisposable
 {
     private const int MaxBufferSize = 1024 * 1024;
     private const int MaxDecompressedSize = 4 * 1024 * 1024;
     private readonly PacketTailBuffer _tail = new(2 * MaxBufferSize);
+    private readonly IRuntimeObservationSink _sink;
     private bool _hasParsed;
     private TcpConnection _connection;
     private long _currentFrameOrdinal;
@@ -27,6 +29,17 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     private long? _timestampOverrideMilliseconds;
 
     private static readonly byte[] Pattern = [0x06, 0x00, 0x36];
+
+    public PacketStreamProcessor(IRuntimeObservationSink sink)
+    {
+        ArgumentNullException.ThrowIfNull(sink);
+        _sink = sink;
+    }
+
+    public PacketStreamProcessor(CombatMetricsStore store)
+        : this(new LegacyRuntimeObservationSink(store))
+    {
+    }
 
     public void Dispose()
     {
@@ -63,29 +76,29 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return;
         }
 
-        var lifecycleId = store.ResolveLifecycleId(instanceId);
+        var lifecycleId = _sink.ResolveLifecycleId(instanceId);
         if (hasCatalogEntry &&
-            store.TryGetNpcRuntimeState(lifecycleId, out var existing) &&
+            _sink.TryGetNpcRuntimeState(lifecycleId, out var existing) &&
             existing.NpcCode is int existingCode &&
             existingCode != npcCode &&
             CombatMetricsEngine.TryResolveNpcCatalogEntry(existingCode, out _))
         {
-            store.RebindInstanceLifecycle(instanceId);
+            _sink.RebindInstanceLifecycle(instanceId);
         }
 
-        store.AppendNpcCode(instanceId, npcCode);
+        _sink.AppendNpcCode(instanceId, npcCode);
 
         if (!hasCatalogEntry)
         {
             return;
         }
 
-        store.AppendNpcName(npcCode, entry.Name);
+        _sink.AppendNpcName(npcCode, entry.Name);
 
         var kind = CombatMetricsEngine.ResolveNpcKind(entry.Kind);
         if (kind != NpcKind.Unknown && kind != NpcKind.Summon)
         {
-            store.AppendNpcKind(instanceId, kind);
+            _sink.AppendNpcKind(instanceId, kind);
         }
     }
 
@@ -153,7 +166,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.UpdateCurrentMap(value);
+        _sink.UpdateCurrentMap(value);
         return true;
     }
 
@@ -715,7 +728,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         consumed = parsed.TailOffset;
-        store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
         var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{originServerText}", payload[..consumed]);
         return _hasParsed = true;
@@ -731,7 +744,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
         consumed = parsed.TailOffset;
         var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{originServerText}|embedded=true", payload[..consumed]);
@@ -793,7 +806,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (value0 == 2 && value1 == 1 && value2 == 0)
         {
-            store.AppendNpcHp(npcId, checked((int)npcHp), CurrentTimestampMilliseconds);
+            _sink.AppendNpcHp(npcId, checked((int)npcHp), CurrentTimestampMilliseconds);
         }
         consumed = reader.Offset;
         var eventName = value0 == 2 && value1 == 1 && value2 == 0 ? "remain-hp" : "entity-value-008d";
@@ -827,11 +840,11 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (isActive is bool active)
         {
-            store.SetNpcBattle(npcId, active, CurrentTimestampMilliseconds);
+            _sink.SetNpcBattle(npcId, active, CurrentTimestampMilliseconds);
         }
         else
         {
-            store.ToggleNpcBattle(npcId);
+            _sink.ToggleNpcBattle(npcId);
         }
         consumed = reader.Offset;
         var activeText = isActive.HasValue ? $"|active={isActive.Value}" : string.Empty;
@@ -853,7 +866,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (parsed.Damage <= 0) return false;
 
-        if (!store.IsKnownEntity(parsed.SourceId) && !store.IsKnownEntity(parsed.TargetId))
+        if (!_sink.IsKnownEntity(parsed.SourceId) && !_sink.IsKnownEntity(parsed.TargetId))
         {
             return false;
         }
@@ -884,7 +897,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             BatchOrdinal = batchOrdinal
         };
 
-        store.AppendCombatPacket(combatPacket);
+        _sink.AppendCombatPacket(combatPacket);
 
         if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId))
         {
@@ -903,12 +916,12 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 BatchOrdinal = batchOrdinal
             };
             regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
-            store.AppendCombatPacket(regenPacket);
+            _sink.AppendCombatPacket(regenPacket);
         }
 
         if (ShouldStoreDrainHealing(parsed))
         {
-            store.AppendCombatPacket(new ParsedCombatPacket
+            _sink.AppendCombatPacket(new ParsedCombatPacket
             {
                 TargetId = parsed.SourceId,
                 SourceId = parsed.SourceId,
@@ -959,7 +972,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (damage <= 0) return false;
 
-        if (!store.IsKnownEntity(sourceId) && !store.IsKnownEntity(targetId))
+        if (!_sink.IsKnownEntity(sourceId) && !_sink.IsKnownEntity(targetId))
         {
             return false;
         }
@@ -978,7 +991,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         };
         combatPacket.SetPeriodicEffect(PeriodicEffectRelation.Target, mode);
 
-        store.AppendCombatPacket(combatPacket);
+        _sink.AppendCombatPacket(combatPacket);
 
         consumed = reader.Offset;
         RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={targetId}|source={sourceId}|skill={resolvedSkillCode.Value}|damage={damage}{FormatEffectHint(combatPacket)}", payload[..consumed]);
@@ -1005,7 +1018,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         {
             npcCode = npcValue;
             TryApplyNpcCatalog(summonId, npcValue);
-            store.AppendNpcKind(summonId, NpcKind.Summon);
+            _sink.AppendNpcKind(summonId, NpcKind.Summon);
         }
 
         ReadOnlySpan<byte> keyPattern = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
@@ -1023,7 +1036,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         var realSourceId = (payload[offset] & 0xff) | ((payload[offset + 1] & 0xff) << 8);
         if (realSourceId == 0) return false;
 
-        store.AppendSummon(realSourceId, summonId);
+        _sink.AppendSummon(realSourceId, summonId);
         consumed = Math.Max(offset + 2, reader.Offset);
         var payloadLength = consumed > 0 ? consumed : payload.Length;
         var kind = Packet4036Descriptors.ClassifyKind(payloadLength);
@@ -1049,12 +1062,12 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        if (store.SummonOwnerByInstance.ContainsKey(targetId))
+        if (_sink.HasSummonOwner(targetId))
         {
             return false;
         }
 
-        return !store.TryGetNpcRuntimeState(targetId, out var state) || state.Kind != NpcKind.Summon;
+        return !_sink.TryGetNpcRuntimeState(targetId, out var state) || state.Kind != NpcKind.Summon;
     }
 
     private void ParseRecoveryPacket(ReadOnlySpan<byte> packet, bool flag = true)
@@ -1064,7 +1077,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (packet[2] != 0xff || packet[3] != 0xff)
         {
-            var target = store.CurrentTarget;
+            var target = _sink.CurrentTarget;
             var processed = false;
             if (target != 0)
             {
@@ -1170,7 +1183,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                     var sanitizedName = SanitizeNickname(possibleName);
                     if (sanitizedName != null)
                     {
-                        store.AppendNickname(info.Value, sanitizedName);
+                        _sink.AppendNickname(info.Value, sanitizedName);
                     }
                 }
             }
@@ -1187,7 +1200,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                         var sanitizedName = SanitizeNickname(possibleName);
                         if (sanitizedName != null)
                         {
-                            store.AppendNickname(info.Value, sanitizedName);
+                            _sink.AppendNickname(info.Value, sanitizedName);
                         }
                     }
                 }
@@ -1282,7 +1295,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 combatPacket.Modifiers |= DamageModifiers.MultiHit;
             }
 
-            store.AppendCombatPacket(combatPacket);
+            _sink.AppendCombatPacket(combatPacket);
 
             if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId))
             {
@@ -1301,12 +1314,12 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                     BatchOrdinal = batchOrdinal
                 };
                 regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
-                store.AppendCombatPacket(regenPacket);
+                _sink.AppendCombatPacket(regenPacket);
             }
 
             if (ShouldStoreDrainHealing(parsed))
             {
-                store.AppendCombatPacket(new ParsedCombatPacket
+                _sink.AppendCombatPacket(new ParsedCombatPacket
                 {
                     TargetId = parsed.SourceId,
                     SourceId = parsed.SourceId,
@@ -1328,7 +1341,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         {
             var tailHint = FormatResolvedReferenceHint("tailSkill", compact.TailRaw);
             var timestamp = CurrentTimestampMilliseconds;
-            store.RegisterCompactValue0438(
+            _sink.RegisterCompactValue0438(
                 compact.TargetId,
                 compact.SourceId,
                 compact.SkillCodeRaw,
@@ -1353,7 +1366,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         var compactOutcomeTimestamp = CurrentTimestampMilliseconds;
-        store.RegisterCompactValue0438(
+        _sink.RegisterCompactValue0438(
             compactOutcome.TargetId,
             compactOutcome.SourceId,
             compactOutcome.SkillCodeRaw,
@@ -1383,7 +1396,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (parsed.IsLinkRecord)
         {
-            store.RegisterPeriodicLink0538(
+            _sink.RegisterPeriodicLink0538(
                 parsed.TargetId,
                 parsed.SourceId,
                 parsed.LinkId,
@@ -1418,7 +1431,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             parsed.TargetId == parsed.SourceId ? PeriodicEffectRelation.Self : PeriodicEffectRelation.Target,
             parsed.Mode);
 
-        store.AppendCombatPacket(combatPacket);
+        _sink.AppendCombatPacket(combatPacket);
         var periodicTailHint = parsed.TailLength > 0
             ? $"|tailLen={parsed.TailLength}|tailRaw={parsed.TailRaw}|tailSkillRaw={parsed.TailSkillCodeRaw}|tailPrefix={parsed.TailPrefixValue}{FormatResolvedReferenceHint("tailSkill", parsed.TailSkillCodeRaw)}"
             : string.Empty;
@@ -1433,7 +1446,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentBatchOrdinal);
+        _sink.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentBatchOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-0238",
             _connection,
@@ -1449,7 +1462,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentTimestampMilliseconds, CurrentFrameOrdinal, CurrentBatchOrdinal);
+        _sink.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, CurrentTimestampMilliseconds, CurrentFrameOrdinal, CurrentBatchOrdinal);
         RawPacketDump.AppendFrameEvent(
             "compact-0638",
             _connection,
@@ -1465,7 +1478,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.ObserveBossFocusPulse(parsed.TargetId, CurrentTimestampMilliseconds);
+        _sink.ObserveBossFocusPulse(parsed.TargetId, CurrentTimestampMilliseconds);
         RawPacketDump.AppendFrameEvent(
             "sidecar-3538",
             _connection,
@@ -1489,8 +1502,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
                 TryApplyNpcCatalog(parsed.SummonId, parsed.NpcCode.Value);
             }
 
-            store.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
-            store.AppendSummon(parsed.OwnerId, parsed.SummonId);
+            _sink.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
+            _sink.AppendSummon(parsed.OwnerId, parsed.SummonId);
             var npcCodeText = parsed.NpcCode.HasValue ? $"|npcCode={parsed.NpcCode.Value}" : string.Empty;
             RawPacketDump.AppendFrameEvent("summon", _connection, $"kind={Packet4036Descriptors.FormatKind(parsed.Kind, parsed.TailOffset)}|owner={parsed.OwnerId}|summon={parsed.SummonId}{npcCodeText}", packet[..Math.Min(parsed.TailOffset, packet.Length)]);
             return _hasParsed = true;
@@ -1505,7 +1518,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
             if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
             {
-                store.AppendNpcHp(spawn.EntityId, currentHp, maxHp, CurrentTimestampMilliseconds);
+                _sink.AppendNpcHp(spawn.EntityId, currentHp, maxHp, CurrentTimestampMilliseconds);
             }
 
             var spawnNpcCodeText = spawn.NpcCode.HasValue ? $"|npcCode={spawn.NpcCode.Value}" : string.Empty;
@@ -1524,13 +1537,13 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             TryApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value, requireCatalogEntry: true);
             if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
             {
-                store.AppendNpcHp(spawn.EntityId, currentHp, maxHp, CurrentTimestampMilliseconds);
+                _sink.AppendNpcHp(spawn.EntityId, currentHp, maxHp, CurrentTimestampMilliseconds);
             }
         }
 
         if (Packet4036CreateParser.TryParseOwner(packet, out var entityId, out var ownerId))
         {
-            store.AppendSummon(ownerId, entityId);
+            _sink.AppendSummon(ownerId, entityId);
         }
 
         if (!Packet4036Parser.TryParse(packet, out var parsed))
@@ -1573,7 +1586,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RegisterObservation2A38(
+        _sink.RegisterObservation2A38(
             parsed.SourceId,
             parsed.Mode,
             parsed.GroupCode,
@@ -1603,7 +1616,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RegisterObservation2C38(
+        _sink.RegisterObservation2C38(
             parsed.SourceId,
             parsed.Mode,
             parsed.SequenceId,
@@ -1679,10 +1692,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
-        var targetId = store.ResolveNpcObservationSource();
+        var targetId = _sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
-            store.AppendNpc0140Value(targetId, parsed.Value0);
+            _sink.AppendNpc0140Value(targetId, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
                 TryApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
@@ -1707,10 +1720,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
 
-        var targetId = store.ResolveNpcObservationSource();
+        var targetId = _sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
-            store.AppendNpc2136State(targetId, parsed.Sequence, parsed.Value0);
+            _sink.AppendNpc2136State(targetId, parsed.Sequence, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
                 TryApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
@@ -1733,7 +1746,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.UpdateCurrentMapInstance(parsed.InstanceId);
+        _sink.UpdateCurrentMapInstance(parsed.InstanceId);
 
         RawPacketDump.AppendFrameEvent(
             "map-2e92",
@@ -1752,10 +1765,10 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
-        var targetId = store.ResolveNpcObservationSource();
+        var targetId = _sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
-            store.AppendNpc0240Value(targetId, parsed.Value0);
+            _sink.AppendNpc0240Value(targetId, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
                 TryApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
@@ -1778,8 +1791,8 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.AppendNpc4636State(parsed.SourceId, parsed.State0, parsed.State1);
-        store.RememberNpcObservationSource(parsed.SourceId);
+        _sink.AppendNpc4636State(parsed.SourceId, parsed.State0, parsed.State1);
+        _sink.RememberNpcObservationSource(parsed.SourceId);
 
         RawPacketDump.AppendFrameEvent(
             "state-4636",
@@ -1797,7 +1810,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.RememberNpcObservationSource(parsed.SourceId);
+        _sink.RememberNpcObservationSource(parsed.SourceId);
 
         RawPacketDump.AppendFrameEvent(
             "state-4536",
@@ -1838,7 +1851,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         }
 
         var tailOffset = Math.Min(packet.Length, reader.Offset + parsed.TailOffset);
-        store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
         var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{originServerText}", packet[..tailOffset]);
         return _hasParsed = true;
@@ -1848,7 +1861,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
     {
         if (Packet4436NicknameParser.TryParse(packet, out var parsed))
         {
-            store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+            _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
             var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
             RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=other|len={parsed.NicknameLength}|delta={parsed.Delta}{originServerText}", packet);
             return _hasParsed = true;
@@ -1864,7 +1877,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.AppendNickname(parsed.PlayerId, parsed.Nickname);
+        _sink.AppendNickname(parsed.PlayerId, parsed.Nickname);
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=roster|len={parsed.NicknameLength}", packet[..parsed.TailOffset]);
         return _hasParsed = true;
     }
@@ -1879,7 +1892,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
         var isHealth = Packet008DRemainHpParser.IsHealthValue(parsed);
         if (isHealth)
         {
-            store.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp), CurrentTimestampMilliseconds);
+            _sink.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp), CurrentTimestampMilliseconds);
         }
 
         var eventName = isHealth ? "remain-hp" : "entity-value-008d";
@@ -1896,11 +1909,11 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
 
         if (parsed.IsActive is bool isActive)
         {
-            store.SetNpcBattle(parsed.NpcId, isActive, CurrentTimestampMilliseconds);
+            _sink.SetNpcBattle(parsed.NpcId, isActive, CurrentTimestampMilliseconds);
         }
         else
         {
-            store.ToggleNpcBattle(parsed.NpcId);
+            _sink.ToggleNpcBattle(parsed.NpcId);
         }
 
         var activeText = parsed.IsActive.HasValue ? $"|active={parsed.IsActive.Value}" : string.Empty;
@@ -1915,7 +1928,7 @@ public sealed class PacketStreamProcessor(CombatMetricsStore store)
             return false;
         }
 
-        store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
         var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{originServerText}", packet[..parsed.TailOffset]);
         return _hasParsed = true;
