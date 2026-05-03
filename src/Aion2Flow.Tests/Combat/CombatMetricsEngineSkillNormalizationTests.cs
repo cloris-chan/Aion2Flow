@@ -74,6 +74,33 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     }
 
     [Fact]
+    public void AppendCombatPacket_Normalizes_RegenerationHealing_RawNpcSkillCode()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(1230340, "Jumping Overhead Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+        var store = new CombatMetricsStore();
+        var regenPacket = new ParsedCombatPacket
+        {
+            SourceId = 4342,
+            TargetId = 4342,
+            OriginalSkillCode = 1239430,
+            SkillCode = 1239430,
+            Damage = 603,
+            EventKind = CombatEventKind.Healing,
+            ValueKind = CombatValueKind.Healing
+        };
+        regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
+
+        store.AppendCombatPacket(regenPacket);
+
+        Assert.True(regenPacket.IsNormalized);
+        Assert.Equal(1230340, regenPacket.SkillCode);
+        Assert.Equal("Jumping Overhead Slam", CombatEventClassifier.DisplaySkillNameFor(regenPacket.SkillCode));
+    }
+
+    [Fact]
     public void Remaps_Triggered_Sibling_Skill_Packets_To_Sibling_Skill_Code()
     {
         CombatMetricsEngine.LoadSkillMap("zh-TW");

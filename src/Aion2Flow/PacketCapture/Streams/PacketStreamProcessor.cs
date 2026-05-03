@@ -910,7 +910,6 @@ public sealed class PacketStreamProcessor : IDisposable
                 Damage = parsed.RegenerationAmount,
                 EventKind = CombatEventKind.Healing,
                 ValueKind = CombatValueKind.Healing,
-                IsNormalized = true,
                 Timestamp = CurrentTimestampMilliseconds,
                 FrameOrdinal = frameOrdinal,
                 BatchOrdinal = batchOrdinal
@@ -1308,7 +1307,6 @@ public sealed class PacketStreamProcessor : IDisposable
                     Damage = parsed.RegenerationAmount,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.Healing,
-                    IsNormalized = true,
                     Timestamp = CurrentTimestampMilliseconds,
                     FrameOrdinal = frameOrdinal,
                     BatchOrdinal = batchOrdinal

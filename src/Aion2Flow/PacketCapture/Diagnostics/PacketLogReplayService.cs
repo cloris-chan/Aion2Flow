@@ -432,7 +432,6 @@ public sealed class PacketLogReplayService
                 Damage = parsed.RegenerationAmount,
                 EventKind = CombatEventKind.Healing,
                 ValueKind = CombatValueKind.Healing,
-                IsNormalized = true,
                 Timestamp = timestamp,
                 FrameOrdinal = frameOrdinal,
                 BatchOrdinal = batchOrdinal
