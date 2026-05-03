@@ -117,7 +117,7 @@ public sealed class CombatMetricsStore
     private readonly Lock _observedBossLock = new();
     private readonly ConcurrentDictionary<int, byte> _bossFocusInstances = new();
     private readonly ConcurrentDictionary<int, int> _instanceLifecycleRemap = new();
-    private ObservedBossSnapshot? _observedBoss;
+    private readonly Dictionary<int, ObservedBossSnapshot> _observedBosses = [];
     private int _nextSyntheticLifecycleId = int.MaxValue;
     private int _lastObservedNpcSource;
     private long _observationOrdinal;
@@ -186,10 +186,14 @@ public sealed class CombatMetricsStore
         }
         lock (_observedBossLock)
         {
-            if (_observedBoss is { } observedBoss &&
-                (observedBoss.InstanceId == previousId || observedBoss.InstanceId == rawInstanceId))
+            if (_observedBosses.Remove(previousId, out var previousSnapshot))
             {
-                _observedBoss = observedBoss with { InstanceId = newId };
+                _observedBosses[newId] = previousSnapshot with { InstanceId = newId };
+            }
+            else if (previousId != rawInstanceId &&
+                _observedBosses.Remove(rawInstanceId, out var rawSnapshot))
+            {
+                _observedBosses[newId] = rawSnapshot with { InstanceId = newId };
             }
         }
         return newId;
@@ -1170,25 +1174,62 @@ public sealed class CombatMetricsStore
         long visibilityTimeoutMilliseconds,
         out ObservedBossSnapshot snapshot)
     {
-        lock (_observedBossLock)
+        var snapshots = GetObservedBosses(nowMilliseconds, visibilityTimeoutMilliseconds);
+        if (snapshots.Count == 0)
         {
-            if (_observedBoss is not { } current)
-            {
-                snapshot = default;
-                return false;
-            }
-
-            var elapsed = Math.Max(0, nowMilliseconds - current.LastObservedAtMilliseconds);
-            if (elapsed <= visibilityTimeoutMilliseconds ||
-                _bossFocusInstances.ContainsKey(current.InstanceId))
-            {
-                snapshot = current;
-                return true;
-            }
-
-            _observedBoss = null;
             snapshot = default;
             return false;
+        }
+
+        snapshot = snapshots[0];
+        for (var i = 1; i < snapshots.Count; i++)
+        {
+            var candidate = snapshots[i];
+            if (candidate.LastObservedAtMilliseconds > snapshot.LastObservedAtMilliseconds)
+            {
+                snapshot = candidate;
+            }
+        }
+        return true;
+    }
+
+    public IReadOnlyList<ObservedBossSnapshot> GetObservedBosses(
+        long nowMilliseconds,
+        long visibilityTimeoutMilliseconds)
+    {
+        lock (_observedBossLock)
+        {
+            if (_observedBosses.Count == 0)
+            {
+                return Array.Empty<ObservedBossSnapshot>();
+            }
+
+            List<int>? expired = null;
+            var result = new List<ObservedBossSnapshot>(_observedBosses.Count);
+            foreach (var (instanceId, snapshot) in _observedBosses)
+            {
+                var elapsed = Math.Max(0, nowMilliseconds - snapshot.LastObservedAtMilliseconds);
+                if (elapsed <= visibilityTimeoutMilliseconds ||
+                    _bossFocusInstances.ContainsKey(instanceId))
+                {
+                    result.Add(snapshot);
+                }
+                else
+                {
+                    (expired ??= []).Add(instanceId);
+                }
+            }
+
+            if (expired is not null)
+            {
+                foreach (var id in expired)
+                {
+                    _observedBosses.Remove(id);
+                }
+            }
+
+            result.Sort(static (a, b) => a.InstanceId.CompareTo(b.InstanceId));
+            return result;
         }
     }
 
@@ -1676,10 +1717,10 @@ public sealed class CombatMetricsStore
 
     public CombatMetricsStore DeepClone()
     {
-        ObservedBossSnapshot? observedBoss;
+        KeyValuePair<int, ObservedBossSnapshot>[] observedBosses;
         lock (_observedBossLock)
         {
-            observedBoss = _observedBoss;
+            observedBosses = [.. _observedBosses];
         }
 
         var clone = new CombatMetricsStore
@@ -1688,9 +1729,12 @@ public sealed class CombatMetricsStore
             CurrentMapId = CurrentMapId,
             CurrentMapInstanceId = CurrentMapInstanceId,
             _lastObservedNpcSource = _lastObservedNpcSource,
-            _observedBoss = observedBoss,
             _nextSyntheticLifecycleId = _nextSyntheticLifecycleId
         };
+        foreach (var pair in observedBosses)
+        {
+            clone._observedBosses[pair.Key] = pair.Value;
+        }
 
         CloneValues(_instanceLifecycleRemap, clone._instanceLifecycleRemap);
         CloneValues(_bossFocusInstances, clone._bossFocusInstances);
@@ -1893,7 +1937,7 @@ public sealed class CombatMetricsStore
     {
         lock (_observedBossLock)
         {
-            return _observedBoss?.InstanceId == instanceId;
+            return _observedBosses.ContainsKey(instanceId);
         }
     }
 
@@ -1912,22 +1956,13 @@ public sealed class CombatMetricsStore
 
         lock (_observedBossLock)
         {
-            if (_observedBoss is { } current &&
-                current.InstanceId == instanceId &&
-                current.HasHp)
+            if (_observedBosses.TryGetValue(instanceId, out var current) && current.HasHp)
             {
-                _observedBoss = current with { LastObservedAtMilliseconds = observedAt };
+                _observedBosses[instanceId] = current with { LastObservedAtMilliseconds = observedAt };
                 return;
             }
 
-            if (_observedBoss is { } other &&
-                other.InstanceId != instanceId &&
-                other.LastObservedAtMilliseconds > observedAt)
-            {
-                return;
-            }
-
-            _observedBoss = new ObservedBossSnapshot(instanceId, 0, 1, observedAt, HasHp: false);
+            _observedBosses[instanceId] = new ObservedBossSnapshot(instanceId, 0, 1, observedAt, HasHp: false);
         }
     }
 
@@ -1935,14 +1970,7 @@ public sealed class CombatMetricsStore
     {
         lock (_observedBossLock)
         {
-            if (_observedBoss is { } current &&
-                current.InstanceId != instanceId &&
-                current.LastObservedAtMilliseconds > observedAtMilliseconds)
-            {
-                return;
-            }
-
-            _observedBoss = new ObservedBossSnapshot(
+            _observedBosses[instanceId] = new ObservedBossSnapshot(
                 instanceId,
                 hp,
                 Math.Max(1, maxHp),
@@ -1955,7 +1983,7 @@ public sealed class CombatMetricsStore
     {
         lock (_observedBossLock)
         {
-            _observedBoss = null;
+            _observedBosses.Clear();
         }
     }
 
@@ -1963,10 +1991,7 @@ public sealed class CombatMetricsStore
     {
         lock (_observedBossLock)
         {
-            if (_observedBoss?.InstanceId == instanceId)
-            {
-                _observedBoss = null;
-            }
+            _observedBosses.Remove(instanceId);
         }
     }
 

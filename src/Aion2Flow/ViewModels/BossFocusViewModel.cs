@@ -5,8 +5,7 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed partial class BossFocusViewModel : ObservableObject
 {
-    [ObservableProperty]
-    public partial bool IsVisible { get; set; }
+    public int InstanceId { get; init; }
 
     [ObservableProperty]
     public partial string DisplayName { get; set; } = string.Empty;
@@ -49,12 +48,10 @@ public sealed partial class BossFocusViewModel : ObservableObject
             HpText = "--";
             MaxHpText = "--";
         }
-        IsVisible = true;
     }
 
     public void Clear()
     {
-        IsVisible = false;
         DisplayName = string.Empty;
         Hp = 0;
         MaxHp = 1;

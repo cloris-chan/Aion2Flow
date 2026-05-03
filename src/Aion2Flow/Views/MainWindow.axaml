@@ -79,42 +79,52 @@
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="1"
-                Classes="BossFocusPanel"
-                IsVisible="{Binding BossFocus.IsVisible}">
-            <Grid>
-                <ProgressBar Classes="BossFocusHpBar"
-                         Minimum="0"
-                         Maximum="1"
-                         Value="{Binding BossFocus.HpRatio}"
-                         IsHitTestVisible="False" />
+        <ItemsControl Grid.Row="1"
+                      ItemsSource="{Binding BossFocuses}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical" Spacing="2" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:BossFocusViewModel">
+                    <Border Classes="BossFocusPanel">
+                        <Grid>
+                            <ProgressBar Classes="BossFocusHpBar"
+                                     Minimum="0"
+                                     Maximum="1"
+                                     Value="{Binding HpRatio}"
+                                     IsHitTestVisible="False" />
 
-                <Grid ColumnDefinitions="*,Auto"
-                    ColumnSpacing="8"
-                    Margin="6,4">
-                    <TextBlock Grid.Column="0"
-                               Classes="BossFocusName"
-                               Text="{Binding BossFocus.DisplayName}"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center" />
+                            <Grid ColumnDefinitions="*,Auto"
+                                ColumnSpacing="8"
+                                Margin="6,4">
+                                <TextBlock Grid.Column="0"
+                                           Classes="BossFocusName"
+                                           Text="{Binding DisplayName}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" />
 
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                Spacing="2"
-                                VerticalAlignment="Center">
-                        <TextBlock Classes="BossFocusHp"
-                                   Text="{Binding BossFocus.HpText}"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Classes="BossFocusHpSlash"
-                                   Text="/"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Classes="BossFocusHpMuted"
-                                   Text="{Binding BossFocus.MaxHpText}"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </Grid>
-            </Grid>
-        </Border>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            Spacing="2"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Classes="BossFocusHp"
+                                               Text="{Binding HpText}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Classes="BossFocusHpSlash"
+                                               Text="/"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Classes="BossFocusHpMuted"
+                                               Text="{Binding MaxHpText}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
         <controls:AnimatedItemsView Grid.Row="2"
                                      ItemSpacing="1"

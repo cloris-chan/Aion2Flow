@@ -40,7 +40,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public LocalizationService Localization { get; }
     public CombatantDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
     public SettingsFlyoutViewModel SettingsFlyout { get; }
-    public BossFocusViewModel BossFocus { get; } = new();
+    public ObservableCollection<BossFocusViewModel> BossFocuses { get; } = [];
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
     public ObservableCollection<BattleHistoryItemViewModel> BattleHistory { get; } = [];
 
@@ -238,7 +238,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             _displayedSnapshot = new DamageMeterSnapshot();
             Combatants.Clear();
             CombatantDetails.Clear();
-            BossFocus.Clear();
+            BossFocuses.Clear();
             SelectedCombatant = null;
             SelectedBattleHistory = null;
             IsViewingArchivedBattle = false;
@@ -397,19 +397,56 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         if (IsViewingArchivedBattle || displayStore != _store)
         {
-            BossFocus.Clear();
+            BossFocuses.Clear();
             return;
         }
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        if (!_store.TryGetObservedBoss(now, BossFocusVisibilityTimeoutMilliseconds, out var boss))
+        var snapshots = _store.GetObservedBosses(now, BossFocusVisibilityTimeoutMilliseconds);
+        SyncBossFocuses(snapshots);
+    }
+
+    private void SyncBossFocuses(IReadOnlyList<CombatMetricsStore.ObservedBossSnapshot> snapshots)
+    {
+        for (var i = BossFocuses.Count - 1; i >= 0; i--)
         {
-            BossFocus.Clear();
-            return;
+            var existing = BossFocuses[i];
+            var stillPresent = false;
+            for (var j = 0; j < snapshots.Count; j++)
+            {
+                if (snapshots[j].InstanceId == existing.InstanceId)
+                {
+                    stillPresent = true;
+                    break;
+                }
+            }
+            if (!stillPresent)
+            {
+                BossFocuses.RemoveAt(i);
+            }
         }
 
-        var displayName = CombatMetricsEngine.ResolveCombatantDisplayName(_store, _latestLiveDamage, boss.InstanceId);
-        BossFocus.Update(displayName, boss.Hp, boss.MaxHp, boss.HasHp);
+        for (var i = 0; i < snapshots.Count; i++)
+        {
+            var snapshot = snapshots[i];
+            BossFocusViewModel? row = null;
+            for (var j = 0; j < BossFocuses.Count; j++)
+            {
+                if (BossFocuses[j].InstanceId == snapshot.InstanceId)
+                {
+                    row = BossFocuses[j];
+                    break;
+                }
+            }
+
+            var displayName = CombatMetricsEngine.ResolveCombatantDisplayName(_store, _latestLiveDamage, snapshot.InstanceId);
+            if (row is null)
+            {
+                row = new BossFocusViewModel { InstanceId = snapshot.InstanceId };
+                BossFocuses.Add(row);
+            }
+            row.Update(displayName, snapshot.Hp, snapshot.MaxHp, snapshot.HasHp);
+        }
     }
 
     internal static bool ShouldDisplayCombatant(CombatMetricsStore store, int combatantId, CombatantMetrics data)
