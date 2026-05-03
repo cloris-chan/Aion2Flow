@@ -2,6 +2,7 @@ using System.Buffers;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Scene.Compatibility;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.PacketCapture;
@@ -22,6 +23,34 @@ public sealed class PacketCaptureDispatcherTests
             var parsed = dispatcher.DispatchCapturedPacket(packet);
 
             Assert.True(parsed);
+            Assert.True(store.CombatPacketsByTarget.TryGetValue(17640, out var packets));
+            Assert.Single(packets);
+        }
+        finally
+        {
+            packet.Return();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public void Uses_Runtime_Sink_Factory_For_New_Stream()
+    {
+        var store = new CombatMetricsStore();
+        var factoryCalls = 0;
+        var dispatcher = new PacketCaptureDispatcher(() =>
+        {
+            factoryCalls++;
+            return new LegacyRuntimeObservationSink(store);
+        });
+        var packet = CreatePacket(InboundConnection, HexHelper.FromFixture("combat/0538-dot.hex"), sequenceNumber: 200);
+
+        try
+        {
+            var parsed = dispatcher.DispatchCapturedPacket(packet);
+
+            Assert.True(parsed);
+            Assert.Equal(1, factoryCalls);
             Assert.True(store.CombatPacketsByTarget.TryGetValue(17640, out var packets));
             Assert.Single(packets);
         }

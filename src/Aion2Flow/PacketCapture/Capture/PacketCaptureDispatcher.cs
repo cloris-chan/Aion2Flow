@@ -1,16 +1,21 @@
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Scene.Compatibility;
+using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Services.Logging;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
-public sealed class PacketCaptureDispatcher(CombatMetricsStore store)
+public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFactory)
 {
     private readonly Dictionary<TcpConnection, TcpCaptureStreamState> _tcpStreams = [];
-
     private Task? _worker;
     private CancellationTokenSource? _cts;
+
+    public PacketCaptureDispatcher(CombatMetricsStore store) : this(() => new LegacyRuntimeObservationSink(store))
+    {
+    }
 
     public async Task StartAsync(CancellationToken token)
     {
@@ -73,7 +78,7 @@ public sealed class PacketCaptureDispatcher(CombatMetricsStore store)
     {
         if (!_tcpStreams.TryGetValue(packet.Connection, out var tcpStream))
         {
-            tcpStream = TcpCaptureStreamState.Create(store);
+            tcpStream = TcpCaptureStreamState.Create(sinkFactory);
             _tcpStreams[packet.Connection] = tcpStream;
         }
 
@@ -158,11 +163,11 @@ public sealed class PacketCaptureDispatcher(CombatMetricsStore store)
             Reassembler.Dispose();
         }
 
-        public static TcpCaptureStreamState Create(CombatMetricsStore store)
+        public static TcpCaptureStreamState Create(Func<IRuntimeObservationSink> sinkFactory)
         {
             return new TcpCaptureStreamState(
                 new TcpStreamReassembler(),
-                new PacketStreamProcessor(store));
+                new PacketStreamProcessor(sinkFactory()));
         }
     }
 }
