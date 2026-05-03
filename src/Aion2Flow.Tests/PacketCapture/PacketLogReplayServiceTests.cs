@@ -1,9 +1,11 @@
+using System.Globalization;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
+using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Tests.Protocol;
 
@@ -109,6 +111,35 @@ public sealed class PacketLogReplayServiceTests
         {
             File.Delete(stagedPath);
             File.Delete(arrivedPath);
+        }
+    }
+
+    [Fact]
+    public void Stream_Replay_Runtime_Sink_Path_Matches_Legacy_Processor_Constructor()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var entries = new[]
+        {
+            CreateStreamReplayEntry("2026-05-02T15:52:39.1861829+08:00", "state/2136-boss-scene-200003.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:40.0000000+08:00", "nickname/3336-own-thanks.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:41.0000000+08:00", "combat/0438-damage.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:42.0000000+08:00", "combat/0538-dot.hex")
+        };
+
+        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        try
+        {
+            var sinkReplay = PacketLogReplayService.Replay(path);
+            var legacyReplay = ReplayStreamEntriesWithProcessor(
+                entries,
+                static store => new PacketStreamProcessor(store));
+
+            AssertStreamReplayParity(legacyReplay, sinkReplay);
+        }
+        finally
+        {
+            File.Delete(path);
         }
     }
 
@@ -888,6 +919,169 @@ public sealed class PacketLogReplayServiceTests
         return path;
     }
 
+    private static StreamReplayEntry CreateStreamReplayEntry(string timestamp, string fixture)
+    {
+        return new StreamReplayEntry(
+            DateTimeOffset.Parse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            HexHelper.FromFixture(fixture));
+    }
+
+    private static string BuildStreamReplayLine(StreamReplayEntry entry)
+        => $"{entry.Timestamp:O}|dir=inbound|16777343:57080->16777343:49820|len={entry.Payload.Length}|data={Convert.ToHexString(entry.Payload)}";
+
+    private static StreamProcessorReplayResult ReplayStreamEntriesWithProcessor(
+        IReadOnlyList<StreamReplayEntry> entries,
+        Func<CombatMetricsStore, PacketStreamProcessor> createProcessor)
+    {
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var replayedLines = 0;
+        var skippedLines = 0;
+        using var processor = createProcessor(store);
+        var connection = new TcpConnection(16777343, 16777343, 57080, 49820);
+
+        foreach (var entry in entries)
+        {
+            if (processor.AppendAndProcess(entry.Payload, connection, entry.Timestamp.ToUnixTimeMilliseconds()))
+            {
+                replayedLines++;
+            }
+            else
+            {
+                skippedLines++;
+            }
+        }
+
+        store.FlushPendingOutcomeSidecars();
+        store.FlushOrphanCompactHits();
+        return new StreamProcessorReplayResult(
+            entries.Count,
+            replayedLines,
+            skippedLines,
+            engine.CreateBattleSnapshot(),
+            store.DeepClone());
+    }
+
+    private static void AssertStreamReplayParity(StreamProcessorReplayResult expected, PacketLogReplayResult actual)
+    {
+        Assert.Equal(expected.TotalLines, actual.TotalLines);
+        Assert.Equal(expected.ReplayedLines, actual.ReplayedLines);
+        Assert.Equal(expected.SkippedLines, actual.SkippedLines);
+        AssertSnapshotParity(expected.Snapshot, actual.Snapshot);
+        Assert.Equal(
+            BuildBattlePacketFacts(expected.Store, expected.Snapshot),
+            BuildBattlePacketFacts(actual.Store, actual.Snapshot));
+    }
+
+    private static void AssertSnapshotParity(DamageMeterSnapshot expected, DamageMeterSnapshot actual)
+    {
+        Assert.Equal(expected.BattleTime, actual.BattleTime);
+        Assert.Equal(expected.BattleStartTime, actual.BattleStartTime);
+        Assert.Equal(expected.BattleEndTime, actual.BattleEndTime);
+        Assert.Equal(expected.TargetName, actual.TargetName);
+        Assert.Equal(expected.MapId, actual.MapId);
+        Assert.Equal(expected.MapInstanceId, actual.MapInstanceId);
+        Assert.Equal(expected.TargetObservation?.InstanceId, actual.TargetObservation?.InstanceId);
+        Assert.Equal(
+            expected.Combatants.Keys.Order().ToArray(),
+            actual.Combatants.Keys.Order().ToArray());
+
+        foreach (var id in expected.Combatants.Keys)
+        {
+            AssertCombatantParity(expected.Combatants[id], actual.Combatants[id]);
+        }
+    }
+
+    private static void AssertCombatantParity(CombatantMetrics expected, CombatantMetrics actual)
+    {
+        Assert.Equal(expected.Nickname, actual.Nickname);
+        Assert.Equal(expected.CharacterClass, actual.CharacterClass);
+        Assert.Equal(expected.DamageAmount, actual.DamageAmount);
+        Assert.Equal(expected.HealingAmount, actual.HealingAmount);
+        Assert.Equal(expected.PeriodicHealingAmount, actual.PeriodicHealingAmount);
+        Assert.Equal(expected.DrainDamageAmount, actual.DrainDamageAmount);
+        Assert.Equal(expected.DrainHealingAmount, actual.DrainHealingAmount);
+        Assert.Equal(expected.RegenerationHealingAmount, actual.RegenerationHealingAmount);
+        Assert.Equal(expected.ShieldAmount, actual.ShieldAmount);
+        Assert.Equal(expected.ShieldTimes, actual.ShieldTimes);
+        Assert.Equal(expected.ShieldAbsorbedAmount, actual.ShieldAbsorbedAmount);
+        Assert.Equal(expected.ShieldAbsorbedTimes, actual.ShieldAbsorbedTimes);
+        Assert.Equal(
+            expected.Skills.Keys.Order().ToArray(),
+            actual.Skills.Keys.Order().ToArray());
+
+        foreach (var skillCode in expected.Skills.Keys)
+        {
+            AssertSkillParity(expected.Skills[skillCode], actual.Skills[skillCode]);
+        }
+    }
+
+    private static void AssertSkillParity(SkillMetrics expected, SkillMetrics actual)
+    {
+        Assert.Equal(expected.SkillCode, actual.SkillCode);
+        Assert.Equal(expected.EventKind, actual.EventKind);
+        Assert.Equal(expected.PrimaryValueKind, actual.PrimaryValueKind);
+        Assert.Equal(expected.DamageAmount, actual.DamageAmount);
+        Assert.Equal(expected.PeriodicDamageAmount, actual.PeriodicDamageAmount);
+        Assert.Equal(expected.PeriodicDamageTimes, actual.PeriodicDamageTimes);
+        Assert.Equal(expected.HealingAmount, actual.HealingAmount);
+        Assert.Equal(expected.HealingTimes, actual.HealingTimes);
+        Assert.Equal(expected.SupportTimes, actual.SupportTimes);
+        Assert.Equal(expected.PeriodicHealingAmount, actual.PeriodicHealingAmount);
+        Assert.Equal(expected.PeriodicHealingTimes, actual.PeriodicHealingTimes);
+        Assert.Equal(expected.DrainDamageAmount, actual.DrainDamageAmount);
+        Assert.Equal(expected.DrainDamageTimes, actual.DrainDamageTimes);
+        Assert.Equal(expected.DrainHealingAmount, actual.DrainHealingAmount);
+        Assert.Equal(expected.DrainHealingTimes, actual.DrainHealingTimes);
+        Assert.Equal(expected.RegenerationHealingAmount, actual.RegenerationHealingAmount);
+        Assert.Equal(expected.RegenerationHealingTimes, actual.RegenerationHealingTimes);
+        Assert.Equal(expected.ShieldAmount, actual.ShieldAmount);
+        Assert.Equal(expected.ShieldTimes, actual.ShieldTimes);
+        Assert.Equal(expected.ShieldAbsorbedAmount, actual.ShieldAbsorbedAmount);
+        Assert.Equal(expected.ShieldAbsorbedTimes, actual.ShieldAbsorbedTimes);
+        Assert.Equal(expected.CriticalTimes, actual.CriticalTimes);
+        Assert.Equal(expected.Times, actual.Times);
+        Assert.Equal(expected.AttemptTimes, actual.AttemptTimes);
+        Assert.Equal(expected.EvadeTimes, actual.EvadeTimes);
+        Assert.Equal(expected.InvincibleTimes, actual.InvincibleTimes);
+        Assert.Equal(expected.MultiHitTimes, actual.MultiHitTimes);
+        Assert.Equal(expected.BackTimes, actual.BackTimes);
+        Assert.Equal(expected.PerfectTimes, actual.PerfectTimes);
+        Assert.Equal(expected.SmiteTimes, actual.SmiteTimes);
+        Assert.Equal(expected.ParryTimes, actual.ParryTimes);
+        Assert.Equal(expected.BlockTimes, actual.BlockTimes);
+        Assert.Equal(expected.EnduranceTimes, actual.EnduranceTimes);
+        Assert.Equal(expected.RegenerationTimes, actual.RegenerationTimes);
+        Assert.Equal(expected.DefensivePerfectTimes, actual.DefensivePerfectTimes);
+    }
+
+    private static string[] BuildBattlePacketFacts(CombatMetricsStore store, DamageMeterSnapshot snapshot)
+    {
+        return CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime)
+            .Select(static context =>
+            {
+                var packet = context.Packet;
+                return string.Join(
+                    "|",
+                    context.SourceId,
+                    context.TargetId,
+                    packet.SourceId,
+                    packet.TargetId,
+                    packet.OriginalSkillCode,
+                    packet.SkillCode,
+                    packet.Damage,
+                    packet.Modifiers,
+                    packet.EventKind,
+                    packet.ValueKind,
+                    packet.EffectTag,
+                    packet.Timestamp,
+                    packet.FrameOrdinal,
+                    packet.BatchOrdinal);
+            })
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+    }
+
     private static string BuildSummaryDump(IEnumerable<PacketLogCombatantSummary> summaries)
     {
         return string.Join(
@@ -935,4 +1129,13 @@ public sealed class PacketLogReplayServiceTests
             new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];
     }
+
+    private sealed record StreamProcessorReplayResult(
+        int TotalLines,
+        int ReplayedLines,
+        int SkippedLines,
+        DamageMeterSnapshot Snapshot,
+        CombatMetricsStore Store);
+
+    private sealed record StreamReplayEntry(DateTimeOffset Timestamp, byte[] Payload);
 }
