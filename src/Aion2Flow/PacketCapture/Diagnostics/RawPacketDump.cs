@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Services.Logging;
@@ -34,6 +35,8 @@ internal static class RawPacketDump
     public static string RawLogPath => _rawLogPath;
     public static string StreamLogPath => _streamLogPath;
     public static string FrameLogPath => _frameLogPath;
+
+    private static bool ShouldWriteFrameLog => IsEnabled && _frameWriter is not null;
 
     public static void RotateLogs()
     {
@@ -100,21 +103,23 @@ internal static class RawPacketDump
         }
     }
 
-    public static void AppendFrameEvent(string eventName, in TcpConnection connection, string detail, ReadOnlySpan<byte> payload)
+    public static void AppendFrameEvent(string eventName, in TcpConnection connection, FrameEventDetail detail, ReadOnlySpan<byte> payload)
     {
         var hasObserver = FrameEventObserved is not null;
-        if ((!IsEnabled || _frameWriter is null) && !hasObserver)
+        var shouldWrite = ShouldWriteFrameLog;
+        if (!shouldWrite && !hasObserver)
         {
             return;
         }
 
         try
         {
-            var timestamp = DateTimeOffset.Now;
             var timestampTicks = Stopwatch.GetTimestamp();
-            if (IsEnabled && _frameWriter is not null)
+            var detailText = detail.ToString();
+            if (shouldWrite && _frameWriter is not null)
             {
-                var line = $"{timestamp:O}|{eventName}|{connection.SourceAddress}:{connection.SourcePort}->{connection.DestinationAddress}:{connection.DestinationPort}|{detail}|data={Convert.ToHexString(payload)}";
+                var timestamp = DateTimeOffset.Now;
+                var line = $"{timestamp:O}|{eventName}|{connection.SourceAddress}:{connection.SourcePort}->{connection.DestinationAddress}:{connection.DestinationPort}|{detailText}|data={Convert.ToHexString(payload)}";
                 lock (SyncRoot)
                 {
                     _frameWriter.WriteLine(line);
@@ -125,7 +130,7 @@ internal static class RawPacketDump
             {
                 try
                 {
-                    FrameEventObserved?.Invoke(new FrameEventObservation(timestampTicks, eventName, connection, detail));
+                    FrameEventObserved?.Invoke(new FrameEventObservation(timestampTicks, eventName, connection, detailText));
                 }
                 catch
                 {
@@ -159,4 +164,89 @@ internal static class RawPacketDump
     }
 
     public readonly record struct FrameEventObservation(long TimestampTicks, string EventName, TcpConnection Connection, string Detail);
+
+    [InterpolatedStringHandler]
+    public ref struct FrameEventDetail
+    {
+        private DefaultInterpolatedStringHandler _handler;
+        private readonly bool _isEnabled;
+
+        public FrameEventDetail(int literalLength, int formattedCount, out bool shouldAppend)
+        {
+            _isEnabled = ShouldWriteFrameLog;
+            shouldAppend = _isEnabled;
+            _handler = _isEnabled
+                ? new DefaultInterpolatedStringHandler(literalLength, formattedCount)
+                : default;
+        }
+
+        public void AppendLiteral(string value)
+        {
+            if (_isEnabled)
+            {
+                _handler.AppendLiteral(value);
+            }
+        }
+
+        public void AppendFormatted<T>(T value)
+        {
+            if (_isEnabled)
+            {
+                _handler.AppendFormatted(value);
+            }
+        }
+
+        public void AppendFormatted<T>(T value, string? format)
+        {
+            if (_isEnabled)
+            {
+                _handler.AppendFormatted(value, format);
+            }
+        }
+
+        public void AppendFormatted<T>(T value, int alignment)
+        {
+            if (_isEnabled)
+            {
+                _handler.AppendFormatted(value, alignment);
+            }
+        }
+
+        public void AppendFormatted<T>(T value, int alignment, string? format)
+        {
+            if (_isEnabled)
+            {
+                _handler.AppendFormatted(value, alignment, format);
+            }
+        }
+
+        public void AppendFormatted(string? value)
+        {
+            if (_isEnabled)
+            {
+                _handler.AppendFormatted(value);
+            }
+        }
+
+        public void AppendFormatted(string? value, int alignment = 0, string? format = null)
+        {
+            if (_isEnabled)
+            {
+                _handler.AppendFormatted(value, alignment, format);
+            }
+        }
+
+        public void AppendFormatted(ReadOnlySpan<char> value)
+        {
+            if (_isEnabled)
+            {
+                _handler.AppendFormatted(value);
+            }
+        }
+
+        public override string ToString()
+        {
+            return _isEnabled ? _handler.ToStringAndClear() : string.Empty;
+        }
+    }
 }

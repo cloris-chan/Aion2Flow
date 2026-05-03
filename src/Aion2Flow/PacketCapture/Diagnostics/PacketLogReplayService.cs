@@ -40,6 +40,17 @@ public sealed class PacketLogReplayService
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
 
+        if (TryDetectLogKindFromSourceName(sourceName, out var sourceLogKind))
+        {
+            return sourceLogKind switch
+            {
+                ReplayLogKind.Stream => ReplayStreamLines(ReadLines(reader), sourceName),
+                ReplayLogKind.Frame => ReplayFrameLines(ReadLines(reader), sourceName),
+                ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-battle replay."),
+                _ => throw new InvalidOperationException($"Unsupported replay log kind: {sourceLogKind}.")
+            };
+        }
+
         var lines = new List<string>();
         while (reader.ReadLine() is { } line)
         {
@@ -56,7 +67,15 @@ public sealed class PacketLogReplayService
         };
     }
 
-    private static PacketLogReplayResult ReplayFrameLines(List<string> lines, string sourceName)
+    private static IEnumerable<string> ReadLines(TextReader reader)
+    {
+        while (reader.ReadLine() is { } line)
+        {
+            yield return line;
+        }
+    }
+
+    private static PacketLogReplayResult ReplayFrameLines(IEnumerable<string> lines, string sourceName)
     {
         var store = new CombatMetricsStore();
         IRuntimeObservationSink sink = new LegacyRuntimeObservationSink(store);
@@ -64,13 +83,18 @@ public sealed class PacketLogReplayService
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         long frameOrdinal = 0;
+        var totalLines = 0;
+        var replayedLines = 0;
+        var skippedLines = 0;
         var ingestStart = CaptureBaselineStart();
 
         foreach (var line in lines)
         {
+            totalLines++;
             if (!TryParseEntry(line, out var entry))
             {
                 IncrementCount(skippedEventCounts, "<invalid>");
+                skippedLines++;
                 continue;
             }
 
@@ -79,10 +103,12 @@ public sealed class PacketLogReplayService
             if (TryReplayEntry(sink, entry, frameOrdinal, batchOrdinal))
             {
                 IncrementCount(replayedEventCounts, entry.EventName);
+                replayedLines++;
             }
             else
             {
                 IncrementCount(skippedEventCounts, entry.EventName);
+                skippedLines++;
             }
         }
 
@@ -99,9 +125,9 @@ public sealed class PacketLogReplayService
 
         return new PacketLogReplayResult(
             sourceName,
-            lines.Count,
-            replayedEventCounts.Values.Sum(),
-            skippedEventCounts.Values.Sum(),
+            totalLines,
+            replayedLines,
+            skippedLines,
             snapshot,
             store.DeepClone(),
             summaries,
@@ -115,7 +141,7 @@ public sealed class PacketLogReplayService
         };
     }
 
-    private static PacketLogReplayResult ReplayStreamLines(List<string> lines, string sourceName)
+    private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName)
     {
         var store = new CombatMetricsStore();
         IRuntimeObservationSink sink = new LegacyRuntimeObservationSink(store);
@@ -123,19 +149,25 @@ public sealed class PacketLogReplayService
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         using var inboundProcessor = new PacketStreamProcessor(sink);
+        var totalLines = 0;
+        var replayedLines = 0;
+        var skippedLines = 0;
         var ingestStart = CaptureBaselineStart();
 
         foreach (var line in lines)
         {
+            totalLines++;
             if (!TryParseStreamEntry(line, out var entry))
             {
                 IncrementCount(skippedEventCounts, "<invalid>");
+                skippedLines++;
                 continue;
             }
 
             if (string.Equals(entry.Direction, "outbound", StringComparison.OrdinalIgnoreCase))
             {
                 IncrementCount(skippedEventCounts, "outbound-ignored");
+                skippedLines++;
                 continue;
             }
 
@@ -147,10 +179,12 @@ public sealed class PacketLogReplayService
             if (parsed)
             {
                 IncrementCount(replayedEventCounts, entry.Direction);
+                replayedLines++;
             }
             else
             {
                 IncrementCount(skippedEventCounts, entry.Direction);
+                skippedLines++;
             }
         }
 
@@ -168,9 +202,9 @@ public sealed class PacketLogReplayService
 
         return new PacketLogReplayResult(
             sourceName,
-            lines.Count,
-            replayedEventCounts.Values.Sum(),
-            skippedEventCounts.Values.Sum(),
+            totalLines,
+            replayedLines,
+            skippedLines,
             snapshot,
             store.DeepClone(),
             summaries,
@@ -1179,22 +1213,9 @@ public sealed class PacketLogReplayService
 
     private static ReplayLogKind DetectLogKind(IReadOnlyList<string> lines, string sourceName)
     {
-        if (sourceName.Contains(".stream.", StringComparison.OrdinalIgnoreCase) ||
-            sourceName.EndsWith("stream.log", StringComparison.OrdinalIgnoreCase))
+        if (TryDetectLogKindFromSourceName(sourceName, out var sourceLogKind))
         {
-            return ReplayLogKind.Stream;
-        }
-
-        if (sourceName.Contains(".frame.", StringComparison.OrdinalIgnoreCase) ||
-            sourceName.EndsWith("frame.log", StringComparison.OrdinalIgnoreCase))
-        {
-            return ReplayLogKind.Frame;
-        }
-
-        if (sourceName.Contains(".raw.", StringComparison.OrdinalIgnoreCase) ||
-            sourceName.EndsWith("raw.log", StringComparison.OrdinalIgnoreCase))
-        {
-            return ReplayLogKind.Raw;
+            return sourceLogKind;
         }
 
         foreach (var line in lines)
@@ -1220,6 +1241,33 @@ public sealed class PacketLogReplayService
         }
 
         return ReplayLogKind.Frame;
+    }
+
+    private static bool TryDetectLogKindFromSourceName(string sourceName, out ReplayLogKind logKind)
+    {
+        if (sourceName.Contains(".stream.", StringComparison.OrdinalIgnoreCase) ||
+            sourceName.EndsWith("stream.log", StringComparison.OrdinalIgnoreCase))
+        {
+            logKind = ReplayLogKind.Stream;
+            return true;
+        }
+
+        if (sourceName.Contains(".frame.", StringComparison.OrdinalIgnoreCase) ||
+            sourceName.EndsWith("frame.log", StringComparison.OrdinalIgnoreCase))
+        {
+            logKind = ReplayLogKind.Frame;
+            return true;
+        }
+
+        if (sourceName.Contains(".raw.", StringComparison.OrdinalIgnoreCase) ||
+            sourceName.EndsWith("raw.log", StringComparison.OrdinalIgnoreCase))
+        {
+            logKind = ReplayLogKind.Raw;
+            return true;
+        }
+
+        logKind = default;
+        return false;
     }
 
     private static bool TryParseStreamEntry(string line, out StreamReplayEntry entry)

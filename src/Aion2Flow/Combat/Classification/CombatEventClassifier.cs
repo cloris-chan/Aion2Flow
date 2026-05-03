@@ -317,52 +317,77 @@ internal static class PacketSkillTraits
         MatchesExact(packet, EnhanceSpiritBenedictionBaseSkillCode, 16190010, 16190020, 16190030) ||
         MatchesByHundred(packet, EnhanceSpiritBenedictionBaseSkillCode);
 
-    private static bool MatchesExact(ParsedCombatPacket packet, params int[] skillCodes)
+    private static bool MatchesExact(ParsedCombatPacket packet, int skillCode)
     {
-        foreach (var skillCode in skillCodes)
-        {
-            if (skillCode <= 0)
-            {
-                continue;
-            }
-
-            if (packet.SkillCode == skillCode || packet.OriginalSkillCode == skillCode)
-            {
-                return true;
-            }
-
-            if (CombatMetricsEngine.InferOriginalSkillCode(packet.OriginalSkillCode) == skillCode ||
-                CombatMetricsEngine.InferOriginalSkillCode(packet.SkillCode) == skillCode)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return MatchesSkillCode(packet, skillCode);
     }
 
-    private static bool MatchesBase(ParsedCombatPacket packet, params int[] baseSkillCodes)
+    private static bool MatchesExact(ParsedCombatPacket packet, int skillCode0, int skillCode1)
     {
-        foreach (var baseSkillCode in baseSkillCodes)
+        return MatchesSkillCode(packet, skillCode0) ||
+               MatchesSkillCode(packet, skillCode1);
+    }
+
+    private static bool MatchesExact(ParsedCombatPacket packet, int skillCode0, int skillCode1, int skillCode2)
+    {
+        return MatchesSkillCode(packet, skillCode0) ||
+               MatchesSkillCode(packet, skillCode1) ||
+               MatchesSkillCode(packet, skillCode2);
+    }
+
+    private static bool MatchesExact(ParsedCombatPacket packet, int skillCode0, int skillCode1, int skillCode2, int skillCode3)
+    {
+        return MatchesSkillCode(packet, skillCode0) ||
+               MatchesSkillCode(packet, skillCode1) ||
+               MatchesSkillCode(packet, skillCode2) ||
+               MatchesSkillCode(packet, skillCode3);
+    }
+
+    private static bool MatchesSkillCode(ParsedCombatPacket packet, int skillCode)
+    {
+        if (skillCode <= 0)
         {
-            if (baseSkillCode <= 0)
-            {
-                continue;
-            }
-
-            if (packet.BaseSkillCode == baseSkillCode)
-            {
-                return true;
-            }
-
-            if (CombatMetricsEngine.ParseSkillVariant(packet.OriginalSkillCode).BaseSkillCode == baseSkillCode ||
-                CombatMetricsEngine.ParseSkillVariant(packet.SkillCode).BaseSkillCode == baseSkillCode)
-            {
-                return true;
-            }
+            return false;
         }
 
-        return false;
+        if (packet.SkillCode == skillCode || packet.OriginalSkillCode == skillCode)
+        {
+            return true;
+        }
+
+        return CombatMetricsEngine.InferOriginalSkillCode(packet.OriginalSkillCode) == skillCode ||
+               CombatMetricsEngine.InferOriginalSkillCode(packet.SkillCode) == skillCode;
+    }
+
+    private static bool MatchesBase(ParsedCombatPacket packet, int baseSkillCode)
+    {
+        return MatchesBaseSkillCode(packet, baseSkillCode);
+    }
+
+    private static bool MatchesBase(ParsedCombatPacket packet, int baseSkillCode0, int baseSkillCode1, int baseSkillCode2, int baseSkillCode3, int baseSkillCode4, int baseSkillCode5)
+    {
+        return MatchesBaseSkillCode(packet, baseSkillCode0) ||
+               MatchesBaseSkillCode(packet, baseSkillCode1) ||
+               MatchesBaseSkillCode(packet, baseSkillCode2) ||
+               MatchesBaseSkillCode(packet, baseSkillCode3) ||
+               MatchesBaseSkillCode(packet, baseSkillCode4) ||
+               MatchesBaseSkillCode(packet, baseSkillCode5);
+    }
+
+    private static bool MatchesBaseSkillCode(ParsedCombatPacket packet, int baseSkillCode)
+    {
+        if (baseSkillCode <= 0)
+        {
+            return false;
+        }
+
+        if (packet.BaseSkillCode == baseSkillCode)
+        {
+            return true;
+        }
+
+        return CombatMetricsEngine.ParseSkillVariant(packet.OriginalSkillCode).BaseSkillCode == baseSkillCode ||
+               CombatMetricsEngine.ParseSkillVariant(packet.SkillCode).BaseSkillCode == baseSkillCode;
     }
 
     private static bool MatchesByHundred(ParsedCombatPacket packet, int skillCode) =>

@@ -89,7 +89,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
     private int _currentTarget;
     private Guid _currentBattleId = Guid.NewGuid();
 
-    private sealed record TargetDecision(HashSet<int> TargetIds, string TargetName, int TrackingTargetId);
+    private readonly record struct TargetDecision(HashSet<int> TargetIds, string TargetName, int TrackingTargetId);
 
     private static SkillCollection _skillMap = [];
 
@@ -290,9 +290,14 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                 personal.ProcessCombatEvent(packet);
             }
 
-            var totalDamage = dataSnapshot.Combatants.Values
-                .Where(static combatant => combatant.CharacterClass is not null)
-                .Sum(static combatant => combatant.DamageAmount);
+            var totalDamage = 0L;
+            foreach (var combatant in dataSnapshot.Combatants.Values)
+            {
+                if (combatant.CharacterClass is not null)
+                {
+                    totalDamage += combatant.DamageAmount;
+                }
+            }
 
             foreach (var data in dataSnapshot.Combatants.Values)
             {
@@ -853,12 +858,23 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return;
         }
 
-        foreach (var targetId in _targetInfoMap.Keys.ToArray())
+        List<int>? summonTargets = null;
+        foreach (var targetId in _targetInfoMap.Keys)
         {
             if (IsKnownSummonInstance(Store, targetId))
             {
-                _targetInfoMap.Remove(targetId);
+                (summonTargets ??= []).Add(targetId);
             }
+        }
+
+        if (summonTargets is null)
+        {
+            return;
+        }
+
+        foreach (var targetId in summonTargets)
+        {
+            _targetInfoMap.Remove(targetId);
         }
     }
 

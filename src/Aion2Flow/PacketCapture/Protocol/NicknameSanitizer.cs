@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 
 namespace Cloris.Aion2Flow.PacketCapture.Protocol;
 
@@ -7,37 +6,38 @@ internal static class NicknameSanitizer
 {
     public static string? Sanitize(string nickname)
     {
-        var sanitized = nickname.Split('\0')[0].Trim();
-        if (string.IsNullOrEmpty(sanitized))
+        var raw = GetNullTerminatedPrefix(nickname).Trim();
+        if (raw.IsEmpty)
         {
             return null;
         }
 
-        var nicknameBuilder = new StringBuilder();
+        var sanitized = raw;
         var onlyNumbers = true;
         var hasHan = false;
+        var length = 0;
 
         foreach (var ch in sanitized)
         {
             if (!char.IsLetterOrDigit(ch))
             {
-                if (nicknameBuilder.Length == 0) return null;
+                if (length == 0) return null;
                 break;
             }
 
             if (ch == '\uFFFD')
             {
-                if (nicknameBuilder.Length == 0) return null;
+                if (length == 0) return null;
                 break;
             }
 
             if (char.IsControl(ch))
             {
-                if (nicknameBuilder.Length == 0) return null;
+                if (length == 0) return null;
                 break;
             }
 
-            nicknameBuilder.Append(ch);
+            length++;
             if (char.IsLetter(ch)) onlyNumbers = false;
             if (char.GetUnicodeCategory(ch) == UnicodeCategory.OtherLetter)
             {
@@ -45,13 +45,13 @@ internal static class NicknameSanitizer
             }
         }
 
-        var trimmed = nicknameBuilder.ToString();
+        var trimmed = sanitized[..length];
         if (trimmed.Length == 0) return null;
         if (trimmed.Length < 3 && !hasHan) return null;
         if (onlyNumbers) return null;
         if (trimmed.Length == 1 && char.IsLetter(trimmed[0]) && !hasHan) return null;
 
-        return trimmed;
+        return new string(trimmed);
     }
 
     public static string? SanitizeStrict(string nickname)
@@ -62,7 +62,7 @@ internal static class NicknameSanitizer
             return null;
         }
 
-        var rawSource = nickname.Split('\0')[0];
+        var rawSource = GetNullTerminatedPrefix(nickname);
         if (rawSource.Length == 0)
         {
             return null;
@@ -73,11 +73,18 @@ internal static class NicknameSanitizer
             return null;
         }
 
-        if (!string.Equals(sanitized, rawSource, StringComparison.Ordinal))
+        if (!rawSource.SequenceEqual(sanitized))
         {
             return null;
         }
 
         return sanitized;
+    }
+
+    private static ReadOnlySpan<char> GetNullTerminatedPrefix(string nickname)
+    {
+        var span = nickname.AsSpan();
+        var terminator = span.IndexOf('\0');
+        return terminator >= 0 ? span[..terminator] : span;
     }
 }

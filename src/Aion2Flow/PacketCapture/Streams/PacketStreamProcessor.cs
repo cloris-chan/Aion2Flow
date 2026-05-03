@@ -159,6 +159,23 @@ public sealed class PacketStreamProcessor : IDisposable
         return $"|{prefix}={normalized}";
     }
 
+    private static string FormatOriginServerHint(int? originServerId)
+        => originServerId is > 0 ? $"|originServer={originServerId.Value}" : string.Empty;
+
+    private static string FormatActiveHint(bool? isActive)
+        => isActive.HasValue ? $"|active={isActive.Value}" : string.Empty;
+
+    private static string FormatNpcCodeHint(int? npcCode)
+        => npcCode is > 0 ? $"|npcCode={npcCode.Value}" : string.Empty;
+
+    private static string FormatNpcHpHint(int? currentHp, int? maxHp)
+        => currentHp is int hp && maxHp is int hpMax ? $"|currentHp={hp}|maxHp={hpMax}" : string.Empty;
+
+    private static string FormatPeriodicTailHint(Packet0538PeriodicValue parsed)
+        => parsed.TailLength > 0
+            ? $"|tailLen={parsed.TailLength}|tailRaw={parsed.TailRaw}|tailSkillRaw={parsed.TailSkillCodeRaw}|tailPrefix={parsed.TailPrefixValue}{FormatResolvedReferenceHint("tailSkill", parsed.TailSkillCodeRaw)}"
+            : string.Empty;
+
     private bool StageDestinationMapFromSceneState(uint value)
     {
         if (!IsSceneStateMapId(value))
@@ -729,8 +746,7 @@ public sealed class PacketStreamProcessor : IDisposable
 
         consumed = parsed.TailOffset;
         _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
-        var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{originServerText}", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{FormatOriginServerHint(parsed.OriginServerId)}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -747,8 +763,7 @@ public sealed class PacketStreamProcessor : IDisposable
         _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
         _sink.MarkSceneArrival();
         consumed = parsed.TailOffset;
-        var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{originServerText}|embedded=true", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{FormatOriginServerHint(parsed.OriginServerId)}|embedded=true", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -848,8 +863,7 @@ public sealed class PacketStreamProcessor : IDisposable
             _sink.ToggleNpcBattle(npcId);
         }
         consumed = reader.Offset;
-        var activeText = isActive.HasValue ? $"|active={isActive.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={npcId}{activeText}", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={npcId}{FormatActiveHint(isActive)}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -1040,8 +1054,7 @@ public sealed class PacketStreamProcessor : IDisposable
         consumed = Math.Max(offset + 2, reader.Offset);
         var payloadLength = consumed > 0 ? consumed : payload.Length;
         var kind = Packet4036Descriptors.ClassifyKind(payloadLength);
-        var npcCodeText = npcCode.HasValue ? $"|npcCode={npcCode.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("summon", _connection, $"kind={Packet4036Descriptors.FormatKind(kind, payloadLength)}|owner={realSourceId}|summon={summonId}{npcCodeText}", payload[..consumed]);
+        RawPacketDump.AppendFrameEvent("summon", _connection, $"kind={Packet4036Descriptors.FormatKind(kind, payloadLength)}|owner={realSourceId}|summon={summonId}{FormatNpcCodeHint(npcCode)}", payload[..consumed]);
         return _hasParsed = true;
     }
 
@@ -1100,23 +1113,23 @@ public sealed class PacketStreamProcessor : IDisposable
                 var damageIdx = packet.IndexOf(damageNeedle);
                 var periodicIdx = packet.IndexOf(periodicNeedle);
                 var idx = -1;
-                Func<ReadOnlySpan<byte>, bool>? handler = null;
+                var handlerKind = 0;
 
                 if (damageIdx > 0 && periodicIdx > 0)
                 {
-                    if (damageIdx < periodicIdx) { idx = damageIdx; handler = Parse0438ValuePacket; }
-                    else { idx = periodicIdx; handler = ParsePeriodicValuePacket; }
+                    if (damageIdx < periodicIdx) { idx = damageIdx; handlerKind = 1; }
+                    else { idx = periodicIdx; handlerKind = 2; }
                 }
                 else if (damageIdx > 0)
                 {
-                    idx = damageIdx; handler = Parse0438ValuePacket;
+                    idx = damageIdx; handlerKind = 1;
                 }
                 else if (periodicIdx > 0)
                 {
-                    idx = periodicIdx; handler = ParsePeriodicValuePacket;
+                    idx = periodicIdx; handlerKind = 2;
                 }
 
-                if (idx > 0 && handler != null)
+                if (idx > 0 && handlerKind != 0)
                 {
                     if (!TryReadVarInt(packet, idx - 1, out var packetLengthInfo))
                     {
@@ -1129,7 +1142,14 @@ public sealed class PacketStreamProcessor : IDisposable
                         if (startIdx >= 0 && startIdx < endIdx && endIdx <= packet.Length)
                         {
                             var extractedPacket = packet[startIdx..endIdx];
-                            handler(extractedPacket);
+                            if (handlerKind == 1)
+                            {
+                                Parse0438ValuePacket(extractedPacket);
+                            }
+                            else
+                            {
+                                ParsePeriodicValuePacket(extractedPacket);
+                            }
                             processed = true;
                             if (endIdx < packet.Length)
                             {
@@ -1338,7 +1358,6 @@ public sealed class PacketStreamProcessor : IDisposable
 
         if (Packet0438CompactValueParser.TryParse(packet, out var compact))
         {
-            var tailHint = FormatResolvedReferenceHint("tailSkill", compact.TailRaw);
             var timestamp = CurrentTimestampMilliseconds;
             _sink.RegisterCompactValue0438(
                 compact.TargetId,
@@ -1354,7 +1373,7 @@ public sealed class PacketStreamProcessor : IDisposable
             RawPacketDump.AppendFrameEvent(
                 "compact-value",
                 _connection,
-                $"target={compact.TargetId}|source={compact.SourceId}|switch={compact.LayoutTag}|flag={compact.Flag}|marker={compact.Marker}|type={compact.Type}|skillRaw={compact.SkillCodeRaw}|unknown={compact.Unknown}|value={compact.Value}|loop={compact.Loop}|tailLen={compact.TailLength}|tailRaw={compact.TailRaw}{FormatResolvedSkillHint(compact.SkillCodeRaw)}{tailHint}",
+                $"target={compact.TargetId}|source={compact.SourceId}|switch={compact.LayoutTag}|flag={compact.Flag}|marker={compact.Marker}|type={compact.Type}|skillRaw={compact.SkillCodeRaw}|unknown={compact.Unknown}|value={compact.Value}|loop={compact.Loop}|tailLen={compact.TailLength}|tailRaw={compact.TailRaw}{FormatResolvedSkillHint(compact.SkillCodeRaw)}{FormatResolvedReferenceHint("tailSkill", compact.TailRaw)}",
                 packet[..(packet.Length - compact.TailLength)]);
             return _hasParsed = true;
         }
@@ -1405,11 +1424,10 @@ public sealed class PacketStreamProcessor : IDisposable
                 frameOrdinal,
                 batchOrdinal);
 
-            var linkTailHint = FormatResolvedReferenceHint("tailSkill", parsed.TailRaw);
             RawPacketDump.AppendFrameEvent(
                 "periodic-link",
                 _connection,
-                $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|linkId={parsed.LinkId}|unknown={parsed.Unknown}|tailRaw={parsed.TailRaw}|effect={Packet0538PeriodicValueParser.FormatEffectLabel(parsed.TargetId, parsed.SourceId, parsed.Mode)}{linkTailHint}",
+                $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|linkId={parsed.LinkId}|unknown={parsed.Unknown}|tailRaw={parsed.TailRaw}|effect={Packet0538PeriodicValueParser.FormatEffectLabel(parsed.TargetId, parsed.SourceId, parsed.Mode)}{FormatResolvedReferenceHint("tailSkill", parsed.TailRaw)}",
                 packet);
             return _hasParsed = true;
         }
@@ -1431,10 +1449,7 @@ public sealed class PacketStreamProcessor : IDisposable
             parsed.Mode);
 
         _sink.AppendCombatPacket(combatPacket);
-        var periodicTailHint = parsed.TailLength > 0
-            ? $"|tailLen={parsed.TailLength}|tailRaw={parsed.TailRaw}|tailSkillRaw={parsed.TailSkillCodeRaw}|tailPrefix={parsed.TailPrefixValue}{FormatResolvedReferenceHint("tailSkill", parsed.TailSkillCodeRaw)}"
-            : string.Empty;
-        RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|unknown={parsed.Unknown}|damage={parsed.Damage}{periodicTailHint}{FormatEffectHint(combatPacket)}{FormatResolvedCombatHint(combatPacket)}", packet);
+        RawPacketDump.AppendFrameEvent("periodic", _connection, $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|unknown={parsed.Unknown}|damage={parsed.Damage}{FormatPeriodicTailHint(parsed)}{FormatEffectHint(combatPacket)}{FormatResolvedCombatHint(combatPacket)}", packet);
         return _hasParsed = true;
     }
 
@@ -1503,8 +1518,7 @@ public sealed class PacketStreamProcessor : IDisposable
 
             _sink.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
             _sink.AppendSummon(parsed.OwnerId, parsed.SummonId);
-            var npcCodeText = parsed.NpcCode.HasValue ? $"|npcCode={parsed.NpcCode.Value}" : string.Empty;
-            RawPacketDump.AppendFrameEvent("summon", _connection, $"kind={Packet4036Descriptors.FormatKind(parsed.Kind, parsed.TailOffset)}|owner={parsed.OwnerId}|summon={parsed.SummonId}{npcCodeText}", packet[..Math.Min(parsed.TailOffset, packet.Length)]);
+            RawPacketDump.AppendFrameEvent("summon", _connection, $"kind={Packet4036Descriptors.FormatKind(parsed.Kind, parsed.TailOffset)}|owner={parsed.OwnerId}|summon={parsed.SummonId}{FormatNpcCodeHint(parsed.NpcCode)}", packet[..Math.Min(parsed.TailOffset, packet.Length)]);
             return _hasParsed = true;
         }
 
@@ -1520,9 +1534,7 @@ public sealed class PacketStreamProcessor : IDisposable
                 _sink.AppendNpcHp(spawn.EntityId, currentHp, maxHp, CurrentTimestampMilliseconds);
             }
 
-            var spawnNpcCodeText = spawn.NpcCode.HasValue ? $"|npcCode={spawn.NpcCode.Value}" : string.Empty;
-            var spawnHpText = spawn.CurrentHp is int hp && spawn.MaxHp is int hpMax ? $"|currentHp={hp}|maxHp={hpMax}" : string.Empty;
-            RawPacketDump.AppendFrameEvent("npc-spawn", _connection, $"kind={Packet4036Descriptors.FormatKind(spawn.Kind, packet.Length)}|entity={spawn.EntityId}{spawnNpcCodeText}{spawnHpText}", packet);
+            RawPacketDump.AppendFrameEvent("npc-spawn", _connection, $"kind={Packet4036Descriptors.FormatKind(spawn.Kind, packet.Length)}|entity={spawn.EntityId}{FormatNpcCodeHint(spawn.NpcCode)}{FormatNpcHpHint(spawn.CurrentHp, spawn.MaxHp)}", packet);
             return _hasParsed = true;
         }
 
@@ -1852,8 +1864,7 @@ public sealed class PacketStreamProcessor : IDisposable
         var tailOffset = Math.Min(packet.Length, reader.Offset + parsed.TailOffset);
         _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
         _sink.MarkSceneArrival();
-        var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{originServerText}", packet[..tailOffset]);
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{FormatOriginServerHint(parsed.OriginServerId)}", packet[..tailOffset]);
         return _hasParsed = true;
     }
 
@@ -1862,8 +1873,7 @@ public sealed class PacketStreamProcessor : IDisposable
         if (Packet4436NicknameParser.TryParse(packet, out var parsed))
         {
             _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
-            var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
-            RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=other|len={parsed.NicknameLength}|delta={parsed.Delta}{originServerText}", packet);
+            RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=other|len={parsed.NicknameLength}|delta={parsed.Delta}{FormatOriginServerHint(parsed.OriginServerId)}", packet);
             return _hasParsed = true;
         }
 
@@ -1916,8 +1926,7 @@ public sealed class PacketStreamProcessor : IDisposable
             _sink.ToggleNpcBattle(parsed.NpcId);
         }
 
-        var activeText = parsed.IsActive.HasValue ? $"|active={parsed.IsActive.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={parsed.NpcId}{activeText}|tailLen={parsed.TailLength}", packet);
+        RawPacketDump.AppendFrameEvent("battle-toggle", _connection, $"npcId={parsed.NpcId}{FormatActiveHint(parsed.IsActive)}|tailLen={parsed.TailLength}", packet);
         return _hasParsed = true;
     }
 
@@ -1929,8 +1938,7 @@ public sealed class PacketStreamProcessor : IDisposable
         }
 
         _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
-        var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
-        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{originServerText}", packet[..parsed.TailOffset]);
+        RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{FormatOriginServerHint(parsed.OriginServerId)}", packet[..parsed.TailOffset]);
         return _hasParsed = true;
     }
 

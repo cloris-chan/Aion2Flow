@@ -47,21 +47,21 @@ public sealed class CombatMetricsStore
         long BatchOrdinal);
     private readonly record struct AvoidedSignature(int SourceId, int TargetId, int Marker);
     private readonly record struct PeriodicLinkSignature(int TargetId, int LinkId, int SequenceId, int TailRaw, long BatchOrdinal);
-    private sealed record NpcInstanceState
+    private sealed class NpcInstanceState
     {
-        public int? NpcCode { get; init; }
-        public int? Hp { get; init; }
-        public int? MaxHp { get; init; }
-        public long? HpObservedAtMilliseconds { get; init; }
-        public bool? BattleToggledOn { get; init; }
-        public NpcKind? Kind { get; init; }
-        public uint? Value2136 { get; init; }
-        public uint? Sequence2136 { get; init; }
-        public uint? Value0140 { get; init; }
-        public uint? Value0240 { get; init; }
-        public (byte State0, byte State1)? State4636 { get; init; }
-        public (int SequenceId, int ResultCode)? Latest2C38 { get; init; }
-        public ConcurrentDictionary<int, int>? Results2C38BySequence { get; init; }
+        public int? NpcCode { get; set; }
+        public int? Hp { get; set; }
+        public int? MaxHp { get; set; }
+        public long? HpObservedAtMilliseconds { get; set; }
+        public bool? BattleToggledOn { get; set; }
+        public NpcKind? Kind { get; set; }
+        public uint? Value2136 { get; set; }
+        public uint? Sequence2136 { get; set; }
+        public uint? Value0140 { get; set; }
+        public uint? Value0240 { get; set; }
+        public (byte State0, byte State1)? State4636 { get; set; }
+        public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
+        public ConcurrentDictionary<int, int>? Results2C38BySequence { get; set; }
     }
 
     public readonly record struct NpcInstanceStateSnapshot(
@@ -882,10 +882,10 @@ public sealed class CombatMetricsStore
 
     private void StorePacket(ParsedCombatPacket packet)
     {
-        var bySource = _packetsBySource.GetOrAdd(packet.SourceId, _ => new ConcurrentQueue<ParsedCombatPacket>());
+        var bySource = _packetsBySource.GetOrAdd(packet.SourceId, static _ => new ConcurrentQueue<ParsedCombatPacket>());
         bySource.Enqueue(packet);
 
-        var byTarget = _packetsByTarget.GetOrAdd(packet.TargetId, _ => new ConcurrentQueue<ParsedCombatPacket>());
+        var byTarget = _packetsByTarget.GetOrAdd(packet.TargetId, static _ => new ConcurrentQueue<ParsedCombatPacket>());
         byTarget.Enqueue(packet);
 
         IndexPacketByPair(packet);
@@ -933,8 +933,9 @@ public sealed class CombatMetricsStore
 
         _detailRevisionByCombatant.AddOrUpdate(
             combatantId,
-            revision,
-            (_, currentRevision) => Math.Max(currentRevision, revision));
+            static (_, revisionValue) => revisionValue,
+            static (_, currentRevision, revisionValue) => Math.Max(currentRevision, revisionValue),
+            revision);
     }
 
     private void MarkCombatantAndAdjacentDetailsDirty(int combatantId)
@@ -1050,7 +1051,16 @@ public sealed class CombatMetricsStore
     public void AppendNpcCode(int instanceId, int npcCode)
     {
         instanceId = ResolveLifecycleId(instanceId);
-        UpdateNpcState(instanceId, state => state with { NpcCode = npcCode });
+        if (instanceId <= 0)
+        {
+            return;
+        }
+
+        var state = GetOrAddNpcState(instanceId);
+        lock (state)
+        {
+            state.NpcCode = npcCode;
+        }
         MarkCombatantAndAdjacentDetailsDirty(instanceId);
     }
 
@@ -1064,7 +1074,17 @@ public sealed class CombatMetricsStore
         }
 
         var resolvedInstanceId = ResolveLifecycleId(instanceId);
-        UpdateNpcState(resolvedInstanceId, state => state with { Kind = kind });
+        var state = GetOrAddNpcState(resolvedInstanceId);
+        int? hp;
+        int? maxHp;
+        long? observedAt;
+        lock (state)
+        {
+            state.Kind = kind;
+            hp = state.Hp;
+            maxHp = state.MaxHp;
+            observedAt = state.HpObservedAtMilliseconds;
+        }
         if (kind != NpcKind.Boss)
         {
             _bossFocusInstances.TryRemove(resolvedInstanceId, out _);
@@ -1073,14 +1093,13 @@ public sealed class CombatMetricsStore
         }
 
         if (!_bossFocusInstances.ContainsKey(resolvedInstanceId) ||
-            !_npcStateByInstance.TryGetValue(resolvedInstanceId, out var state) ||
-            state.Hp is not int hp ||
-            state.HpObservedAtMilliseconds is not long observedAt)
+            hp is not int hpValue ||
+            observedAt is not long observedAtValue)
         {
             return;
         }
 
-        RememberObservedBoss(resolvedInstanceId, hp, Math.Max(state.MaxHp ?? hp, hp), observedAt);
+        RememberObservedBoss(resolvedInstanceId, hpValue, Math.Max(maxHp ?? hpValue, hpValue), observedAtValue);
     }
 
     public void AppendNpcHp(int instanceId, int hp) =>
@@ -1105,35 +1124,21 @@ public sealed class CombatMetricsStore
         var observedAt = observedAtMilliseconds > 0
             ? observedAtMilliseconds
             : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        NpcInstanceState updated = null!;
-        _npcStateByInstance.AddOrUpdate(
-            resolvedInstanceId,
-            _ =>
-            {
-                updated = new NpcInstanceState
-                {
-                    Hp = hp,
-                    MaxHp = hasExplicitMaxHp ? Math.Max(explicitMaxHp, hp) : hp,
-                    HpObservedAtMilliseconds = observedAt
-                };
-                return updated;
-            },
-            (_, current) =>
-            {
-                updated = current with
-                {
-                    Hp = hp,
-                    MaxHp = hasExplicitMaxHp
-                        ? Math.Max(explicitMaxHp, hp)
-                        : Math.Max(current.MaxHp ?? 0, hp),
-                    HpObservedAtMilliseconds = observedAt
-                };
-                return updated;
-            });
+        var state = GetOrAddNpcState(resolvedInstanceId);
+        int rememberedMaxHp;
+        lock (state)
+        {
+            state.Hp = hp;
+            state.MaxHp = hasExplicitMaxHp
+                ? Math.Max(explicitMaxHp, hp)
+                : Math.Max(state.MaxHp ?? 0, hp);
+            state.HpObservedAtMilliseconds = observedAt;
+            rememberedMaxHp = Math.Max(state.MaxHp ?? hp, hp);
+        }
 
         if (_bossFocusInstances.ContainsKey(resolvedInstanceId) || IsObservedBoss(resolvedInstanceId))
         {
-            RememberObservedBoss(resolvedInstanceId, hp, Math.Max(updated.MaxHp ?? hp, hp), observedAt);
+            RememberObservedBoss(resolvedInstanceId, hp, rememberedMaxHp, observedAt);
         }
     }
 
@@ -1190,7 +1195,11 @@ public sealed class CombatMetricsStore
         }
 
         var resolvedInstanceId = ResolveLifecycleId(instanceId);
-        UpdateNpcState(resolvedInstanceId, state => state with { BattleToggledOn = isActive });
+        var state = GetOrAddNpcState(resolvedInstanceId);
+        lock (state)
+        {
+            state.BattleToggledOn = isActive;
+        }
         if (!IsBossInstance(resolvedInstanceId))
         {
             return;
@@ -1272,21 +1281,64 @@ public sealed class CombatMetricsStore
 
     public void AppendNpc2136State(int instanceId, uint sequence, uint value0)
     {
-        UpdateNpcState(instanceId, state => state with
+        instanceId = ResolveLifecycleId(instanceId);
+        if (instanceId <= 0)
         {
-            Sequence2136 = sequence,
-            Value2136 = value0
-        });
+            return;
+        }
+
+        var state = GetOrAddNpcState(instanceId);
+        lock (state)
+        {
+            state.Sequence2136 = sequence;
+            state.Value2136 = value0;
+        }
     }
 
-    public void AppendNpc0140Value(int instanceId, uint value0) =>
-        UpdateNpcState(instanceId, state => state with { Value0140 = value0 });
+    public void AppendNpc0140Value(int instanceId, uint value0)
+    {
+        instanceId = ResolveLifecycleId(instanceId);
+        if (instanceId <= 0)
+        {
+            return;
+        }
 
-    public void AppendNpc0240Value(int instanceId, uint value0) =>
-        UpdateNpcState(instanceId, state => state with { Value0240 = value0 });
+        var state = GetOrAddNpcState(instanceId);
+        lock (state)
+        {
+            state.Value0140 = value0;
+        }
+    }
 
-    public void AppendNpc4636State(int instanceId, byte state0, byte state1) =>
-        UpdateNpcState(instanceId, state => state with { State4636 = (state0, state1) });
+    public void AppendNpc0240Value(int instanceId, uint value0)
+    {
+        instanceId = ResolveLifecycleId(instanceId);
+        if (instanceId <= 0)
+        {
+            return;
+        }
+
+        var state = GetOrAddNpcState(instanceId);
+        lock (state)
+        {
+            state.Value0240 = value0;
+        }
+    }
+
+    public void AppendNpc4636State(int instanceId, byte state0, byte state1)
+    {
+        instanceId = ResolveLifecycleId(instanceId);
+        if (instanceId <= 0)
+        {
+            return;
+        }
+
+        var state = GetOrAddNpcState(instanceId);
+        lock (state)
+        {
+            state.State4636 = (state0, state1);
+        }
+    }
 
     public void AppendNpc2C38State(int instanceId, int sequenceId, int resultCode)
     {
@@ -1297,28 +1349,13 @@ public sealed class CombatMetricsStore
 
         instanceId = ResolveLifecycleId(instanceId);
 
-        _npcStateByInstance.AddOrUpdate(
-            instanceId,
-            _ =>
-            {
-                var bySequence = new ConcurrentDictionary<int, int>();
-                bySequence[sequenceId] = resultCode;
-                return new NpcInstanceState
-                {
-                    Latest2C38 = (sequenceId, resultCode),
-                    Results2C38BySequence = bySequence
-                };
-            },
-            (_, current) =>
-            {
-                var bySequence = current.Results2C38BySequence ?? new ConcurrentDictionary<int, int>();
-                bySequence[sequenceId] = resultCode;
-                return current with
-                {
-                    Latest2C38 = (sequenceId, resultCode),
-                    Results2C38BySequence = bySequence
-                };
-            });
+        var state = GetOrAddNpcState(instanceId);
+        lock (state)
+        {
+            var bySequence = state.Results2C38BySequence ??= new ConcurrentDictionary<int, int>();
+            bySequence[sequenceId] = resultCode;
+            state.Latest2C38 = (sequenceId, resultCode);
+        }
     }
 
     public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, long timestamp, long frameOrdinal)
@@ -1446,10 +1483,18 @@ public sealed class CombatMetricsStore
             return false;
         }
 
+        ConcurrentDictionary<int, int>? resultsBySequence;
+        (int SequenceId, int ResultCode)? latest2C38;
+        lock (state)
+        {
+            resultsBySequence = state.Results2C38BySequence;
+            latest2C38 = state.Latest2C38;
+        }
+
         if (preferredSequenceId.HasValue)
         {
-            if (state.Results2C38BySequence is not null &&
-                state.Results2C38BySequence.TryGetValue(preferredSequenceId.Value, out resultCode))
+            if (resultsBySequence is not null &&
+                resultsBySequence.TryGetValue(preferredSequenceId.Value, out resultCode))
             {
                 sequenceId = preferredSequenceId.Value;
                 return true;
@@ -1458,10 +1503,10 @@ public sealed class CombatMetricsStore
             return false;
         }
 
-        if (state.Latest2C38 is { } latest2C38)
+        if (latest2C38 is { } latest)
         {
-            sequenceId = latest2C38.SequenceId;
-            resultCode = latest2C38.ResultCode;
+            sequenceId = latest.SequenceId;
+            resultCode = latest.ResultCode;
             return true;
         }
 
@@ -1472,19 +1517,22 @@ public sealed class CombatMetricsStore
     {
         if (_npcStateByInstance.TryGetValue(instanceId, out var current))
         {
-            state = new NpcInstanceStateSnapshot(
-                current.NpcCode,
-                current.Hp,
-                current.MaxHp,
-                current.HpObservedAtMilliseconds,
-                current.BattleToggledOn,
-                current.Kind,
-                current.Value2136,
-                current.Sequence2136,
-                current.Value0140,
-                current.Value0240,
-                current.State4636,
-                current.Latest2C38);
+            lock (current)
+            {
+                state = new NpcInstanceStateSnapshot(
+                    current.NpcCode,
+                    current.Hp,
+                    current.MaxHp,
+                    current.HpObservedAtMilliseconds,
+                    current.BattleToggledOn,
+                    current.Kind,
+                    current.Value2136,
+                    current.Sequence2136,
+                    current.Value0140,
+                    current.Value0240,
+                    current.State4636,
+                    current.Latest2C38);
+            }
             return true;
         }
 
@@ -1519,23 +1567,24 @@ public sealed class CombatMetricsStore
     public void ToggleNpcBattle(int instanceId)
     {
         var resolvedInstanceId = ResolveLifecycleId(instanceId);
-        bool? toggledOn = null;
-        UpdateNpcState(
-            resolvedInstanceId,
-            state =>
-            {
-                toggledOn = !(state.BattleToggledOn ?? false);
-                return state with
-                {
-                    BattleToggledOn = toggledOn
-                };
-            });
+        if (resolvedInstanceId <= 0)
+        {
+            return;
+        }
 
-        if (toggledOn is true)
+        var state = GetOrAddNpcState(resolvedInstanceId);
+        bool toggledOn;
+        lock (state)
+        {
+            toggledOn = !(state.BattleToggledOn ?? false);
+            state.BattleToggledOn = toggledOn;
+        }
+
+        if (toggledOn)
         {
             AppendBossFocusEnter(resolvedInstanceId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
-        else if (toggledOn is false && IsBossInstance(resolvedInstanceId))
+        else if (IsBossInstance(resolvedInstanceId))
         {
             AppendBossFocusExit(resolvedInstanceId);
         }
@@ -1860,9 +1909,10 @@ public sealed class CombatMetricsStore
 
             if (_npcStateByInstance.TryGetValue(combatantId, out var npcState))
             {
-                clone._npcStateByInstance[combatantId] = CloneNpcState(npcState);
+                var npcStateClone = CloneNpcState(npcState);
+                clone._npcStateByInstance[combatantId] = npcStateClone;
                 relevantNpcInstanceIds.Add(combatantId);
-                if (npcState.NpcCode is int npcCode &&
+                if (npcStateClone.NpcCode is int npcCode &&
                     _npcNameByCode.TryGetValue(npcCode, out var npcName))
                 {
                     clone._npcNameByCode[npcCode] = npcName;
@@ -1916,12 +1966,27 @@ public sealed class CombatMetricsStore
 
     private static NpcInstanceState CloneNpcState(NpcInstanceState state)
     {
-        return state with
+        lock (state)
         {
-            Results2C38BySequence = state.Results2C38BySequence is null
-                ? null
-                : new ConcurrentDictionary<int, int>(state.Results2C38BySequence)
-        };
+            return new NpcInstanceState
+            {
+                NpcCode = state.NpcCode,
+                Hp = state.Hp,
+                MaxHp = state.MaxHp,
+                HpObservedAtMilliseconds = state.HpObservedAtMilliseconds,
+                BattleToggledOn = state.BattleToggledOn,
+                Kind = state.Kind,
+                Value2136 = state.Value2136,
+                Sequence2136 = state.Sequence2136,
+                Value0140 = state.Value0140,
+                Value0240 = state.Value0240,
+                State4636 = state.State4636,
+                Latest2C38 = state.Latest2C38,
+                Results2C38BySequence = state.Results2C38BySequence is null
+                    ? null
+                    : new ConcurrentDictionary<int, int>(state.Results2C38BySequence)
+            };
+        }
     }
 
     private void ExpandRelevantCombatantIdsWithSummonOwners(HashSet<int> relevantCombatantIds)
@@ -1951,20 +2016,8 @@ public sealed class CombatMetricsStore
         }
     }
 
-    private void UpdateNpcState(int instanceId, Func<NpcInstanceState, NpcInstanceState> update)
-    {
-        if (instanceId <= 0)
-        {
-            return;
-        }
-
-        instanceId = ResolveLifecycleId(instanceId);
-
-        _npcStateByInstance.AddOrUpdate(
-            instanceId,
-            _ => update(new NpcInstanceState()),
-            (_, current) => update(current));
-    }
+    private NpcInstanceState GetOrAddNpcState(int instanceId)
+        => _npcStateByInstance.GetOrAdd(instanceId, static _ => new NpcInstanceState());
 
     private bool IsBossInstance(int instanceId)
     {
@@ -1988,11 +2041,21 @@ public sealed class CombatMetricsStore
             ? observedAtMilliseconds
             : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        if (_npcStateByInstance.TryGetValue(instanceId, out var state) &&
-            state.Hp is int hp)
+        if (_npcStateByInstance.TryGetValue(instanceId, out var state))
         {
-            RememberObservedBoss(instanceId, hp, Math.Max(state.MaxHp ?? hp, hp), observedAt);
-            return;
+            int? hp;
+            int? maxHp;
+            lock (state)
+            {
+                hp = state.Hp;
+                maxHp = state.MaxHp;
+            }
+
+            if (hp is int hpValue)
+            {
+                RememberObservedBoss(instanceId, hpValue, Math.Max(maxHp ?? hpValue, hpValue), observedAt);
+                return;
+            }
         }
 
         lock (_observedBossLock)
