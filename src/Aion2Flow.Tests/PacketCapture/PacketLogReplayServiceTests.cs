@@ -144,6 +144,35 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_Records_Baseline_Counters_For_Ingest_Snapshot_And_Summary()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var entries = new[]
+        {
+            CreateStreamReplayEntry("2026-05-02T15:52:39.1861829+08:00", "state/2136-boss-scene-200003.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:40.0000000+08:00", "nickname/3336-own-thanks.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:41.0000000+08:00", "combat/0438-damage.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:42.0000000+08:00", "combat/0538-dot.hex")
+        };
+
+        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        try
+        {
+            var replay = PacketLogReplayService.Replay(path);
+
+            Assert.NotSame(PacketLogReplayBaselineCounters.Empty, replay.BaselineCounters);
+            AssertBaselineCounter(replay.BaselineCounters.ReplayIngest);
+            AssertBaselineCounter(replay.BaselineCounters.SnapshotCreation);
+            AssertBaselineCounter(replay.BaselineCounters.CombatantSummaryCreation);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Replay_Reconstructs_Boss_Activity_From_Sidecar_And_Health_Frame()
     {
         CombatMetricsEngine.SetGameResources(
@@ -971,6 +1000,12 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(
             BuildBattlePacketFacts(expected.Store, expected.Snapshot),
             BuildBattlePacketFacts(actual.Store, actual.Snapshot));
+    }
+
+    private static void AssertBaselineCounter(PacketLogReplayBaselineCounter counter)
+    {
+        Assert.True(counter.Elapsed >= TimeSpan.Zero);
+        Assert.True(counter.AllocatedBytes >= 0);
     }
 
     private static void AssertSnapshotParity(DamageMeterSnapshot expected, DamageMeterSnapshot actual)

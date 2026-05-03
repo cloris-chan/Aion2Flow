@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Runtime;
@@ -7,6 +8,16 @@ using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
+
+public readonly record struct CombatantDetailRefreshBaselineCounters(
+    TimeSpan Elapsed,
+    long AllocatedBytes,
+    int BattlePacketCount,
+    int DetailRowCount,
+    int CounterpartCount)
+{
+    public static CombatantDetailRefreshBaselineCounters Empty { get; } = new(TimeSpan.Zero, 0, 0, 0, 0);
+}
 
 public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 {
@@ -79,6 +90,8 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 
     public SkillDetailSectionViewModel IncomingShield => IncomingDetail.ShieldSection;
 
+    public CombatantDetailRefreshBaselineCounters LastRefreshBaselineCounters { get; private set; }
+
     [ObservableProperty]
     public partial string CombatantName { get; set; } = string.Empty;
 
@@ -122,7 +135,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         CombatMetricsStore? store = null,
         bool forceRefresh = false)
     {
+        var baselineStart = CaptureBaselineStart();
         RefreshContext(battleContextId, combatantId, snapshot, store, forceRefresh);
+        LastRefreshBaselineCounters = CaptureRefreshBaselineCounter(baselineStart);
     }
 
     public void Clear()
@@ -135,9 +150,39 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         _detailRevision = -1;
         CombatantName = string.Empty;
         SelectedDirectionIndex = 0;
+        LastRefreshBaselineCounters = CombatantDetailRefreshBaselineCounters.Empty;
         OutgoingDetail.Clear();
         IncomingDetail.Clear();
     }
+
+    private DetailBaselineStart CaptureBaselineStart()
+        => new(Stopwatch.GetTimestamp(), GC.GetAllocatedBytesForCurrentThread());
+
+    private CombatantDetailRefreshBaselineCounters CaptureRefreshBaselineCounter(DetailBaselineStart start)
+    {
+        var elapsed = Stopwatch.GetElapsedTime(start.Timestamp);
+        var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - start.AllocatedBytes;
+        return new CombatantDetailRefreshBaselineCounters(
+            elapsed,
+            Math.Max(0, allocatedBytes),
+            _battlePackets.Count,
+            CountDetailRows(),
+            CountCounterpartOptions());
+    }
+
+    private int CountDetailRows()
+        => OutgoingDamage.Rows.Count +
+           OutgoingHealing.Rows.Count +
+           OutgoingShield.Rows.Count +
+           IncomingDamage.Rows.Count +
+           IncomingHealing.Rows.Count +
+           IncomingShield.Rows.Count;
+
+    private int CountCounterpartOptions()
+        => OutgoingDetail.DamageCounterpartFilter.Counterparts.Count +
+           OutgoingDetail.SupportCounterpartFilter.Counterparts.Count +
+           IncomingDetail.DamageCounterpartFilter.Counterparts.Count +
+           IncomingDetail.SupportCounterpartFilter.Counterparts.Count;
 
     private void HandleCounterpartSelectionChanged(object? sender, EventArgs e)
     {
@@ -964,4 +1009,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 
         section.SelectedScope = selectedScope;
     }
+
+    private readonly record struct DetailBaselineStart(long Timestamp, long AllocatedBytes);
 }

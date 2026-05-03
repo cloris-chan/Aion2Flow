@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
@@ -63,6 +64,7 @@ public sealed class PacketLogReplayService
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         long frameOrdinal = 0;
+        var ingestStart = CaptureBaselineStart();
 
         foreach (var line in lines)
         {
@@ -85,8 +87,15 @@ public sealed class PacketLogReplayService
         }
 
         store.FlushOrphanCompactHits();
+        var ingestCounter = CaptureBaselineCounter(ingestStart);
+
+        var snapshotStart = CaptureBaselineStart();
         var snapshot = engine.CreateBattleSnapshot();
+        var snapshotCounter = CaptureBaselineCounter(snapshotStart);
+
+        var summaryStart = CaptureBaselineStart();
         var summaries = BuildCombatantSummaries(store, snapshot);
+        var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
             sourceName,
@@ -97,7 +106,13 @@ public sealed class PacketLogReplayService
             store.DeepClone(),
             summaries,
             replayedEventCounts,
-            skippedEventCounts);
+            skippedEventCounts)
+        {
+            BaselineCounters = new PacketLogReplayBaselineCounters(
+                ingestCounter,
+                snapshotCounter,
+                summaryCounter)
+        };
     }
 
     private static PacketLogReplayResult ReplayStreamLines(List<string> lines, string sourceName)
@@ -108,6 +123,7 @@ public sealed class PacketLogReplayService
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         using var inboundProcessor = new PacketStreamProcessor(sink);
+        var ingestStart = CaptureBaselineStart();
 
         foreach (var line in lines)
         {
@@ -140,8 +156,15 @@ public sealed class PacketLogReplayService
 
         store.FlushPendingOutcomeSidecars();
         store.FlushOrphanCompactHits();
+        var ingestCounter = CaptureBaselineCounter(ingestStart);
+
+        var snapshotStart = CaptureBaselineStart();
         var snapshot = engine.CreateBattleSnapshot();
+        var snapshotCounter = CaptureBaselineCounter(snapshotStart);
+
+        var summaryStart = CaptureBaselineStart();
         var summaries = BuildCombatantSummaries(store, snapshot);
+        var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
             sourceName,
@@ -152,7 +175,23 @@ public sealed class PacketLogReplayService
             store.DeepClone(),
             summaries,
             replayedEventCounts,
-            skippedEventCounts);
+            skippedEventCounts)
+        {
+            BaselineCounters = new PacketLogReplayBaselineCounters(
+                ingestCounter,
+                snapshotCounter,
+                summaryCounter)
+        };
+    }
+
+    private static BaselineStart CaptureBaselineStart()
+        => new(Stopwatch.GetTimestamp(), GC.GetAllocatedBytesForCurrentThread());
+
+    private static PacketLogReplayBaselineCounter CaptureBaselineCounter(BaselineStart start)
+    {
+        var elapsed = Stopwatch.GetElapsedTime(start.Timestamp);
+        var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - start.AllocatedBytes;
+        return new PacketLogReplayBaselineCounter(elapsed, Math.Max(0, allocatedBytes));
     }
 
     private static List<PacketLogCombatantSummary> BuildCombatantSummaries(
@@ -1495,6 +1534,8 @@ public sealed class PacketLogReplayService
                 IncomingInvincibles);
         }
     }
+
+    private readonly record struct BaselineStart(long Timestamp, long AllocatedBytes);
 }
 
 public sealed record PacketLogReplayResult(
@@ -1506,7 +1547,26 @@ public sealed record PacketLogReplayResult(
     CombatMetricsStore Store,
     IReadOnlyList<PacketLogCombatantSummary> Combatants,
     IReadOnlyDictionary<string, int> ReplayedEventCounts,
-    IReadOnlyDictionary<string, int> SkippedEventCounts);
+    IReadOnlyDictionary<string, int> SkippedEventCounts)
+{
+    public PacketLogReplayBaselineCounters BaselineCounters { get; init; } = PacketLogReplayBaselineCounters.Empty;
+}
+
+public sealed record PacketLogReplayBaselineCounters(
+    PacketLogReplayBaselineCounter ReplayIngest,
+    PacketLogReplayBaselineCounter SnapshotCreation,
+    PacketLogReplayBaselineCounter CombatantSummaryCreation)
+{
+    public static PacketLogReplayBaselineCounters Empty { get; } = new(
+        PacketLogReplayBaselineCounter.Empty,
+        PacketLogReplayBaselineCounter.Empty,
+        PacketLogReplayBaselineCounter.Empty);
+}
+
+public readonly record struct PacketLogReplayBaselineCounter(TimeSpan Elapsed, long AllocatedBytes)
+{
+    public static PacketLogReplayBaselineCounter Empty { get; } = new(TimeSpan.Zero, 0);
+}
 
 public sealed record PacketLogCombatantSummary(
     int CombatantId,

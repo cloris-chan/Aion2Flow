@@ -63,6 +63,39 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SelectBattleCombatant_Records_Detail_Refresh_Baseline_Counters()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+
+        const int playerId = 1001;
+        const int healerId = 1002;
+        const int bossId = 9001;
+
+        store.AppendNickname(playerId, "Perigee");
+        store.AppendNickname(healerId, "Helper");
+        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(store, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
+
+        var snapshot = engine.CreateBattleSnapshot();
+        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+
+        var counters = viewModel.LastRefreshBaselineCounters;
+        Assert.True(counters.Elapsed >= TimeSpan.Zero);
+        Assert.True(counters.AllocatedBytes >= 0);
+        Assert.True(counters.BattlePacketCount > 0);
+        Assert.True(counters.DetailRowCount > 0);
+        Assert.True(counters.CounterpartCount > 0);
+    }
+
+    [Fact]
     public void SelectBattleCombatant_Uses_Archived_BattleId_Context()
     {
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
