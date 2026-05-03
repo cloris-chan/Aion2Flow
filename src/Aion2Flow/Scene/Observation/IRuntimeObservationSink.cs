@@ -21,9 +21,11 @@ public interface IRuntimeObservationSink
 
     void RememberNpcObservationSource(int instanceId);
 
-    void UpdateCurrentMap(uint mapId);
+    void StageDestinationMap(uint mapId);
 
-    void UpdateCurrentMapInstance(uint instanceId);
+    void StageDestinationMapInstance(uint instanceId);
+
+    void MarkSceneArrival();
 
     void AppendCombatPacket(ParsedCombatPacket packet);
 

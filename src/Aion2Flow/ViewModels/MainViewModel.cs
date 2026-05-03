@@ -565,18 +565,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         out string reason)
     {
         reason = string.Empty;
-        if (previousLiveSnapshot.MapId == 0)
-        {
-            if (latestLiveSnapshot.MapId != 0 && HasArchivableBattle(previousLiveSnapshot))
-            {
-                reason = "map-transition";
-                return true;
-            }
 
-            return false;
-        }
-
-        if (latestLiveSnapshot.MapId == 0)
+        if (latestLiveSnapshot.MapId == 0 || !HasArchivableBattle(previousLiveSnapshot))
         {
             return false;
         }
@@ -587,9 +577,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             return true;
         }
 
-        if (previousLiveSnapshot.MapInstanceId != 0 &&
-            latestLiveSnapshot.MapInstanceId != 0 &&
-            previousLiveSnapshot.MapInstanceId != latestLiveSnapshot.MapInstanceId)
+        if (previousLiveSnapshot.MapInstanceId != latestLiveSnapshot.MapInstanceId)
         {
             reason = "map-instance-transition";
             return true;

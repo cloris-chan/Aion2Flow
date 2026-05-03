@@ -159,14 +159,14 @@ public sealed class PacketStreamProcessor : IDisposable
         return $"|{prefix}={normalized}";
     }
 
-    private bool UpdateCurrentMapFromSceneState(uint value)
+    private bool StageDestinationMapFromSceneState(uint value)
     {
         if (!IsSceneStateMapId(value))
         {
             return false;
         }
 
-        _sink.UpdateCurrentMap(value);
+        _sink.StageDestinationMap(value);
         return true;
     }
 
@@ -745,6 +745,7 @@ public sealed class PacketStreamProcessor : IDisposable
         }
 
         _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        _sink.MarkSceneArrival();
         consumed = parsed.TailOffset;
         var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{originServerText}|embedded=true", payload[..consumed]);
@@ -1689,7 +1690,7 @@ public sealed class PacketStreamProcessor : IDisposable
             return false;
         }
 
-        var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
+        var sceneMap = StageDestinationMapFromSceneState(parsed.Value0);
         var targetId = _sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -1716,7 +1717,7 @@ public sealed class PacketStreamProcessor : IDisposable
             return false;
         }
 
-        var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
+        var sceneMap = StageDestinationMapFromSceneState(parsed.Value0);
 
         var targetId = _sink.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -1744,7 +1745,7 @@ public sealed class PacketStreamProcessor : IDisposable
             return false;
         }
 
-        _sink.UpdateCurrentMapInstance(parsed.InstanceId);
+        _sink.StageDestinationMapInstance(parsed.InstanceId);
 
         RawPacketDump.AppendFrameEvent(
             "map-2e92",
@@ -1762,7 +1763,7 @@ public sealed class PacketStreamProcessor : IDisposable
             return false;
         }
 
-        var sceneMap = UpdateCurrentMapFromSceneState(parsed.Value0);
+        var sceneMap = StageDestinationMapFromSceneState(parsed.Value0);
         var targetId = _sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -1850,6 +1851,7 @@ public sealed class PacketStreamProcessor : IDisposable
 
         var tailOffset = Math.Min(packet.Length, reader.Offset + parsed.TailOffset);
         _sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        _sink.MarkSceneArrival();
         var originServerText = parsed.OriginServerId.HasValue ? $"|originServer={parsed.OriginServerId.Value}" : string.Empty;
         RawPacketDump.AppendFrameEvent("nickname", _connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{originServerText}", packet[..tailOffset]);
         return _hasParsed = true;

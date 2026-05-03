@@ -34,8 +34,9 @@ public sealed class BattleArchiveServiceTests
             DamageContribution = 1
         };
         snapshot.Combatants[1] = combatant;
-        store.UpdateCurrentMap(200003);
-        store.UpdateCurrentMapInstance(113515);
+        store.StageDestinationMap(200003);
+        store.StageDestinationMapInstance(113515);
+        store.MarkSceneArrival();
         store.AppendNickname(1, "Tester", 420);
 
         var record = service.Archive(snapshot, store, "manual", isAutomatic: false);
@@ -128,8 +129,9 @@ public sealed class BattleArchiveServiceTests
     {
         var service = new BattleArchiveService();
         var store = new CombatMetricsStore();
-        store.UpdateCurrentMap(600091);
-        store.UpdateCurrentMapInstance(410001);
+        store.StageDestinationMap(600091);
+        store.StageDestinationMapInstance(410001);
+        store.MarkSceneArrival();
 
         var snapshot = new DamageMeterSnapshot
         {

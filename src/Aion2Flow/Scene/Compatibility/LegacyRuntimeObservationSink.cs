@@ -57,9 +57,11 @@ public sealed class LegacyRuntimeObservationSink : IRuntimeObservationSink
 
     public void RememberNpcObservationSource(int instanceId) => _store.RememberNpcObservationSource(instanceId);
 
-    public void UpdateCurrentMap(uint mapId) => _store.UpdateCurrentMap(mapId);
+    public void StageDestinationMap(uint mapId) => _store.StageDestinationMap(mapId);
 
-    public void UpdateCurrentMapInstance(uint instanceId) => _store.UpdateCurrentMapInstance(instanceId);
+    public void StageDestinationMapInstance(uint instanceId) => _store.StageDestinationMapInstance(instanceId);
+
+    public void MarkSceneArrival() => _store.MarkSceneArrival();
 
     public void AppendCombatPacket(ParsedCombatPacket packet) => _store.AppendCombatPacket(packet);
 

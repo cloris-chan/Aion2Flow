@@ -21,6 +21,8 @@ public sealed class PacketStreamProcessorNpcObservationTests
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-200003.hex"), TestConnection);
 
         Assert.True(parsed);
+        Assert.Equal((uint)0, store.CurrentMapId);
+        store.MarkSceneArrival();
         Assert.Equal((uint)200003, store.CurrentMapId);
     }
 
@@ -49,7 +51,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     [InlineData("state/2136-boss-scene-200003.hex", 200003)]
     [InlineData("state/0140-boss-tail-430d03.hex", 200003)]
     [InlineData("state/0240-boss-tail-430d03.hex", 200003)]
-    public void Scene_State_Frames_Update_Current_Map_Id(string fixture, uint expectedMapId)
+    public void Scene_State_Frames_Stage_Map_Id_Until_Arrival(string fixture, uint expectedMapId)
     {
         var store = new CombatMetricsStore();
         var processor = new PacketStreamProcessor(store);
@@ -57,25 +59,35 @@ public sealed class PacketStreamProcessorNpcObservationTests
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture(fixture), TestConnection);
 
         Assert.True(parsed);
+        Assert.Equal((uint)0, store.CurrentMapId);
+        store.MarkSceneArrival();
         Assert.Equal(expectedMapId, store.CurrentMapId);
     }
 
     [Fact]
-    public void Map_Instance_Frame_Updates_Instance_And_Is_Cleared_On_Map_Change()
+    public void Map_Instance_Frame_Stages_Instance_And_Is_Cleared_On_Confirmed_Map_Change()
     {
         var store = new CombatMetricsStore();
         var processor = new PacketStreamProcessor(store);
 
-        store.UpdateCurrentMap(200003);
+        store.StageDestinationMap(200003);
+        store.MarkSceneArrival();
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2e92-bosschallenge-map-event.hex"), TestConnection);
 
         Assert.True(parsed);
         Assert.Equal((uint)200003, store.CurrentMapId);
+        Assert.Equal((uint)0, store.CurrentMapInstanceId);
+
+        store.MarkSceneArrival();
         Assert.Equal((uint)113515, store.CurrentMapInstanceId);
 
         parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-1010.hex"), TestConnection);
 
         Assert.True(parsed);
+        Assert.Equal((uint)200003, store.CurrentMapId);
+        Assert.Equal((uint)113515, store.CurrentMapInstanceId);
+
+        store.MarkSceneArrival();
         Assert.Equal((uint)1010, store.CurrentMapId);
         Assert.Equal((uint)0, store.CurrentMapInstanceId);
     }
@@ -110,6 +122,12 @@ public sealed class PacketStreamProcessorNpcObservationTests
     [Fact]
     public void Synthesizes_Invincible_From_Mode48_Periodic_Link_Record()
     {
+        CombatMetricsEngine.SetGameResources(
+            [
+                new Skill(1230000, "Fangs", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+            ],
+            new Dictionary<int, NpcCatalogEntry>());
+
         var store = new CombatMetricsStore();
         var processor = new PacketStreamProcessor(store);
 

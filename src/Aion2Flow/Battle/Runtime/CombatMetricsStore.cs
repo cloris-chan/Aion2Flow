@@ -133,21 +133,58 @@ public sealed class CombatMetricsStore
 
     public uint CurrentMapId { get; private set; }
     public uint CurrentMapInstanceId { get; private set; }
+    private uint _pendingDestinationMapId;
+    private uint _pendingDestinationMapInstanceId;
+    private bool _hasPendingDestinationMap;
+    private bool _hasPendingDestinationMapInstance;
 
-    public void UpdateCurrentMap(uint mapId)
+    public void StageDestinationMap(uint mapId)
     {
-        if (mapId != 0 && mapId != CurrentMapId)
+        if (mapId == 0)
         {
-            CurrentMapId = mapId;
-            CurrentMapInstanceId = 0;
+            return;
+        }
+
+        if (!_hasPendingDestinationMap || _pendingDestinationMapId != mapId)
+        {
+            _pendingDestinationMapId = mapId;
+            _hasPendingDestinationMap = true;
+            _pendingDestinationMapInstanceId = 0;
+            _hasPendingDestinationMapInstance = false;
         }
     }
 
-    public void UpdateCurrentMapInstance(uint instanceId)
+    public void StageDestinationMapInstance(uint instanceId)
     {
-        if (instanceId != 0)
+        if (instanceId == 0)
         {
-            CurrentMapInstanceId = instanceId;
+            return;
+        }
+
+        _pendingDestinationMapInstanceId = instanceId;
+        _hasPendingDestinationMapInstance = true;
+    }
+
+    public void MarkSceneArrival()
+    {
+        if (_hasPendingDestinationMap)
+        {
+            var mapChanged = CurrentMapId != _pendingDestinationMapId;
+            CurrentMapId = _pendingDestinationMapId;
+            if (mapChanged)
+            {
+                CurrentMapInstanceId = 0;
+            }
+
+            _pendingDestinationMapId = 0;
+            _hasPendingDestinationMap = false;
+        }
+
+        if (_hasPendingDestinationMapInstance)
+        {
+            CurrentMapInstanceId = _pendingDestinationMapInstanceId;
+            _pendingDestinationMapInstanceId = 0;
+            _hasPendingDestinationMapInstance = false;
         }
     }
 
@@ -1728,6 +1765,10 @@ public sealed class CombatMetricsStore
             CurrentTarget = CurrentTarget,
             CurrentMapId = CurrentMapId,
             CurrentMapInstanceId = CurrentMapInstanceId,
+            _pendingDestinationMapId = _pendingDestinationMapId,
+            _pendingDestinationMapInstanceId = _pendingDestinationMapInstanceId,
+            _hasPendingDestinationMap = _hasPendingDestinationMap,
+            _hasPendingDestinationMapInstance = _hasPendingDestinationMapInstance,
             _lastObservedNpcSource = _lastObservedNpcSource,
             _nextSyntheticLifecycleId = _nextSyntheticLifecycleId
         };

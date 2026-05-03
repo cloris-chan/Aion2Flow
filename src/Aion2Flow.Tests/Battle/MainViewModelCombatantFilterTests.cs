@@ -7,12 +7,15 @@ namespace Cloris.Aion2Flow.Tests.Battle;
 public sealed class MainViewModelCombatantFilterTests
 {
     [Theory]
-    [InlineData(1010, 0, 200003, 113515, true, "map-transition")]
-    [InlineData(1010, 0, 1010, 0, false, "")]
-    [InlineData(200003, 113515, 200003, 113515, false, "")]
-    [InlineData(200003, 113515, 200003, 113526, true, "map-instance-transition")]
-    [InlineData(0, 0, 1010, 0, false, "")]
-    [InlineData(600002, 396972, 1010, 0, true, "map-transition")]
+    [InlineData(1010u, 0u, 200003u, 113515u, true, "map-transition")]
+    [InlineData(1010u, 0u, 1010u, 0u, false, "")]
+    [InlineData(200003u, 113515u, 200003u, 113515u, false, "")]
+    [InlineData(200003u, 113515u, 200003u, 113526u, true, "map-instance-transition")]
+    [InlineData(200003u, 0u, 200003u, 113515u, true, "map-instance-transition")]
+    [InlineData(0u, 0u, 1010u, 0u, true, "map-transition")]
+    [InlineData(0u, 0u, 50u, 0u, true, "map-transition")]
+    [InlineData(0u, 0u, 0u, 0u, false, "")]
+    [InlineData(600002u, 396972u, 1010u, 0u, true, "map-transition")]
     public void Map_Transitions_Select_Automatic_Reset_Scope(
         uint previousMapId,
         uint previousInstanceId,
@@ -24,8 +27,11 @@ public sealed class MainViewModelCombatantFilterTests
         var previous = new DamageMeterSnapshot
         {
             MapId = previousMapId,
-            MapInstanceId = previousInstanceId
+            MapInstanceId = previousInstanceId,
+            BattleTime = 12_000
         };
+        previous.Combatants[1] = new CombatantMetrics("Tester");
+
         var latest = new DamageMeterSnapshot
         {
             MapId = latestMapId,
@@ -39,24 +45,62 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void Unknown_To_Known_Map_With_Existing_Battle_Selects_Automatic_Reset()
+    public void Map_Change_Without_Battle_Does_Not_Trigger_Reset()
     {
         var previous = new DamageMeterSnapshot
         {
-            MapId = 0,
+            MapId = 600002
+        };
+
+        var latest = new DamageMeterSnapshot
+        {
+            MapId = 1010
+        };
+
+        var result = MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason);
+
+        Assert.False(result);
+        Assert.Equal(string.Empty, reason);
+    }
+
+    [Fact]
+    public void Predictive_MapId_Flip_Without_Confirmation_Does_Not_Archive()
+    {
+        var previous = new DamageMeterSnapshot
+        {
+            MapId = 1010,
             BattleTime = 12_000
         };
         previous.Combatants[1] = new CombatantMetrics("Tester");
 
         var latest = new DamageMeterSnapshot
         {
-            MapId = 600091
+            MapId = 1010
         };
 
-        var result = MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason);
+        Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
+        Assert.Equal(string.Empty, reason);
+    }
 
-        Assert.True(result);
-        Assert.Equal("map-transition", reason);
+    [Fact]
+    public void Sub_Instance_Boss_Room_Does_Not_Archive()
+    {
+        var previous = new DamageMeterSnapshot
+        {
+            MapId = 910036,
+            MapInstanceId = 113515,
+            BattleTime = 12_000
+        };
+        previous.Combatants[1] = new CombatantMetrics("Tester");
+
+        var latest = new DamageMeterSnapshot
+        {
+            MapId = 910036,
+            MapInstanceId = 113515
+        };
+
+        Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
+        Assert.Equal(string.Empty, reason);
     }
 
     [Fact]

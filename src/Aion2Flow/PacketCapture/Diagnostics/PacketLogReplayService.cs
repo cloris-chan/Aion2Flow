@@ -640,7 +640,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        UpdateCurrentMapFromSceneState(store, parsed.Value0);
+        StageDestinationMapFromSceneState(store, parsed.Value0);
 
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -662,7 +662,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        UpdateCurrentMapFromSceneState(store, parsed.Value0);
+        StageDestinationMapFromSceneState(store, parsed.Value0);
 
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -684,7 +684,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.UpdateCurrentMapInstance(parsed.InstanceId);
+        store.StageDestinationMapInstance(parsed.InstanceId);
         return true;
     }
 
@@ -695,7 +695,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        UpdateCurrentMapFromSceneState(store, parsed.Value0);
+        StageDestinationMapFromSceneState(store, parsed.Value0);
 
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -710,11 +710,11 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static void UpdateCurrentMapFromSceneState(CombatMetricsStore store, uint value)
+    private static void StageDestinationMapFromSceneState(CombatMetricsStore store, uint value)
     {
         if (IsSceneStateMapId(value))
         {
-            store.UpdateCurrentMap(value);
+            store.StageDestinationMap(value);
         }
     }
 
@@ -780,6 +780,7 @@ public sealed class PacketLogReplayService
         if (Packet3336NicknameParser.TryParse(packet, out var ownParsed))
         {
             store.AppendNickname(ownParsed.PlayerId, ownParsed.Nickname, ownParsed.OriginServerId);
+            store.MarkSceneArrival();
             return true;
         }
 

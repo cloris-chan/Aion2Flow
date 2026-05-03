@@ -64,14 +64,16 @@ public sealed class PacketLogReplayServiceTests
         var crossServerLine = "2026-05-02T15:18:11.3272281+08:00|state-0140|16777343:60154->16777343:65518|target=8709|value0=22|value1=1|sceneMap=True|data=150140160000000000000000000000000100";
         var artifactDungeonLine = "2026-05-02T15:18:45.0172805+08:00|state-0140|16777343:60154->16777343:65518|target=21120|value0=503006|value1=1|sceneMap=True|data=150140DEAC07000000000000000000000100";
         var pantheonLine = "2026-05-02T15:52:39.1861829+08:00|state-0140|16777343:51528->16777343:53941|target=15498|value0=50|value1=1|sceneMap=True|data=150140320000000000000000000000000100";
+        var ownNicknameLine = "2026-05-02T15:52:40.0000000+08:00|nickname|16777343:51528->16777343:53941|playerId=2007|kind=own|len=7|originServer=495|data=D1143336D70F5FB17904070750657269676565EF0306000000012D000000";
 
-        var path = WriteTempReplayLog("frame", lowerReshantaLine, crossServerLine, artifactDungeonLine, pantheonLine);
+        var path = WriteTempReplayLog("frame", lowerReshantaLine, crossServerLine, artifactDungeonLine, pantheonLine, ownNicknameLine);
         try
         {
             var replay = PacketLogReplayService.Replay(path);
 
-            Assert.Equal(4, replay.ReplayedLines);
+            Assert.Equal(5, replay.ReplayedLines);
             Assert.Equal(4, replay.ReplayedEventCounts["state-0140"]);
+            Assert.Equal(1, replay.ReplayedEventCounts["nickname"]);
             Assert.Equal(50u, replay.Store.CurrentMapId);
             Assert.Equal(50u, replay.Snapshot.MapId);
         }
