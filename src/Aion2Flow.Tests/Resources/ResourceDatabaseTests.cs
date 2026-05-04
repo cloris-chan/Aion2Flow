@@ -85,6 +85,7 @@ public sealed class ResourceDatabaseTests
     [InlineData(600011u, "烏努庫庫峽谷")]
     [InlineData(600091u, "凶猛的角岩窟")]
     [InlineData(600121u, "無之搖籃")]
+    [InlineData(500017u, "布里特拉空襲")]
     public void LoadMaps_Resolves_Client_Table_Scene_Id_Aliases(uint mapId, string expectedName)
     {
         var maps = ResourceDatabase.LoadMaps("zh-TW");
