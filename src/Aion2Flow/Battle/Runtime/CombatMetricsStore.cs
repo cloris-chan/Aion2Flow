@@ -145,6 +145,11 @@ public sealed class CombatMetricsStore
             return;
         }
 
+        if (mapId == CurrentMapId)
+        {
+            return;
+        }
+
         if (!_hasPendingDestinationMap || _pendingDestinationMapId != mapId)
         {
             _pendingDestinationMapId = mapId;
@@ -158,6 +163,14 @@ public sealed class CombatMetricsStore
     {
         if (instanceId == 0)
         {
+            return;
+        }
+
+        if (!_hasPendingDestinationMap)
+        {
+            CurrentMapInstanceId = instanceId;
+            _pendingDestinationMapInstanceId = 0;
+            _hasPendingDestinationMapInstance = false;
             return;
         }
 

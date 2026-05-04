@@ -76,7 +76,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.True(parsed);
         Assert.Equal((uint)200003, store.CurrentMapId);
-        Assert.Equal((uint)0, store.CurrentMapInstanceId);
+        Assert.Equal((uint)113515, store.CurrentMapInstanceId);
 
         store.MarkSceneArrival();
         Assert.Equal((uint)113515, store.CurrentMapInstanceId);
@@ -90,6 +90,27 @@ public sealed class PacketStreamProcessorNpcObservationTests
         store.MarkSceneArrival();
         Assert.Equal((uint)1010, store.CurrentMapId);
         Assert.Equal((uint)0, store.CurrentMapInstanceId);
+    }
+
+    [Fact]
+    public void Redundant_State_2136_For_Same_Map_Does_Not_Stale_The_Already_Applied_Instance()
+    {
+        var store = new CombatMetricsStore();
+
+        store.StageDestinationMap(910035);
+        store.MarkSceneArrival();
+        Assert.Equal((uint)910035, store.CurrentMapId);
+        Assert.Equal((uint)0, store.CurrentMapInstanceId);
+
+        store.StageDestinationMap(910035);
+
+        store.StageDestinationMapInstance(516446);
+        Assert.Equal((uint)516446, store.CurrentMapInstanceId);
+
+        store.StageDestinationMap(910035);
+        store.MarkSceneArrival();
+        Assert.Equal((uint)910035, store.CurrentMapId);
+        Assert.Equal((uint)516446, store.CurrentMapInstanceId);
     }
 
     [Fact]

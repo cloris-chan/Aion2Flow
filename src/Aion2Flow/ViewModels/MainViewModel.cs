@@ -543,19 +543,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             return true;
         }
 
-        if (previousLiveSnapshot.BattleTime <= 0 || previousLiveSnapshot.Combatants.Count == 0)
-        {
-            return false;
-        }
-
-        if (latestLiveSnapshot.Encounter.ShouldArchive && previousLiveSnapshot.Encounter.IsActive)
-        {
-            ArchiveSnapshot(previousLiveSnapshot, latestLiveSnapshot.Encounter.Reason, isAutomatic: true);
-            _engine.Reset();
-            RawPacketDump.RotateLogs();
-            return true;
-        }
-
         return false;
     }
 
