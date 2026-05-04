@@ -1188,27 +1188,6 @@ public sealed class CombatMetricsStore
         RememberObservedBossActivity(resolvedInstanceId, observedAtMilliseconds);
     }
 
-    public void ObserveBossFocusPulse(int instanceId, long observedAtMilliseconds)
-    {
-        if (instanceId <= 0)
-        {
-            return;
-        }
-
-        var resolvedInstanceId = ResolveLifecycleId(instanceId);
-        if (!IsBossInstance(resolvedInstanceId))
-        {
-            return;
-        }
-
-        if (HasObservedDeadNpc(resolvedInstanceId))
-        {
-            return;
-        }
-
-        RememberObservedBossActivity(resolvedInstanceId, observedAtMilliseconds);
-    }
-
     public void AppendBossFocusExit(int instanceId)
     {
         if (instanceId <= 0)

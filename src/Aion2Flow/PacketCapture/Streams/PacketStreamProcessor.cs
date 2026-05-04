@@ -1492,7 +1492,6 @@ public sealed class PacketStreamProcessor : IDisposable
             return false;
         }
 
-        _sink.ObserveBossFocusPulse(parsed.TargetId, CurrentTimestampMilliseconds);
         RawPacketDump.AppendFrameEvent(
             "sidecar-3538",
             _connection,

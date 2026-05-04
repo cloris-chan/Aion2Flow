@@ -157,9 +157,6 @@ public sealed class LegacyRuntimeObservationSink : IRuntimeObservationSink
 
     public void ToggleNpcBattle(int instanceId) => _store.ToggleNpcBattle(instanceId);
 
-    public void ObserveBossFocusPulse(int instanceId, long observedAtMilliseconds)
-        => _store.ObserveBossFocusPulse(instanceId, observedAtMilliseconds);
-
     public void AppendNpc2136State(int instanceId, uint sequence, uint value0)
         => _store.AppendNpc2136State(instanceId, sequence, value0);
 

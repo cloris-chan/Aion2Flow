@@ -85,21 +85,6 @@ public sealed class CombatMetricsStoreNpcRuntimeObservationTests
     }
 
     [Fact]
-    public void Boss_Focus_Pulse_Does_Not_Persist_After_Visibility_Window()
-    {
-        var store = new CombatMetricsStore();
-
-        store.AppendNpcKind(3518, NpcKind.Boss);
-        store.AppendNpcHp(3518, 49_200, 49_200, 900);
-        store.ObserveBossFocusPulse(3518, 1_000);
-
-        Assert.True(store.TryGetObservedBoss(1_500, 2_000, out var boss));
-        Assert.True(boss.HasHp);
-        Assert.Equal(49_200, boss.MaxHp);
-        Assert.False(store.TryGetObservedBoss(3_001, 2_000, out _));
-    }
-
-    [Fact]
     public void Observed_Boss_Promotes_Existing_Hp_When_Active_Npc_Is_Later_Identified_As_Boss()
     {
         var store = new CombatMetricsStore();
@@ -177,7 +162,6 @@ public sealed class CombatMetricsStoreNpcRuntimeObservationTests
         store.AppendNpcHp(3518, 0, 1_100);
         store.SetNpcBattle(3518, true, 1_200);
         store.ToggleNpcBattle(3518);
-        store.ObserveBossFocusPulse(3518, 1_250);
         store.AppendBossFocusEnter(3518, 1_260);
 
         Assert.False(store.TryGetObservedBoss(1_300, 2_000, out _));

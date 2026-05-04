@@ -110,8 +110,6 @@ public interface IRuntimeObservationSink
 
     void ToggleNpcBattle(int instanceId);
 
-    void ObserveBossFocusPulse(int instanceId, long observedAtMilliseconds);
-
     void AppendNpc2136State(int instanceId, uint sequence, uint value0);
 
     void AppendNpc0140Value(int instanceId, uint value0);

@@ -173,7 +173,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_Reconstructs_Boss_Activity_From_Sidecar_And_Health_Frame()
+    public void Replay_Reconstructs_Boss_Activity_From_Battle_And_Health_Frame()
     {
         CombatMetricsEngine.SetGameResources(
             BuildReplaySkillMap(),
@@ -189,7 +189,7 @@ public sealed class PacketLogReplayServiceTests
         var hpLine = "2026-05-01T21:37:41.4785243+08:00|remain-hp|16777343:60154->16777343:65518|npcId=56688|value0=2|value1=1|value2=0|value=22847|data=14008DF0BA030201003F590000";
         var exitLine = "2026-05-01T21:38:08.1582599+08:00|battle-toggle|16777343:60154->16777343:65518|npcId=56688|active=False|tailLen=2|data=0B218DF0BA030000";
         var spawnOnlyPath = WriteTempReplayLog("frame", spawnLine);
-        var pulsePath = WriteTempReplayLog("frame", spawnLine, pulseLine);
+        var sidecarOnlyPath = WriteTempReplayLog("frame", spawnLine, pulseLine);
         var hpPath = WriteTempReplayLog("frame", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine);
         var exitPath = WriteTempReplayLog("frame", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine, exitLine);
         try
@@ -198,16 +198,9 @@ public sealed class PacketLogReplayServiceTests
             var afterSpawn = DateTimeOffset.Parse("2026-05-01T21:36:18.7000332+08:00").ToUnixTimeMilliseconds();
             Assert.False(spawnOnlyReplay.Store.TryGetObservedBoss(afterSpawn, 2_000, out _));
 
-            var pulseReplay = PacketLogReplayService.Replay(pulsePath);
+            var sidecarOnlyReplay = PacketLogReplayService.Replay(sidecarOnlyPath);
             var afterPulse = DateTimeOffset.Parse("2026-05-01T21:37:31.4028167+08:00").ToUnixTimeMilliseconds();
-            var afterPulseTimeout = DateTimeOffset.Parse("2026-05-01T21:37:33.4038167+08:00").ToUnixTimeMilliseconds();
-
-            Assert.True(pulseReplay.Store.TryGetObservedBoss(afterPulse, 2_000, out var pulseBoss));
-            Assert.True(pulseBoss.HasHp);
-            Assert.Equal(56_688, pulseBoss.InstanceId);
-            Assert.Equal(49_200, pulseBoss.Hp);
-            Assert.Equal(49_200, pulseBoss.MaxHp);
-            Assert.False(pulseReplay.Store.TryGetObservedBoss(afterPulseTimeout, 2_000, out _));
+            Assert.False(sidecarOnlyReplay.Store.TryGetObservedBoss(afterPulse, 2_000, out _));
 
             var replay = PacketLogReplayService.Replay(hpPath);
             var afterHp = DateTimeOffset.Parse("2026-05-01T21:37:41.5785243+08:00").ToUnixTimeMilliseconds();
@@ -229,7 +222,7 @@ public sealed class PacketLogReplayServiceTests
         finally
         {
             File.Delete(spawnOnlyPath);
-            File.Delete(pulsePath);
+            File.Delete(sidecarOnlyPath);
             File.Delete(hpPath);
             File.Delete(exitPath);
         }

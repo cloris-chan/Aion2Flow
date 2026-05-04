@@ -430,7 +430,7 @@ public sealed class PacketLogReplayService
             "compact-outcome" => TryReplayCompactOutcome(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "compact-0238" => TryReplayCompact0238(store, packet, batchOrdinal),
             "compact-0638" => TryReplayCompact0638(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "sidecar-3538" => TryReplay3538(store, packet, timestamp),
+            "sidecar-3538" => TryReplay3538(packet),
             "wrapped-8456" => TryReplay8456(store, packet),
             "state-0140" => TryReplay0140(store, packet),
             "state-2136" => TryReplay2136(store, packet),
@@ -689,16 +689,8 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static bool TryReplay3538(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp)
-    {
-        if (!Packet3538SidecarParser.TryParse(packet, out var parsed))
-        {
-            return false;
-        }
-
-        store.ObserveBossFocusPulse(parsed.TargetId, timestamp);
-        return true;
-    }
+    private static bool TryReplay3538(ReadOnlySpan<byte> packet)
+        => Packet3538SidecarParser.TryParse(packet, out _);
 
     private static bool TryReplay8456(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {
@@ -1103,9 +1095,8 @@ public sealed class PacketLogReplayService
             return true;
         }
 
-        if (Packet3538SidecarParser.TryParse(packet, out var sidecar))
+        if (Packet3538SidecarParser.TryParse(packet, out _))
         {
-            store.ObserveBossFocusPulse(sidecar.TargetId, timestamp);
             return true;
         }
 
