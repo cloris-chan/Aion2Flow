@@ -1,3 +1,4 @@
+using System.Drawing;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Services.Settings;
@@ -13,4 +14,6 @@ public sealed class AppSettings
     public uint? BattleResetHotkeyModifiers { get; set; }
 
     public uint? BattleResetHotkeyVirtualKey { get; set; }
+
+    public Point? MainWindowPosition { get; set; }
 }

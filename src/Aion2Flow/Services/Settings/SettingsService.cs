@@ -86,6 +86,7 @@ public sealed class SettingsService
         MaxVisibleCombatantRows = source.MaxVisibleCombatantRows,
         Language = source.Language,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,
-        BattleResetHotkeyVirtualKey = source.BattleResetHotkeyVirtualKey
+        BattleResetHotkeyVirtualKey = source.BattleResetHotkeyVirtualKey,
+        MainWindowPosition = source.MainWindowPosition
     };
 }

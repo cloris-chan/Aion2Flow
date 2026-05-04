@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Cloris.Aion2Flow.Services.Hotkeys;
+using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
 using CommunityToolkit.Mvvm.DependencyInjection;
 
@@ -14,6 +15,7 @@ namespace Cloris.Aion2Flow.Views;
 public partial class MainWindow : Window
 {
     private readonly GlobalHotkeyService _globalHotkeyService;
+    private readonly SettingsService _settingsService;
     private bool _hotkeyAttached;
 
     public new MainViewModel DataContext { get => (MainViewModel)base.DataContext!; set => base.DataContext = value; }
@@ -22,11 +24,16 @@ public partial class MainWindow : Window
     {
         DataContext = Ioc.Default.GetRequiredService<MainViewModel>();
         _globalHotkeyService = Ioc.Default.GetRequiredService<GlobalHotkeyService>();
+        _settingsService = Ioc.Default.GetRequiredService<SettingsService>();
         DataContext.InitializeAsync().ConfigureAwait(false);
         AvaloniaXamlLoader.Load(this);
         DataContext.BattleHistory.CollectionChanged += OnBattleHistoryCollectionChanged;
         RebuildBattleHistoryMenuItems();
         _globalHotkeyService.Triggered += OnGlobalHotkeyTriggered;
+        if (_settingsService.Current.MainWindowPosition.HasValue)
+        {
+            Position = new(_settingsService.Current.MainWindowPosition.Value.X, _settingsService.Current.MainWindowPosition.Value.Y);
+        }
     }
 
     protected override void OnOpened(EventArgs e)
@@ -75,11 +82,17 @@ public partial class MainWindow : Window
         }
     }
 
-    protected override void OnClosed(EventArgs e)
+    protected override void OnClosing(WindowClosingEventArgs e)
     {
         DataContext.BattleHistory.CollectionChanged -= OnBattleHistoryCollectionChanged;
         _globalHotkeyService.Triggered -= OnGlobalHotkeyTriggered;
         _globalHotkeyService.SetHotkey(null);
+        _settingsService.Update(settings => settings.MainWindowPosition = new(Position.X, Position.Y));
+        base.OnClosing(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
         base.OnClosed(e);
         DataContext.DisposeAsync().AsTask().ConfigureAwait(false);
     }
