@@ -164,6 +164,29 @@ public sealed class CombatMetricsStoreNpcRuntimeObservationTests
     }
 
     [Fact]
+    public void Observed_Boss_Is_Cleared_When_Remain_Hp_Reaches_Zero()
+    {
+        var store = new CombatMetricsStore();
+
+        store.AppendNpcKind(3518, NpcKind.Boss);
+        store.SetNpcBattle(3518, true, 900);
+        store.AppendNpcHp(3518, 157_000, 1_000);
+
+        Assert.True(store.TryGetObservedBoss(10_000, 2_000, out _));
+
+        store.AppendNpcHp(3518, 0, 1_100);
+        store.SetNpcBattle(3518, true, 1_200);
+        store.ToggleNpcBattle(3518);
+        store.ObserveBossFocusPulse(3518, 1_250);
+        store.AppendBossFocusEnter(3518, 1_260);
+
+        Assert.False(store.TryGetObservedBoss(1_300, 2_000, out _));
+        Assert.True(store.TryGetNpcRuntimeState(3518, out var state));
+        Assert.Equal(0, state.Hp);
+        Assert.False(state.BattleToggledOn);
+    }
+
+    [Fact]
     public void Observed_Boss_Is_Cleared_By_Later_NonBoss_Kind()
     {
         var store = new CombatMetricsStore();

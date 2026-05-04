@@ -1146,7 +1146,18 @@ public sealed class CombatMetricsStore
                 ? Math.Max(explicitMaxHp, hp)
                 : Math.Max(state.MaxHp ?? 0, hp);
             state.HpObservedAtMilliseconds = observedAt;
+            if (IsObservedDead(state))
+            {
+                state.BattleToggledOn = false;
+            }
             rememberedMaxHp = Math.Max(state.MaxHp ?? hp, hp);
+        }
+
+        if (hp == 0)
+        {
+            _bossFocusInstances.TryRemove(resolvedInstanceId, out _);
+            ClearObservedBoss(resolvedInstanceId);
+            return;
         }
 
         if (_bossFocusInstances.ContainsKey(resolvedInstanceId) || IsObservedBoss(resolvedInstanceId))
@@ -1168,6 +1179,11 @@ public sealed class CombatMetricsStore
             return;
         }
 
+        if (HasObservedDeadNpc(resolvedInstanceId))
+        {
+            return;
+        }
+
         _bossFocusInstances[resolvedInstanceId] = 0;
         RememberObservedBossActivity(resolvedInstanceId, observedAtMilliseconds);
     }
@@ -1181,6 +1197,11 @@ public sealed class CombatMetricsStore
 
         var resolvedInstanceId = ResolveLifecycleId(instanceId);
         if (!IsBossInstance(resolvedInstanceId))
+        {
+            return;
+        }
+
+        if (HasObservedDeadNpc(resolvedInstanceId))
         {
             return;
         }
@@ -1209,16 +1230,17 @@ public sealed class CombatMetricsStore
 
         var resolvedInstanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(resolvedInstanceId);
+        var shouldEnterBattle = isActive;
         lock (state)
         {
-            state.BattleToggledOn = isActive;
-        }
-        if (!IsBossInstance(resolvedInstanceId))
-        {
-            return;
+            if (isActive && IsObservedDead(state))
+            {
+                shouldEnterBattle = false;
+            }
+            state.BattleToggledOn = shouldEnterBattle;
         }
 
-        if (isActive)
+        if (shouldEnterBattle)
         {
             AppendBossFocusEnter(resolvedInstanceId, observedAtMilliseconds);
         }
@@ -1590,6 +1612,10 @@ public sealed class CombatMetricsStore
         lock (state)
         {
             toggledOn = !(state.BattleToggledOn ?? false);
+            if (toggledOn && IsObservedDead(state))
+            {
+                toggledOn = false;
+            }
             state.BattleToggledOn = toggledOn;
         }
 
@@ -1597,7 +1623,7 @@ public sealed class CombatMetricsStore
         {
             AppendBossFocusEnter(resolvedInstanceId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
-        else if (IsBossInstance(resolvedInstanceId))
+        else
         {
             AppendBossFocusExit(resolvedInstanceId);
         }
@@ -2039,6 +2065,22 @@ public sealed class CombatMetricsStore
             _npcStateByInstance.TryGetValue(instanceId, out var state) &&
             state.Kind == NpcKind.Boss;
     }
+
+    private bool HasObservedDeadNpc(int instanceId)
+    {
+        if (!_npcStateByInstance.TryGetValue(instanceId, out var state))
+        {
+            return false;
+        }
+
+        lock (state)
+        {
+            return IsObservedDead(state);
+        }
+    }
+
+    private static bool IsObservedDead(NpcInstanceState state)
+        => state.Hp == 0 && state.HpObservedAtMilliseconds.HasValue;
 
     private bool IsObservedBoss(int instanceId)
     {
