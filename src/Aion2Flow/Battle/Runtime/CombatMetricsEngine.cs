@@ -270,6 +270,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
                     personal.CharacterClass = resolvedCharacterClass;
                 }
                 else if (!Store.SummonOwnerByInstance.ContainsKey(uid) &&
+                         packet.SourceId == uid &&
                          (nicknameData.ContainsKey(uid) || !Store.TryGetNpcRuntimeState(uid, out var npcCheck) || !npcCheck.NpcCode.HasValue) &&
                          TryGetClassEvidence(packet, out var inferredClass, out var evidenceScore))
                 {

@@ -276,6 +276,36 @@ public sealed class StatePacketParserTests
         Assert.Equal(49_200, result.MaxHp);
     }
 
+    [Fact]
+    public void TryParseNpcSpawn_Recognizes_Create198_1C0000_Layout()
+    {
+        var packet = HexHelper.Parse("D9014036E9E7091C0000FF912C000002B82539C6F8DA5EC600E07F45F2ECB442544001E897C503E897C50364000000640000000000000000000000B80B0000983A000001000000000000000000000000000000000000000603110181969800FFFFFFFFFFFFFFFF8075D52ABB030000E9E7090108B82539C6F8DA5EC600E07F45110284969800FFFFFFFFFFFFFFFF8075D52ABB030000E9E70901B82539C6F8DA5EC600E07F451103410A3101FFFFFFFFFFFFFFFF8075D52ABB030000E9E70901B82539C6F8DA5EC600E07F4506DC420100004400000000");
+
+        var ok = Packet4036CreateParser.TryParseNpcSpawn(packet, out var result);
+
+        Assert.True(ok);
+        Assert.Equal(Packet4036Kind.Create198, result.Kind);
+        Assert.Equal(160_745, result.EntityId);
+        Assert.Equal(2_920_959, result.NpcCode);
+        Assert.Equal(7_425_000, result.CurrentHp);
+        Assert.Equal(7_425_000, result.MaxHp);
+    }
+
+    [Fact]
+    public void TryParseNpcSpawn_Recognizes_Create198_0C3200_Layout()
+    {
+        var packet = HexHelper.Parse("C10140368EBD010C32006B41230000020040FB440000CD4400E0DC4400809D41000E01C0A8A504C0A8A50464000000640000000000000000000000204E0000204E000001000000000000000000000000000000000000000602110181969800FFFFFFFFFFFFFFFF8075D52ABB0300008EBD0101140040FB440000CD4400E0DC44110284969800FFFFFFFFFFFFFFFF8075D52ABB0300008EBD01010040FB440000CD4400E0DC440100410000000301EE020000EE0200005F450F00628180A100");
+
+        var ok = Packet4036CreateParser.TryParseNpcSpawn(packet, out var result);
+
+        Assert.True(ok);
+        Assert.Equal(Packet4036Kind.Create198, result.Kind);
+        Assert.Equal(24_206, result.EntityId);
+        Assert.Equal(2_310_507, result.NpcCode);
+        Assert.Equal(9_000_000, result.CurrentHp);
+        Assert.Equal(9_000_000, result.MaxHp);
+    }
+
     [Theory]
     [MemberData(nameof(FixtureCatalog.Wrapped8456Samples), MemberType = typeof(FixtureCatalog))]
     public void Parses_8456_Wrapped_Frame(FixtureCatalog.Wrapped8456Sample sample)
