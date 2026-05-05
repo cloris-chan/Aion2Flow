@@ -8,6 +8,7 @@ using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Scene;
+using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -138,7 +139,8 @@ public sealed class PacketLogReplayService
             BaselineCounters = new PacketLogReplayBaselineCounters(
                 ingestCounter,
                 snapshotCounter,
-                summaryCounter)
+                summaryCounter),
+            SceneJournal = sinkHolder.Journal
         };
     }
 
@@ -216,7 +218,8 @@ public sealed class PacketLogReplayService
             BaselineCounters = new PacketLogReplayBaselineCounters(
                 ingestCounter,
                 snapshotCounter,
-                summaryCounter)
+                summaryCounter),
+            SceneJournal = sinkHolder.Journal
         };
     }
 
@@ -1591,6 +1594,7 @@ public sealed record PacketLogReplayResult(
     IReadOnlyDictionary<string, int> SkippedEventCounts)
 {
     public PacketLogReplayBaselineCounters BaselineCounters { get; init; } = PacketLogReplayBaselineCounters.Empty;
+    public ObservedEventJournal? SceneJournal { get; init; }
 }
 
 public sealed record PacketLogReplayBaselineCounters(

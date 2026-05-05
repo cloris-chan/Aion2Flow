@@ -970,6 +970,121 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(summonSummary.IncomingHealing == 1701, summaryDump);
     }
 
+    [Fact]
+    public void M1_06_DualWrite_VendoredLog_Parity_20260415()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log");
+
+        SceneDualWrite.Enabled = false;
+        var legacy = PacketLogReplayService.Replay(path);
+
+        SceneDualWrite.Enabled = true;
+        var dualWrite = PacketLogReplayService.Replay(path);
+
+        SceneDualWrite.Enabled = false;
+
+        AssertSnapshotParity(legacy.Snapshot, dualWrite.Snapshot);
+        Assert.Equal(legacy.ReplayedLines, dualWrite.ReplayedLines);
+        Assert.NotNull(dualWrite.SceneJournal);
+        Assert.True(dualWrite.SceneJournal!.Count > 0);
+    }
+
+    [Fact]
+    public void M1_06_DualWrite_VendoredLog_Parity_20260419()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log");
+
+        SceneDualWrite.Enabled = false;
+        var legacy = PacketLogReplayService.Replay(path);
+
+        SceneDualWrite.Enabled = true;
+        var dualWrite = PacketLogReplayService.Replay(path);
+
+        SceneDualWrite.Enabled = false;
+
+        AssertSnapshotParity(legacy.Snapshot, dualWrite.Snapshot);
+        Assert.Equal(legacy.ReplayedLines, dualWrite.ReplayedLines);
+        Assert.NotNull(dualWrite.SceneJournal);
+        Assert.True(dualWrite.SceneJournal!.Count > 0);
+    }
+
+    [Fact]
+    public void M1_06_DualWrite_JournalOrdinals_AreMonotonicallyIncreasing()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log");
+
+        SceneDualWrite.Enabled = true;
+        var replay = PacketLogReplayService.Replay(path);
+        SceneDualWrite.Enabled = false;
+
+        var journal = replay.SceneJournal!;
+        Assert.True(journal.Count > 0);
+
+        long prevOrdinal = -1;
+        for (int i = 0; i < journal.Count; i++)
+        {
+            var entry = journal.Read(i);
+            Assert.True(entry.Stamp.ObservationOrdinal > prevOrdinal, $"Ordinal {entry.Stamp.ObservationOrdinal} at index {i} not greater than {prevOrdinal}");
+            prevOrdinal = entry.Stamp.ObservationOrdinal;
+        }
+    }
+
+    [Fact]
+    public void M1_06_DualWrite_BaselineCounters_AreRecorded()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var entries = new[]
+        {
+            CreateStreamReplayEntry("2026-05-02T15:52:39.1861829+08:00", "state/2136-boss-scene-200003.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:40.0000000+08:00", "nickname/3336-own-thanks.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:41.0000000+08:00", "combat/0438-damage.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:42.0000000+08:00", "combat/0538-dot.hex")
+        };
+
+        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        try
+        {
+            SceneDualWrite.Enabled = true;
+            var replay = PacketLogReplayService.Replay(path);
+            SceneDualWrite.Enabled = false;
+
+            Assert.NotSame(PacketLogReplayBaselineCounters.Empty, replay.BaselineCounters);
+            AssertBaselineCounter(replay.BaselineCounters.ReplayIngest);
+            AssertBaselineCounter(replay.BaselineCounters.SnapshotCreation);
+            AssertBaselineCounter(replay.BaselineCounters.CombatantSummaryCreation);
+        }
+        finally
+        {
+            SceneDualWrite.Enabled = false;
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void M1_06_DualWrite_LegacyOnlyJournal_IsNull()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var entries = new[]
+        {
+            CreateStreamReplayEntry("2026-05-02T15:52:41.0000000+08:00", "combat/0438-damage.hex"),
+        };
+
+        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        try
+        {
+            SceneDualWrite.Enabled = false;
+            var replay = PacketLogReplayService.Replay(path);
+            Assert.Null(replay.SceneJournal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static string WriteTempReplayLog(string logKind, params string[] lines)
     {
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.{logKind}.log");
