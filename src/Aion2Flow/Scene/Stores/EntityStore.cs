@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Battle.Model;
 
@@ -21,7 +22,8 @@ public sealed class EntityStore
 
         return record!;
     }
-    public bool TryGet(int entityId, out EntityRecord? record) => _entities.TryGetValue(entityId, out record);
+
+    public bool TryGet(int entityId, [NotNullWhen(true)] out EntityRecord? record) => _entities.TryGetValue(entityId, out record);
 
     public void ApplyNpcCode(int instanceId, int npcCode)
     {

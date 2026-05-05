@@ -7,7 +7,6 @@ using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Stores;
-using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
@@ -333,7 +332,6 @@ public class SnapshotChangeFeedTests
         var batch = store.ReadChanges(cursor, 100);
 
         Assert.Equal(2, store.Revision);
-        // Each ApplyCombat emits: PairUpdated + CombatantUpdated(source) + CombatantUpdated(target) = 3
         Assert.Equal(6, batch.Changes.Count);
         Assert.False(batch.HasMore);
     }
@@ -373,14 +371,60 @@ public class SnapshotChangeFeedTests
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
-        // Create cursor after revision 1
         var cursor = store.CreateCursor(1);
         var batch = store.ReadChanges(cursor, 100);
         Assert.Empty(batch.Changes);
 
-        // New combat after cursor
         store.ApplyCombat(100, 300, 300, 1, 1, 2000);
         batch = store.ReadChanges(cursor, 100);
         Assert.Equal(3, batch.Changes.Count);
+    }
+}
+
+public class LegacyBattleSnapshotAdapterTests
+{
+    [Fact]
+    public void Adapter_CreateSnapshot_ProducesCombatantEntries()
+    {
+        var entities = new EntityStore();
+        var combat = new CombatStore();
+        entities.ApplyNickname(100, "Player1");
+        entities.ApplyNpcCode(200, 2310108);
+        combat.ApplyCombat(100, 200, 1000, 5, 5, 1000);
+
+        var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
+        var snapshot = adapter.CreateSnapshot();
+
+        Assert.Equal(2, snapshot.Combatants.Count);
+        Assert.True(snapshot.Combatants.ContainsKey(100));
+        Assert.True(snapshot.Combatants.ContainsKey(200));
+    }
+
+    [Fact]
+    public void Adapter_CreateSnapshot_ResolvesDisplayName()
+    {
+        var entities = new EntityStore();
+        var combat = new CombatStore();
+        entities.ApplyNickname(100, "Perigee");
+        entities.ApplyNpcCode(200, 2310108);
+        combat.ApplyCombat(100, 200, 500, 1, 1, 1000);
+
+        var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
+        var snapshot = adapter.CreateSnapshot();
+
+        Assert.Equal("Perigee", snapshot.Combatants[100].Nickname);
+        Assert.Equal("NPC-2310108", snapshot.Combatants[200].Nickname);
+    }
+
+    [Fact]
+    public void Adapter_EmptyCombat_ProducesEmptySnapshot()
+    {
+        var entities = new EntityStore();
+        var combat = new CombatStore();
+
+        var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
+        var snapshot = adapter.CreateSnapshot();
+
+        Assert.Empty(snapshot.Combatants);
     }
 }
