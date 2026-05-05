@@ -7,6 +7,7 @@ using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.PacketCapture;
@@ -139,6 +140,41 @@ public sealed class PacketLogReplayServiceTests
         }
         finally
         {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void DualWrite_Replay_Parity_Matches_LegacyOnly()
+    {
+        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var entries = new[]
+        {
+            CreateStreamReplayEntry("2026-05-02T15:52:39.1861829+08:00", "state/2136-boss-scene-200003.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:40.0000000+08:00", "nickname/3336-own-thanks.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:41.0000000+08:00", "combat/0438-damage.hex"),
+            CreateStreamReplayEntry("2026-05-02T15:52:42.0000000+08:00", "combat/0538-dot.hex")
+        };
+
+        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        try
+        {
+            SceneDualWrite.Enabled = false;
+            var legacyOnly = PacketLogReplayService.Replay(path);
+
+            SceneDualWrite.Enabled = true;
+            var dualWrite = PacketLogReplayService.Replay(path);
+
+            SceneDualWrite.Enabled = false;
+
+            AssertSnapshotParity(legacyOnly.Snapshot, dualWrite.Snapshot);
+            Assert.Equal(legacyOnly.ReplayedLines, dualWrite.ReplayedLines);
+            Assert.Equal(legacyOnly.SkippedLines, dualWrite.SkippedLines);
+        }
+        finally
+        {
+            SceneDualWrite.Enabled = false;
             File.Delete(path);
         }
     }

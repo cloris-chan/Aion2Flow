@@ -7,7 +7,7 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using Cloris.Aion2Flow.Scene.Compatibility;
+using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Observation;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -78,7 +78,8 @@ public sealed class PacketLogReplayService
     private static PacketLogReplayResult ReplayFrameLines(IEnumerable<string> lines, string sourceName)
     {
         var store = new CombatMetricsStore();
-        IRuntimeObservationSink sink = new LegacyRuntimeObservationSink(store);
+        using var sinkHolder = SceneSinkFactory.CreateForReplay(store);
+        IRuntimeObservationSink sink = sinkHolder.Sink;
         var engine = new CombatMetricsEngine(store);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -144,7 +145,8 @@ public sealed class PacketLogReplayService
     private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName)
     {
         var store = new CombatMetricsStore();
-        IRuntimeObservationSink sink = new LegacyRuntimeObservationSink(store);
+        using var sinkHolder = SceneSinkFactory.CreateForReplay(store);
+        IRuntimeObservationSink sink = sinkHolder.Sink;
         var engine = new CombatMetricsEngine(store);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);

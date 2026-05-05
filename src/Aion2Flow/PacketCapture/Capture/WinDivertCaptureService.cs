@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using Cloris.Aion2Flow.Scene.Compatibility;
+using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Logging;
@@ -26,7 +26,7 @@ public sealed class WinDivertCaptureService(
     private readonly ProtocolRoundTripEstimator _protocolRttEstimator = new();
 
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService = processPortDiscoveryService;
-    private readonly Func<IRuntimeObservationSink> _runtimeSinkFactory = () => new LegacyRuntimeObservationSink(store);
+    private readonly Func<IRuntimeObservationSink> _runtimeSinkFactory = SceneSinkFactory.CreateForStore(store);
     public PacketCaptureDispatcher Dispatcher { get => field ??= new(_runtimeSinkFactory); }
     public bool IsDriverActive => _divert is not null;
     public bool HasDriverError { get; private set; }
