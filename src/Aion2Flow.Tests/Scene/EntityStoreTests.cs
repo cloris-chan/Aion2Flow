@@ -428,3 +428,69 @@ public class LegacyBattleSnapshotAdapterTests
         Assert.Empty(snapshot.Combatants);
     }
 }
+
+public class DualReadParityTests
+{
+    [Fact]
+    public void M2_06_ScenePath_CapturesSameCombatantIds_AsLegacyPath()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        SceneDualWrite.Enabled = true;
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
+        SceneDualWrite.Enabled = false;
+
+        var journal = replay.SceneJournal!;
+        Assert.True(journal.Count > 0);
+
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        var applier = new DomainEventApplier(entities, metadata, combat);
+        applier.ApplyJournal(journal);
+
+        var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
+        var sceneSnapshot = adapter.CreateSnapshot();
+
+        var legacySnapshot = replay.Snapshot;
+
+        var legacyWithDamage = legacySnapshot.Combatants
+            .Where(static kv => kv.Value.DamageAmount > 0)
+            .Select(static kv => kv.Key)
+            .ToHashSet();
+
+        var sceneIds = sceneSnapshot.Combatants.Keys.ToHashSet();
+
+        foreach (var id in legacyWithDamage)
+        {
+            Assert.True(sceneIds.Contains(id), $"Scene path missing combatant {id} that has damage in legacy path");
+        }
+    }
+
+    [Fact]
+    public void M2_06_CombatStore_DamageTotals_MatchLegacy_OutgoingDamage()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        SceneDualWrite.Enabled = true;
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
+        SceneDualWrite.Enabled = false;
+
+        var journal = replay.SceneJournal!;
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        var applier = new DomainEventApplier(entities, metadata, combat);
+        applier.ApplyJournal(journal);
+
+        var legacySnapshot = replay.Snapshot;
+
+        var topDealer = legacySnapshot.Combatants
+            .Where(static kv => kv.Value.DamageAmount > 0)
+            .OrderByDescending(static kv => kv.Value.DamageAmount)
+            .First();
+
+        Assert.True(combat.TryGetCombatant(topDealer.Key, out var sceneCombatant));
+        Assert.True(sceneCombatant!.OutgoingDamage > 0, $"Scene path has 0 outgoing damage for combatant {topDealer.Key}");
+    }
+}
