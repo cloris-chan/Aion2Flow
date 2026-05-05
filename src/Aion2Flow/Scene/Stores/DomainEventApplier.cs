@@ -3,10 +3,11 @@ using Cloris.Aion2Flow.Scene.Observation;
 
 namespace Cloris.Aion2Flow.Scene.Stores;
 
-public sealed class DomainEventApplier(EntityStore entities, MetadataStore metadata)
+public sealed class DomainEventApplier(EntityStore entities, MetadataStore metadata, CombatStore combat)
 {
     public EntityStore Entities => entities;
     public MetadataStore Metadata => metadata;
+    public CombatStore Combat => combat;
 
     public void ApplyJournal(ObservedEventJournal journal)
     {
@@ -31,6 +32,9 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
     {
         switch (entry.Domain)
         {
+            case ObservedEventDomain.Combat when entry.Combat is { } c:
+                combat.ApplyCombat(entry.SourceEntityId, entry.TargetEntityId, c.Damage, c.HitCount, c.AttemptCount, c.SkillCode);
+                break;
             case ObservedEventDomain.State when entry.State is { } state:
                 ApplyState(in entry, in state);
                 break;
@@ -61,6 +65,6 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
             return;
         }
 
-        entities.GetOrAdd(state.EntityId);
+        _ = entities.GetOrAdd(state.EntityId);
     }
 }

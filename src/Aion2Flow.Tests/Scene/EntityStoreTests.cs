@@ -117,7 +117,7 @@ public class DomainEventApplierTests
 
         var entities = new EntityStore();
         var metadata = new MetadataStore();
-        var applier = new DomainEventApplier(entities, metadata);
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
 
@@ -154,7 +154,7 @@ public class DomainEventApplierTests
 
         var entities = new EntityStore();
         var metadata = new MetadataStore();
-        var applier = new DomainEventApplier(entities, metadata);
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
 
@@ -181,7 +181,7 @@ public class DomainEventApplierTests
 
         var entities = new EntityStore();
         var metadata = new MetadataStore();
-        var applier = new DomainEventApplier(entities, metadata);
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
 
@@ -196,7 +196,7 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var entities = new EntityStore();
         var metadata = new MetadataStore();
-        var applier = new DomainEventApplier(entities, metadata);
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
 
@@ -217,10 +217,104 @@ public class DomainEventApplierTests
 
         var entities = new EntityStore();
         var metadata = new MetadataStore();
-        var applier = new DomainEventApplier(entities, metadata);
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
 
         Assert.True(entities.Count > 0, $"Expected entities from journal with {journal.Count} entries");
+    }
+}
+
+public class CombatStoreTests
+{
+    [Fact]
+    public void CombatStore_ApplyCombat_CreatesPairAndCombatant()
+    {
+        var store = new CombatStore();
+        store.ApplyCombat(100, 200, 500, 1, 1, 1234);
+
+        Assert.True(store.TryGetPair(100, 200, out var pair));
+        Assert.Equal(500, pair!.TotalDamage);
+        Assert.Equal(1, pair.HitCount);
+
+        Assert.True(store.TryGetCombatant(100, out var source));
+        Assert.Equal(500, source!.OutgoingDamage);
+
+        Assert.True(store.TryGetCombatant(200, out var target));
+        Assert.Equal(500, target!.IncomingDamage);
+    }
+
+    [Fact]
+    public void CombatStore_ApplyCombat_AccumulatesMultipleHits()
+    {
+        var store = new CombatStore();
+        store.ApplyCombat(100, 200, 300, 1, 1, 1000);
+        store.ApplyCombat(100, 200, 700, 1, 1, 1000);
+
+        Assert.True(store.TryGetPair(100, 200, out var pair));
+        Assert.Equal(1000, pair!.TotalDamage);
+        Assert.Equal(2, pair.HitCount);
+
+        Assert.True(store.TryGetCombatant(100, out var source));
+        Assert.Equal(1000, source!.OutgoingDamage);
+        Assert.Equal(2, source.OutgoingHits);
+    }
+
+    [Fact]
+    public void CombatStore_OutgoingAndIncomingIndexes()
+    {
+        var store = new CombatStore();
+        store.ApplyCombat(100, 200, 500, 1, 1, 1000);
+        store.ApplyCombat(100, 300, 300, 1, 1, 2000);
+
+        var outgoing = store.GetOutgoingPairs(100);
+        Assert.Equal(2, outgoing.Count);
+
+        var incoming200 = store.GetIncomingPairs(200);
+        Assert.Single(incoming200);
+
+        var incoming300 = store.GetIncomingPairs(300);
+        Assert.Single(incoming300);
+    }
+
+    [Fact]
+    public void CombatStore_Revision_IncrementsOnEachApply()
+    {
+        var store = new CombatStore();
+        Assert.Equal(0, store.Revision);
+
+        store.ApplyCombat(100, 200, 500, 1, 1, 1000);
+        Assert.Equal(1, store.Revision);
+
+        store.ApplyCombat(100, 200, 300, 1, 1, 1000);
+        Assert.Equal(2, store.Revision);
+    }
+
+    [Fact]
+    public void DomainEventApplier_CombatObservation_PopulatesCombatStore()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = 100,
+            TargetEntityId = 200,
+            Combat = new CombatObservation { SkillCode = 1000, Damage = 500, HitCount = 1, AttemptCount = 1 }
+        });
+
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        var applier = new DomainEventApplier(entities, metadata, combat);
+
+        applier.ApplyJournal(journal);
+
+        Assert.True(combat.TryGetPair(100, 200, out var pair));
+        Assert.Equal(500, pair!.TotalDamage);
+        Assert.Equal(1, combat.Revision);
     }
 }
