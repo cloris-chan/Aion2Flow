@@ -2,12 +2,13 @@ using System.Runtime.InteropServices;
 
 namespace Cloris.Aion2Flow.Scene.Stores;
 
-public sealed class CombatStore
+public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
 {
     private readonly Dictionary<(int Source, int Target), CombatPairRecord> _pairs = [];
     private readonly Dictionary<int, CombatantRecord> _combatants = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _outgoingBySource = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _incomingByTarget = [];
+    private readonly List<CombatSnapshotChange> _changeLog = [];
     private long _revision;
 
     public IReadOnlyDictionary<(int Source, int Target), CombatPairRecord> Pairs => _pairs;
@@ -29,12 +30,14 @@ public sealed class CombatStore
         pair.AttemptCount += attemptCount;
         pair.LastSkillCode = skillCode;
         pair.Revision = _revision;
+        _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.PairUpdated, sourceId, pairKey, _revision));
 
         var source = GetOrAddCombatant(sourceId);
         source.OutgoingDamage += damage;
         source.OutgoingHits += hitCount;
         source.OutgoingAttempts += attemptCount;
         source.Revision = _revision;
+        _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, sourceId, default, _revision));
 
         if (targetId > 0)
         {
@@ -43,6 +46,7 @@ public sealed class CombatStore
             target.IncomingHits += hitCount;
             target.IncomingAttempts += attemptCount;
             target.Revision = _revision;
+            _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, targetId, default, _revision));
         }
 
         if (!_outgoingBySource.TryGetValue(sourceId, out var outgoing))
@@ -93,7 +97,36 @@ public sealed class CombatStore
         _combatants.Clear();
         _outgoingBySource.Clear();
         _incomingByTarget.Clear();
+        _changeLog.Clear();
         _revision = 0;
+    }
+
+    public SnapshotChangeCursor CreateCursor(long afterRevision) =>
+        new(afterRevision, 0);
+
+    public SnapshotChangeBatch<CombatSnapshotChange> ReadChanges(SnapshotChangeCursor cursor, int maxChanges)
+    {
+        int lo = 0, hi = _changeLog.Count;
+        while (lo < hi)
+        {
+            int mid = lo + (hi - lo) / 2;
+            if (_changeLog[mid].Revision <= cursor.Revision)
+                lo = mid + 1;
+            else
+                hi = mid;
+        }
+
+        int start = lo + cursor.Offset;
+        if (start >= _changeLog.Count)
+            return new SnapshotChangeBatch<CombatSnapshotChange>(cursor.Revision, _revision, [], false);
+
+        int count = Math.Min(maxChanges, _changeLog.Count - start);
+        var changes = _changeLog.GetRange(start, count);
+        return new SnapshotChangeBatch<CombatSnapshotChange>(
+            cursor.Revision,
+            changes[^1].Revision,
+            changes,
+            start + count < _changeLog.Count);
     }
 }
 

@@ -7,6 +7,7 @@ using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Stores;
+using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
@@ -316,5 +317,70 @@ public class CombatStoreTests
         Assert.True(combat.TryGetPair(100, 200, out var pair));
         Assert.Equal(500, pair!.TotalDamage);
         Assert.Equal(1, combat.Revision);
+    }
+}
+
+public class SnapshotChangeFeedTests
+{
+    [Fact]
+    public void CombatStore_ChangeFeed_TracksPairAndCombatantChanges()
+    {
+        var store = new CombatStore();
+        store.ApplyCombat(100, 200, 500, 1, 1, 1000);
+        store.ApplyCombat(100, 200, 300, 1, 1, 1000);
+
+        var cursor = store.CreateCursor(0);
+        var batch = store.ReadChanges(cursor, 100);
+
+        Assert.Equal(2, store.Revision);
+        // Each ApplyCombat emits: PairUpdated + CombatantUpdated(source) + CombatantUpdated(target) = 3
+        Assert.Equal(6, batch.Changes.Count);
+        Assert.False(batch.HasMore);
+    }
+
+    [Fact]
+    public void CombatStore_ChangeFeed_CursorSkipsAlreadyRead()
+    {
+        var store = new CombatStore();
+        store.ApplyCombat(100, 200, 500, 1, 1, 1000);
+        store.ApplyCombat(100, 300, 300, 1, 1, 2000);
+
+        var cursor = store.CreateCursor(0);
+        var batch1 = store.ReadChanges(cursor, 3);
+        Assert.Equal(3, batch1.Changes.Count);
+        Assert.True(batch1.HasMore);
+
+        var cursor2 = new SnapshotChangeCursor(batch1.ToRevision, 0);
+        var batch2 = store.ReadChanges(cursor2, 100);
+        Assert.Equal(3, batch2.Changes.Count);
+        Assert.False(batch2.HasMore);
+    }
+
+    [Fact]
+    public void CombatStore_ChangeFeed_EmptyWhenNoChanges()
+    {
+        var store = new CombatStore();
+        var cursor = store.CreateCursor(0);
+        var batch = store.ReadChanges(cursor, 100);
+
+        Assert.Empty(batch.Changes);
+        Assert.False(batch.HasMore);
+    }
+
+    [Fact]
+    public void CombatStore_ChangeFeed_OnlyReturnsNewChanges()
+    {
+        var store = new CombatStore();
+        store.ApplyCombat(100, 200, 500, 1, 1, 1000);
+
+        // Create cursor after revision 1
+        var cursor = store.CreateCursor(1);
+        var batch = store.ReadChanges(cursor, 100);
+        Assert.Empty(batch.Changes);
+
+        // New combat after cursor
+        store.ApplyCombat(100, 300, 300, 1, 1, 2000);
+        batch = store.ReadChanges(cursor, 100);
+        Assert.Equal(3, batch.Changes.Count);
     }
 }
