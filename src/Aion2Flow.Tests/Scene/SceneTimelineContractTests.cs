@@ -476,4 +476,81 @@ public class SceneTimelineContractTests
         public void AppendNpc4636State(int instanceId, byte state0, byte state1) { }
         public void AppendSummon(int ownerId, int summonInstanceId) => LastAppendSummon = (ownerId, summonInstanceId);
     }
+
+    [Fact]
+    public void Boundary_StageDestinationMap_IgnoresZero()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(0);
+        Assert.Equal(0u, svc.CurrentMapId);
+    }
+
+    [Fact]
+    public void Boundary_StageDestinationMap_StagesAndArrivalCommits()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(910035);
+        Assert.Equal(0u, svc.CurrentMapId);
+        var kind = svc.MarkSceneArrival();
+        Assert.Equal(SceneTransitionKind.MapChanged, kind);
+        Assert.Equal(910035u, svc.CurrentMapId);
+    }
+
+    [Fact]
+    public void Boundary_SameMap_DoesNotTriggerTransition()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(100);
+        svc.MarkSceneArrival();
+        svc.StageDestinationMap(100);
+        var kind = svc.MarkSceneArrival();
+        Assert.Equal(SceneTransitionKind.None, kind);
+    }
+
+    [Fact]
+    public void Boundary_InstanceWithoutPendingMap_AppliesDirectly()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(200003);
+        svc.MarkSceneArrival();
+        svc.StageDestinationMapInstance(113515);
+        Assert.Equal(113515u, svc.CurrentMapInstanceId);
+    }
+
+    [Fact]
+    public void Boundary_MapChange_ResetsInstance()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(200003);
+        svc.MarkSceneArrival();
+        svc.StageDestinationMapInstance(113515);
+        svc.StageDestinationMap(1010);
+        svc.MarkSceneArrival();
+        Assert.Equal(1010u, svc.CurrentMapId);
+        Assert.Equal(0u, svc.CurrentMapInstanceId);
+    }
+
+    [Fact]
+    public void Boundary_InstanceStagedAlongsideMap_CommitsTogether()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(200003);
+        svc.StageDestinationMapInstance(515552);
+        svc.MarkSceneArrival();
+        Assert.Equal(200003u, svc.CurrentMapId);
+        Assert.Equal(515552u, svc.CurrentMapInstanceId);
+    }
+
+    [Fact]
+    public void Boundary_RedundantMapStage_DoesNotClobberInstance()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(910035);
+        svc.MarkSceneArrival();
+        svc.StageDestinationMapInstance(516446);
+        svc.StageDestinationMap(910035);
+        svc.MarkSceneArrival();
+        Assert.Equal(910035u, svc.CurrentMapId);
+        Assert.Equal(516446u, svc.CurrentMapInstanceId);
+    }
 }
