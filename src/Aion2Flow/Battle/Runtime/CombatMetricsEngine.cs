@@ -582,9 +582,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             return false;
         }
 
-        var isPeriodicSelf = packet.IsPeriodicSelfEffect;
-
-        if (isPeriodicSelf)
+        if (packet.IsPeriodicEffect)
         {
             return false;
         }
@@ -596,11 +594,10 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
 
         score = packet.EventKind == CombatEventKind.Damage
             ? 6
-            : packet.ValueKind == CombatValueKind.Shield && !packet.IsPeriodicEffect
+            : packet.ValueKind == CombatValueKind.Shield
                 ? 4
                 : packet.EventKind == CombatEventKind.Healing
                   && packet.ValueKind == CombatValueKind.Healing
-                  && !packet.IsPeriodicEffect
                     ? 3
                     : 0;
 
