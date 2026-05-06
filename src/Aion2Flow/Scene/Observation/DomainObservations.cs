@@ -34,7 +34,7 @@ public readonly record struct CombatObservation
 
 public readonly record struct StateObservation(int EntityId, int StateCode, int Value0, int Value1, long DetailRaw);
 
-public readonly record struct SceneObservation(int MapId, int MapInstanceId, int Value0, int Value1, string? DiagnosticKey);
+public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, int Value0, int Value1, string? DiagnosticKey);
 
 public readonly record struct ResourceObservation(int EntityId, long? CurrentValue, long? MaximumValue, long? Delta, int ResourceKind);
 

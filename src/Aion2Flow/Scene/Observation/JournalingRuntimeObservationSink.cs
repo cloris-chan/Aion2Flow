@@ -50,7 +50,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Raw = default,
             Scene = new SceneObservation
             {
-                MapId = (int)mapId,
+                MapId = mapId,
                 MapInstanceId = 0,
                 Value0 = 0,
                 Value1 = 0,
@@ -73,7 +73,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Scene = new SceneObservation
             {
                 MapId = 0,
-                MapInstanceId = (int)instanceId,
+                MapInstanceId = instanceId,
                 Value0 = 0,
                 Value1 = 0,
                 DiagnosticKey = "stage-destination-instance"

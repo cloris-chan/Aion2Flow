@@ -55,6 +55,9 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
                 entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
                 _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), entry.Raw.TimestampMilliseconds);
                 break;
+            case ObservedEventDomain.Scene when entry.Scene is { } scene:
+                ApplyScene(in scene);
+                break;
             case ObservedEventDomain.Aura when entry.Aura is { } aura:
                 ApplyAura(in entry, in aura);
                 break;
@@ -126,6 +129,24 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
             var stamp = entry.Stamp;
             ApplyCombatResult(in stamp, in result);
         }
+    }
+
+    private void ApplyScene(in SceneObservation scene)
+    {
+        if (scene.DiagnosticKey == "stage-destination-map")
+        {
+            metadata.StageDestinationMap(scene.MapId);
+            return;
+        }
+
+        if (scene.DiagnosticKey == "stage-destination-instance")
+        {
+            metadata.StageDestinationMapInstance(scene.MapInstanceId);
+            return;
+        }
+
+        if (scene.DiagnosticKey == "scene-arrival")
+            metadata.MarkSceneArrival();
     }
 
     private void ApplyState(in ObservedEventEnvelope entry, in StateObservation state)

@@ -113,7 +113,7 @@ public class SceneTimelineContractTests
 
         Assert.Equal(ObservedEventDomain.Scene, envelope.Domain);
         Assert.NotNull(envelope.Scene);
-        Assert.Equal(910035, envelope.Scene!.Value.MapId);
+        Assert.Equal(910035u, envelope.Scene!.Value.MapId);
         Assert.Null(envelope.Combat);
         Assert.Null(envelope.State);
     }
@@ -245,7 +245,7 @@ public class SceneTimelineContractTests
 
         var read = journal.Read(0);
         Assert.Equal(ObservedEventDomain.Scene, read.Domain);
-        Assert.Equal(910035, read.Scene!.Value.MapId);
+        Assert.Equal(910035u, read.Scene!.Value.MapId);
     }
 
     [Fact]
@@ -386,7 +386,7 @@ public class SceneTimelineContractTests
         Assert.Equal(1, journal.Count);
         var entry = journal.Read(0);
         Assert.Equal(ObservedEventDomain.Scene, entry.Domain);
-        Assert.Equal(910035, entry.Scene!.Value.MapId);
+        Assert.Equal(910035u, entry.Scene!.Value.MapId);
     }
 
     [Fact]

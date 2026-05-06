@@ -69,6 +69,16 @@ public sealed class SceneBoundaryService
 
         return kind;
     }
+
+    public void Clear()
+    {
+        _pendingMapId = 0;
+        _pendingInstanceId = 0;
+        _hasPendingMap = false;
+        _hasPendingInstance = false;
+        CurrentMapId = 0;
+        CurrentMapInstanceId = 0;
+    }
 }
 
 public enum SceneTransitionKind : byte { None, MapChanged, InstanceChanged }

@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.Battle.Runtime;
 
 namespace Cloris.Aion2Flow.Scene.Stores;
 
-public sealed class LegacyBattleSnapshotAdapter(EntityStore entities, CombatStore combat)
+public sealed class LegacyBattleSnapshotAdapter(EntityStore entities, CombatStore combat, MetadataStore? metadata = null)
 {
     public DamageMeterSnapshot CreateSnapshot()
     {
@@ -15,8 +15,8 @@ public sealed class LegacyBattleSnapshotAdapter(EntityStore entities, CombatStor
             snapshot.Combatants[combatantId] = metrics;
         }
 
-        snapshot.MapId = 0;
-        snapshot.MapInstanceId = 0;
+        snapshot.MapId = metadata?.CurrentMapId ?? 0;
+        snapshot.MapInstanceId = metadata?.CurrentMapInstanceId ?? 0;
 
         return snapshot;
     }

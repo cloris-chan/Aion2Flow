@@ -117,6 +117,37 @@ public class EntityStoreTests
         Assert.True(store.TryGetDisplayName(2007, out var name));
         Assert.Equal("Perigee", name);
     }
+
+    [Fact]
+    public void MetadataStore_MapStaging_CommitsOnArrival()
+    {
+        var store = new MetadataStore();
+
+        store.StageDestinationMap(200003);
+        store.StageDestinationMapInstance(515552);
+
+        Assert.Equal(0u, store.CurrentMapId);
+        Assert.Equal(0u, store.CurrentMapInstanceId);
+
+        store.MarkSceneArrival();
+
+        Assert.Equal(200003u, store.CurrentMapId);
+        Assert.Equal(515552u, store.CurrentMapInstanceId);
+    }
+
+    [Fact]
+    public void MetadataStore_Clear_ResetsMapIdentity()
+    {
+        var store = new MetadataStore();
+        store.StageDestinationMap(200003);
+        store.StageDestinationMapInstance(515552);
+        store.MarkSceneArrival();
+
+        store.Clear();
+
+        Assert.Equal(0u, store.CurrentMapId);
+        Assert.Equal(0u, store.CurrentMapInstanceId);
+    }
 }
 
 public class DomainEventApplierTests
@@ -335,6 +366,70 @@ public class DomainEventApplierTests
     }
 
     [Fact]
+    public void Applier_SceneObservations_StageAndCommitMapIdentity()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
+            Domain = ObservedEventDomain.Scene,
+            Scene = new SceneObservation { MapId = 200003, DiagnosticKey = "stage-destination-map" }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
+            Domain = ObservedEventDomain.Scene,
+            Scene = new SceneObservation { MapInstanceId = 515552, DiagnosticKey = "stage-destination-instance" }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 2 },
+            Domain = ObservedEventDomain.Scene,
+            Scene = new SceneObservation { DiagnosticKey = "scene-arrival" }
+        });
+
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
+
+        applier.ApplyJournal(journal);
+
+        Assert.Equal(200003u, metadata.CurrentMapId);
+        Assert.Equal(515552u, metadata.CurrentMapInstanceId);
+    }
+
+    [Fact]
+    public void Applier_SceneObservations_DoNotCommitStagedMapBeforeArrival()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
+            Domain = ObservedEventDomain.Scene,
+            Scene = new SceneObservation { MapId = 910035, DiagnosticKey = "stage-destination-map" }
+        });
+
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
+
+        applier.ApplyJournal(journal);
+
+        Assert.Equal(0u, metadata.CurrentMapId);
+        Assert.Equal(0u, metadata.CurrentMapInstanceId);
+    }
+
+    [Fact]
     public void Applier_EmptyJournal_DoesNothing()
     {
         var journal = new ObservedEventJournal();
@@ -366,6 +461,25 @@ public class DomainEventApplierTests
         applier.ApplyJournal(journal);
 
         Assert.True(entities.Count > 0, $"Expected entities from journal with {journal.Count} entries");
+    }
+
+    [Fact]
+    public void Applier_VendoredReplay_ReconstructsConfirmedMapIdentity()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        SceneDualWrite.Enabled = true;
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
+        SceneDualWrite.Enabled = false;
+
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
+
+        applier.ApplyJournal(replay.SceneJournal!);
+
+        Assert.Equal(replay.Store.CurrentMapId, metadata.CurrentMapId);
+        Assert.Equal(replay.Store.CurrentMapInstanceId, metadata.CurrentMapInstanceId);
     }
 }
 
@@ -622,6 +736,23 @@ public class LegacyBattleSnapshotAdapterTests
 
         Assert.Empty(snapshot.Combatants);
     }
+
+    [Fact]
+    public void Adapter_CreateSnapshot_UsesMetadataMapIdentity()
+    {
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        metadata.StageDestinationMap(200003);
+        metadata.StageDestinationMapInstance(515552);
+        metadata.MarkSceneArrival();
+
+        var adapter = new LegacyBattleSnapshotAdapter(entities, combat, metadata);
+        var snapshot = adapter.CreateSnapshot();
+
+        Assert.Equal(200003u, snapshot.MapId);
+        Assert.Equal(515552u, snapshot.MapInstanceId);
+    }
 }
 
 public class DualReadParityTests
@@ -644,7 +775,7 @@ public class DualReadParityTests
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
 
-        var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
+        var adapter = new LegacyBattleSnapshotAdapter(entities, combat, metadata);
         var sceneSnapshot = adapter.CreateSnapshot();
 
         var legacySnapshot = replay.Snapshot;
