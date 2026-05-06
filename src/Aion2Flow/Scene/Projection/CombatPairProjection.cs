@@ -8,6 +8,9 @@ public sealed class DirectedPairSnapshot
 {
     public DirectedPairKey Key { get; init; }
     public long TotalDamage { get; init; }
+    public long TotalHealing { get; init; }
+    public long TotalShield { get; init; }
+    public long TotalShieldAbsorbed { get; init; }
     public int HitCount { get; init; }
     public int AttemptCount { get; init; }
     public int LastSkillCode { get; init; }
@@ -23,6 +26,12 @@ public sealed class CombatantSummary
     public long IncomingDamage { get; init; }
     public int IncomingHits { get; init; }
     public int IncomingAttempts { get; init; }
+    public long OutgoingHealing { get; init; }
+    public long IncomingHealing { get; init; }
+    public long OutgoingShield { get; init; }
+    public long IncomingShield { get; init; }
+    public long OutgoingShieldAbsorbed { get; init; }
+    public long IncomingShieldAbsorbed { get; init; }
     public long Revision { get; init; }
 }
 
@@ -59,6 +68,9 @@ public sealed class CombatPairProjection
             {
                 Key = pairKey,
                 TotalDamage = record.TotalDamage,
+                TotalHealing = record.TotalHealing,
+                TotalShield = record.TotalShield,
+                TotalShieldAbsorbed = record.TotalShieldAbsorbed,
                 HitCount = record.HitCount,
                 AttemptCount = record.AttemptCount,
                 LastSkillCode = record.LastSkillCode,
@@ -94,6 +106,12 @@ public sealed class CombatPairProjection
                 IncomingDamage = record.IncomingDamage,
                 IncomingHits = record.IncomingHits,
                 IncomingAttempts = record.IncomingAttempts,
+                OutgoingHealing = record.OutgoingHealing,
+                IncomingHealing = record.IncomingHealing,
+                OutgoingShield = record.OutgoingShield,
+                IncomingShield = record.IncomingShield,
+                OutgoingShieldAbsorbed = record.OutgoingShieldAbsorbed,
+                IncomingShieldAbsorbed = record.IncomingShieldAbsorbed,
                 Revision = record.Revision
             };
         }

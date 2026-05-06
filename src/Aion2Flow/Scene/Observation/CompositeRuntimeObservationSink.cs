@@ -62,8 +62,8 @@ public sealed class CompositeRuntimeObservationSink(IRuntimeObservationSink lega
 
     public void AppendCombatPacket(ParsedCombatPacket packet)
     {
-        legacy.AppendCombatPacket(packet);
         journaling.AppendCombatPacket(packet);
+        legacy.AppendCombatPacket(packet);
     }
 
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal)

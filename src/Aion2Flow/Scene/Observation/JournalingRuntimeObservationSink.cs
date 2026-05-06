@@ -125,10 +125,27 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Combat = new CombatObservation
             {
                 SkillCode = packet.SkillCode,
+                OriginalSkillCode = packet.OriginalSkillCode,
+                BaseSkillCode = packet.BaseSkillCode,
                 Damage = packet.Damage,
                 HitCount = packet.HitContribution,
                 AttemptCount = packet.AttemptContribution,
-                DetailRaw = packet.DetailRaw
+                DetailRaw = packet.DetailRaw,
+                Marker = packet.Marker,
+                Type = packet.Type,
+                Flag = packet.Flag,
+                LayoutTag = packet.LayoutTag,
+                Loop = packet.Loop,
+                DrainHealAmount = packet.DrainHealAmount,
+                RegenerationAmount = packet.RegenerationAmount,
+                Modifiers = packet.Modifiers,
+                ResourceKind = packet.ResourceKind,
+                EventKind = packet.EventKind,
+                ValueKind = packet.ValueKind,
+                EffectTag = packet.EffectTag,
+                PeriodicRelation = packet.PeriodicRelation,
+                PeriodicMode = packet.PeriodicMode,
+                ChainId = packet.Unknown
             }
         });
     }

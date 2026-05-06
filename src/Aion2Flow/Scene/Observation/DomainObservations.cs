@@ -1,8 +1,35 @@
 namespace Cloris.Aion2Flow.Scene.Observation;
 
+using Cloris.Aion2Flow.Combat.Classification;
+using Cloris.Aion2Flow.Combat.Metrics;
+
 public readonly record struct RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds);
 
-public readonly record struct CombatObservation(int SkillCode, long Damage, int HitCount, int AttemptCount, long DetailRaw);
+public readonly record struct CombatObservation
+{
+    public int SkillCode { get; init; }
+    public int OriginalSkillCode { get; init; }
+    public int BaseSkillCode { get; init; }
+    public long Damage { get; init; }
+    public int HitCount { get; init; }
+    public int AttemptCount { get; init; }
+    public long DetailRaw { get; init; }
+    public int Marker { get; init; }
+    public int Type { get; init; }
+    public int Flag { get; init; }
+    public int LayoutTag { get; init; }
+    public int Loop { get; init; }
+    public int DrainHealAmount { get; init; }
+    public int RegenerationAmount { get; init; }
+    public DamageModifiers Modifiers { get; init; }
+    public CombatResourceKind ResourceKind { get; init; }
+    public CombatEventKind EventKind { get; init; }
+    public CombatValueKind ValueKind { get; init; }
+    public PacketEffectTag EffectTag { get; init; }
+    public PeriodicEffectRelation PeriodicRelation { get; init; }
+    public int PeriodicMode { get; init; }
+    public int ChainId { get; init; }
+}
 
 public readonly record struct StateObservation(int EntityId, int StateCode, int Value0, int Value1, long DetailRaw);
 

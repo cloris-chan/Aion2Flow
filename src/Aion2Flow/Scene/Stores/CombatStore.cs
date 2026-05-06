@@ -1,4 +1,7 @@
 using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.Combat.Classification;
+using Cloris.Aion2Flow.Combat.Metrics;
+using Cloris.Aion2Flow.Scene.Observation;
 
 namespace Cloris.Aion2Flow.Scene.Stores;
 
@@ -17,8 +20,25 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     public long Revision => _revision;
 
     public void ApplyCombat(int sourceId, int targetId, long damage, int hitCount, int attemptCount, int skillCode)
+        => ApplyCombat(sourceId, targetId, new CombatObservation
+        {
+            SkillCode = skillCode,
+            Damage = damage,
+            HitCount = hitCount,
+            AttemptCount = attemptCount,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+
+    public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation)
     {
         _revision++;
+        var contributesDamage = ContributesDamage(in observation);
+        var contributesHealing = ContributesHealing(in observation);
+        var contributesShieldGrant = ContributesShieldGrant(in observation);
+        var contributesShieldAbsorbed = ContributesShieldAbsorbed(in observation);
+        var hitCount = contributesDamage ? observation.HitCount : 0;
+        var attemptCount = contributesDamage ? observation.AttemptCount : 0;
 
         var pairKey = (sourceId, targetId);
         if (!_pairs.TryGetValue(pairKey, out var pair))
@@ -26,17 +46,23 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             pair = new CombatPairRecord { SourceId = sourceId, TargetId = targetId };
             _pairs[pairKey] = pair;
         }
-        pair.TotalDamage += damage;
+        pair.TotalDamage += contributesDamage ? observation.Damage : 0;
+        pair.TotalHealing += contributesHealing ? observation.Damage : 0;
+        pair.TotalShield += contributesShieldGrant ? observation.Damage : 0;
+        pair.TotalShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
         pair.HitCount += hitCount;
         pair.AttemptCount += attemptCount;
-        pair.LastSkillCode = skillCode;
+        pair.LastSkillCode = observation.SkillCode;
         pair.Revision = _revision;
         _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.PairUpdated, sourceId, pairKey, _revision));
         MarkDetailRevision(sourceId, _revision);
         MarkDetailRevision(targetId, _revision);
 
         var source = GetOrAddCombatant(sourceId);
-        source.OutgoingDamage += damage;
+        source.OutgoingDamage += contributesDamage ? observation.Damage : 0;
+        source.OutgoingHealing += contributesHealing ? observation.Damage : 0;
+        source.OutgoingShield += contributesShieldGrant ? observation.Damage : 0;
+        source.OutgoingShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
         source.OutgoingHits += hitCount;
         source.OutgoingAttempts += attemptCount;
         source.Revision = _revision;
@@ -45,7 +71,10 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         if (targetId > 0)
         {
             var target = GetOrAddCombatant(targetId);
-            target.IncomingDamage += damage;
+            target.IncomingDamage += contributesDamage ? observation.Damage : 0;
+            target.IncomingHealing += contributesHealing ? observation.Damage : 0;
+            target.IncomingShield += contributesShieldGrant ? observation.Damage : 0;
+            target.IncomingShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
             target.IncomingHits += hitCount;
             target.IncomingAttempts += attemptCount;
             target.Revision = _revision;
@@ -69,6 +98,40 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             incoming.Add(pairKey);
         }
     }
+
+    private static bool ContributesDamage(in CombatObservation observation)
+    {
+        if (observation.EventKind == CombatEventKind.Damage &&
+            observation.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
+            (observation.AttemptCount > 0 || (observation.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
+        {
+            return true;
+        }
+
+        return observation.ValueKind switch
+        {
+            CombatValueKind.Damage => observation.Damage > 0,
+            CombatValueKind.PeriodicDamage => observation.Damage > 0,
+            CombatValueKind.DrainDamage => observation.Damage > 0,
+            CombatValueKind.Unknown => observation.EventKind == CombatEventKind.Damage && observation.Damage > 0,
+            _ => false
+        };
+    }
+
+    private static bool ContributesHealing(in CombatObservation observation) =>
+        observation.ValueKind switch
+        {
+            CombatValueKind.Healing => observation.Damage > 0,
+            CombatValueKind.PeriodicHealing => observation.Damage > 0,
+            CombatValueKind.DrainHealing => observation.Damage > 0,
+            _ => observation.EventKind == CombatEventKind.Healing && observation.Damage > 0
+        };
+
+    private static bool ContributesShieldGrant(in CombatObservation observation) =>
+        observation.ValueKind == CombatValueKind.Shield && observation.EffectTag != PacketEffectTag.ShieldAbsorbed && observation.Damage > 0;
+
+    private static bool ContributesShieldAbsorbed(in CombatObservation observation) =>
+        observation.ValueKind == CombatValueKind.Shield && observation.EffectTag == PacketEffectTag.ShieldAbsorbed && observation.Damage > 0;
 
     public bool TryGetPair(int sourceId, int targetId, out CombatPairRecord? pair) =>
         _pairs.TryGetValue((sourceId, targetId), out pair);
@@ -169,6 +232,9 @@ public sealed class CombatPairRecord
     public int SourceId { get; init; }
     public int TargetId { get; init; }
     public long TotalDamage { get; set; }
+    public long TotalHealing { get; set; }
+    public long TotalShield { get; set; }
+    public long TotalShieldAbsorbed { get; set; }
     public int HitCount { get; set; }
     public int AttemptCount { get; set; }
     public int LastSkillCode { get; set; }
@@ -184,5 +250,11 @@ public sealed class CombatantRecord
     public long IncomingDamage { get; set; }
     public int IncomingHits { get; set; }
     public int IncomingAttempts { get; set; }
+    public long OutgoingHealing { get; set; }
+    public long IncomingHealing { get; set; }
+    public long OutgoingShield { get; set; }
+    public long IncomingShield { get; set; }
+    public long OutgoingShieldAbsorbed { get; set; }
+    public long IncomingShieldAbsorbed { get; set; }
     public long Revision { get; set; }
 }

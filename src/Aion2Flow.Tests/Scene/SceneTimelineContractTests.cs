@@ -88,7 +88,7 @@ public class SceneTimelineContractTests
             SourceEntityId: 100,
             TargetEntityId: 200,
             Raw: new RawPacketReference(0x0438, 32, 1, 1000),
-            Combat: new CombatObservation(SkillCode: 1234, Damage: 500, HitCount: 1, AttemptCount: 1, DetailRaw: 0));
+            Combat: new CombatObservation { SkillCode = 1234, Damage = 500, HitCount = 1, AttemptCount = 1, DetailRaw = 0 });
 
         Assert.Equal(ObservedEventDomain.Combat, envelope.Domain);
         Assert.NotNull(envelope.Combat);
