@@ -6,6 +6,7 @@ namespace Cloris.Aion2Flow.Scene.Stores;
 
 public sealed class DomainEventApplier(EntityStore entities, MetadataStore metadata, CombatStore combat)
 {
+    private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
     private readonly PeriodicChainCanonicalizer _periodicChain = new();
 
     public EntityStore Entities => entities;
@@ -36,7 +37,11 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         switch (entry.Domain)
         {
             case ObservedEventDomain.Combat when entry.Combat is { } c:
-                foreach (var result in _periodicChain.Normalize(entry.SourceEntityId, entry.TargetEntityId, in c))
+                var stamp = entry.Stamp;
+                var combatObservation = c;
+                var systemRecoveryResult = _systemPeriodicRecovery.Normalize(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation);
+                var systemRecoveryObservation = systemRecoveryResult.Observation;
+                foreach (var result in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
                 {
                     var observation = result.Observation;
                     combat.ApplyCombat(result.SourceId, result.TargetId, in observation);

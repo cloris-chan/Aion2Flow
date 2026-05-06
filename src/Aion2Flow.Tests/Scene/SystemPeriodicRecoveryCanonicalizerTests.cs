@@ -1,0 +1,158 @@
+using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat.Classification;
+using Cloris.Aion2Flow.Combat.Metrics;
+using Cloris.Aion2Flow.PacketCapture.Diagnostics;
+using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Scene;
+using Cloris.Aion2Flow.Scene.Canonicalization;
+using Cloris.Aion2Flow.Scene.Journal;
+using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.Scene.Runtime;
+using Cloris.Aion2Flow.Scene.Stores;
+using Cloris.Aion2Flow.Tests.Protocol;
+
+namespace Cloris.Aion2Flow.Tests.Scene;
+
+public class SystemPeriodicRecoveryCanonicalizerTests
+{
+    [Fact]
+    public void ScenePath_TreatsSystemPeriodicSelfRecoveryTickAsHealingAfterSeed()
+    {
+        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        const int playerId = 4086;
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+
+        var unseededTick = CreatePacket(playerId, 190000151, 2934, 500, 1, 1, 2);
+        var seed = CreatePacket(playerId, 190000131, 7634, 1_000, 10, 10, 1);
+        var tick = CreatePacket(playerId, 190000131, 7634, 60_000, 11, 11, 2);
+
+        sink.AppendCombatPacket(unseededTick);
+        sink.AppendCombatPacket(seed);
+        sink.AppendCombatPacket(tick);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetCombatant(playerId, out var combatant));
+        Assert.Equal(7634, combatant!.OutgoingHealing);
+        Assert.Equal(7634, combatant.IncomingHealing);
+        Assert.Equal(0, combatant.OutgoingDamage);
+    }
+
+    [Fact]
+    public void ScenePath_ConsumesSystemPeriodicSelfRecoverySeedOnFirstContinuation()
+    {
+        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        const int playerId = 4086;
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+
+        var seed = CreatePacket(playerId, 190000131, 7634, 1_000, 10, 10, 1);
+        var mismatchedTick = CreatePacket(playerId, 190000131, 1111, 2_000, 11, 11, 2);
+        var laterMatchingTick = CreatePacket(playerId, 190000131, 7634, 3_000, 12, 12, 2);
+
+        sink.AppendCombatPacket(seed);
+        sink.AppendCombatPacket(mismatchedTick);
+        sink.AppendCombatPacket(laterMatchingTick);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetCombatant(playerId, out var combatant));
+        Assert.Equal(0, combatant!.OutgoingHealing);
+        Assert.Equal(0, combatant.OutgoingDamage);
+    }
+
+    [Fact]
+    public void ScenePath_DoesNotPromoteContinuationBeforeSeedOrdinal()
+    {
+        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        const int playerId = 4086;
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+
+        var seed = CreatePacket(playerId, 190000131, 7634, 1_000, 10, 10, 1);
+        var earlierTick = CreatePacket(playerId, 190000131, 7634, 2_000, 9, 9, 2);
+
+        sink.AppendCombatPacket(seed);
+        sink.AppendCombatPacket(earlierTick);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetCombatant(playerId, out var combatant));
+        Assert.Equal(0, combatant!.OutgoingHealing);
+        Assert.Equal(0, combatant.OutgoingDamage);
+    }
+
+    [Fact]
+    public void ScenePath_Replay_SystemPeriodicSelfRecovery_MatchesLegacyGroundTruth()
+    {
+        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        SceneDualWrite.Enabled = true;
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426140354.log"));
+        SceneDualWrite.Enabled = false;
+
+        var legacyHealingBySource = replay.Store.CombatPacketsBySource.Values
+            .SelectMany(static packets => packets)
+            .Where(static packet => packet.SourceId == packet.TargetId && packet.BaseSkillCode == 190000000 && packet.ValueKind == CombatValueKind.PeriodicHealing)
+            .GroupBy(static packet => packet.SourceId)
+            .ToDictionary(static group => group.Key, static group => group.Sum(static packet => (long)packet.Damage));
+        var entries = replay.SceneJournal!.GetEntries(replay.SceneJournal.CreateCursor(0), replay.SceneJournal.Count)
+            .ToArray()
+            .Where(IsRawSystemPeriodicRecoveryEntry)
+            .ToArray();
+        var canonicalizer = new SystemPeriodicRecoveryCanonicalizer();
+        var sceneHealingBySource = entries
+            .Select(entry =>
+            {
+                var stamp = entry.Stamp;
+                var observation = entry.Combat!.Value;
+                return canonicalizer.Normalize(entry.SourceEntityId, entry.TargetEntityId, in stamp, in observation);
+            })
+            .Where(static result => result.Observation.ValueKind == CombatValueKind.PeriodicHealing)
+            .GroupBy(static result => result.SourceId)
+            .ToDictionary(static group => group.Key, static group => group.Sum(static result => result.Observation.Damage));
+
+        Assert.NotEmpty(legacyHealingBySource);
+        Assert.Contains(entries, static entry => entry.SourceEntityId == 10744 && entry.Combat!.Value.PeriodicMode == 1 && entry.Combat.Value.OriginalSkillCode == 190000131 && entry.Combat.Value.Damage == 13656 && entry.Stamp.BatchOrdinal == 859);
+        Assert.Contains(entries, static entry => entry.SourceEntityId == 10744 && entry.Combat!.Value.PeriodicMode == 2 && entry.Combat.Value.OriginalSkillCode == 190000131 && entry.Combat.Value.Damage == 13656 && entry.Stamp.BatchOrdinal == 869);
+        Assert.Equal(legacyHealingBySource.Keys.Order(), sceneHealingBySource.Keys.Order());
+
+        foreach (var (sourceId, healing) in legacyHealingBySource)
+            Assert.Equal(healing, sceneHealingBySource[sourceId]);
+    }
+
+    private static ParsedCombatPacket CreatePacket(int playerId, int originalSkillCode, int damage, long timestamp, long frameOrdinal, long batchOrdinal, int mode)
+    {
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = playerId,
+            OriginalSkillCode = originalSkillCode,
+            SkillCode = originalSkillCode,
+            Damage = damage,
+            Timestamp = timestamp,
+            FrameOrdinal = frameOrdinal,
+            BatchOrdinal = batchOrdinal
+        };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Self, mode);
+        return packet;
+    }
+
+    private static CombatStore Apply(ObservedEventJournal journal)
+    {
+        var combat = new CombatStore();
+        var applier = new DomainEventApplier(new EntityStore(), new MetadataStore(), combat);
+        applier.ApplyJournal(journal);
+        return combat;
+    }
+
+    private static bool IsRawSystemPeriodicRecoveryEntry(ObservedEventEnvelope entry)
+    {
+        if (entry.Domain != ObservedEventDomain.Combat || entry.SourceEntityId != entry.TargetEntityId || entry.Combat is not { } observation || observation.PeriodicRelation != PeriodicEffectRelation.Self || observation.PeriodicMode is not (1 or 2))
+            return false;
+
+        var originalSkillCode = observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
+        return CombatMetricsEngine.ParseSkillVariant(originalSkillCode).BaseSkillCode == 190000000;
+    }
+}
