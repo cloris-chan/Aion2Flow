@@ -66,6 +66,12 @@ public sealed class CompositeRuntimeObservationSink(IRuntimeObservationSink lega
         legacy.AppendCombatPacket(packet);
     }
 
+    public void CompleteBatch(long batchOrdinal)
+    {
+        legacy.CompleteBatch(batchOrdinal);
+        journaling.CompleteBatch(batchOrdinal);
+    }
+
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         legacy.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal);

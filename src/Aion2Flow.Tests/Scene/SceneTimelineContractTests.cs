@@ -497,6 +497,7 @@ public class SceneTimelineContractTests
         public void StageDestinationMapInstance(uint instanceId) { }
         public void MarkSceneArrival() => SceneArrivalCalled = true;
         public void AppendCombatPacket(ParsedCombatPacket packet) { }
+        public void CompleteBatch(long batchOrdinal) { }
         public void RegisterCompactValue0438(int t, int s, int sk, int m, int l, int tp, long ts, long fo, long bo) { }
         public void RegisterCompactValue0438(int t, int s, int sk, int m, int l, int tp, int v, long ts, long fo, long bo) { }
         public void RegisterCompactControl0238(int s, int sk, int m, long bo) { }

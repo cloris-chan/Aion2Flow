@@ -59,6 +59,8 @@ public sealed class LegacyRuntimeObservationSink(CombatMetricsStore store) : IRu
 
     public void AppendCombatPacket(ParsedCombatPacket packet) => store.AppendCombatPacket(packet);
 
+    public void CompleteBatch(long batchOrdinal) { }
+
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal)
         => store.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal);
 

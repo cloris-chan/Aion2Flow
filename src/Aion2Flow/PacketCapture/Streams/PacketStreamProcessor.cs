@@ -305,6 +305,10 @@ public sealed class PacketStreamProcessor : IDisposable
             {
                 AppendToTail(remaining);
             }
+            else
+            {
+                _sink.CompleteBatch(_currentAppendBatchOrdinal);
+            }
 
             return hasParsed;
         }

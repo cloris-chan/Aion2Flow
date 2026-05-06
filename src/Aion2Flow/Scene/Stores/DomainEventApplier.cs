@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.Scene.Canonicalization;
 using Cloris.Aion2Flow.Scene.Journal;
+using Cloris.Aion2Flow.Scene.Model;
 using Cloris.Aion2Flow.Scene.Observation;
 
 namespace Cloris.Aion2Flow.Scene.Stores;
@@ -9,6 +10,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
     private readonly PeriodicChainCanonicalizer _periodicChain = new();
     private readonly MultiHitAttributionService _multiHitAttribution = new();
+    private readonly CompactOutcomeCanonicalizer _compactOutcome = new();
 
     public EntityStore Entities => entities;
     public MetadataStore Metadata => metadata;
@@ -31,6 +33,8 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
 
             cursor = new JournalCursor(cursor.Position + entries.Length, cursor.StartOrdinal);
         }
+
+        FlushPendingOutcomeSidecars();
     }
 
     private void ApplyEntry(in ObservedEventEnvelope entry)
@@ -38,12 +42,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         switch (entry.Domain)
         {
             case ObservedEventDomain.Combat when entry.Combat is { } c:
-                var stamp = entry.Stamp;
-                var combatObservation = c;
-                var systemRecoveryResult = _systemPeriodicRecovery.Normalize(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation);
-                var systemRecoveryObservation = systemRecoveryResult.Observation;
-                foreach (var result in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
-                    ApplyCombatResult(in entry, in result);
+                ApplyCombat(in entry, in c);
                 break;
             case ObservedEventDomain.State when entry.State is { } state:
                 ApplyState(in entry, in state);
@@ -57,12 +56,53 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         }
     }
 
-    private void ApplyCombatResult(in ObservedEventEnvelope entry, in CombatCanonicalizationResult result)
+    public void CompleteBatch(long batchOrdinal)
+    {
+        foreach (var result in _compactOutcome.CompleteBatch(batchOrdinal))
+        {
+            var stamp = result.Stamp;
+            var observation = result.Observation;
+            var systemRecoveryResult = _systemPeriodicRecovery.Normalize(result.SourceId, result.TargetId, in stamp, in observation);
+            var systemRecoveryObservation = systemRecoveryResult.Observation;
+            foreach (var normalized in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
+                ApplyCombatResult(in stamp, in normalized);
+        }
+    }
+
+    public void FlushPendingOutcomeSidecars() => CompleteBatch(long.MaxValue);
+
+    private void ApplyCombat(in ObservedEventEnvelope entry, in CombatObservation combatObservation)
+    {
+        var stamp = entry.Stamp;
+        var rawResults = entry.Raw.Opcode switch
+        {
+            0x0238 => _compactOutcome.ObserveCompactControl0238(entry.SourceEntityId, in stamp, in combatObservation),
+            0x0638 => _compactOutcome.ObserveCompactControl0638(entry.SourceEntityId, in stamp, in combatObservation),
+            _ => _compactOutcome.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation)
+        };
+
+        foreach (var rawResult in rawResults)
+        {
+            var observation = rawResult.Observation;
+            var resultStamp = rawResult.Stamp;
+            var systemRecoveryResult = _systemPeriodicRecovery.Normalize(rawResult.SourceId, rawResult.TargetId, in resultStamp, in observation);
+            var systemRecoveryObservation = systemRecoveryResult.Observation;
+            foreach (var result in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
+                ApplyCombatResult(in resultStamp, in result);
+        }
+    }
+
+    private void ApplyCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result)
     {
         var observation = result.Observation;
         combat.ApplyCombat(result.SourceId, result.TargetId, in observation);
-        var stamp = entry.Stamp;
         _multiHitAttribution.ObserveCombat(result.SourceId, result.TargetId, in stamp, in observation);
+    }
+
+    private void ApplyCombatResult(in CombatCanonicalizationResult result)
+    {
+        var observation = result.Observation;
+        combat.ApplyCombat(result.SourceId, result.TargetId, in observation);
     }
 
     private void ApplyAura(in ObservedEventEnvelope entry, in AuraObservation aura)
@@ -71,7 +111,10 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
             entities.ApplyNpc2C38State(aura.TargetEntityId, aura.SequenceId, aura.ResultCode);
 
         if (_multiHitAttribution.TrySynthesize2C38Invincible(in entry, in aura) is { } result)
-            ApplyCombatResult(in entry, in result);
+        {
+            var stamp = entry.Stamp;
+            ApplyCombatResult(in stamp, in result);
+        }
     }
 
     private void ApplyState(in ObservedEventEnvelope entry, in StateObservation state)

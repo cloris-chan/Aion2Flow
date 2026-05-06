@@ -29,6 +29,8 @@ public interface IRuntimeObservationSink
 
     void AppendCombatPacket(ParsedCombatPacket packet);
 
+    void CompleteBatch(long batchOrdinal);
+
     void RegisterCompactValue0438(
         int targetId,
         int sourceId,

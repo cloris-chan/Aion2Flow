@@ -151,6 +151,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
+    public void CompleteBatch(long batchOrdinal) => journal.CompleteBatch(batchOrdinal);
+
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         targetId = ResolveLifecycleId(targetId);
@@ -176,7 +178,10 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
-                DetailRaw = marker
+                DetailRaw = marker,
+                Marker = marker,
+                Type = type,
+                LayoutTag = layoutTag
             }
         });
     }
@@ -206,7 +211,10 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Damage = value,
                 HitCount = 0,
                 AttemptCount = 0,
-                DetailRaw = marker
+                DetailRaw = marker,
+                Marker = marker,
+                Type = type,
+                LayoutTag = layoutTag
             }
         });
     }
@@ -235,7 +243,10 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
-                DetailRaw = marker
+                DetailRaw = marker,
+                Marker = marker,
+                Type = 0,
+                LayoutTag = 0
             }
         });
     }
@@ -264,7 +275,10 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
-                DetailRaw = marker
+                DetailRaw = marker,
+                Marker = marker,
+                Type = 0,
+                LayoutTag = 0
             }
         });
     }
