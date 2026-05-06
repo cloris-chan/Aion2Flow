@@ -436,16 +436,58 @@ public class SceneTimelineContractTests
         Assert.False(composite.IsKnownEntity(99));
     }
 
+    [Fact]
+    public void CompositeSink_RebindLifecycle_SyncsJournalEntityIds()
+    {
+        var legacy = new FakeRuntimeSink();
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var journaling = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+        var composite = new CompositeRuntimeObservationSink(legacy, journaling);
+
+        var reboundId = composite.RebindInstanceLifecycle(3518);
+
+        composite.AppendNpcCode(3518, 2000002);
+        composite.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 3518,
+            SkillCode = 11000010,
+            Damage = 500,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 1_000
+        });
+
+        Assert.Equal(reboundId, journaling.ResolveLifecycleId(3518));
+        Assert.Equal(reboundId, journal.Read(0).SourceEntityId);
+        Assert.Equal(reboundId, journal.Read(0).State!.Value.EntityId);
+        Assert.Equal(reboundId, journal.Read(1).TargetEntityId);
+        Assert.Equal(3518, legacy.LastAppendNpcCode.InstanceId);
+    }
+
     private sealed class FakeRuntimeSink : IRuntimeObservationSink
     {
+        private readonly Dictionary<int, int> _remap = [];
+        private int _nextSyntheticLifecycleId = int.MaxValue;
+
         public int CurrentTarget { get; set; }
         public HashSet<int> KnownEntities { get; } = [];
         public uint LastStageDestinationMap;
         public bool SceneArrivalCalled;
         public (int OwnerId, int SummonId) LastAppendSummon;
+        public (int InstanceId, int NpcCode) LastAppendNpcCode;
 
-        public int ResolveLifecycleId(int rawInstanceId) => rawInstanceId;
-        public int RebindInstanceLifecycle(int rawInstanceId) => rawInstanceId;
+        public int ResolveLifecycleId(int rawInstanceId) => rawInstanceId > 0 && _remap.TryGetValue(rawInstanceId, out var mapped) ? mapped : rawInstanceId;
+        public int RebindInstanceLifecycle(int rawInstanceId)
+        {
+            if (rawInstanceId <= 0)
+                return rawInstanceId;
+
+            var mapped = Interlocked.Decrement(ref _nextSyntheticLifecycleId);
+            _remap[rawInstanceId] = mapped;
+            return mapped;
+        }
         public bool IsKnownEntity(int id) => KnownEntities.Contains(id);
         public bool HasSummonOwner(int instanceId) => false;
         public bool TryGetNpcRuntimeState(int instanceId, out RuntimeNpcStateSnapshot state) { state = default; return false; }
@@ -463,7 +505,7 @@ public class SceneTimelineContractTests
         public void RegisterObservation2A38(int s, int mo, int gc, int si, ushort hv, uint bc, long ts, long fo, long bo) { }
         public void RegisterObservation2C38(int ii, int mo, int si, int rc, int ts, int tsk, long ts2, long fo, long bo) { }
         public void AppendNickname(int uid, string nickname, int? originServerId = null) { }
-        public void AppendNpcCode(int instanceId, int npcCode) { }
+        public void AppendNpcCode(int instanceId, int npcCode) => LastAppendNpcCode = (instanceId, npcCode);
         public void AppendNpcName(int npcCode, string name) { }
         public void AppendNpcKind(int instanceId, NpcKind kind) { }
         public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds) { }

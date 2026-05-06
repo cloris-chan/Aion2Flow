@@ -7,19 +7,21 @@ namespace Cloris.Aion2Flow.Scene.Observation;
 
 public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Guid sceneSessionId) : IRuntimeObservationSink
 {
-    private int _currentTarget;
+    private readonly LifecycleRemapService _lifecycle = new();
 
     public ObservedEventJournal Journal => journal;
 
     public int CurrentTarget
     {
-        get => _currentTarget;
-        set => _currentTarget = value;
+        get => _lifecycle.CurrentTarget;
+        set => _lifecycle.CurrentTarget = value;
     }
 
-    public int ResolveLifecycleId(int rawInstanceId) => rawInstanceId;
+    public int ResolveLifecycleId(int rawInstanceId) => _lifecycle.Resolve(rawInstanceId);
 
-    public int RebindInstanceLifecycle(int rawInstanceId) => rawInstanceId;
+    public int RebindInstanceLifecycle(int rawInstanceId) => _lifecycle.Rebind(rawInstanceId);
+
+    public void SetLifecycleId(int rawInstanceId, int mappedInstanceId) => _lifecycle.Set(rawInstanceId, mappedInstanceId);
 
     public bool IsKnownEntity(int id) => false;
 
@@ -31,9 +33,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         return false;
     }
 
-    public int ResolveNpcObservationSource() => 0;
+    public int ResolveNpcObservationSource() => _lifecycle.CurrentTarget > 0 ? _lifecycle.CurrentTarget : _lifecycle.LastObservedNpcSource;
 
-    public void RememberNpcObservationSource(int instanceId) { }
+    public void RememberNpcObservationSource(int instanceId) => _lifecycle.RememberNpcObservationSource(instanceId);
 
     public void StageDestinationMap(uint mapId)
     {
@@ -103,14 +105,16 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendCombatPacket(ParsedCombatPacket packet)
     {
+        var sourceId = ResolveLifecycleId(packet.SourceId);
+        var targetId = ResolveLifecycleId(packet.TargetId);
         var stamp = clock.CreateStamp(packet.Timestamp, packet.FrameOrdinal, packet.BatchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId,
             Stamp = stamp,
             Domain = ObservedEventDomain.Combat,
-            SourceEntityId = packet.SourceId,
-            TargetEntityId = packet.TargetId,
+            SourceEntityId = sourceId,
+            TargetEntityId = targetId,
             Raw = new RawPacketReference
             {
                 Opcode = 0,
@@ -131,6 +135,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        targetId = ResolveLifecycleId(targetId);
+        sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, batchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
@@ -159,6 +165,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        targetId = ResolveLifecycleId(targetId);
+        sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, batchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
@@ -187,6 +195,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal)
     {
+        sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStampFromOffset(0, 0, batchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
@@ -215,6 +224,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, batchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
@@ -243,6 +253,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterPeriodicLink0538(int targetId, int sourceId, int linkId, int sequenceId, int tailRaw, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        targetId = ResolveLifecycleId(targetId);
+        sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, batchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
@@ -271,6 +283,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, batchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
@@ -300,6 +313,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal)
     {
+        instanceId = ResolveLifecycleId(instanceId);
+        tailSourceId = ResolveLifecycleId(tailSourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, batchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
@@ -329,6 +344,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendNickname(int uid, string nickname, int? originServerId = null)
     {
+        uid = ResolveLifecycleId(uid);
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -351,6 +367,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendNpcCode(int instanceId, int npcCode)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -376,6 +393,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         var stamp = clock.CreateStamp(observedAtMilliseconds, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -398,6 +416,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         var stamp = clock.CreateStamp(observedAtMilliseconds, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -420,6 +439,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         var stamp = clock.CreateStamp(observedAtMilliseconds, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -444,6 +464,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendNpc2136State(int instanceId, uint sequence, uint value0)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -466,6 +487,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendNpc0140Value(int instanceId, uint value0)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -488,6 +510,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendNpc0240Value(int instanceId, uint value0)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -510,6 +533,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendNpc4636State(int instanceId, byte state0, byte state1)
     {
+        instanceId = ResolveLifecycleId(instanceId);
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
@@ -532,6 +556,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void AppendSummon(int ownerId, int summonInstanceId)
     {
+        ownerId = ResolveLifecycleId(ownerId);
+        summonInstanceId = ResolveLifecycleId(summonInstanceId);
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {

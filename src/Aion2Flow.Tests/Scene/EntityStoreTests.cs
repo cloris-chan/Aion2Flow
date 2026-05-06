@@ -191,6 +191,47 @@ public class DomainEventApplierTests
     }
 
     [Fact]
+    public void Applier_LifecycleReboundEvents_UseSyntheticEntityId()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        const int reboundId = int.MaxValue - 1;
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = reboundId,
+            TargetEntityId = 0,
+            State = new StateObservation { EntityId = reboundId, StateCode = 2000002 }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = 100,
+            TargetEntityId = reboundId,
+            Combat = new CombatObservation { SkillCode = 11000010, Damage = 500, HitCount = 1, AttemptCount = 1 }
+        });
+
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        var applier = new DomainEventApplier(entities, metadata, combat);
+
+        applier.ApplyJournal(journal);
+
+        Assert.True(entities.TryGet(reboundId, out var entity));
+        Assert.Equal(2000002, entity!.NpcCode);
+        Assert.True(combat.TryGetPair(100, reboundId, out var pair));
+        Assert.Equal(500, pair!.TotalDamage);
+        Assert.False(entities.TryGet(3518, out _));
+    }
+
+    [Fact]
     public void Applier_EmptyJournal_DoesNothing()
     {
         var journal = new ObservedEventJournal();

@@ -21,7 +21,12 @@ public sealed class CompositeRuntimeObservationSink(IRuntimeObservationSink lega
 
     public int ResolveLifecycleId(int rawInstanceId) => legacy.ResolveLifecycleId(rawInstanceId);
 
-    public int RebindInstanceLifecycle(int rawInstanceId) => legacy.RebindInstanceLifecycle(rawInstanceId);
+    public int RebindInstanceLifecycle(int rawInstanceId)
+    {
+        var mapped = legacy.RebindInstanceLifecycle(rawInstanceId);
+        journaling.SetLifecycleId(rawInstanceId, mapped);
+        return mapped;
+    }
 
     public bool IsKnownEntity(int id) => legacy.IsKnownEntity(id);
 
