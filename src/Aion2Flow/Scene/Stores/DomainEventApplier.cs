@@ -8,6 +8,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
 {
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
     private readonly PeriodicChainCanonicalizer _periodicChain = new();
+    private readonly MultiHitAttributionService _multiHitAttribution = new();
 
     public EntityStore Entities => entities;
     public MetadataStore Metadata => metadata;
@@ -42,10 +43,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
                 var systemRecoveryResult = _systemPeriodicRecovery.Normalize(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation);
                 var systemRecoveryObservation = systemRecoveryResult.Observation;
                 foreach (var result in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
-                {
-                    var observation = result.Observation;
-                    combat.ApplyCombat(result.SourceId, result.TargetId, in observation);
-                }
+                    ApplyCombatResult(in entry, in result);
                 break;
             case ObservedEventDomain.State when entry.State is { } state:
                 ApplyState(in entry, in state);
@@ -54,15 +52,26 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
                 entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
                 break;
             case ObservedEventDomain.Aura when entry.Aura is { } aura:
-                ApplyAura(in aura);
+                ApplyAura(in entry, in aura);
                 break;
         }
     }
 
-    private void ApplyAura(in AuraObservation aura)
+    private void ApplyCombatResult(in ObservedEventEnvelope entry, in CombatCanonicalizationResult result)
+    {
+        var observation = result.Observation;
+        combat.ApplyCombat(result.SourceId, result.TargetId, in observation);
+        var stamp = entry.Stamp;
+        _multiHitAttribution.ObserveCombat(result.SourceId, result.TargetId, in stamp, in observation);
+    }
+
+    private void ApplyAura(in ObservedEventEnvelope entry, in AuraObservation aura)
     {
         if (aura.TargetEntityId > 0 && aura.SequenceId > 0)
             entities.ApplyNpc2C38State(aura.TargetEntityId, aura.SequenceId, aura.ResultCode);
+
+        if (_multiHitAttribution.TrySynthesize2C38Invincible(in entry, in aura) is { } result)
+            ApplyCombatResult(in entry, in result);
     }
 
     private void ApplyState(in ObservedEventEnvelope entry, in StateObservation state)

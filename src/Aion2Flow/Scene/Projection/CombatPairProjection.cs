@@ -13,6 +13,9 @@ public sealed class DirectedPairSnapshot
     public long TotalShieldAbsorbed { get; init; }
     public int HitCount { get; init; }
     public int AttemptCount { get; init; }
+    public int EvadeCount { get; init; }
+    public int InvincibleCount { get; init; }
+    public int MultiHitCount { get; init; }
     public int LastSkillCode { get; init; }
     public long Revision { get; init; }
 }
@@ -23,9 +26,15 @@ public sealed class CombatantSummary
     public long OutgoingDamage { get; init; }
     public int OutgoingHits { get; init; }
     public int OutgoingAttempts { get; init; }
+    public int OutgoingEvades { get; init; }
+    public int OutgoingInvincibles { get; init; }
+    public int OutgoingMultiHits { get; init; }
     public long IncomingDamage { get; init; }
     public int IncomingHits { get; init; }
     public int IncomingAttempts { get; init; }
+    public int IncomingEvades { get; init; }
+    public int IncomingInvincibles { get; init; }
+    public int IncomingMultiHits { get; init; }
     public long OutgoingHealing { get; init; }
     public long IncomingHealing { get; init; }
     public long OutgoingShield { get; init; }
@@ -73,6 +82,9 @@ public sealed class CombatPairProjection
                 TotalShieldAbsorbed = record.TotalShieldAbsorbed,
                 HitCount = record.HitCount,
                 AttemptCount = record.AttemptCount,
+                EvadeCount = record.EvadeCount,
+                InvincibleCount = record.InvincibleCount,
+                MultiHitCount = record.MultiHitCount,
                 LastSkillCode = record.LastSkillCode,
                 Revision = record.Revision
             };
@@ -103,9 +115,15 @@ public sealed class CombatPairProjection
                 OutgoingDamage = record.OutgoingDamage,
                 OutgoingHits = record.OutgoingHits,
                 OutgoingAttempts = record.OutgoingAttempts,
+                OutgoingEvades = record.OutgoingEvades,
+                OutgoingInvincibles = record.OutgoingInvincibles,
+                OutgoingMultiHits = record.OutgoingMultiHits,
                 IncomingDamage = record.IncomingDamage,
                 IncomingHits = record.IncomingHits,
                 IncomingAttempts = record.IncomingAttempts,
+                IncomingEvades = record.IncomingEvades,
+                IncomingInvincibles = record.IncomingInvincibles,
+                IncomingMultiHits = record.IncomingMultiHits,
                 OutgoingHealing = record.OutgoingHealing,
                 IncomingHealing = record.IncomingHealing,
                 OutgoingShield = record.OutgoingShield,

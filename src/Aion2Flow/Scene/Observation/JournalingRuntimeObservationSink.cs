@@ -136,6 +136,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Flag = packet.Flag,
                 LayoutTag = packet.LayoutTag,
                 Loop = packet.Loop,
+                MultiHitCount = packet.MultiHitCount,
                 DrainHealAmount = packet.DrainHealAmount,
                 RegenerationAmount = packet.RegenerationAmount,
                 Modifiers = packet.Modifiers,
@@ -324,7 +325,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 StackCount = 0,
                 SequenceId = sequenceId,
                 ChainId = 0,
-                ResultCode = 0
+                ResultCode = 0,
+                Mode = mode
             }
         });
     }
@@ -356,7 +358,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 StackCount = 0,
                 SequenceId = sequenceId,
                 ChainId = 0,
-                ResultCode = resultCode
+                ResultCode = resultCode,
+                Mode = mode
             }
         });
     }

@@ -19,6 +19,7 @@ public readonly record struct CombatObservation
     public int Flag { get; init; }
     public int LayoutTag { get; init; }
     public int Loop { get; init; }
+    public int MultiHitCount { get; init; }
     public int DrainHealAmount { get; init; }
     public int RegenerationAmount { get; init; }
     public DamageModifiers Modifiers { get; init; }
@@ -37,4 +38,4 @@ public readonly record struct SceneObservation(int MapId, int MapInstanceId, int
 
 public readonly record struct ResourceObservation(int EntityId, long? CurrentValue, long? MaximumValue, long? Delta, int ResourceKind);
 
-public readonly record struct AuraObservation(int SourceEntityId, int TargetEntityId, int SkillCode, int StackCount, int SequenceId, int ChainId, int ResultCode);
+public readonly record struct AuraObservation(int SourceEntityId, int TargetEntityId, int SkillCode, int StackCount, int SequenceId, int ChainId, int ResultCode, int Mode);
