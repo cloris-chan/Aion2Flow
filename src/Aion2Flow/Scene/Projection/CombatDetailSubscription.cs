@@ -12,33 +12,46 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
 
     public CombatDetailDelta? Poll()
     {
+        var detailRevision = store.GetCombatantDetailRevision(combatantId);
+        if (detailRevision <= _lastAppliedRevision)
+            return null;
+
         var batch = store.ReadChanges(_cursor, 64);
         if (batch.Changes.Count == 0)
             return null;
 
         bool affected = false;
-        for (int i = 0; i < batch.Changes.Count; i++)
+        while (true)
         {
-            var change = batch.Changes[i];
-            if (change.CombatantId == combatantId || change.PairKey.Source == combatantId || change.PairKey.Target == combatantId)
+            for (int i = 0; i < batch.Changes.Count; i++)
             {
-                affected = true;
-                break;
+                var change = batch.Changes[i];
+                if (change.CombatantId == combatantId || change.PairKey.Source == combatantId || change.PairKey.Target == combatantId)
+                {
+                    affected = true;
+                    break;
+                }
             }
-        }
 
-        _cursor = new SnapshotChangeCursor(batch.ToRevision, 0);
-        _lastAppliedRevision = batch.ToRevision;
+            _cursor = new SnapshotChangeCursor(batch.ToRevision, 0);
+            if (!batch.HasMore || batch.ToRevision >= detailRevision)
+                break;
+
+            batch = store.ReadChanges(_cursor, 64);
+            if (batch.Changes.Count == 0)
+                break;
+        }
 
         if (!affected)
             return null;
 
+        _lastAppliedRevision = detailRevision;
         projection.Rebuild(store);
 
         return new CombatDetailDelta
         {
             CombatantId = combatantId,
-            Revision = _lastAppliedRevision,
+            Revision = detailRevision,
             OutgoingPairs = projection.GetOutgoingPairs(combatantId),
             IncomingPairs = projection.GetIncomingPairs(combatantId),
             Combatant = projection.GetCombatant(combatantId)

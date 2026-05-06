@@ -422,6 +422,23 @@ public class CombatStoreTests
     }
 
     [Fact]
+    public void CombatStore_DetailRevision_TracksAffectedCombatantsOnly()
+    {
+        var store = new CombatStore();
+        store.ApplyCombat(100, 200, 500, 1, 1, 1000);
+
+        Assert.Equal(1, store.GetCombatantDetailRevision(100));
+        Assert.Equal(1, store.GetCombatantDetailRevision(200));
+        Assert.Equal(0, store.GetCombatantDetailRevision(999));
+
+        store.ApplyCombat(300, 400, 700, 1, 1, 2000);
+
+        Assert.Equal(1, store.GetCombatantDetailRevision(100));
+        Assert.Equal(2, store.GetCombatantDetailRevision(300));
+        Assert.Equal(2, store.GetCombatantDetailRevision(400));
+    }
+
+    [Fact]
     public void DomainEventApplier_CombatObservation_PopulatesCombatStore()
     {
         var journal = new ObservedEventJournal();
@@ -483,6 +500,40 @@ public class SnapshotChangeFeedTests
         var batch2 = store.ReadChanges(cursor2, 100);
         Assert.Equal(3, batch2.Changes.Count);
         Assert.False(batch2.HasMore);
+    }
+
+    [Fact]
+    public void CombatStore_ChangeFeed_DoesNotSplitRevisionGroups()
+    {
+        var store = new CombatStore();
+        for (int i = 0; i < 30; i++)
+            store.ApplyCombat(100 + i, 200 + i, 1, 1, 1, 1000 + i);
+
+        var cursor = store.CreateCursor(0);
+        var batch = store.ReadChanges(cursor, 64);
+
+        Assert.Equal(63, batch.Changes.Count);
+        Assert.True(batch.HasMore);
+        Assert.Equal(21, batch.ToRevision);
+
+        var next = store.ReadChanges(new SnapshotChangeCursor(batch.ToRevision, 0), 100);
+
+        Assert.Equal(27, next.Changes.Count);
+        Assert.Equal(22, next.Changes[0].Revision);
+    }
+
+    [Fact]
+    public void CombatStore_ChangeFeed_ReturnsWholeRevisionGroupWhenLimitIsSmaller()
+    {
+        var store = new CombatStore();
+        store.ApplyCombat(100, 200, 1, 1, 1, 1000);
+        store.ApplyCombat(300, 400, 1, 1, 1, 2000);
+
+        var batch = store.ReadChanges(store.CreateCursor(0), 1);
+
+        Assert.Equal(3, batch.Changes.Count);
+        Assert.True(batch.HasMore);
+        Assert.All(batch.Changes, change => Assert.Equal(1, change.Revision));
     }
 
     [Fact]

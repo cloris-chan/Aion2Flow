@@ -61,6 +61,7 @@ public class CombatDetailSubscriptionTests
 
         var delta = sub.Poll();
         Assert.Null(delta);
+        Assert.Equal(0, sub.LastAppliedRevision);
     }
 
     [Fact]
@@ -98,5 +99,40 @@ public class CombatDetailSubscriptionTests
         var delta2 = sub.Poll();
 
         Assert.Equal(800, delta2!.Combatant!.OutgoingDamage);
+    }
+
+    [Fact]
+    public void Subscription_DoesNotAdvanceRevisionForIrrelevantCombat()
+    {
+        var store = new CombatStore();
+        var projection = CombatPairProjection.FromCombatStore(store);
+        var sub = new CombatDetailSubscription(store, projection, 100);
+
+        store.ApplyCombat(300, 400, 700, 1, 1, 3000);
+
+        var delta = sub.Poll();
+
+        Assert.Null(delta);
+        Assert.Equal(0, sub.LastAppliedRevision);
+        Assert.Equal(0, store.GetCombatantDetailRevision(100));
+    }
+
+    [Fact]
+    public void Subscription_CatchesRelevantChangeAfterLargeIrrelevantBurst()
+    {
+        var store = new CombatStore();
+        var projection = CombatPairProjection.FromCombatStore(store);
+        var sub = new CombatDetailSubscription(store, projection, 100);
+
+        for (int i = 0; i < 80; i++)
+            store.ApplyCombat(300 + i, 400 + i, 1, 1, 1, 3000 + i);
+
+        store.ApplyCombat(100, 200, 500, 1, 1, 1000);
+
+        var delta = sub.Poll();
+
+        Assert.NotNull(delta);
+        Assert.Equal(store.GetCombatantDetailRevision(100), delta!.Revision);
+        Assert.Single(delta.OutgoingPairs);
     }
 }

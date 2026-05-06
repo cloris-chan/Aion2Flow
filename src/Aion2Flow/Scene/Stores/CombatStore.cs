@@ -9,6 +9,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     private readonly Dictionary<int, HashSet<(int, int)>> _outgoingBySource = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _incomingByTarget = [];
     private readonly List<CombatSnapshotChange> _changeLog = [];
+    private readonly Dictionary<int, long> _detailRevisionByCombatant = [];
     private long _revision;
 
     public IReadOnlyDictionary<(int Source, int Target), CombatPairRecord> Pairs => _pairs;
@@ -31,6 +32,8 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         pair.LastSkillCode = skillCode;
         pair.Revision = _revision;
         _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.PairUpdated, sourceId, pairKey, _revision));
+        MarkDetailRevision(sourceId, _revision);
+        MarkDetailRevision(targetId, _revision);
 
         var source = GetOrAddCombatant(sourceId);
         source.OutgoingDamage += damage;
@@ -79,6 +82,9 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     public IReadOnlyCollection<(int, int)> GetIncomingPairs(int targetId) =>
         _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
 
+    public long GetCombatantDetailRevision(int combatantId) =>
+        combatantId > 0 && _detailRevisionByCombatant.TryGetValue(combatantId, out var revision) ? revision : 0;
+
     private CombatantRecord GetOrAddCombatant(int combatantId)
     {
         ref var record = ref CollectionsMarshal.GetValueRefOrAddDefault(_combatants, combatantId, out var exists);
@@ -91,6 +97,16 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         return record!;
     }
 
+    private void MarkDetailRevision(int combatantId, long revision)
+    {
+        if (combatantId <= 0)
+            return;
+
+        _detailRevisionByCombatant[combatantId] = _detailRevisionByCombatant.TryGetValue(combatantId, out var current)
+            ? Math.Max(current, revision)
+            : revision;
+    }
+
     public void Clear()
     {
         _pairs.Clear();
@@ -98,6 +114,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         _outgoingBySource.Clear();
         _incomingByTarget.Clear();
         _changeLog.Clear();
+        _detailRevisionByCombatant.Clear();
         _revision = 0;
     }
 
@@ -106,6 +123,8 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
 
     public SnapshotChangeBatch<CombatSnapshotChange> ReadChanges(SnapshotChangeCursor cursor, int maxChanges)
     {
+        maxChanges = Math.Max(1, maxChanges);
+
         int lo = 0, hi = _changeLog.Count;
         while (lo < hi)
         {
@@ -121,6 +140,21 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             return new SnapshotChangeBatch<CombatSnapshotChange>(cursor.Revision, _revision, [], false);
 
         int count = Math.Min(maxChanges, _changeLog.Count - start);
+        if (count < _changeLog.Count - start)
+        {
+            var lastRevision = _changeLog[start + count - 1].Revision;
+            if (_changeLog[start + count].Revision == lastRevision)
+            {
+                while (count > 0 && _changeLog[start + count - 1].Revision == lastRevision)
+                    count--;
+                if (count == 0)
+                {
+                    count = 1;
+                    while (start + count < _changeLog.Count && _changeLog[start + count].Revision == lastRevision)
+                        count++;
+                }
+            }
+        }
         var changes = _changeLog.GetRange(start, count);
         return new SnapshotChangeBatch<CombatSnapshotChange>(
             cursor.Revision,
