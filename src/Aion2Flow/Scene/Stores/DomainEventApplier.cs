@@ -41,7 +41,16 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
             case ObservedEventDomain.Resource when entry.Resource is { } resource:
                 entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
                 break;
+            case ObservedEventDomain.Aura when entry.Aura is { } aura:
+                ApplyAura(in aura);
+                break;
         }
+    }
+
+    private void ApplyAura(in AuraObservation aura)
+    {
+        if (aura.TargetEntityId > 0 && aura.SequenceId > 0)
+            entities.ApplyNpc2C38State(aura.TargetEntityId, aura.SequenceId, aura.ResultCode);
     }
 
     private void ApplyState(in ObservedEventEnvelope entry, in StateObservation state)
@@ -62,6 +71,30 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         if (state.StateCode is >= 2_000_000 and <= 2_999_999)
         {
             entities.ApplyNpcCode(state.EntityId, state.StateCode);
+            return;
+        }
+
+        if (state.StateCode == 2136)
+        {
+            entities.ApplyNpc2136State(state.EntityId, checked((uint)state.Value0), checked((uint)state.Value1));
+            return;
+        }
+
+        if (state.StateCode == 140)
+        {
+            entities.ApplyNpc0140Value(state.EntityId, checked((uint)state.Value0));
+            return;
+        }
+
+        if (state.StateCode == 240)
+        {
+            entities.ApplyNpc0240Value(state.EntityId, checked((uint)state.Value0));
+            return;
+        }
+
+        if (state.StateCode == 4636)
+        {
+            entities.ApplyNpc4636State(state.EntityId, checked((byte)state.Value0), checked((byte)state.Value1));
             return;
         }
 

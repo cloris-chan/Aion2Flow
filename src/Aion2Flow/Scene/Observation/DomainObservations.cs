@@ -10,4 +10,4 @@ public readonly record struct SceneObservation(int MapId, int MapInstanceId, int
 
 public readonly record struct ResourceObservation(int EntityId, long? CurrentValue, long? MaximumValue, long? Delta, int ResourceKind);
 
-public readonly record struct AuraObservation(int SourceEntityId, int TargetEntityId, int SkillCode, int StackCount, int SequenceId, int ChainId);
+public readonly record struct AuraObservation(int SourceEntityId, int TargetEntityId, int SkillCode, int StackCount, int SequenceId, int ChainId, int ResultCode);

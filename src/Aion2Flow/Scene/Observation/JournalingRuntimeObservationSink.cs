@@ -306,7 +306,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 SkillCode = (int)buffCodeRaw,
                 StackCount = 0,
                 SequenceId = sequenceId,
-                ChainId = 0
+                ChainId = 0,
+                ResultCode = 0
             }
         });
     }
@@ -337,7 +338,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 SkillCode = tailSkillCodeRaw,
                 StackCount = 0,
                 SequenceId = sequenceId,
-                ChainId = 0
+                ChainId = 0,
+                ResultCode = resultCode
             }
         });
     }

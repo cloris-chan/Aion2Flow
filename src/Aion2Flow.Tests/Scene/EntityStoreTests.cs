@@ -57,6 +57,25 @@ public class EntityStoreTests
     }
 
     [Fact]
+    public void EntityStore_ApplyNpcExtendedState_UpdatesNpcRuntimeFields()
+    {
+        var store = new EntityStore();
+        store.ApplyNpc2136State(4370, 6, 200003);
+        store.ApplyNpc0140Value(4370, 200003);
+        store.ApplyNpc0240Value(4370, 200003);
+        store.ApplyNpc4636State(4370, 2, 79);
+        store.ApplyNpc2C38State(4370, 95, 7);
+
+        Assert.True(store.TryGet(4370, out var entity));
+        Assert.Equal((uint)6, entity!.Sequence2136);
+        Assert.Equal((uint)200003, entity.Value2136);
+        Assert.Equal((uint)200003, entity.Value0140);
+        Assert.Equal((uint)200003, entity.Value0240);
+        Assert.Equal(((byte)2, (byte)79), entity.State4636);
+        Assert.Equal((95, 7), entity.Latest2C38);
+    }
+
+    [Fact]
     public void EntityStore_IsKnownEntity_ReturnsTrueForExisting()
     {
         var store = new EntityStore();
@@ -229,6 +248,77 @@ public class DomainEventApplierTests
         Assert.True(combat.TryGetPair(100, reboundId, out var pair));
         Assert.Equal(500, pair!.TotalDamage);
         Assert.False(entities.TryGet(3518, out _));
+    }
+
+    [Fact]
+    public void Applier_NpcExtendedStateObservations_PopulateEntityRecord()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 4370,
+            TargetEntityId = 0,
+            State = new StateObservation { EntityId = 4370, StateCode = 2136, Value0 = 6, Value1 = 200003 }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 4370,
+            TargetEntityId = 0,
+            State = new StateObservation { EntityId = 4370, StateCode = 140, Value0 = 200003 }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 2 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 4370,
+            TargetEntityId = 0,
+            State = new StateObservation { EntityId = 4370, StateCode = 240, Value0 = 200003 }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 3 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 4370,
+            TargetEntityId = 0,
+            State = new StateObservation { EntityId = 4370, StateCode = 4636, Value0 = 2, Value1 = 79 }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 4 },
+            Domain = ObservedEventDomain.Aura,
+            SourceEntityId = 0,
+            TargetEntityId = 4370,
+            Aura = new AuraObservation { TargetEntityId = 4370, SequenceId = 95, ResultCode = 7 }
+        });
+
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
+
+        applier.ApplyJournal(journal);
+
+        Assert.True(entities.TryGet(4370, out var entity));
+        Assert.Equal((uint)6, entity!.Sequence2136);
+        Assert.Equal((uint)200003, entity.Value2136);
+        Assert.Equal((uint)200003, entity.Value0140);
+        Assert.Equal((uint)200003, entity.Value0240);
+        Assert.Equal(((byte)2, (byte)79), entity.State4636);
+        Assert.Equal((95, 7), entity.Latest2C38);
     }
 
     [Fact]
