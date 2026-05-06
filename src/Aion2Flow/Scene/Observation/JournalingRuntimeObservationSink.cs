@@ -398,7 +398,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             State = new StateObservation
             {
                 EntityId = uid,
-                StateCode = 0,
+                StateCode = StateCodes.PlayerIdentity,
                 Value0 = 0,
                 Value1 = 0,
                 DetailRaw = 0
@@ -430,7 +430,29 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
     }
 
     public void AppendNpcName(int npcCode, string name) { }
-    public void AppendNpcKind(int instanceId, NpcKind kind) { }
+
+    public void AppendNpcKind(int instanceId, NpcKind kind)
+    {
+        instanceId = ResolveLifecycleId(instanceId);
+        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneSessionId,
+            Stamp = stamp,
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = instanceId,
+            TargetEntityId = 0,
+            Raw = default,
+            State = new StateObservation
+            {
+                EntityId = instanceId,
+                StateCode = StateCodes.NpcKind,
+                Value0 = (int)kind,
+                Value1 = 0,
+                DetailRaw = 0
+            }
+        });
+    }
 
     public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds)
     {
@@ -443,7 +465,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Resource,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = new RawPacketReference
+            {
+                Opcode = 0x008D,
+                PayloadLength = 0,
+                CaptureSequence = 0,
+                TimestampMilliseconds = observedAtMilliseconds
+            },
             Resource = new ResourceObservation
             {
                 EntityId = instanceId,
@@ -466,7 +494,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Resource,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = new RawPacketReference
+            {
+                Opcode = 0x008D,
+                PayloadLength = 0,
+                CaptureSequence = 0,
+                TimestampMilliseconds = observedAtMilliseconds
+            },
             Resource = new ResourceObservation
             {
                 EntityId = instanceId,
@@ -489,19 +523,46 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = new RawPacketReference
+            {
+                Opcode = 0x218D,
+                PayloadLength = 0,
+                CaptureSequence = 0,
+                TimestampMilliseconds = observedAtMilliseconds
+            },
             State = new StateObservation
             {
                 EntityId = instanceId,
-                StateCode = isActive ? 1 : 0,
-                Value0 = 0,
+                StateCode = StateCodes.NpcBattle,
+                Value0 = isActive ? 1 : 0,
                 Value1 = 0,
                 DetailRaw = 0
             }
         });
     }
 
-    public void ToggleNpcBattle(int instanceId) { }
+    public void ToggleNpcBattle(int instanceId)
+    {
+        instanceId = ResolveLifecycleId(instanceId);
+        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneSessionId,
+            Stamp = stamp,
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = instanceId,
+            TargetEntityId = 0,
+            Raw = default,
+            State = new StateObservation
+            {
+                EntityId = instanceId,
+                StateCode = StateCodes.NpcBattleToggle,
+                Value0 = 0,
+                Value1 = 0,
+                DetailRaw = 0
+            }
+        });
+    }
 
     public void AppendNpc2136State(int instanceId, uint sequence, uint value0)
     {

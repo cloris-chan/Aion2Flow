@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Scene.Canonicalization;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
@@ -12,10 +13,12 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
     private readonly MultiHitAttributionService _multiHitAttribution = new();
     private readonly CompactOutcomeCanonicalizer _compactOutcome = new();
     private readonly PeriodicLinkCanonicalizer _periodicLink = new();
+    private readonly BossFocusStore _bossFocus = new(entities);
 
     public EntityStore Entities => entities;
     public MetadataStore Metadata => metadata;
     public CombatStore Combat => combat;
+    public BossFocusStore BossFocus => _bossFocus;
 
     public void ApplyJournal(ObservedEventJournal journal)
     {
@@ -50,6 +53,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
                 break;
             case ObservedEventDomain.Resource when entry.Resource is { } resource:
                 entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
+                _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), entry.Raw.TimestampMilliseconds);
                 break;
             case ObservedEventDomain.Aura when entry.Aura is { } aura:
                 ApplyAura(in entry, in aura);
@@ -132,10 +136,34 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
             return;
         }
 
-        if (state.StateCode == 0)
+        if (state.StateCode == StateCodes.PlayerIdentity)
         {
             if (entry.SourceEntityId > 0)
                 entities.ApplyNickname(entry.SourceEntityId, string.Empty);
+            return;
+        }
+
+        if (state.StateCode == StateCodes.NpcKind)
+        {
+            var kind = Enum.IsDefined((NpcKind)state.Value0) ? (NpcKind)state.Value0 : NpcKind.Unknown;
+            entities.ApplyNpcKind(state.EntityId, kind);
+            _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Raw.TimestampMilliseconds);
+            return;
+        }
+
+        if (state.StateCode == StateCodes.NpcBattle)
+        {
+            var isActive = state.Value0 != 0 && CanNpcBattleActivate(state.EntityId);
+            entities.ApplyBattleToggle(state.EntityId, isActive);
+            _bossFocus.ApplyBattle(state.EntityId, isActive, entry.Raw.TimestampMilliseconds);
+            return;
+        }
+
+        if (state.StateCode == StateCodes.NpcBattleToggle)
+        {
+            var isActive = !entities.GetOrAdd(state.EntityId).BattleActive && CanNpcBattleActivate(state.EntityId);
+            entities.ApplyBattleToggle(state.EntityId, isActive);
+            _bossFocus.ApplyBattleToggle(state.EntityId, isActive, entry.Raw.TimestampMilliseconds);
             return;
         }
 
@@ -171,4 +199,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
 
         _ = entities.GetOrAdd(state.EntityId);
     }
+
+    private bool CanNpcBattleActivate(int instanceId) =>
+        !entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
 }

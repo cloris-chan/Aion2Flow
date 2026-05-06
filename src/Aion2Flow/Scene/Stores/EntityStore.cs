@@ -57,7 +57,9 @@ public sealed class EntityStore
     {
         var entity = GetOrAdd(instanceId);
         entity.CurrentHp = hp;
-        entity.MaxHp = maxHp;
+        entity.MaxHp = maxHp > 0 ? Math.Max(maxHp, hp) : Math.Max(entity.MaxHp ?? 0, hp);
+        if (hp == 0)
+            entity.BattleActive = false;
     }
 
     public void ApplyBattleToggle(int instanceId, bool isActive)

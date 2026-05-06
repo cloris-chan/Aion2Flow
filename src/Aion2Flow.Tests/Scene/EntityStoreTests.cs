@@ -57,6 +57,19 @@ public class EntityStoreTests
     }
 
     [Fact]
+    public void EntityStore_ApplyNpcHp_PreservesKnownMaxWhenRemainHpOmitsMax()
+    {
+        var store = new EntityStore();
+
+        store.ApplyNpcHp(56688, 49_200, 49_200);
+        store.ApplyNpcHp(56688, 22_847, 0);
+
+        Assert.True(store.TryGet(56688, out var entity));
+        Assert.Equal(22_847, entity!.CurrentHp);
+        Assert.Equal(49_200, entity.MaxHp);
+    }
+
+    [Fact]
     public void EntityStore_ApplyNpcExtendedState_UpdatesNpcRuntimeFields()
     {
         var store = new EntityStore();

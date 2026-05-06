@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.Combat.NpcRuntime;
 
 namespace Cloris.Aion2Flow.Combat;
 
-internal static class EncounterHeuristicEvaluator
+internal static class BossFocusHeuristicEvaluator
 {
     public static EncounterSummary Evaluate(int trackingTargetId, long battleTime, NpcRuntimeObservation? observation)
     {

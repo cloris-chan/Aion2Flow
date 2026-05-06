@@ -3,7 +3,7 @@ using Cloris.Aion2Flow.Combat.NpcRuntime;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
 
-public sealed class EncounterHeuristicEvaluatorTests
+public sealed class BossFocusHeuristicEvaluatorTests
 {
     [Fact]
     public void Treats_SceneActivation_Hint_As_Active_Encounter()
@@ -14,7 +14,7 @@ public sealed class EncounterHeuristicEvaluatorTests
             PhaseHint = NpcRuntimePhaseHint.SceneActivation
         };
 
-        var summary = EncounterHeuristicEvaluator.Evaluate(4370, 0, observation);
+        var summary = BossFocusHeuristicEvaluator.Evaluate(4370, 0, observation);
 
         Assert.True(summary.IsActive);
         Assert.False(summary.ShouldArchive);
@@ -31,7 +31,7 @@ public sealed class EncounterHeuristicEvaluatorTests
             Hp = 156000
         };
 
-        var summary = EncounterHeuristicEvaluator.Evaluate(4370, 10_000, observation);
+        var summary = BossFocusHeuristicEvaluator.Evaluate(4370, 10_000, observation);
 
         Assert.False(summary.IsActive);
         Assert.True(summary.ShouldArchive);
@@ -48,7 +48,7 @@ public sealed class EncounterHeuristicEvaluatorTests
             PhaseHint = NpcRuntimePhaseHint.ActiveCombat
         };
 
-        var summary = EncounterHeuristicEvaluator.Evaluate(4370, 0, observation);
+        var summary = BossFocusHeuristicEvaluator.Evaluate(4370, 0, observation);
 
         Assert.True(summary.IsActive);
         Assert.False(summary.ShouldArchive);

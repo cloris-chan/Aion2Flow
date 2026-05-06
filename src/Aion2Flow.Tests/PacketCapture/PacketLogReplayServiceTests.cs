@@ -8,6 +8,8 @@ using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Scene;
+using Cloris.Aion2Flow.Scene.Journal;
+using Cloris.Aion2Flow.Scene.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.PacketCapture;
@@ -251,12 +253,31 @@ public sealed class PacketLogReplayServiceTests
             Assert.Equal(22_847, boss.Hp);
             Assert.Equal(49_200, boss.MaxHp);
 
+            SceneDualWrite.Enabled = true;
+            var sceneReplay = PacketLogReplayService.Replay(hpPath);
+            SceneDualWrite.Enabled = false;
+            var applier = ApplySceneJournal(sceneReplay.SceneJournal!);
+
+            Assert.True(applier.BossFocus.TryGetObservedBoss(afterHp, 2_000, out var sceneBoss));
+            Assert.True(sceneBoss.HasHp);
+            Assert.Equal(56_688, sceneBoss.InstanceId);
+            Assert.Equal(22_847, sceneBoss.Hp);
+            Assert.Equal(49_200, sceneBoss.MaxHp);
+
             var exitReplay = PacketLogReplayService.Replay(exitPath);
             var afterExit = DateTimeOffset.Parse("2026-05-01T21:38:08.2582599+08:00").ToUnixTimeMilliseconds();
             Assert.False(exitReplay.Store.TryGetObservedBoss(afterExit, 2_000, out _));
+
+            SceneDualWrite.Enabled = true;
+            var sceneExitReplay = PacketLogReplayService.Replay(exitPath);
+            SceneDualWrite.Enabled = false;
+            var exitApplier = ApplySceneJournal(sceneExitReplay.SceneJournal!);
+
+            Assert.False(exitApplier.BossFocus.TryGetObservedBoss(afterExit, 2_000, out _));
         }
         finally
         {
+            SceneDualWrite.Enabled = false;
             File.Delete(spawnOnlyPath);
             File.Delete(sidecarOnlyPath);
             File.Delete(hpPath);
@@ -1090,6 +1111,13 @@ public sealed class PacketLogReplayServiceTests
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.{logKind}.log");
         File.WriteAllLines(path, lines);
         return path;
+    }
+
+    private static DomainEventApplier ApplySceneJournal(ObservedEventJournal journal)
+    {
+        var applier = new DomainEventApplier(new EntityStore(), new MetadataStore(), new CombatStore());
+        applier.ApplyJournal(journal);
+        return applier;
     }
 
     private static StreamReplayEntry CreateStreamReplayEntry(string timestamp, string fixture)

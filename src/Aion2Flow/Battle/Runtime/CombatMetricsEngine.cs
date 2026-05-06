@@ -310,7 +310,7 @@ public sealed class CombatMetricsEngine(CombatMetricsStore store)
             }
 
             dataSnapshot.BattleTime = battleTime;
-            dataSnapshot.Encounter = EncounterHeuristicEvaluator.Evaluate(_currentTarget, battleTime, dataSnapshot.TargetObservation);
+            dataSnapshot.Encounter = BossFocusHeuristicEvaluator.Evaluate(_currentTarget, battleTime, dataSnapshot.TargetObservation);
             return dataSnapshot;
         }
     }
