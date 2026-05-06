@@ -11,6 +11,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
     private readonly PeriodicChainCanonicalizer _periodicChain = new();
     private readonly MultiHitAttributionService _multiHitAttribution = new();
     private readonly CompactOutcomeCanonicalizer _compactOutcome = new();
+    private readonly PeriodicLinkCanonicalizer _periodicLink = new();
 
     public EntityStore Entities => entities;
     public MetadataStore Metadata => metadata;
@@ -62,10 +63,8 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         {
             var stamp = result.Stamp;
             var observation = result.Observation;
-            var systemRecoveryResult = _systemPeriodicRecovery.Normalize(result.SourceId, result.TargetId, in stamp, in observation);
-            var systemRecoveryObservation = systemRecoveryResult.Observation;
-            foreach (var normalized in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
-                ApplyCombatResult(in stamp, in normalized);
+            var canonicalized = new CombatCanonicalizationResult(result.SourceId, result.TargetId, observation);
+            ApplyCanonicalizedCombatResult(in stamp, in canonicalized);
         }
     }
 
@@ -74,6 +73,13 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
     private void ApplyCombat(in ObservedEventEnvelope entry, in CombatObservation combatObservation)
     {
         var stamp = entry.Stamp;
+        if (entry.Raw.Opcode == 0x0538 && PeriodicLinkCanonicalizer.IsLinkObservation(in combatObservation))
+        {
+            if (_periodicLink.Normalize(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation) is { } periodicLinkResult)
+                ApplyCanonicalizedCombatResult(in stamp, in periodicLinkResult);
+            return;
+        }
+
         var rawResults = entry.Raw.Opcode switch
         {
             0x0238 => _compactOutcome.ObserveCompactControl0238(entry.SourceEntityId, in stamp, in combatObservation),
@@ -85,11 +91,18 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         {
             var observation = rawResult.Observation;
             var resultStamp = rawResult.Stamp;
-            var systemRecoveryResult = _systemPeriodicRecovery.Normalize(rawResult.SourceId, rawResult.TargetId, in resultStamp, in observation);
-            var systemRecoveryObservation = systemRecoveryResult.Observation;
-            foreach (var result in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
-                ApplyCombatResult(in resultStamp, in result);
+            var result = new CombatCanonicalizationResult(rawResult.SourceId, rawResult.TargetId, observation);
+            ApplyCanonicalizedCombatResult(in resultStamp, in result);
         }
+    }
+
+    private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result)
+    {
+        var observation = result.Observation;
+        var systemRecoveryResult = _systemPeriodicRecovery.Normalize(result.SourceId, result.TargetId, in stamp, in observation);
+        var systemRecoveryObservation = systemRecoveryResult.Observation;
+        foreach (var normalized in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
+            ApplyCombatResult(in stamp, in normalized);
     }
 
     private void ApplyCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result)
@@ -97,12 +110,6 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         var observation = result.Observation;
         combat.ApplyCombat(result.SourceId, result.TargetId, in observation);
         _multiHitAttribution.ObserveCombat(result.SourceId, result.TargetId, in stamp, in observation);
-    }
-
-    private void ApplyCombatResult(in CombatCanonicalizationResult result)
-    {
-        var observation = result.Observation;
-        combat.ApplyCombat(result.SourceId, result.TargetId, in observation);
     }
 
     private void ApplyAura(in ObservedEventEnvelope entry, in AuraObservation aura)

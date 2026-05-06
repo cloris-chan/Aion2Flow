@@ -287,6 +287,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
+        linkId = ResolveLifecycleId(linkId);
+        RememberNpcObservationSource(targetId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, batchOrdinal);
         journal.Append(new ObservedEventEnvelope
         {
@@ -305,10 +307,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Combat = new CombatObservation
             {
                 SkillCode = tailRaw,
+                OriginalSkillCode = tailRaw,
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
-                DetailRaw = linkId
+                DetailRaw = linkId,
+                Marker = sequenceId,
+                Type = 48
             }
         });
     }
