@@ -10,6 +10,7 @@ using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.Scene.Projection;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
 
@@ -140,7 +141,8 @@ public sealed class PacketLogReplayService
                 ingestCounter,
                 snapshotCounter,
                 summaryCounter),
-            SceneJournal = sinkHolder.Journal
+            SceneJournal = sinkHolder.Journal,
+            SceneOwner = sinkHolder.Owner
         };
     }
 
@@ -219,7 +221,8 @@ public sealed class PacketLogReplayService
                 ingestCounter,
                 snapshotCounter,
                 summaryCounter),
-            SceneJournal = sinkHolder.Journal
+            SceneJournal = sinkHolder.Journal,
+            SceneOwner = sinkHolder.Owner
         };
     }
 
@@ -1595,6 +1598,7 @@ public sealed record PacketLogReplayResult(
 {
     public PacketLogReplayBaselineCounters BaselineCounters { get; init; } = PacketLogReplayBaselineCounters.Empty;
     public ObservedEventJournal? SceneJournal { get; init; }
+    public SceneReadModelOwner? SceneOwner { get; init; }
 }
 
 public sealed record PacketLogReplayBaselineCounters(

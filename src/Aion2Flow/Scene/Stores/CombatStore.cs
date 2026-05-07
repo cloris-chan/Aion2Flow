@@ -11,12 +11,14 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     private readonly Dictionary<int, CombatantRecord> _combatants = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _outgoingBySource = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _incomingByTarget = [];
+    private readonly List<CombatEventRecord> _events = [];
     private readonly List<CombatSnapshotChange> _changeLog = [];
     private readonly Dictionary<int, long> _detailRevisionByCombatant = [];
     private long _revision;
 
     public IReadOnlyDictionary<(int Source, int Target), CombatPairRecord> Pairs => _pairs;
     public IReadOnlyDictionary<int, CombatantRecord> Combatants => _combatants;
+    public IReadOnlyList<CombatEventRecord> Events => _events;
     public long Revision => _revision;
 
     public void ApplyCombat(int sourceId, int targetId, long damage, int hitCount, int attemptCount, int skillCode)
@@ -45,6 +47,23 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         var evadeCount = contributesDamage && (observation.Modifiers & DamageModifiers.Evade) != 0 ? attemptCount : 0;
         var invincibleCount = contributesDamage && (observation.Modifiers & DamageModifiers.Invincible) != 0 ? attemptCount : 0;
         var multiHitCount = contributesDamage && (observation.Modifiers & DamageModifiers.MultiHit) != 0 ? 1 : 0;
+        _events.Add(new CombatEventRecord
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            Observation = observation,
+            ObservedAtMilliseconds = observedAtMilliseconds,
+            Revision = _revision,
+            ContributesDamage = contributesDamage,
+            ContributesHealing = contributesHealing,
+            ContributesShieldGrant = contributesShieldGrant,
+            ContributesShieldAbsorbed = contributesShieldAbsorbed,
+            HitCount = hitCount,
+            AttemptCount = attemptCount,
+            EvadeCount = evadeCount,
+            InvincibleCount = invincibleCount,
+            MultiHitCount = multiHitCount
+        });
 
         var pairKey = (sourceId, targetId);
         if (!_pairs.TryGetValue(pairKey, out var pair))
@@ -218,6 +237,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         _combatants.Clear();
         _outgoingBySource.Clear();
         _incomingByTarget.Clear();
+        _events.Clear();
         _changeLog.Clear();
         _detailRevisionByCombatant.Clear();
         _revision = 0;
@@ -288,6 +308,24 @@ public sealed class CombatPairRecord
     public long FirstObserved { get; set; }
     public long LastObserved { get; set; }
     public long Revision { get; set; }
+}
+
+public sealed class CombatEventRecord
+{
+    public int SourceId { get; init; }
+    public int TargetId { get; init; }
+    public CombatObservation Observation { get; init; }
+    public long ObservedAtMilliseconds { get; init; }
+    public long Revision { get; init; }
+    public bool ContributesDamage { get; init; }
+    public bool ContributesHealing { get; init; }
+    public bool ContributesShieldGrant { get; init; }
+    public bool ContributesShieldAbsorbed { get; init; }
+    public int HitCount { get; init; }
+    public int AttemptCount { get; init; }
+    public int EvadeCount { get; init; }
+    public int InvincibleCount { get; init; }
+    public int MultiHitCount { get; init; }
 }
 
 public sealed class CombatantRecord

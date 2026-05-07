@@ -702,14 +702,30 @@ public class LegacyBattleSnapshotAdapterTests
         var combat = new CombatStore();
         entities.ApplyNickname(100, "Player1");
         entities.ApplyNpcCode(200, 2310108);
-        combat.ApplyCombat(100, 200, 1000, 5, 5, 1000);
+        combat.ApplyCombat(100, 200, new CombatObservation
+        {
+            SkillCode = 1000,
+            Damage = 1000,
+            HitCount = 5,
+            AttemptCount = 5,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_000);
+        combat.ApplyCombat(100, 200, new CombatObservation
+        {
+            SkillCode = 1000,
+            Damage = 1,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_001);
 
         var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
         var snapshot = adapter.CreateSnapshot();
 
-        Assert.Equal(2, snapshot.Combatants.Count);
+        Assert.Single(snapshot.Combatants);
         Assert.True(snapshot.Combatants.ContainsKey(100));
-        Assert.True(snapshot.Combatants.ContainsKey(200));
     }
 
     [Fact]
@@ -719,13 +735,29 @@ public class LegacyBattleSnapshotAdapterTests
         var combat = new CombatStore();
         entities.ApplyNickname(100, "Perigee");
         entities.ApplyNpcCode(200, 9_999_998);
-        combat.ApplyCombat(100, 200, 500, 1, 1, 1000);
+        combat.ApplyCombat(100, 200, new CombatObservation
+        {
+            SkillCode = 1000,
+            Damage = 500,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_000);
+        combat.ApplyCombat(100, 200, new CombatObservation
+        {
+            SkillCode = 1000,
+            Damage = 1,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_001);
 
         var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Equal("Perigee", snapshot.Combatants[100].Nickname);
-        Assert.Equal("NPC-9999998", snapshot.Combatants[200].Nickname);
     }
 
     [Fact]
@@ -809,16 +841,149 @@ public class SceneCombatSnapshotAdapterTests
         Assert.Equal(2_600, snapshot.BattleEndTime);
         Assert.Equal(1_600, snapshot.BattleTime);
         Assert.True(snapshot.Encounter.IsActive);
-
         var player = snapshot.Combatants[100];
         Assert.Equal("Perigee", player.Nickname);
         Assert.Equal(1500, player.DamageAmount);
         Assert.Equal(600, player.HealingAmount);
         Assert.Equal(300, player.ShieldAbsorbedAmount);
         Assert.Equal(1, player.ShieldAbsorbedTimes);
-        Assert.Equal(CharacterClass.None, player.CharacterClass);
-        Assert.Equal(1500d / 1600 * 1000, player.DamagePerSecond, 3);
+    }
+
+    [Fact]
+    public void Adapter_CreateSnapshot_ExpandsSinglePointWindowWithRelevantRecovery()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new Skill(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        entities.ApplyNickname(100, "Perigee");
+        entities.ApplyNpcCode(200, 9_999_999);
+        metadata.ApplyNpcName(9_999_999, "Nazarak");
+
+        combat.ApplyCombat(100, 200, new CombatObservation
+        {
+            SkillCode = 11000010,
+            Damage = 1500,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_000);
+        combat.ApplyCombat(100, 100, new CombatObservation
+        {
+            SkillCode = 13000010,
+            Damage = 600,
+            EventKind = CombatEventKind.Healing,
+            ValueKind = CombatValueKind.Healing
+        }, 2_500);
+
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata);
+        var snapshot = adapter.CreateSnapshot();
+
+        var player = snapshot.Combatants[100];
+        Assert.Equal("Perigee", player.Nickname);
+        Assert.Equal(1500, player.DamageAmount);
+        Assert.Equal(600, player.HealingAmount);
+        Assert.Equal(CharacterClass.Gladiator, player.CharacterClass);
+        Assert.Equal(1_000, snapshot.BattleStartTime);
+        Assert.Equal(2_500, snapshot.BattleEndTime);
+        Assert.Equal(1_500, snapshot.BattleTime);
+        Assert.Equal(1500d / 1500 * 1000, player.DamagePerSecond, 3);
         Assert.Equal(1d, player.DamageContribution, 3);
+    }
+
+    [Fact]
+    public void Adapter_CreateSnapshot_FoldsSummonOutgoingDamageToOwnerAndSkipsSummonTargets()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new Skill(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
+            new Skill(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var entities = new EntityStore();
+        var combat = new CombatStore();
+        entities.ApplyNickname(314, "Owner");
+        entities.ApplySummon(314, 900);
+        entities.ApplyNpcCode(200, 9_999_999);
+
+        combat.ApplyCombat(314, 200, new CombatObservation
+        {
+            SkillCode = 16010000,
+            Damage = 405,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_000);
+        combat.ApplyCombat(900, 200, new CombatObservation
+        {
+            SkillCode = 16100003,
+            Damage = 1205,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_010);
+        combat.ApplyCombat(900, 900, new CombatObservation
+        {
+            SkillCode = 16990004,
+            Damage = 10_000,
+            EventKind = CombatEventKind.Support,
+            ValueKind = CombatValueKind.Support
+        }, 1_020);
+
+        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore()).CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(314, out var owner));
+        Assert.False(snapshot.Combatants.ContainsKey(900));
+        Assert.Equal(1610, owner.DamageAmount);
+        Assert.Equal(CharacterClass.Elementalist, owner.CharacterClass);
+    }
+
+    [Fact]
+    public void Adapter_CreateSnapshot_HidesKnownNpcClassEvenWithPlayerSkill()
+    {
+        CombatMetricsEngine.SetGameResources(
+        [
+            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var entities = new EntityStore();
+        var combat = new CombatStore();
+        entities.ApplyNickname(100, "Player");
+        entities.ApplyNpcCode(200, 9_999_999);
+
+        combat.ApplyCombat(100, 200, new CombatObservation
+        {
+            SkillCode = 11000010,
+            Damage = 500,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_000);
+        combat.ApplyCombat(200, 100, new CombatObservation
+        {
+            SkillCode = 11000010,
+            Damage = 300,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_100);
+
+        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore()).CreateSnapshot();
+
+        Assert.Equal(CharacterClass.Gladiator, snapshot.Combatants[100].CharacterClass);
+        Assert.Null(snapshot.Combatants[200].CharacterClass);
     }
 }
 
