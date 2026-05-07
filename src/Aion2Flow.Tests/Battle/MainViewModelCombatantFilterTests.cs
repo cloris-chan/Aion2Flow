@@ -199,6 +199,22 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_SceneMode_RefreshesLiveDetailFromSceneProjection()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        fixture.ViewModel.SelectedCombatant = Assert.Single(fixture.ViewModel.Combatants);
+
+        Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.CombatantName);
+        Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
+        Assert.Equal(2, fixture.ViewModel.CombatantDetails.OutgoingDamage.Hits);
+        Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
+        Assert.Single(fixture.ViewModel.CombatantDetails.OutgoingDetail.DamageCounterpartFilter.Counterparts);
+    }
+
+    [Fact]
     public void SceneLiveReadModel_Reset_StartsNewBattleWithoutDroppingIdentity()
     {
         var scene = new SceneLiveReadModel();

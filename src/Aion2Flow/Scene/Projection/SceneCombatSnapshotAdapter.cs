@@ -43,7 +43,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         if (battleTime > 0)
         {
-            foreach (var battleEvent in EnumerateBattleEvents(start, end))
+            foreach (var battleEvent in EnumerateBattleEvents(start, end, null))
                 ApplyEvent(snapshot, battleEvent);
         }
 
@@ -66,6 +66,22 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return snapshot;
     }
 
+    public IReadOnlyList<CombatDetailEvent> CreateDetailEvents(DamageMeterSnapshot snapshot, int combatantId, CombatPairProjection projection)
+    {
+        if (combatantId <= 0 || snapshot.BattleTime <= 0 || snapshot.BattleStartTime <= 0 || snapshot.BattleEndTime < snapshot.BattleStartTime || !snapshot.Combatants.ContainsKey(combatantId))
+            return [];
+
+        _inferredOwnerBySummon.Clear();
+        InferPreexistingSummonOwners();
+        var events = new List<CombatDetailEvent>();
+        AppendDetailEvents(events, snapshot, combatantId, projection.Pairs.Values);
+        events.Sort(static (a, b) => a.Revision.CompareTo(b.Revision));
+
+        return events;
+    }
+
+    public string ResolveDetailDisplayName(int entityId) => ResolveDisplayName(entityId);
+
     private void ApplyEvent(DamageMeterSnapshot snapshot, BattleEvent battleEvent)
     {
         if (battleEvent.SourceId <= 0)
@@ -82,6 +98,37 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
 
         metrics.ProcessCombatEvent(packet);
+    }
+
+    private void AppendDetailEvents(List<CombatDetailEvent> events, DamageMeterSnapshot snapshot, int combatantId, IEnumerable<DirectedPairSnapshot> pairs)
+    {
+        foreach (var pair in pairs)
+        {
+            var sourceId = ResolveCombatantId(pair.Key.SourceId);
+            if (sourceId != combatantId && pair.Key.TargetId != combatantId)
+                continue;
+
+            foreach (var record in combat.GetPairEvents(pair.Key.SourceId, pair.Key.TargetId))
+            {
+                var eventSourceId = ResolveCombatantId(record.SourceId);
+                if (!ShouldIncludeDetailEvent(record, eventSourceId, record.TargetId, snapshot))
+                    continue;
+
+                events.Add(new CombatDetailEvent(ToPacket(record, eventSourceId, record.TargetId), eventSourceId, record.TargetId, record.Revision));
+            }
+        }
+    }
+
+    private bool ShouldIncludeDetailEvent(CombatEventRecord e, int sourceId, int targetId, DamageMeterSnapshot snapshot)
+    {
+        if (IsWithinBattleWindow(e, snapshot.BattleStartTime, snapshot.BattleEndTime))
+            return !IsSummonDamageTarget(e);
+
+        var relevant = new HashSet<int>(snapshot.Combatants.Keys);
+        if (snapshot.TargetObservation?.InstanceId is int targetInstanceId && targetInstanceId > 0)
+            relevant.Add(targetInstanceId);
+
+        return IsRelevantRecoveryEvent(e, sourceId, targetId, relevant);
     }
 
     private CombatantMetrics GetOrAdd(DamageMeterSnapshot snapshot, int combatantId)
@@ -208,7 +255,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private IEnumerable<BattleEvent> EnumerateBattleEvents(long start, long end)
+    private IEnumerable<BattleEvent> EnumerateBattleEvents(long start, long end, HashSet<int>? filterCombatantIds)
     {
         if (start <= 0 || end < start)
             yield break;
@@ -224,7 +271,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             if (e.TargetId > 0)
                 relevant.Add(e.TargetId);
 
-            yield return new BattleEvent(e, sourceId, e.TargetId);
+            if (filterCombatantIds is null || filterCombatantIds.Contains(sourceId) || filterCombatantIds.Contains(e.TargetId))
+                yield return new BattleEvent(e, sourceId, e.TargetId);
         }
 
         if (relevant.Count == 0)
@@ -239,7 +287,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             if (!IsRelevantRecoveryEvent(e, sourceId, e.TargetId, relevant))
                 continue;
 
-            yield return new BattleEvent(e, sourceId, e.TargetId);
+            if (filterCombatantIds is null || filterCombatantIds.Contains(sourceId) || filterCombatantIds.Contains(e.TargetId))
+                yield return new BattleEvent(e, sourceId, e.TargetId);
         }
     }
 

@@ -666,6 +666,13 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             ? SelectedBattleHistory.Record.Store
             : _store;
 
+        if (!IsViewingArchivedBattle && _settingsService.Current.SceneSnapshotReadMode == SceneSnapshotReadMode.Scene)
+        {
+            var detail = _captureService.Scene.Owner.CreateDetailDelta(snapshot, SelectedCombatant.Id);
+            CombatantDetails.SelectSceneBattleCombatant(battleContextId, SelectedCombatant.Id, snapshot, detail, forceRefresh);
+            return;
+        }
+
         CombatantDetails.SelectBattleCombatant(battleContextId, SelectedCombatant.Id, snapshot, store, forceRefresh);
     }
 

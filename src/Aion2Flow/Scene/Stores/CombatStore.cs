@@ -11,6 +11,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     private readonly Dictionary<int, CombatantRecord> _combatants = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _outgoingBySource = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _incomingByTarget = [];
+    private readonly Dictionary<(int Source, int Target), List<CombatEventRecord>> _eventsByPair = [];
     private readonly List<CombatEventRecord> _events = [];
     private readonly List<CombatSnapshotChange> _changeLog = [];
     private readonly Dictionary<int, long> _detailRevisionByCombatant = [];
@@ -47,7 +48,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         var evadeCount = contributesDamage && (observation.Modifiers & DamageModifiers.Evade) != 0 ? attemptCount : 0;
         var invincibleCount = contributesDamage && (observation.Modifiers & DamageModifiers.Invincible) != 0 ? attemptCount : 0;
         var multiHitCount = contributesDamage && (observation.Modifiers & DamageModifiers.MultiHit) != 0 ? 1 : 0;
-        _events.Add(new CombatEventRecord
+        var eventRecord = new CombatEventRecord
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -63,9 +64,17 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             EvadeCount = evadeCount,
             InvincibleCount = invincibleCount,
             MultiHitCount = multiHitCount
-        });
+        };
+        _events.Add(eventRecord);
 
         var pairKey = (sourceId, targetId);
+        if (!_eventsByPair.TryGetValue(pairKey, out var pairEvents))
+        {
+            pairEvents = [];
+            _eventsByPair[pairKey] = pairEvents;
+        }
+        pairEvents.Add(eventRecord);
+
         if (!_pairs.TryGetValue(pairKey, out var pair))
         {
             pair = new CombatPairRecord { SourceId = sourceId, TargetId = targetId };
@@ -206,6 +215,9 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     public IReadOnlyCollection<(int, int)> GetIncomingPairs(int targetId) =>
         _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
 
+    public IReadOnlyList<CombatEventRecord> GetPairEvents(int sourceId, int targetId) =>
+        _eventsByPair.TryGetValue((sourceId, targetId), out var events) ? events : [];
+
     public long GetCombatantDetailRevision(int combatantId) =>
         combatantId > 0 && _detailRevisionByCombatant.TryGetValue(combatantId, out var revision) ? revision : 0;
 
@@ -237,6 +249,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         _combatants.Clear();
         _outgoingBySource.Clear();
         _incomingByTarget.Clear();
+        _eventsByPair.Clear();
         _events.Clear();
         _changeLog.Clear();
         _detailRevisionByCombatant.Clear();

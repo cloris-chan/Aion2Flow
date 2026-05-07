@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Scene.Stores;
 
 namespace Cloris.Aion2Flow.Scene.Projection;
@@ -57,6 +58,34 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
             Combatant = projection.GetCombatant(combatantId)
         };
     }
+
+    public CombatDetailDelta CreateSnapshotDelta(SceneCombatSnapshotAdapter adapter, DamageMeterSnapshot snapshot)
+    {
+        projection.Rebuild(store);
+        var events = projection.GetDetailEvents(adapter, snapshot, combatantId);
+        var detailRevision = ResolveDetailRevision(events);
+        _lastAppliedRevision = detailRevision;
+        _cursor = store.CreateCursor(store.Revision);
+        return new CombatDetailDelta
+        {
+            CombatantId = combatantId,
+            Revision = detailRevision,
+            OutgoingPairs = projection.GetOutgoingPairs(combatantId),
+            IncomingPairs = projection.GetIncomingPairs(combatantId),
+            Events = events,
+            DisplayNames = projection.BuildDetailDisplayNames(adapter, events),
+            Combatant = projection.GetCombatant(combatantId)
+        };
+    }
+
+    private static long ResolveDetailRevision(IReadOnlyList<CombatDetailEvent> events)
+    {
+        var revision = 0L;
+        for (var i = 0; i < events.Count; i++)
+            revision = Math.Max(revision, events[i].Revision);
+
+        return revision;
+    }
 }
 
 public sealed class CombatDetailDelta
@@ -65,5 +94,7 @@ public sealed class CombatDetailDelta
     public long Revision { get; init; }
     public IReadOnlyList<DirectedPairKey> OutgoingPairs { get; init; } = [];
     public IReadOnlyList<DirectedPairKey> IncomingPairs { get; init; } = [];
+    public IReadOnlyList<CombatDetailEvent> Events { get; init; } = [];
+    public IReadOnlyDictionary<int, string> DisplayNames { get; init; } = new Dictionary<int, string>();
     public CombatantSummary? Combatant { get; init; }
 }

@@ -6,6 +6,7 @@ using Cloris.Aion2Flow.Assets.Icons;
 using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Capture;
+using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Logging;
@@ -49,7 +50,12 @@ internal static class Program
         services.AddSingleton(logWriter);
         AppLog.Initialize(logWriter);
 
-        services.AddSingleton<SettingsService>();
+        services.AddSingleton(static _ =>
+        {
+            var settings = new SettingsService();
+            SceneDualWrite.Enabled = settings.Current.SceneSnapshotReadMode != SceneSnapshotReadMode.Legacy;
+            return settings;
+        });
         services.AddSingleton<App>();
         services.AddSingleton<LanguageService>();
         services.AddSingleton<GameResourceService>();

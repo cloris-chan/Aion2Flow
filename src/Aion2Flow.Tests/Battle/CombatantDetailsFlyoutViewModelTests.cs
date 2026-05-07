@@ -7,6 +7,8 @@ using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Scene;
+using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Tests.Protocol;
 using Cloris.Aion2Flow.ViewModels;
@@ -90,9 +92,100 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var counters = viewModel.LastRefreshBaselineCounters;
         Assert.True(counters.Elapsed >= TimeSpan.Zero);
         Assert.True(counters.AllocatedBytes >= 0);
-        Assert.True(counters.BattlePacketCount > 0);
+        Assert.True(counters.DetailEventCount > 0);
         Assert.True(counters.DetailRowCount > 0);
         Assert.True(counters.CounterpartCount > 0);
+    }
+
+    [Fact]
+    public void SelectSceneBattleCombatant_Builds_Live_Detail_From_Scene_Projection()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+
+        const int playerId = 1001;
+        const int healerId = 1002;
+        const int bossId = 9001;
+        const int addId = 9002;
+
+        sink.AppendNickname(playerId, "Perigee");
+        sink.AppendNickname(healerId, "Helper");
+        AppendScenePacket(sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(sink, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing, 2);
+        AppendScenePacket(sink, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, 3);
+        AppendScenePacket(sink, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing, 4);
+        AppendScenePacket(sink, playerId, bossId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, 5);
+        AppendScenePacket(sink, playerId, addId, 11000010, 200, 5_500, CombatEventKind.Damage, CombatValueKind.Damage, 6);
+        for (var i = 1; i <= 6; i++)
+            sink.CompleteBatch(i);
+
+        var snapshot = scene.Owner.CreateSnapshot();
+        var detail = scene.Owner.CreateDetailDelta(snapshot, playerId);
+        viewModel.SelectSceneBattleCombatant(snapshot.BattleId, playerId, snapshot, detail);
+
+        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(1000, viewModel.OutgoingDamage.Total);
+        Assert.Equal(3, viewModel.OutgoingDamage.Hits);
+        Assert.Equal(250, viewModel.OutgoingHealing.Total);
+        Assert.Equal(180, viewModel.IncomingDamage.Total);
+        Assert.Equal(340, viewModel.IncomingHealing.Total);
+        Assert.Equal(6, viewModel.LastRefreshBaselineCounters.DetailEventCount);
+        Assert.Equal(2, viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.Count);
+        Assert.Single(viewModel.OutgoingDetail.SupportCounterpartFilter.Counterparts);
+        Assert.Contains(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, x => x.CombatantId == bossId && x.DisplayName == bossId.ToString(CultureInfo.InvariantCulture));
+        Assert.Contains(viewModel.OutgoingDetail.SupportCounterpartFilter.Counterparts, x => x.CombatantId == playerId && x.DisplayName == "Perigee");
+        Assert.Contains(viewModel.IncomingDetail.SupportCounterpartFilter.Counterparts, x => x.CombatantId == healerId && x.DisplayName == "Helper");
+
+        SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
+
+        Assert.Equal(800, viewModel.OutgoingDamage.Total);
+        Assert.Single(viewModel.OutgoingDamage.Rows);
+        Assert.Equal("Strike", viewModel.OutgoingDamage.Rows[0].SkillName);
+        Assert.Equal(800, viewModel.OutgoingDamage.Rows[0].TotalAmount);
+    }
+
+    [Fact]
+    public void SelectSceneBattleCombatant_Includes_Summon_Detail_Folded_To_Owner()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+
+        const int playerId = 1001;
+        const int summonId = 5001;
+        const int bossId = 9001;
+
+        sink.AppendNickname(playerId, "Perigee");
+        sink.AppendSummon(playerId, summonId);
+        AppendScenePacket(sink, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(sink, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
+
+        var snapshot = scene.Owner.CreateSnapshot();
+        var detail = scene.Owner.CreateDetailDelta(snapshot, playerId);
+        viewModel.SelectSceneBattleCombatant(snapshot.BattleId, playerId, snapshot, detail);
+
+        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(1000, viewModel.OutgoingDamage.Total);
+        Assert.Equal(2, viewModel.OutgoingDamage.Hits);
+        Assert.Equal(2, viewModel.LastRefreshBaselineCounters.DetailEventCount);
+        Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
     }
 
     [Fact]
@@ -1264,6 +1357,33 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         };
 
         store.AppendCombatPacket(packet);
+    }
+
+    private static void AppendScenePacket(
+        JournalingRuntimeObservationSink sink,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int damage,
+        long timestamp,
+        CombatEventKind eventKind,
+        CombatValueKind valueKind,
+        long batchOrdinal)
+    {
+        sink.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = skillCode,
+            OriginalSkillCode = skillCode,
+            Damage = damage,
+            Timestamp = timestamp,
+            BatchOrdinal = batchOrdinal,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = eventKind,
+            ValueKind = valueKind
+        });
     }
 
     private static void AssertModifierValues(int actualCount, double actualRate, int expectedCount, int denominator)

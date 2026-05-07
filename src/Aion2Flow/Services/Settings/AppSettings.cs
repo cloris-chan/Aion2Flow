@@ -9,7 +9,7 @@ public sealed class AppSettings
 
     public int MaxVisibleCombatantRows { get; set; } = 4;
 
-    public SceneSnapshotReadMode SceneSnapshotReadMode { get; set; } = SceneSnapshotReadMode.Legacy;
+    public SceneSnapshotReadMode SceneSnapshotReadMode { get; set; } = SceneSnapshotReadMode.Scene;
 
     public string? Language { get; set; }
 

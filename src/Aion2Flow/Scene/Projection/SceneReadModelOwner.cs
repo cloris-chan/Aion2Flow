@@ -44,6 +44,13 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
         return adapter.CreateSnapshot();
     }
 
+    public CombatDetailDelta CreateDetailDelta(DamageMeterSnapshot snapshot, int combatantId)
+    {
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata, _applier.BossFocus, BattleId);
+        var subscription = new CombatDetailSubscription(combat, _pairs, combatantId);
+        return subscription.CreateSnapshotDelta(adapter, snapshot);
+    }
+
     public void Refresh()
     {
         lock (_gate)

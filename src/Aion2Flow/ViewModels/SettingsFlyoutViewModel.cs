@@ -91,7 +91,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public partial int MaxVisibleCombatantRows { get; set; } = 4;
 
     [ObservableProperty]
-    public partial SceneSnapshotReadMode SceneSnapshotReadMode { get; set; } = SceneSnapshotReadMode.Legacy;
+    public partial SceneSnapshotReadMode SceneSnapshotReadMode { get; set; } = SceneSnapshotReadMode.Scene;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
