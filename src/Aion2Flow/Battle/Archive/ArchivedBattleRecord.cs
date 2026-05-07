@@ -11,4 +11,5 @@ public sealed class ArchivedBattleRecord
     public bool IsAutomatic { get; init; }
     public DamageMeterSnapshot Snapshot { get; init; } = new();
     public CombatMetricsStore Store { get; init; } = new();
+    public SceneArchivePayload? ScenePayload { get; init; }
 }

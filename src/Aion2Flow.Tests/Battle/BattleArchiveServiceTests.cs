@@ -1,8 +1,14 @@
 using Cloris.Aion2Flow.Battle.Archive;
+using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat;
+using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Combat.NpcRuntime;
+using Cloris.Aion2Flow.Scene.Journal;
+using Cloris.Aion2Flow.Scene.Model;
+using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.Scene.Projection;
 
 namespace Cloris.Aion2Flow.Tests.Battle;
 
@@ -202,5 +208,149 @@ public sealed class BattleArchiveServiceTests
 
         Assert.Equal(100, service.History.Count);
         Assert.False(service.TryGetBattle(firstBattleId, out _));
+    }
+
+    [Fact]
+    public void SceneArchivePayload_Captures_Detail_Delta_Without_Live_Store()
+    {
+        const int playerId = 100;
+        const int bossId = 200;
+        var owner = CreateSceneOwner(playerId, bossId);
+        var snapshot = owner.CreateSnapshot();
+
+        var payload = SceneArchivePayload.Create(owner, snapshot);
+        var delta = payload.CreateDetailDelta(playerId);
+
+        Assert.Equal(snapshot.BattleId, payload.Snapshot.BattleId);
+        Assert.Equal(2, payload.Events.Count);
+        Assert.Equal(playerId, delta.CombatantId);
+        Assert.Equal(2, delta.Events.Count);
+        Assert.Equal(playerId, delta.Events[0].SourceId);
+        Assert.Equal(bossId, delta.Events[0].TargetId);
+        Assert.Equal(750, delta.Events[0].Packet.Damage);
+        Assert.Equal("Tester", delta.DisplayNames[playerId]);
+        Assert.Equal("Archive Boss", delta.DisplayNames[bossId]);
+        Assert.Equal(751, delta.Combatant!.OutgoingDamage);
+        Assert.Single(delta.OutgoingPairs);
+    }
+
+    [Fact]
+    public void SceneArchivePayload_Is_Independent_Of_Live_Scene_Mutations()
+    {
+        const int playerId = 100;
+        const int bossId = 200;
+        var owner = CreateSceneOwner(playerId, bossId);
+        var snapshot = owner.CreateSnapshot();
+
+        var payload = SceneArchivePayload.Create(owner, snapshot);
+
+        snapshot.TargetName = "Changed";
+        owner.Entities.ApplyNickname(playerId, "Changed");
+        owner.Combat.ApplyCombat(playerId, bossId, new CombatObservation
+        {
+            SkillCode = 11000011,
+            Damage = 250,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 2_000);
+
+        var delta = payload.CreateDetailDelta(playerId);
+
+        Assert.Equal("Archive Boss", payload.Snapshot.TargetName);
+        Assert.Equal("Tester", payload.DisplayNames[playerId]);
+        Assert.Equal(2, payload.Events.Count);
+        Assert.Equal(2, delta.Events.Count);
+        Assert.Equal(750, delta.Events[0].Packet.Damage);
+    }
+
+    [Fact]
+    public void SceneArchivePayload_Captures_Identity_And_Boss_Focus_Facts()
+    {
+        const int playerId = 100;
+        const int bossId = 200;
+        var owner = CreateSceneOwner(playerId, bossId);
+        var snapshot = owner.CreateSnapshot();
+
+        var payload = SceneArchivePayload.Create(owner, snapshot);
+
+        var bossIdentity = Assert.Single(payload.Entities, e => e.EntityId == bossId);
+        Assert.Equal(2_999_997, bossIdentity.NpcCode);
+        Assert.Equal(NpcKind.Boss, bossIdentity.Kind);
+        Assert.True(payload.NpcNamesByCode.ContainsKey(2_999_997));
+        var focus = Assert.Single(payload.Bosses, b => b.InstanceId == bossId);
+        Assert.True(focus.HasHp);
+        Assert.Equal(50_000, focus.Hp);
+    }
+
+    private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId)
+    {
+        const int bossCode = 2_999_997;
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendState(journal, sceneId, playerId, 0, StateCodes.PlayerIdentity, 0, 0, "Tester", 1, 1_000);
+        AppendState(journal, sceneId, bossId, 0, bossCode, 0, 0, null, 2, 1_001);
+        AppendState(journal, sceneId, bossCode, 0, StateCodes.NpcName, 0, 0, "Archive Boss", 3, 1_002);
+        AppendState(journal, sceneId, bossId, 0, StateCodes.NpcKind, (int)NpcKind.Boss, 0, null, 4, 1_003);
+        AppendResource(journal, sceneId, bossId, 50_000, 100_000, 5, 1_004);
+        AppendState(journal, sceneId, bossId, 0, StateCodes.NpcBattle, 1, 0, null, 6, 1_005);
+        AppendCombat(journal, sceneId, playerId, bossId, 750, 7, 1_500);
+        AppendCombat(journal, sceneId, playerId, bossId, 1, 8, 1_501);
+        journal.CompleteBatch(1);
+
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid());
+        owner.Refresh();
+        return owner;
+    }
+
+    private static void AppendState(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int stateCode, int value0, int value1, string? text, long ordinal, long observedAt)
+    {
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = sourceId,
+            TargetEntityId = targetId,
+            Raw = new RawPacketReference(0, 0, ordinal, observedAt),
+            State = new StateObservation(sourceId, stateCode, value0, value1, 0, text)
+        });
+    }
+
+    private static void AppendResource(ObservedEventJournal journal, Guid sceneId, int entityId, long current, long maximum, long ordinal, long observedAt)
+    {
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Domain = ObservedEventDomain.Resource,
+            SourceEntityId = entityId,
+            TargetEntityId = 0,
+            Raw = new RawPacketReference(0, 0, ordinal, observedAt),
+            Resource = new ResourceObservation(entityId, current, maximum, null, 0)
+        });
+    }
+
+    private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int damage, long ordinal, long observedAt)
+    {
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = sourceId,
+            TargetEntityId = targetId,
+            Raw = new RawPacketReference(0x0438, 0, ordinal, observedAt),
+            Combat = new CombatObservation
+            {
+                SkillCode = 11000010,
+                Damage = damage,
+                HitCount = 1,
+                AttemptCount = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            }
+        });
     }
 }
