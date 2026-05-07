@@ -11,12 +11,16 @@ public sealed class DirectedPairSnapshot
     public long TotalHealing { get; init; }
     public long TotalShield { get; init; }
     public long TotalShieldAbsorbed { get; init; }
+    public int ShieldCount { get; init; }
+    public int ShieldAbsorbedCount { get; init; }
     public int HitCount { get; init; }
     public int AttemptCount { get; init; }
     public int EvadeCount { get; init; }
     public int InvincibleCount { get; init; }
     public int MultiHitCount { get; init; }
     public int LastSkillCode { get; init; }
+    public long FirstObserved { get; init; }
+    public long LastObserved { get; init; }
     public long Revision { get; init; }
 }
 
@@ -41,6 +45,12 @@ public sealed class CombatantSummary
     public long IncomingShield { get; init; }
     public long OutgoingShieldAbsorbed { get; init; }
     public long IncomingShieldAbsorbed { get; init; }
+    public int OutgoingShieldCount { get; init; }
+    public int IncomingShieldCount { get; init; }
+    public int OutgoingShieldAbsorbedCount { get; init; }
+    public int IncomingShieldAbsorbedCount { get; init; }
+    public long FirstObserved { get; init; }
+    public long LastObserved { get; init; }
     public long Revision { get; init; }
 }
 
@@ -80,12 +90,16 @@ public sealed class CombatPairProjection
                 TotalHealing = record.TotalHealing,
                 TotalShield = record.TotalShield,
                 TotalShieldAbsorbed = record.TotalShieldAbsorbed,
+                ShieldCount = record.ShieldCount,
+                ShieldAbsorbedCount = record.ShieldAbsorbedCount,
                 HitCount = record.HitCount,
                 AttemptCount = record.AttemptCount,
                 EvadeCount = record.EvadeCount,
                 InvincibleCount = record.InvincibleCount,
                 MultiHitCount = record.MultiHitCount,
                 LastSkillCode = record.LastSkillCode,
+                FirstObserved = record.FirstObserved,
+                LastObserved = record.LastObserved,
                 Revision = record.Revision
             };
 
@@ -130,6 +144,12 @@ public sealed class CombatPairProjection
                 IncomingShield = record.IncomingShield,
                 OutgoingShieldAbsorbed = record.OutgoingShieldAbsorbed,
                 IncomingShieldAbsorbed = record.IncomingShieldAbsorbed,
+                OutgoingShieldCount = record.OutgoingShieldCount,
+                IncomingShieldCount = record.IncomingShieldCount,
+                OutgoingShieldAbsorbedCount = record.OutgoingShieldAbsorbedCount,
+                IncomingShieldAbsorbedCount = record.IncomingShieldAbsorbedCount,
+                FirstObserved = record.FirstObserved,
+                LastObserved = record.LastObserved,
                 Revision = record.Revision
             };
         }

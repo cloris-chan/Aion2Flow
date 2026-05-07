@@ -31,6 +31,9 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         });
 
     public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation)
+        => ApplyCombat(sourceId, targetId, in observation, 0);
+
+    public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation, long observedAtMilliseconds)
     {
         _revision++;
         var contributesDamage = ContributesDamage(in observation);
@@ -53,6 +56,8 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         pair.TotalHealing += contributesHealing ? observation.Damage : 0;
         pair.TotalShield += contributesShieldGrant ? observation.Damage : 0;
         pair.TotalShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
+        pair.ShieldCount += contributesShieldGrant ? 1 : 0;
+        pair.ShieldAbsorbedCount += contributesShieldAbsorbed ? 1 : 0;
         pair.HitCount += hitCount;
         pair.AttemptCount += attemptCount;
         pair.EvadeCount += evadeCount;
@@ -60,6 +65,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         pair.MultiHitCount += multiHitCount;
         pair.LastSkillCode = observation.SkillCode;
         pair.Revision = _revision;
+        ApplyObservedAt(pair, observedAtMilliseconds);
         _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.PairUpdated, sourceId, pairKey, _revision));
         MarkDetailRevision(sourceId, _revision);
         MarkDetailRevision(targetId, _revision);
@@ -69,12 +75,15 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         source.OutgoingHealing += contributesHealing ? observation.Damage : 0;
         source.OutgoingShield += contributesShieldGrant ? observation.Damage : 0;
         source.OutgoingShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
+        source.OutgoingShieldCount += contributesShieldGrant ? 1 : 0;
+        source.OutgoingShieldAbsorbedCount += contributesShieldAbsorbed ? 1 : 0;
         source.OutgoingHits += hitCount;
         source.OutgoingAttempts += attemptCount;
         source.OutgoingEvades += evadeCount;
         source.OutgoingInvincibles += invincibleCount;
         source.OutgoingMultiHits += multiHitCount;
         source.Revision = _revision;
+        ApplyObservedAt(source, observedAtMilliseconds);
         _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, sourceId, default, _revision));
 
         if (targetId > 0)
@@ -84,12 +93,15 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             target.IncomingHealing += contributesHealing ? observation.Damage : 0;
             target.IncomingShield += contributesShieldGrant ? observation.Damage : 0;
             target.IncomingShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
+            target.IncomingShieldCount += contributesShieldGrant ? 1 : 0;
+            target.IncomingShieldAbsorbedCount += contributesShieldAbsorbed ? 1 : 0;
             target.IncomingHits += hitCount;
             target.IncomingAttempts += attemptCount;
             target.IncomingEvades += evadeCount;
             target.IncomingInvincibles += invincibleCount;
             target.IncomingMultiHits += multiHitCount;
             target.Revision = _revision;
+            ApplyObservedAt(target, observedAtMilliseconds);
             _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, targetId, default, _revision));
         }
 
@@ -144,6 +156,24 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
 
     private static bool ContributesShieldAbsorbed(in CombatObservation observation) =>
         observation.ValueKind == CombatValueKind.Shield && observation.EffectTag == PacketEffectTag.ShieldAbsorbed && observation.Damage > 0;
+
+    private static void ApplyObservedAt(CombatPairRecord record, long observedAtMilliseconds)
+    {
+        if (observedAtMilliseconds <= 0)
+            return;
+
+        record.FirstObserved = record.FirstObserved > 0 ? Math.Min(record.FirstObserved, observedAtMilliseconds) : observedAtMilliseconds;
+        record.LastObserved = Math.Max(record.LastObserved, observedAtMilliseconds);
+    }
+
+    private static void ApplyObservedAt(CombatantRecord record, long observedAtMilliseconds)
+    {
+        if (observedAtMilliseconds <= 0)
+            return;
+
+        record.FirstObserved = record.FirstObserved > 0 ? Math.Min(record.FirstObserved, observedAtMilliseconds) : observedAtMilliseconds;
+        record.LastObserved = Math.Max(record.LastObserved, observedAtMilliseconds);
+    }
 
     public bool TryGetPair(int sourceId, int targetId, out CombatPairRecord? pair) =>
         _pairs.TryGetValue((sourceId, targetId), out pair);
@@ -247,12 +277,16 @@ public sealed class CombatPairRecord
     public long TotalHealing { get; set; }
     public long TotalShield { get; set; }
     public long TotalShieldAbsorbed { get; set; }
+    public int ShieldCount { get; set; }
+    public int ShieldAbsorbedCount { get; set; }
     public int HitCount { get; set; }
     public int AttemptCount { get; set; }
     public int EvadeCount { get; set; }
     public int InvincibleCount { get; set; }
     public int MultiHitCount { get; set; }
     public int LastSkillCode { get; set; }
+    public long FirstObserved { get; set; }
+    public long LastObserved { get; set; }
     public long Revision { get; set; }
 }
 
@@ -277,5 +311,11 @@ public sealed class CombatantRecord
     public long IncomingShield { get; set; }
     public long OutgoingShieldAbsorbed { get; set; }
     public long IncomingShieldAbsorbed { get; set; }
+    public int OutgoingShieldCount { get; set; }
+    public int IncomingShieldCount { get; set; }
+    public int OutgoingShieldAbsorbedCount { get; set; }
+    public int IncomingShieldAbsorbedCount { get; set; }
+    public long FirstObserved { get; set; }
+    public long LastObserved { get; set; }
     public long Revision { get; set; }
 }

@@ -1,11 +1,14 @@
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat.Classification;
+using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
 using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.Scene.Projection;
 using Cloris.Aion2Flow.Scene.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
@@ -715,14 +718,14 @@ public class LegacyBattleSnapshotAdapterTests
         var entities = new EntityStore();
         var combat = new CombatStore();
         entities.ApplyNickname(100, "Perigee");
-        entities.ApplyNpcCode(200, 2310108);
+        entities.ApplyNpcCode(200, 9_999_998);
         combat.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
         var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Equal("Perigee", snapshot.Combatants[100].Nickname);
-        Assert.Equal("NPC-2310108", snapshot.Combatants[200].Nickname);
+        Assert.Equal("NPC-9999998", snapshot.Combatants[200].Nickname);
     }
 
     [Fact]
@@ -752,6 +755,215 @@ public class LegacyBattleSnapshotAdapterTests
 
         Assert.Equal(200003u, snapshot.MapId);
         Assert.Equal(515552u, snapshot.MapInstanceId);
+    }
+}
+
+public class SceneCombatSnapshotAdapterTests
+{
+    [Fact]
+    public void Adapter_CreateSnapshot_ProjectsSceneTotalsAndWindow()
+    {
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        entities.ApplyNickname(100, "Perigee");
+        entities.ApplyNpcCode(200, 9_999_999);
+        metadata.ApplyNpcName(9_999_999, "Nazarak");
+        metadata.StageDestinationMap(200003);
+        metadata.StageDestinationMapInstance(515552);
+        metadata.MarkSceneArrival();
+
+        combat.ApplyCombat(100, 200, new CombatObservation
+        {
+            SkillCode = 11000010,
+            Damage = 1500,
+            HitCount = 2,
+            AttemptCount = 2,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 1_000);
+        combat.ApplyCombat(100, 100, new CombatObservation
+        {
+            SkillCode = 17000010,
+            Damage = 600,
+            EventKind = CombatEventKind.Healing,
+            ValueKind = CombatValueKind.Healing
+        }, 2_500);
+        combat.ApplyCombat(100, 100, new CombatObservation
+        {
+            SkillCode = 17000011,
+            Damage = 300,
+            EventKind = CombatEventKind.Support,
+            ValueKind = CombatValueKind.Shield,
+            EffectTag = PacketEffectTag.ShieldAbsorbed
+        }, 2_600);
+
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata);
+        var snapshot = adapter.CreateSnapshot();
+
+        Assert.Equal(200003u, snapshot.MapId);
+        Assert.Equal(515552u, snapshot.MapInstanceId);
+        Assert.Equal("Nazarak", snapshot.TargetName);
+        Assert.Equal(200, snapshot.TargetObservation?.InstanceId);
+        Assert.Equal(1_000, snapshot.BattleStartTime);
+        Assert.Equal(2_600, snapshot.BattleEndTime);
+        Assert.Equal(1_600, snapshot.BattleTime);
+        Assert.True(snapshot.Encounter.IsActive);
+
+        var player = snapshot.Combatants[100];
+        Assert.Equal("Perigee", player.Nickname);
+        Assert.Equal(1500, player.DamageAmount);
+        Assert.Equal(600, player.HealingAmount);
+        Assert.Equal(300, player.ShieldAbsorbedAmount);
+        Assert.Equal(1, player.ShieldAbsorbedTimes);
+        Assert.Equal(CharacterClass.None, player.CharacterClass);
+        Assert.Equal(1500d / 1600 * 1000, player.DamagePerSecond, 3);
+        Assert.Equal(1d, player.DamageContribution, 3);
+    }
+}
+
+public class SceneReadModelOwnerTests
+{
+    [Fact]
+    public void Owner_Refresh_AppliesJournalIncrementally()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        var owner = new SceneReadModelOwner(journal);
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 100,
+            State = new StateObservation
+            {
+                EntityId = 100,
+                StateCode = StateCodes.PlayerIdentity,
+                Text = "Perigee"
+            }
+        });
+
+        owner.Refresh();
+
+        Assert.Equal(1, owner.AppliedObservationOrdinal);
+        Assert.True(owner.Entities.TryGet(100, out var entity));
+        Assert.Equal("Perigee", entity.Nickname);
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = 100,
+            TargetEntityId = 200,
+            Raw = new RawPacketReference { TimestampMilliseconds = 1_000 },
+            Combat = new CombatObservation
+            {
+                SkillCode = 11000010,
+                Damage = 500,
+                HitCount = 1,
+                AttemptCount = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            }
+        });
+
+        owner.Refresh();
+
+        Assert.Equal(2, owner.AppliedObservationOrdinal);
+        Assert.True(owner.Combat.TryGetPair(100, 200, out var pair));
+        Assert.NotNull(pair);
+        Assert.Equal(500, pair.TotalDamage);
+    }
+
+    [Fact]
+    public void Owner_Refresh_DoesNotFlushPendingCompactOutcomeBeforeCompletedBatch()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        var owner = new SceneReadModelOwner(journal);
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 0, BatchOrdinal = 100 },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = 100,
+            TargetEntityId = 200,
+            Raw = new RawPacketReference { TimestampMilliseconds = 1_000 },
+            Combat = new CombatObservation
+            {
+                SkillCode = 11000010,
+                Damage = 1,
+                HitCount = 1,
+                AttemptCount = 1,
+                Marker = 77,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            }
+        });
+
+        owner.Refresh();
+
+        Assert.False(owner.Combat.TryGetPair(100, 200, out _));
+
+        journal.CompleteBatch(100);
+        owner.Refresh();
+
+        Assert.True(owner.Combat.TryGetPair(100, 200, out var pair));
+        Assert.NotNull(pair);
+        Assert.Equal(1, pair.TotalDamage);
+    }
+
+    [Fact]
+    public void LiveReadModel_CapturesFactoryJournal()
+    {
+        var store = new CombatMetricsStore();
+        var scene = new SceneLiveReadModel();
+        SceneDualWrite.Enabled = true;
+        try
+        {
+            var sink = SceneSinkFactory.CreateForStore(store, scene)();
+            sink.AppendNickname(100, "Perigee");
+            scene.Owner.Refresh();
+            var snapshot = scene.Owner.CreateSnapshot();
+
+            Assert.Equal(1, scene.Journal.Count);
+            Assert.Equal(scene.SessionId, snapshot.BattleId);
+            Assert.True(scene.Owner.Entities.TryGet(100, out var entity));
+            Assert.Equal("Perigee", entity.Nickname);
+        }
+        finally
+        {
+            SceneDualWrite.Enabled = false;
+        }
+    }
+
+    [Fact]
+    public void ReplaySinkHolder_ExposesSceneOwnerWhenDualWriteEnabled()
+    {
+        var store = new CombatMetricsStore();
+        SceneDualWrite.Enabled = true;
+        try
+        {
+            using var holder = SceneSinkFactory.CreateForReplay(store);
+            Assert.NotNull(holder.Journal);
+            Assert.NotNull(holder.Owner);
+            var journal = holder.Journal;
+            var owner = holder.Owner;
+            holder.Sink.AppendNickname(100, "Perigee");
+            owner.Refresh();
+
+            Assert.Equal(1, journal.Count);
+            Assert.True(owner.Entities.TryGet(100, out var entity));
+            Assert.Equal("Perigee", entity.Nickname);
+        }
+        finally
+        {
+            SceneDualWrite.Enabled = false;
+        }
     }
 }
 

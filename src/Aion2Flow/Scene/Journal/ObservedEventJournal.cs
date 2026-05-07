@@ -89,6 +89,20 @@ public sealed class ObservedEventJournal
             return CollectionsMarshal.AsSpan(_entries).Slice(start, count);
         }
     }
+
+    public int CopyEntries(JournalCursor cursor, Span<ObservedEventEnvelope> destination)
+    {
+        lock (_gate)
+        {
+            int start = cursor.Position;
+            if (start >= _entries.Count || destination.Length == 0)
+                return 0;
+
+            int count = Math.Min(destination.Length, _entries.Count - start);
+            CollectionsMarshal.AsSpan(_entries).Slice(start, count).CopyTo(destination);
+            return count;
+        }
+    }
 }
 
 public readonly record struct JournalCursor(int Position, long StartOrdinal);

@@ -26,8 +26,10 @@ public sealed class WinDivertCaptureService(
     private readonly ProtocolRoundTripEstimator _protocolRttEstimator = new();
 
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService = processPortDiscoveryService;
-    private readonly Func<IRuntimeObservationSink> _runtimeSinkFactory = SceneSinkFactory.CreateForStore(store);
-    public PacketCaptureDispatcher Dispatcher { get => field ??= new(_runtimeSinkFactory); }
+    private readonly SceneLiveReadModel _scene = new();
+    private Func<IRuntimeObservationSink> RuntimeSinkFactory { get => field ??= SceneSinkFactory.CreateForStore(store, _scene); }
+    public PacketCaptureDispatcher Dispatcher { get => field ??= new(RuntimeSinkFactory); }
+    public SceneLiveReadModel Scene => _scene;
     public bool IsDriverActive => _divert is not null;
     public bool HasDriverError { get; private set; }
     public double? CurrentRoundTripTimeMilliseconds

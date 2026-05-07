@@ -42,7 +42,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         FlushPendingOutcomeSidecars();
     }
 
-    private void ApplyEntry(in ObservedEventEnvelope entry)
+    public void ApplyEntry(in ObservedEventEnvelope entry)
     {
         switch (entry.Domain)
         {
@@ -72,7 +72,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
             var stamp = result.Stamp;
             var observation = result.Observation;
             var canonicalized = new CombatCanonicalizationResult(result.SourceId, result.TargetId, observation);
-            ApplyCanonicalizedCombatResult(in stamp, in canonicalized);
+            ApplyCanonicalizedCombatResult(in stamp, in canonicalized, result.ObservedAtMilliseconds);
         }
     }
 
@@ -84,7 +84,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         if (entry.Raw.Opcode == 0x0538 && PeriodicLinkCanonicalizer.IsLinkObservation(in combatObservation))
         {
             if (_periodicLink.Normalize(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation) is { } periodicLinkResult)
-                ApplyCanonicalizedCombatResult(in stamp, in periodicLinkResult);
+                ApplyCanonicalizedCombatResult(in stamp, in periodicLinkResult, entry.Raw.TimestampMilliseconds);
             return;
         }
 
@@ -92,7 +92,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         {
             0x0238 => _compactOutcome.ObserveCompactControl0238(entry.SourceEntityId, in stamp, in combatObservation),
             0x0638 => _compactOutcome.ObserveCompactControl0638(entry.SourceEntityId, in stamp, in combatObservation),
-            _ => _compactOutcome.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation)
+            _ => _compactOutcome.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds)
         };
 
         foreach (var rawResult in rawResults)
@@ -100,11 +100,11 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
             var observation = rawResult.Observation;
             var resultStamp = rawResult.Stamp;
             var result = new CombatCanonicalizationResult(rawResult.SourceId, rawResult.TargetId, observation);
-            ApplyCanonicalizedCombatResult(in resultStamp, in result);
+            ApplyCanonicalizedCombatResult(in resultStamp, in result, rawResult.ObservedAtMilliseconds);
         }
     }
 
-    private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result)
+    private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
     {
         var resultObservation = result.Observation;
         var ownerTargetSummonRestoreResult = _ownerTargetSummonRestore.Normalize(result.SourceId, result.TargetId, in resultObservation);
@@ -112,13 +112,13 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonRestoreResult.SourceId, ownerTargetSummonRestoreResult.TargetId, in stamp, in observation);
         var systemRecoveryObservation = systemRecoveryResult.Observation;
         foreach (var normalized in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
-            ApplyCombatResult(in stamp, in normalized);
+            ApplyCombatResult(in stamp, in normalized, observedAtMilliseconds);
     }
 
-    private void ApplyCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result)
+    private void ApplyCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
     {
         var observation = result.Observation;
-        combat.ApplyCombat(result.SourceId, result.TargetId, in observation);
+        combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
         _multiHitAttribution.ObserveCombat(result.SourceId, result.TargetId, in stamp, in observation);
     }
 
@@ -130,7 +130,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         if (_multiHitAttribution.TrySynthesize2C38Invincible(in entry, in aura) is { } result)
         {
             var stamp = entry.Stamp;
-            ApplyCombatResult(in stamp, in result);
+            ApplyCombatResult(in stamp, in result, entry.Raw.TimestampMilliseconds);
         }
     }
 
@@ -163,7 +163,19 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         if (state.StateCode == StateCodes.PlayerIdentity)
         {
             if (entry.SourceEntityId > 0)
-                entities.ApplyNickname(entry.SourceEntityId, string.Empty);
+            {
+                var nickname = state.Text ?? string.Empty;
+                entities.ApplyNickname(entry.SourceEntityId, nickname);
+                if (!string.IsNullOrWhiteSpace(nickname))
+                    metadata.ApplyDisplayName(entry.SourceEntityId, nickname);
+            }
+            return;
+        }
+
+        if (state.StateCode == StateCodes.NpcName)
+        {
+            if (state.EntityId > 0 && !string.IsNullOrWhiteSpace(state.Text))
+                metadata.ApplyNpcName(state.EntityId, state.Text);
             return;
         }
 

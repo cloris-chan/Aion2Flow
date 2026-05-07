@@ -401,7 +401,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 StateCode = StateCodes.PlayerIdentity,
                 Value0 = 0,
                 Value1 = 0,
-                DetailRaw = 0
+                DetailRaw = 0,
+                Text = nickname
             }
         });
     }
@@ -429,7 +430,28 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpcName(int npcCode, string name) { }
+    public void AppendNpcName(int npcCode, string name)
+    {
+        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneSessionId,
+            Stamp = stamp,
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 0,
+            TargetEntityId = 0,
+            Raw = default,
+            State = new StateObservation
+            {
+                EntityId = npcCode,
+                StateCode = StateCodes.NpcName,
+                Value0 = 0,
+                Value1 = 0,
+                DetailRaw = 0,
+                Text = name
+            }
+        });
+    }
 
     public void AppendNpcKind(int instanceId, NpcKind kind)
     {

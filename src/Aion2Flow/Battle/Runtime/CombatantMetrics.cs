@@ -37,6 +37,16 @@ public sealed class CombatantMetrics(string nickname)
     private void AddShieldAbsorbedAmount(int amount) => ShieldAbsorbedAmount += amount;
     private void AddShieldAbsorbedTime() => ShieldAbsorbedTimes++;
 
+    internal void ApplySceneTotals(long damage, long healing, long shield, int shieldTimes, long shieldAbsorbed, int shieldAbsorbedTimes)
+    {
+        DamageAmount += damage;
+        HealingAmount += healing;
+        ShieldAmount += shield;
+        ShieldTimes += shieldTimes;
+        ShieldAbsorbedAmount += shieldAbsorbed;
+        ShieldAbsorbedTimes += shieldAbsorbedTimes;
+    }
+
     public bool ProcessCombatEvent(ParsedCombatPacket packet)
     {
         var contributesOutcomeOnly =

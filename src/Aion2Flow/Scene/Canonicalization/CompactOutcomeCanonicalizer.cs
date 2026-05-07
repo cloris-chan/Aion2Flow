@@ -9,8 +9,8 @@ namespace Cloris.Aion2Flow.Scene.Canonicalization;
 public sealed class CompactOutcomeCanonicalizer
 {
     private const int MaxPendingAvoidances = 32;
-    private readonly record struct PendingDirectBlockedDamage(int SourceId, int TargetId, TimelineStamp Stamp, CombatObservation Observation);
-    private readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int OriginalSkillCode, int Marker, TimelineStamp Stamp);
+    private readonly record struct PendingDirectBlockedDamage(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
+    private readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int OriginalSkillCode, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds);
     private readonly record struct AvoidedSignature(int SourceId, int TargetId, int Marker);
     private readonly List<PendingDirectBlockedDamage> _pendingDirect = [];
     private readonly List<PendingCompactAvoidance> _pendingCompact = [];
@@ -19,7 +19,7 @@ public sealed class CompactOutcomeCanonicalizer
     private readonly HashSet<(int TargetId, int SkillCode)> _confirmedCompactDamage = [];
     private long _currentBatchOrdinal;
 
-    public IReadOnlyList<StampedCombatCanonicalizationResult> NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation)
+    public IReadOnlyList<StampedCombatCanonicalizationResult> NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
     {
         var isCompactType2Sidecar = IsCompactType2Sidecar(in observation);
         if (isCompactType2Sidecar && IsCompactDamageConfirmation(sourceId, targetId, in observation))
@@ -33,13 +33,13 @@ public sealed class CompactOutcomeCanonicalizer
         if (isCompactType2Sidecar)
             return prefix;
 
-        if (TryObserveCompactAvoidance(sourceId, targetId, in stamp, in observation))
+        if (TryObserveCompactAvoidance(sourceId, targetId, in stamp, in observation, observedAtMilliseconds))
             return prefix;
 
-        if (TryObserveDirectBlockedDamage(sourceId, targetId, in stamp, in observation))
+        if (TryObserveDirectBlockedDamage(sourceId, targetId, in stamp, in observation, observedAtMilliseconds))
             return prefix;
 
-        return Append(prefix, new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observation));
+        return Append(prefix, new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, observation));
     }
 
     public IReadOnlyList<StampedCombatCanonicalizationResult> ObserveCompactControl0238(int sourceId, in TimelineStamp stamp, in CombatObservation observation)
@@ -67,7 +67,7 @@ public sealed class CompactOutcomeCanonicalizer
         return FinalizeBatch();
     }
 
-    private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation)
+    private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds)
     {
         if (!IsCompactEvadeSignal(sourceId, targetId, in observation) || observation.Marker <= 0)
             return false;
@@ -80,12 +80,12 @@ public sealed class CompactOutcomeCanonicalizer
         if (_resolvedAvoidanceSignatures.Contains(signature))
             return true;
 
-        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.SkillCode, observation.Marker, stamp));
+        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.SkillCode, observation.Marker, stamp, observedAtMilliseconds));
         TrimPending();
         return true;
     }
 
-    private bool TryObserveDirectBlockedDamage(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation)
+    private bool TryObserveDirectBlockedDamage(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds)
     {
         if (!IsDirectBlockedDamageCandidate(sourceId, targetId, in observation))
             return false;
@@ -94,7 +94,7 @@ public sealed class CompactOutcomeCanonicalizer
         if (_resolvedAvoidanceSignatures.Contains(signature))
             return true;
 
-        _pendingDirect.Add(new PendingDirectBlockedDamage(sourceId, targetId, stamp, observation));
+        _pendingDirect.Add(new PendingDirectBlockedDamage(sourceId, targetId, stamp, observedAtMilliseconds, observation));
         TrimPending();
         return true;
     }
@@ -113,12 +113,12 @@ public sealed class CompactOutcomeCanonicalizer
             {
                 _resolvedAvoidanceSignatures.Add(signature);
                 var observation = pending.Observation;
-                results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, ApplyAvoidedModifier(pending.SourceId, pending.TargetId, in observation, DamageModifiers.Evade, PacketEffectTag.ActiveDodgeEvade)));
+                results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, pending.ObservedAtMilliseconds, ApplyAvoidedModifier(pending.SourceId, pending.TargetId, in observation, DamageModifiers.Evade, PacketEffectTag.ActiveDodgeEvade)));
             }
             else
             {
                 var observation = pending.Observation;
-                results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, NormalizeBaseObservation(pending.SourceId, pending.TargetId, in observation)));
+                results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, pending.ObservedAtMilliseconds, NormalizeBaseObservation(pending.SourceId, pending.TargetId, in observation)));
             }
         }
 
@@ -135,7 +135,7 @@ public sealed class CompactOutcomeCanonicalizer
             }
 
             _resolvedAvoidanceSignatures.Add(signature);
-            results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, CreateCompactEvade(in pending)));
+            results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, pending.ObservedAtMilliseconds, CreateCompactEvade(in pending)));
         }
 
         _pendingDirect.Clear();
@@ -347,4 +347,4 @@ public sealed class CompactOutcomeCanonicalizer
     }
 }
 
-public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, CombatObservation Observation);
+public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
