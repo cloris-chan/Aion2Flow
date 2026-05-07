@@ -10,6 +10,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
     private readonly Lock _gate = new();
     private DomainEventApplier _applier = new DomainEventApplier(entities, metadata, combat);
     private readonly CombatPairProjection _pairs = new();
+    private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
+    private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
     private long _appliedBatchOrdinal = -1;
@@ -44,11 +46,27 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
         return adapter.CreateSnapshot();
     }
 
-    public CombatDetailDelta CreateDetailDelta(DamageMeterSnapshot snapshot, int combatantId)
+    public CombatDetailDelta CreateDetailDelta(DamageMeterSnapshot snapshot, int combatantId, bool forceRefresh = false)
     {
-        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata, _applier.BossFocus, BattleId);
-        var subscription = new CombatDetailSubscription(combat, _pairs, combatantId);
-        return subscription.CreateSnapshotDelta(adapter, snapshot);
+        lock (_gate)
+        {
+            var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata, _applier.BossFocus, BattleId);
+            var subscription = GetDetailSubscription(combatantId);
+            if (forceRefresh || !_lastDetailDeltas.ContainsKey(combatantId))
+            {
+                var cold = subscription.CreateSnapshotDelta(adapter, snapshot);
+                _lastDetailDeltas[combatantId] = cold;
+                return cold;
+            }
+
+            if (subscription.Poll(adapter, snapshot) is { } delta)
+            {
+                _lastDetailDeltas[combatantId] = delta;
+                return delta;
+            }
+
+            return _lastDetailDeltas[combatantId];
+        }
     }
 
     public void Refresh()
@@ -91,6 +109,17 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
         }
     }
 
+    private CombatDetailSubscription GetDetailSubscription(int combatantId)
+    {
+        if (!_detailSubscriptions.TryGetValue(combatantId, out var subscription))
+        {
+            subscription = new CombatDetailSubscription(combat, _pairs, combatantId);
+            _detailSubscriptions[combatantId] = subscription;
+        }
+
+        return subscription;
+    }
+
     public void ResetCombat(Guid battleId, long startOrdinal)
     {
         lock (_gate)
@@ -99,6 +128,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
             combat.Clear();
             _applier = new DomainEventApplier(entities, metadata, combat);
             _pairs.Rebuild(combat);
+            _detailSubscriptions.Clear();
+            _lastDetailDeltas.Clear();
             _cursor = journal.CreateCursor(startOrdinal);
             AppliedObservationOrdinal = 0;
             _appliedBatchOrdinal = journal.LastCompletedBatchOrdinal;

@@ -985,6 +985,52 @@ public class SceneCombatSnapshotAdapterTests
         Assert.Equal(CharacterClass.Gladiator, snapshot.Combatants[100].CharacterClass);
         Assert.Null(snapshot.Combatants[200].CharacterClass);
     }
+
+    [Fact]
+    public void Adapter_CreateSnapshot_UsesTimelineNowForBossFallbackWithoutCombat()
+    {
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        var bossFocus = new BossFocusStore(entities);
+        entities.ApplyNpcKind(3518, NpcKind.Boss);
+        entities.ApplyBattleToggle(3518, true);
+        bossFocus.ApplyBattle(3518, true, 1_000);
+
+        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, metadata, bossFocus).CreateSnapshot();
+
+        Assert.Equal(3518, snapshot.Encounter.TrackingTargetId);
+        Assert.True(snapshot.Encounter.IsActive);
+    }
+
+    [Fact]
+    public void Adapter_CreateSnapshot_ExpiresBossFallbackAgainstLatestSceneObservation()
+    {
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        var bossFocus = new BossFocusStore(entities);
+        entities.ApplyNpcKind(3518, NpcKind.Boss);
+        entities.ApplyBattleToggle(3518, true);
+        bossFocus.ApplyBattle(3518, true, 1_000);
+        entities.ApplyNickname(100, "Player");
+        entities.ApplyNpcCode(200, 9_999_999);
+
+        combat.ApplyCombat(100, 200, new CombatObservation
+        {
+            SkillCode = 11000010,
+            Damage = 500,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 20_000);
+
+        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, metadata, bossFocus).CreateSnapshot();
+
+        Assert.Equal(200, snapshot.Encounter.TrackingTargetId);
+        Assert.NotEqual(3518, snapshot.Encounter.TrackingTargetId);
+    }
 }
 
 public class SceneReadModelOwnerTests
@@ -1083,6 +1129,114 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
+    public void Owner_CreateDetailDelta_ReusesWarmSubscriptionForIrrelevantCombat()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+
+        AppendScenePacket(sink, 100, 200, 11000010, 500, 1_000, 1);
+        AppendScenePacket(sink, 100, 200, 11000010, 300, 2_000, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
+
+        var firstSnapshot = scene.Owner.CreateSnapshot();
+        var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
+
+        AppendScenePacket(sink, 300, 400, 11000010, 700, 3_000, 3);
+        sink.CompleteBatch(3);
+
+        var secondSnapshot = scene.Owner.CreateSnapshot();
+        var warm = scene.Owner.CreateDetailDelta(secondSnapshot, 100);
+
+        Assert.Same(cold, warm);
+        Assert.Equal(2, warm.Revision);
+        Assert.Equal(2, warm.Events.Count);
+    }
+
+    [Fact]
+    public void Owner_CreateDetailDelta_UpdatesWarmSubscriptionForRelevantCombat()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+
+        AppendScenePacket(sink, 100, 200, 11000010, 500, 1_000, 1);
+        AppendScenePacket(sink, 100, 200, 11000010, 300, 2_000, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
+
+        var firstSnapshot = scene.Owner.CreateSnapshot();
+        var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
+
+        AppendScenePacket(sink, 100, 200, 11000010, 200, 3_000, 3);
+        sink.CompleteBatch(3);
+
+        var secondSnapshot = scene.Owner.CreateSnapshot();
+        var warm = scene.Owner.CreateDetailDelta(secondSnapshot, 100);
+
+        Assert.NotSame(cold, warm);
+        Assert.Equal(3, warm.Revision);
+        Assert.Equal(3, warm.Events.Count);
+    }
+
+    [Fact]
+    public void Owner_CreateDetailDelta_UsesSeparateSubscriptionForSelectionSwitch()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+
+        AppendScenePacket(sink, 100, 200, 11000010, 500, 1_000, 1);
+        AppendScenePacket(sink, 300, 400, 11000010, 700, 2_000, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
+
+        var snapshot = scene.Owner.CreateSnapshot();
+        var first = scene.Owner.CreateDetailDelta(snapshot, 100);
+        var second = scene.Owner.CreateDetailDelta(snapshot, 300);
+
+        Assert.NotSame(first, second);
+        Assert.Equal(100, first.CombatantId);
+        Assert.Equal(300, second.CombatantId);
+        Assert.Single(first.Events);
+        Assert.Single(second.Events);
+    }
+
+    [Fact]
+    public void Owner_CreateDetailDelta_TreatsSummonDamageAsOwnerRelevantOnWarmPoll()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+
+        sink.AppendNickname(100, "Owner");
+        sink.AppendSummon(100, 500);
+        AppendScenePacket(sink, 500, 200, 11000010, 500, 1_000, 1);
+        AppendScenePacket(sink, 500, 200, 11000010, 300, 2_000, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
+
+        var firstSnapshot = scene.Owner.CreateSnapshot();
+        var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
+
+        AppendScenePacket(sink, 500, 200, 11000010, 200, 3_000, 3);
+        sink.CompleteBatch(3);
+
+        var secondSnapshot = scene.Owner.CreateSnapshot();
+        var warm = scene.Owner.CreateDetailDelta(secondSnapshot, 100);
+
+        Assert.NotSame(cold, warm);
+        Assert.Equal(3, warm.Revision);
+        Assert.Equal(3, warm.Events.Count);
+        Assert.All(warm.Events, e => Assert.Equal(100, e.SourceId));
+    }
+
+    [Fact]
     public void LiveReadModel_CapturesFactoryJournal()
     {
         var store = new CombatMetricsStore();
@@ -1099,6 +1253,98 @@ public class SceneReadModelOwnerTests
             Assert.Equal(scene.SessionId, snapshot.BattleId);
             Assert.True(scene.Owner.Entities.TryGet(100, out var entity));
             Assert.Equal("Perigee", entity.Nickname);
+        }
+        finally
+        {
+            SceneDualWrite.Enabled = false;
+        }
+    }
+
+    [Fact]
+    public void LiveReadModel_Reset_BarrierSeparatesOldAndNewCombat()
+    {
+        var store = new CombatMetricsStore();
+        var scene = new SceneLiveReadModel();
+        SceneDualWrite.Enabled = true;
+        try
+        {
+            var sink = SceneSinkFactory.CreateForStore(store, scene)();
+            sink.AppendNickname(100, "Player");
+            sink.AppendCombatPacket(new ParsedCombatPacket
+            {
+                SourceId = 100,
+                TargetId = 200,
+                SkillCode = 11000010,
+                OriginalSkillCode = 11000010,
+                Damage = 500,
+                Timestamp = 1_000,
+                BatchOrdinal = 1,
+                HitContribution = 1,
+                AttemptContribution = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            });
+            sink.AppendCombatPacket(new ParsedCombatPacket
+            {
+                SourceId = 100,
+                TargetId = 200,
+                SkillCode = 11000010,
+                OriginalSkillCode = 11000010,
+                Damage = 300,
+                Timestamp = 2_000,
+                BatchOrdinal = 2,
+                HitContribution = 1,
+                AttemptContribution = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            });
+            sink.CompleteBatch(1);
+            sink.CompleteBatch(2);
+
+            var first = scene.Owner.CreateSnapshot();
+            var oldSessionId = scene.SessionId;
+            var resetStartOrdinal = scene.Clock.NextObservationOrdinal;
+            scene.Reset();
+            sink.AppendCombatPacket(new ParsedCombatPacket
+            {
+                SourceId = 100,
+                TargetId = 201,
+                SkillCode = 11000010,
+                OriginalSkillCode = 11000010,
+                Damage = 700,
+                Timestamp = 3_000,
+                BatchOrdinal = 3,
+                HitContribution = 1,
+                AttemptContribution = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            });
+            sink.AppendCombatPacket(new ParsedCombatPacket
+            {
+                SourceId = 100,
+                TargetId = 201,
+                SkillCode = 11000010,
+                OriginalSkillCode = 11000010,
+                Damage = 300,
+                Timestamp = 4_000,
+                BatchOrdinal = 4,
+                HitContribution = 1,
+                AttemptContribution = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            });
+            sink.CompleteBatch(3);
+            sink.CompleteBatch(4);
+
+            var second = scene.Owner.CreateSnapshot();
+
+            Assert.NotEqual(oldSessionId, scene.SessionId);
+            Assert.NotEqual(first.BattleId, second.BattleId);
+            Assert.Equal(resetStartOrdinal, scene.Journal.Read(resetStartOrdinal).Stamp.ObservationOrdinal);
+            Assert.Equal(scene.SessionId, scene.Journal.Read(resetStartOrdinal).SceneSessionId);
+            Assert.Equal(1000, second.Combatants[100].DamageAmount);
+            Assert.Equal("Player", second.Combatants[100].Nickname);
+            Assert.DoesNotContain(200, second.Combatants.Keys);
         }
         finally
         {
@@ -1153,6 +1399,39 @@ public class SceneReadModelOwnerTests
         {
             SceneDualWrite.Enabled = false;
         }
+    }
+
+    private static SkillCollection BuildSkillMap()
+    {
+        return
+        [
+            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
+        ];
+    }
+
+    private static void AppendScenePacket(
+        JournalingRuntimeObservationSink sink,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int damage,
+        long timestamp,
+        long batchOrdinal)
+    {
+        sink.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = skillCode,
+            OriginalSkillCode = skillCode,
+            Damage = damage,
+            Timestamp = timestamp,
+            BatchOrdinal = batchOrdinal,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
     }
 }
 

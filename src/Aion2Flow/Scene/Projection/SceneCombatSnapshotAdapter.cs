@@ -16,12 +16,13 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 {
     private readonly Dictionary<int, ClassEvidence> _classEvidence = [];
     private readonly Dictionary<int, int> _inferredOwnerBySummon = [];
+    private bool _ownerInferenceReady;
 
     public DamageMeterSnapshot CreateSnapshot()
     {
         _classEvidence.Clear();
-        _inferredOwnerBySummon.Clear();
-        InferPreexistingSummonOwners();
+        ResetOwnerInference();
+        EnsureOwnerInference();
         var snapshot = new DamageMeterSnapshot
         {
             BattleId = battleId == default ? Guid.NewGuid() : battleId,
@@ -30,7 +31,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         };
 
         var targetDecision = DecideTarget();
-        var trackingTargetId = ResolveTrackingTargetId(targetDecision.TrackingTargetId);
+        var now = ResolveSnapshotNow();
+        var trackingTargetId = ResolveTrackingTargetId(targetDecision.TrackingTargetId, now);
         var damageTargetId = targetDecision.DamageTargetId > 0 ? targetDecision.DamageTargetId : trackingTargetId;
         snapshot.TargetName = ResolveTargetName(damageTargetId);
         snapshot.TargetObservation = BuildTargetObservation(trackingTargetId);
@@ -62,7 +64,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             data.DamageContribution = totalDamage > 0 ? (double)data.DamageAmount / totalDamage : 0;
         }
 
-        snapshot.Encounter = EvaluateEncounter(trackingTargetId, battleTime, snapshot.TargetObservation);
+        snapshot.Encounter = EvaluateEncounter(trackingTargetId, battleTime, snapshot.TargetObservation, now);
         return snapshot;
     }
 
@@ -71,8 +73,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (combatantId <= 0 || snapshot.BattleTime <= 0 || snapshot.BattleStartTime <= 0 || snapshot.BattleEndTime < snapshot.BattleStartTime || !snapshot.Combatants.ContainsKey(combatantId))
             return [];
 
-        _inferredOwnerBySummon.Clear();
-        InferPreexistingSummonOwners();
+        ResetOwnerInference();
+        EnsureOwnerInference();
         var events = new List<CombatDetailEvent>();
         AppendDetailEvents(events, snapshot, combatantId, projection.Pairs.Values);
         events.Sort(static (a, b) => a.Revision.CompareTo(b.Revision));
@@ -81,6 +83,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     }
 
     public string ResolveDetailDisplayName(int entityId) => ResolveDisplayName(entityId);
+
+    public int ResolveDetailCombatantId(int entityId)
+    {
+        EnsureOwnerInference();
+        return ResolveCombatantId(entityId);
+    }
 
     private void ApplyEvent(DamageMeterSnapshot snapshot, BattleEvent battleEvent)
     {
@@ -371,12 +379,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return entityId.ToString(CultureInfo.InvariantCulture);
     }
 
-    private int ResolveTrackingTargetId(int trackingTargetId)
+    private int ResolveTrackingTargetId(int trackingTargetId, long nowMilliseconds)
     {
         if (trackingTargetId > 0)
             return trackingTargetId;
 
-        return bossFocus is not null && bossFocus.TryGetObservedBoss(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), 10_000, out var boss) ? boss.InstanceId : 0;
+        return bossFocus is not null && bossFocus.TryGetObservedBoss(nowMilliseconds, 10_000, out var boss) ? boss.InstanceId : 0;
     }
 
     private CharacterClass? ResolveCharacterClass(int entityId)
@@ -459,6 +467,21 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             if (ownerId > 0)
                 _inferredOwnerBySummon[summonId] = ownerId;
         }
+    }
+
+    private void ResetOwnerInference()
+    {
+        _inferredOwnerBySummon.Clear();
+        _ownerInferenceReady = false;
+    }
+
+    private void EnsureOwnerInference()
+    {
+        if (_ownerInferenceReady)
+            return;
+
+        InferPreexistingSummonOwners();
+        _ownerInferenceReady = true;
     }
 
     private static bool TryResolveSkill(in CombatObservation observation, out Skill skill)
@@ -544,9 +567,25 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return observation;
     }
 
-    private EncounterSummary EvaluateEncounter(int targetId, long battleTime, NpcRuntimeObservation? observation)
+    private long ResolveSnapshotNow()
     {
-        if (targetId <= 0 && bossFocus is not null && bossFocus.TryGetObservedBoss(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), 10_000, out var boss))
+        var now = 0L;
+        foreach (var e in combat.Events)
+            now = Math.Max(now, ObservedAt(e));
+
+        if (now <= 0 && bossFocus is not null)
+        {
+            var snapshots = bossFocus.GetObservedBosses(0, long.MaxValue);
+            for (var i = 0; i < snapshots.Count; i++)
+                now = Math.Max(now, snapshots[i].LastObservedAtMilliseconds);
+        }
+
+        return now;
+    }
+
+    private EncounterSummary EvaluateEncounter(int targetId, long battleTime, NpcRuntimeObservation? observation, long nowMilliseconds)
+    {
+        if (targetId <= 0 && bossFocus is not null && bossFocus.TryGetObservedBoss(nowMilliseconds, 10_000, out var boss))
         {
             targetId = boss.InstanceId;
             observation = BuildTargetObservation(targetId);

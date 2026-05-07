@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
@@ -6,6 +7,7 @@ using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Compatibility;
+using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
@@ -213,6 +215,33 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.True(parsed);
         Assert.True(store.Nicknames.TryGetValue(2007, out var nickname));
         Assert.Equal("Perigee", nickname);
+    }
+
+    [Fact]
+    public async Task AppendAndProcess_Holds_Synchronization_Gate_For_Whole_Batch()
+    {
+        var sink = new BlockingSynchronizedSink();
+        using var processor = new PacketStreamProcessor(sink);
+        var packet = Convert.FromHexString("1EAA3336D70F5FB17904070750657269676565EF0306000000012D000000");
+        var running = Task.Run(() => processor.AppendAndProcess(packet, TestConnection), TestContext.Current.CancellationToken);
+
+        await sink.NicknameEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        var acquired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiter = Task.Run(() =>
+        {
+            lock (sink.Gate)
+            {
+                acquired.SetResult();
+            }
+        }, TestContext.Current.CancellationToken);
+
+        Assert.NotSame(acquired.Task, await Task.WhenAny(acquired.Task, Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken)));
+        sink.AllowNickname.SetResult();
+        Assert.True(await running.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
+        await acquired.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        await waiter.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        Assert.True(sink.SceneArrivalCalled);
     }
 
     [Fact]
@@ -734,5 +763,51 @@ public sealed class PacketStreamProcessorNpcObservationTests
             new Skill(12000100, "Dodge", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
             new Skill(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];
+    }
+
+    private sealed class BlockingSynchronizedSink : IRuntimeObservationSink, IRuntimeObservationSynchronization
+    {
+        public Lock Gate { get; } = new();
+        public TaskCompletionSource NicknameEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource AllowNickname { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int CurrentTarget { get; set; }
+        public bool SceneArrivalCalled { get; private set; }
+
+        public int ResolveLifecycleId(int rawInstanceId) => rawInstanceId;
+        public int RebindInstanceLifecycle(int rawInstanceId) => rawInstanceId;
+        public bool IsKnownEntity(int id) => false;
+        public bool HasSummonOwner(int instanceId) => false;
+        public bool TryGetNpcRuntimeState(int instanceId, out RuntimeNpcStateSnapshot state) { state = default; return false; }
+        public int ResolveNpcObservationSource() => 0;
+        public void RememberNpcObservationSource(int instanceId) { }
+        public void StageDestinationMap(uint mapId) { }
+        public void StageDestinationMapInstance(uint instanceId) { }
+        public void MarkSceneArrival() => SceneArrivalCalled = true;
+        public void AppendCombatPacket(ParsedCombatPacket packet) { }
+        public void CompleteBatch(long batchOrdinal) { }
+        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal) { }
+        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal) { }
+        public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal) { }
+        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal) { }
+        public void RegisterPeriodicLink0538(int targetId, int sourceId, int linkId, int sequenceId, int tailRaw, long timestamp, long frameOrdinal, long batchOrdinal) { }
+        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal) { }
+        public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal) { }
+        public void AppendNickname(int uid, string nickname, int? originServerId = null)
+        {
+            NicknameEntered.SetResult();
+            AllowNickname.Task.GetAwaiter().GetResult();
+        }
+        public void AppendNpcCode(int instanceId, int npcCode) { }
+        public void AppendNpcName(int npcCode, string name) { }
+        public void AppendNpcKind(int instanceId, NpcKind kind) { }
+        public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds) { }
+        public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds) { }
+        public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds) { }
+        public void ToggleNpcBattle(int instanceId) { }
+        public void AppendNpc2136State(int instanceId, uint sequence, uint value0) { }
+        public void AppendNpc0140Value(int instanceId, uint value0) { }
+        public void AppendNpc0240Value(int instanceId, uint value0) { }
+        public void AppendNpc4636State(int instanceId, byte state0, byte state1) { }
+        public void AppendSummon(int ownerId, int summonInstanceId) { }
     }
 }

@@ -6,6 +6,8 @@ using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
+using Cloris.Aion2Flow.Scene.Projection;
+using Cloris.Aion2Flow.Scene.Stores;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Logging;
 using Cloris.Aion2Flow.Services.Settings;
@@ -323,6 +325,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     internal void RefreshCombatStatsForTesting() => RefreshCombatStats();
 
+    internal void ResetLiveModelsForTesting() => ResetLiveModels();
+
     private DamageMeterSnapshot CreateLiveSnapshot()
     {
         return _settingsService.Current.SceneSnapshotReadMode switch
@@ -353,16 +357,18 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         var battleSeconds = snapshot.BattleTime / 1000.0;
         BattleTimeSeconds = battleSeconds;
         LiveSceneName = ResolveSceneDisplayName(snapshot.MapId);
-        var displayStore = ResolveDisplayStore();
-        RefreshBossFocus(displayStore);
+        var useSceneDisplay = UseSceneLiveReadPath();
+        var displayStore = useSceneDisplay ? null : ResolveDisplayStore();
+        var sceneOwner = useSceneDisplay ? _captureService.Scene.Owner : null;
+        RefreshBossFocus(displayStore, sceneOwner, snapshot);
 
         using var deferral = Combatants.SuspendNotifications();
         foreach (var row in deferral.Snapshot)
         {
             if (snapshot.Combatants.TryGetValue(row.Id, out var data) &&
-                ShouldDisplayCombatant(displayStore, row.Id, data))
+                ShouldDisplayCombatant(displayStore, sceneOwner, row.Id, data))
             {
-                row.DisplayName = ResolveDisplayName(snapshot, row.Id);
+                row.DisplayName = ResolveDisplayName(snapshot, displayStore, sceneOwner, row.Id);
                 row.CharacterClass = data.CharacterClass;
                 row.DamagePerSecond = data.DamagePerSecond;
                 row.HealingPerSecond = data.HealingPerSecond;
@@ -381,9 +387,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             if (Combatants.Contains(id))
                 continue;
 
-            if (!ShouldDisplayCombatant(displayStore, id, data))
+            if (!ShouldDisplayCombatant(displayStore, sceneOwner, id, data))
                 continue;
-            var displayName = ResolveDisplayName(snapshot, id);
+            var displayName = ResolveDisplayName(snapshot, displayStore, sceneOwner, id);
 
             Combatants.Add(new CombatantRowViewModel
             {
@@ -416,9 +422,34 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         ApplySnapshot(_displayedSnapshot, forceDetailRefresh);
     }
 
-    private string ResolveDisplayName(DamageMeterSnapshot snapshot, int id)
+    private string ResolveDisplayName(DamageMeterSnapshot snapshot, CombatMetricsStore? store, SceneReadModelOwner? sceneOwner, int id)
+        => sceneOwner is not null
+            ? ResolveSceneDisplayName(snapshot, sceneOwner.Entities, sceneOwner.Metadata, id)
+            : CombatMetricsEngine.ResolveCombatantDisplayName(store!, snapshot, id);
+
+    private static string ResolveSceneDisplayName(DamageMeterSnapshot snapshot, EntityStore entities, MetadataStore metadata, int id)
     {
-        return CombatMetricsEngine.ResolveCombatantDisplayName(ResolveDisplayStore(), snapshot, id);
+        if (metadata.TryGetDisplayName(id, out var displayName) && !string.IsNullOrWhiteSpace(displayName))
+            return displayName;
+
+        if (entities.TryGet(id, out var entity))
+        {
+            if (!string.IsNullOrWhiteSpace(entity.Nickname))
+                return entity.Nickname;
+
+            if (entity.NpcCode is int npcCode)
+            {
+                if (CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
+                    return catalogEntry.Name;
+
+                if (metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName))
+                    return npcName;
+            }
+        }
+
+        return snapshot.Combatants.TryGetValue(id, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname)
+            ? combatant.Nickname
+            : id.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private CombatMetricsStore ResolveDisplayStore()
@@ -426,28 +457,47 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             ? SelectedBattleHistory.Record.Store
             : _store;
 
-    private void RefreshBossFocus(CombatMetricsStore displayStore)
+    private void RefreshBossFocus(CombatMetricsStore? displayStore, SceneReadModelOwner? sceneOwner, DamageMeterSnapshot snapshot)
     {
-        if (IsViewingArchivedBattle || displayStore != _store)
+        if (IsViewingArchivedBattle)
         {
             BossFocuses.Clear();
             return;
         }
 
-        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var snapshots = _store.GetObservedBosses(now, BossFocusVisibilityTimeoutMilliseconds);
-        SyncBossFocuses(snapshots);
+        if (sceneOwner is not null)
+        {
+            var now = ResolveBossFocusNow(snapshot);
+            var snapshots = sceneOwner.BossFocus.GetObservedBosses(now, BossFocusVisibilityTimeoutMilliseconds);
+            SyncBossFocuses(snapshots.Count, i => snapshots[i].InstanceId, i => snapshots[i].Hp, i => snapshots[i].MaxHp, i => snapshots[i].HasHp, id => ResolveSceneDisplayName(snapshot, sceneOwner.Entities, sceneOwner.Metadata, id));
+            return;
+        }
+
+        if (displayStore != _store)
+        {
+            BossFocuses.Clear();
+            return;
+        }
+
+        var legacyNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var legacySnapshots = _store.GetObservedBosses(legacyNow, BossFocusVisibilityTimeoutMilliseconds);
+        SyncBossFocuses(legacySnapshots.Count, i => legacySnapshots[i].InstanceId, i => legacySnapshots[i].Hp, i => legacySnapshots[i].MaxHp, i => legacySnapshots[i].HasHp, id => CombatMetricsEngine.ResolveCombatantDisplayName(_store, _latestLiveDamage, id));
     }
 
-    private void SyncBossFocuses(IReadOnlyList<CombatMetricsStore.ObservedBossSnapshot> snapshots)
+    private static long ResolveBossFocusNow(DamageMeterSnapshot snapshot)
+        => snapshot.BattleEndTime > 0
+            ? snapshot.BattleEndTime
+            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    private void SyncBossFocuses(int snapshotCount, Func<int, int> getInstanceId, Func<int, int> getHp, Func<int, int> getMaxHp, Func<int, bool> getHasHp, Func<int, string> resolveDisplayName)
     {
         for (var i = BossFocuses.Count - 1; i >= 0; i--)
         {
             var existing = BossFocuses[i];
             var stillPresent = false;
-            for (var j = 0; j < snapshots.Count; j++)
+            for (var j = 0; j < snapshotCount; j++)
             {
-                if (snapshots[j].InstanceId == existing.InstanceId)
+                if (getInstanceId(j) == existing.InstanceId)
                 {
                     stillPresent = true;
                     break;
@@ -459,37 +509,43 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             }
         }
 
-        for (var i = 0; i < snapshots.Count; i++)
+        for (var i = 0; i < snapshotCount; i++)
         {
-            var snapshot = snapshots[i];
+            var instanceId = getInstanceId(i);
             BossFocusViewModel? row = null;
             for (var j = 0; j < BossFocuses.Count; j++)
             {
-                if (BossFocuses[j].InstanceId == snapshot.InstanceId)
+                if (BossFocuses[j].InstanceId == instanceId)
                 {
                     row = BossFocuses[j];
                     break;
                 }
             }
 
-            var displayName = CombatMetricsEngine.ResolveCombatantDisplayName(_store, _latestLiveDamage, snapshot.InstanceId);
+            var displayName = resolveDisplayName(instanceId);
             if (row is null)
             {
-                row = new BossFocusViewModel { InstanceId = snapshot.InstanceId };
+                row = new BossFocusViewModel { InstanceId = instanceId };
                 BossFocuses.Add(row);
             }
-            row.Update(displayName, snapshot.Hp, snapshot.MaxHp, snapshot.HasHp);
+            row.Update(displayName, getHp(i), getMaxHp(i), getHasHp(i));
         }
     }
 
     internal static bool ShouldDisplayCombatant(CombatMetricsStore store, int combatantId, CombatantMetrics data)
+        => ShouldDisplayCombatant(store, null, combatantId, data);
+
+    private static bool ShouldDisplayCombatant(CombatMetricsStore? store, SceneReadModelOwner? sceneOwner, int combatantId, CombatantMetrics data)
     {
         if (data.CharacterClass is null)
         {
             return false;
         }
 
-        if (!store.TryGetNpcRuntimeState(combatantId, out var npcState))
+        if (sceneOwner is not null)
+            return ShouldDisplaySceneCombatant(sceneOwner.Entities, combatantId);
+
+        if (!store!.TryGetNpcRuntimeState(combatantId, out var npcState))
         {
             return true;
         }
@@ -501,6 +557,20 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         return npcState.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
     }
+
+    private static bool ShouldDisplaySceneCombatant(EntityStore entities, int combatantId)
+    {
+        if (!entities.TryGet(combatantId, out var entity))
+            return true;
+
+        if (entity.NpcCode.HasValue)
+            return false;
+
+        return entity.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
+    }
+
+    private bool UseSceneLiveReadPath()
+        => !IsViewingArchivedBattle && _settingsService.Current.SceneSnapshotReadMode == SceneSnapshotReadMode.Scene;
 
     public async ValueTask DisposeAsync()
     {
@@ -611,8 +681,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void ResetLiveModels()
     {
-        _engine.Reset();
-        _captureService.Scene.Reset();
+        _captureService.Scene.Reset(_engine.Reset);
         LastSceneSnapshotDiff = string.Empty;
     }
 
@@ -668,7 +737,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         if (!IsViewingArchivedBattle && _settingsService.Current.SceneSnapshotReadMode == SceneSnapshotReadMode.Scene)
         {
-            var detail = _captureService.Scene.Owner.CreateDetailDelta(snapshot, SelectedCombatant.Id);
+            var detail = _captureService.Scene.Owner.CreateDetailDelta(snapshot, SelectedCombatant.Id, forceRefresh);
             CombatantDetails.SelectSceneBattleCombatant(battleContextId, SelectedCombatant.Id, snapshot, detail, forceRefresh);
             return;
         }

@@ -12,30 +12,33 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
     public long LastAppliedRevision => _lastAppliedRevision;
 
     public CombatDetailDelta? Poll()
-    {
-        var detailRevision = store.GetCombatantDetailRevision(combatantId);
-        if (detailRevision <= _lastAppliedRevision)
-            return null;
+        => PollCore(null, null);
 
+    public CombatDetailDelta? Poll(SceneCombatSnapshotAdapter adapter, DamageMeterSnapshot snapshot)
+        => PollCore(adapter, snapshot);
+
+    private CombatDetailDelta? PollCore(SceneCombatSnapshotAdapter? adapter, DamageMeterSnapshot? snapshot)
+    {
         var batch = store.ReadChanges(_cursor, 64);
         if (batch.Changes.Count == 0)
             return null;
 
         bool affected = false;
+        var detailRevision = _lastAppliedRevision;
         while (true)
         {
             for (int i = 0; i < batch.Changes.Count; i++)
             {
                 var change = batch.Changes[i];
-                if (change.CombatantId == combatantId || change.PairKey.Source == combatantId || change.PairKey.Target == combatantId)
+                if (IsRelevant(in change, adapter))
                 {
                     affected = true;
-                    break;
+                    detailRevision = Math.Max(detailRevision, change.Revision);
                 }
             }
 
             _cursor = new SnapshotChangeCursor(batch.ToRevision, 0);
-            if (!batch.HasMore || batch.ToRevision >= detailRevision)
+            if (!batch.HasMore)
                 break;
 
             batch = store.ReadChanges(_cursor, 64);
@@ -46,26 +49,30 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
         if (!affected)
             return null;
 
-        _lastAppliedRevision = detailRevision;
-        projection.Rebuild(store);
-
-        return new CombatDetailDelta
-        {
-            CombatantId = combatantId,
-            Revision = detailRevision,
-            OutgoingPairs = projection.GetOutgoingPairs(combatantId),
-            IncomingPairs = projection.GetIncomingPairs(combatantId),
-            Combatant = projection.GetCombatant(combatantId)
-        };
+        var delta = CreateDelta(detailRevision, adapter, snapshot);
+        _lastAppliedRevision = delta.Revision;
+        return delta;
     }
 
     public CombatDetailDelta CreateSnapshotDelta(SceneCombatSnapshotAdapter adapter, DamageMeterSnapshot snapshot)
     {
-        projection.Rebuild(store);
-        var events = projection.GetDetailEvents(adapter, snapshot, combatantId);
-        var detailRevision = ResolveDetailRevision(events);
-        _lastAppliedRevision = detailRevision;
+        var detailRevision = store.GetCombatantDetailRevision(combatantId);
         _cursor = store.CreateCursor(store.Revision);
+        var delta = CreateDelta(detailRevision, adapter, snapshot);
+        _lastAppliedRevision = delta.Revision;
+        return delta;
+    }
+
+    private CombatDetailDelta CreateDelta(long revision, SceneCombatSnapshotAdapter? adapter, DamageMeterSnapshot? snapshot)
+    {
+        if (projection.Revision != store.Revision)
+            projection.Rebuild(store);
+
+        var events = adapter is not null && snapshot is not null
+            ? projection.GetDetailEvents(adapter, snapshot, combatantId)
+            : [];
+        var detailRevision = Math.Max(revision, ResolveDetailRevision(events));
+
         return new CombatDetailDelta
         {
             CombatantId = combatantId,
@@ -73,10 +80,22 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
             OutgoingPairs = projection.GetOutgoingPairs(combatantId),
             IncomingPairs = projection.GetIncomingPairs(combatantId),
             Events = events,
-            DisplayNames = projection.BuildDetailDisplayNames(adapter, events),
+            DisplayNames = adapter is not null ? projection.BuildDetailDisplayNames(adapter, events) : new Dictionary<int, string>(),
             Combatant = projection.GetCombatant(combatantId)
         };
     }
+
+    private bool IsRelevant(in CombatSnapshotChange change, SceneCombatSnapshotAdapter? adapter)
+    {
+        if (ResolveDetailCombatantId(change.CombatantId, adapter) == combatantId)
+            return true;
+
+        return ResolveDetailCombatantId(change.PairKey.Source, adapter) == combatantId ||
+               ResolveDetailCombatantId(change.PairKey.Target, adapter) == combatantId;
+    }
+
+    private static int ResolveDetailCombatantId(int entityId, SceneCombatSnapshotAdapter? adapter)
+        => entityId > 0 && adapter is not null ? adapter.ResolveDetailCombatantId(entityId) : entityId;
 
     private static long ResolveDetailRevision(IReadOnlyList<CombatDetailEvent> events)
     {

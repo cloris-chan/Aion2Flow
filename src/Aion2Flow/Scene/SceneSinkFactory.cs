@@ -15,11 +15,11 @@ public static class SceneSinkFactory
         () =>
         {
             if (!SceneDualWrite.Enabled)
-                return new LegacyRuntimeObservationSink(store);
+                return scene.Synchronize(new LegacyRuntimeObservationSink(store));
 
             var legacy = new LegacyRuntimeObservationSink(store);
             var journaling = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
-            return new CompositeRuntimeObservationSink(legacy, journaling);
+            return scene.Synchronize(new CompositeRuntimeObservationSink(legacy, journaling));
         };
 
     public static ReplaySinkHolder CreateForReplay(CombatMetricsStore store)
@@ -55,12 +55,28 @@ public sealed class SceneLiveReadModel
     {
         lock (_gate)
         {
-            SessionId = Guid.NewGuid();
-            Owner.ResetCombat(SessionId, Clock.NextObservationOrdinal);
+            ResetCore();
+        }
+    }
+
+    public void Reset(Action reset)
+    {
+        lock (_gate)
+        {
+            reset();
+            ResetCore();
         }
     }
 
     public long NextBatchOrdinal() => Interlocked.Increment(ref _nextBatchOrdinal);
+
+    public IRuntimeObservationSink Synchronize(IRuntimeObservationSink sink) => new SynchronizedRuntimeObservationSink(sink, _gate);
+
+    private void ResetCore()
+    {
+        SessionId = Guid.NewGuid();
+        Owner.ResetCombat(SessionId, Clock.NextObservationOrdinal);
+    }
 }
 
 public readonly struct ReplaySinkHolder(IRuntimeObservationSink sink, ObservedEventJournal? journal, SceneReadModelOwner? owner) : IDisposable

@@ -199,6 +199,48 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_SceneMode_UsesSceneDisplayNameWhenLegacyStoreDisagrees()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendLegacyIdentity(300, "Legacy Name");
+        fixture.AppendSceneBattle(300, "Scene Name", 400, 3_000, 5_000);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal("Scene Name", row.DisplayName);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_FiltersNpcFromSceneStoreWhenLegacyStoreIsEmpty()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneNpc(900_002, 2_100_350, NpcKind.Monster);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(300, row.Id);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_UsesSceneBossFocusWhenLegacyStoreIsEmpty()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 25_000, 50_000, 5_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var focus = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.Equal(900_002, focus.InstanceId);
+        Assert.Equal("Scene Boss", focus.DisplayName);
+        Assert.Equal(25_000, focus.Hp);
+        Assert.Equal(50_000, focus.MaxHp);
+    }
+
+    [Fact]
     public void RefreshCombatStats_SceneMode_RefreshesLiveDetailFromSceneProjection()
     {
         var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
@@ -212,6 +254,72 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal(2, fixture.ViewModel.CombatantDetails.OutgoingDamage.Hits);
         Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
         Assert.Single(fixture.ViewModel.CombatantDetails.OutgoingDetail.DamageCounterpartFilter.Counterparts);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_DoesNotRebuildLiveDetailForIrrelevantSceneCombat()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        fixture.ViewModel.SelectedCombatant = Assert.Single(fixture.ViewModel.Combatants);
+        var row = fixture.ViewModel.CombatantDetails.OutgoingDamage.Rows[0];
+
+        fixture.AppendSceneBattle(301, "Other Player", 600, 6_000, 7_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Same(row, fixture.ViewModel.CombatantDetails.OutgoingDamage.Rows[0]);
+        Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_RebuildsLiveDetailForRelevantSceneCombat()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        fixture.ViewModel.SelectedCombatant = Assert.Single(fixture.ViewModel.Combatants);
+        var firstTotal = fixture.ViewModel.CombatantDetails.OutgoingDamage.Total;
+
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 200, 6_000, 3);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal(600, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
+        Assert.True(fixture.ViewModel.CombatantDetails.OutgoingDamage.Total > firstTotal);
+        Assert.Equal(3, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
+    }
+
+    [Fact]
+    public void ResetLiveModels_ResetsLegacyAndSceneSnapshotsTogether()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        SceneDualWrite.Enabled = true;
+        try
+        {
+            var sink = fixture.CreateLiveSink();
+            AppendLiveBattle(sink, 100, "Player", 800, 1_000, 2_000, 1);
+            var firstLegacy = fixture.CreateLegacySnapshot();
+            var firstScene = fixture.CreateSceneSnapshot();
+
+            fixture.ViewModel.ResetLiveModelsForTesting();
+
+            AppendLiveBattle(sink, 100, "Player", 900, 3_000, 4_000, 3);
+            var secondLegacy = fixture.CreateLegacySnapshot();
+            var secondScene = fixture.CreateSceneSnapshot();
+
+            Assert.NotEqual(firstLegacy.BattleId, secondLegacy.BattleId);
+            Assert.NotEqual(firstScene.BattleId, secondScene.BattleId);
+            Assert.Equal(900, secondLegacy.Combatants[100].DamageAmount);
+            Assert.Equal(900, secondScene.Combatants[100].DamageAmount);
+            Assert.Equal("Player", secondLegacy.Combatants[100].Nickname);
+            Assert.Equal("Player", secondScene.Combatants[100].Nickname);
+        }
+        finally
+        {
+            SceneDualWrite.Enabled = false;
+        }
     }
 
     [Fact]
@@ -295,6 +403,20 @@ public sealed class MainViewModelCombatantFilterTests
         }
 
         public void AppendSceneBattle(int playerId, string name, int damage, long start, long end) => MainViewModelCombatantFilterTests.AppendSceneBattle(_captureService.Scene, playerId, name, damage, start, end);
+
+        public IRuntimeObservationSink CreateLiveSink() => SceneSinkFactory.CreateForStore(_engine.Store, _captureService.Scene)();
+
+        public DamageMeterSnapshot CreateLegacySnapshot() => _engine.CreateBattleSnapshot();
+
+        public DamageMeterSnapshot CreateSceneSnapshot() => _captureService.Scene.Owner.CreateSnapshot();
+
+        public void AppendSceneDamage(int sourceId, int targetId, int skillCode, int damage, long timestamp, long batchOrdinal) => MainViewModelCombatantFilterTests.AppendSceneDamage(_captureService.Scene, sourceId, targetId, skillCode, damage, timestamp, batchOrdinal);
+
+        public void AppendSceneNpc(int instanceId, int npcCode, NpcKind kind) => MainViewModelCombatantFilterTests.AppendSceneNpc(_captureService.Scene, instanceId, npcCode, kind);
+
+        public void AppendSceneBossFocus(int instanceId, string name, int hp, int maxHp, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocus(_captureService.Scene, instanceId, name, hp, maxHp, timestamp);
+
+        public void AppendLegacyIdentity(int playerId, string name) => _engine.Store.AppendNickname(playerId, name);
     }
 
     private static void AppendSceneBattle(SceneLiveReadModel scene, int playerId, string name, int damage, long start, long end)
@@ -327,6 +449,76 @@ public sealed class MainViewModelCombatantFilterTests
         });
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
+    }
+
+    private static void AppendLiveBattle(IRuntimeObservationSink sink, int playerId, string name, int damage, long start, long end, long firstBatchOrdinal)
+    {
+        sink.AppendNickname(playerId, name);
+        sink.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = 900_002,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = damage / 2,
+            Timestamp = start,
+            BatchOrdinal = firstBatchOrdinal,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        sink.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = 900_002,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = damage - damage / 2,
+            Timestamp = end,
+            BatchOrdinal = firstBatchOrdinal + 1,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        sink.CompleteBatch(firstBatchOrdinal);
+        sink.CompleteBatch(firstBatchOrdinal + 1);
+    }
+
+    private static void AppendSceneNpc(SceneLiveReadModel scene, int instanceId, int npcCode, NpcKind kind)
+    {
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        sink.AppendNpcCode(instanceId, npcCode);
+        sink.AppendNpcKind(instanceId, kind);
+    }
+
+    private static void AppendSceneBossFocus(SceneLiveReadModel scene, int instanceId, string name, int hp, int maxHp, long timestamp)
+    {
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        sink.AppendNpcName(2_100_351, name);
+        sink.AppendNpcCode(instanceId, 2_100_351);
+        sink.AppendNpcKind(instanceId, NpcKind.Boss);
+        sink.SetNpcBattle(instanceId, true, timestamp - 100);
+        sink.AppendNpcHp(instanceId, hp, maxHp, timestamp);
+    }
+
+    private static void AppendSceneDamage(SceneLiveReadModel scene, int sourceId, int targetId, int skillCode, int damage, long timestamp, long batchOrdinal)
+    {
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        sink.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = skillCode,
+            OriginalSkillCode = skillCode,
+            Damage = damage,
+            Timestamp = timestamp,
+            BatchOrdinal = batchOrdinal,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        sink.CompleteBatch(batchOrdinal);
     }
 
     private static SkillCollection BuildSkillMap()

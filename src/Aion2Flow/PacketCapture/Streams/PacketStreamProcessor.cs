@@ -268,6 +268,17 @@ public sealed class PacketStreamProcessor : IDisposable
 
     public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection)
     {
+        if (_sink is IRuntimeObservationSynchronization synchronization)
+        {
+            lock (synchronization.Gate)
+                return AppendAndProcessCore(payload, in connection);
+        }
+
+        return AppendAndProcessCore(payload, in connection);
+    }
+
+    private bool AppendAndProcessCore(ReadOnlySpan<byte> payload, in TcpConnection connection)
+    {
         _connection = connection;
         var previousAppendBatchOrdinal = _currentAppendBatchOrdinal;
         _currentAppendBatchOrdinal = ++_nextBatchOrdinal;
