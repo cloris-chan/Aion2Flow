@@ -6,7 +6,7 @@ public sealed class SceneRuntimeClock(long startMonotonicTicks)
 {
     private long _nextObservationOrdinal;
 
-    public long NextObservationOrdinal => _nextObservationOrdinal;
+    public long NextObservationOrdinal => Volatile.Read(ref _nextObservationOrdinal);
 
     public TimelineStamp CreateStamp(long packetTimestampMilliseconds, long frameOrdinal, long batchOrdinal)
     {
@@ -15,7 +15,7 @@ public sealed class SceneRuntimeClock(long startMonotonicTicks)
         return new TimelineStamp
         {
             OffsetTicks = offsetTicks,
-            ObservationOrdinal = _nextObservationOrdinal++,
+            ObservationOrdinal = Interlocked.Increment(ref _nextObservationOrdinal) - 1,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
         };
@@ -26,7 +26,7 @@ public sealed class SceneRuntimeClock(long startMonotonicTicks)
         return new TimelineStamp
         {
             OffsetTicks = offsetTicks,
-            ObservationOrdinal = _nextObservationOrdinal++,
+            ObservationOrdinal = Interlocked.Increment(ref _nextObservationOrdinal) - 1,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal
         };

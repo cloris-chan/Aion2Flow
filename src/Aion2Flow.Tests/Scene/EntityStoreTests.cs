@@ -1107,6 +1107,30 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
+    public void LiveReadModel_FactoryReadsDualWriteFlagWhenSinkIsCreated()
+    {
+        var store = new CombatMetricsStore();
+        var scene = new SceneLiveReadModel();
+        SceneDualWrite.Enabled = false;
+        var factory = SceneSinkFactory.CreateForStore(store, scene);
+        SceneDualWrite.Enabled = true;
+        try
+        {
+            var sink = factory();
+            sink.AppendNickname(100, "Perigee");
+            scene.Owner.Refresh();
+
+            Assert.Equal(1, scene.Journal.Count);
+            Assert.True(scene.Owner.Entities.TryGet(100, out var entity));
+            Assert.Equal("Perigee", entity.Nickname);
+        }
+        finally
+        {
+            SceneDualWrite.Enabled = false;
+        }
+    }
+
+    [Fact]
     public void ReplaySinkHolder_ExposesSceneOwnerWhenDualWriteEnabled()
     {
         var store = new CombatMetricsStore();

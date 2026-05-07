@@ -12,15 +12,15 @@ public static class SceneSinkFactory
     public static Func<IRuntimeObservationSink> CreateForStore(CombatMetricsStore store) => CreateForStore(store, new SceneLiveReadModel());
 
     public static Func<IRuntimeObservationSink> CreateForStore(CombatMetricsStore store, SceneLiveReadModel scene) =>
-        SceneDualWrite.Enabled
-            ? () =>
-            {
-                var clock = new SceneRuntimeClock(DateTimeOffset.UtcNow.Ticks);
-                var legacy = new LegacyRuntimeObservationSink(store);
-                var journaling = new JournalingRuntimeObservationSink(scene.Journal, clock, scene.SessionId);
-                return new CompositeRuntimeObservationSink(legacy, journaling);
-            }
-            : () => new LegacyRuntimeObservationSink(store);
+        () =>
+        {
+            if (!SceneDualWrite.Enabled)
+                return new LegacyRuntimeObservationSink(store);
+
+            var legacy = new LegacyRuntimeObservationSink(store);
+            var journaling = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+            return new CompositeRuntimeObservationSink(legacy, journaling);
+        };
 
     public static ReplaySinkHolder CreateForReplay(CombatMetricsStore store)
     {
@@ -38,14 +38,29 @@ public static class SceneSinkFactory
 
 public sealed class SceneLiveReadModel
 {
-    public Guid SessionId { get; } = Guid.NewGuid();
+    private readonly Lock _gate = new();
+    private long _nextBatchOrdinal;
+
+    public Guid SessionId { get; private set; } = Guid.NewGuid();
     public ObservedEventJournal Journal { get; } = new();
+    public SceneRuntimeClock Clock { get; } = new(DateTimeOffset.UtcNow.Ticks);
     public SceneReadModelOwner Owner { get; }
 
     public SceneLiveReadModel()
     {
         Owner = new SceneReadModelOwner(Journal, SessionId);
     }
+
+    public void Reset()
+    {
+        lock (_gate)
+        {
+            SessionId = Guid.NewGuid();
+            Owner.ResetCombat(SessionId, Clock.NextObservationOrdinal);
+        }
+    }
+
+    public long NextBatchOrdinal() => Interlocked.Increment(ref _nextBatchOrdinal);
 }
 
 public readonly struct ReplaySinkHolder(IRuntimeObservationSink sink, ObservedEventJournal? journal, SceneReadModelOwner? owner) : IDisposable

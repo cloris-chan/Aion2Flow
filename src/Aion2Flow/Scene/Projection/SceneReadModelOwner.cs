@@ -8,7 +8,7 @@ namespace Cloris.Aion2Flow.Scene.Projection;
 public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battleId, EntityStore entities, MetadataStore metadata, CombatStore combat)
 {
     private readonly Lock _gate = new();
-    private readonly DomainEventApplier _applier = new DomainEventApplier(entities, metadata, combat);
+    private DomainEventApplier _applier = new DomainEventApplier(entities, metadata, combat);
     private readonly CombatPairProjection _pairs = new();
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
@@ -33,7 +33,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
     public DomainEventApplier Applier => _applier;
     public BossFocusStore BossFocus => _applier.BossFocus;
     public CombatPairProjection Pairs => _pairs;
-    public Guid BattleId { get; } = battleId;
+    public Guid BattleId { get; private set; } = battleId;
     public long AppliedObservationOrdinal { get; private set; }
     public long AppliedBatchOrdinal => _appliedBatchOrdinal;
 
@@ -55,11 +55,18 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
                     break;
 
                 var entries = _entryBuffer.AsSpan(0, count);
+                var appliedCount = 0L;
                 foreach (ref readonly var entry in entries)
-                    _applier.ApplyEntry(in entry);
+                {
+                    if (entry.Stamp.ObservationOrdinal >= _cursor.StartOrdinal)
+                    {
+                        _applier.ApplyEntry(in entry);
+                        appliedCount++;
+                    }
+                }
 
                 _cursor = new JournalCursor(_cursor.Position + count, _cursor.StartOrdinal);
-                AppliedObservationOrdinal += count;
+                AppliedObservationOrdinal += appliedCount;
             }
 
             var completedBatch = journal.LastCompletedBatchOrdinal;
@@ -74,6 +81,21 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
                 _pairs.Rebuild(combat);
                 _projectionRevision = combat.Revision;
             }
+        }
+    }
+
+    public void ResetCombat(Guid battleId, long startOrdinal)
+    {
+        lock (_gate)
+        {
+            BattleId = battleId;
+            combat.Clear();
+            _applier = new DomainEventApplier(entities, metadata, combat);
+            _pairs.Rebuild(combat);
+            _cursor = journal.CreateCursor(startOrdinal);
+            AppliedObservationOrdinal = 0;
+            _appliedBatchOrdinal = journal.LastCompletedBatchOrdinal;
+            _projectionRevision = combat.Revision;
         }
     }
 }

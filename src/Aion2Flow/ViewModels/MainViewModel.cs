@@ -7,6 +7,8 @@ using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Services.Logging;
+using Cloris.Aion2Flow.Services.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -29,6 +31,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly GameResourceService _gameResourceService;
     private readonly BattleArchiveService _battleArchiveService;
     private readonly CombatantDetailsFlyoutViewModel _combatantDetails;
+    private readonly SettingsService _settingsService;
 
     private PeriodicTimer? _refreshTimer;
     private Task? _refreshTask;
@@ -43,6 +46,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<BossFocusViewModel> BossFocuses { get; } = [];
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
     public ObservableCollection<BattleHistoryItemViewModel> BattleHistory { get; } = [];
+    internal string LastSceneSnapshotDiff { get; private set; } = string.Empty;
 
     [ObservableProperty]
     public partial string Status { get; set; } = string.Empty;
@@ -105,6 +109,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         BattleArchiveService battleArchiveService,
         CombatantDetailsFlyoutViewModel combatantDetails,
         LocalizationService localization,
+        SettingsService settingsService,
         SettingsFlyoutViewModel settingsFlyout)
     {
         _captureService = captureService;
@@ -115,6 +120,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _gameResourceService = gameResourceService;
         _battleArchiveService = battleArchiveService;
         _combatantDetails = combatantDetails;
+        _settingsService = settingsService;
         Localization = localization;
         SettingsFlyout = settingsFlyout;
 
@@ -231,7 +237,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             ArchiveSnapshot(_latestLiveDamage, "manual-reset", isAutomatic: true);
-            _engine.Reset();
+            ResetLiveModels();
             RawPacketDump.RotateLogs();
 
             _latestLiveDamage = new DamageMeterSnapshot();
@@ -297,10 +303,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var previousLiveSnapshot = _latestLiveDamage;
-        var nextLiveSnapshot = _engine.CreateBattleSnapshot();
+        var nextLiveSnapshot = CreateLiveSnapshot();
         if (TryAutoResetBattle(previousLiveSnapshot, nextLiveSnapshot))
         {
-            nextLiveSnapshot = _engine.CreateBattleSnapshot();
+            nextLiveSnapshot = CreateLiveSnapshot();
         }
 
         _latestLiveDamage = nextLiveSnapshot;
@@ -313,6 +319,33 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         _displayedSnapshot = _latestLiveDamage;
         ApplySnapshot(_displayedSnapshot);
+    }
+
+    internal void RefreshCombatStatsForTesting() => RefreshCombatStats();
+
+    private DamageMeterSnapshot CreateLiveSnapshot()
+    {
+        return _settingsService.Current.SceneSnapshotReadMode switch
+        {
+            SceneSnapshotReadMode.Scene => _captureService.Scene.Owner.CreateSnapshot(),
+            SceneSnapshotReadMode.Both => CreateBothLiveSnapshot(),
+            _ => _engine.CreateBattleSnapshot()
+        };
+    }
+
+    private DamageMeterSnapshot CreateBothLiveSnapshot()
+    {
+        var legacy = _engine.CreateBattleSnapshot();
+        var scene = _captureService.Scene.Owner.CreateSnapshot();
+        RecordSceneSnapshotDiff(legacy, scene);
+        return legacy;
+    }
+
+    private void RecordSceneSnapshotDiff(DamageMeterSnapshot legacy, DamageMeterSnapshot scene)
+    {
+        LastSceneSnapshotDiff = BuildSceneSnapshotDiff(legacy, scene);
+        if (!string.IsNullOrEmpty(LastSceneSnapshotDiff))
+            AppLog.Write(AppLogLevel.Debug, $"Scene snapshot diff: {LastSceneSnapshotDiff}");
     }
 
     private void ApplySnapshot(DamageMeterSnapshot snapshot, bool forceDetailRefresh = false)
@@ -538,7 +571,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         if (TryResolveMapTransitionResetReason(previousLiveSnapshot, latestLiveSnapshot, out var mapTransitionReason))
         {
             ArchiveSnapshot(previousLiveSnapshot, mapTransitionReason, isAutomatic: true);
-            _engine.Reset();
+            ResetLiveModels();
             RawPacketDump.RotateLogs();
             return true;
         }
@@ -575,6 +608,43 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private static bool HasArchivableBattle(DamageMeterSnapshot snapshot)
         => snapshot.BattleTime > 0 && snapshot.Combatants.Count > 0;
+
+    private void ResetLiveModels()
+    {
+        _engine.Reset();
+        _captureService.Scene.Reset();
+        LastSceneSnapshotDiff = string.Empty;
+    }
+
+    internal static string BuildSceneSnapshotDiff(DamageMeterSnapshot legacy, DamageMeterSnapshot scene)
+    {
+        var diffs = new List<string>();
+        AppendDiff(diffs, "battleTime", legacy.BattleTime, scene.BattleTime);
+        AppendDiff(diffs, "battleStart", legacy.BattleStartTime, scene.BattleStartTime);
+        AppendDiff(diffs, "battleEnd", legacy.BattleEndTime, scene.BattleEndTime);
+        AppendDiff(diffs, "mapId", legacy.MapId, scene.MapId);
+        AppendDiff(diffs, "mapInstanceId", legacy.MapInstanceId, scene.MapInstanceId);
+        AppendDiff(diffs, "target", legacy.Encounter.TrackingTargetId, scene.Encounter.TrackingTargetId);
+
+        foreach (var id in legacy.Combatants.Keys.Concat(scene.Combatants.Keys).Distinct().Order())
+        {
+            legacy.Combatants.TryGetValue(id, out var l);
+            scene.Combatants.TryGetValue(id, out var s);
+            AppendDiff(diffs, $"combatant:{id}:damage", l?.DamageAmount ?? 0, s?.DamageAmount ?? 0);
+            AppendDiff(diffs, $"combatant:{id}:healing", l?.HealingAmount ?? 0, s?.HealingAmount ?? 0);
+            AppendDiff(diffs, $"combatant:{id}:shieldAbsorbed", l?.ShieldAbsorbedAmount ?? 0, s?.ShieldAbsorbedAmount ?? 0);
+            if (l?.CharacterClass != s?.CharacterClass)
+                diffs.Add($"combatant:{id}:class legacy={l?.CharacterClass?.ToString() ?? "<null>"} scene={s?.CharacterClass?.ToString() ?? "<null>"}");
+        }
+
+        return string.Join("; ", diffs);
+    }
+
+    private static void AppendDiff(List<string> diffs, string field, long legacy, long scene)
+    {
+        if (legacy != scene)
+            diffs.Add($"{field} legacy={legacy} scene={scene}");
+    }
 
     private void RefreshCombatantDetails(bool forceRefresh = false)
     {
