@@ -10,6 +10,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
 {
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
     private readonly PeriodicChainCanonicalizer _periodicChain = new();
+    private readonly OwnerTargetSummonRestoreCanonicalizer _ownerTargetSummonRestore = new(entities);
     private readonly MultiHitAttributionService _multiHitAttribution = new();
     private readonly CompactOutcomeCanonicalizer _compactOutcome = new();
     private readonly PeriodicLinkCanonicalizer _periodicLink = new();
@@ -105,8 +106,10 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
 
     private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result)
     {
-        var observation = result.Observation;
-        var systemRecoveryResult = _systemPeriodicRecovery.Normalize(result.SourceId, result.TargetId, in stamp, in observation);
+        var resultObservation = result.Observation;
+        var ownerTargetSummonRestoreResult = _ownerTargetSummonRestore.Normalize(result.SourceId, result.TargetId, in resultObservation);
+        var observation = ownerTargetSummonRestoreResult.Observation;
+        var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonRestoreResult.SourceId, ownerTargetSummonRestoreResult.TargetId, in stamp, in observation);
         var systemRecoveryObservation = systemRecoveryResult.Observation;
         foreach (var normalized in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
             ApplyCombatResult(in stamp, in normalized);
