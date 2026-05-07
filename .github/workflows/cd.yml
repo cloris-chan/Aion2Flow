@@ -1,4 +1,4 @@
-name: Deploy to GitHub Releases
+name: CD
 
 on:
   push:
@@ -14,12 +14,11 @@ defaults:
 
 env:
   APP_ID: Aion2Flow
-  PACK_TITLE: Aion2Flow
-  MAIN_EXE: Aion2Flow.exe
-  RUNTIME_ID: win-x64
+  SOLUTION_PATH: ./Aion2Flow.slnx
   PROJECT_PATH: ./src/Aion2Flow/Aion2Flow.csproj
   PUBLISH_DIR: ./publish
   RELEASES_DIR: ./Releases
+  VELOPACK_RUNTIME: win-x64
   ICON_PATH: ./assets/Aion2Flow.ico
 
 jobs:
@@ -27,8 +26,8 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout tagged commit
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
 
       - name: Parse release metadata
         id: meta
@@ -54,7 +53,7 @@ jobs:
           Write-Host "Prerelease  : $isPrerelease"
 
       - name: Setup .NET 10 SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -73,15 +72,16 @@ jobs:
           "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
 
       - name: Restore
-        run: dotnet restore ${{ env.PROJECT_PATH }}
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
 
-      - name: Publish Release Build
-        run: >
-          dotnet publish ${{ env.PROJECT_PATH }}
-          -c Release
-          -r ${{ env.RUNTIME_ID }}
-          -o ${{ env.PUBLISH_DIR }}
-          --no-restore
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION_PATH }} -c Release --no-restore
+
+      - name: Test
+        run: dotnet test ${{ env.SOLUTION_PATH }} -c Release --no-build --verbosity normal
+
+      - name: Publish
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -o ${{ env.PUBLISH_DIR }}
 
       - name: Download previous releases for delta generation
         run: |
@@ -107,10 +107,8 @@ jobs:
             -u "${{ env.APP_ID }}" `
             -v "${{ steps.meta.outputs.version }}" `
             -p "${{ env.PUBLISH_DIR }}" `
-            -r "${{ env.RUNTIME_ID }}" `
+            -r "${{ env.VELOPACK_RUNTIME }}" `
             -c "${{ steps.meta.outputs.pack_channel }}" `
-            --packTitle "${{ env.PACK_TITLE }}" `
-            --mainExe "${{ env.MAIN_EXE }}" `
             --icon "${{ env.ICON_PATH }}" `
             --delta BestSize `
             --noInst

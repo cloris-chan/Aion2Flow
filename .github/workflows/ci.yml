@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: pwsh
+
+env:
+  SOLUTION_PATH: ./Aion2Flow.slnx
+  PROJECT_PATH: ./src/Aion2Flow/Aion2Flow.csproj
+
+jobs:
+  verify:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION_PATH }} -c Release --no-restore
+
+      - name: Test
+        run: dotnet test ${{ env.SOLUTION_PATH }} -c Release --no-build --verbosity normal
+
+      - name: Publish
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -o "$env:RUNNER_TEMP\publish"
