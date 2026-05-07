@@ -16,14 +16,21 @@ public sealed class BattleArchiveService
     public IReadOnlyList<ArchivedBattleRecord> History => _historySnapshot;
 
     public ArchivedBattleRecord? Archive(DamageMeterSnapshot snapshot, CombatMetricsStore store, string trigger, bool isAutomatic)
+        => AddArchiveRecord(snapshot.DeepClone(), store.CreateArchiveSlice(snapshot), null, trigger, isAutomatic);
+
+    public ArchivedBattleRecord? Archive(SceneArchivePayload payload, string trigger, bool isAutomatic)
     {
-        if (snapshot.BattleTime <= 0 || snapshot.Combatants.Count == 0)
+        var archivedPayload = payload.DeepClone();
+        return AddArchiveRecord(archivedPayload.Snapshot, new CombatMetricsStore(), archivedPayload, trigger, isAutomatic);
+    }
+
+    private ArchivedBattleRecord? AddArchiveRecord(DamageMeterSnapshot archivedSnapshot, CombatMetricsStore archivedStore, SceneArchivePayload? payload, string trigger, bool isAutomatic)
+    {
+        if (archivedSnapshot.BattleTime <= 0 || archivedSnapshot.Combatants.Count == 0)
         {
             return null;
         }
 
-        var archivedSnapshot = snapshot.DeepClone();
-        var archivedStore = store.CreateArchiveSlice(snapshot);
         ArchivedBattleRecord? record;
         bool historyChanged;
         lock (_lock)
@@ -40,7 +47,8 @@ public sealed class BattleArchiveService
                 Trigger = trigger,
                 IsAutomatic = isAutomatic,
                 Snapshot = archivedSnapshot,
-                Store = archivedStore
+                Store = archivedStore,
+                ScenePayload = payload
             };
 
             _history.Insert(0, record);

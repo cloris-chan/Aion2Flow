@@ -75,6 +75,18 @@ public sealed class SceneArchivePayload
         };
     }
 
+    public SceneArchivePayload DeepClone() => new()
+    {
+        Snapshot = Snapshot.DeepClone(),
+        Events = Events.Select(static e => e.DeepClone()).ToArray(),
+        DisplayNames = new Dictionary<int, string>(DisplayNames),
+        Pairs = Pairs.Select(ClonePair).ToArray(),
+        Combatants = Combatants.Select(CloneCombatant).ToArray(),
+        Entities = Entities.Select(static e => e.DeepClone()).ToArray(),
+        NpcNamesByCode = new Dictionary<int, string>(NpcNamesByCode),
+        Bosses = Bosses.Select(static b => b.DeepClone()).ToArray()
+    };
+
     public CombatDetailDelta CreateDetailDelta(int combatantId)
     {
         if (combatantId <= 0 || !Snapshot.Combatants.ContainsKey(combatantId))
@@ -213,6 +225,26 @@ public sealed class SceneArchivePayload
             .ThenBy(static p => p.Key.TargetId)
             .ToArray();
     }
+
+    private static DirectedPairSnapshot ClonePair(DirectedPairSnapshot pair) => new()
+    {
+        Key = pair.Key,
+        TotalDamage = pair.TotalDamage,
+        TotalHealing = pair.TotalHealing,
+        TotalShield = pair.TotalShield,
+        TotalShieldAbsorbed = pair.TotalShieldAbsorbed,
+        ShieldCount = pair.ShieldCount,
+        ShieldAbsorbedCount = pair.ShieldAbsorbedCount,
+        HitCount = pair.HitCount,
+        AttemptCount = pair.AttemptCount,
+        EvadeCount = pair.EvadeCount,
+        InvincibleCount = pair.InvincibleCount,
+        MultiHitCount = pair.MultiHitCount,
+        LastSkillCode = pair.LastSkillCode,
+        FirstObserved = pair.FirstObserved,
+        LastObserved = pair.LastObserved,
+        Revision = pair.Revision
+    };
 
     private static CombatantSummary[] BuildCombatants(IReadOnlyList<DirectedPairSnapshot> pairs)
     {
@@ -522,6 +554,14 @@ public sealed class SceneArchiveCombatEvent
         Revision = e.Revision
     };
 
+    public SceneArchiveCombatEvent DeepClone() => new()
+    {
+        Packet = Packet.DeepClone(),
+        SourceId = SourceId,
+        TargetId = TargetId,
+        Revision = Revision
+    };
+
     public CombatDetailEvent ToDetailEvent() => new(Packet.DeepClone(), SourceId, TargetId, Revision);
 }
 
@@ -563,6 +603,26 @@ public sealed class SceneArchiveEntityIdentity
         Latest2C38 = e.Latest2C38,
         LastObservedOrdinal = e.LastObservedOrdinal
     };
+
+    public SceneArchiveEntityIdentity DeepClone() => new()
+    {
+        EntityId = EntityId,
+        NpcCode = NpcCode,
+        Kind = Kind,
+        Nickname = Nickname,
+        IsPlayer = IsPlayer,
+        OwnerEntityId = OwnerEntityId,
+        CurrentHp = CurrentHp,
+        MaxHp = MaxHp,
+        BattleActive = BattleActive,
+        Value2136 = Value2136,
+        Sequence2136 = Sequence2136,
+        Value0140 = Value0140,
+        Value0240 = Value0240,
+        State4636 = State4636,
+        Latest2C38 = Latest2C38,
+        LastObservedOrdinal = LastObservedOrdinal
+    };
 }
 
 public sealed class SceneArchiveBossFocus
@@ -572,4 +632,13 @@ public sealed class SceneArchiveBossFocus
     public int MaxHp { get; init; }
     public long LastObservedAtMilliseconds { get; init; }
     public bool HasHp { get; init; }
+
+    public SceneArchiveBossFocus DeepClone() => new()
+    {
+        InstanceId = InstanceId,
+        Hp = Hp,
+        MaxHp = MaxHp,
+        LastObservedAtMilliseconds = LastObservedAtMilliseconds,
+        HasHp = HasHp
+    };
 }

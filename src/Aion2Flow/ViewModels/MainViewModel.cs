@@ -633,6 +633,11 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private ArchivedBattleRecord? ArchiveSnapshot(DamageMeterSnapshot snapshot, string trigger, bool isAutomatic)
     {
+        if (_settingsService.Current.SceneSnapshotReadMode == SceneSnapshotReadMode.Scene)
+        {
+            return _battleArchiveService.Archive(SceneArchivePayload.Create(_captureService.Scene.Owner, snapshot), trigger, isAutomatic);
+        }
+
         return _battleArchiveService.Archive(snapshot, _store, trigger, isAutomatic);
     }
 

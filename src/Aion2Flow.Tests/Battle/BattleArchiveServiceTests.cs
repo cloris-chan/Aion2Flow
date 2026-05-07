@@ -284,6 +284,25 @@ public sealed class BattleArchiveServiceTests
         Assert.Equal(50_000, focus.Hp);
     }
 
+    [Fact]
+    public void Archive_ScenePayload_Does_Not_Create_Legacy_Store_Slice()
+    {
+        const int playerId = 100;
+        const int bossId = 200;
+        var service = new BattleArchiveService();
+        var owner = CreateSceneOwner(playerId, bossId);
+        var payload = SceneArchivePayload.Create(owner, owner.CreateSnapshot());
+
+        var record = service.Archive(payload, "manual", isAutomatic: false);
+
+        Assert.NotNull(record);
+        Assert.NotSame(payload, record!.ScenePayload);
+        Assert.Equal(payload.Events.Count, record.ScenePayload!.Events.Count);
+        Assert.Empty(record.Store.CombatPacketsBySource);
+        Assert.Empty(record.Store.Nicknames);
+        Assert.Equal(payload.Snapshot.BattleId, record.BattleId);
+    }
+
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId)
     {
         const int bossCode = 2_999_997;

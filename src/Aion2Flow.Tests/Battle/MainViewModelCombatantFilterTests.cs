@@ -292,6 +292,73 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void ArchiveCurrentBattle_SceneMode_WritesScenePayloadWithoutLegacySlice()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendLegacyIdentity(300, "Legacy Name");
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        fixture.ViewModel.ArchiveCurrentBattleCommand.Execute(null);
+
+        var history = Assert.Single(fixture.ViewModel.BattleHistory);
+        Assert.NotNull(history.Record.ScenePayload);
+        Assert.Empty(history.Record.Store.Nicknames);
+        Assert.Equal("Scene Player", history.Record.ScenePayload!.DisplayNames[300]);
+        Assert.Equal(400, history.Record.ScenePayload.CreateDetailDelta(300).Combatant!.OutgoingDamage);
+    }
+
+    [Fact]
+    public void ArchiveCurrentBattle_LegacyMode_KeepsLegacyArchiveFallback()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Legacy);
+        fixture.AppendLegacyBattle(100, "Legacy Player", 200, 1_000, 2_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        fixture.ViewModel.ArchiveCurrentBattleCommand.Execute(null);
+
+        var history = Assert.Single(fixture.ViewModel.BattleHistory);
+        Assert.Null(history.Record.ScenePayload);
+        Assert.Equal("Legacy Player", history.Record.Store.Nicknames[100]);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_AutoArchiveWritesScenePayloadOnMapTransition()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendSceneMap(200003, 113515);
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        fixture.AppendSceneMap(200004, 113516);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var record = Assert.Single(fixture.Archive.History);
+        Assert.Equal("map-transition", record.Trigger);
+        Assert.True(record.IsAutomatic);
+        Assert.NotNull(record.ScenePayload);
+        Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.OutgoingDamage);
+        Assert.Empty(record.Store.Nicknames);
+    }
+
+    [Fact]
+    public void ResetCommand_SceneMode_ArchivesScenePayload()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        fixture.ViewModel.ResetCommand.Execute(null);
+
+        var record = Assert.Single(fixture.Archive.History);
+        Assert.Equal("manual-reset", record.Trigger);
+        Assert.True(record.IsAutomatic);
+        Assert.NotNull(record.ScenePayload);
+        Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.OutgoingDamage);
+        Assert.Empty(record.Store.Nicknames);
+    }
+
+    [Fact]
     public void ResetLiveModels_ResetsLegacyAndSceneSnapshotsTogether()
     {
         var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
@@ -346,14 +413,16 @@ public sealed class MainViewModelCombatantFilterTests
         private readonly CombatMetricsEngine _engine;
         private readonly WinDivertCaptureService _captureService;
 
-        private MainViewModelFixture(MainViewModel viewModel, CombatMetricsEngine engine, WinDivertCaptureService captureService)
+        private MainViewModelFixture(MainViewModel viewModel, CombatMetricsEngine engine, WinDivertCaptureService captureService, BattleArchiveService archive)
         {
             ViewModel = viewModel;
             _engine = engine;
             _captureService = captureService;
+            Archive = archive;
         }
 
         public MainViewModel ViewModel { get; }
+        public BattleArchiveService Archive { get; }
 
         public static MainViewModelFixture Create(SceneSnapshotReadMode readMode)
         {
@@ -372,7 +441,7 @@ public sealed class MainViewModelCombatantFilterTests
             var capture = new WinDivertCaptureService(store, ports);
             var details = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
             var viewModel = new MainViewModel(capture, ports, engine, store, language, resources, archive, details, localization, settings, null!);
-            return new MainViewModelFixture(viewModel, engine, capture);
+            return new MainViewModelFixture(viewModel, engine, capture, archive);
         }
 
         public void AppendLegacyBattle(int playerId, string name, int damage, long start, long end)
@@ -417,6 +486,8 @@ public sealed class MainViewModelCombatantFilterTests
         public void AppendSceneBossFocus(int instanceId, string name, int hp, int maxHp, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocus(_captureService.Scene, instanceId, name, hp, maxHp, timestamp);
 
         public void AppendLegacyIdentity(int playerId, string name) => _engine.Store.AppendNickname(playerId, name);
+
+        public void AppendSceneMap(uint mapId, uint instanceId) => MainViewModelCombatantFilterTests.AppendSceneMap(_captureService.Scene, mapId, instanceId);
     }
 
     private static void AppendSceneBattle(SceneLiveReadModel scene, int playerId, string name, int damage, long start, long end)
@@ -519,6 +590,14 @@ public sealed class MainViewModelCombatantFilterTests
             ValueKind = CombatValueKind.Damage
         });
         sink.CompleteBatch(batchOrdinal);
+    }
+
+    private static void AppendSceneMap(SceneLiveReadModel scene, uint mapId, uint instanceId)
+    {
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        sink.StageDestinationMap(mapId);
+        sink.StageDestinationMapInstance(instanceId);
+        sink.MarkSceneArrival();
     }
 
     private static SkillCollection BuildSkillMap()
