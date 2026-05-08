@@ -52,8 +52,8 @@ public sealed class BattleArchiveServiceTests
         Assert.Equal("Test Boss", record!.Snapshot.TargetName);
         Assert.Equal((uint)200003, record.Snapshot.MapId);
         Assert.Equal((uint)113515, record.Snapshot.MapInstanceId);
-        Assert.Equal((uint)200003, record.Store.CurrentMapId);
-        Assert.Equal((uint)113515, record.Store.CurrentMapInstanceId);
+        Assert.Equal((uint)200003, record.LegacyStore.CurrentMapId);
+        Assert.Equal((uint)113515, record.LegacyStore.CurrentMapInstanceId);
         Assert.True(service.TryGetBattle(record.BattleId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
 
@@ -61,8 +61,8 @@ public sealed class BattleArchiveServiceTests
         store.AppendNickname(1, "Changed");
 
         Assert.Equal("Test Boss", record.Snapshot.TargetName);
-        Assert.Equal("Tester", record.Store.Nicknames[1]);
-        Assert.Equal(420, record.Store.PlayerOriginServerIds[1]);
+        Assert.Equal("Tester", record.LegacyStore.Nicknames[1]);
+        Assert.Equal(420, record.LegacyStore.PlayerOriginServerIds[1]);
     }
 
     [Fact]
@@ -110,15 +110,15 @@ public sealed class BattleArchiveServiceTests
 
         Assert.NotNull(record);
 
-        Assert.True(record!.Store.Nicknames.ContainsKey(playerId));
-        Assert.False(record.Store.Nicknames.ContainsKey(unrelatedPlayerId));
-        Assert.True(record.Store.PlayerOriginServerIds.ContainsKey(playerId));
-        Assert.False(record.Store.PlayerOriginServerIds.ContainsKey(unrelatedPlayerId));
-        Assert.True(record.Store.TryGetNpcRuntimeState(bossInstanceId, out var archivedBossState));
+        Assert.True(record!.LegacyStore.Nicknames.ContainsKey(playerId));
+        Assert.False(record.LegacyStore.Nicknames.ContainsKey(unrelatedPlayerId));
+        Assert.True(record.LegacyStore.PlayerOriginServerIds.ContainsKey(playerId));
+        Assert.False(record.LegacyStore.PlayerOriginServerIds.ContainsKey(unrelatedPlayerId));
+        Assert.True(record.LegacyStore.TryGetNpcRuntimeState(bossInstanceId, out var archivedBossState));
         Assert.Equal(bossCode, archivedBossState.NpcCode);
-        Assert.False(record.Store.TryGetNpcRuntimeState(unrelatedNpcInstanceId, out _));
-        Assert.True(record.Store.NpcNameByCode.ContainsKey(bossCode));
-        Assert.False(record.Store.NpcNameByCode.ContainsKey(unrelatedNpcCode));
+        Assert.False(record.LegacyStore.TryGetNpcRuntimeState(unrelatedNpcInstanceId, out _));
+        Assert.True(record.LegacyStore.NpcNameByCode.ContainsKey(bossCode));
+        Assert.False(record.LegacyStore.NpcNameByCode.ContainsKey(unrelatedNpcCode));
 
         Assert.True(store.Nicknames.ContainsKey(playerId));
         Assert.True(store.Nicknames.ContainsKey(unrelatedPlayerId));
@@ -152,8 +152,8 @@ public sealed class BattleArchiveServiceTests
         Assert.NotNull(record);
         Assert.Equal((uint)0, record!.Snapshot.MapId);
         Assert.Equal((uint)0, record.Snapshot.MapInstanceId);
-        Assert.Equal((uint)0, record.Store.CurrentMapId);
-        Assert.Equal((uint)0, record.Store.CurrentMapInstanceId);
+        Assert.Equal((uint)0, record.LegacyStore.CurrentMapId);
+        Assert.Equal((uint)0, record.LegacyStore.CurrentMapInstanceId);
     }
 
     [Fact]
@@ -298,8 +298,8 @@ public sealed class BattleArchiveServiceTests
         Assert.NotNull(record);
         Assert.NotSame(payload, record!.ScenePayload);
         Assert.Equal(payload.Events.Count, record.ScenePayload!.Events.Count);
-        Assert.Empty(record.Store.CombatPacketsBySource);
-        Assert.Empty(record.Store.Nicknames);
+        Assert.Empty(record.LegacyStore.CombatPacketsBySource);
+        Assert.Empty(record.LegacyStore.Nicknames);
         Assert.Equal(payload.Snapshot.BattleId, record.BattleId);
     }
 

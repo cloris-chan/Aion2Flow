@@ -47,8 +47,8 @@ public sealed class BattleArchiveService
                 Trigger = trigger,
                 IsAutomatic = isAutomatic,
                 Snapshot = archivedSnapshot,
-                Store = archivedStore,
-                ScenePayload = payload
+                ScenePayload = payload,
+                LegacyStore = archivedStore
             };
 
             _history.Insert(0, record);

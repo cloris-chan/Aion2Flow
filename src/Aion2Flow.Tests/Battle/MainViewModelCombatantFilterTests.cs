@@ -303,9 +303,29 @@ public sealed class MainViewModelCombatantFilterTests
 
         var history = Assert.Single(fixture.ViewModel.BattleHistory);
         Assert.NotNull(history.Record.ScenePayload);
-        Assert.Empty(history.Record.Store.Nicknames);
+        Assert.Empty(history.Record.LegacyStore.Nicknames);
         Assert.Equal("Scene Player", history.Record.ScenePayload!.DisplayNames[300]);
         Assert.Equal(400, history.Record.ScenePayload.CreateDetailDelta(300).Combatant!.OutgoingDamage);
+    }
+
+    [Fact]
+    public void ArchiveCurrentBattle_SceneMode_ArchivedDetailUsesScenePayload()
+    {
+        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        fixture.AppendLegacyIdentity(300, "Legacy Name");
+        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        fixture.ViewModel.ArchiveCurrentBattleCommand.Execute(null);
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        fixture.ViewModel.SelectedCombatant = null;
+        fixture.ViewModel.SelectedCombatant = row;
+
+        Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.CombatantName);
+        Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
+        Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
+        Assert.Empty(fixture.ViewModel.BattleHistory[0].Record.LegacyStore.Nicknames);
     }
 
     [Fact]
@@ -319,7 +339,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         var history = Assert.Single(fixture.ViewModel.BattleHistory);
         Assert.Null(history.Record.ScenePayload);
-        Assert.Equal("Legacy Player", history.Record.Store.Nicknames[100]);
+        Assert.Equal("Legacy Player", history.Record.LegacyStore.Nicknames[100]);
     }
 
     [Fact]
@@ -338,7 +358,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.True(record.IsAutomatic);
         Assert.NotNull(record.ScenePayload);
         Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.OutgoingDamage);
-        Assert.Empty(record.Store.Nicknames);
+        Assert.Empty(record.LegacyStore.Nicknames);
     }
 
     [Fact]
@@ -355,7 +375,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.True(record.IsAutomatic);
         Assert.NotNull(record.ScenePayload);
         Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.OutgoingDamage);
-        Assert.Empty(record.Store.Nicknames);
+        Assert.Empty(record.LegacyStore.Nicknames);
     }
 
     [Fact]

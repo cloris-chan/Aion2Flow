@@ -222,6 +222,46 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SelectBattleCombatant_Uses_Archived_ScenePayload_When_Available()
+    {
+        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var store = new CombatMetricsStore();
+        var engine = new CombatMetricsEngine(store);
+        var archive = new BattleArchiveService();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+
+        const int playerId = 1001;
+        const int bossId = 9001;
+
+        store.AppendNickname(playerId, "Legacy Name");
+        sink.AppendNickname(playerId, "Scene Player");
+        AppendScenePacket(sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
+
+        var payload = SceneArchivePayload.Create(scene.Owner, scene.Owner.CreateSnapshot());
+        var record = archive.Archive(payload, "manual", isAutomatic: false);
+
+        Assert.NotNull(record);
+        Assert.Empty(record!.LegacyStore.Nicknames);
+
+        scene.Reset();
+        viewModel.SelectBattleCombatant(record.BattleId, playerId);
+
+        Assert.Equal("Scene Player", viewModel.CombatantName);
+        Assert.Equal(1000, viewModel.OutgoingDamage.Total);
+        Assert.Equal(2, viewModel.OutgoingDamage.Hits);
+        Assert.Equal(2, viewModel.LastRefreshBaselineCounters.DetailEventCount);
+        Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
+    }
+
+    [Fact]
     public void SelectBattleCombatant_Keeps_Selected_Combatant_Healing_Details_Outside_Damage_Window()
     {
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());

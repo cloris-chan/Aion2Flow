@@ -235,7 +235,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             return;
         }
 
-        if (!TryResolveContext(battleContextId, snapshotOverride, storeOverride, out var snapshot, out var store))
+        if (TryResolveArchivedSceneContext(battleContextId, snapshotOverride, storeOverride, combatantId.Value, out var archivedSnapshot, out var archivedDetail))
+        {
+            RefreshSceneContext(battleContextId, combatantId.Value, archivedSnapshot, archivedDetail, forceRefresh);
+            return;
+        }
+
+        if (!TryResolveLegacyContext(battleContextId, snapshotOverride, storeOverride, out var snapshot, out var store))
         {
             _battleContextId = battleContextId;
             _combatantId = combatantId;
@@ -335,7 +341,27 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         RefreshAllSections();
     }
 
-    private bool TryResolveContext(
+    private bool TryResolveArchivedSceneContext(
+        Guid battleContextId,
+        DamageMeterSnapshot? snapshotOverride,
+        CombatMetricsStore? storeOverride,
+        int combatantId,
+        out DamageMeterSnapshot snapshot,
+        out CombatDetailDelta detail)
+    {
+        if (storeOverride is null && _battleArchiveService.TryGetBattle(battleContextId, out var record) && record.ScenePayload is { } payload)
+        {
+            snapshot = snapshotOverride ?? record.Snapshot;
+            detail = payload.CreateDetailDelta(combatantId);
+            return true;
+        }
+
+        snapshot = new DamageMeterSnapshot();
+        detail = new CombatDetailDelta();
+        return false;
+    }
+
+    private bool TryResolveLegacyContext(
         Guid battleContextId,
         DamageMeterSnapshot? snapshotOverride,
         CombatMetricsStore? storeOverride,
@@ -352,7 +378,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         if (_battleArchiveService.TryGetBattle(battleContextId, out var record) && record is not null)
         {
             snapshot = record.Snapshot;
-            store = record.Store;
+            store = record.LegacyStore;
             return true;
         }
 

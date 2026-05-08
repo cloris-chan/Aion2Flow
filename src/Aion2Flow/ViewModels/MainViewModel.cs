@@ -454,7 +454,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private CombatMetricsStore ResolveDisplayStore()
         => IsViewingArchivedBattle && SelectedBattleHistory is not null
-            ? SelectedBattleHistory.Record.Store
+            ? SelectedBattleHistory.Record.LegacyStore
             : _store;
 
     private void RefreshBossFocus(CombatMetricsStore? displayStore, SceneReadModelOwner? sceneOwner, DamageMeterSnapshot snapshot)
@@ -737,8 +737,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             : _displayedSnapshot;
 
         var store = IsViewingArchivedBattle && SelectedBattleHistory is not null
-            ? SelectedBattleHistory.Record.Store
+            ? SelectedBattleHistory.Record.LegacyStore
             : _store;
+
+        if (IsViewingArchivedBattle && SelectedBattleHistory?.Record.ScenePayload is { } payload)
+        {
+            var detail = payload.CreateDetailDelta(SelectedCombatant.Id);
+            CombatantDetails.SelectSceneBattleCombatant(battleContextId, SelectedCombatant.Id, snapshot, detail, forceRefresh);
+            return;
+        }
 
         if (!IsViewingArchivedBattle && _settingsService.Current.SceneSnapshotReadMode == SceneSnapshotReadMode.Scene)
         {

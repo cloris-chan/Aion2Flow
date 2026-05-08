@@ -10,6 +10,6 @@ public sealed class ArchivedBattleRecord
     public string Trigger { get; init; } = string.Empty;
     public bool IsAutomatic { get; init; }
     public DamageMeterSnapshot Snapshot { get; init; } = new();
-    public CombatMetricsStore Store { get; init; } = new();
     public SceneArchivePayload? ScenePayload { get; init; }
+    internal CombatMetricsStore LegacyStore { get; init; } = new();
 }
