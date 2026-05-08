@@ -1,9 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
-using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.Combat.Metrics;
-using Cloris.Aion2Flow.Scene.Combat;
-using Cloris.Aion2Flow.Scene.Projection;
+using Cloris.Aion2Flow.Protocol.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 

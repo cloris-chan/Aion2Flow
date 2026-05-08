@@ -1,5 +1,4 @@
-using Cloris.Aion2Flow.Combat;
-using Cloris.Aion2Flow.PacketCapture.Diagnostics;
+using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Tests.Protocol;
 

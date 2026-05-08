@@ -1,5 +1,4 @@
-using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Combat.Metrics;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
 

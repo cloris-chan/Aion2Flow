@@ -1,9 +1,9 @@
 using System.Globalization;
-using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
-using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Combat;

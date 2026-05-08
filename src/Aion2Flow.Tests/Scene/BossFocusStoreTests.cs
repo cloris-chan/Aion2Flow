@@ -1,8 +1,8 @@
-using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Scene.Journal;
-using Cloris.Aion2Flow.Scene.Observation;
-using Cloris.Aion2Flow.Scene.Runtime;
-using Cloris.Aion2Flow.Scene.Stores;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
 

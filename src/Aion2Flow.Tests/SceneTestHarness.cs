@@ -1,9 +1,7 @@
-using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Scene.Combat;
-using Cloris.Aion2Flow.Combat.Metrics;
-using Cloris.Aion2Flow.Scene;
-using Cloris.Aion2Flow.Scene.Observation;
-using Cloris.Aion2Flow.Scene.Projection;
+using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
 
 namespace Cloris.Aion2Flow.Tests;
 

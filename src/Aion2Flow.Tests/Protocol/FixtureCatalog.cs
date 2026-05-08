@@ -1,5 +1,4 @@
-using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.PacketCapture.Protocol;
+using Cloris.Aion2Flow.Protocol.Packets;
 
 namespace Cloris.Aion2Flow.Tests.Protocol;
 

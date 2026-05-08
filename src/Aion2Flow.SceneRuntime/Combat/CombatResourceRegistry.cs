@@ -1,10 +1,9 @@
 using System.Collections.Concurrent;
-using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.Combat.Metrics;
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 
-namespace Cloris.Aion2Flow.Combat;
+namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
 public static class CombatResourceRegistry
 {

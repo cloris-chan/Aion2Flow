@@ -1,5 +1,4 @@
-using Cloris.Aion2Flow.PacketCapture;
-using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Capture.Streams;
 
 namespace Cloris.Aion2Flow.Tests.PacketCapture;
 

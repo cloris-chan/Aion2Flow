@@ -1,8 +1,8 @@
-using Cloris.Aion2Flow.Scene.Journal;
-using Cloris.Aion2Flow.Scene.Model;
-using Cloris.Aion2Flow.Scene.Observation;
-using Cloris.Aion2Flow.Scene.Runtime;
-using ParsedCombatPacket = Cloris.Aion2Flow.Combat.Metrics.ParsedCombatPacket;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
+using ParsedCombatPacket = Cloris.Aion2Flow.SceneRuntime.Combat.ParsedCombatPacket;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
 

@@ -1,5 +1,5 @@
-using Cloris.Aion2Flow.Scene.Projection;
-using Cloris.Aion2Flow.Scene.Stores;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
 

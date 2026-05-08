@@ -1,8 +1,5 @@
-using Cloris.Aion2Flow.Combat;
-using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.Combat.Metrics;
-using Cloris.Aion2Flow.PacketCapture.Diagnostics;
-using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.Capture.Diagnostics;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Tests;
 

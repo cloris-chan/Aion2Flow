@@ -1,5 +1,3 @@
-using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.Tests.Combat;

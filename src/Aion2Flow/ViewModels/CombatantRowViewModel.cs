@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Battle.Model;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;

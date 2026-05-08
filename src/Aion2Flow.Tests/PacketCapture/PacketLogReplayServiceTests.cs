@@ -1,15 +1,12 @@
 using System.Globalization;
-using Cloris.Aion2Flow.Scene.Combat;
-using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.Combat.Metrics;
-using Cloris.Aion2Flow.PacketCapture.Diagnostics;
-using Cloris.Aion2Flow.PacketCapture.Protocol;
-using Cloris.Aion2Flow.PacketCapture.Readers;
-using Cloris.Aion2Flow.PacketCapture.Streams;
+using Cloris.Aion2Flow.Capture.Diagnostics;
+using Cloris.Aion2Flow.Capture.Streams;
+using Cloris.Aion2Flow.Protocol.Packets;
+using Cloris.Aion2Flow.Protocol.Readers;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
-using Cloris.Aion2Flow.Scene.Journal;
-using Cloris.Aion2Flow.Scene.Stores;
+using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.PacketCapture;
