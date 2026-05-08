@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
+using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Scene.Model;
 using Cloris.Aion2Flow.Scene.Observation;
 
@@ -14,6 +15,9 @@ public sealed class CompactOutcomeCanonicalizer
     private readonly record struct AvoidedSignature(int SourceId, int TargetId, int Marker);
     private readonly List<PendingDirectBlockedDamage> _pendingDirect = [];
     private readonly List<PendingCompactAvoidance> _pendingCompact = [];
+    private readonly List<PendingCompactAvoidance> _pendingCompactDamage = [];
+    private readonly List<PendingCompactAvoidance> _pendingCompactControls0638 = [];
+    private readonly List<StampedCombatCanonicalizationResult> _storedDamage = [];
     private readonly HashSet<int> _currentBatchDodgeTargets = [];
     private readonly HashSet<AvoidedSignature> _resolvedAvoidanceSignatures = [];
     private readonly HashSet<(int TargetId, int SkillCode)> _confirmedCompactDamage = [];
@@ -21,25 +25,42 @@ public sealed class CompactOutcomeCanonicalizer
 
     public IReadOnlyList<StampedCombatCanonicalizationResult> NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
     {
-        var isCompactType2Sidecar = IsCompactType2Sidecar(in observation);
-        if (isCompactType2Sidecar && IsCompactDamageConfirmation(sourceId, targetId, in observation))
+        var prefix = EnsureBatch(stamp.BatchOrdinal);
+
+        if (TryObserveDirectBlockedDamage(sourceId, targetId, in stamp, in observation, observedAtMilliseconds))
+            return prefix;
+
+        var result = new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, observation);
+        TrackStored(in result);
+        return Append(prefix, result);
+    }
+
+    public IReadOnlyList<StampedCombatCanonicalizationResult> ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
+    {
+        var isCompactSignal = IsCompactSignalShape(in observation) && observation.EventKind == CombatEventKind.Unknown && observation.ValueKind == CombatValueKind.Unknown;
+        if (!isCompactSignal)
         {
+            var directPrefix = EnsureBatch(stamp.BatchOrdinal);
+            var directResult = new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, observation);
+            TrackStored(in directResult);
+            return Append(directPrefix, directResult);
+        }
+
+        if (IsCompactType2Sidecar(in observation) && IsCompactDamageConfirmation(sourceId, targetId, in observation))
+        {
+            _pendingCompactDamage.Add(new PendingCompactAvoidance(sourceId, targetId, observation.SkillCode, observation.Marker, stamp, observedAtMilliseconds));
             _confirmedCompactDamage.Add((targetId, observation.SkillCode));
             CancelPendingCompactEvade(targetId, observation.SkillCode);
         }
 
         var prefix = EnsureBatch(stamp.BatchOrdinal);
-
-        if (isCompactType2Sidecar)
+        if (IsCompactType2Sidecar(in observation))
             return prefix;
 
         if (TryObserveCompactAvoidance(sourceId, targetId, in stamp, in observation, observedAtMilliseconds))
             return prefix;
 
-        if (TryObserveDirectBlockedDamage(sourceId, targetId, in stamp, in observation, observedAtMilliseconds))
-            return prefix;
-
-        return Append(prefix, new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, observation));
+        return prefix;
     }
 
     public IReadOnlyList<StampedCombatCanonicalizationResult> ObserveCompactControl0238(int sourceId, in TimelineStamp stamp, in CombatObservation observation)
@@ -49,9 +70,12 @@ public sealed class CompactOutcomeCanonicalizer
         return prefix;
     }
 
-    public IReadOnlyList<StampedCombatCanonicalizationResult> ObserveCompactControl0638(int sourceId, in TimelineStamp stamp, in CombatObservation observation)
+    public IReadOnlyList<StampedCombatCanonicalizationResult> ObserveCompactControl0638(int sourceId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
     {
         var prefix = EnsureBatch(stamp.BatchOrdinal);
+        if (sourceId > 0 && observation.Marker > 0 && observation.SkillCode > 0)
+            _pendingCompactControls0638.Add(new PendingCompactAvoidance(sourceId, 0, observation.SkillCode, observation.Marker, stamp, observedAtMilliseconds));
+
         ObserveDodgeSignal(sourceId, in observation);
         return prefix;
     }
@@ -59,12 +83,17 @@ public sealed class CompactOutcomeCanonicalizer
     public IReadOnlyList<StampedCombatCanonicalizationResult> CompleteBatch(long batchOrdinal)
     {
         if (_currentBatchOrdinal == 0)
-            return [];
+            return batchOrdinal == long.MaxValue ? FlushOrphanCompactHits() : [];
 
         if (batchOrdinal > 0 && _currentBatchOrdinal > 0 && batchOrdinal < _currentBatchOrdinal)
             return [];
 
-        return FinalizeBatch();
+        if (batchOrdinal == long.MaxValue)
+            return FinalizeAll();
+
+        var results = FinalizeBatch();
+        TrackStored(results);
+        return results;
     }
 
     private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds)
@@ -146,6 +175,131 @@ public sealed class CompactOutcomeCanonicalizer
         return results;
     }
 
+    private IReadOnlyList<StampedCombatCanonicalizationResult> FinalizeAll()
+    {
+        var results = new List<StampedCombatCanonicalizationResult>();
+        var finalized = FinalizeBatch();
+        TrackStored(finalized);
+        results.AddRange(finalized);
+        results.AddRange(FlushOrphanCompactHits());
+        return results;
+    }
+
+    private IReadOnlyList<StampedCombatCanonicalizationResult> FlushOrphanCompactHits()
+    {
+        var storedKeys = new HashSet<(long Batch, int Source, int Target, int Marker)>();
+        var damageMarkersBySource = new HashSet<(int Source, int Marker)>();
+        var lastDamageTargetBySourceBaseSkill = new Dictionary<(int Source, int BaseSkill), int>();
+        var damageHitsBySourceBaseSkill = new Dictionary<(int Source, int BaseSkill), int>();
+        foreach (var pending in _storedDamage)
+        {
+            if (pending.Observation.EventKind != CombatEventKind.Damage)
+                continue;
+            if (pending.SourceId <= 0 || pending.Observation.Marker <= 0)
+                continue;
+
+            damageMarkersBySource.Add((pending.SourceId, pending.Observation.Marker));
+            var observation = pending.Observation;
+            var baseSkill = observation.BaseSkillCode > 0 ? observation.BaseSkillCode : ResolveBaseSkillCode(OriginalSkillCode(in observation));
+            if (baseSkill > 0 && pending.TargetId > 0)
+            {
+                lastDamageTargetBySourceBaseSkill[(pending.SourceId, baseSkill)] = pending.TargetId;
+                var key = (pending.SourceId, baseSkill);
+                damageHitsBySourceBaseSkill.TryGetValue(key, out var prev);
+                damageHitsBySourceBaseSkill[key] = prev + 1;
+            }
+
+            if (pending.TargetId <= 0 || pending.SourceId == pending.TargetId)
+                continue;
+
+            storedKeys.Add((pending.Stamp.BatchOrdinal, pending.SourceId, pending.TargetId, pending.Observation.Marker));
+            storedKeys.Add((pending.Stamp.BatchOrdinal - 1, pending.SourceId, pending.TargetId, pending.Observation.Marker));
+            storedKeys.Add((pending.Stamp.BatchOrdinal + 1, pending.SourceId, pending.TargetId, pending.Observation.Marker));
+        }
+
+        var results = new List<StampedCombatCanonicalizationResult>();
+        foreach (var pending in _pendingCompactDamage)
+        {
+            if (pending.Marker <= 0)
+                continue;
+
+            if (storedKeys.Contains((pending.Stamp.BatchOrdinal, pending.SourceId, pending.TargetId, pending.Marker)))
+                continue;
+
+            if (!IsPlayerOrphanItemSkillCandidate(pending.OriginalSkillCode))
+                continue;
+
+            results.Add(CreateOrphanCompactHit(in pending, pending.TargetId));
+        }
+
+        var coveredMarkers = new HashSet<(int Source, int Marker)>(damageMarkersBySource);
+        foreach (var pending in _pendingCompactDamage)
+        {
+            if (pending.SourceId > 0 && pending.Marker > 0)
+                coveredMarkers.Add((pending.SourceId, pending.Marker));
+        }
+
+        foreach (var pending in _pendingCompact)
+        {
+            if (pending.SourceId > 0 && pending.Marker > 0)
+                coveredMarkers.Add((pending.SourceId, pending.Marker));
+        }
+
+        var seen0638Markers = new HashSet<(int Source, int Marker)>();
+        var emittedBySourceBaseSkill = new Dictionary<(int Source, int BaseSkill), int>();
+        var totalControlsBySourceBaseSkill = new Dictionary<(int Source, int BaseSkill), int>();
+        foreach (var pending in _pendingCompactControls0638)
+        {
+            if (pending.Marker <= 0 || pending.SourceId <= 0)
+                continue;
+
+            var baseSkill = ResolveBaseSkillCode(pending.OriginalSkillCode);
+            if (baseSkill <= 0)
+                continue;
+
+            var key = (pending.SourceId, baseSkill);
+            totalControlsBySourceBaseSkill.TryGetValue(key, out var prev);
+            totalControlsBySourceBaseSkill[key] = prev + 1;
+        }
+
+        foreach (var pending in _pendingCompactControls0638)
+        {
+            if (pending.Marker <= 0 || pending.SourceId <= 0)
+                continue;
+
+            if (coveredMarkers.Contains((pending.SourceId, pending.Marker)))
+                continue;
+
+            if (!IsPlayerOrphanItemSkillCandidate(pending.OriginalSkillCode))
+                continue;
+
+            if (!seen0638Markers.Add((pending.SourceId, pending.Marker)))
+                continue;
+
+            var baseSkill = ResolveBaseSkillCode(pending.OriginalSkillCode);
+            if (baseSkill <= 0)
+                continue;
+
+            if (!lastDamageTargetBySourceBaseSkill.TryGetValue((pending.SourceId, baseSkill), out var targetId) || targetId <= 0)
+                continue;
+
+            var key = (pending.SourceId, baseSkill);
+            damageHitsBySourceBaseSkill.TryGetValue(key, out var damageCount);
+            emittedBySourceBaseSkill.TryGetValue(key, out var emittedCount);
+            totalControlsBySourceBaseSkill.TryGetValue(key, out var totalControls);
+            if (damageCount + emittedCount >= totalControls)
+                continue;
+
+            results.Add(CreateOrphanCompactHit(in pending, targetId));
+            emittedBySourceBaseSkill[key] = emittedCount + 1;
+        }
+
+        _pendingCompactDamage.Clear();
+        _pendingCompactControls0638.Clear();
+        _storedDamage.Clear();
+        return results;
+    }
+
     private IReadOnlyList<StampedCombatCanonicalizationResult> EnsureBatch(long batchOrdinal)
     {
         var resolvedBatchOrdinal = batchOrdinal > 0 ? batchOrdinal : 0;
@@ -159,8 +313,21 @@ public sealed class CompactOutcomeCanonicalizer
             return [];
 
         var results = FinalizeBatch();
+        TrackStored(results);
         _currentBatchOrdinal = resolvedBatchOrdinal;
         return results;
+    }
+
+    private void TrackStored(IReadOnlyList<StampedCombatCanonicalizationResult> results)
+    {
+        foreach (var result in results)
+            TrackStored(in result);
+    }
+
+    private void TrackStored(in StampedCombatCanonicalizationResult result)
+    {
+        if (result.Observation.EventKind == CombatEventKind.Damage)
+            _storedDamage.Add(result);
     }
 
     private static IReadOnlyList<StampedCombatCanonicalizationResult> Append(IReadOnlyList<StampedCombatCanonicalizationResult> prefix, in StampedCombatCanonicalizationResult result)
@@ -345,6 +512,37 @@ public sealed class CompactOutcomeCanonicalizer
         var classPrefix = trackedSkillCode / 1000000;
         return classPrefix is >= 11 and <= 18;
     }
+
+    private static StampedCombatCanonicalizationResult CreateOrphanCompactHit(in PendingCompactAvoidance pending, int targetId)
+    {
+        var observation = new CombatObservation
+        {
+            SkillCode = pending.OriginalSkillCode,
+            OriginalSkillCode = pending.OriginalSkillCode,
+            Damage = 0,
+            HitCount = 1,
+            AttemptCount = 1,
+            Marker = pending.Marker,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        };
+        return new StampedCombatCanonicalizationResult(pending.SourceId, targetId, pending.Stamp, pending.ObservedAtMilliseconds, NormalizeBaseObservation(pending.SourceId, targetId, in observation));
+    }
+
+    private static bool IsPlayerOrphanItemSkillCandidate(int originalSkillCode)
+    {
+        var resolvedSkillCode = CombatResourceRegistry.InferOriginalSkillCode(originalSkillCode);
+        if (resolvedSkillCode is null)
+            return false;
+
+        return CombatResourceRegistry.SkillMap.TryGetValue(resolvedSkillCode.Value, out var skill) && skill.SourceType == SkillSourceType.ItemSkill && skill.Category != SkillCategory.Npc;
+    }
+
+    private static int ResolveBaseSkillCode(int skillCodeRaw) =>
+        skillCodeRaw > 0 ? CombatResourceRegistry.ParseSkillVariant(skillCodeRaw).BaseSkillCode : 0;
+
+    private static int OriginalSkillCode(in CombatObservation observation) =>
+        observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
 }
 
 public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);

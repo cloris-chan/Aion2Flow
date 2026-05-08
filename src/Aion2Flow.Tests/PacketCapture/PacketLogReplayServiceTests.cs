@@ -79,7 +79,7 @@ public sealed class PacketLogReplayServiceTests
             Assert.Equal(5, replay.ReplayedLines);
             Assert.Equal(4, replay.ReplayedEventCounts["state-0140"]);
             Assert.Equal(1, replay.ReplayedEventCounts["nickname"]);
-            Assert.Equal(50u, replay.Store.CurrentMapId);
+            Assert.Equal(50u, replay.SceneOwner.Metadata.CurrentMapId);
             Assert.Equal(50u, replay.Snapshot.MapId);
         }
         finally
@@ -101,13 +101,13 @@ public sealed class PacketLogReplayServiceTests
             var stagedReplay = PacketLogReplayService.Replay(stagedPath);
 
             Assert.Equal(1, stagedReplay.ReplayedLines);
-            Assert.Equal(0u, stagedReplay.Store.CurrentMapId);
+            Assert.Equal(0u, stagedReplay.SceneOwner.Metadata.CurrentMapId);
             Assert.Equal(0u, stagedReplay.Snapshot.MapId);
 
             var arrivedReplay = PacketLogReplayService.Replay(arrivedPath);
 
             Assert.Equal(2, arrivedReplay.ReplayedLines);
-            Assert.Equal(50u, arrivedReplay.Store.CurrentMapId);
+            Assert.Equal(50u, arrivedReplay.SceneOwner.Metadata.CurrentMapId);
             Assert.Equal(50u, arrivedReplay.Snapshot.MapId);
         }
         finally
@@ -118,7 +118,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Stream_Replay_Runtime_Sink_Path_Matches_Legacy_Processor_Constructor()
+    public void Stream_Replay_Runtime_Sink_Path_Matches_Direct_Scene_Processor()
     {
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -134,11 +134,9 @@ public sealed class PacketLogReplayServiceTests
         try
         {
             var sinkReplay = PacketLogReplayService.Replay(path);
-            var legacyReplay = ReplayStreamEntriesWithProcessor(
-                entries,
-                static store => new PacketStreamProcessor(store));
+            var directReplay = ReplayStreamEntriesWithSceneProcessor(entries);
 
-            AssertStreamReplayParity(legacyReplay, sinkReplay);
+            AssertStreamReplayParity(directReplay, sinkReplay);
         }
         finally
         {
@@ -147,7 +145,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void DualWrite_Replay_Parity_Matches_LegacyOnly()
+    public void Scene_Replay_Is_Deterministic()
     {
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -162,21 +160,15 @@ public sealed class PacketLogReplayServiceTests
         var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
         try
         {
-            SceneDualWrite.Enabled = false;
-            var legacyOnly = PacketLogReplayService.Replay(path);
+            var first = PacketLogReplayService.Replay(path);
+            var second = PacketLogReplayService.Replay(path);
 
-            SceneDualWrite.Enabled = true;
-            var dualWrite = PacketLogReplayService.Replay(path);
-
-            SceneDualWrite.Enabled = false;
-
-            AssertSnapshotParity(legacyOnly.Snapshot, dualWrite.Snapshot);
-            Assert.Equal(legacyOnly.ReplayedLines, dualWrite.ReplayedLines);
-            Assert.Equal(legacyOnly.SkippedLines, dualWrite.SkippedLines);
+            AssertSnapshotParity(first.Snapshot, second.Snapshot);
+            Assert.Equal(first.ReplayedLines, second.ReplayedLines);
+            Assert.Equal(first.SkippedLines, second.SkippedLines);
         }
         finally
         {
-            SceneDualWrite.Enabled = false;
             File.Delete(path);
         }
     }
@@ -234,11 +226,11 @@ public sealed class PacketLogReplayServiceTests
         {
             var spawnOnlyReplay = PacketLogReplayService.Replay(spawnOnlyPath);
             var afterSpawn = DateTimeOffset.Parse("2026-05-01T21:36:18.7000332+08:00").ToUnixTimeMilliseconds();
-            Assert.False(spawnOnlyReplay.Store.TryGetObservedBoss(afterSpawn, 2_000, out _));
+            Assert.False(spawnOnlyReplay.SceneOwner.BossFocus.TryGetObservedBoss(afterSpawn, 2_000, out _));
 
             var sidecarOnlyReplay = PacketLogReplayService.Replay(sidecarOnlyPath);
             var afterPulse = DateTimeOffset.Parse("2026-05-01T21:37:31.4028167+08:00").ToUnixTimeMilliseconds();
-            Assert.False(sidecarOnlyReplay.Store.TryGetObservedBoss(afterPulse, 2_000, out _));
+            Assert.False(sidecarOnlyReplay.SceneOwner.BossFocus.TryGetObservedBoss(afterPulse, 2_000, out _));
 
             var replay = PacketLogReplayService.Replay(hpPath);
             var afterHp = DateTimeOffset.Parse("2026-05-01T21:37:41.5785243+08:00").ToUnixTimeMilliseconds();
@@ -247,16 +239,13 @@ public sealed class PacketLogReplayServiceTests
             Assert.Equal(2, replay.ReplayedEventCounts["sidecar-3538"]);
             Assert.Equal(1, replay.ReplayedEventCounts["battle-toggle"]);
             Assert.Equal(1, replay.ReplayedEventCounts["remain-hp"]);
-            Assert.True(replay.Store.TryGetObservedBoss(afterHp, 2_000, out var boss));
+            Assert.True(replay.SceneOwner.BossFocus.TryGetObservedBoss(afterHp, 2_000, out var boss));
             Assert.True(boss.HasHp);
             Assert.Equal(56_688, boss.InstanceId);
             Assert.Equal(22_847, boss.Hp);
             Assert.Equal(49_200, boss.MaxHp);
-
-            SceneDualWrite.Enabled = true;
             var sceneReplay = PacketLogReplayService.Replay(hpPath);
-            SceneDualWrite.Enabled = false;
-            var applier = ApplySceneJournal(sceneReplay.SceneJournal!);
+            var applier = ApplySceneJournal(sceneReplay.SceneJournal);
 
             Assert.True(applier.BossFocus.TryGetObservedBoss(afterHp, 2_000, out var sceneBoss));
             Assert.True(sceneBoss.HasHp);
@@ -266,18 +255,14 @@ public sealed class PacketLogReplayServiceTests
 
             var exitReplay = PacketLogReplayService.Replay(exitPath);
             var afterExit = DateTimeOffset.Parse("2026-05-01T21:38:08.2582599+08:00").ToUnixTimeMilliseconds();
-            Assert.False(exitReplay.Store.TryGetObservedBoss(afterExit, 2_000, out _));
-
-            SceneDualWrite.Enabled = true;
+            Assert.False(exitReplay.SceneOwner.BossFocus.TryGetObservedBoss(afterExit, 2_000, out _));
             var sceneExitReplay = PacketLogReplayService.Replay(exitPath);
-            SceneDualWrite.Enabled = false;
-            var exitApplier = ApplySceneJournal(sceneExitReplay.SceneJournal!);
+            var exitApplier = ApplySceneJournal(sceneExitReplay.SceneJournal);
 
             Assert.False(exitApplier.BossFocus.TryGetObservedBoss(afterExit, 2_000, out _));
         }
         finally
         {
-            SceneDualWrite.Enabled = false;
             File.Delete(spawnOnlyPath);
             File.Delete(sidecarOnlyPath);
             File.Delete(hpPath);
@@ -547,7 +532,7 @@ public sealed class PacketLogReplayServiceTests
             Assert.Equal(1, replay.ReplayedEventCounts["summon"]);
             Assert.Equal(1, replay.ReplayedEventCounts["damage"]);
             Assert.False(
-                replay.Store.CombatPacketsBySource.TryGetValue(17755, out var summonPackets) &&
+                SceneReplayTestView.BySource(replay).TryGetValue(17755, out var summonPackets) &&
                 summonPackets.Any(static packet => packet.SourceId == 17755 && packet.TargetId == 17755 && packet.Damage == 3));
             Assert.DoesNotContain(
                 replay.Snapshot.Combatants,
@@ -726,7 +711,7 @@ public sealed class PacketLogReplayServiceTests
         const int hpAbsorptionEffectSkillCode = 10000013;
         const int wardingStrikeSkillCode = 12351450;
         const int punishingStrikeSkillCode = 12060240;
-        var selfHealingPackets = replay.Store.CombatPacketsBySource[playerId]
+        var selfHealingPackets = SceneReplayTestView.BySource(replay)[playerId]
             .Where(packet =>
                 packet.SourceId == playerId &&
                 packet.TargetId == playerId &&
@@ -734,7 +719,7 @@ public sealed class PacketLogReplayServiceTests
             .ToArray();
         var packetDump = string.Join(
             Environment.NewLine,
-            replay.Store.CombatPacketsBySource[playerId]
+            SceneReplayTestView.BySource(replay)[playerId]
                 .Where(static packet => packet.SourceId == packet.TargetId)
                 .Select(static packet =>
                     $"skill={packet.SkillCode} raw={packet.OriginalSkillCode} damage={packet.Damage} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} detail={packet.DetailRaw}"));
@@ -793,7 +778,7 @@ public sealed class PacketLogReplayServiceTests
                     $"skill={pair.Key} heal={pair.Value.HealingAmount} periodic={pair.Value.PeriodicHealingAmount} drain={pair.Value.DrainHealingAmount} times={pair.Value.HealingTimes}"));
         var packetDump = string.Join(
             Environment.NewLine,
-            replay.Store.CombatPacketsBySource[playerId]
+            SceneReplayTestView.BySource(replay)[playerId]
                 .Where(static packet => packet.SourceId == packet.TargetId || packet.DrainHealAmount > 0)
                 .Select(static packet =>
                     $"skill={packet.SkillCode} raw={packet.OriginalSkillCode} damage={packet.Damage} drain={packet.DrainHealAmount} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} type={packet.Type} detail={packet.DetailRaw}"));
@@ -820,7 +805,7 @@ public sealed class PacketLogReplayServiceTests
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426140354.log"));
 
         const int playerId = 4156;
-        var playerOwnedIds = replay.Store.SummonOwnerByInstance
+        var playerOwnedIds = SceneReplayTestView.SummonOwnerByInstance(replay)
             .Where(static pair => pair.Value == playerId)
             .Select(static pair => pair.Key)
             .Append(playerId)
@@ -839,12 +824,12 @@ public sealed class PacketLogReplayServiceTests
                     $"id={summary.CombatantId} name={summary.DisplayName} outDmg={summary.OutgoingDamage} inDmg={summary.IncomingDamage} outHeal={summary.OutgoingHealing} inHeal={summary.IncomingHealing} outShield={summary.OutgoingShield} inShield={summary.IncomingShield} attempts={summary.OutgoingAttempts}/{summary.IncomingAttempts} hits={summary.OutgoingHits}/{summary.IncomingHits}"));
         var summonDump = string.Join(
             Environment.NewLine,
-            replay.Store.SummonOwnerByInstance
+            SceneReplayTestView.SummonOwnerByInstance(replay)
                 .OrderBy(static pair => pair.Key)
                 .Select(static pair => $"summon={pair.Key} owner={pair.Value}"));
         var targetDump = string.Join(
             Environment.NewLine,
-            replay.Store.CombatPacketsByTarget
+            SceneReplayTestView.ByTarget(replay)
                 .Select(static pair => new
                 {
                     Target = pair.Key,
@@ -855,7 +840,7 @@ public sealed class PacketLogReplayServiceTests
                 .Select(entry => $"target={entry.Target} damage={entry.Damage} packets={entry.Count}"));
         var playerIncomingDump = string.Join(
             Environment.NewLine,
-            replay.Store.CombatPacketsByTarget[playerId]
+            SceneReplayTestView.ByTarget(replay)[playerId]
                 .Where(static packet => packet.EventKind == CombatEventKind.Damage)
                 .GroupBy(static packet => new { packet.SourceId, packet.SkillCode, packet.OriginalSkillCode })
                 .Select(static group => new
@@ -872,18 +857,20 @@ public sealed class PacketLogReplayServiceTests
                 .Select(entry => $"source={entry.SourceId} skill={entry.SkillCode} raw={entry.OriginalSkillCode} damage={entry.Damage} attempts={entry.Attempts} hits={entry.Hits} packets={entry.Count}"));
         var playerHealingGroupDump = string.Join(
             Environment.NewLine,
-            CombatMetricsEngine.EnumerateBattlePackets(replay.Store, replay.Snapshot.BattleStartTime, replay.Snapshot.BattleEndTime)
-                .Where(context => context.SourceId == playerId &&
-                                  context.Packet.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing)
-                .GroupBy(context => new
+            SceneReplayTestView.Packets(replay)
+                .Where(packet => packet.SourceId == playerId &&
+                                 packet.Timestamp >= replay.Snapshot.BattleStartTime &&
+                                 packet.Timestamp <= replay.Snapshot.BattleEndTime &&
+                                 packet.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing)
+                .GroupBy(packet => new
                 {
-                    context.Packet.SkillCode,
-                    context.Packet.OriginalSkillCode,
-                    context.Packet.ValueKind,
-                    InWindow = context.Packet.Timestamp >= replay.Snapshot.BattleStartTime && context.Packet.Timestamp <= replay.Snapshot.BattleEndTime,
-                    RawSource = context.Packet.SourceId,
-                    IsSelfTarget = context.Packet.TargetId == playerId,
-                    IsSummonTarget = playerOwnedIds.Contains(context.Packet.TargetId) && context.Packet.TargetId != playerId
+                    packet.SkillCode,
+                    packet.OriginalSkillCode,
+                    packet.ValueKind,
+                    InWindow = true,
+                    RawSource = packet.SourceId,
+                    IsSelfTarget = packet.TargetId == playerId,
+                    IsSummonTarget = playerOwnedIds.Contains(packet.TargetId) && packet.TargetId != playerId
                 })
                 .Select(group => new
                 {
@@ -894,7 +881,7 @@ public sealed class PacketLogReplayServiceTests
                     group.Key.RawSource,
                     group.Key.IsSelfTarget,
                     group.Key.IsSummonTarget,
-                    Damage = group.Sum(context => context.Packet.Damage),
+                    Damage = group.Sum(static packet => packet.Damage),
                     Count = group.Count()
                 })
                 .OrderByDescending(entry => entry.Damage)
@@ -902,12 +889,12 @@ public sealed class PacketLogReplayServiceTests
                     $"skill={entry.SkillCode} raw={entry.OriginalSkillCode} value={entry.ValueKind} inWindow={entry.InWindow} rawSource={entry.RawSource} self={entry.IsSelfTarget} summonTarget={entry.IsSummonTarget} damage={entry.Damage} count={entry.Count}"));
         var spiritDescentPacketDump = string.Join(
             Environment.NewLine,
-            replay.Store.CombatPacketsBySource.Values
+            SceneReplayTestView.BySource(replay).Values
                 .SelectMany(static queue => queue)
                 .Where(static packet => packet.SkillCode == 16990004 || packet.OriginalSkillCode == 16990004)
                 .OrderBy(static packet => packet.Timestamp)
                 .Select(packet =>
-                    $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} sourceSummon={replay.Store.SummonOwnerByInstance.ContainsKey(packet.SourceId)} targetSummon={replay.Store.SummonOwnerByInstance.ContainsKey(packet.TargetId)}"));
+                    $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} sourceSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.SourceId)} targetSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.TargetId)}"));
         var diagnostics =
             $"target={replay.Snapshot.TargetObservation?.InstanceId} targetName={replay.Snapshot.TargetName} battle={replay.Snapshot.BattleStartTime}-{replay.Snapshot.BattleEndTime}\ncombatants:\n{combatantDump}\nsummaries:\n{summaryDump}\nsummons:\n{summonDump}\ntargets:\n{targetDump}\nplayer-healing-groups:\n{playerHealingGroupDump}\nspirit-descent-packets:\n{spiritDescentPacketDump}\nplayer-incoming:\n{playerIncomingDump}";
 
@@ -938,7 +925,7 @@ public sealed class PacketLogReplayServiceTests
         const int playerId = 10277;
         const int summonId = 37299;
         const int enhanceSpiritBenedictionSkillCode = 16190000;
-        var healingPackets = replay.Store.CombatPacketsBySource[playerId]
+        var healingPackets = SceneReplayTestView.BySource(replay)[playerId]
             .Where(packet =>
                 packet.SkillCode == enhanceSpiritBenedictionSkillCode &&
                 packet.ValueKind == CombatValueKind.PeriodicHealing)
@@ -969,12 +956,12 @@ public sealed class PacketLogReplayServiceTests
                     $"skill={pair.Key} heal={pair.Value.HealingAmount} periodic={pair.Value.PeriodicHealingAmount} drain={pair.Value.DrainHealingAmount} times={pair.Value.HealingTimes}"));
         var spiritDump = string.Join(
             Environment.NewLine,
-            replay.Store.CombatPacketsBySource.Values
+            SceneReplayTestView.BySource(replay).Values
                 .SelectMany(static queue => queue)
                 .Where(static packet => packet.SkillCode == 16990004 || packet.OriginalSkillCode == 16990004)
                 .OrderBy(static packet => packet.Timestamp)
                 .Select(packet =>
-                    $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} sourceSummon={replay.Store.SummonOwnerByInstance.ContainsKey(packet.SourceId)} targetSummon={replay.Store.SummonOwnerByInstance.ContainsKey(packet.TargetId)}"));
+                    $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} sourceSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.SourceId)} targetSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.TargetId)}"));
         Assert.True(playerMetrics.HealingAmount == 3438, $"HealingAmount={playerMetrics.HealingAmount} expected=3438 battle={replay.Snapshot.BattleStartTime}-{replay.Snapshot.BattleEndTime}\n{skillDump}\n{spiritDump}\n{combatantDump}");
         Assert.True(playerMetrics.Skills.TryGetValue(enhanceSpiritBenedictionSkillCode, out var skill), combatantDump);
         Assert.Equal(3438, skill.HealingAmount);
@@ -992,56 +979,39 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void M1_06_DualWrite_VendoredLog_Parity_20260415()
+    public void SceneReplay_VendoredLog_IsDeterministic_20260415()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log");
+        var first = PacketLogReplayService.Replay(path);
+        var second = PacketLogReplayService.Replay(path);
 
-        SceneDualWrite.Enabled = false;
-        var legacy = PacketLogReplayService.Replay(path);
-
-        SceneDualWrite.Enabled = true;
-        var dualWrite = PacketLogReplayService.Replay(path);
-
-        SceneDualWrite.Enabled = false;
-
-        AssertSnapshotParity(legacy.Snapshot, dualWrite.Snapshot);
-        Assert.Equal(legacy.ReplayedLines, dualWrite.ReplayedLines);
-        Assert.NotNull(dualWrite.SceneJournal);
-        Assert.True(dualWrite.SceneJournal!.Count > 0);
+        AssertSnapshotParity(first.Snapshot, second.Snapshot);
+        Assert.Equal(first.ReplayedLines, second.ReplayedLines);
+        Assert.True(second.SceneJournal.Count > 0);
     }
 
     [Fact]
-    public void M1_06_DualWrite_VendoredLog_Parity_20260419()
+    public void SceneReplay_VendoredLog_IsDeterministic_20260419()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log");
+        var first = PacketLogReplayService.Replay(path);
+        var second = PacketLogReplayService.Replay(path);
 
-        SceneDualWrite.Enabled = false;
-        var legacy = PacketLogReplayService.Replay(path);
-
-        SceneDualWrite.Enabled = true;
-        var dualWrite = PacketLogReplayService.Replay(path);
-
-        SceneDualWrite.Enabled = false;
-
-        AssertSnapshotParity(legacy.Snapshot, dualWrite.Snapshot);
-        Assert.Equal(legacy.ReplayedLines, dualWrite.ReplayedLines);
-        Assert.NotNull(dualWrite.SceneJournal);
-        Assert.True(dualWrite.SceneJournal!.Count > 0);
+        AssertSnapshotParity(first.Snapshot, second.Snapshot);
+        Assert.Equal(first.ReplayedLines, second.ReplayedLines);
+        Assert.True(second.SceneJournal.Count > 0);
     }
 
     [Fact]
-    public void M1_06_DualWrite_JournalOrdinals_AreMonotonicallyIncreasing()
+    public void SceneReplay_JournalOrdinals_AreMonotonicallyIncreasing()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log");
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(path);
-        SceneDualWrite.Enabled = false;
 
-        var journal = replay.SceneJournal!;
+        var journal = replay.SceneJournal;
         Assert.True(journal.Count > 0);
 
         long prevOrdinal = -1;
@@ -1054,7 +1024,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void M1_06_DualWrite_BaselineCounters_AreRecorded()
+    public void SceneReplay_BaselineCounters_AreRecorded()
     {
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var entries = new[]
@@ -1068,9 +1038,7 @@ public sealed class PacketLogReplayServiceTests
         var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
         try
         {
-            SceneDualWrite.Enabled = true;
             var replay = PacketLogReplayService.Replay(path);
-            SceneDualWrite.Enabled = false;
 
             Assert.NotSame(PacketLogReplayBaselineCounters.Empty, replay.BaselineCounters);
             AssertBaselineCounter(replay.BaselineCounters.ReplayIngest);
@@ -1079,13 +1047,12 @@ public sealed class PacketLogReplayServiceTests
         }
         finally
         {
-            SceneDualWrite.Enabled = false;
             File.Delete(path);
         }
     }
 
     [Fact]
-    public void M1_06_DualWrite_LegacyOnlyJournal_IsNull()
+    public void SceneReplay_AlwaysExposesSceneJournal()
     {
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var entries = new[]
@@ -1096,9 +1063,9 @@ public sealed class PacketLogReplayServiceTests
         var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
         try
         {
-            SceneDualWrite.Enabled = false;
             var replay = PacketLogReplayService.Replay(path);
-            Assert.Null(replay.SceneJournal);
+            Assert.True(replay.SceneJournal.Count > 0);
+            Assert.NotNull(replay.SceneOwner);
         }
         finally
         {
@@ -1130,15 +1097,12 @@ public sealed class PacketLogReplayServiceTests
     private static string BuildStreamReplayLine(StreamReplayEntry entry)
         => $"{entry.Timestamp:O}|dir=inbound|16777343:57080->16777343:49820|len={entry.Payload.Length}|data={Convert.ToHexString(entry.Payload)}";
 
-    private static StreamProcessorReplayResult ReplayStreamEntriesWithProcessor(
-        IReadOnlyList<StreamReplayEntry> entries,
-        Func<CombatMetricsStore, PacketStreamProcessor> createProcessor)
+    private static StreamProcessorReplayResult ReplayStreamEntriesWithSceneProcessor(IReadOnlyList<StreamReplayEntry> entries)
     {
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var holder = SceneSinkFactory.CreateForReplay();
         var replayedLines = 0;
         var skippedLines = 0;
-        using var processor = createProcessor(store);
+        using var processor = new PacketStreamProcessor(holder.Sink);
         var connection = new TcpConnection(16777343, 16777343, 57080, 49820);
 
         foreach (var entry in entries)
@@ -1153,14 +1117,23 @@ public sealed class PacketLogReplayServiceTests
             }
         }
 
-        store.FlushPendingOutcomeSidecars();
-        store.FlushOrphanCompactHits();
+        holder.Sink.CompleteBatch(long.MaxValue);
         return new StreamProcessorReplayResult(
             entries.Count,
             replayedLines,
             skippedLines,
-            engine.CreateBattleSnapshot(),
-            store.DeepClone());
+            holder.Owner.CreateSnapshot(),
+            SceneReplayTestView.Packets(new PacketLogReplayResult(
+                string.Empty,
+                entries.Count,
+                replayedLines,
+                skippedLines,
+                holder.Owner.CreateSnapshot(),
+                holder.Journal,
+                holder.Owner,
+                [],
+                new Dictionary<string, int>(),
+                new Dictionary<string, int>())));
     }
 
     private static void AssertStreamReplayParity(StreamProcessorReplayResult expected, PacketLogReplayResult actual)
@@ -1170,8 +1143,8 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(expected.SkippedLines, actual.SkippedLines);
         AssertSnapshotParity(expected.Snapshot, actual.Snapshot);
         Assert.Equal(
-            BuildBattlePacketFacts(expected.Store, expected.Snapshot),
-            BuildBattlePacketFacts(actual.Store, actual.Snapshot));
+            BuildBattlePacketFacts(expected.Packets, expected.Snapshot),
+            BuildBattlePacketFacts(SceneReplayTestView.Packets(actual), actual.Snapshot));
     }
 
     private static void AssertBaselineCounter(PacketLogReplayBaselineCounter counter)
@@ -1262,16 +1235,16 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(expected.DefensivePerfectTimes, actual.DefensivePerfectTimes);
     }
 
-    private static string[] BuildBattlePacketFacts(CombatMetricsStore store, DamageMeterSnapshot snapshot)
+    private static string[] BuildBattlePacketFacts(IReadOnlyList<SceneReplayPacket> packets, DamageMeterSnapshot snapshot)
     {
-        return CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime)
-            .Select(static context =>
+        return packets
+            .Where(packet => packet.Timestamp >= snapshot.BattleStartTime && packet.Timestamp <= snapshot.BattleEndTime)
+            .Select(static packet =>
             {
-                var packet = context.Packet;
                 return string.Join(
                     "|",
-                    context.SourceId,
-                    context.TargetId,
+                    packet.SourceId,
+                    packet.TargetId,
                     packet.SourceId,
                     packet.TargetId,
                     packet.OriginalSkillCode,
@@ -1281,9 +1254,7 @@ public sealed class PacketLogReplayServiceTests
                     packet.EventKind,
                     packet.ValueKind,
                     packet.EffectTag,
-                    packet.Timestamp,
-                    packet.FrameOrdinal,
-                    packet.BatchOrdinal);
+                    packet.Timestamp);
             })
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -1342,7 +1313,7 @@ public sealed class PacketLogReplayServiceTests
         int ReplayedLines,
         int SkippedLines,
         DamageMeterSnapshot Snapshot,
-        CombatMetricsStore Store);
+        IReadOnlyList<SceneReplayPacket> Packets);
 
     private sealed record StreamReplayEntry(DateTimeOffset Timestamp, byte[] Payload);
 }

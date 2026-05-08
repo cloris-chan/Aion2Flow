@@ -3,7 +3,6 @@ using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Canonicalization;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
@@ -177,22 +176,18 @@ public class MultiHitAttributionServiceTests
     }
 
     [Fact]
-    public void ScenePath_Replay_Aux2C38Invincible_MatchesLegacyPairs()
+    public void ScenePath_Replay_Aux2C38Invincible_ProjectsScenePairs()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426140354.log"));
-        SceneDualWrite.Enabled = false;
 
-        var legacyPackets = replay.Store.CombatPacketsBySource.Values
-            .SelectMany(static packets => packets)
+        var packets = SceneReplayTestView.Packets(replay)
             .Where(static packet => packet.EffectTag == PacketEffectTag.Aux2C38Invincible)
             .ToArray();
-        var combat = Apply(replay.SceneJournal!);
+        var combat = Apply(replay.SceneJournal);
 
-        Assert.NotEmpty(legacyPackets);
-        foreach (var packet in legacyPackets)
+        Assert.NotEmpty(packets);
+        foreach (var packet in packets)
         {
             Assert.True(combat.TryGetPair(packet.SourceId, packet.TargetId, out var pair));
             Assert.NotNull(pair);

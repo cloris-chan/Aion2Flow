@@ -6,8 +6,9 @@ using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Scene;
-using Cloris.Aion2Flow.Scene.Compatibility;
+using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.Scene.Runtime;
 using Cloris.Aion2Flow.Scene.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
@@ -18,31 +19,34 @@ public sealed class PacketStreamProcessorNpcObservationTests
     private static readonly TcpConnection TestConnection = new(0x0100007f, 0x0100007f, 49820, 57080);
 
     [Fact]
-    public void Runtime_Sink_Constructor_Writes_To_Legacy_Store()
+    public void Runtime_Sink_Constructor_Writes_To_Scene_Journal()
     {
-        var store = new CombatMetricsStore();
-        using var processor = new PacketStreamProcessor(new LegacyRuntimeObservationSink(store));
+        var scene = new SceneLiveReadModel();
+        using var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
 
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-200003.hex"), TestConnection);
 
         Assert.True(parsed);
-        Assert.Equal((uint)0, store.CurrentMapId);
-        store.MarkSceneArrival();
-        Assert.Equal((uint)200003, store.CurrentMapId);
+        scene.Owner.Refresh();
+        Assert.Equal((uint)0, scene.Owner.Metadata.CurrentMapId);
+        scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)).MarkSceneArrival();
+        scene.Owner.Refresh();
+        Assert.Equal((uint)200003, scene.Owner.Metadata.CurrentMapId);
     }
 
     [Fact]
     public void Uses_Recent_4536_Source_As_Fallback_For_SourceLess_Runtime_State_Frames()
     {
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid()) { CurrentTarget = 4370 };
+        var processor = new PacketStreamProcessor(sink);
 
         processor.AppendAndProcess(HexHelper.FromFixture("state/4536-boss-observed-4370.hex"), TestConnection);
         processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-200003.hex"), TestConnection);
         processor.AppendAndProcess(HexHelper.FromFixture("state/0140-boss-tail-430d03.hex"), TestConnection);
         processor.AppendAndProcess(HexHelper.FromFixture("state/0240-boss-tail-430d03.hex"), TestConnection);
 
-        Assert.True(store.TryGetNpcRuntimeState(4370, out var state));
+        Assert.True(sink.TryGetNpcRuntimeState(4370, out var state));
         Assert.Equal((uint)6, state.Sequence2136);
         Assert.Equal((uint)200003, state.Value2136);
         Assert.Equal((uint)200003, state.Value0140);
@@ -50,13 +54,11 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
-    public void Scene_DualWrite_Captures_Npc_Extended_State_From_State_Frames()
+    public void Scene_Replay_Captures_Npc_Extended_State_From_State_Frames()
     {
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-        SceneDualWrite.Enabled = false;
 
-        var journal = replay.SceneJournal!;
+        var journal = replay.SceneJournal;
         var entities = new EntityStore();
         var metadata = new MetadataStore();
         var combat = new CombatStore();
@@ -77,43 +79,50 @@ public sealed class PacketStreamProcessorNpcObservationTests
     [InlineData("state/0240-boss-tail-430d03.hex", 200003)]
     public void Scene_State_Frames_Stage_Map_Id_Until_Arrival(string fixture, uint expectedMapId)
     {
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var scene = new SceneLiveReadModel();
+        var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
 
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture(fixture), TestConnection);
 
         Assert.True(parsed);
-        Assert.Equal((uint)0, store.CurrentMapId);
-        store.MarkSceneArrival();
-        Assert.Equal(expectedMapId, store.CurrentMapId);
+        scene.Owner.Refresh();
+        Assert.Equal((uint)0, scene.Owner.Metadata.CurrentMapId);
+        scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)).MarkSceneArrival();
+        scene.Owner.Refresh();
+        Assert.Equal(expectedMapId, scene.Owner.Metadata.CurrentMapId);
     }
 
     [Fact]
     public void Map_Instance_Frame_Stages_Instance_And_Is_Cleared_On_Confirmed_Map_Change()
     {
-        var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var scene = new SceneLiveReadModel();
+        var arrivalSink = scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal));
+        var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
 
-        store.StageDestinationMap(200003);
-        store.MarkSceneArrival();
+        arrivalSink.StageDestinationMap(200003);
+        arrivalSink.MarkSceneArrival();
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2e92-bosschallenge-map-event.hex"), TestConnection);
+        scene.Owner.Refresh();
 
         Assert.True(parsed);
-        Assert.Equal((uint)200003, store.CurrentMapId);
-        Assert.Equal((uint)113515, store.CurrentMapInstanceId);
+        Assert.Equal((uint)200003, scene.Owner.Metadata.CurrentMapId);
+        Assert.Equal((uint)113515, scene.Owner.Metadata.CurrentMapInstanceId);
 
-        store.MarkSceneArrival();
-        Assert.Equal((uint)113515, store.CurrentMapInstanceId);
+        arrivalSink.MarkSceneArrival();
+        scene.Owner.Refresh();
+        Assert.Equal((uint)113515, scene.Owner.Metadata.CurrentMapInstanceId);
 
         parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-1010.hex"), TestConnection);
+        scene.Owner.Refresh();
 
         Assert.True(parsed);
-        Assert.Equal((uint)200003, store.CurrentMapId);
-        Assert.Equal((uint)113515, store.CurrentMapInstanceId);
+        Assert.Equal((uint)200003, scene.Owner.Metadata.CurrentMapId);
+        Assert.Equal((uint)113515, scene.Owner.Metadata.CurrentMapInstanceId);
 
-        store.MarkSceneArrival();
-        Assert.Equal((uint)1010, store.CurrentMapId);
-        Assert.Equal((uint)0, store.CurrentMapInstanceId);
+        arrivalSink.MarkSceneArrival();
+        scene.Owner.Refresh();
+        Assert.Equal((uint)1010, scene.Owner.Metadata.CurrentMapId);
+        Assert.Equal((uint)0, scene.Owner.Metadata.CurrentMapInstanceId);
     }
 
     [Fact]
@@ -149,17 +158,15 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.False(catalog.ContainsKey(sceneStateValue));
         CombatMetricsEngine.SetGameResources([], catalog);
 
-        var store = new CombatMetricsStore
-        {
-            CurrentTarget = npcInstanceId
-        };
-        store.AppendNpcCode(npcInstanceId, npcCode);
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid()) { CurrentTarget = npcInstanceId };
+        sink.AppendNpcCode(npcInstanceId, npcCode);
 
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(sink);
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-200003.hex"), TestConnection);
 
         Assert.True(parsed);
-        Assert.True(store.TryGetNpcRuntimeState(npcInstanceId, out var state));
+        Assert.True(sink.TryGetNpcRuntimeState(npcInstanceId, out var state));
         Assert.Equal(npcCode, state.NpcCode);
         Assert.Equal((uint)sceneStateValue, state.Value2136);
     }
@@ -174,7 +181,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
             new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("combat/0538-mode48-link.hex"), TestConnection);
 
@@ -194,7 +201,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     public void Keeps_NonLink_0538_Periodic_Value_In_Combat_Metrics()
     {
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("combat/0538-dot.hex"), TestConnection);
 
@@ -207,7 +214,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     public void Scans_Embedded_3336_OwnNickname_Record_From_Larger_Packet()
     {
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
         var packet = Convert.FromHexString("1EAA3336D70F5FB17904070750657269676565EF0306000000012D000000");
 
         var parsed = processor.AppendAndProcess(packet, TestConnection);
@@ -248,7 +255,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     public void Parses_Compact_0438_Recovery_Frame_Without_Adding_Combat_Metrics()
     {
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("combat/0438-compact-other.hex"), TestConnection);
 
@@ -262,7 +269,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     public void Parses_Compact_Control_Frames_Without_Adding_Combat_Metrics(string path)
     {
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture(path), TestConnection);
 
@@ -276,7 +283,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         processor.AppendAndProcess(HexHelper.Parse("2B043892D5013604EB449A48C700040311005C02D84D01000000FC8901E8AA090101C1180100AC3E"), TestConnection);
         processor.AppendAndProcess(HexHelper.Parse("0E0638EB4478B4CB000500"), TestConnection);
@@ -343,7 +350,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         processor.AppendAndProcess(HexHelper.Parse("220438ADCB010400A507D1890E014402AFD5AD6901000000D88501FB1D0100"), TestConnection);
         processor.AppendAndProcess(HexHelper.Parse("18845601383B4236040000000D69F36D9D01000000"), TestConnection);
@@ -365,7 +372,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         processor.AppendAndProcess(HexHelper.Parse("280438AFDD013600A507368E0301F1021800033F636501000000D88501A1550101DF010100"), TestConnection);
         processor.AppendAndProcess(HexHelper.Parse("18845601383B423605000000D3EDFD6D9D01000000"), TestConnection);
@@ -387,7 +394,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         processor.AppendAndProcess(HexHelper.Parse("270438D0A10B3400EB3F368E03011003033F636501000000F07DD3470102950795070100"), TestConnection);
         processor.AppendAndProcess(HexHelper.Parse("210438D0A10B0400EB3FD1890E011503AFD5AD6901000000F07DAB350100"), TestConnection);
@@ -418,7 +425,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         CombatMetricsEngine.SetGameResources(BuildMultiHitSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        var processor = new PacketStreamProcessor(store);
+        var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         processor.AppendAndProcess(HexHelper.Parse("210438AFDD010400A507D1890E01C403AFD5AD6901000000F07DD6350100"), TestConnection);
         processor.AppendAndProcess(HexHelper.Parse("0C3538AFDD0100A507"), TestConnection);

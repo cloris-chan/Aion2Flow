@@ -12,6 +12,7 @@ using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Projection;
+using Cloris.Aion2Flow.Scene.Stores;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
 
@@ -80,10 +81,8 @@ public sealed class PacketLogReplayService
 
     private static PacketLogReplayResult ReplayFrameLines(IEnumerable<string> lines, string sourceName)
     {
-        var store = new CombatMetricsStore();
-        using var sinkHolder = SceneSinkFactory.CreateForReplay(store);
+        using var sinkHolder = SceneSinkFactory.CreateForReplay();
         IRuntimeObservationSink sink = sinkHolder.Sink;
-        var engine = new CombatMetricsEngine(store);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         long frameOrdinal = 0;
@@ -116,15 +115,15 @@ public sealed class PacketLogReplayService
             }
         }
 
-        store.FlushOrphanCompactHits();
+        sink.CompleteBatch(long.MaxValue);
         var ingestCounter = CaptureBaselineCounter(ingestStart);
 
         var snapshotStart = CaptureBaselineStart();
-        var snapshot = engine.CreateBattleSnapshot();
+        var snapshot = sinkHolder.Owner.CreateSnapshot();
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = BuildCombatantSummaries(store, snapshot);
+        var summaries = BuildCombatantSummaries(sinkHolder.Owner.Combat, sinkHolder.Owner.Entities, sinkHolder.Owner.Metadata, snapshot);
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
@@ -133,7 +132,8 @@ public sealed class PacketLogReplayService
             replayedLines,
             skippedLines,
             snapshot,
-            store.DeepClone(),
+            sinkHolder.Journal,
+            sinkHolder.Owner,
             summaries,
             replayedEventCounts,
             skippedEventCounts)
@@ -142,17 +142,13 @@ public sealed class PacketLogReplayService
                 ingestCounter,
                 snapshotCounter,
                 summaryCounter),
-            SceneJournal = sinkHolder.Journal,
-            SceneOwner = sinkHolder.Owner
         };
     }
 
     private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName)
     {
-        var store = new CombatMetricsStore();
-        using var sinkHolder = SceneSinkFactory.CreateForReplay(store);
+        using var sinkHolder = SceneSinkFactory.CreateForReplay();
         IRuntimeObservationSink sink = sinkHolder.Sink;
-        var engine = new CombatMetricsEngine(store);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         using var inboundProcessor = new PacketStreamProcessor(sink);
@@ -195,16 +191,15 @@ public sealed class PacketLogReplayService
             }
         }
 
-        store.FlushPendingOutcomeSidecars();
-        store.FlushOrphanCompactHits();
+        sink.CompleteBatch(long.MaxValue);
         var ingestCounter = CaptureBaselineCounter(ingestStart);
 
         var snapshotStart = CaptureBaselineStart();
-        var snapshot = engine.CreateBattleSnapshot();
+        var snapshot = sinkHolder.Owner.CreateSnapshot();
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = BuildCombatantSummaries(store, snapshot);
+        var summaries = BuildCombatantSummaries(sinkHolder.Owner.Combat, sinkHolder.Owner.Entities, sinkHolder.Owner.Metadata, snapshot);
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
@@ -213,7 +208,8 @@ public sealed class PacketLogReplayService
             replayedLines,
             skippedLines,
             snapshot,
-            store.DeepClone(),
+            sinkHolder.Journal,
+            sinkHolder.Owner,
             summaries,
             replayedEventCounts,
             skippedEventCounts)
@@ -222,8 +218,6 @@ public sealed class PacketLogReplayService
                 ingestCounter,
                 snapshotCounter,
                 summaryCounter),
-            SceneJournal = sinkHolder.Journal,
-            SceneOwner = sinkHolder.Owner
         };
     }
 
@@ -237,43 +231,41 @@ public sealed class PacketLogReplayService
         return new PacketLogReplayBaselineCounter(elapsed, Math.Max(0, allocatedBytes));
     }
 
-    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(
-        CombatMetricsStore store,
-        DamageMeterSnapshot snapshot)
+    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(CombatStore combat, EntityStore entities, MetadataStore metadata, DamageMeterSnapshot snapshot)
     {
         var summariesByCombatantId = new Dictionary<int, MutableCombatantSummary>();
 
-        foreach (var context in CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime))
+        foreach (var e in EnumerateSummaryEvents(combat, entities, snapshot))
         {
-            var packet = context.Packet;
-            var sourceId = context.SourceId;
-            var targetId = context.TargetId;
+            var sourceId = ResolveCombatantId(entities, e.SourceId);
+            var targetId = e.TargetId;
 
             if (sourceId > 0)
             {
-                EnsureSummary(summariesByCombatantId, sourceId, store, snapshot);
+                EnsureSummary(summariesByCombatantId, sourceId, entities, metadata);
             }
 
             if (targetId > 0)
             {
-                EnsureSummary(summariesByCombatantId, targetId, store, snapshot);
+                EnsureSummary(summariesByCombatantId, targetId, entities, metadata);
             }
 
-            if (ContributesDamage(packet))
+            var observation = e.Observation;
+            if (e.ContributesDamage)
             {
-                ApplyDamageSummary(summariesByCombatantId, sourceId, targetId, packet);
+                ApplyDamageSummary(summariesByCombatantId, sourceId, targetId, in observation);
                 continue;
             }
 
-            if (ContributesHealing(packet))
+            if (e.ContributesHealing)
             {
-                ApplyHealingSummary(summariesByCombatantId, sourceId, targetId, packet);
+                ApplyHealingSummary(summariesByCombatantId, sourceId, targetId, in observation);
                 continue;
             }
 
-            if (ContributesShield(packet))
+            if (e.ContributesShieldGrant || e.ContributesShieldAbsorbed)
             {
-                ApplyShieldSummary(summariesByCombatantId, sourceId, targetId, packet);
+                ApplyShieldSummary(summariesByCombatantId, sourceId, targetId, in observation);
             }
         }
 
@@ -283,11 +275,46 @@ public sealed class PacketLogReplayService
             .ToList();
     }
 
+    private static IEnumerable<CombatEventRecord> EnumerateSummaryEvents(CombatStore combat, EntityStore entities, DamageMeterSnapshot snapshot)
+    {
+        if (snapshot.BattleStartTime <= 0 || snapshot.BattleEndTime < snapshot.BattleStartTime)
+            yield break;
+
+        var relevant = new HashSet<int>();
+        foreach (var e in combat.Events)
+        {
+            if (!IsWithinBattleWindow(e, snapshot.BattleStartTime, snapshot.BattleEndTime) || IsSummonDamageTarget(entities, e))
+                continue;
+
+            var sourceId = ResolveCombatantId(entities, e.SourceId);
+            relevant.Add(sourceId);
+            if (e.TargetId > 0)
+                relevant.Add(e.TargetId);
+
+            yield return e;
+        }
+
+        if (relevant.Count == 0)
+            yield break;
+
+        foreach (var e in combat.Events)
+        {
+            if (IsWithinBattleWindow(e, snapshot.BattleStartTime, snapshot.BattleEndTime) || IsSummonDamageTarget(entities, e))
+                continue;
+
+            var sourceId = ResolveCombatantId(entities, e.SourceId);
+            if (!IsRelevantRecoveryEvent(e, sourceId, e.TargetId, relevant))
+                continue;
+
+            yield return e;
+        }
+    }
+
     private static MutableCombatantSummary EnsureSummary(
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int combatantId,
-        CombatMetricsStore store,
-        DamageMeterSnapshot snapshot)
+        EntityStore entities,
+        MetadataStore metadata)
     {
         if (summariesByCombatantId.TryGetValue(combatantId, out var existing))
         {
@@ -296,7 +323,7 @@ public sealed class PacketLogReplayService
 
         var created = new MutableCombatantSummary(
             combatantId,
-            CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, combatantId));
+            ResolveDisplayName(entities, metadata, combatantId));
         summariesByCombatantId[combatantId] = created;
         return created;
     }
@@ -305,17 +332,17 @@ public sealed class PacketLogReplayService
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int sourceId,
         int targetId,
-        ParsedCombatPacket packet)
+        in CombatObservation observation)
     {
-        var hitContribution = Math.Max(0, packet.HitContribution);
-        var attemptContribution = Math.Max(hitContribution, Math.Max(0, packet.AttemptContribution));
-        var criticalContribution = packet.IsCritical ? hitContribution : 0;
-        var evadeContribution = (packet.Modifiers & DamageModifiers.Evade) != 0 ? attemptContribution : 0;
-        var invincibleContribution = (packet.Modifiers & DamageModifiers.Invincible) != 0 ? attemptContribution : 0;
+        var hitContribution = Math.Max(0, observation.HitCount);
+        var attemptContribution = Math.Max(hitContribution, Math.Max(0, observation.AttemptCount));
+        var criticalContribution = (observation.Modifiers & DamageModifiers.Critical) != 0 ? hitContribution : 0;
+        var evadeContribution = (observation.Modifiers & DamageModifiers.Evade) != 0 ? attemptContribution : 0;
+        var invincibleContribution = (observation.Modifiers & DamageModifiers.Invincible) != 0 ? attemptContribution : 0;
 
         if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
-            source.OutgoingDamage += packet.Damage;
+            source.OutgoingDamage += observation.Damage;
             source.OutgoingHits += hitContribution;
             source.OutgoingAttempts += attemptContribution;
             source.OutgoingCriticals += criticalContribution;
@@ -325,7 +352,7 @@ public sealed class PacketLogReplayService
 
         if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
-            target.IncomingDamage += packet.Damage;
+            target.IncomingDamage += observation.Damage;
             target.IncomingHits += hitContribution;
             target.IncomingAttempts += attemptContribution;
             target.IncomingCriticals += criticalContribution;
@@ -338,19 +365,19 @@ public sealed class PacketLogReplayService
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int sourceId,
         int targetId,
-        ParsedCombatPacket packet)
+        in CombatObservation observation)
     {
         if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
-            source.OutgoingHealing += packet.Damage;
+            source.OutgoingHealing += observation.Damage;
         }
 
         if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
-            target.IncomingHealing += packet.Damage;
-            if (packet.EffectTag == PacketEffectTag.RegenerationHealing)
+            target.IncomingHealing += observation.Damage;
+            if (observation.EffectTag == PacketEffectTag.RegenerationHealing)
             {
-                target.RegenerationHealing += packet.Damage;
+                target.RegenerationHealing += observation.Damage;
             }
         }
     }
@@ -359,71 +386,96 @@ public sealed class PacketLogReplayService
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int sourceId,
         int targetId,
-        ParsedCombatPacket packet)
+        in CombatObservation observation)
     {
-        if (packet.EffectTag == PacketEffectTag.ShieldAbsorbed)
+        if (observation.EffectTag == PacketEffectTag.ShieldAbsorbed)
         {
-            if (packet.Damage <= 0)
+            if (observation.Damage <= 0)
             {
                 return;
             }
 
             if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var absorbSource))
             {
-                absorbSource.OutgoingShieldAbsorbed += packet.Damage;
+                absorbSource.OutgoingShieldAbsorbed += observation.Damage;
             }
 
             if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var absorbTarget))
             {
-                absorbTarget.IncomingShieldAbsorbed += packet.Damage;
+                absorbTarget.IncomingShieldAbsorbed += observation.Damage;
             }
             return;
         }
 
         if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
-            source.OutgoingShield += packet.Damage;
+            source.OutgoingShield += observation.Damage;
         }
 
         if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
-            target.IncomingShield += packet.Damage;
+            target.IncomingShield += observation.Damage;
         }
     }
 
-    private static bool ContributesDamage(ParsedCombatPacket packet)
+    private static int ResolveCombatantId(EntityStore entities, int entityId)
     {
-        if (packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
-            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
-        {
+        if (entityId <= 0)
+            return entityId;
+
+        return entities.TryGet(entityId, out var entity) && entity.OwnerEntityId is int ownerId ? ownerId : entityId;
+    }
+
+    private static bool IsWithinBattleWindow(CombatEventRecord e, long start, long end) =>
+        e.ObservedAtMilliseconds >= start && e.ObservedAtMilliseconds <= end;
+
+    private static bool IsSummonDamageTarget(EntityStore entities, CombatEventRecord e)
+    {
+        if (e.TargetId <= 0 || !e.ContributesDamage)
+            return false;
+
+        if (IsKnownSummon(entities, e.TargetId))
             return true;
+
+        return ResolveCombatantId(entities, e.SourceId) == ResolveCombatantId(entities, e.TargetId);
+    }
+
+    private static bool IsKnownSummon(EntityStore entities, int entityId) =>
+        entities.TryGet(entityId, out var entity) && (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon);
+
+    private static bool IsRelevantRecoveryEvent(CombatEventRecord e, int sourceId, int targetId, HashSet<int> relevant)
+    {
+        if (e.Observation.Damage <= 0 || (!relevant.Contains(sourceId) && !relevant.Contains(targetId)))
+            return false;
+
+        return e.Observation.EventKind is CombatEventKind.Healing or CombatEventKind.Support
+               || e.Observation.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing or CombatValueKind.Shield or CombatValueKind.Support;
+    }
+
+    private static string ResolveDisplayName(EntityStore entities, MetadataStore metadata, int entityId)
+    {
+        if (metadata.TryGetDisplayName(entityId, out var displayName) && !string.IsNullOrWhiteSpace(displayName))
+            return displayName;
+
+        if (entities.TryGet(entityId, out var entity))
+        {
+            if (!string.IsNullOrWhiteSpace(entity.Nickname))
+                return entity.Nickname;
+
+            if (entity.NpcCode is int npcCode)
+            {
+                if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
+                    return catalogEntry.Name;
+
+                if (metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName))
+                    return npcName;
+
+                return $"NPC-{npcCode}";
+            }
         }
 
-        return packet.ValueKind switch
-        {
-            CombatValueKind.Damage => packet.Damage > 0,
-            CombatValueKind.PeriodicDamage => packet.Damage > 0,
-            CombatValueKind.DrainDamage => packet.Damage > 0,
-            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
-            _ => false
-        };
+        return entityId.ToString(CultureInfo.InvariantCulture);
     }
-
-    private static bool ContributesHealing(ParsedCombatPacket packet)
-    {
-        return packet.ValueKind switch
-        {
-            CombatValueKind.Healing => packet.Damage > 0,
-            CombatValueKind.PeriodicHealing => packet.Damage > 0,
-            CombatValueKind.DrainHealing => packet.Damage > 0,
-            CombatValueKind.Shield => false,
-            _ => packet.EventKind == CombatEventKind.Healing && packet.Damage > 0
-        };
-    }
-
-    private static bool ContributesShield(ParsedCombatPacket packet)
-        => packet.ValueKind == CombatValueKind.Shield && packet.Damage > 0;
 
     private static bool TryReplayEntry(IRuntimeObservationSink store, FrameReplayEntry entry, long frameOrdinal, long batchOrdinal)
     {
@@ -1592,14 +1644,13 @@ public sealed record PacketLogReplayResult(
     int ReplayedLines,
     int SkippedLines,
     DamageMeterSnapshot Snapshot,
-    CombatMetricsStore Store,
+    ObservedEventJournal SceneJournal,
+    SceneReadModelOwner SceneOwner,
     IReadOnlyList<PacketLogCombatantSummary> Combatants,
     IReadOnlyDictionary<string, int> ReplayedEventCounts,
     IReadOnlyDictionary<string, int> SkippedEventCounts)
 {
     public PacketLogReplayBaselineCounters BaselineCounters { get; init; } = PacketLogReplayBaselineCounters.Empty;
-    public ObservedEventJournal? SceneJournal { get; init; }
-    public SceneReadModelOwner? SceneOwner { get; init; }
 }
 
 public sealed record PacketLogReplayBaselineCounters(

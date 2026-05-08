@@ -3,6 +3,7 @@ using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Tests.PacketCapture;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
@@ -16,7 +17,7 @@ public sealed class CombatMetricsEngineLiveClassInferenceTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        using var processor = new PacketStreamProcessor(store);
+        using var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         const int combatantId = 2906;
         CharacterClass? firstResolvedClass = null;

@@ -2,7 +2,6 @@ using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
 using Cloris.Aion2Flow.Scene.Observation;
@@ -273,12 +272,9 @@ public class CompactOutcomeCanonicalizerTests
     public void ScenePath_Replay_IncomingCompactEvades_MatchesLegacyPrimary(string fileName)
     {
         CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
-        SceneDualWrite.Enabled = false;
 
-        var combat = Apply(replay.SceneJournal!);
+        var combat = Apply(replay.SceneJournal);
         var legacyPrimary = replay.Combatants
             .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
             .ThenByDescending(static summary => summary.IncomingDamage)

@@ -1,8 +1,8 @@
 using System.Buffers;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using Cloris.Aion2Flow.Scene.Compatibility;
+using Cloris.Aion2Flow.Scene;
+using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.PacketCapture;
@@ -12,10 +12,10 @@ public sealed class PacketCaptureDispatcherTests
     private static readonly TcpConnection InboundConnection = new(0x0100007f, 0x0100007f, 57080, 49820);
 
     [Fact]
-    public void Continues_To_Parse_Inbound_Payload_Into_Combat_Metrics()
+    public void Continues_To_Parse_Inbound_Payload_Into_Scene_Journal()
     {
-        var store = new CombatMetricsStore();
-        var dispatcher = new PacketCaptureDispatcher(store);
+        var scene = new SceneLiveReadModel();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
         var packet = CreatePacket(InboundConnection, HexHelper.FromFixture("combat/0538-dot.hex"), sequenceNumber: 200);
 
         try
@@ -23,8 +23,8 @@ public sealed class PacketCaptureDispatcherTests
             var parsed = dispatcher.DispatchCapturedPacket(packet);
 
             Assert.True(parsed);
-            Assert.True(store.CombatPacketsByTarget.TryGetValue(17640, out var packets));
-            Assert.Single(packets);
+            scene.Owner.Refresh();
+            Assert.Contains(scene.Owner.Combat.Events, static e => e.TargetId == 17640);
         }
         finally
         {
@@ -36,12 +36,12 @@ public sealed class PacketCaptureDispatcherTests
     [Fact]
     public void Uses_Runtime_Sink_Factory_For_New_Stream()
     {
-        var store = new CombatMetricsStore();
+        var scene = new SceneLiveReadModel();
         var factoryCalls = 0;
         var dispatcher = new PacketCaptureDispatcher(() =>
         {
             factoryCalls++;
-            return new LegacyRuntimeObservationSink(store);
+            return scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal));
         });
         var packet = CreatePacket(InboundConnection, HexHelper.FromFixture("combat/0538-dot.hex"), sequenceNumber: 200);
 
@@ -51,8 +51,8 @@ public sealed class PacketCaptureDispatcherTests
 
             Assert.True(parsed);
             Assert.Equal(1, factoryCalls);
-            Assert.True(store.CombatPacketsByTarget.TryGetValue(17640, out var packets));
-            Assert.Single(packets);
+            scene.Owner.Refresh();
+            Assert.Contains(scene.Owner.Combat.Events, static e => e.TargetId == 17640);
         }
         finally
         {

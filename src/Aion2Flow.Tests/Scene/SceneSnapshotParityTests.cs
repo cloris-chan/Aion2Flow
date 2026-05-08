@@ -17,7 +17,7 @@ public sealed class SceneSnapshotParityTests
         foreach (var fileName in VendoredStreamLogNames())
         {
             var replay = SceneReplayFixture.Replay(fileName);
-            var scene = replay.SceneOwner!.CreateSnapshot();
+            var scene = replay.SceneOwner.CreateSnapshot();
             var diffs = BuildDiffs(replay.Snapshot, scene);
 
             foreach (var diff in diffs)

@@ -11,6 +11,7 @@ using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Projection;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Tests.PacketCapture;
 using Cloris.Aion2Flow.Tests.Protocol;
 using Cloris.Aion2Flow.ViewModels;
 
@@ -1066,7 +1067,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
                 $"skill={row.SkillCode}|name={row.SkillName}|total={row.TotalAmount}|hits={row.Hits}|attempts={row.Attempts}|evades={row.Evades}|invincible={row.Invincible}")
             .ToArray();
 
-        var sourceIds = replay.Store.SummonOwnerByInstance
+        var sourceIds = SceneReplayTestView.SummonOwnerByInstance(replay)
             .Where(static pair => pair.Value == playerId)
             .Select(static pair => pair.Key)
             .Append(playerId)
@@ -1077,7 +1078,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var relevantPackets = new List<string>();
         foreach (var sourceId in sourceIds)
         {
-            if (!replay.Store.CombatPacketsBySource.TryGetValue(sourceId, out var packets))
+            if (!SceneReplayTestView.BySource(replay).TryGetValue(sourceId, out var packets))
             {
                 continue;
             }
@@ -1090,7 +1091,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
                 }
 
                 relevantPackets.Add(
-                    $"ts={packet.Timestamp}|rawSource={packet.SourceId}|resolvedSource={CombatMetricsEngine.ResolveCombatantId(replay.Store, packet.SourceId)}|target={packet.TargetId}|skillRaw={packet.OriginalSkillCode}|skill={packet.SkillCode}|damage={packet.Damage}|hit={packet.HitContribution}|attempt={packet.AttemptContribution}|event={packet.EventKind}|value={packet.ValueKind}|mods={packet.Modifiers}|effect={DescribePacketEffect(packet)}|detailDamage={ContributesDamageForDetail(packet)}");
+                    $"ts={packet.Timestamp}|rawSource={packet.SourceId}|resolvedSource={SceneReplayTestView.ResolveCombatantId(replay, packet.SourceId)}|target={packet.TargetId}|skillRaw={packet.OriginalSkillCode}|skill={packet.SkillCode}|damage={packet.Damage}|hit={packet.HitContribution}|attempt={packet.AttemptContribution}|event={packet.EventKind}|value={packet.ValueKind}|mods={packet.Modifiers}|effect={DescribeScenePacketEffect(packet)}|detailDamage={ContributesDamageForDetail(packet)}");
             }
         }
 
@@ -1120,7 +1121,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var store = new CombatMetricsStore();
-        using var processor = new PacketStreamProcessor(store);
+        using var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
 
         foreach (var entry in ReadStreamLogEntries("aion2flow.stream.20260412103519.log"))
         {
@@ -1281,6 +1282,25 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         };
     }
 
+    private static bool ContributesDamageForDetail(SceneReplayPacket packet)
+    {
+        if (packet.EventKind == CombatEventKind.Damage &&
+            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
+            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
+        {
+            return true;
+        }
+
+        return packet.ValueKind switch
+        {
+            CombatValueKind.Damage => packet.Damage > 0,
+            CombatValueKind.PeriodicDamage => packet.Damage > 0,
+            CombatValueKind.DrainDamage => packet.Damage > 0,
+            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
+            _ => false
+        };
+    }
+
     private readonly record struct StreamLogEntry(long TimestampMilliseconds, bool IsInbound, TcpConnection Connection, byte[] Payload);
 
     private static string DescribePacketEffect(ParsedCombatPacket packet)
@@ -1289,6 +1309,16 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         {
             return $"{packet.PeriodicRelation}:{packet.PeriodicMode}";
         }
+
+        return packet.EffectTag == PacketEffectTag.None
+            ? "none"
+            : packet.EffectTag.ToString();
+    }
+
+    private static string DescribeScenePacketEffect(SceneReplayPacket packet)
+    {
+        if (packet.PeriodicRelation != PeriodicEffectRelation.None || packet.PeriodicMode != 0)
+            return $"{packet.PeriodicRelation}:{packet.PeriodicMode}";
 
         return packet.EffectTag == PacketEffectTag.None
             ? "none"
@@ -1427,22 +1457,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     private static ArchivedBattleRecord? CreateSceneArchiveRecord(PacketLogReplayResult replay)
     {
         var service = new BattleArchiveService();
-        var payload = SceneArchivePayload.Create(replay.SceneOwner!, replay.SceneOwner!.CreateSnapshot());
+        var payload = SceneArchivePayload.Create(replay.SceneOwner, replay.SceneOwner.CreateSnapshot());
         return service.Archive(payload, "replay", isAutomatic: false);
     }
 
     private static PacketLogReplayResult ReplayWithScene(string path)
     {
-        var previous = SceneDualWrite.Enabled;
-        SceneDualWrite.Enabled = true;
-        try
-        {
-            return PacketLogReplayService.Replay(path);
-        }
-        finally
-        {
-            SceneDualWrite.Enabled = previous;
-        }
+        return PacketLogReplayService.Replay(path);
     }
 
     private static CombatDetailDelta CreateStoreDetailDelta(DamageMeterSnapshot snapshot, CombatMetricsStore store, int combatantId)

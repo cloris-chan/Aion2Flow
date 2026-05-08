@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
 using Cloris.Aion2Flow.Scene.Observation;
@@ -372,17 +371,14 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void CompositeSink_ForwardsStageDestinationMapToBoth()
+    public void JournalingSink_RecordsStageDestinationMap()
     {
-        var legacy = new FakeRuntimeSink();
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
-        var journaling = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var composite = new CompositeRuntimeObservationSink(legacy, journaling);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        composite.StageDestinationMap(910035);
+        sink.StageDestinationMap(910035);
 
-        Assert.Equal(910035u, legacy.LastStageDestinationMap);
         Assert.Equal(1, journal.Count);
         var entry = journal.Read(0);
         Assert.Equal(ObservedEventDomain.Scene, entry.Domain);
@@ -390,65 +386,56 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void CompositeSink_ForwardsMarkSceneArrivalToBoth()
+    public void JournalingSink_RecordsMarkSceneArrival()
     {
-        var legacy = new FakeRuntimeSink();
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
-        var journaling = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var composite = new CompositeRuntimeObservationSink(legacy, journaling);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        composite.MarkSceneArrival();
+        sink.MarkSceneArrival();
 
-        Assert.True(legacy.SceneArrivalCalled);
         Assert.Equal(1, journal.Count);
         Assert.Equal(ObservedEventDomain.Scene, journal.Read(0).Domain);
         Assert.Equal("scene-arrival", journal.Read(0).Scene!.Value.DiagnosticKey);
     }
 
     [Fact]
-    public void CompositeSink_ForwardsAppendSummonToBoth()
+    public void JournalingSink_RecordsAppendSummonAndState()
     {
-        var legacy = new FakeRuntimeSink();
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
-        var journaling = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var composite = new CompositeRuntimeObservationSink(legacy, journaling);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        composite.AppendSummon(100, 200);
+        sink.AppendSummon(100, 200);
 
-        Assert.Equal((100, 200), legacy.LastAppendSummon);
+        Assert.True(sink.HasSummonOwner(200));
         Assert.Equal(1, journal.Count);
         Assert.Equal(ObservedEventDomain.State, journal.Read(0).Domain);
     }
 
     [Fact]
-    public void CompositeSink_LegacyIsQueryAuthority()
+    public void JournalingSink_TracksKnownEntities()
     {
-        var legacy = new FakeRuntimeSink();
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
-        var journaling = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var composite = new CompositeRuntimeObservationSink(legacy, journaling);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        legacy.KnownEntities.Add(42);
-        Assert.True(composite.IsKnownEntity(42));
-        Assert.False(composite.IsKnownEntity(99));
+        sink.AppendNpcCode(42, 2000002);
+        Assert.True(sink.IsKnownEntity(42));
+        Assert.False(sink.IsKnownEntity(99));
     }
 
     [Fact]
-    public void CompositeSink_RebindLifecycle_SyncsJournalEntityIds()
+    public void JournalingSink_RebindLifecycle_SyncsJournalEntityIds()
     {
-        var legacy = new FakeRuntimeSink();
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
-        var journaling = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var composite = new CompositeRuntimeObservationSink(legacy, journaling);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var reboundId = composite.RebindInstanceLifecycle(3518);
+        var reboundId = sink.RebindInstanceLifecycle(3518);
 
-        composite.AppendNpcCode(3518, 2000002);
-        composite.AppendCombatPacket(new ParsedCombatPacket
+        sink.AppendNpcCode(3518, 2000002);
+        sink.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = 100,
             TargetId = 3518,
@@ -459,65 +446,10 @@ public class SceneTimelineContractTests
             Timestamp = 1_000
         });
 
-        Assert.Equal(reboundId, journaling.ResolveLifecycleId(3518));
+        Assert.Equal(reboundId, sink.ResolveLifecycleId(3518));
         Assert.Equal(reboundId, journal.Read(0).SourceEntityId);
         Assert.Equal(reboundId, journal.Read(0).State!.Value.EntityId);
         Assert.Equal(reboundId, journal.Read(1).TargetEntityId);
-        Assert.Equal(3518, legacy.LastAppendNpcCode.InstanceId);
-    }
-
-    private sealed class FakeRuntimeSink : IRuntimeObservationSink
-    {
-        private readonly Dictionary<int, int> _remap = [];
-        private int _nextSyntheticLifecycleId = int.MaxValue;
-
-        public int CurrentTarget { get; set; }
-        public HashSet<int> KnownEntities { get; } = [];
-        public uint LastStageDestinationMap;
-        public bool SceneArrivalCalled;
-        public (int OwnerId, int SummonId) LastAppendSummon;
-        public (int InstanceId, int NpcCode) LastAppendNpcCode;
-
-        public int ResolveLifecycleId(int rawInstanceId) => rawInstanceId > 0 && _remap.TryGetValue(rawInstanceId, out var mapped) ? mapped : rawInstanceId;
-        public int RebindInstanceLifecycle(int rawInstanceId)
-        {
-            if (rawInstanceId <= 0)
-                return rawInstanceId;
-
-            var mapped = Interlocked.Decrement(ref _nextSyntheticLifecycleId);
-            _remap[rawInstanceId] = mapped;
-            return mapped;
-        }
-        public bool IsKnownEntity(int id) => KnownEntities.Contains(id);
-        public bool HasSummonOwner(int instanceId) => false;
-        public bool TryGetNpcRuntimeState(int instanceId, out RuntimeNpcStateSnapshot state) { state = default; return false; }
-        public int ResolveNpcObservationSource() => 0;
-        public void RememberNpcObservationSource(int instanceId) { }
-        public void StageDestinationMap(uint mapId) => LastStageDestinationMap = mapId;
-        public void StageDestinationMapInstance(uint instanceId) { }
-        public void MarkSceneArrival() => SceneArrivalCalled = true;
-        public void AppendCombatPacket(ParsedCombatPacket packet) { }
-        public void CompleteBatch(long batchOrdinal) { }
-        public void RegisterCompactValue0438(int t, int s, int sk, int m, int l, int tp, long ts, long fo, long bo) { }
-        public void RegisterCompactValue0438(int t, int s, int sk, int m, int l, int tp, int v, long ts, long fo, long bo) { }
-        public void RegisterCompactControl0238(int s, int sk, int m, long bo) { }
-        public void RegisterCompactControl0638(int s, int sk, int m, long ts, long fo, long bo) { }
-        public void RegisterPeriodicLink0538(int t, int s, int li, int si, int tr, long ts, long fo, long bo) { }
-        public void RegisterObservation2A38(int s, int mo, int gc, int si, ushort hv, uint bc, long ts, long fo, long bo) { }
-        public void RegisterObservation2C38(int ii, int mo, int si, int rc, int ts, int tsk, long ts2, long fo, long bo) { }
-        public void AppendNickname(int uid, string nickname, int? originServerId = null) { }
-        public void AppendNpcCode(int instanceId, int npcCode) => LastAppendNpcCode = (instanceId, npcCode);
-        public void AppendNpcName(int npcCode, string name) { }
-        public void AppendNpcKind(int instanceId, NpcKind kind) { }
-        public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds) { }
-        public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds) { }
-        public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds) { }
-        public void ToggleNpcBattle(int instanceId) { }
-        public void AppendNpc2136State(int instanceId, uint sequence, uint value0) { }
-        public void AppendNpc0140Value(int instanceId, uint value0) { }
-        public void AppendNpc0240Value(int instanceId, uint value0) { }
-        public void AppendNpc4636State(int instanceId, byte state0, byte state1) { }
-        public void AppendSummon(int ownerId, int summonInstanceId) => LastAppendSummon = (ownerId, summonInstanceId);
     }
 
     [Fact]

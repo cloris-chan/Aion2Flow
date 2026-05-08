@@ -295,18 +295,13 @@ public sealed class CombatMetricsEngineNpcCatalogTests
         const int entityId = 17952;
         const int npcCode = 2980159;
 
-        Assert.True(result.Store.TryGetNpcRuntimeState(entityId, out var state),
+        Assert.True(SceneReplayTestView.TryGetNpcRuntimeState(result, entityId, out var state),
             $"Replay store must have NPC state for entity {entityId}");
         Assert.Equal(npcCode, state.NpcCode);
 
-        var displayName = CombatMetricsEngine.ResolveCombatantDisplayName(result.Store, result.Snapshot, entityId);
+        var displayName = SceneReplayTestView.ResolveDisplayName(result, entityId);
         Assert.NotEqual(entityId.ToString(), displayName);
         Assert.Equal(catalog[npcCode].Name, displayName);
-
-        var archiveSlice = result.Store.CreateArchiveSlice(result.Snapshot);
-        var archiveName = CombatMetricsEngine.ResolveCombatantDisplayName(archiveSlice, result.Snapshot, entityId);
-        Assert.NotEqual(entityId.ToString(), archiveName);
-        Assert.Equal(catalog[npcCode].Name, archiveName);
     }
 
     [Fact]
@@ -331,7 +326,7 @@ public sealed class CombatMetricsEngineNpcCatalogTests
         {
             var result = PacketLogReplayService.Replay(path);
 
-            Assert.True(result.Store.TryGetNpcRuntimeState(entityId, out var state),
+            Assert.True(SceneReplayTestView.TryGetNpcRuntimeState(result, entityId, out var state),
                 $"Replay store missing NPC state for entity {entityId}");
             Assert.Equal(npcCode, state.NpcCode);
             Assert.Equal((uint)sceneStateValue, state.Value2136);
@@ -365,12 +360,11 @@ public sealed class CombatMetricsEngineNpcCatalogTests
             Assert.True(result.ReplayedEventCounts.ContainsKey("npc-spawn"), "npc-spawn not replayed");
             Assert.True(result.ReplayedEventCounts.ContainsKey("damage"), "damage not replayed");
 
-            Assert.True(result.Store.TryGetNpcRuntimeState(entityId, out var state),
+            Assert.True(SceneReplayTestView.TryGetNpcRuntimeState(result, entityId, out var state),
                 $"Replay store missing NPC state for entity {entityId}");
             Assert.Equal(npcCode, state.NpcCode);
 
-            var displayName = CombatMetricsEngine.ResolveCombatantDisplayName(
-                result.Store, result.Snapshot, entityId);
+            var displayName = SceneReplayTestView.ResolveDisplayName(result, entityId);
             Assert.NotEqual(entityId.ToString(), displayName);
             Assert.Equal(catalog[npcCode].Name, displayName);
 

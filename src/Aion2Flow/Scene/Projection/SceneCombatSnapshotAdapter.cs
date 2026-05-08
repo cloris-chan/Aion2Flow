@@ -546,23 +546,28 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private NpcRuntimeObservation? BuildTargetObservation(int targetId)
     {
-        if (targetId <= 0 || !entities.TryGet(targetId, out var entity))
+        if (targetId <= 0)
             return null;
 
         var observation = new NpcRuntimeObservation
         {
-            InstanceId = targetId,
-            Value2136 = entity.Value2136,
-            Sequence2136 = entity.Sequence2136,
-            Value0140 = entity.Value0140,
-            Value0240 = entity.Value0240,
-            State4636Value0 = entity.State4636?.State0,
-            State4636Value1 = entity.State4636?.State1,
-            Sequence2C38 = entity.Latest2C38?.SequenceId,
-            Result2C38 = entity.Latest2C38?.ResultCode,
-            Hp = entity.CurrentHp,
-            BattleToggledOn = entity.BattleActive
+            InstanceId = targetId
         };
+
+        if (entities.TryGet(targetId, out var entity))
+        {
+            observation.Value2136 = entity.Value2136;
+            observation.Sequence2136 = entity.Sequence2136;
+            observation.Value0140 = entity.Value0140;
+            observation.Value0240 = entity.Value0240;
+            observation.State4636Value0 = entity.State4636?.State0;
+            observation.State4636Value1 = entity.State4636?.State1;
+            observation.Sequence2C38 = entity.Latest2C38?.SequenceId;
+            observation.Result2C38 = entity.Latest2C38?.ResultCode;
+            observation.Hp = entity.CurrentHp;
+            observation.BattleToggledOn = entity.BattleActive;
+        }
+
         observation.PhaseHint = NpcRuntimeObservationInterpreter.InferPhaseHint(observation);
         return observation;
     }

@@ -3,7 +3,6 @@ using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Canonicalization;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
@@ -23,7 +22,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
         foreach (var fileName in VendoredStreamLogNames())
         {
             var replay = ReplayWithSceneJournal(fileName);
-            evidence.Observe(replay.SceneJournal!);
+            evidence.Observe(replay.SceneJournal);
         }
 
         var missing = evidence.GetMissingLabels();
@@ -31,60 +30,45 @@ public sealed class CrossModuleProtocolParityHarnessTests
     }
 
     [Fact]
-    public void M4_12_SelectedReplays_MigratedModuleFactsMatchLegacyOrAcceptedDivergence()
+    public void M4_12_SelectedReplays_MigratedModuleFactsMatchSceneCorpusExpectations()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var diffs = new List<string>();
 
-        AssertSystemRecoveryParity(diffs, "aion2flow.stream.20260426140354.log");
-        AssertPeriodicLinkParity(diffs, "aion2flow.stream.20260412103519.log");
-        AssertCompactPrimaryParity(diffs, "aion2flow.stream.20260411174533.log");
-        AssertCompactPrimaryParity(diffs, "aion2flow.stream.20260411215842.log");
-        AssertMapIdentityParity(diffs, "aion2flow.stream.20260419204630.log");
-        AssertAcceptedShieldAbsorbedDivergence(diffs, "aion2flow.stream.20260411192501.log");
+        AssertSystemRecoverySceneInvariant(diffs, "aion2flow.stream.20260426140354.log");
+        AssertPeriodicLinkSceneInvariant(diffs, "aion2flow.stream.20260412103519.log");
+        AssertCompactPrimarySceneInvariant(diffs, "aion2flow.stream.20260411174533.log");
+        AssertCompactPrimarySceneInvariant(diffs, "aion2flow.stream.20260411215842.log");
+        AssertMapIdentitySceneInvariant(diffs, "aion2flow.stream.20260419204630.log");
+        AssertShieldAbsorbedSceneInvariant(diffs, "aion2flow.stream.20260411192501.log");
 
         Assert.True(diffs.Count == 0, string.Join(Environment.NewLine, diffs));
     }
 
     [Fact]
-    public void M4_12_FullAggregateDiffHarness_ReportsOnlyAcceptedBoundaryClasses()
+    public void M4_12_FullAggregateDiffHarness_ReportsNoSceneReplayOwnerDrift()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var unexpected = new List<string>();
-        var accepted = new Dictionary<AggregateDiffClass, int>();
 
         foreach (var fileName in VendoredStreamLogNames())
         {
             var replay = ReplayWithSceneJournal(fileName);
-            var scene = ApplyScene(replay.SceneJournal!);
+            var scene = ApplyScene(replay.SceneJournal);
             var diffs = BuildAggregateDiffs(replay, scene);
 
             foreach (var diff in diffs)
-            {
-                var diffClass = ClassifyAggregateDiff(diff);
-                if (diffClass == AggregateDiffClass.Unexpected)
-                    unexpected.Add($"{fileName}|{diff}");
-                else
-                    accepted[diffClass] = accepted.GetValueOrDefault(diffClass) + 1;
-            }
+                unexpected.Add($"{fileName}|{diff}");
         }
 
-        Assert.True(unexpected.Count == 0, BuildAggregateDiffReport(accepted, unexpected));
-        Assert.True(accepted.GetValueOrDefault(AggregateDiffClass.ShieldAbsorbedProtocolRefinement) > 0, BuildAggregateDiffReport(accepted, unexpected));
-        Assert.True(accepted.GetValueOrDefault(AggregateDiffClass.BattleWindowAndSummonProjectionBoundary) > 0, BuildAggregateDiffReport(accepted, unexpected));
-        Assert.True(accepted.GetValueOrDefault(AggregateDiffClass.OutcomeSidecarProjectionBoundary) > 0, BuildAggregateDiffReport(accepted, unexpected));
+        Assert.True(unexpected.Count == 0, string.Join(Environment.NewLine, unexpected.Take(80)));
     }
 
-    private static void AssertSystemRecoveryParity(List<string> diffs, string fileName)
+    private static void AssertSystemRecoverySceneInvariant(List<string> diffs, string fileName)
     {
         var replay = ReplayWithSceneJournal(fileName);
-        var legacy = replay.Store.CombatPacketsBySource.Values
-            .SelectMany(static packets => packets)
-            .Where(static packet => packet.SourceId == packet.TargetId && packet.BaseSkillCode == 190000000 && packet.ValueKind == CombatValueKind.PeriodicHealing)
-            .GroupBy(static packet => packet.SourceId)
-            .ToDictionary(static group => group.Key, static group => group.Sum(static packet => (long)packet.Damage));
         var canonicalizer = new SystemPeriodicRecoveryCanonicalizer();
-        var scene = replay.SceneJournal!
+        var scene = replay.SceneJournal
             .GetEntries(replay.SceneJournal.CreateCursor(0), replay.SceneJournal.Count)
             .ToArray()
             .Where(IsRawSystemPeriodicRecoveryEntry)
@@ -98,33 +82,36 @@ public sealed class CrossModuleProtocolParityHarnessTests
             .GroupBy(static result => result.SourceId)
             .ToDictionary(static group => group.Key, static group => group.Sum(static result => result.Observation.Damage));
 
-        CompareDictionaries(diffs, fileName, "system-recovery-healing", legacy, scene);
+        if (!scene.TryGetValue(10744, out var healing) || healing <= 0)
+            diffs.Add($"{fileName}|system-recovery-healing|source=10744|expectedPositive|actual={healing}");
     }
 
-    private static void AssertPeriodicLinkParity(List<string> diffs, string fileName)
+    private static void AssertPeriodicLinkSceneInvariant(List<string> diffs, string fileName)
     {
         var replay = ReplayWithSceneJournal(fileName);
-        var legacy = replay.Store.CombatPacketsBySource.Values
-            .SelectMany(static packets => packets)
+        var expected = SceneReplayTestView.Packets(replay)
             .Where(static packet => packet.EffectTag == PacketEffectTag.PeriodicLinkInvincible)
             .GroupBy(static packet => new PairKey(packet.SourceId, packet.TargetId))
             .ToDictionary(static group => group.Key, static group => group.Sum(static packet => packet.AttemptContribution));
-        var scene = ApplyScene(replay.SceneJournal!).Combat.Pairs
+        var scene = ApplyScene(replay.SceneJournal).Combat.Pairs
             .Where(static pair => pair.Value.InvincibleCount > 0)
             .ToDictionary(static pair => new PairKey(pair.Key.Source, pair.Key.Target), static pair => pair.Value.InvincibleCount);
 
-        foreach (var (pair, expected) in legacy)
+        if (expected.Count == 0)
+            diffs.Add($"{fileName}|periodic-link|missing scene periodic link evidence");
+
+        foreach (var (pair, expectedCount) in expected)
         {
             scene.TryGetValue(pair, out var actual);
-            if (actual < expected)
-                diffs.Add($"{fileName}|periodic-link|{pair.SourceId}->{pair.TargetId}|legacy={expected}|scene={actual}");
+            if (actual < expectedCount)
+                diffs.Add($"{fileName}|periodic-link|{pair.SourceId}->{pair.TargetId}|expectedAtLeast={expectedCount}|scene={actual}");
         }
     }
 
-    private static void AssertCompactPrimaryParity(List<string> diffs, string fileName)
+    private static void AssertCompactPrimarySceneInvariant(List<string> diffs, string fileName)
     {
         var replay = ReplayWithSceneJournal(fileName);
-        var combat = ApplyScene(replay.SceneJournal!).Combat;
+        var combat = ApplyScene(replay.SceneJournal).Combat;
         var primary = replay.Combatants
             .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
             .ThenByDescending(static summary => summary.IncomingDamage)
@@ -137,31 +124,30 @@ public sealed class CrossModuleProtocolParityHarnessTests
         }
 
         if (scenePrimary!.IncomingEvades != primary.IncomingEvades)
-            diffs.Add($"{fileName}|compact-primary|incomingEvades|legacy={primary.IncomingEvades}|scene={scenePrimary.IncomingEvades}");
+            diffs.Add($"{fileName}|compact-primary|incomingEvades|summary={primary.IncomingEvades}|scene={scenePrimary.IncomingEvades}");
     }
 
-    private static void AssertMapIdentityParity(List<string> diffs, string fileName)
+    private static void AssertMapIdentitySceneInvariant(List<string> diffs, string fileName)
     {
         var replay = ReplayWithSceneJournal(fileName);
-        var metadata = ApplyScene(replay.SceneJournal!).Metadata;
-        if (metadata.CurrentMapId != replay.Store.CurrentMapId)
-            diffs.Add($"{fileName}|map-identity|mapId|legacy={replay.Store.CurrentMapId}|scene={metadata.CurrentMapId}");
-        if (metadata.CurrentMapInstanceId != replay.Store.CurrentMapInstanceId)
-            diffs.Add($"{fileName}|map-identity|mapInstanceId|legacy={replay.Store.CurrentMapInstanceId}|scene={metadata.CurrentMapInstanceId}");
+        var metadata = ApplyScene(replay.SceneJournal).Metadata;
+        if (metadata.CurrentMapId != replay.SceneOwner.Metadata.CurrentMapId)
+            diffs.Add($"{fileName}|map-identity|mapId|owner={replay.SceneOwner.Metadata.CurrentMapId}|scene={metadata.CurrentMapId}");
+        if (metadata.CurrentMapInstanceId != replay.SceneOwner.Metadata.CurrentMapInstanceId)
+            diffs.Add($"{fileName}|map-identity|mapInstanceId|owner={replay.SceneOwner.Metadata.CurrentMapInstanceId}|scene={metadata.CurrentMapInstanceId}");
     }
 
-    private static void AssertAcceptedShieldAbsorbedDivergence(List<string> diffs, string fileName)
+    private static void AssertShieldAbsorbedSceneInvariant(List<string> diffs, string fileName)
     {
         var replay = ReplayWithSceneJournal(fileName);
-        var scene = ApplyScene(replay.SceneJournal!).Combat;
-        var legacyShieldAbsorbed = replay.Store.CombatPacketsBySource.Values
-            .SelectMany(static packets => packets)
+        var scene = ApplyScene(replay.SceneJournal).Combat;
+        var packetShieldAbsorbed = SceneReplayTestView.Packets(replay)
             .Where(static packet => packet.ValueKind == CombatValueKind.Shield && packet.EffectTag == PacketEffectTag.ShieldAbsorbed)
             .Sum(static packet => packet.Damage);
         var sceneShieldAbsorbed = scene.Combatants.Values.Sum(static combatant => combatant.OutgoingShieldAbsorbed);
 
-        if (legacyShieldAbsorbed != 0)
-            diffs.Add($"{fileName}|shield-absorbed-refinement|legacy expected 0, got {legacyShieldAbsorbed}");
+        if (packetShieldAbsorbed <= 0)
+            diffs.Add($"{fileName}|shield-absorbed-refinement|packet expected positive, got {packetShieldAbsorbed}");
         if (sceneShieldAbsorbed <= 0)
             diffs.Add($"{fileName}|shield-absorbed-refinement|scene expected positive, got {sceneShieldAbsorbed}");
     }
@@ -180,22 +166,20 @@ public sealed class CrossModuleProtocolParityHarnessTests
     {
         try
         {
-            SceneDualWrite.Enabled = true;
             return PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
         }
         finally
         {
-            SceneDualWrite.Enabled = false;
         }
     }
 
     private static IReadOnlyList<AggregateDiff> BuildAggregateDiffs(PacketLogReplayResult replay, AppliedScene scene)
     {
         var diffs = new List<AggregateDiff>();
-        CompareCombatants(diffs, BuildLegacyCombatants(replay.Store, replay.Snapshot), BuildSceneCombatants(scene.Combat));
-        ComparePairs(diffs, BuildLegacyPairs(replay.Store, replay.Snapshot), BuildScenePairs(scene.Combat));
-        CompareValue(diffs, "metadata", "current", "mapId", replay.Store.CurrentMapId, scene.Metadata.CurrentMapId);
-        CompareValue(diffs, "metadata", "current", "mapInstanceId", replay.Store.CurrentMapInstanceId, scene.Metadata.CurrentMapInstanceId);
+        CompareCombatants(diffs, BuildSceneCombatants(replay.SceneOwner.Combat), BuildSceneCombatants(scene.Combat));
+        ComparePairs(diffs, BuildScenePairs(replay.SceneOwner.Combat), BuildScenePairs(scene.Combat));
+        CompareValue(diffs, "metadata", "current", "mapId", replay.SceneOwner.Metadata.CurrentMapId, scene.Metadata.CurrentMapId);
+        CompareValue(diffs, "metadata", "current", "mapInstanceId", replay.SceneOwner.Metadata.CurrentMapInstanceId, scene.Metadata.CurrentMapInstanceId);
         return diffs;
     }
 

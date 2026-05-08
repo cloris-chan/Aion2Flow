@@ -1,5 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
-using Cloris.Aion2Flow.Scene.Compatibility;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Projection;
@@ -12,30 +10,13 @@ public static class SceneSinkFactory
     public static Func<IRuntimeObservationSink> CreateForLive(SceneLiveReadModel scene) =>
         () => scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal));
 
-    public static Func<IRuntimeObservationSink> CreateForStore(CombatMetricsStore store) => CreateForStore(store, new SceneLiveReadModel());
-
-    public static Func<IRuntimeObservationSink> CreateForStore(CombatMetricsStore store, SceneLiveReadModel scene) =>
-        () =>
-        {
-            if (!SceneDualWrite.Enabled)
-                return scene.Synchronize(new LegacyRuntimeObservationSink(store));
-
-            var legacy = new LegacyRuntimeObservationSink(store);
-            var journaling = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
-            return scene.Synchronize(new CompositeRuntimeObservationSink(legacy, journaling));
-        };
-
-    public static ReplaySinkHolder CreateForReplay(CombatMetricsStore store)
+    public static ReplaySinkHolder CreateForReplay()
     {
-        if (!SceneDualWrite.Enabled)
-            return new ReplaySinkHolder(new LegacyRuntimeObservationSink(store), null, null);
-
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         var clock = new SceneRuntimeClock(DateTimeOffset.UtcNow.Ticks);
-        var legacy = new LegacyRuntimeObservationSink(store);
         var journaling = new JournalingRuntimeObservationSink(journal, clock, sceneId);
-        return new ReplaySinkHolder(new CompositeRuntimeObservationSink(legacy, journaling), journal, new SceneReadModelOwner(journal, sceneId));
+        return new ReplaySinkHolder(journaling, journal, new SceneReadModelOwner(journal, sceneId));
     }
 }
 
@@ -82,11 +63,11 @@ public sealed class SceneLiveReadModel
     }
 }
 
-public readonly struct ReplaySinkHolder(IRuntimeObservationSink sink, ObservedEventJournal? journal, SceneReadModelOwner? owner) : IDisposable
+public readonly struct ReplaySinkHolder(IRuntimeObservationSink sink, ObservedEventJournal journal, SceneReadModelOwner owner) : IDisposable
 {
     public IRuntimeObservationSink Sink { get; } = sink;
-    public ObservedEventJournal? Journal { get; } = journal;
-    public SceneReadModelOwner? Owner { get; } = owner;
+    public ObservedEventJournal Journal { get; } = journal;
+    public SceneReadModelOwner Owner { get; } = owner;
 
     public void Dispose() { }
 }

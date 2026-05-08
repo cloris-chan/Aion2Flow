@@ -1,6 +1,5 @@
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Tests.Protocol;
@@ -37,7 +36,7 @@ public sealed class MultiHitDiagnosticTests
             .First();
 
         var sourceIds = new HashSet<int> { player.CombatantId };
-        foreach (var (summonId, ownerId) in replay.Store.SummonOwnerByInstance)
+        foreach (var (summonId, ownerId) in SceneReplayTestView.SummonOwnerByInstance(replay))
         {
             if (ownerId == player.CombatantId)
             {
@@ -48,7 +47,7 @@ public sealed class MultiHitDiagnosticTests
         var totalMultiHit = 0;
         foreach (var sourceId in sourceIds)
         {
-            if (replay.Store.CombatPacketsBySource.TryGetValue(sourceId, out var packets))
+            if (SceneReplayTestView.BySource(replay).TryGetValue(sourceId, out var packets))
             {
                 foreach (var packet in packets)
                 {

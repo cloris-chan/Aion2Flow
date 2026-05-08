@@ -449,12 +449,9 @@ public class DomainEventApplierTests
     public void Applier_VendoredReplay_PopulatesEntities()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-        SceneDualWrite.Enabled = false;
 
-        var journal = replay.SceneJournal!;
+        var journal = replay.SceneJournal;
         Assert.True(journal.Count > 0);
 
         var entities = new EntityStore();
@@ -470,19 +467,16 @@ public class DomainEventApplierTests
     public void Applier_VendoredReplay_ReconstructsConfirmedMapIdentity()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-        SceneDualWrite.Enabled = false;
 
         var entities = new EntityStore();
         var metadata = new MetadataStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
-        applier.ApplyJournal(replay.SceneJournal!);
+        applier.ApplyJournal(replay.SceneJournal);
 
-        Assert.Equal(replay.Store.CurrentMapId, metadata.CurrentMapId);
-        Assert.Equal(replay.Store.CurrentMapInstanceId, metadata.CurrentMapInstanceId);
+        Assert.Equal(replay.SceneOwner.Metadata.CurrentMapId, metadata.CurrentMapId);
+        Assert.Equal(replay.SceneOwner.Metadata.CurrentMapInstanceId, metadata.CurrentMapInstanceId);
     }
 }
 
@@ -1239,12 +1233,10 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void LiveReadModel_CapturesFactoryJournal()
     {
-        var store = new CombatMetricsStore();
         var scene = new SceneLiveReadModel();
-        SceneDualWrite.Enabled = true;
         try
         {
-            var sink = SceneSinkFactory.CreateForStore(store, scene)();
+            var sink = SceneSinkFactory.CreateForLive(scene)();
             sink.AppendNickname(100, "Perigee");
             scene.Owner.Refresh();
             var snapshot = scene.Owner.CreateSnapshot();
@@ -1256,19 +1248,16 @@ public class SceneReadModelOwnerTests
         }
         finally
         {
-            SceneDualWrite.Enabled = false;
         }
     }
 
     [Fact]
     public void LiveReadModel_Reset_BarrierSeparatesOldAndNewCombat()
     {
-        var store = new CombatMetricsStore();
         var scene = new SceneLiveReadModel();
-        SceneDualWrite.Enabled = true;
         try
         {
-            var sink = SceneSinkFactory.CreateForStore(store, scene)();
+            var sink = SceneSinkFactory.CreateForLive(scene)();
             sink.AppendNickname(100, "Player");
             sink.AppendCombatPacket(new ParsedCombatPacket
             {
@@ -1348,18 +1337,14 @@ public class SceneReadModelOwnerTests
         }
         finally
         {
-            SceneDualWrite.Enabled = false;
         }
     }
 
     [Fact]
-    public void LiveReadModel_FactoryReadsDualWriteFlagWhenSinkIsCreated()
+    public void LiveReadModel_FactoryCreatesSceneSink()
     {
-        var store = new CombatMetricsStore();
         var scene = new SceneLiveReadModel();
-        SceneDualWrite.Enabled = false;
-        var factory = SceneSinkFactory.CreateForStore(store, scene);
-        SceneDualWrite.Enabled = true;
+        var factory = SceneSinkFactory.CreateForLive(scene);
         try
         {
             var sink = factory();
@@ -1372,18 +1357,15 @@ public class SceneReadModelOwnerTests
         }
         finally
         {
-            SceneDualWrite.Enabled = false;
         }
     }
 
     [Fact]
-    public void ReplaySinkHolder_ExposesSceneOwnerWhenDualWriteEnabled()
+    public void ReplaySinkHolder_ExposesSceneOwner()
     {
-        var store = new CombatMetricsStore();
-        SceneDualWrite.Enabled = true;
         try
         {
-            using var holder = SceneSinkFactory.CreateForReplay(store);
+            using var holder = SceneSinkFactory.CreateForReplay();
             Assert.NotNull(holder.Journal);
             Assert.NotNull(holder.Owner);
             var journal = holder.Journal;
@@ -1397,7 +1379,6 @@ public class SceneReadModelOwnerTests
         }
         finally
         {
-            SceneDualWrite.Enabled = false;
         }
     }
 
@@ -1441,12 +1422,9 @@ public class DualReadParityTests
     public void M2_06_ScenePath_CapturesSameCombatantIds_AsLegacyPath()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-        SceneDualWrite.Enabled = false;
 
-        var journal = replay.SceneJournal!;
+        var journal = replay.SceneJournal;
         Assert.True(journal.Count > 0);
 
         var entities = new EntityStore();
@@ -1477,12 +1455,9 @@ public class DualReadParityTests
     public void M2_06_CombatStore_DamageTotals_MatchLegacy_OutgoingDamage()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-        SceneDualWrite.Enabled = false;
 
-        var journal = replay.SceneJournal!;
+        var journal = replay.SceneJournal;
         var entities = new EntityStore();
         var metadata = new MetadataStore();
         var combat = new CombatStore();

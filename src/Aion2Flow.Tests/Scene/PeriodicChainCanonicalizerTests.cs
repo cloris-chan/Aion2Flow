@@ -2,8 +2,6 @@ using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
-using Cloris.Aion2Flow.Scene.Compatibility;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Runtime;
@@ -160,15 +158,13 @@ public class PeriodicChainCanonicalizerTests
     }
 
     [Fact]
-    public void CompositeSink_JournalsRawPacketBeforeLegacyPeriodicMutation()
+    public void JournalingSink_PreservesRawPeriodicPacketObservation()
     {
         CombatMetricsEngine.LoadSkillMap("zh-TW");
         const int playerId = 2508;
-        var legacy = new CombatMetricsStore();
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
-        var journaling = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var composite = new CompositeRuntimeObservationSink(new LegacyRuntimeObservationSink(legacy), journaling);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
         var packet = new ParsedCombatPacket
         {
@@ -182,22 +178,20 @@ public class PeriodicChainCanonicalizerTests
         };
         packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
 
-        composite.AppendCombatPacket(packet);
+        sink.AppendCombatPacket(packet);
 
         Assert.Equal(4676, journal.Read(0).Combat!.Value.Damage);
-        Assert.Equal(0, packet.Damage);
+        Assert.Equal(4676, packet.Damage);
     }
 
     [Fact]
-    public void ScenePath_Replay_EnhanceSpiritBenedictionPeriodicHealing_MatchesLegacyGroundTruth()
+    public void ScenePath_Replay_EnhanceSpiritBenedictionPeriodicHealing_MatchesGroundTruth()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426031332.log"));
-        SceneDualWrite.Enabled = false;
 
-        var combat = Apply(replay.SceneJournal!);
+        var combat = Apply(replay.SceneJournal);
 
         Assert.True(combat.TryGetCombatant(10277, out var player));
         Assert.True(combat.TryGetCombatant(37299, out var summon));

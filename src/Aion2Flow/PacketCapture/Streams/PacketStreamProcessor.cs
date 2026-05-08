@@ -1,14 +1,12 @@
 using System.Buffers;
 using System.Text;
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
-using Cloris.Aion2Flow.Scene.Compatibility;
 using Cloris.Aion2Flow.Scene.Observation;
 using K4os.Compression.LZ4;
 
@@ -35,11 +33,6 @@ public sealed class PacketStreamProcessor : IDisposable
     {
         ArgumentNullException.ThrowIfNull(sink);
         _sink = sink;
-    }
-
-    public PacketStreamProcessor(CombatMetricsStore store)
-        : this(new LegacyRuntimeObservationSink(store))
-    {
     }
 
     public void Dispose()

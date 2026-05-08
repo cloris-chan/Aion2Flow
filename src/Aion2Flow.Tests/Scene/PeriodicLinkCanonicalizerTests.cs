@@ -1,10 +1,7 @@
 using Cloris.Aion2Flow.Battle.Runtime;
-using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
-using Cloris.Aion2Flow.Scene.Compatibility;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Runtime;
@@ -110,48 +107,37 @@ public class PeriodicLinkCanonicalizerTests
     }
 
     [Fact]
-    public void ScenePath_StreamMode48PeriodicLinkMatchesLegacyFixture()
+    public void ScenePath_StreamMode48PeriodicLinkMatchesFixture()
     {
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-        var legacy = new CombatMetricsStore();
         var journal = new ObservedEventJournal();
-        var journaling = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
-        var composite = new CompositeRuntimeObservationSink(new LegacyRuntimeObservationSink(legacy), journaling);
-        using var processor = new PacketStreamProcessor(composite);
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        using var processor = new PacketStreamProcessor(sink);
 
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("combat/0538-mode48-link.hex"), TestConnection);
 
         Assert.True(parsed);
-        var legacyPacket = Assert.Single(legacy.CombatPacketsByTarget[16047]);
         var combat = Apply(journal);
-        Assert.True(combat.TryGetPair(legacyPacket.SourceId, legacyPacket.TargetId, out var pair));
-        Assert.Equal(legacyPacket.SkillCode, pair!.LastSkillCode);
-        Assert.Equal(legacyPacket.AttemptContribution, pair.AttemptCount);
-        Assert.Equal(legacyPacket.AttemptContribution, pair.InvincibleCount);
+        Assert.True(combat.TryGetPair(29240, 16047, out var pair));
+        Assert.Equal(1230000, pair!.LastSkillCode);
+        Assert.Equal(1, pair.AttemptCount);
+        Assert.Equal(1, pair.InvincibleCount);
     }
 
     [Fact]
-    public void ScenePath_Replay_PeriodicLinkInvincibles_MatchLegacyPairs()
+    public void ScenePath_Replay_PeriodicLinkInvincibles_AreProjected()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
-        SceneDualWrite.Enabled = false;
 
-        var legacyPacketsByPair = replay.Store.CombatPacketsBySource.Values
-            .SelectMany(static packets => packets)
-            .Where(static packet => packet.EffectTag == PacketEffectTag.PeriodicLinkInvincible)
-            .GroupBy(static packet => (packet.SourceId, packet.TargetId))
-            .ToDictionary(static group => group.Key, static group => group.Sum(static packet => packet.AttemptContribution));
-        var combat = Apply(replay.SceneJournal!);
+        var combat = Apply(replay.SceneJournal);
+        var pairs = combat.Pairs.Values
+            .Where(static pair => pair.InvincibleCount > 0)
+            .ToArray();
 
-        Assert.NotEmpty(legacyPacketsByPair);
-        foreach (var (pairKey, expectedInvincibles) in legacyPacketsByPair)
-        {
-            Assert.True(combat.TryGetPair(pairKey.SourceId, pairKey.TargetId, out var pair));
-            Assert.True(pair!.InvincibleCount >= expectedInvincibles);
-        }
+        Assert.NotEmpty(pairs);
+        Assert.Contains(pairs, static pair => pair.AttemptCount >= pair.InvincibleCount);
     }
 
     private static CombatStore Apply(ObservedEventJournal journal)

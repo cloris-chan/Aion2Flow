@@ -1,7 +1,6 @@
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Projection;
 using Cloris.Aion2Flow.Scene.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
@@ -14,12 +13,9 @@ public class DetailProjectionParityTests
     public void SceneProjection_TopDealer_MatchesLegacy()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-        SceneDualWrite.Enabled = false;
 
-        var journal = replay.SceneJournal!;
+        var journal = replay.SceneJournal;
         var entities = new EntityStore();
         var metadata = new MetadataStore();
         var combat = new CombatStore();
@@ -42,12 +38,9 @@ public class DetailProjectionParityTests
     public void Subscription_DeltaReflectsCombatStoreState()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-        SceneDualWrite.Enabled = false;
 
-        var journal = replay.SceneJournal!;
+        var journal = replay.SceneJournal;
         var entities = new EntityStore();
         var metadata = new MetadataStore();
         var combat = new CombatStore();
@@ -72,12 +65,9 @@ public class DetailProjectionParityTests
     public void SceneProjection_CombatantCount_MatchesLegacy()
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        SceneDualWrite.Enabled = true;
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log"));
-        SceneDualWrite.Enabled = false;
 
-        var journal = replay.SceneJournal!;
+        var journal = replay.SceneJournal;
         var entities = new EntityStore();
         var metadata = new MetadataStore();
         var combat = new CombatStore();

@@ -1,7 +1,5 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Services.Logging;
 
@@ -12,10 +10,6 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
     private readonly Dictionary<TcpConnection, TcpCaptureStreamState> _tcpStreams = [];
     private Task? _worker;
     private CancellationTokenSource? _cts;
-
-    public PacketCaptureDispatcher(CombatMetricsStore store) : this(SceneSinkFactory.CreateForStore(store))
-    {
-    }
 
     public async Task StartAsync(CancellationToken token)
     {
