@@ -1,6 +1,4 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
-using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Scene.Canonicalization;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
@@ -125,21 +123,10 @@ public sealed class OwnerTargetSummonRestoreCanonicalizerTests
     }
 
     [Fact]
-    public void ScenePath_OwnerTargetWindSpiritRestoreParityMatchesLegacyStore()
+    public void ScenePath_OwnerTargetWindSpiritRestoreProjectionStoresHealingOnly()
     {
         const int ownerId = 4086;
         const int summonId = 38013;
-        var legacy = new CombatMetricsStore();
-        legacy.AppendSummon(ownerId, summonId);
-        legacy.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = ownerId,
-            SkillCode = 16990003,
-            OriginalSkillCode = 16990003,
-            Damage = 114
-        });
-
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         journal.Append(new ObservedEventEnvelope
@@ -169,12 +156,13 @@ public sealed class OwnerTargetSummonRestoreCanonicalizerTests
         });
 
         var scene = Apply(journal);
-        var legacyPacket = Assert.Single(legacy.CombatPacketsBySource[summonId]);
 
-        Assert.Equal(CombatValueKind.Healing, legacyPacket.ValueKind);
         Assert.True(scene.TryGetCombatant(summonId, out var sceneSummon));
-        Assert.Equal(legacyPacket.Damage, sceneSummon!.OutgoingHealing);
+        Assert.Equal(114, sceneSummon!.OutgoingHealing);
         Assert.Equal(0, sceneSummon.OutgoingDamage);
+        Assert.True(scene.TryGetCombatant(ownerId, out var sceneOwner));
+        Assert.Equal(114, sceneOwner!.IncomingHealing);
+        Assert.Equal(0, sceneOwner.IncomingDamage);
     }
 
     private static CombatStore Apply(ObservedEventJournal journal)

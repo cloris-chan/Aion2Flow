@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Services;
 
@@ -62,7 +61,7 @@ public sealed class LocalizationServicesTests
         }
         finally
         {
-            CombatMetricsEngine.LoadSkillMap(LanguageService.TraditionalChinese);
+            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
         }
     }
 }

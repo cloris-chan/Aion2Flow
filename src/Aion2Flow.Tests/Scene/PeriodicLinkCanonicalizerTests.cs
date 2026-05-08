@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
@@ -17,7 +16,7 @@ public class PeriodicLinkCanonicalizerTests
     [Fact]
     public void ScenePath_SynthesizesInvincibleFromPeriodicLinkRecord()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
 
@@ -40,7 +39,7 @@ public class PeriodicLinkCanonicalizerTests
     [Fact]
     public void ScenePath_IgnoresSelfPeriodicLinkBuffTick()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
 
@@ -55,7 +54,7 @@ public class PeriodicLinkCanonicalizerTests
     [Fact]
     public void ScenePath_DeduplicatesPeriodicLinkWithinBatch()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
 
@@ -72,7 +71,7 @@ public class PeriodicLinkCanonicalizerTests
     [Fact]
     public void ScenePath_AllowsSamePeriodicLinkAcrossBatches()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
 
@@ -109,7 +108,7 @@ public class PeriodicLinkCanonicalizerTests
     [Fact]
     public void ScenePath_StreamMode48PeriodicLinkMatchesFixture()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
         using var processor = new PacketStreamProcessor(sink);
@@ -127,7 +126,7 @@ public class PeriodicLinkCanonicalizerTests
     [Fact]
     public void ScenePath_Replay_PeriodicLinkInvincibles_AreProjected()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
 

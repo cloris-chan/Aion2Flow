@@ -391,7 +391,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         public static MainViewModelFixture Create()
         {
-            CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+            CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
             var settingsPath = Path.Combine(Path.GetTempPath(), $"aion2flow-test-{Guid.NewGuid():N}.json");
             var settings = new SettingsService(settingsPath);
             var language = new LanguageService();

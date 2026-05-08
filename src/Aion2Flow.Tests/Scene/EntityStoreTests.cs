@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -448,7 +447,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_VendoredReplay_PopulatesEntities()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var journal = replay.SceneJournal;
@@ -466,7 +465,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_VendoredReplay_ReconstructsConfirmedMapIdentity()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var entities = new EntityStore();
@@ -687,7 +686,7 @@ public class SnapshotChangeFeedTests
     }
 }
 
-public class LegacyBattleSnapshotAdapterTests
+public class SceneSnapshotAdapterBasicTests
 {
     [Fact]
     public void Adapter_CreateSnapshot_ProducesCombatantEntries()
@@ -715,7 +714,7 @@ public class LegacyBattleSnapshotAdapterTests
             ValueKind = CombatValueKind.Damage
         }, 1_001);
 
-        var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore());
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Single(snapshot.Combatants);
@@ -748,7 +747,7 @@ public class LegacyBattleSnapshotAdapterTests
             ValueKind = CombatValueKind.Damage
         }, 1_001);
 
-        var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore());
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Equal("Perigee", snapshot.Combatants[100].Nickname);
@@ -760,7 +759,7 @@ public class LegacyBattleSnapshotAdapterTests
         var entities = new EntityStore();
         var combat = new CombatStore();
 
-        var adapter = new LegacyBattleSnapshotAdapter(entities, combat);
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore());
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Empty(snapshot.Combatants);
@@ -776,7 +775,7 @@ public class LegacyBattleSnapshotAdapterTests
         metadata.StageDestinationMapInstance(515552);
         metadata.MarkSceneArrival();
 
-        var adapter = new LegacyBattleSnapshotAdapter(entities, combat, metadata);
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata);
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Equal(200003u, snapshot.MapId);
@@ -846,7 +845,7 @@ public class SceneCombatSnapshotAdapterTests
     [Fact]
     public void Adapter_CreateSnapshot_ExpandsSinglePointWindowWithRelevantRecovery()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
             new Skill(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
@@ -894,7 +893,7 @@ public class SceneCombatSnapshotAdapterTests
     [Fact]
     public void Adapter_CreateSnapshot_FoldsSummonOutgoingDamageToOwnerAndSkipsSummonTargets()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
             new Skill(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
@@ -944,7 +943,7 @@ public class SceneCombatSnapshotAdapterTests
     [Fact]
     public void Adapter_CreateSnapshot_HidesKnownNpcClassEvenWithPlayerSkill()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
             new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
@@ -1125,7 +1124,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_ReusesWarmSubscriptionForIrrelevantCombat()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -1152,7 +1151,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_UpdatesWarmSubscriptionForRelevantCombat()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -1179,7 +1178,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_UsesSeparateSubscriptionForSelectionSwitch()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -1203,7 +1202,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_TreatsSummonDamageAsOwnerRelevantOnWarmPoll()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -1421,7 +1420,7 @@ public class DualReadParityTests
     [Fact]
     public void M2_06_ScenePath_CapturesSameCombatantIds_AsLegacyPath()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var journal = replay.SceneJournal;
@@ -1433,7 +1432,7 @@ public class DualReadParityTests
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
 
-        var adapter = new LegacyBattleSnapshotAdapter(entities, combat, metadata);
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata);
         var sceneSnapshot = adapter.CreateSnapshot();
 
         var legacySnapshot = replay.Snapshot;
@@ -1454,7 +1453,7 @@ public class DualReadParityTests
     [Fact]
     public void M2_06_CombatStore_DamageTotals_MatchLegacy_OutgoingDamage()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var journal = replay.SceneJournal;

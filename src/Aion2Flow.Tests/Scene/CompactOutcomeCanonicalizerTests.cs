@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
@@ -15,7 +14,7 @@ public class CompactOutcomeCanonicalizerTests
     [Fact]
     public void ScenePath_FlushesCompactType1AvoidAsEvade()
     {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         journal.Append(new ObservedEventEnvelope
         {
@@ -49,7 +48,7 @@ public class CompactOutcomeCanonicalizerTests
     [Fact]
     public void ScenePath_ConvertsDirectBlockedDamageToEvadeWhenDodgeControlArrives()
     {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         journal.Append(new ObservedEventEnvelope
@@ -101,7 +100,7 @@ public class CompactOutcomeCanonicalizerTests
     [Fact]
     public void ScenePath_KeepsDirectBlockedDamageWhenNoDodgeControlArrives()
     {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         journal.Append(new ObservedEventEnvelope
         {
@@ -135,7 +134,7 @@ public class CompactOutcomeCanonicalizerTests
     [Fact]
     public void ScenePath_DoesNotStoreCompactType2SidecarAsCombat()
     {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         journal.Append(new ObservedEventEnvelope
         {
@@ -166,7 +165,7 @@ public class CompactOutcomeCanonicalizerTests
     [Fact]
     public void ScenePath_CompactType2SidecarCancelsPendingCompactEvade()
     {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         journal.Append(new ObservedEventEnvelope
@@ -217,7 +216,7 @@ public class CompactOutcomeCanonicalizerTests
     [Fact]
     public void ScenePath_CompactType2SidecarCancelsPendingCompactEvadeBeforeBatchSwitch()
     {
-        CombatMetricsEngine.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         journal.Append(new ObservedEventEnvelope
@@ -271,7 +270,7 @@ public class CompactOutcomeCanonicalizerTests
     [InlineData("aion2flow.stream.20260412103519.log")]
     public void ScenePath_Replay_IncomingCompactEvades_MatchesLegacyPrimary(string fileName)
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
 
         var combat = Apply(replay.SceneJournal);

@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -17,7 +16,7 @@ public class SystemPeriodicRecoveryCanonicalizerTests
     [Fact]
     public void ScenePath_TreatsSystemPeriodicSelfRecoveryTickAsHealingAfterSeed()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
         const int playerId = 4086;
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
@@ -41,7 +40,7 @@ public class SystemPeriodicRecoveryCanonicalizerTests
     [Fact]
     public void ScenePath_ConsumesSystemPeriodicSelfRecoverySeedOnFirstContinuation()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
         const int playerId = 4086;
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
@@ -64,7 +63,7 @@ public class SystemPeriodicRecoveryCanonicalizerTests
     [Fact]
     public void ScenePath_DoesNotPromoteContinuationBeforeSeedOrdinal()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
         const int playerId = 4086;
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
@@ -85,7 +84,7 @@ public class SystemPeriodicRecoveryCanonicalizerTests
     [Fact]
     public void ScenePath_Replay_SystemPeriodicSelfRecovery_MatchesCorpusGroundTruth()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426140354.log"));
 
         var entries = replay.SceneJournal.GetEntries(replay.SceneJournal.CreateCursor(0), replay.SceneJournal.Count)
@@ -141,6 +140,6 @@ public class SystemPeriodicRecoveryCanonicalizerTests
             return false;
 
         var originalSkillCode = observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
-        return CombatMetricsEngine.ParseSkillVariant(originalSkillCode).BaseSkillCode == 190000000;
+        return CombatResourceRegistry.ParseSkillVariant(originalSkillCode).BaseSkillCode == 190000000;
     }
 }

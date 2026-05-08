@@ -1,21 +1,20 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
 
-public sealed class CombatMetricsEngineSkillNormalizationTests
+public sealed class SkillNormalizationSceneTests
 {
     [Fact]
     public void InferOriginalSkillCode_Resolves_Specialization_Variants_Without_Offset_Guessing()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var resolved = CombatMetricsEngine.InferOriginalSkillCode(17750010);
+        var resolved = CombatResourceRegistry.InferOriginalSkillCode(17750010);
 
         Assert.Equal(17750000, resolved);
     }
@@ -23,12 +22,12 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void InferOriginalSkillCode_Does_Not_Map_Unmatched_Raw_Code_To_Nearby_Offset_Skill()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(1910261, "Black Hole", SkillCategory.Elementalist, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var resolved = CombatMetricsEngine.InferOriginalSkillCode(1910501);
+        var resolved = CombatResourceRegistry.InferOriginalSkillCode(1910501);
 
         Assert.Null(resolved);
     }
@@ -36,12 +35,12 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void InferOriginalSkillCode_Does_Not_Collapse_Unmatched_Npc_Code_To_Unrelated_Low_Id_Skill()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(10000, "Account Security", SkillCategory.Etc, SkillSourceType.Unknown, "system", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var resolved = CombatMetricsEngine.InferOriginalSkillCode(1232480);
+        var resolved = CombatResourceRegistry.InferOriginalSkillCode(1232480);
 
         Assert.Null(resolved);
     }
@@ -49,13 +48,13 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void InferOriginalSkillCode_Prefers_Nearby_Npc_Base_Over_Unrelated_Low_Id_Skill()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(10000, "Account Security", SkillCategory.Etc, SkillSourceType.Unknown, "system", null),
             new Skill(1232000, "Sting", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var resolved = CombatMetricsEngine.InferOriginalSkillCode(1232480);
+        var resolved = CombatResourceRegistry.InferOriginalSkillCode(1232480);
 
         Assert.Equal(1232000, resolved);
     }
@@ -63,12 +62,12 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void InferOriginalSkillCode_Resolves_Periodic_Shield_Variant_To_Base_Skill()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(18730000, "Protection Circle", SkillCategory.Templar, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var resolved = CombatMetricsEngine.InferOriginalSkillCode(1873000211);
+        var resolved = CombatResourceRegistry.InferOriginalSkillCode(1873000211);
 
         Assert.Equal(18730000, resolved);
     }
@@ -76,11 +75,10 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void AppendCombatPacket_Normalizes_RegenerationHealing_RawNpcSkillCode()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(1230340, "Jumping Overhead Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
-        var store = new CombatMetricsStore();
         var regenPacket = new ParsedCombatPacket
         {
             SourceId = 4342,
@@ -93,7 +91,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
         };
         regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
 
-        store.AppendCombatPacket(regenPacket);
+        CombatResourceRegistry.NormalizePacketForStorage(regenPacket);
 
         Assert.True(regenPacket.IsNormalized);
         Assert.Equal(1230340, regenPacket.SkillCode);
@@ -103,13 +101,13 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Remaps_Triggered_Sibling_Skill_Packets_To_Sibling_Skill_Code()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
-        var engine = new CombatMetricsEngine();
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        using var scene = new SceneTestHarness();
         const int sourceId = 3632;
         const int targetId = 19621;
 
-        engine.Store.AppendNickname(sourceId, "Cleric");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(sourceId, "Cleric");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -118,7 +116,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 38641
         });
         Thread.Sleep(5);
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -127,7 +125,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 38641
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
         Assert.DoesNotContain(17040250, combatant.Skills.Keys);
@@ -140,13 +138,13 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Keeps_Exact_Known_Skill_Code_On_Primary_Skill_Packets()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
-        var engine = new CombatMetricsEngine();
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        using var scene = new SceneTestHarness();
         const int sourceId = 3632;
         const int targetId = 19621;
 
-        engine.Store.AppendNickname(sourceId, "Cleric");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(sourceId, "Cleric");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -155,7 +153,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 9408
         });
         Thread.Sleep(5);
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -164,7 +162,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 9408
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
         Assert.True(combatant.Skills.TryGetValue(17040250, out var skill));
@@ -176,19 +174,19 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Collapses_SameName_NonTriggered_PcSkill_Variants_To_Base_Skill()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
             new Skill(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
             new Skill(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int sourceId = 3038;
         const int targetId = 29219;
 
-        engine.Store.AppendNickname(sourceId, "Templar");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(sourceId, "Templar");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -197,7 +195,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 23108,
             Timestamp = 1_000
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -207,7 +205,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_100
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
         Assert.True(combatant.Skills.TryGetValue(12240000, out var judgment));
@@ -221,18 +219,18 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Collapses_SameName_Variant_Without_Resource_Semantics()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
             new Skill(12240150, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int sourceId = 3038;
         const int targetId = 29219;
 
-        engine.Store.AppendNickname(sourceId, "Templar");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(sourceId, "Templar");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -241,7 +239,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 1200,
             Timestamp = 1_000
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -251,7 +249,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_100
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
         Assert.True(combatant.Skills.TryGetValue(12240000, out var judgment));
@@ -262,13 +260,13 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Counts_MurderousBurst_Triggered_Damage_Sibling_As_Damage()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
-        var engine = new CombatMetricsEngine();
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        using var scene = new SceneTestHarness();
         const int sourceId = 2007;
         const int targetId = 55783;
 
-        engine.Store.AppendNickname(sourceId, "Perigee");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(sourceId, "Perigee");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -277,7 +275,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 77669
         });
         Thread.Sleep(5);
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = sourceId,
             TargetId = targetId,
@@ -286,7 +284,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 77669
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
         Assert.True(combatant.Skills.TryGetValue(11800008, out var skill));
@@ -299,18 +297,18 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Attributes_Ambush_Drain_Heal_From_Tail_Extraction()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null),
             new Skill(1010000, "Restore HP", SkillCategory.Npc, SkillSourceType.ItemSkill, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int playerId = 3406;
         const int npcId = 17629;
 
-        engine.Store.AppendNickname(playerId, "Perigee");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = npcId,
@@ -321,7 +319,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_000
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = playerId,
@@ -332,7 +330,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_000
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = npcId,
@@ -342,7 +340,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_040
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = npcId,
             TargetId = npcId,
@@ -352,7 +350,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_050
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(2000, combatant.DamageAmount);
@@ -369,11 +367,11 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Normalizes_Self_Periodic_Healing_Remaining_Total_At_Append_Time()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
         const int playerId = 2508;
-        var store = new CombatMetricsStore();
+        using var scene = new SceneTestHarness();
 
-        store.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(playerId, "Perigee");
         const int chainId = 4242;
         var seedPacket = new ParsedCombatPacket
         {
@@ -386,7 +384,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_000
         };
         seedPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
-        store.AppendCombatPacket(seedPacket);
+        scene.AppendCombatPacket(seedPacket);
 
         var remainingTotals = new[] { 4209, 3742, 3275, 2808, 2341, 1874, 1407, 940, 473 };
         for (var index = 0; index < remainingTotals.Length; index++)
@@ -402,11 +400,11 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
                 Timestamp = 3_000 + (index * 2_000L)
             };
             tickPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);
-            store.AppendCombatPacket(tickPacket);
+            scene.AppendCombatPacket(tickPacket);
         }
 
-        Assert.True(store.CombatPacketsBySource.TryGetValue(playerId, out var packets));
-        var normalizedDamages = packets.Select(static packet => packet.Damage).ToArray();
+        scene.CreateSnapshot();
+        var normalizedDamages = scene.Owner.Combat.Events.Select(static e => e.Observation.Damage).ToArray();
 
         Assert.Equal(10, normalizedDamages.Length);
         Assert.Equal(0, normalizedDamages[0]);
@@ -416,18 +414,18 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Classifies_Self_ActionPoint_Restore_Followup_As_Support_By_Packet_Trait()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(13360010, "入侵", SkillCategory.Assassin, SkillSourceType.PcSkill, "skill", null),
             new Skill(13360120, "入侵", SkillCategory.Assassin, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int playerId = 7166;
         const int targetId = 262851;
 
-        engine.Store.AppendNickname(playerId, "Perigee");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -436,7 +434,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 18167,
             Timestamp = 1_000
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -445,7 +443,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 32404,
             Timestamp = 1_050
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = playerId,
@@ -455,7 +453,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_100
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(50571, combatant.DamageAmount);
@@ -473,14 +471,14 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Classifies_Packet_Tagged_Instance_Clear_Health_Restore_As_Healing_Without_Inflating_Damage_Totals()
     {
-        CombatMetricsEngine.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int playerId = 9024;
         const int targetId = 262851;
 
-        engine.Store.AppendNickname(playerId, "Perigee");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -489,7 +487,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 18167,
             Timestamp = 1_000
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -498,7 +496,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 32404,
             Timestamp = 1_050
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = playerId,
@@ -509,7 +507,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_100
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(50571, combatant.DamageAmount);
@@ -528,18 +526,18 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
     [Fact]
     public void Classifies_Charge7_Base_Skill_Resource_Followups_As_Support_Without_Inflating_Damage_Totals()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(11360017, "Rush Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "skill", null),
             new Skill(11360120, "Rush Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "skill", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int playerId = 2672;
         const int targetId = 159265;
 
-        engine.Store.AppendNickname(playerId, "Perigee");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -548,7 +546,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 3421,
             Timestamp = 1_000
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -557,7 +555,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 6615,
             Timestamp = 1_050
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = playerId,
@@ -566,7 +564,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Damage = 30000,
             Timestamp = 1_100
         });
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = playerId,
@@ -576,7 +574,7 @@ public sealed class CombatMetricsEngineSkillNormalizationTests
             Timestamp = 1_150
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(10036, combatant.DamageAmount);

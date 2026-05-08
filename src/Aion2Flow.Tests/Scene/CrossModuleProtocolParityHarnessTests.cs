@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -16,7 +15,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
     [Fact]
     public void M4_12_VendoredStreamCorpus_ContainsProtocolEvidenceForMigratedModules()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var evidence = new ProtocolEvidence();
 
         foreach (var fileName in VendoredStreamLogNames())
@@ -32,7 +31,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
     [Fact]
     public void M4_12_SelectedReplays_MigratedModuleFactsMatchSceneCorpusExpectations()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var diffs = new List<string>();
 
         AssertSystemRecoverySceneInvariant(diffs, "aion2flow.stream.20260426140354.log");
@@ -48,7 +47,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
     [Fact]
     public void M4_12_FullAggregateDiffHarness_ReportsNoSceneReplayOwnerDrift()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var unexpected = new List<string>();
 
         foreach (var fileName in VendoredStreamLogNames())
@@ -183,25 +182,6 @@ public sealed class CrossModuleProtocolParityHarnessTests
         return diffs;
     }
 
-    private static Dictionary<int, CombatantTotals> BuildLegacyCombatants(CombatMetricsStore store, DamageMeterSnapshot snapshot)
-    {
-        var totals = new Dictionary<int, CombatantTotals>();
-        foreach (var context in CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime))
-            ApplyLegacyPacket(totals, context);
-        return totals;
-    }
-
-    private static Dictionary<PairKey, PairTotals> BuildLegacyPairs(CombatMetricsStore store, DamageMeterSnapshot snapshot)
-    {
-        var totals = new Dictionary<PairKey, PairTotals>();
-        foreach (var context in CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime))
-        {
-            var pair = GetOrAdd(totals, new PairKey(context.SourceId, context.TargetId));
-            ApplyToPair(pair, context.Packet);
-        }
-        return totals;
-    }
-
     private static Dictionary<int, CombatantTotals> BuildSceneCombatants(CombatStore combat)
     {
         var totals = new Dictionary<int, CombatantTotals>();
@@ -251,41 +231,6 @@ public sealed class CrossModuleProtocolParityHarnessTests
             };
         }
         return totals;
-    }
-
-    private static void ApplyLegacyPacket(Dictionary<int, CombatantTotals> totals, CombatMetricsEngine.BattlePacketContext context)
-    {
-        var contribution = GetContribution(context.Packet);
-        if (contribution.Kind == ContributionKind.None)
-            return;
-
-        if (context.SourceId > 0)
-        {
-            var source = GetOrAdd(totals, context.SourceId);
-            source.OutgoingDamage += contribution.Damage;
-            source.OutgoingHealing += contribution.Healing;
-            source.OutgoingShield += contribution.Shield;
-            source.OutgoingShieldAbsorbed += contribution.ShieldAbsorbed;
-            source.OutgoingHits += contribution.Hits;
-            source.OutgoingAttempts += contribution.Attempts;
-            source.OutgoingEvades += contribution.Evades;
-            source.OutgoingInvincibles += contribution.Invincibles;
-            source.OutgoingMultiHits += contribution.MultiHits;
-        }
-
-        if (context.TargetId > 0)
-        {
-            var target = GetOrAdd(totals, context.TargetId);
-            target.IncomingDamage += contribution.Damage;
-            target.IncomingHealing += contribution.Healing;
-            target.IncomingShield += contribution.Shield;
-            target.IncomingShieldAbsorbed += contribution.ShieldAbsorbed;
-            target.IncomingHits += contribution.Hits;
-            target.IncomingAttempts += contribution.Attempts;
-            target.IncomingEvades += contribution.Evades;
-            target.IncomingInvincibles += contribution.Invincibles;
-            target.IncomingMultiHits += contribution.MultiHits;
-        }
     }
 
     private static void ApplyToPair(PairTotals totals, ParsedCombatPacket packet)
@@ -470,7 +415,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
             return false;
 
         var originalSkillCode = observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
-        return CombatMetricsEngine.ParseSkillVariant(originalSkillCode).BaseSkillCode == 190000000;
+        return CombatResourceRegistry.ParseSkillVariant(originalSkillCode).BaseSkillCode == 190000000;
     }
 
     private static string BuildAggregateDiffReport(Dictionary<AggregateDiffClass, int> accepted, List<string> unexpected)

@@ -19,7 +19,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Reconstructs_Battle_Snapshot_And_Combatant_Summaries_From_Frame_Log()
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var firstLine = "2026-04-10T16:15:36.2148073+08:00|damage|16777343:62420->16777343:52250|target=200287|source=16039|skillRaw=17010230|damage=3593|skill=17010230|baseSkill=17010000|charge=0|specs=2+3|skillName=Earth's Retribution|valueKind=Damage|data=230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01";
         var secondLine = "2026-04-10T16:15:36.3112138+08:00|damage|16777343:62420->16777343:52250|target=200287|source=16039|skillRaw=17730001|damage=2875|skill=17730000|baseSkill=17730000|charge=1|skillName=Empyrean Lord's Grace|valueKind=Damage|data=220438DF9C0C0400A77DD1890E015002AFD5AD6901000000D88501BB1601";
@@ -120,7 +120,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Stream_Replay_Runtime_Sink_Path_Matches_Direct_Scene_Processor()
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var entries = new[]
         {
@@ -147,7 +147,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Scene_Replay_Is_Deterministic()
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var entries = new[]
         {
@@ -176,7 +176,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Records_Baseline_Counters_For_Ingest_Snapshot_And_Summary()
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var entries = new[]
         {
@@ -205,7 +205,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Reconstructs_Boss_Activity_From_Battle_And_Health_Frame()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
             BuildReplaySkillMap(),
             new Dictionary<int, NpcCatalogEntry>
             {
@@ -285,7 +285,7 @@ public sealed class PacketLogReplayServiceTests
     [InlineData("aion2flow.stream.20260412110721.log", 10, 7)]
     public void Replay_Reconstructs_April11_Incoming_Avoidance_Ground_Truth_From_Stream_Log(string fileName, int expectedEvades, int expectedInvincibles)
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
 
@@ -306,7 +306,7 @@ public sealed class PacketLogReplayServiceTests
     [InlineData("aion2flow.stream.20260412110721.log", 10, 7)]
     public void Replay_Reconstructs_Reported_MultiSource_Invincibles_With_Full_Skill_Map(string fileName, int expectedEvades, int expectedInvincibles)
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
 
@@ -325,7 +325,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260415_Outgoing_Combat_Stats_Match_Game_Ground_Truth()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log"));
 
@@ -347,7 +347,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260416021557_Outgoing_Combat_Stats_Match_Game_Ground_Truth()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260416021557.log"));
 
@@ -371,7 +371,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260416021406_Outgoing_Combat_Stats_Match_Game_Ground_Truth()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260416021406.log"));
 
@@ -395,7 +395,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260417003456_Ground_AoE_Entities_Attributed_To_Owning_Player()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260417003456.log"));
 
@@ -416,7 +416,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260417023559_Cleric_Healing_No_False_Drain()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260417023559.log"));
         Assert.True(replay.ReplayedLines > 0);
@@ -446,7 +446,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260417141813_Light_Of_Regeneration_Periodic_Healing()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260417141813.log"));
         Assert.True(replay.ReplayedLines > 0);
@@ -475,7 +475,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260419204630_Instance_Clear_Restore_And_Incoming_Damage()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
         Assert.True(replay.ReplayedLines > 0);
@@ -496,7 +496,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260423001617_Visible_Combatant_Damage_Contribution_Does_Not_Exceed_One_Hundred_Percent()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260423001617.log"));
         Assert.True(replay.ReplayedLines > 0);
@@ -520,7 +520,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Does_Not_Synthesize_Regeneration_Healing_For_Known_Summons()
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var summonLine = "2026-04-25T00:58:41.8295743+08:00|summon|16777343:58107->16777343:50695|kind=create-177|owner=314|summon=17755|npcCode=2920107|data=BC014036DB8A015F1000AB8E2C004002003F18C70079064700FC1A461A2C7E42302D01C249C249740B0000740B000000000000D078020064000000F04902000100000000000000A08601000000000090D00300010101110143AA9809FFFFFFFFFFFFFFFF8075D52ABB030000BA0207028FBB18C736A9054700001A460702063A010000FA0200000000EF030641657468657201000200000000000000000000000000000002CD004C040000D000B202000017000000D71D030000";
         var damageLine = "2026-04-25T00:58:46.2662741+08:00|damage|16777343:58107->16777343:50695|target=17755|source=24468|skillRaw=1232480|damage=16|skill=10000|baseSkill=1230000|charge=0|specs=2+4|skillName=Account Security|valueKind=Damage|data=230438DB8A01060094BF0160CE1200020240038B9D580701000000904E1001";
@@ -545,163 +545,9 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Store_Treats_Owner_Target_Wind_Spirit_Restore_As_Healing()
-    {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        store.AppendSummon(4086, 38013);
-        store.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = 38013,
-            TargetId = 4086,
-            OriginalSkillCode = 16990003,
-            SkillCode = 16990003,
-            Damage = 114,
-            Timestamp = 1_000
-        });
-
-        var packet = Assert.Single(store.CombatPacketsBySource[38013]);
-        Assert.Equal(CombatEventKind.Healing, packet.EventKind);
-        Assert.Equal(CombatValueKind.Healing, packet.ValueKind);
-
-        var metrics = new CombatantMetrics("player");
-        Assert.False(metrics.ProcessCombatEvent(packet));
-        Assert.Equal(0, metrics.DamageAmount);
-        Assert.Equal(114, metrics.HealingAmount);
-    }
-
-    [Fact]
-    public void Store_Treats_System_Periodic_Self_Recovery_Tick_As_Healing_By_Packet_Continuation()
-    {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        var unseededTick = new ParsedCombatPacket
-        {
-            SourceId = 4086,
-            TargetId = 4086,
-            OriginalSkillCode = 190000151,
-            SkillCode = 190000151,
-            Damage = 2934,
-            Timestamp = 500,
-            FrameOrdinal = 1,
-            BatchOrdinal = 1
-        };
-        unseededTick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
-
-        var seed = new ParsedCombatPacket
-        {
-            SourceId = 4086,
-            TargetId = 4086,
-            OriginalSkillCode = 190000131,
-            SkillCode = 190000131,
-            Damage = 7634,
-            Timestamp = 1_000,
-            FrameOrdinal = 10,
-            BatchOrdinal = 10
-        };
-        seed.SetPeriodicEffect(PeriodicEffectRelation.Self, 1);
-
-        var tick = new ParsedCombatPacket
-        {
-            SourceId = 4086,
-            TargetId = 4086,
-            OriginalSkillCode = 190000131,
-            SkillCode = 190000131,
-            Damage = 7634,
-            Timestamp = 60_000,
-            FrameOrdinal = 11,
-            BatchOrdinal = 11
-        };
-        tick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
-
-        store.AppendCombatPacket(unseededTick);
-        store.AppendCombatPacket(seed);
-        store.AppendCombatPacket(tick);
-
-        var packets = store.CombatPacketsBySource[4086].ToArray();
-        Assert.Equal(3, packets.Length);
-        Assert.Equal(CombatEventKind.Support, packets[0].EventKind);
-        Assert.Equal(CombatValueKind.Support, packets[0].ValueKind);
-        Assert.Equal(CombatEventKind.Support, packets[1].EventKind);
-        Assert.Equal(CombatValueKind.Support, packets[1].ValueKind);
-        Assert.Equal(CombatEventKind.Healing, packets[2].EventKind);
-        Assert.Equal(CombatValueKind.PeriodicHealing, packets[2].ValueKind);
-
-        var metrics = new CombatantMetrics("player");
-        foreach (var packet in packets)
-        {
-            metrics.ProcessCombatEvent(packet);
-        }
-
-        Assert.Equal(0, metrics.DamageAmount);
-        Assert.Equal(7634, metrics.HealingAmount);
-        Assert.Equal(7634, metrics.PeriodicHealingAmount);
-    }
-
-    [Fact]
-    public void Store_Consumes_System_Periodic_Self_Recovery_Seed_On_First_Tick()
-    {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var store = new CombatMetricsStore();
-        var seed = new ParsedCombatPacket
-        {
-            SourceId = 4086,
-            TargetId = 4086,
-            OriginalSkillCode = 190000131,
-            SkillCode = 190000131,
-            Damage = 7634,
-            Timestamp = 1_000,
-            FrameOrdinal = 10,
-            BatchOrdinal = 10
-        };
-        seed.SetPeriodicEffect(PeriodicEffectRelation.Self, 1);
-
-        var mismatchedTick = new ParsedCombatPacket
-        {
-            SourceId = 4086,
-            TargetId = 4086,
-            OriginalSkillCode = 190000131,
-            SkillCode = 190000131,
-            Damage = 1111,
-            Timestamp = 2_000,
-            FrameOrdinal = 11,
-            BatchOrdinal = 11
-        };
-        mismatchedTick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
-
-        var laterMatchingTick = new ParsedCombatPacket
-        {
-            SourceId = 4086,
-            TargetId = 4086,
-            OriginalSkillCode = 190000131,
-            SkillCode = 190000131,
-            Damage = 7634,
-            Timestamp = 3_000,
-            FrameOrdinal = 12,
-            BatchOrdinal = 12
-        };
-        laterMatchingTick.SetPeriodicEffect(PeriodicEffectRelation.Self, 2);
-
-        store.AppendCombatPacket(seed);
-        store.AppendCombatPacket(mismatchedTick);
-        store.AppendCombatPacket(laterMatchingTick);
-
-        var packets = store.CombatPacketsBySource[4086].ToArray();
-        Assert.Equal(3, packets.Length);
-        Assert.All(packets, static packet =>
-        {
-            Assert.Equal(CombatEventKind.Support, packet.EventKind);
-            Assert.Equal(CombatValueKind.Support, packet.ValueKind);
-        });
-    }
-
-    [Fact]
     public void Replay_20260426110459_Templar_DirectSelfHpRecovery_Packets_Are_Healing()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426110459.log"));
 
@@ -755,7 +601,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260426121726_Templar_Healing_Matches_Game_Ground_Truth()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426121726.log"));
 
@@ -800,7 +646,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260426140354_SummonRestores_And_TargetSupport_Are_Classified_From_PacketShape()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426140354.log"));
 
@@ -916,7 +762,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260426031332_EnhanceSpiritBenediction_Self_And_Summon_Healing_Match_Game_Ground_Truth()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426031332.log"));
 
@@ -981,7 +827,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void SceneReplay_VendoredLog_IsDeterministic_20260415()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log");
         var first = PacketLogReplayService.Replay(path);
         var second = PacketLogReplayService.Replay(path);
@@ -994,7 +840,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void SceneReplay_VendoredLog_IsDeterministic_20260419()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log");
         var first = PacketLogReplayService.Replay(path);
         var second = PacketLogReplayService.Replay(path);
@@ -1007,7 +853,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void SceneReplay_JournalOrdinals_AreMonotonicallyIncreasing()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var path = FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log");
         var replay = PacketLogReplayService.Replay(path);
 
@@ -1026,7 +872,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void SceneReplay_BaselineCounters_AreRecorded()
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var entries = new[]
         {
             CreateStreamReplayEntry("2026-05-02T15:52:39.1861829+08:00", "state/2136-boss-scene-200003.hex"),
@@ -1054,7 +900,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void SceneReplay_AlwaysExposesSceneJournal()
     {
-        CombatMetricsEngine.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var entries = new[]
         {
             CreateStreamReplayEntry("2026-05-02T15:52:41.0000000+08:00", "combat/0438-damage.hex"),

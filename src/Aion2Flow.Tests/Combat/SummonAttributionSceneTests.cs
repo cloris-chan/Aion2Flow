@@ -1,24 +1,23 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
 
-public sealed class CombatMetricsEngineSummonAttributionTests
+public sealed class SummonAttributionSceneTests
 {
     [Fact]
     public void Attributes_Summon_Damage_To_Owner_In_Snapshot()
     {
-        CombatMetricsEngine.SkillMap = new SkillCollection();
-        var engine = new CombatMetricsEngine();
+        CombatResourceRegistry.SkillMap = new SkillCollection();
+        using var scene = new SceneTestHarness();
         const int ownerId = 12115;
         const int summonId = 18345;
         const int targetId = 17640;
 
-        engine.Store.AppendSummon(ownerId, summonId);
-        engine.Store.AppendNickname(ownerId, "Owner");
+        scene.AppendSummon(ownerId, summonId);
+        scene.AppendNickname(ownerId, "Owner");
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = targetId,
@@ -30,7 +29,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
 
         Thread.Sleep(5);
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = targetId,
@@ -40,7 +39,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Type = 2
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.BattleTime > 0);
         Assert.True(snapshot.Combatants.ContainsKey(ownerId));
@@ -59,15 +58,15 @@ public sealed class CombatMetricsEngineSummonAttributionTests
     [Fact]
     public void Infers_Preexisting_Elementalist_Summon_From_Signature_Skills()
     {
-        CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int ownerId = 1734;
         const int summonId = 123483;
         const int targetId = 110150;
 
-        engine.Store.AppendNickname(ownerId, "Owner");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(ownerId, "Owner");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = ownerId,
             TargetId = targetId,
@@ -77,7 +76,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_000
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = targetId,
@@ -87,28 +86,26 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_010
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
         Assert.False(snapshot.Combatants.ContainsKey(summonId));
         Assert.Equal(1610, owner.DamageAmount);
-        Assert.True(engine.Store.SummonOwnerByInstance.TryGetValue(summonId, out var inferredOwnerId));
-        Assert.Equal(ownerId, inferredOwnerId);
     }
 
     [Fact]
     public void Treats_Spirit_Descent_Summon_Restore_As_Support()
     {
-        CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int ownerId = 1734;
         const int summonId = 76631;
         const int targetId = 110150;
 
-        engine.Store.AppendNickname(ownerId, "Owner");
-        engine.Store.AppendSummon(ownerId, summonId);
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(ownerId, "Owner");
+        scene.AppendSummon(ownerId, summonId);
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = ownerId,
             TargetId = targetId,
@@ -118,7 +115,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_000
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = summonId,
@@ -128,7 +125,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_050
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = summonId,
@@ -138,7 +135,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_051
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
         Assert.Equal(0, owner.HealingAmount);
@@ -151,16 +148,16 @@ public sealed class CombatMetricsEngineSummonAttributionTests
     [Fact]
     public void Treats_Repeated_Spirit_Descent_Summon_Restore_As_Support()
     {
-        CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int ownerId = 314;
         const int summonId = 34799;
         const int targetId = 23089;
 
-        engine.Store.AppendNickname(ownerId, "Owner");
-        engine.Store.AppendSummon(ownerId, summonId);
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(ownerId, "Owner");
+        scene.AppendSummon(ownerId, summonId);
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = ownerId,
             TargetId = targetId,
@@ -170,7 +167,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_000
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = summonId,
@@ -181,7 +178,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_050
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = summonId,
@@ -192,7 +189,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_051
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = summonId,
@@ -203,7 +200,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 2_050
         });
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = summonId,
@@ -214,7 +211,7 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 2_051
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
         Assert.Equal(0, owner.HealingAmount);
@@ -227,17 +224,17 @@ public sealed class CombatMetricsEngineSummonAttributionTests
     [Fact]
     public void Treats_Wind_Spirit_Descent_Restore_As_Support()
     {
-        CombatMetricsEngine.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var engine = new CombatMetricsEngine();
+        using var scene = new SceneTestHarness();
         const int ownerId = 314;
         const int summonId = 21821;
         const int targetId = 23089;
 
-        engine.Store.AppendNickname(ownerId, "Owner");
-        engine.Store.AppendSummon(ownerId, summonId);
-        engine.Store.AppendNpcCode(summonId, 2920148);
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(ownerId, "Owner");
+        scene.AppendSummon(ownerId, summonId);
+        scene.AppendNpcCode(summonId, 2920148);
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = ownerId,
             TargetId = targetId,
@@ -247,12 +244,12 @@ public sealed class CombatMetricsEngineSummonAttributionTests
             Timestamp = 1_000
         });
 
-        AppendSpiritDescentRestore(engine.Store, summonId, 1, 1_050, 8_588);
-        AppendSpiritDescentRestore(engine.Store, summonId, 1, 1_051, 100_000);
-        AppendSpiritDescentRestore(engine.Store, summonId, 5, 2_050, 8_588);
-        AppendSpiritDescentRestore(engine.Store, summonId, 5, 2_051, 100_000);
+        AppendSpiritDescentRestore(scene, summonId, 1, 1_050, 8_588);
+        AppendSpiritDescentRestore(scene, summonId, 1, 1_051, 100_000);
+        AppendSpiritDescentRestore(scene, summonId, 5, 2_050, 8_588);
+        AppendSpiritDescentRestore(scene, summonId, 5, 2_051, 100_000);
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
         Assert.Equal(0, owner.HealingAmount);
@@ -263,13 +260,13 @@ public sealed class CombatMetricsEngineSummonAttributionTests
     }
 
     private static void AppendSpiritDescentRestore(
-        CombatMetricsStore store,
+        SceneTestHarness scene,
         int summonId,
         int marker,
         long timestamp,
         int amount)
     {
-        store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = summonId,
             TargetId = summonId,

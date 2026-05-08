@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
@@ -15,7 +14,7 @@ public class PeriodicChainCanonicalizerTests
     [Fact]
     public void ScenePath_NormalizesSelfPeriodicHealingRemainingTotal()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
         const int playerId = 2508;
         const int chainId = 4242;
         var journal = new ObservedEventJournal();
@@ -63,7 +62,7 @@ public class PeriodicChainCanonicalizerTests
     [Fact]
     public void ScenePath_SelfPeriodicHealingTerminalTickConsumesRemainingTotal()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
         const int playerId = 2508;
         const int chainId = 4242;
         var journal = new ObservedEventJournal();
@@ -160,7 +159,7 @@ public class PeriodicChainCanonicalizerTests
     [Fact]
     public void JournalingSink_PreservesRawPeriodicPacketObservation()
     {
-        CombatMetricsEngine.LoadSkillMap("zh-TW");
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
         const int playerId = 2508;
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
@@ -187,7 +186,7 @@ public class PeriodicChainCanonicalizerTests
     [Fact]
     public void ScenePath_Replay_EnhanceSpiritBenedictionPeriodicHealing_MatchesGroundTruth()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426031332.log"));
 

@@ -1,23 +1,22 @@
 using System.Globalization;
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Tests.PacketCapture;
+using Cloris.Aion2Flow.Scene;
+using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
 
-public sealed class CombatMetricsEngineLiveClassInferenceTests
+public sealed class LiveClassInferenceSceneTests
 {
     [Fact]
     public void LiveReplay_20260423002750_Does_Not_Drop_Combatant_Class_After_It_Is_Inferred()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
-        using var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
+        var scene = new SceneLiveReadModel();
+        using var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
 
         const int combatantId = 2906;
         CharacterClass? firstResolvedClass = null;
@@ -36,7 +35,7 @@ public sealed class CombatMetricsEngineLiveClassInferenceTests
                 continue;
             }
 
-            var snapshot = engine.CreateBattleSnapshot();
+            var snapshot = scene.Owner.CreateSnapshot();
             if (!snapshot.Combatants.TryGetValue(combatantId, out var combatant))
             {
                 continue;

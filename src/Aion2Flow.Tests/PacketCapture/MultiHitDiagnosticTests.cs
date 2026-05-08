@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
@@ -24,7 +23,7 @@ public sealed class MultiHitDiagnosticTests
     [InlineData("aion2flow.stream.20260414045207.log", 119)]
     public void Replay_Detects_Correct_MultiHit_Count_From_Stream_Log(string fileName, int expectedMultiHitCount)
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
             new SkillCollection(),
             new Dictionary<int, NpcCatalogEntry>());
 

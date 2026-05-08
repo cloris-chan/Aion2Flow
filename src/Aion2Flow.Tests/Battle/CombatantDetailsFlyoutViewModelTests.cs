@@ -10,8 +10,8 @@ using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Projection;
+using Cloris.Aion2Flow.Scene.Stores;
 using Cloris.Aion2Flow.Services;
-using Cloris.Aion2Flow.Tests.PacketCapture;
 using Cloris.Aion2Flow.Tests.Protocol;
 using Cloris.Aion2Flow.ViewModels;
 
@@ -22,10 +22,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Builds_Live_Battle_Sections_And_Filters_By_Target()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -35,18 +34,18 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
         const int addId = 9002;
 
-        store.AppendNickname(playerId, "Perigee");
-        store.AppendNickname(healerId, "Helper");
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(healerId, "Helper");
 
-        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, playerId, bossId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, addId, 11000010, 200, 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, addId, 11000010, 200, 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -68,10 +67,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Records_Detail_Refresh_Baseline_Counters()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -80,14 +78,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int healerId = 1002;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
-        store.AppendNickname(healerId, "Helper");
-        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(healerId, "Helper");
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var counters = viewModel.LastRefreshBaselineCounters;
         Assert.True(counters.Elapsed >= TimeSpan.Zero);
@@ -100,10 +98,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneBattleCombatant_Builds_Live_Detail_From_Scene_Projection()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -154,10 +150,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneBattleCombatant_Includes_Summon_Detail_Folded_To_Owner()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -189,7 +183,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneBattleCombatant_Uses_Archived_BattleId_Context()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
@@ -224,7 +218,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneBattleCombatant_Uses_Archived_ScenePayload()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
@@ -261,10 +255,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Keeps_Selected_Combatant_Healing_Details_Outside_Damage_Window()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -272,17 +265,17 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, playerId, 12000010, 150, 1_500, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, playerId, playerId, 13000010, 250, 2_500, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, playerId, 12000010, 150, 1_500, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, playerId, 13000010, 250, 2_500, CombatEventKind.Healing, CombatValueKind.Healing);
 
-        var snapshot = engine.CreateBattleSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.Equal(400, snapshot.Combatants[playerId].HealingAmount);
 
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         Assert.Equal(400, viewModel.OutgoingHealing.Total);
         Assert.Equal(400, viewModel.IncomingHealing.Total);
@@ -294,7 +287,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneBattleCombatant_Uses_Archived_ScenePayload_For_Summon_Attribution()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
@@ -330,10 +323,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Splits_Healing_And_Shield_Sections_And_Shares_Recovery_Scope()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -342,16 +334,16 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int allyId = 1002;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
-        store.AppendNickname(allyId, "Helper");
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(allyId, "Helper");
 
-        AppendPacket(store, playerId, bossId, 11000010, 450, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, playerId, playerId, 14000010, 300, 3_000, CombatEventKind.Healing, CombatValueKind.Shield);
-        AppendPacket(store, playerId, allyId, 14000010, 200, 4_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 450, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, playerId, 14000010, 300, 3_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(scene.Sink, playerId, allyId, 14000010, 200, 4_000, CombatEventKind.Healing, CombatValueKind.Shield);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         Assert.Equal(250, viewModel.OutgoingHealing.Total);
         Assert.Equal(500, viewModel.OutgoingShield.Total);
@@ -371,10 +363,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Does_Not_Treat_Hostile_Shield_Absorption_As_Support_Source()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -383,15 +374,15 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int healerId = 1002;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
-        store.AppendNickname(healerId, "Helper");
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(healerId, "Helper");
 
-        AppendPacket(store, playerId, bossId, 11000010, 450, 500, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, healerId, playerId, 13000010, 90, 1_000, CombatEventKind.Healing, CombatValueKind.Healing);
-        AppendPacket(store, bossId, playerId, 14000010, 300, 2_000, CombatEventKind.Support, CombatValueKind.Shield);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 450, 500, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, healerId, playerId, 13000010, 90, 1_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, bossId, playerId, 14000010, 300, 2_000, CombatEventKind.Support, CombatValueKind.Shield);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         Assert.Equal(90, viewModel.IncomingHealing.Total);
         Assert.Equal(300, viewModel.IncomingShield.Total);
@@ -402,10 +393,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Does_Not_Count_DamageTagged_Periodic_Support_On_Allies_As_Outgoing_Damage()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -416,19 +406,19 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int allyThreeId = 1004;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Tata");
-        store.AppendNickname(allyOneId, "Alpha");
-        store.AppendNickname(allyTwoId, "Bravo");
-        store.AppendNickname(allyThreeId, "Charlie");
+        scene.AppendNickname(playerId, "Tata");
+        scene.AppendNickname(allyOneId, "Alpha");
+        scene.AppendNickname(allyTwoId, "Bravo");
+        scene.AppendNickname(allyThreeId, "Charlie");
 
-        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         AppendPeriodicTargetPacket(allyOneId, 2_000);
         AppendPeriodicTargetPacket(allyTwoId, 3_000);
         AppendPeriodicTargetPacket(allyThreeId, 4_000);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         Assert.Equal(500, snapshot.Combatants[playerId].DamageAmount);
         Assert.Equal(500, viewModel.OutgoingDamage.Total);
@@ -455,17 +445,16 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
             packet.EventKind = CombatEventClassifier.Classify(packet);
             packet.ValueKind = CombatEventClassifier.ClassifyValueKind(packet);
-            store.AppendCombatPacket(packet);
+            scene.AppendCombatPacket(packet);
         }
     }
 
     [Fact]
     public void SelectBattleCombatant_Does_Not_Count_DamageTagged_Self_Support_As_Outgoing_Damage()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -473,9 +462,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "RIpplinger");
+        scene.AppendNickname(playerId, "RIpplinger");
 
-        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var selfPacket = new ParsedCombatPacket
         {
@@ -488,10 +477,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         };
         selfPacket.EventKind = CombatEventClassifier.Classify(selfPacket);
         selfPacket.ValueKind = CombatEventClassifier.ClassifyValueKind(selfPacket);
-        store.AppendCombatPacket(selfPacket);
+        scene.AppendCombatPacket(selfPacket);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         Assert.Equal(500, snapshot.Combatants[playerId].DamageAmount);
         Assert.Equal(500, viewModel.OutgoingDamage.Total);
@@ -503,10 +492,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Preserves_Live_Scope_Filter_Across_Refreshes()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -515,16 +503,16 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
         const int addId = 9002;
 
-        store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, addId, 11000010, 200, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        scene.AppendNickname(playerId, "Perigee");
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, addId, 11000010, 200, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
         SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
 
-        AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         AssertSelectedCounterpartIds(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
@@ -534,10 +522,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Preserves_Counterpart_ViewModel_Identity_Across_Relevant_Refreshes()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -546,21 +533,21 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
         const int addId = 9002;
 
-        store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, addId, 11000010, 200, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        scene.AppendNickname(playerId, "Perigee");
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, addId, 11000010, 200, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var originalBossCounterpart = Assert.Single(
             viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts,
             static counterpart => counterpart.CombatantId == bossId);
 
-        AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
-        snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var refreshedBossCounterpart = Assert.Single(
             viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts,
@@ -574,10 +561,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Builds_PerSkill_Damage_Modifier_Summaries()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -585,14 +571,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3, modifiers: DamageModifiers.Back | DamageModifiers.Smite);
-        AppendPacket(store, playerId, bossId, 11000010, 400, 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.Perfect);
-        AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3, modifiers: DamageModifiers.Back | DamageModifiers.Smite);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 400, 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.Perfect);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
@@ -610,13 +596,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Tracks_MultiHit_Modifiers_Without_Inflating_Direct_Hits()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(13060250, "突襲", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -624,11 +609,11 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 13060250, 35515, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 2, marker: 1);
+        AppendPacket(scene.Sink, playerId, bossId, 13060250, 35515, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 2, marker: 1);
         AppendPacket(
-            store,
+            scene.Sink,
             playerId,
             bossId,
             13060250,
@@ -641,8 +626,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             marker: 4,
             multiHitCount: 1);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
@@ -657,14 +642,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Counts_MultiHit_Once_Per_Activation_Group()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(17010230, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
             new Skill(17730000, "主神恩寵", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -672,10 +656,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(playerId, "Perigee");
 
         AppendPacket(
-            store,
+            scene.Sink,
             playerId,
             bossId,
             17010230,
@@ -688,7 +672,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             modifiers: DamageModifiers.Back | DamageModifiers.Perfect | DamageModifiers.MultiHit,
             multiHitCount: 2);
         AppendPacket(
-            store,
+            scene.Sink,
             playerId,
             bossId,
             17730000,
@@ -700,7 +684,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             marker: 2,
             modifiers: DamageModifiers.Back);
         AppendPacket(
-            store,
+            scene.Sink,
             playerId,
             bossId,
             17010230,
@@ -713,7 +697,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             modifiers: DamageModifiers.Back | DamageModifiers.MultiHit,
             multiHitCount: 2);
         AppendPacket(
-            store,
+            scene.Sink,
             playerId,
             bossId,
             17730000,
@@ -725,8 +709,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             marker: 4,
             modifiers: DamageModifiers.Back);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var rows = viewModel.OutgoingDamage.Rows.OrderBy(row => row.SkillCode).ToArray();
 
@@ -741,10 +725,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Keeps_Very_Large_Periodic_Damage_Totals_Consistent()
     {
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -752,15 +735,15 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 1_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
-        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 2_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
-        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 3_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
-        AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, int.MaxValue, 1_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, int.MaxValue, 2_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, int.MaxValue, 3_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, int.MaxValue, 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var expectedDamage = 4L * int.MaxValue;
 
@@ -778,15 +761,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Damage_Hits_And_Modifier_Rates_Ignore_Periodic_Ticks()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(17010010, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
             new Skill(17020010, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
             new Skill(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -794,24 +776,24 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(store, playerId, bossId, 17010010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3);
-        AppendPacket(store, playerId, bossId, 17010010, 100, 1_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
-        AppendPacket(store, playerId, bossId, 17010010, 100, 2_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 17010010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3);
+        AppendPacket(scene.Sink, playerId, bossId, 17010010, 100, 1_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 17010010, 100, 2_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
-        AppendPacket(store, playerId, bossId, 17020010, 450, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, bossId, 17020010, 90, 3_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
-        AppendPacket(store, playerId, bossId, 17020010, 90, 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 17020010, 450, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 17020010, 90, 3_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 17020010, 90, 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
-        AppendPacket(store, playerId, bossId, 17030010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Back);
-        AppendPacket(store, playerId, bossId, 17030010, 250, 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, bossId, 17030010, 80, 6_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
-        AppendPacket(store, playerId, bossId, 17030010, 80, 6_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
-        AppendPacket(store, playerId, bossId, 17030010, 80, 7_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 17030010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Back);
+        AppendPacket(scene.Sink, playerId, bossId, 17030010, 250, 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 17030010, 80, 6_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 17030010, 80, 6_500, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
+        AppendPacket(scene.Sink, playerId, bossId, 17030010, 80, 7_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         Assert.Equal(4, viewModel.OutgoingDamage.Hits);
         Assert.Equal(7, viewModel.OutgoingDamage.PeriodicHits);
@@ -847,14 +829,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Tracks_Evade_And_Block_Defense_Outcomes()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
             new Skill(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -862,21 +843,21 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 100, 500, CombatEventKind.Damage, CombatValueKind.Damage);
+        scene.AppendNickname(playerId, "Perigee");
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 100, 500, CombatEventKind.Damage, CombatValueKind.Damage);
 
-        AppendPacket(store, bossId, playerId, 1100020, 1, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance | DamageModifiers.Regeneration);
-        AppendPacket(store, bossId, playerId, 1100020, 1, 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
-        AppendPacket(store, bossId, playerId, 1100020, 0, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
-        AppendPacket(store, bossId, playerId, 1100020, 0, 4_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
-        AppendPacket(store, bossId, playerId, 1100020, 11, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry);
-        AppendPacket(store, bossId, playerId, 1100020, 1, 6_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
-        AppendPacket(store, bossId, playerId, 1100020, 0, 7_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
-        AppendPacket(store, bossId, playerId, 1100020, 11, 8_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block);
-        AppendPacket(store, bossId, playerId, 1100020, 1, 9_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block | DamageModifiers.Perfect);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 1, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance | DamageModifiers.Regeneration);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 1, 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 0, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 0, 4_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 11, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 1, 6_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 0, 7_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 11, 8_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 1, 9_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block | DamageModifiers.Perfect);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var row = Assert.Single(viewModel.IncomingDamage.Rows);
 
@@ -899,13 +880,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Keeps_Synthetic_Invincible_In_Summary_Without_Showing_Fake_Dodge_Row()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -913,10 +893,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 100, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        scene.AppendNickname(playerId, "Perigee");
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 100, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
         AppendPacket(
-            store,
+            scene.Sink,
             playerId,
             bossId,
             SyntheticCombatSkillCodes.UnresolvedInvincible,
@@ -928,8 +908,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             hitContribution: 0,
             attemptContribution: 1);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
@@ -945,14 +925,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Counts_UnresolvedAttacker_Invincible_In_Incoming_Summary_Without_UnknownScope()
     {
-        CombatMetricsEngine.SetGameResources(
+        CombatResourceRegistry.SetGameResources(
         [
             new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
             new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -960,11 +939,11 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 100, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, bossId, playerId, 99000010, 25, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        scene.AppendNickname(playerId, "Perigee");
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 100, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, bossId, playerId, 99000010, 25, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
         AppendPacket(
-            store,
+            scene.Sink,
             0,
             playerId,
             SyntheticCombatSkillCodes.UnresolvedInvincible,
@@ -976,8 +955,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             hitContribution: 0,
             attemptContribution: 1);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         var row = Assert.Single(viewModel.IncomingDamage.Rows);
 
@@ -992,7 +971,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412103519_Stream_Log()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = ReplayWithScene(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
         var language = new LanguageService();
@@ -1015,7 +994,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412110721_Stream_Log()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         var replay = ReplayWithScene(FixtureHelper.GetPath("logs/aion2flow.stream.20260412110721.log"));
         var language = new LanguageService();
@@ -1042,7 +1021,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_20260422222104_Does_Not_Show_Ally_Targets_In_Outgoing_Damage()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var logPath = FixtureHelper.GetPath("logs/aion2flow.stream.20260422222104.log");
         var replay = ReplayWithScene(logPath);
         var language = new LanguageService();
@@ -1118,10 +1097,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412103519_Live_Stream_Path()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        using var processor = new PacketStreamProcessor(new StoreRuntimeObservationSink(store));
+        var scene = new SceneLiveReadModel();
+        using var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
 
         foreach (var entry in ReadStreamLogEntries("aion2flow.stream.20260412103519.log"))
         {
@@ -1133,44 +1112,26 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             processor.AppendAndProcess(entry.Payload, entry.Connection, entry.TimestampMilliseconds);
         }
 
-        var engine = new CombatMetricsEngine(store);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        var battlePackets = CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime)
-            .Where(static context => context.TargetId == 3737)
+        scene.Owner.Refresh();
+        var snapshot = scene.Owner.CreateSnapshot();
+        var battlePackets = scene.Owner.Combat.Events
+            .Where(static e => e.TargetId == 3737 && e.ObservedAtMilliseconds >= 0)
             .ToArray();
         var battleInvincibles = battlePackets
-            .Where(static context => context.TargetId == 3737 && (context.Packet.Modifiers & DamageModifiers.Invincible) != 0)
-            .Select(static context => $"ts={context.Packet.Timestamp}|source={context.SourceId}|marker={context.Packet.Marker}|attempt={context.Packet.AttemptContribution}|effect={DescribePacketEffect(context.Packet)}")
+            .Where(static e => (e.Observation.Modifiers & DamageModifiers.Invincible) != 0)
+            .Select(static e => $"ts={e.ObservedAtMilliseconds}|source={e.SourceId}|marker={e.Observation.Marker}|attempt={e.Observation.AttemptCount}|effect={DescribePacketEffect(e)}")
             .ToArray();
-        var manualIncomingDamageMetrics = new Dictionary<int, SkillMetrics>();
-
-        foreach (var battlePacket in battlePackets)
-        {
-            if (!ContributesDamageForDetail(battlePacket.Packet))
-            {
-                continue;
-            }
-
-            if (!manualIncomingDamageMetrics.TryGetValue(battlePacket.Packet.SkillCode, out var skill))
-            {
-                skill = new SkillMetrics(battlePacket.Packet);
-                manualIncomingDamageMetrics[battlePacket.Packet.SkillCode] = skill;
-            }
-
-            skill.ProcessEvent(battlePacket.Packet);
-        }
-
-        var manualInvincibleCount = manualIncomingDamageMetrics.Values.Sum(static skill => skill.InvincibleTimes);
+        var manualInvincibleCount = battlePackets.Where(static e => e.ContributesDamage).Sum(static e => e.InvincibleCount);
 
         Assert.Contains(3737, snapshot.Combatants.Keys);
         Assert.True(battleInvincibles.Length == 7, string.Join(Environment.NewLine, battleInvincibles));
         Assert.True(manualInvincibleCount == 7, string.Join(Environment.NewLine, battleInvincibles));
 
-        SelectStoreCombatant(viewModel, engine, store, 3737);
+        SelectSceneCombatant(viewModel, scene.Owner, snapshot, 3737);
 
         Assert.Equal(18, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
@@ -1315,6 +1276,17 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             : packet.EffectTag.ToString();
     }
 
+    private static string DescribePacketEffect(CombatEventRecord e)
+    {
+        var observation = e.Observation;
+        if (observation.PeriodicRelation != PeriodicEffectRelation.None || observation.PeriodicMode != 0)
+            return $"{observation.PeriodicRelation}:{observation.PeriodicMode}";
+
+        return observation.EffectTag == PacketEffectTag.None
+            ? "none"
+            : observation.EffectTag.ToString();
+    }
+
     private static string DescribeScenePacketEffect(SceneReplayPacket packet)
     {
         if (packet.PeriodicRelation != PeriodicEffectRelation.None || packet.PeriodicMode != 0)
@@ -1326,7 +1298,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     private static void AppendPacket(
-        CombatMetricsStore store,
+        IRuntimeObservationSink sink,
         int sourceId,
         int targetId,
         int skillCode,
@@ -1362,11 +1334,11 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         };
 
         packet.SetPeriodicEffect(periodicRelation, periodicMode);
-        store.AppendCombatPacket(packet);
+        sink.AppendCombatPacket(packet);
     }
 
     private static void AppendPacket(
-        CombatMetricsStore store,
+        IRuntimeObservationSink sink,
         int sourceId,
         int targetId,
         int skillCode,
@@ -1399,7 +1371,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             ValueKind = valueKind
         };
 
-        store.AppendCombatPacket(packet);
+        sink.AppendCombatPacket(packet);
     }
 
     private static void AppendScenePacket(
@@ -1436,15 +1408,21 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(expectedRate, actualRate, 10);
     }
 
-    private static void SelectStoreCombatant(CombatantDetailsFlyoutViewModel viewModel, CombatMetricsEngine engine, CombatMetricsStore store, int combatantId, bool forceRefresh = false)
+    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, int combatantId, bool forceRefresh = false)
     {
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, snapshot, store, combatantId, forceRefresh);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, snapshot, combatantId, forceRefresh);
     }
 
-    private static void SelectStoreCombatant(CombatantDetailsFlyoutViewModel viewModel, DamageMeterSnapshot snapshot, CombatMetricsStore store, int combatantId, bool forceRefresh = false)
+    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, DamageMeterSnapshot snapshot, int combatantId, bool forceRefresh = false)
     {
-        var detail = CreateStoreDetailDelta(snapshot, store, combatantId);
+        var detail = scene.CreateDetailDelta(snapshot, combatantId, forceRefresh);
+        viewModel.SelectSceneBattleCombatant(snapshot.BattleId, combatantId, snapshot, detail, forceRefresh);
+    }
+
+    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneReadModelOwner scene, DamageMeterSnapshot snapshot, int combatantId, bool forceRefresh = false)
+    {
+        var detail = scene.CreateDetailDelta(snapshot, combatantId, forceRefresh);
         viewModel.SelectSceneBattleCombatant(snapshot.BattleId, combatantId, snapshot, detail, forceRefresh);
     }
 
@@ -1466,48 +1444,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         return PacketLogReplayService.Replay(path);
     }
 
-    private static CombatDetailDelta CreateStoreDetailDelta(DamageMeterSnapshot snapshot, CombatMetricsStore store, int combatantId)
-    {
-        var events = store.EnumerateCombatantDetailPackets(snapshot, combatantId)
-            .Select(static packet => new CombatDetailEvent(packet.Packet, packet.SourceId, packet.TargetId))
-            .ToArray();
-        var displayNames = new Dictionary<int, string>();
-        AddDisplayName(displayNames, snapshot, store, combatantId);
-        for (var i = 0; i < events.Length; i++)
-        {
-            AddDisplayName(displayNames, snapshot, store, events[i].SourceId);
-            AddDisplayName(displayNames, snapshot, store, events[i].TargetId);
-        }
-
-        return new CombatDetailDelta
-        {
-            CombatantId = combatantId,
-            Revision = store.GetCombatantDetailRevision(combatantId),
-            OutgoingPairs = events.Where(e => e.SourceId == combatantId && e.TargetId > 0).Select(static e => new DirectedPairKey(e.SourceId, e.TargetId)).Distinct().OrderBy(static p => p.SourceId).ThenBy(static p => p.TargetId).ToArray(),
-            IncomingPairs = events.Where(e => e.TargetId == combatantId && e.SourceId > 0).Select(static e => new DirectedPairKey(e.SourceId, e.TargetId)).Distinct().OrderBy(static p => p.SourceId).ThenBy(static p => p.TargetId).ToArray(),
-            Events = events,
-            DisplayNames = displayNames
-        };
-    }
-
-    private static void AddDisplayName(Dictionary<int, string> names, DamageMeterSnapshot snapshot, CombatMetricsStore store, int combatantId)
-    {
-        if (combatantId <= 0)
-            return;
-
-        var name = CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, combatantId);
-        if (!string.IsNullOrWhiteSpace(name))
-            names[combatantId] = name;
-    }
-
     [Fact]
     public void ScopeOptions_Resolve_Npc_Name_From_Catalog_When_NpcCode_Set()
     {
         var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), catalog);
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
+        using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
@@ -1516,15 +1459,15 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int npcInstanceId = 29994;
         const int npcCode = 2400032;
 
-        store.AppendNickname(playerId, "Perigee");
-        store.AppendNpcCode(npcInstanceId, npcCode);
-        store.AppendNpcKind(npcInstanceId, NpcKind.Monster);
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendNpcCode(npcInstanceId, npcCode);
+        scene.AppendNpcKind(npcInstanceId, NpcKind.Monster);
 
-        AppendPacket(store, playerId, npcInstanceId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, npcInstanceId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, npcInstanceId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, npcInstanceId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        SelectStoreCombatant(viewModel, engine, store, playerId);
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, playerId);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
@@ -1539,7 +1482,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     public void ScopeOptions_Resolve_Npc_Name_From_Archived_ScenePayload()
     {
         var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
-        CombatMetricsEngine.SetGameResources(BuildSkillMap(), catalog);
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);

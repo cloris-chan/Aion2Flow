@@ -1,20 +1,19 @@
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Metrics;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
 
-public sealed class CombatMetricsEngineCharacterClassInferenceTests
+public sealed class CharacterClassInferenceSceneTests
 {
     [Fact]
     public void Does_Not_Infer_CharacterClass_From_Periodic_Self_Support_Proc()
     {
-        CombatMetricsEngine.LoadSkillMap("en-US");
-        var engine = new CombatMetricsEngine();
+        CombatResourceRegistry.LoadSkillMap("en-US");
+        using var scene = new SceneTestHarness();
         const int playerId = 101;
         const int targetId = 9001;
 
-        engine.Store.AppendNickname(playerId, "Player");
+        scene.AppendNickname(playerId, "Player");
         var periodicPacket = new ParsedCombatPacket
         {
             SourceId = playerId,
@@ -24,11 +23,11 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
             Damage = 120
         };
         periodicPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 0);
-        engine.Store.AppendCombatPacket(periodicPacket);
+        scene.AppendCombatPacket(periodicPacket);
 
         Thread.Sleep(5);
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -37,7 +36,7 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
             Damage = 1350,
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Null(combatant.CharacterClass);
@@ -46,12 +45,12 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
     [Fact]
     public void Prefers_Offensive_Class_Evidence_Over_Sprint_Mantra_Proc()
     {
-        CombatMetricsEngine.LoadSkillMap("en-US");
-        var engine = new CombatMetricsEngine();
+        CombatResourceRegistry.LoadSkillMap("en-US");
+        using var scene = new SceneTestHarness();
         const int playerId = 102;
         const int targetId = 9002;
 
-        engine.Store.AppendNickname(playerId, "Ranger");
+        scene.AppendNickname(playerId, "Ranger");
         var periodicPacket = new ParsedCombatPacket
         {
             SourceId = playerId,
@@ -61,11 +60,11 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
             Damage = 90
         };
         periodicPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 0);
-        engine.Store.AppendCombatPacket(periodicPacket);
+        scene.AppendCombatPacket(periodicPacket);
 
         Thread.Sleep(5);
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -74,7 +73,7 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
             Damage = 2450,
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(CharacterClass.Ranger, combatant.CharacterClass);
@@ -83,13 +82,13 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
     [Fact]
     public void DamageContribution_Includes_PreInference_Damage_When_Class_Is_Inferred_Later()
     {
-        CombatMetricsEngine.LoadSkillMap("en-US");
-        var engine = new CombatMetricsEngine();
+        CombatResourceRegistry.LoadSkillMap("en-US");
+        using var scene = new SceneTestHarness();
         const int playerId = 103;
         const int targetId = 9003;
 
-        engine.Store.AppendNickname(playerId, "Late Ranger");
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendNickname(playerId, "Late Ranger");
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -100,7 +99,7 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
 
         Thread.Sleep(5);
 
-        engine.Store.AppendCombatPacket(new ParsedCombatPacket
+        scene.AppendCombatPacket(new ParsedCombatPacket
         {
             SourceId = playerId,
             TargetId = targetId,
@@ -109,7 +108,7 @@ public sealed class CombatMetricsEngineCharacterClassInferenceTests
             Damage = 500,
         });
 
-        var snapshot = engine.CreateSnapshot();
+        var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(CharacterClass.Ranger, combatant.CharacterClass);

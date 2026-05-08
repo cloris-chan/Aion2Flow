@@ -1,11 +1,10 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
 
-public sealed class CombatMetricsEngineLocalizationTests
+public sealed class CombatLocalizationSceneTests
 {
     [Fact]
     public void SkillMetrics_SkillName_Tracks_Current_Language_Resources()
@@ -21,13 +20,13 @@ public sealed class CombatMetricsEngineLocalizationTests
                 ValueKind = CombatValueKind.PeriodicHealing
             };
 
-            CombatMetricsEngine.LoadSkillMap("zh-TW");
+            CombatResourceRegistry.LoadSkillMap("zh-TW");
             var zhName = ResourceDatabase.LoadSkills("zh-TW")[2011101].Name;
             var metrics = new SkillMetrics(packet);
 
             Assert.Equal(zhName, metrics.SkillName);
 
-            CombatMetricsEngine.LoadSkillMap("en-US");
+            CombatResourceRegistry.LoadSkillMap("en-US");
             var enName = ResourceDatabase.LoadSkills("en-US")[2011101].Name;
 
             Assert.Equal(enName, metrics.SkillName);
@@ -35,7 +34,7 @@ public sealed class CombatMetricsEngineLocalizationTests
         }
         finally
         {
-            CombatMetricsEngine.LoadSkillMap("zh-TW");
+            CombatResourceRegistry.LoadSkillMap("zh-TW");
         }
     }
 
@@ -44,14 +43,14 @@ public sealed class CombatMetricsEngineLocalizationTests
     {
         try
         {
-            CombatMetricsEngine.LoadSkillMap("zh-TW");
-            var engine = new CombatMetricsEngine();
+            CombatResourceRegistry.LoadSkillMap("zh-TW");
+            using var scene = new SceneTestHarness();
             const int sourceId = 2007;
             const int targetId = 55783;
             const int skillCode = 11800008;
 
-            engine.Store.AppendNickname(sourceId, "Perigee");
-            engine.Store.AppendCombatPacket(new ParsedCombatPacket
+            scene.AppendNickname(sourceId, "Perigee");
+            scene.AppendCombatPacket(new ParsedCombatPacket
             {
                 SourceId = sourceId,
                 TargetId = targetId,
@@ -60,7 +59,7 @@ public sealed class CombatMetricsEngineLocalizationTests
                 Damage = 77669
             });
             Thread.Sleep(5);
-            engine.Store.AppendCombatPacket(new ParsedCombatPacket
+            scene.AppendCombatPacket(new ParsedCombatPacket
             {
                 SourceId = sourceId,
                 TargetId = targetId,
@@ -69,13 +68,13 @@ public sealed class CombatMetricsEngineLocalizationTests
                 Damage = 77669
             });
 
-            var zhSnapshot = engine.CreateBattleSnapshot();
+            var zhSnapshot = scene.CreateSnapshot();
             Assert.True(zhSnapshot.Combatants.TryGetValue(sourceId, out var zhCombatant));
             Assert.True(zhCombatant.Skills.TryGetValue(skillCode, out var zhSkill));
             var zhSkillName = zhSkill.SkillName;
 
-            CombatMetricsEngine.LoadSkillMap("en-US");
-            var enSnapshot = engine.CreateBattleSnapshot();
+            CombatResourceRegistry.LoadSkillMap("en-US");
+            var enSnapshot = scene.CreateSnapshot();
 
             Assert.True(enSnapshot.Combatants.TryGetValue(sourceId, out var enCombatant));
             Assert.True(enCombatant.Skills.TryGetValue(skillCode, out var enSkill));
@@ -97,7 +96,7 @@ public sealed class CombatMetricsEngineLocalizationTests
         }
         finally
         {
-            CombatMetricsEngine.LoadSkillMap("zh-TW");
+            CombatResourceRegistry.LoadSkillMap("zh-TW");
         }
     }
 }
