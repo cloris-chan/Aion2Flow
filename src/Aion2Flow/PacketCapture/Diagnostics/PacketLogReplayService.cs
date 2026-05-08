@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
@@ -1136,7 +1137,7 @@ public sealed class PacketLogReplayService
             return;
         }
 
-        var hasCatalogEntry = CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry);
+        var hasCatalogEntry = CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry);
         if (requireCatalogEntry && !hasCatalogEntry)
         {
             return;
@@ -1147,7 +1148,7 @@ public sealed class PacketLogReplayService
             store.TryGetNpcRuntimeState(lifecycleId, out var existing) &&
             existing.NpcCode is int existingCode &&
             existingCode != npcCode &&
-            CombatMetricsEngine.TryResolveNpcCatalogEntry(existingCode, out _))
+            CombatResourceRegistry.TryResolveNpcCatalogEntry(existingCode, out _))
         {
             store.RebindInstanceLifecycle(instanceId);
         }
@@ -1160,7 +1161,7 @@ public sealed class PacketLogReplayService
         }
         store.AppendNpcName(npcCode, entry.Name);
 
-        var kind = CombatMetricsEngine.ResolveNpcKind(entry.Kind);
+        var kind = CombatResourceRegistry.ResolveNpcKind(entry.Kind);
         if (kind != NpcKind.Unknown && kind != NpcKind.Summon)
         {
             store.AppendNpcKind(instanceId, kind);

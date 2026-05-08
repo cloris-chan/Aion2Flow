@@ -4,6 +4,7 @@ using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Collections;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Scene.Projection;
@@ -440,7 +441,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             if (entity.NpcCode is int npcCode)
             {
-                if (CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
+                if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
                     return catalogEntry.Name;
 
                 if (metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName))

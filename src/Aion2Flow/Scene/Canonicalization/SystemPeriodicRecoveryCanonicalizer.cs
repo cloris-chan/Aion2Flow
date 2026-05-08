@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Scene.Model;
@@ -54,7 +54,7 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
         if (originalSkillCode <= 0)
             return false;
 
-        var baseSkillCode = observation.BaseSkillCode > 0 ? observation.BaseSkillCode : CombatMetricsEngine.ParseSkillVariant(originalSkillCode).BaseSkillCode;
+        var baseSkillCode = observation.BaseSkillCode > 0 ? observation.BaseSkillCode : CombatResourceRegistry.ParseSkillVariant(originalSkillCode).BaseSkillCode;
         if (baseSkillCode != PeriodicSelfRecoveryBaseSkillCode)
             return false;
 

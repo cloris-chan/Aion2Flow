@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Scene.Observation;
@@ -157,7 +157,7 @@ public sealed class PeriodicChainCanonicalizer
     private static CombatObservation NormalizeBaseObservation(int sourceId, int targetId, in CombatObservation observation)
     {
         var packet = ToPacket(sourceId, targetId, in observation);
-        CombatMetricsEngine.NormalizePacketForStorage(packet);
+        CombatResourceRegistry.NormalizePacketForStorage(packet);
         return FromPacket(packet, in observation);
     }
 
@@ -243,10 +243,10 @@ public sealed class PeriodicChainCanonicalizer
         MatchesSkillCode(in observation, a) || MatchesSkillCode(in observation, b) || MatchesSkillCode(in observation, c) || MatchesSkillCode(in observation, d);
 
     private static bool MatchesSkillCode(in CombatObservation observation, int skillCode) =>
-        skillCode > 0 && (observation.SkillCode == skillCode || observation.OriginalSkillCode == skillCode || CombatMetricsEngine.InferOriginalSkillCode(observation.OriginalSkillCode) == skillCode || CombatMetricsEngine.InferOriginalSkillCode(observation.SkillCode) == skillCode);
+        skillCode > 0 && (observation.SkillCode == skillCode || observation.OriginalSkillCode == skillCode || CombatResourceRegistry.InferOriginalSkillCode(observation.OriginalSkillCode) == skillCode || CombatResourceRegistry.InferOriginalSkillCode(observation.SkillCode) == skillCode);
 
     private static bool MatchesBase(in CombatObservation observation, int baseSkillCode) =>
-        baseSkillCode > 0 && (observation.BaseSkillCode == baseSkillCode || CombatMetricsEngine.ParseSkillVariant(observation.OriginalSkillCode).BaseSkillCode == baseSkillCode || CombatMetricsEngine.ParseSkillVariant(observation.SkillCode).BaseSkillCode == baseSkillCode);
+        baseSkillCode > 0 && (observation.BaseSkillCode == baseSkillCode || CombatResourceRegistry.ParseSkillVariant(observation.OriginalSkillCode).BaseSkillCode == baseSkillCode || CombatResourceRegistry.ParseSkillVariant(observation.SkillCode).BaseSkillCode == baseSkillCode);
 
     private static bool MatchesByHundred(int candidateSkillCode, int skillCode) =>
         candidateSkillCode > 0 && skillCode > 0 && candidateSkillCode / 100 == skillCode;

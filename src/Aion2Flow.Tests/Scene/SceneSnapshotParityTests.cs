@@ -1,8 +1,5 @@
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
-using Cloris.Aion2Flow.PacketCapture.Diagnostics;
-using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
@@ -12,14 +9,14 @@ public sealed class SceneSnapshotParityTests
     [Fact]
     public void M5_02_VendoredStreamCorpus_SceneSnapshotMatchesLegacyOrAcceptedBoundary()
     {
-        CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        SceneReplayFixture.SetResources();
         var unexpected = new List<string>();
         var accepted = new Dictionary<SnapshotDiffClass, int>();
         var acceptedExamples = new List<string>();
 
         foreach (var fileName in VendoredStreamLogNames())
         {
-            var replay = ReplayWithSceneOwner(fileName);
+            var replay = SceneReplayFixture.Replay(fileName);
             var scene = replay.SceneOwner!.CreateSnapshot();
             var diffs = BuildDiffs(replay.Snapshot, scene);
 
@@ -87,19 +84,6 @@ public sealed class SceneSnapshotParityTests
             return SnapshotDiffClass.TargetTrackingTieBoundary;
 
         return SnapshotDiffClass.Unexpected;
-    }
-
-    private static PacketLogReplayResult ReplayWithSceneOwner(string fileName)
-    {
-        try
-        {
-            SceneDualWrite.Enabled = true;
-            return PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
-        }
-        finally
-        {
-            SceneDualWrite.Enabled = false;
-        }
     }
 
     private static IEnumerable<string> VendoredStreamLogNames()

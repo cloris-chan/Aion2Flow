@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Scene.Model;
@@ -235,14 +235,14 @@ public sealed class CompactOutcomeCanonicalizer
         packet.Modifiers |= modifier;
         packet.SetEffectTag(effectTag);
         packet.IsNormalized = false;
-        CombatMetricsEngine.NormalizePacketForStorage(packet);
+        CombatResourceRegistry.NormalizePacketForStorage(packet);
         return FromPacket(packet, in observation);
     }
 
     private static CombatObservation NormalizeBaseObservation(int sourceId, int targetId, in CombatObservation observation)
     {
         var packet = ToPacket(sourceId, targetId, in observation);
-        CombatMetricsEngine.NormalizePacketForStorage(packet);
+        CombatResourceRegistry.NormalizePacketForStorage(packet);
         return FromPacket(packet, in observation);
     }
 
@@ -262,7 +262,7 @@ public sealed class CompactOutcomeCanonicalizer
             EffectTag = PacketEffectTag.CompactEvade
         };
         var packet = ToPacket(pending.SourceId, pending.TargetId, in observation);
-        CombatMetricsEngine.NormalizePacketForStorage(packet);
+        CombatResourceRegistry.NormalizePacketForStorage(packet);
         return FromPacket(packet, in observation);
     }
 
@@ -333,8 +333,8 @@ public sealed class CompactOutcomeCanonicalizer
         if (skillCode <= 0)
             return 0;
 
-        var variant = CombatMetricsEngine.ParseSkillVariant(skillCode);
-        return CombatMetricsEngine.InferOriginalSkillCode(skillCode) ?? variant.NormalizedSkillCode;
+        var variant = CombatResourceRegistry.ParseSkillVariant(skillCode);
+        return CombatResourceRegistry.InferOriginalSkillCode(skillCode) ?? variant.NormalizedSkillCode;
     }
 
     private static bool IsDodgeSkill(int trackedSkillCode)

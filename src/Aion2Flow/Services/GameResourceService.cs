@@ -1,5 +1,5 @@
 using System.Globalization;
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.Services;
@@ -94,7 +94,7 @@ public sealed class GameResourceService : IDisposable
             Maps = maps;
         }
 
-        CombatMetricsEngine.UpdateDisplayResources(skills, npcCatalog);
+        CombatResourceRegistry.UpdateDisplayResources(skills, npcCatalog);
         ResourcesChanged?.Invoke(this, language);
     }
 }

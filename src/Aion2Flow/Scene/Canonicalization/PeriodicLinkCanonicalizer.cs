@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Scene.Model;
@@ -56,7 +56,7 @@ public sealed class PeriodicLinkCanonicalizer
             ValueKind = CombatValueKind.Damage
         };
         packet.SetEffectTag(PacketEffectTag.PeriodicLinkInvincible);
-        CombatMetricsEngine.NormalizePacketForStorage(packet);
+        CombatResourceRegistry.NormalizePacketForStorage(packet);
         return observation with
         {
             SkillCode = packet.SkillCode,

@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Text;
 using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -70,7 +71,7 @@ public sealed class PacketStreamProcessor : IDisposable
             return;
         }
 
-        var hasCatalogEntry = CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var entry);
+        var hasCatalogEntry = CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry);
         if (requireCatalogEntry && !hasCatalogEntry)
         {
             return;
@@ -81,7 +82,7 @@ public sealed class PacketStreamProcessor : IDisposable
             _sink.TryGetNpcRuntimeState(lifecycleId, out var existing) &&
             existing.NpcCode is int existingCode &&
             existingCode != npcCode &&
-            CombatMetricsEngine.TryResolveNpcCatalogEntry(existingCode, out _))
+            CombatResourceRegistry.TryResolveNpcCatalogEntry(existingCode, out _))
         {
             _sink.RebindInstanceLifecycle(instanceId);
         }
@@ -95,7 +96,7 @@ public sealed class PacketStreamProcessor : IDisposable
 
         _sink.AppendNpcName(npcCode, entry.Name);
 
-        var kind = CombatMetricsEngine.ResolveNpcKind(entry.Kind);
+        var kind = CombatResourceRegistry.ResolveNpcKind(entry.Kind);
         if (kind != NpcKind.Unknown && kind != NpcKind.Summon)
         {
             _sink.AppendNpcKind(instanceId, kind);
@@ -109,15 +110,15 @@ public sealed class PacketStreamProcessor : IDisposable
             return string.Empty;
         }
 
-        var variant = CombatMetricsEngine.ParseSkillVariant((int)rawSkillCode);
+        var variant = CombatResourceRegistry.ParseSkillVariant((int)rawSkillCode);
         var variantHint = FormatSkillVariantHint(variant);
-        var normalized = CombatMetricsEngine.InferOriginalSkillCode((int)rawSkillCode);
+        var normalized = CombatResourceRegistry.InferOriginalSkillCode((int)rawSkillCode);
         if (!normalized.HasValue)
         {
             return $"|skillRaw={rawSkillCode}{variantHint}";
         }
 
-        if (CombatMetricsEngine.SkillMap is not null && CombatMetricsEngine.SkillMap.TryGetValue(normalized.Value, out var skill))
+        if (CombatResourceRegistry.SkillMap.TryGetValue(normalized.Value, out var skill))
         {
             return $"|skill={normalized.Value}{variantHint}|skillName={skill.Name}";
         }
@@ -132,10 +133,10 @@ public sealed class PacketStreamProcessor : IDisposable
             return string.Empty;
         }
 
-        var variant = CombatMetricsEngine.ParseSkillVariant(skillCode);
+        var variant = CombatResourceRegistry.ParseSkillVariant(skillCode);
         var variantHint = FormatSkillVariantHint(variant);
-        var normalized = CombatMetricsEngine.InferOriginalSkillCode(skillCode) ?? skillCode;
-        if (CombatMetricsEngine.SkillMap is not null && CombatMetricsEngine.SkillMap.TryGetValue(normalized, out var skill))
+        var normalized = CombatResourceRegistry.InferOriginalSkillCode(skillCode) ?? skillCode;
+        if (CombatResourceRegistry.SkillMap.TryGetValue(normalized, out var skill))
         {
             return $"|skill={normalized}{variantHint}|skillName={skill.Name}";
         }
@@ -150,8 +151,8 @@ public sealed class PacketStreamProcessor : IDisposable
             return string.Empty;
         }
 
-        var normalized = CombatMetricsEngine.InferOriginalSkillCode(rawSkillCode) ?? rawSkillCode;
-        if (CombatMetricsEngine.SkillMap is not null && CombatMetricsEngine.SkillMap.TryGetValue(normalized, out var skill))
+        var normalized = CombatResourceRegistry.InferOriginalSkillCode(rawSkillCode) ?? rawSkillCode;
+        if (CombatResourceRegistry.SkillMap.TryGetValue(normalized, out var skill))
         {
             return $"|{prefix}={normalized}|{prefix}Name={skill.Name}";
         }
@@ -198,7 +199,7 @@ public sealed class PacketStreamProcessor : IDisposable
             return string.Empty;
         }
 
-        var normalized = CombatMetricsEngine.InferOriginalSkillCode(skillCode) ?? skillCode;
+        var normalized = CombatResourceRegistry.InferOriginalSkillCode(skillCode) ?? skillCode;
         var packetForClassification = packet.DeepClone();
         packetForClassification.SkillCode = normalized;
         packetForClassification.EventKind = CombatEventKind.Damage;
@@ -208,7 +209,7 @@ public sealed class PacketStreamProcessor : IDisposable
         var valueKind = CombatEventClassifier.ClassifyValueKind(packetForClassification);
         var variantHint = FormatSkillVariantHint(packet.SkillVariant);
 
-        if (CombatMetricsEngine.SkillMap is not null && CombatMetricsEngine.SkillMap.TryGetValue(normalized, out var skill))
+        if (CombatResourceRegistry.SkillMap.TryGetValue(normalized, out var skill))
         {
             return $"|skill={normalized}{variantHint}|skillName={skill.Name}|valueKind={valueKind}";
         }
@@ -1080,7 +1081,7 @@ public sealed class PacketStreamProcessor : IDisposable
             return null;
         }
 
-        return CombatMetricsEngine.InferOriginalSkillCode(skillCode);
+        return CombatResourceRegistry.InferOriginalSkillCode(skillCode);
     }
 
     private bool ShouldStoreRegenerationHealing(int targetId)

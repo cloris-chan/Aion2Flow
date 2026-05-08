@@ -348,7 +348,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (targetId <= 0 || !entities.TryGet(targetId, out var entity) || entity.NpcCode is not int npcCode)
             return string.Empty;
 
-        if (CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
+        if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
             return catalogEntry.Name;
 
         return metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName) ? npcName : string.Empty;
@@ -366,7 +366,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
             if (entity.NpcCode is int npcCode)
             {
-                if (CombatMetricsEngine.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
+                if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
                     return catalogEntry.Name;
 
                 if (metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName))
@@ -397,7 +397,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private void InferPreexistingSummonOwners()
     {
-        if (CombatMetricsEngine.SkillMap.Count == 0)
+        if (CombatResourceRegistry.SkillMap.Count == 0)
             return;
 
         var ownerCandidatesByCategory = new Dictionary<SkillCategory, HashSet<int>>();
@@ -486,11 +486,11 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private static bool TryResolveSkill(in CombatObservation observation, out Skill skill)
     {
-        if (observation.SkillCode > 0 && CombatMetricsEngine.SkillMap.TryGetValue(observation.SkillCode, out skill))
+        if (observation.SkillCode > 0 && CombatResourceRegistry.SkillMap.TryGetValue(observation.SkillCode, out skill))
             return true;
 
         var originalSkillCode = observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
-        if (CombatMetricsEngine.InferOriginalSkillCode(originalSkillCode) is { } inferredSkillCode && CombatMetricsEngine.SkillMap.TryGetValue(inferredSkillCode, out skill))
+        if (CombatResourceRegistry.InferOriginalSkillCode(originalSkillCode) is { } inferredSkillCode && CombatResourceRegistry.SkillMap.TryGetValue(inferredSkillCode, out skill))
             return true;
 
         skill = default;
@@ -508,7 +508,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         characterClass = default;
         score = 0;
 
-        if (!CombatMetricsEngine.SkillMap.TryGetValue(observation.SkillCode, out var skill))
+        if (!CombatResourceRegistry.SkillMap.TryGetValue(observation.SkillCode, out var skill))
             return false;
 
         var mappedClass = MapSkillCategoryToClass(skill.Category);

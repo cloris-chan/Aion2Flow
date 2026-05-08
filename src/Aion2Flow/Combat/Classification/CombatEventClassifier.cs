@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Resources;
 
@@ -189,7 +188,7 @@ public static class CombatEventClassifier
 
     private static bool TryGetDisplaySkill(int skillCode, out Skill skill)
     {
-        if (CombatMetricsEngine.SkillDisplayMap.TryGetValue(skillCode, out skill))
+        if (CombatResourceRegistry.SkillDisplayMap.TryGetValue(skillCode, out skill))
         {
             return true;
         }
@@ -200,12 +199,7 @@ public static class CombatEventClassifier
     private static bool TryGetSkill(int skillCode, out Skill skill)
     {
         skill = default;
-        if (CombatMetricsEngine.SkillMap is null)
-        {
-            return false;
-        }
-
-        return CombatMetricsEngine.SkillMap.TryGetValue(skillCode, out skill);
+        return CombatResourceRegistry.SkillMap.TryGetValue(skillCode, out skill);
     }
 }
 
@@ -355,8 +349,8 @@ internal static class PacketSkillTraits
             return true;
         }
 
-        return CombatMetricsEngine.InferOriginalSkillCode(packet.OriginalSkillCode) == skillCode ||
-               CombatMetricsEngine.InferOriginalSkillCode(packet.SkillCode) == skillCode;
+        return CombatResourceRegistry.InferOriginalSkillCode(packet.OriginalSkillCode) == skillCode ||
+               CombatResourceRegistry.InferOriginalSkillCode(packet.SkillCode) == skillCode;
     }
 
     private static bool MatchesBase(ParsedCombatPacket packet, int baseSkillCode)
@@ -386,8 +380,8 @@ internal static class PacketSkillTraits
             return true;
         }
 
-        return CombatMetricsEngine.ParseSkillVariant(packet.OriginalSkillCode).BaseSkillCode == baseSkillCode ||
-               CombatMetricsEngine.ParseSkillVariant(packet.SkillCode).BaseSkillCode == baseSkillCode;
+        return CombatResourceRegistry.ParseSkillVariant(packet.OriginalSkillCode).BaseSkillCode == baseSkillCode ||
+               CombatResourceRegistry.ParseSkillVariant(packet.SkillCode).BaseSkillCode == baseSkillCode;
     }
 
     private static bool MatchesByHundred(ParsedCombatPacket packet, int skillCode) =>

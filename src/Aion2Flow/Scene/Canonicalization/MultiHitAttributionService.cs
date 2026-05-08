@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Scene.Model;
@@ -103,7 +103,7 @@ public sealed class MultiHitAttributionService
         if (skillCode <= 0)
             return 0;
 
-        var variant = CombatMetricsEngine.ParseSkillVariant(skillCode);
-        return CombatMetricsEngine.InferOriginalSkillCode(skillCode) ?? variant.NormalizedSkillCode;
+        var variant = CombatResourceRegistry.ParseSkillVariant(skillCode);
+        return CombatResourceRegistry.InferOriginalSkillCode(skillCode) ?? variant.NormalizedSkillCode;
     }
 }
