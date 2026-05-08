@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
@@ -9,6 +8,7 @@ using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Scene;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Projection;
@@ -50,7 +50,7 @@ public sealed class PacketLogReplayService
             {
                 ReplayLogKind.Stream => ReplayStreamLines(ReadLines(reader), sourceName),
                 ReplayLogKind.Frame => ReplayFrameLines(ReadLines(reader), sourceName),
-                ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-battle replay."),
+                ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
                 _ => throw new InvalidOperationException($"Unsupported replay log kind: {sourceLogKind}.")
             };
         }
@@ -66,7 +66,7 @@ public sealed class PacketLogReplayService
         {
             ReplayLogKind.Stream => ReplayStreamLines(lines, sourceName),
             ReplayLogKind.Frame => ReplayFrameLines(lines, sourceName),
-            ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-battle replay."),
+            ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
             _ => throw new InvalidOperationException($"Unsupported replay log kind: {logKind}.")
         };
     }
@@ -231,7 +231,7 @@ public sealed class PacketLogReplayService
         return new PacketLogReplayBaselineCounter(elapsed, Math.Max(0, allocatedBytes));
     }
 
-    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(CombatStore combat, EntityStore entities, MetadataStore metadata, DamageMeterSnapshot snapshot)
+    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(CombatStore combat, EntityStore entities, MetadataStore metadata, SceneCombatSnapshot snapshot)
     {
         var summariesByCombatantId = new Dictionary<int, MutableCombatantSummary>();
 
@@ -275,15 +275,15 @@ public sealed class PacketLogReplayService
             .ToList();
     }
 
-    private static IEnumerable<CombatEventRecord> EnumerateSummaryEvents(CombatStore combat, EntityStore entities, DamageMeterSnapshot snapshot)
+    private static IEnumerable<CombatEventRecord> EnumerateSummaryEvents(CombatStore combat, EntityStore entities, SceneCombatSnapshot snapshot)
     {
-        if (snapshot.BattleStartTime <= 0 || snapshot.BattleEndTime < snapshot.BattleStartTime)
+        if (snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime)
             yield break;
 
         var relevant = new HashSet<int>();
         foreach (var e in combat.Events)
         {
-            if (!IsWithinBattleWindow(e, snapshot.BattleStartTime, snapshot.BattleEndTime) || IsSummonDamageTarget(entities, e))
+            if (!IsWithinEncounterWindow(e, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTarget(entities, e))
                 continue;
 
             var sourceId = ResolveCombatantId(entities, e.SourceId);
@@ -299,7 +299,7 @@ public sealed class PacketLogReplayService
 
         foreach (var e in combat.Events)
         {
-            if (IsWithinBattleWindow(e, snapshot.BattleStartTime, snapshot.BattleEndTime) || IsSummonDamageTarget(entities, e))
+            if (IsWithinEncounterWindow(e, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTarget(entities, e))
                 continue;
 
             var sourceId = ResolveCombatantId(entities, e.SourceId);
@@ -426,7 +426,7 @@ public sealed class PacketLogReplayService
         return entities.TryGet(entityId, out var entity) && entity.OwnerEntityId is int ownerId ? ownerId : entityId;
     }
 
-    private static bool IsWithinBattleWindow(CombatEventRecord e, long start, long end) =>
+    private static bool IsWithinEncounterWindow(CombatEventRecord e, long start, long end) =>
         e.ObservedAtMilliseconds >= start && e.ObservedAtMilliseconds <= end;
 
     private static bool IsSummonDamageTarget(EntityStore entities, CombatEventRecord e)
@@ -1643,7 +1643,7 @@ public sealed record PacketLogReplayResult(
     int TotalLines,
     int ReplayedLines,
     int SkippedLines,
-    DamageMeterSnapshot Snapshot,
+    SceneCombatSnapshot Snapshot,
     ObservedEventJournal SceneJournal,
     SceneReadModelOwner SceneOwner,
     IReadOnlyList<PacketLogCombatantSummary> Combatants,

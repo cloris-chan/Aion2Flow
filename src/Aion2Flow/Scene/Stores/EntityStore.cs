@@ -59,13 +59,13 @@ public sealed class EntityStore
         entity.CurrentHp = hp;
         entity.MaxHp = maxHp > 0 ? Math.Max(maxHp, hp) : Math.Max(entity.MaxHp ?? 0, hp);
         if (hp == 0)
-            entity.BattleActive = false;
+            entity.NpcCombatActive = false;
     }
 
     public void ApplyBattleToggle(int instanceId, bool isActive)
     {
         var entity = GetOrAdd(instanceId);
-        entity.BattleActive = isActive;
+        entity.NpcCombatActive = isActive;
     }
 
     public void ApplyNpc2136State(int instanceId, uint sequence, uint value0)
@@ -115,7 +115,7 @@ public sealed class EntityRecord
     public int? OwnerEntityId { get; set; }
     public int? CurrentHp { get; set; }
     public int? MaxHp { get; set; }
-    public bool BattleActive { get; set; }
+    public bool NpcCombatActive { get; set; }
     public uint? Value2136 { get; set; }
     public uint? Sequence2136 { get; set; }
     public uint? Value0140 { get; set; }

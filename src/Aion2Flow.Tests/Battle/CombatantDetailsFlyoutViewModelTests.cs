@@ -1,7 +1,7 @@
 using System.Globalization;
-using Cloris.Aion2Flow.Battle.Archive;
+using Cloris.Aion2Flow.Scene.Archive;
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -96,7 +96,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectSceneBattleCombatant_Builds_Live_Detail_From_Scene_Projection()
+    public void SelectSceneEncounterCombatant_Builds_Live_Detail_From_Scene_Projection()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -124,7 +124,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var snapshot = scene.Owner.CreateSnapshot();
         var detail = scene.Owner.CreateDetailDelta(snapshot, playerId);
-        viewModel.SelectSceneBattleCombatant(snapshot.BattleId, playerId, snapshot, detail);
+        viewModel.SelectSceneEncounterCombatant(snapshot.EncounterId, playerId, snapshot, detail);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -148,7 +148,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectSceneBattleCombatant_Includes_Summon_Detail_Folded_To_Owner()
+    public void SelectSceneEncounterCombatant_Includes_Summon_Detail_Folded_To_Owner()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -171,7 +171,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var snapshot = scene.Owner.CreateSnapshot();
         var detail = scene.Owner.CreateDetailDelta(snapshot, playerId);
-        viewModel.SelectSceneBattleCombatant(snapshot.BattleId, playerId, snapshot, detail);
+        viewModel.SelectSceneEncounterCombatant(snapshot.EncounterId, playerId, snapshot, detail);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -181,14 +181,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectSceneBattleCombatant_Uses_Archived_BattleId_Context()
+    public void SelectSceneEncounterCombatant_Uses_Archived_EncounterId_Context()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
-        var archive = new BattleArchiveService();
+        var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
@@ -216,14 +216,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectSceneBattleCombatant_Uses_Archived_ScenePayload()
+    public void SelectSceneEncounterCombatant_Uses_Archived_ScenePayload()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
-        var archive = new BattleArchiveService();
+        var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
@@ -240,7 +240,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.Equal(payload.Snapshot.BattleId, record!.BattleId);
+        Assert.Equal(payload.Snapshot.EncounterId, record!.EncounterId);
 
         scene.Reset();
         SelectArchivedSceneCombatant(viewModel, record, playerId);
@@ -285,14 +285,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectSceneBattleCombatant_Uses_Archived_ScenePayload_For_Summon_Attribution()
+    public void SelectSceneEncounterCombatant_Uses_Archived_ScenePayload_For_Summon_Attribution()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
-        var archive = new BattleArchiveService();
+        var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
@@ -1414,27 +1414,27 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         SelectSceneCombatant(viewModel, scene, snapshot, combatantId, forceRefresh);
     }
 
-    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, DamageMeterSnapshot snapshot, int combatantId, bool forceRefresh = false)
+    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false)
     {
         var detail = scene.CreateDetailDelta(snapshot, combatantId, forceRefresh);
-        viewModel.SelectSceneBattleCombatant(snapshot.BattleId, combatantId, snapshot, detail, forceRefresh);
+        viewModel.SelectSceneEncounterCombatant(snapshot.EncounterId, combatantId, snapshot, detail, forceRefresh);
     }
 
-    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneReadModelOwner scene, DamageMeterSnapshot snapshot, int combatantId, bool forceRefresh = false)
+    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneReadModelOwner scene, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false)
     {
         var detail = scene.CreateDetailDelta(snapshot, combatantId, forceRefresh);
-        viewModel.SelectSceneBattleCombatant(snapshot.BattleId, combatantId, snapshot, detail, forceRefresh);
+        viewModel.SelectSceneEncounterCombatant(snapshot.EncounterId, combatantId, snapshot, detail, forceRefresh);
     }
 
-    private static void SelectArchivedSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, ArchivedBattleRecord record, int combatantId, bool forceRefresh = false)
+    private static void SelectArchivedSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, ArchivedEncounterRecord record, int combatantId, bool forceRefresh = false)
     {
         var detail = record.ScenePayload.CreateDetailDelta(combatantId);
-        viewModel.SelectSceneBattleCombatant(record.BattleId, combatantId, record.Snapshot, detail, forceRefresh);
+        viewModel.SelectSceneEncounterCombatant(record.EncounterId, combatantId, record.Snapshot, detail, forceRefresh);
     }
 
-    private static ArchivedBattleRecord? CreateSceneArchiveRecord(PacketLogReplayResult replay)
+    private static ArchivedEncounterRecord? CreateSceneArchiveRecord(PacketLogReplayResult replay)
     {
-        var service = new BattleArchiveService();
+        var service = new EncounterArchiveService();
         var payload = SceneArchivePayload.Create(replay.SceneOwner, replay.SceneOwner.CreateSnapshot());
         return service.Archive(payload, "replay", isAutomatic: false);
     }
@@ -1487,7 +1487,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization);
-        var archive = new BattleArchiveService();
+        var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 

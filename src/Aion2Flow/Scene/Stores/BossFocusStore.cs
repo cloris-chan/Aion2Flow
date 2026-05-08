@@ -61,7 +61,7 @@ public sealed class BossFocusStore(EntityStore entities)
             return;
         }
 
-        if (_focused.Contains(instanceId) || IsBattleActive(instanceId))
+        if (_focused.Contains(instanceId) || IsNpcCombatActive(instanceId))
         {
             _focused.Add(instanceId);
             RememberActivity(instanceId, observedAtMilliseconds);
@@ -143,8 +143,8 @@ public sealed class BossFocusStore(EntityStore entities)
     private bool IsBossInstance(int instanceId) =>
         entities.TryGet(instanceId, out var entity) && entity.Kind == NpcKind.Boss;
 
-    private bool IsBattleActive(int instanceId) =>
-        entities.TryGet(instanceId, out var entity) && entity.BattleActive && !IsObservedDead(instanceId);
+    private bool IsNpcCombatActive(int instanceId) =>
+        entities.TryGet(instanceId, out var entity) && entity.NpcCombatActive && !IsObservedDead(instanceId);
 
     private bool IsObservedDead(int instanceId) =>
         entities.TryGet(instanceId, out var entity) && entity.CurrentHp == 0;

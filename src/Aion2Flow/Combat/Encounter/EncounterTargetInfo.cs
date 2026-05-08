@@ -19,7 +19,7 @@ public sealed class EncounterTargetInfo
     public int DamageAmount { get; private set; }
     public long FirstDamageTime { get; private set; }
     public long LastDamageTime { get; private set; }
-    public long BattleTime => LastDamageTime - FirstDamageTime;
+    public long EncounterTime => LastDamageTime - FirstDamageTime;
 
     public void ProcessPacket(ParsedCombatPacket packet)
     {

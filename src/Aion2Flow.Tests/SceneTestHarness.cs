@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Observation;
@@ -23,13 +23,13 @@ internal sealed class SceneTestHarness : IDisposable
     public IRuntimeObservationSink Sink => _sink;
     public SceneReadModelOwner Owner => _holder.Owner;
 
-    public DamageMeterSnapshot CreateSnapshot()
+    public SceneCombatSnapshot CreateSnapshot()
     {
         CompletePendingBatches();
         return Owner.CreateSnapshot();
     }
 
-    public CombatDetailDelta CreateDetailDelta(DamageMeterSnapshot snapshot, int combatantId, bool forceRefresh = false) =>
+    public CombatDetailDelta CreateDetailDelta(SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false) =>
         Owner.CreateDetailDelta(snapshot, combatantId, forceRefresh);
 
     public void AppendNickname(int uid, string nickname, int? originServerId = null) =>
@@ -87,7 +87,7 @@ internal sealed class SceneTestHarness : IDisposable
                 entity.CurrentHp,
                 entity.MaxHp,
                 null,
-                entity.BattleActive,
+                entity.NpcCombatActive,
                 entity.Kind,
                 entity.Value2136,
                 entity.Sequence2136,

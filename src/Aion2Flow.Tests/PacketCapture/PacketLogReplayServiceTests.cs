@@ -1,5 +1,5 @@
 using System.Globalization;
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
@@ -27,7 +27,7 @@ public sealed class PacketLogReplayServiceTests
 
         var firstPacket = ParseDamagePacket("230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01");
         var secondPacket = ParseDamagePacket("220438DF9C0C0400A77DD1890E015002AFD5AD6901000000D88501BB1601");
-        var expectedBattleTime =
+        var expectedEncounterTime =
             DateTimeOffset.Parse("2026-04-10T16:15:36.3112138+08:00").ToUnixTimeMilliseconds() -
             DateTimeOffset.Parse("2026-04-10T16:15:36.2148073+08:00").ToUnixTimeMilliseconds();
 
@@ -41,7 +41,7 @@ public sealed class PacketLogReplayServiceTests
             Assert.Equal(1, replay.SkippedLines);
             Assert.Equal(2, replay.ReplayedEventCounts["damage"]);
             Assert.Equal(1, replay.SkippedEventCounts["frame-batch"]);
-            Assert.Equal(expectedBattleTime, replay.Snapshot.BattleTime);
+            Assert.Equal(expectedEncounterTime, replay.Snapshot.EncounterTime);
             Assert.Equal(200287, replay.Snapshot.TargetObservation?.InstanceId);
 
             var source = Assert.Single(replay.Combatants, static summary => summary.CombatantId == 16039);
@@ -705,8 +705,8 @@ public sealed class PacketLogReplayServiceTests
             Environment.NewLine,
             SceneReplayTestView.Packets(replay)
                 .Where(packet => packet.SourceId == playerId &&
-                                 packet.Timestamp >= replay.Snapshot.BattleStartTime &&
-                                 packet.Timestamp <= replay.Snapshot.BattleEndTime &&
+                                 packet.Timestamp >= replay.Snapshot.EncounterStartTime &&
+                                 packet.Timestamp <= replay.Snapshot.EncounterEndTime &&
                                  packet.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing)
                 .GroupBy(packet => new
                 {
@@ -742,7 +742,7 @@ public sealed class PacketLogReplayServiceTests
                 .Select(packet =>
                     $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} sourceSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.SourceId)} targetSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.TargetId)}"));
         var diagnostics =
-            $"target={replay.Snapshot.TargetObservation?.InstanceId} targetName={replay.Snapshot.TargetName} battle={replay.Snapshot.BattleStartTime}-{replay.Snapshot.BattleEndTime}\ncombatants:\n{combatantDump}\nsummaries:\n{summaryDump}\nsummons:\n{summonDump}\ntargets:\n{targetDump}\nplayer-healing-groups:\n{playerHealingGroupDump}\nspirit-descent-packets:\n{spiritDescentPacketDump}\nplayer-incoming:\n{playerIncomingDump}";
+            $"target={replay.Snapshot.TargetObservation?.InstanceId} targetName={replay.Snapshot.TargetName} encounter={replay.Snapshot.EncounterStartTime}-{replay.Snapshot.EncounterEndTime}\ncombatants:\n{combatantDump}\nsummaries:\n{summaryDump}\nsummons:\n{summonDump}\ntargets:\n{targetDump}\nplayer-healing-groups:\n{playerHealingGroupDump}\nspirit-descent-packets:\n{spiritDescentPacketDump}\nplayer-incoming:\n{playerIncomingDump}";
 
         Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), diagnostics);
         Assert.False(
@@ -808,7 +808,7 @@ public sealed class PacketLogReplayServiceTests
                 .OrderBy(static packet => packet.Timestamp)
                 .Select(packet =>
                     $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} sourceSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.SourceId)} targetSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.TargetId)}"));
-        Assert.True(playerMetrics.HealingAmount == 3438, $"HealingAmount={playerMetrics.HealingAmount} expected=3438 battle={replay.Snapshot.BattleStartTime}-{replay.Snapshot.BattleEndTime}\n{skillDump}\n{spiritDump}\n{combatantDump}");
+        Assert.True(playerMetrics.HealingAmount == 3438, $"HealingAmount={playerMetrics.HealingAmount} expected=3438 encounter={replay.Snapshot.EncounterStartTime}-{replay.Snapshot.EncounterEndTime}\n{skillDump}\n{spiritDump}\n{combatantDump}");
         Assert.True(playerMetrics.Skills.TryGetValue(enhanceSpiritBenedictionSkillCode, out var skill), combatantDump);
         Assert.Equal(3438, skill.HealingAmount);
         Assert.Equal(3438, skill.PeriodicHealingAmount);
@@ -989,8 +989,8 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(expected.SkippedLines, actual.SkippedLines);
         AssertSnapshotParity(expected.Snapshot, actual.Snapshot);
         Assert.Equal(
-            BuildBattlePacketFacts(expected.Packets, expected.Snapshot),
-            BuildBattlePacketFacts(SceneReplayTestView.Packets(actual), actual.Snapshot));
+            BuildEncounterPacketFacts(expected.Packets, expected.Snapshot),
+            BuildEncounterPacketFacts(SceneReplayTestView.Packets(actual), actual.Snapshot));
     }
 
     private static void AssertBaselineCounter(PacketLogReplayBaselineCounter counter)
@@ -999,11 +999,11 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(counter.AllocatedBytes >= 0);
     }
 
-    private static void AssertSnapshotParity(DamageMeterSnapshot expected, DamageMeterSnapshot actual)
+    private static void AssertSnapshotParity(SceneCombatSnapshot expected, SceneCombatSnapshot actual)
     {
-        Assert.Equal(expected.BattleTime, actual.BattleTime);
-        Assert.Equal(expected.BattleStartTime, actual.BattleStartTime);
-        Assert.Equal(expected.BattleEndTime, actual.BattleEndTime);
+        Assert.Equal(expected.EncounterTime, actual.EncounterTime);
+        Assert.Equal(expected.EncounterStartTime, actual.EncounterStartTime);
+        Assert.Equal(expected.EncounterEndTime, actual.EncounterEndTime);
         Assert.Equal(expected.TargetName, actual.TargetName);
         Assert.Equal(expected.MapId, actual.MapId);
         Assert.Equal(expected.MapInstanceId, actual.MapInstanceId);
@@ -1018,7 +1018,7 @@ public sealed class PacketLogReplayServiceTests
         }
     }
 
-    private static void AssertCombatantParity(CombatantMetrics expected, CombatantMetrics actual)
+    private static void AssertCombatantParity(SceneCombatantMetrics expected, SceneCombatantMetrics actual)
     {
         Assert.Equal(expected.Nickname, actual.Nickname);
         Assert.Equal(expected.CharacterClass, actual.CharacterClass);
@@ -1081,10 +1081,10 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(expected.DefensivePerfectTimes, actual.DefensivePerfectTimes);
     }
 
-    private static string[] BuildBattlePacketFacts(IReadOnlyList<SceneReplayPacket> packets, DamageMeterSnapshot snapshot)
+    private static string[] BuildEncounterPacketFacts(IReadOnlyList<SceneReplayPacket> packets, SceneCombatSnapshot snapshot)
     {
         return packets
-            .Where(packet => packet.Timestamp >= snapshot.BattleStartTime && packet.Timestamp <= snapshot.BattleEndTime)
+            .Where(packet => packet.Timestamp >= snapshot.EncounterStartTime && packet.Timestamp <= snapshot.EncounterEndTime)
             .Select(static packet =>
             {
                 return string.Join(
@@ -1158,7 +1158,7 @@ public sealed class PacketLogReplayServiceTests
         int TotalLines,
         int ReplayedLines,
         int SkippedLines,
-        DamageMeterSnapshot Snapshot,
+        SceneCombatSnapshot Snapshot,
         IReadOnlyList<SceneReplayPacket> Packets);
 
     private sealed record StreamReplayEntry(DateTimeOffset Timestamp, byte[] Payload);

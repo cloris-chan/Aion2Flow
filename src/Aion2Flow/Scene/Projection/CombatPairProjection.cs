@@ -1,6 +1,6 @@
 namespace Cloris.Aion2Flow.Scene.Projection;
 
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Scene.Stores;
 
 public readonly record struct DirectedPairKey(int SourceId, int TargetId);
@@ -164,7 +164,7 @@ public sealed class CombatPairProjection
 
     public CombatantSummary? GetCombatant(int combatantId) => _combatants.TryGetValue(combatantId, out var c) ? c : null;
 
-    public IReadOnlyList<CombatDetailEvent> GetDetailEvents(SceneCombatSnapshotAdapter adapter, DamageMeterSnapshot snapshot, int combatantId) => adapter.CreateDetailEvents(snapshot, combatantId, this);
+    public IReadOnlyList<CombatDetailEvent> GetDetailEvents(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, int combatantId) => adapter.CreateDetailEvents(snapshot, combatantId, this);
 
     public IReadOnlyDictionary<int, string> BuildDetailDisplayNames(SceneCombatSnapshotAdapter adapter, IReadOnlyList<CombatDetailEvent> events)
     {

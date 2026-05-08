@@ -54,7 +54,7 @@
                                Text="{Binding LiveSceneName}"
                                VerticalAlignment="Center" />
                     <controls:NumericBlock Classes="OverlayHeaderMetric"
-                                           Value="{Binding BattleTimeSeconds}"
+                                           Value="{Binding EncounterTimeSeconds}"
                                            FractionDigits="1"
                                            TrimTrailingZeros="False"
                                            Suffix="s"
@@ -286,7 +286,7 @@
                 <Button Classes="BottomBarButton"
                         CornerRadius="999,0,0,999"
                         MinWidth="26"
-                        IsEnabled="{Binding IsViewingArchivedBattle}"
+                        IsEnabled="{Binding IsViewingArchivedEncounter}"
                         Command="{Binding ReturnToLiveCommand}"
                         ToolTip.Tip="{markups:Translate Action_Live}">
                     <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
@@ -295,11 +295,11 @@
                 <Border Classes="BottomBarDivider"
                         IsHitTestVisible="False" />
 
-                <Button x:Name="BattleHistoryButton"
+                <Button x:Name="EncounterHistoryButton"
                         Classes="BottomBarButton"
                         CornerRadius="0,999,999,0"
                         MinWidth="26"
-                        IsEnabled="{Binding HasArchivedBattles}"
+                        IsEnabled="{Binding HasArchivedEncounters}"
                         ToolTip.Tip="{markups:Translate Column_History}">
                     <Path Classes="Glyph GlyphMd" Data="{StaticResource history}" />
                     <Button.Flyout>

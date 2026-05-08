@@ -139,7 +139,7 @@ public sealed class BossFocusStoreTests
         Assert.False(h.Focus.TryGetObservedBoss(1_300, 2_000, out _));
         Assert.True(h.Entities.TryGet(3518, out var entity));
         Assert.Equal(0, entity!.CurrentHp);
-        Assert.False(entity.BattleActive);
+        Assert.False(entity.NpcCombatActive);
     }
 
     [Fact]
@@ -167,12 +167,12 @@ public sealed class BossFocusStoreTests
         Assert.True(h.Focus.TryGetObservedBoss(1_100, 2_000, out var boss));
         Assert.True(boss.HasHp);
         Assert.True(h.Entities.TryGet(3518, out var entity));
-        Assert.True(entity!.BattleActive);
+        Assert.True(entity!.NpcCombatActive);
 
         h.Toggle(3518, 1_200);
 
         Assert.False(h.Focus.TryGetObservedBoss(1_300, 2_000, out _));
-        Assert.False(entity.BattleActive);
+        Assert.False(entity.NpcCombatActive);
     }
 
     [Fact]
@@ -250,7 +250,7 @@ public sealed class BossFocusStoreTests
 
         public void Toggle(int instanceId, long observedAtMilliseconds)
         {
-            var active = !Entities.GetOrAdd(instanceId).BattleActive && CanActivate(instanceId);
+            var active = !Entities.GetOrAdd(instanceId).NpcCombatActive && CanActivate(instanceId);
             Entities.ApplyBattleToggle(instanceId, active);
             Focus.ApplyBattleToggle(instanceId, active, observedAtMilliseconds);
         }

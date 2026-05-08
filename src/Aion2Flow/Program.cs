@@ -3,7 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Themes.Simple;
 using Cloris.Aion2Flow.Assets.Icons;
-using Cloris.Aion2Flow.Battle.Archive;
+using Cloris.Aion2Flow.Scene.Archive;
 using Cloris.Aion2Flow.PacketCapture.Capture;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
@@ -54,7 +54,7 @@ internal static class Program
         services.AddSingleton<GameResourceService>();
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<AppUpdateService>();
-        services.AddSingleton<BattleArchiveService>();
+        services.AddSingleton<EncounterArchiveService>();
         services.AddSingleton<CombatantDetailsFlyoutViewModel>();
         services.AddSingleton<ProcessPortDiscoveryService>();
         services.AddSingleton<ProcessForegroundWatcher>();

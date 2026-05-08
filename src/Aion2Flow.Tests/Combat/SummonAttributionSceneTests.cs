@@ -41,7 +41,7 @@ public sealed class SummonAttributionSceneTests
 
         var snapshot = scene.CreateSnapshot();
 
-        Assert.True(snapshot.BattleTime > 0);
+        Assert.True(snapshot.EncounterTime > 0);
         Assert.True(snapshot.Combatants.ContainsKey(ownerId));
         Assert.False(snapshot.Combatants.ContainsKey(summonId));
 

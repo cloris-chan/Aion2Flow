@@ -1,15 +1,15 @@
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Scene.Projection;
 using Cloris.Aion2Flow.Scene.Stores;
 
-namespace Cloris.Aion2Flow.Battle.Archive;
+namespace Cloris.Aion2Flow.Scene.Archive;
 
 public sealed class SceneArchivePayload
 {
-    public DamageMeterSnapshot Snapshot { get; init; } = new();
+    public SceneCombatSnapshot Snapshot { get; init; } = new();
     public IReadOnlyList<SceneArchiveCombatEvent> Events { get; init; } = [];
     public IReadOnlyDictionary<int, string> DisplayNames { get; init; } = new Dictionary<int, string>();
     public IReadOnlyList<DirectedPairSnapshot> Pairs { get; init; } = [];
@@ -18,11 +18,11 @@ public sealed class SceneArchivePayload
     public IReadOnlyDictionary<int, string> NpcNamesByCode { get; init; } = new Dictionary<int, string>();
     public IReadOnlyList<SceneArchiveBossFocus> Bosses { get; init; } = [];
 
-    public static SceneArchivePayload Create(SceneReadModelOwner owner, DamageMeterSnapshot snapshot)
+    public static SceneArchivePayload Create(SceneReadModelOwner owner, SceneCombatSnapshot snapshot)
     {
         owner.Refresh();
         var archivedSnapshot = snapshot.DeepClone();
-        var adapter = new SceneCombatSnapshotAdapter(owner.Entities, owner.Combat, owner.Metadata, owner.BossFocus, archivedSnapshot.BattleId);
+        var adapter = new SceneCombatSnapshotAdapter(owner.Entities, owner.Combat, owner.Metadata, owner.BossFocus, archivedSnapshot.EncounterId);
         var eventsByKey = new Dictionary<EventKey, SceneArchiveCombatEvent>();
         var displayNames = new Dictionary<int, string>();
         var entityIds = new HashSet<int>();
@@ -281,7 +281,7 @@ public sealed class SceneArchivePayload
             .ToArray();
     }
 
-    private static SceneArchiveBossFocus[] BuildBosses(BossFocusStore bossFocus, DamageMeterSnapshot snapshot)
+    private static SceneArchiveBossFocus[] BuildBosses(BossFocusStore bossFocus, SceneCombatSnapshot snapshot)
     {
         var targetIds = new HashSet<int>();
         if (snapshot.TargetObservation?.InstanceId is int targetId && targetId > 0)
@@ -575,7 +575,7 @@ public sealed class SceneArchiveEntityIdentity
     public int? OwnerEntityId { get; init; }
     public int? CurrentHp { get; init; }
     public int? MaxHp { get; init; }
-    public bool BattleActive { get; init; }
+    public bool NpcCombatActive { get; init; }
     public uint? Value2136 { get; init; }
     public uint? Sequence2136 { get; init; }
     public uint? Value0140 { get; init; }
@@ -594,7 +594,7 @@ public sealed class SceneArchiveEntityIdentity
         OwnerEntityId = e.OwnerEntityId,
         CurrentHp = e.CurrentHp,
         MaxHp = e.MaxHp,
-        BattleActive = e.BattleActive,
+        NpcCombatActive = e.NpcCombatActive,
         Value2136 = e.Value2136,
         Sequence2136 = e.Sequence2136,
         Value0140 = e.Value0140,
@@ -614,7 +614,7 @@ public sealed class SceneArchiveEntityIdentity
         OwnerEntityId = OwnerEntityId,
         CurrentHp = CurrentHp,
         MaxHp = MaxHp,
-        BattleActive = BattleActive,
+        NpcCombatActive = NpcCombatActive,
         Value2136 = Value2136,
         Sequence2136 = Sequence2136,
         Value0140 = Value0140,

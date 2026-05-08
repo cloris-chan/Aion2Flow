@@ -830,9 +830,9 @@ public class SceneCombatSnapshotAdapterTests
         Assert.Equal(515552u, snapshot.MapInstanceId);
         Assert.Equal("Nazarak", snapshot.TargetName);
         Assert.Equal(200, snapshot.TargetObservation?.InstanceId);
-        Assert.Equal(1_000, snapshot.BattleStartTime);
-        Assert.Equal(2_600, snapshot.BattleEndTime);
-        Assert.Equal(1_600, snapshot.BattleTime);
+        Assert.Equal(1_000, snapshot.EncounterStartTime);
+        Assert.Equal(2_600, snapshot.EncounterEndTime);
+        Assert.Equal(1_600, snapshot.EncounterTime);
         Assert.True(snapshot.Encounter.IsActive);
         var player = snapshot.Combatants[100];
         Assert.Equal("Perigee", player.Nickname);
@@ -883,9 +883,9 @@ public class SceneCombatSnapshotAdapterTests
         Assert.Equal(1500, player.DamageAmount);
         Assert.Equal(600, player.HealingAmount);
         Assert.Equal(CharacterClass.Gladiator, player.CharacterClass);
-        Assert.Equal(1_000, snapshot.BattleStartTime);
-        Assert.Equal(2_500, snapshot.BattleEndTime);
-        Assert.Equal(1_500, snapshot.BattleTime);
+        Assert.Equal(1_000, snapshot.EncounterStartTime);
+        Assert.Equal(2_500, snapshot.EncounterEndTime);
+        Assert.Equal(1_500, snapshot.EncounterTime);
         Assert.Equal(1500d / 1500 * 1000, player.DamagePerSecond, 3);
         Assert.Equal(1d, player.DamageContribution, 3);
     }
@@ -1241,7 +1241,7 @@ public class SceneReadModelOwnerTests
             var snapshot = scene.Owner.CreateSnapshot();
 
             Assert.Equal(1, scene.Journal.Count);
-            Assert.Equal(scene.SessionId, snapshot.BattleId);
+            Assert.Equal(scene.SessionId, snapshot.EncounterId);
             Assert.True(scene.Owner.Entities.TryGet(100, out var entity));
             Assert.Equal("Perigee", entity.Nickname);
         }
@@ -1327,7 +1327,7 @@ public class SceneReadModelOwnerTests
             var second = scene.Owner.CreateSnapshot();
 
             Assert.NotEqual(oldSessionId, scene.SessionId);
-            Assert.NotEqual(first.BattleId, second.BattleId);
+            Assert.NotEqual(first.EncounterId, second.EncounterId);
             Assert.Equal(resetStartOrdinal, scene.Journal.Read(resetStartOrdinal).Stamp.ObservationOrdinal);
             Assert.Equal(scene.SessionId, scene.Journal.Read(resetStartOrdinal).SceneSessionId);
             Assert.Equal(1000, second.Combatants[100].DamageAmount);

@@ -2,9 +2,9 @@ using Cloris.Aion2Flow.Battle.Model;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 
-namespace Cloris.Aion2Flow.Battle.Runtime;
+namespace Cloris.Aion2Flow.Scene.Combat;
 
-public sealed class CombatantMetrics(string nickname)
+public sealed class SceneCombatantMetrics(string nickname)
 {
     public CharacterClass? CharacterClass { get; set; }
 
@@ -125,9 +125,9 @@ public sealed class CombatantMetrics(string nickname)
         return packet.Damage > 0;
     }
 
-    public CombatantMetrics DeepClone()
+    public SceneCombatantMetrics DeepClone()
     {
-        var clone = new CombatantMetrics(Nickname)
+        var clone = new SceneCombatantMetrics(Nickname)
         {
             CharacterClass = CharacterClass,
             DamagePerSecond = DamagePerSecond,

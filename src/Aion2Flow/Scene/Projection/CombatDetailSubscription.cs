@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Scene.Stores;
 
 namespace Cloris.Aion2Flow.Scene.Projection;
@@ -14,10 +14,10 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
     public CombatDetailDelta? Poll()
         => PollCore(null, null);
 
-    public CombatDetailDelta? Poll(SceneCombatSnapshotAdapter adapter, DamageMeterSnapshot snapshot)
+    public CombatDetailDelta? Poll(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
         => PollCore(adapter, snapshot);
 
-    private CombatDetailDelta? PollCore(SceneCombatSnapshotAdapter? adapter, DamageMeterSnapshot? snapshot)
+    private CombatDetailDelta? PollCore(SceneCombatSnapshotAdapter? adapter, SceneCombatSnapshot? snapshot)
     {
         var batch = store.ReadChanges(_cursor, 64);
         if (batch.Changes.Count == 0)
@@ -54,7 +54,7 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
         return delta;
     }
 
-    public CombatDetailDelta CreateSnapshotDelta(SceneCombatSnapshotAdapter adapter, DamageMeterSnapshot snapshot)
+    public CombatDetailDelta CreateSnapshotDelta(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
     {
         var detailRevision = store.GetCombatantDetailRevision(combatantId);
         _cursor = store.CreateCursor(store.Revision);
@@ -63,7 +63,7 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
         return delta;
     }
 
-    private CombatDetailDelta CreateDelta(long revision, SceneCombatSnapshotAdapter? adapter, DamageMeterSnapshot? snapshot)
+    private CombatDetailDelta CreateDelta(long revision, SceneCombatSnapshotAdapter? adapter, SceneCombatSnapshot? snapshot)
     {
         if (projection.Revision != store.Revision)
             projection.Rebuild(store);

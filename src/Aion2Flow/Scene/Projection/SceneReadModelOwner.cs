@@ -1,11 +1,11 @@
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Stores;
 
 namespace Cloris.Aion2Flow.Scene.Projection;
 
-public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battleId, EntityStore entities, MetadataStore metadata, CombatStore combat)
+public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, EntityStore entities, MetadataStore metadata, CombatStore combat)
 {
     private readonly Lock _gate = new();
     private DomainEventApplier _applier = new DomainEventApplier(entities, metadata, combat);
@@ -21,7 +21,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
     {
     }
 
-    public SceneReadModelOwner(ObservedEventJournal journal, Guid battleId) : this(journal, battleId, new EntityStore(), new MetadataStore(), new CombatStore())
+    public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId) : this(journal, encounterId, new EntityStore(), new MetadataStore(), new CombatStore())
     {
     }
 
@@ -35,22 +35,22 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
     public DomainEventApplier Applier => _applier;
     public BossFocusStore BossFocus => _applier.BossFocus;
     public CombatPairProjection Pairs => _pairs;
-    public Guid BattleId { get; private set; } = battleId;
+    public Guid EncounterId { get; private set; } = encounterId;
     public long AppliedObservationOrdinal { get; private set; }
     public long AppliedBatchOrdinal => _appliedBatchOrdinal;
 
-    public DamageMeterSnapshot CreateSnapshot()
+    public SceneCombatSnapshot CreateSnapshot()
     {
         Refresh();
-        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata, _applier.BossFocus, BattleId);
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata, _applier.BossFocus, EncounterId);
         return adapter.CreateSnapshot();
     }
 
-    public CombatDetailDelta CreateDetailDelta(DamageMeterSnapshot snapshot, int combatantId, bool forceRefresh = false)
+    public CombatDetailDelta CreateDetailDelta(SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false)
     {
         lock (_gate)
         {
-            var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata, _applier.BossFocus, BattleId);
+            var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata, _applier.BossFocus, EncounterId);
             var subscription = GetDetailSubscription(combatantId);
             if (forceRefresh || !_lastDetailDeltas.ContainsKey(combatantId))
             {
@@ -120,11 +120,11 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid battl
         return subscription;
     }
 
-    public void ResetCombat(Guid battleId, long startOrdinal)
+    public void ResetCombat(Guid encounterId, long startOrdinal)
     {
         lock (_gate)
         {
-            BattleId = battleId;
+            EncounterId = encounterId;
             combat.Clear();
             _applier = new DomainEventApplier(entities, metadata, combat);
             _pairs.Rebuild(combat);

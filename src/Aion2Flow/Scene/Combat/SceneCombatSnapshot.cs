@@ -1,30 +1,30 @@
 using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.NpcRuntime;
 
-namespace Cloris.Aion2Flow.Battle.Runtime;
+namespace Cloris.Aion2Flow.Scene.Combat;
 
-public sealed class DamageMeterSnapshot
+public sealed class SceneCombatSnapshot
 {
-    public Dictionary<int, CombatantMetrics> Combatants { get; } = [];
-    public Guid BattleId { get; set; } = Guid.NewGuid();
+    public Dictionary<int, SceneCombatantMetrics> Combatants { get; } = [];
+    public Guid EncounterId { get; set; } = Guid.NewGuid();
     public string TargetName { get; set; } = string.Empty;
-    public long BattleTime { get; set; }
-    public long BattleStartTime { get; set; }
-    public long BattleEndTime { get; set; }
+    public long EncounterTime { get; set; }
+    public long EncounterStartTime { get; set; }
+    public long EncounterEndTime { get; set; }
     public NpcRuntimeObservation? TargetObservation { get; set; }
     public EncounterSummary Encounter { get; set; } = new();
     public uint MapId { get; set; }
     public uint MapInstanceId { get; set; }
 
-    public DamageMeterSnapshot DeepClone()
+    public SceneCombatSnapshot DeepClone()
     {
-        var clone = new DamageMeterSnapshot
+        var clone = new SceneCombatSnapshot
         {
-            BattleId = BattleId,
+            EncounterId = EncounterId,
             TargetName = TargetName,
-            BattleTime = BattleTime,
-            BattleStartTime = BattleStartTime,
-            BattleEndTime = BattleEndTime,
+            EncounterTime = EncounterTime,
+            EncounterStartTime = EncounterStartTime,
+            EncounterEndTime = EncounterEndTime,
             TargetObservation = TargetObservation?.DeepClone(),
             Encounter = Encounter.DeepClone(),
             MapId = MapId,

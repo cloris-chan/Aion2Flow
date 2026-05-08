@@ -1,6 +1,6 @@
-using Cloris.Aion2Flow.Battle.Archive;
+using Cloris.Aion2Flow.Scene.Archive;
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Scene.Journal;
 using Cloris.Aion2Flow.Scene.Model;
@@ -9,12 +9,12 @@ using Cloris.Aion2Flow.Scene.Projection;
 
 namespace Cloris.Aion2Flow.Tests.Battle;
 
-public sealed class BattleArchiveServiceTests
+public sealed class EncounterArchiveServiceTests
 {
     [Fact]
     public void Archive_Stores_DeepCloned_ScenePayload_And_Lookup()
     {
-        var service = new BattleArchiveService();
+        var service = new EncounterArchiveService();
         const int playerId = 100;
         const int bossId = 200;
         var owner = CreateSceneOwner(playerId, bossId);
@@ -26,7 +26,7 @@ public sealed class BattleArchiveServiceTests
         Assert.NotSame(payload, record!.ScenePayload);
         Assert.Equal("Archive Boss", record.Snapshot.TargetName);
         Assert.Equal("Tester", record.ScenePayload.DisplayNames[playerId]);
-        Assert.True(service.TryGetBattle(record.BattleId, out var archivedRecord));
+        Assert.True(service.TryGetEncounter(record.EncounterId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
 
         payload.Snapshot.TargetName = "Changed";
@@ -39,7 +39,7 @@ public sealed class BattleArchiveServiceTests
     [Fact]
     public void Archive_Skips_Equivalent_Immediate_Duplicates()
     {
-        var service = new BattleArchiveService();
+        var service = new EncounterArchiveService();
         const int playerId = 100;
         const int bossId = 200;
         var owner = CreateSceneOwner(playerId, bossId);
@@ -56,18 +56,18 @@ public sealed class BattleArchiveServiceTests
     [Fact]
     public void Archive_Trims_History_And_Removes_Lookup_For_Evicted_Record()
     {
-        var service = new BattleArchiveService();
-        Guid firstBattleId = default;
+        var service = new EncounterArchiveService();
+        Guid firstEncounterId = default;
 
         for (var i = 0; i < 101; i++)
         {
-            var snapshot = new DamageMeterSnapshot
+            var snapshot = new SceneCombatSnapshot
             {
-                BattleId = Guid.NewGuid(),
+                EncounterId = Guid.NewGuid(),
                 TargetName = $"Boss {i}",
-                BattleTime = 10_000 + i
+                EncounterTime = 10_000 + i
             };
-            snapshot.Combatants[i + 1] = new CombatantMetrics($"Tester {i}")
+            snapshot.Combatants[i + 1] = new SceneCombatantMetrics($"Tester {i}")
             {
                 DamageContribution = 1,
                 DamagePerSecond = 1_000 + i
@@ -82,12 +82,12 @@ public sealed class BattleArchiveServiceTests
 
             if (i == 0)
             {
-                firstBattleId = record!.BattleId;
+                firstEncounterId = record!.EncounterId;
             }
         }
 
         Assert.Equal(100, service.History.Count);
-        Assert.False(service.TryGetBattle(firstBattleId, out _));
+        Assert.False(service.TryGetEncounter(firstEncounterId, out _));
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public sealed class BattleArchiveServiceTests
         var payload = SceneArchivePayload.Create(owner, snapshot);
         var delta = payload.CreateDetailDelta(playerId);
 
-        Assert.Equal(snapshot.BattleId, payload.Snapshot.BattleId);
+        Assert.Equal(snapshot.EncounterId, payload.Snapshot.EncounterId);
         Assert.Equal(2, payload.Events.Count);
         Assert.Equal(playerId, delta.CombatantId);
         Assert.Equal(2, delta.Events.Count);
@@ -169,7 +169,7 @@ public sealed class BattleArchiveServiceTests
     {
         const int playerId = 100;
         const int bossId = 200;
-        var service = new BattleArchiveService();
+        var service = new EncounterArchiveService();
         var owner = CreateSceneOwner(playerId, bossId);
         var payload = SceneArchivePayload.Create(owner, owner.CreateSnapshot());
 
@@ -178,7 +178,7 @@ public sealed class BattleArchiveServiceTests
         Assert.NotNull(record);
         Assert.NotSame(payload, record!.ScenePayload);
         Assert.Equal(payload.Events.Count, record.ScenePayload.Events.Count);
-        Assert.Equal(payload.Snapshot.BattleId, record.BattleId);
+        Assert.Equal(payload.Snapshot.EncounterId, record.EncounterId);
     }
 
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId)

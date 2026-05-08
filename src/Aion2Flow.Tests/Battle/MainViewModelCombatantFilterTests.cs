@@ -1,6 +1,6 @@
-using Cloris.Aion2Flow.Battle.Archive;
+using Cloris.Aion2Flow.Scene.Archive;
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.PacketCapture.Capture;
@@ -33,15 +33,15 @@ public sealed class MainViewModelCombatantFilterTests
         bool expected,
         string expectedReason)
     {
-        var previous = new DamageMeterSnapshot
+        var previous = new SceneCombatSnapshot
         {
             MapId = previousMapId,
             MapInstanceId = previousInstanceId,
-            BattleTime = 12_000
+            EncounterTime = 12_000
         };
-        previous.Combatants[1] = new CombatantMetrics("Tester");
+        previous.Combatants[1] = new SceneCombatantMetrics("Tester");
 
-        var latest = new DamageMeterSnapshot
+        var latest = new SceneCombatSnapshot
         {
             MapId = latestMapId,
             MapInstanceId = latestInstanceId
@@ -56,12 +56,12 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void Map_Change_Without_Battle_Does_Not_Trigger_Reset()
     {
-        var previous = new DamageMeterSnapshot
+        var previous = new SceneCombatSnapshot
         {
             MapId = 600002
         };
 
-        var latest = new DamageMeterSnapshot
+        var latest = new SceneCombatSnapshot
         {
             MapId = 1010
         };
@@ -75,14 +75,14 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void Predictive_MapId_Flip_Without_Confirmation_Does_Not_Archive()
     {
-        var previous = new DamageMeterSnapshot
+        var previous = new SceneCombatSnapshot
         {
             MapId = 1010,
-            BattleTime = 12_000
+            EncounterTime = 12_000
         };
-        previous.Combatants[1] = new CombatantMetrics("Tester");
+        previous.Combatants[1] = new SceneCombatantMetrics("Tester");
 
-        var latest = new DamageMeterSnapshot
+        var latest = new SceneCombatSnapshot
         {
             MapId = 1010
         };
@@ -94,15 +94,15 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void Sub_Instance_Boss_Room_Does_Not_Archive()
     {
-        var previous = new DamageMeterSnapshot
+        var previous = new SceneCombatSnapshot
         {
             MapId = 910036,
             MapInstanceId = 113515,
-            BattleTime = 12_000
+            EncounterTime = 12_000
         };
-        previous.Combatants[1] = new CombatantMetrics("Tester");
+        previous.Combatants[1] = new SceneCombatantMetrics("Tester");
 
-        var latest = new DamageMeterSnapshot
+        var latest = new SceneCombatSnapshot
         {
             MapId = 910036,
             MapInstanceId = 113515
@@ -138,7 +138,7 @@ public sealed class MainViewModelCombatantFilterTests
     public void ShouldDisplayCombatant_Keeps_Player_Class_When_Not_Npc()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(12669, "Player", 400, 1_000, 2_000);
+        fixture.AppendSceneEncounter(12669, "Player", 400, 1_000, 2_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.Contains(fixture.ViewModel.Combatants, x => x.Id == 12669);
@@ -148,21 +148,21 @@ public sealed class MainViewModelCombatantFilterTests
     public void RefreshCombatStats_SceneMode_DisplaysSceneSnapshot()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Equal(300, row.Id);
         Assert.Equal(400, row.Damage);
-        Assert.Equal(2d, fixture.ViewModel.BattleTimeSeconds);
+        Assert.Equal(2d, fixture.ViewModel.EncounterTimeSeconds);
     }
 
     [Fact]
     public void RefreshCombatStats_SceneMode_UsesSceneDisplayName()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Name", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Name", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
@@ -174,7 +174,7 @@ public sealed class MainViewModelCombatantFilterTests
     public void RefreshCombatStats_SceneMode_FiltersNpcFromSceneStore()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
         fixture.AppendSceneNpc(900_002, 2_100_350, NpcKind.Monster);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
@@ -187,7 +187,7 @@ public sealed class MainViewModelCombatantFilterTests
     public void RefreshCombatStats_SceneMode_UsesSceneBossFocus()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
         fixture.AppendSceneBossFocus(900_002, "Scene Boss", 25_000, 50_000, 5_500);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
@@ -203,7 +203,7 @@ public sealed class MainViewModelCombatantFilterTests
     public void RefreshCombatStats_SceneMode_RefreshesLiveDetailFromSceneProjection()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
         fixture.ViewModel.SelectedCombatant = Assert.Single(fixture.ViewModel.Combatants);
@@ -219,13 +219,13 @@ public sealed class MainViewModelCombatantFilterTests
     public void RefreshCombatStats_SceneMode_DoesNotRebuildLiveDetailForIrrelevantSceneCombat()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
         fixture.ViewModel.SelectedCombatant = Assert.Single(fixture.ViewModel.Combatants);
         var row = fixture.ViewModel.CombatantDetails.OutgoingDamage.Rows[0];
 
-        fixture.AppendSceneBattle(301, "Other Player", 600, 6_000, 7_000);
+        fixture.AppendSceneEncounter(301, "Other Player", 600, 6_000, 7_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.Same(row, fixture.ViewModel.CombatantDetails.OutgoingDamage.Rows[0]);
@@ -236,7 +236,7 @@ public sealed class MainViewModelCombatantFilterTests
     public void RefreshCombatStats_SceneMode_RebuildsLiveDetailForRelevantSceneCombat()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
         fixture.ViewModel.SelectedCombatant = Assert.Single(fixture.ViewModel.Combatants);
@@ -251,28 +251,28 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void ArchiveCurrentBattle_SceneMode_WritesScenePayload()
+    public void ArchiveCurrentEncounter_SceneMode_WritesScenePayload()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        fixture.ViewModel.ArchiveCurrentBattleCommand.Execute(null);
+        fixture.ViewModel.ArchiveCurrentEncounterCommand.Execute(null);
 
-        var history = Assert.Single(fixture.ViewModel.BattleHistory);
+        var history = Assert.Single(fixture.ViewModel.EncounterHistory);
         Assert.NotNull(history.Record.ScenePayload);
         Assert.Equal("Scene Player", history.Record.ScenePayload!.DisplayNames[300]);
         Assert.Equal(400, history.Record.ScenePayload.CreateDetailDelta(300).Combatant!.OutgoingDamage);
     }
 
     [Fact]
-    public void ArchiveCurrentBattle_SceneMode_ArchivedDetailUsesScenePayload()
+    public void ArchiveCurrentEncounter_SceneMode_ArchivedDetailUsesScenePayload()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        fixture.ViewModel.ArchiveCurrentBattleCommand.Execute(null);
+        fixture.ViewModel.ArchiveCurrentEncounterCommand.Execute(null);
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
         fixture.ViewModel.SelectedCombatant = null;
@@ -281,20 +281,20 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.CombatantName);
         Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
         Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
-        Assert.NotNull(fixture.ViewModel.BattleHistory[0].Record.ScenePayload);
+        Assert.NotNull(fixture.ViewModel.EncounterHistory[0].Record.ScenePayload);
     }
 
     [Fact]
-    public void ArchiveCurrentBattle_SceneMode_ArchivedDisplayUsesSnapshot()
+    public void ArchiveCurrentEncounter_SceneMode_ArchivedDisplayUsesSnapshot()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        fixture.ViewModel.ArchiveCurrentBattleCommand.Execute(null);
-        var history = Assert.Single(fixture.ViewModel.BattleHistory);
+        fixture.ViewModel.ArchiveCurrentEncounterCommand.Execute(null);
+        var history = Assert.Single(fixture.ViewModel.EncounterHistory);
         fixture.ViewModel.ReturnToLiveCommand.Execute(null);
-        fixture.ViewModel.SelectedBattleHistory = history;
+        fixture.ViewModel.SelectedEncounterHistory = history;
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Equal(300, row.Id);
@@ -307,7 +307,7 @@ public sealed class MainViewModelCombatantFilterTests
     {
         var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneMap(200003, 113515);
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         fixture.AppendSceneMap(200004, 113516);
@@ -325,7 +325,7 @@ public sealed class MainViewModelCombatantFilterTests
     public void ResetCommand_SceneMode_ArchivesScenePayload()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         fixture.ViewModel.ResetCommand.Execute(null);
@@ -351,7 +351,7 @@ public sealed class MainViewModelCombatantFilterTests
         AppendLiveBattle(sink, 100, "Player", 900, 3_000, 4_000, 3);
         var secondScene = fixture.CreateSceneSnapshot();
 
-        Assert.NotEqual(firstScene.BattleId, secondScene.BattleId);
+        Assert.NotEqual(firstScene.EncounterId, secondScene.EncounterId);
         Assert.Equal(900, secondScene.Combatants[100].DamageAmount);
         Assert.Equal("Player", secondScene.Combatants[100].Nickname);
     }
@@ -360,16 +360,16 @@ public sealed class MainViewModelCombatantFilterTests
     public void SceneLiveReadModel_Reset_StartsNewBattleWithoutDroppingIdentity()
     {
         var scene = new SceneLiveReadModel();
-        AppendSceneBattle(scene, 300, "Scene Player", 400, 3_000, 5_000);
+        AppendSceneEncounter(scene, 300, "Scene Player", 400, 3_000, 5_000);
         var first = scene.Owner.CreateSnapshot();
 
         scene.Reset();
         var reset = scene.Owner.CreateSnapshot();
 
-        AppendSceneBattle(scene, 300, "Scene Player", 401, 6_000, 7_000);
+        AppendSceneEncounter(scene, 300, "Scene Player", 401, 6_000, 7_000);
         var second = scene.Owner.CreateSnapshot();
 
-        Assert.NotEqual(first.BattleId, reset.BattleId);
+        Assert.NotEqual(first.EncounterId, reset.EncounterId);
         Assert.Empty(reset.Combatants);
         Assert.Equal("Scene Player", second.Combatants[300].Nickname);
         Assert.Equal(401, second.Combatants[300].DamageAmount);
@@ -379,7 +379,7 @@ public sealed class MainViewModelCombatantFilterTests
     {
         private readonly WinDivertCaptureService _captureService;
 
-        private MainViewModelFixture(MainViewModel viewModel, WinDivertCaptureService captureService, BattleArchiveService archive)
+        private MainViewModelFixture(MainViewModel viewModel, WinDivertCaptureService captureService, EncounterArchiveService archive)
         {
             ViewModel = viewModel;
             _captureService = captureService;
@@ -387,7 +387,7 @@ public sealed class MainViewModelCombatantFilterTests
         }
 
         public MainViewModel ViewModel { get; }
-        public BattleArchiveService Archive { get; }
+        public EncounterArchiveService Archive { get; }
 
         public static MainViewModelFixture Create()
         {
@@ -397,7 +397,7 @@ public sealed class MainViewModelCombatantFilterTests
             var language = new LanguageService();
             var localization = new LocalizationService(language);
             var resources = new GameResourceService(language);
-            var archive = new BattleArchiveService();
+            var archive = new EncounterArchiveService();
             var ports = new ProcessPortDiscoveryService();
             var capture = new WinDivertCaptureService(ports);
             var details = new CombatantDetailsFlyoutViewModel(localization);
@@ -405,11 +405,11 @@ public sealed class MainViewModelCombatantFilterTests
             return new MainViewModelFixture(viewModel, capture, archive);
         }
 
-        public void AppendSceneBattle(int playerId, string name, int damage, long start, long end) => MainViewModelCombatantFilterTests.AppendSceneBattle(_captureService.Scene, playerId, name, damage, start, end);
+        public void AppendSceneEncounter(int playerId, string name, int damage, long start, long end) => MainViewModelCombatantFilterTests.AppendSceneEncounter(_captureService.Scene, playerId, name, damage, start, end);
 
         public IRuntimeObservationSink CreateLiveSink() => SceneSinkFactory.CreateForLive(_captureService.Scene)();
 
-        public DamageMeterSnapshot CreateSceneSnapshot() => _captureService.Scene.Owner.CreateSnapshot();
+        public SceneCombatSnapshot CreateSceneSnapshot() => _captureService.Scene.Owner.CreateSnapshot();
 
         public void AppendSceneDamage(int sourceId, int targetId, int skillCode, int damage, long timestamp, long batchOrdinal) => MainViewModelCombatantFilterTests.AppendSceneDamage(_captureService.Scene, sourceId, targetId, skillCode, damage, timestamp, batchOrdinal);
 
@@ -420,7 +420,7 @@ public sealed class MainViewModelCombatantFilterTests
         public void AppendSceneMap(uint mapId, uint instanceId) => MainViewModelCombatantFilterTests.AppendSceneMap(_captureService.Scene, mapId, instanceId);
     }
 
-    private static void AppendSceneBattle(SceneLiveReadModel scene, int playerId, string name, int damage, long start, long end)
+    private static void AppendSceneEncounter(SceneLiveReadModel scene, int playerId, string name, int damage, long start, long end)
     {
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
         sink.AppendNickname(playerId, name);

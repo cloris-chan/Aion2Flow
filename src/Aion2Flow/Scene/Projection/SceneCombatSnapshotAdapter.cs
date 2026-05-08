@@ -1,31 +1,31 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 using Cloris.Aion2Flow.Combat.NpcRuntime;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Scene.Observation;
 using Cloris.Aion2Flow.Scene.Stores;
 
 namespace Cloris.Aion2Flow.Scene.Projection;
 
-public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, MetadataStore metadata, BossFocusStore? bossFocus = null, Guid battleId = default)
+public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, MetadataStore metadata, BossFocusStore? bossFocus = null, Guid encounterId = default)
 {
     private readonly Dictionary<int, ClassEvidence> _classEvidence = [];
     private readonly Dictionary<int, int> _inferredOwnerBySummon = [];
     private bool _ownerInferenceReady;
 
-    public DamageMeterSnapshot CreateSnapshot()
+    public SceneCombatSnapshot CreateSnapshot()
     {
         _classEvidence.Clear();
         ResetOwnerInference();
         EnsureOwnerInference();
-        var snapshot = new DamageMeterSnapshot
+        var snapshot = new SceneCombatSnapshot
         {
-            BattleId = battleId == default ? Guid.NewGuid() : battleId,
+            EncounterId = encounterId == default ? Guid.NewGuid() : encounterId,
             MapId = metadata.CurrentMapId,
             MapInstanceId = metadata.CurrentMapInstanceId
         };
@@ -37,16 +37,16 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         snapshot.TargetName = ResolveTargetName(damageTargetId);
         snapshot.TargetObservation = BuildTargetObservation(trackingTargetId);
 
-        var (start, end) = ResolveBattleWindow(targetDecision.TargetIds);
-        var battleTime = end > start ? end - start : 0;
-        snapshot.BattleStartTime = start;
-        snapshot.BattleEndTime = end;
-        snapshot.BattleTime = battleTime;
+        var (start, end) = ResolveEncounterWindow(targetDecision.TargetIds);
+        var encounterTime = end > start ? end - start : 0;
+        snapshot.EncounterStartTime = start;
+        snapshot.EncounterEndTime = end;
+        snapshot.EncounterTime = encounterTime;
 
-        if (battleTime > 0)
+        if (encounterTime > 0)
         {
-            foreach (var battleEvent in EnumerateBattleEvents(start, end, null))
-                ApplyEvent(snapshot, battleEvent);
+            foreach (var encounterEvent in EnumerateEncounterEvents(start, end, null))
+                ApplyEvent(snapshot, encounterEvent);
         }
 
         var totalDamage = 0L;
@@ -59,18 +59,18 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         foreach (var data in snapshot.Combatants.Values)
         {
-            data.DamagePerSecond = battleTime > 0 ? (double)data.DamageAmount / battleTime * 1000 : 0;
-            data.HealingPerSecond = battleTime > 0 ? (double)data.HealingAmount / battleTime * 1000 : 0;
+            data.DamagePerSecond = encounterTime > 0 ? (double)data.DamageAmount / encounterTime * 1000 : 0;
+            data.HealingPerSecond = encounterTime > 0 ? (double)data.HealingAmount / encounterTime * 1000 : 0;
             data.DamageContribution = totalDamage > 0 ? (double)data.DamageAmount / totalDamage : 0;
         }
 
-        snapshot.Encounter = EvaluateEncounter(trackingTargetId, battleTime, snapshot.TargetObservation, now);
+        snapshot.Encounter = EvaluateEncounter(trackingTargetId, encounterTime, snapshot.TargetObservation, now);
         return snapshot;
     }
 
-    public IReadOnlyList<CombatDetailEvent> CreateDetailEvents(DamageMeterSnapshot snapshot, int combatantId, CombatPairProjection projection)
+    public IReadOnlyList<CombatDetailEvent> CreateDetailEvents(SceneCombatSnapshot snapshot, int combatantId, CombatPairProjection projection)
     {
-        if (combatantId <= 0 || snapshot.BattleTime <= 0 || snapshot.BattleStartTime <= 0 || snapshot.BattleEndTime < snapshot.BattleStartTime || !snapshot.Combatants.ContainsKey(combatantId))
+        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId))
             return [];
 
         ResetOwnerInference();
@@ -90,25 +90,25 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return ResolveCombatantId(entityId);
     }
 
-    private void ApplyEvent(DamageMeterSnapshot snapshot, BattleEvent battleEvent)
+    private void ApplyEvent(SceneCombatSnapshot snapshot, EncounterEvent encounterEvent)
     {
-        if (battleEvent.SourceId <= 0)
+        if (encounterEvent.SourceId <= 0)
             return;
 
-        var metrics = GetOrAdd(snapshot, battleEvent.SourceId);
-        var packet = ToPacket(battleEvent.Record, battleEvent.SourceId, battleEvent.TargetId);
+        var metrics = GetOrAdd(snapshot, encounterEvent.SourceId);
+        var packet = ToPacket(encounterEvent.Record, encounterEvent.SourceId, encounterEvent.TargetId);
 
-        var observation = battleEvent.Record.Observation;
-        if (!IsKnownNpcCombatant(battleEvent.SourceId) && !IsKnownSummon(battleEvent.SourceId) && battleEvent.Record.SourceId == battleEvent.SourceId && TryGetClassEvidence(battleEvent.SourceId, battleEvent.TargetId, in observation, out var characterClass, out var score))
+        var observation = encounterEvent.Record.Observation;
+        if (!IsKnownNpcCombatant(encounterEvent.SourceId) && !IsKnownSummon(encounterEvent.SourceId) && encounterEvent.Record.SourceId == encounterEvent.SourceId && TryGetClassEvidence(encounterEvent.SourceId, encounterEvent.TargetId, in observation, out var characterClass, out var score))
         {
-            ref var evidence = ref CollectionsMarshal.GetValueRefOrAddDefault(_classEvidence, battleEvent.SourceId, out _);
+            ref var evidence = ref CollectionsMarshal.GetValueRefOrAddDefault(_classEvidence, encounterEvent.SourceId, out _);
             evidence.Add(characterClass, score);
         }
 
         metrics.ProcessCombatEvent(packet);
     }
 
-    private void AppendDetailEvents(List<CombatDetailEvent> events, DamageMeterSnapshot snapshot, int combatantId, IEnumerable<DirectedPairSnapshot> pairs)
+    private void AppendDetailEvents(List<CombatDetailEvent> events, SceneCombatSnapshot snapshot, int combatantId, IEnumerable<DirectedPairSnapshot> pairs)
     {
         foreach (var pair in pairs)
         {
@@ -127,9 +127,9 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private bool ShouldIncludeDetailEvent(CombatEventRecord e, int sourceId, int targetId, DamageMeterSnapshot snapshot)
+    private bool ShouldIncludeDetailEvent(CombatEventRecord e, int sourceId, int targetId, SceneCombatSnapshot snapshot)
     {
-        if (IsWithinBattleWindow(e, snapshot.BattleStartTime, snapshot.BattleEndTime))
+        if (IsWithinEncounterWindow(e, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
             return !IsSummonDamageTarget(e);
 
         var relevant = new HashSet<int>(snapshot.Combatants.Keys);
@@ -139,11 +139,11 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return IsRelevantRecoveryEvent(e, sourceId, targetId, relevant);
     }
 
-    private CombatantMetrics GetOrAdd(DamageMeterSnapshot snapshot, int combatantId)
+    private SceneCombatantMetrics GetOrAdd(SceneCombatSnapshot snapshot, int combatantId)
     {
         if (!snapshot.Combatants.TryGetValue(combatantId, out var metrics))
         {
-            metrics = new CombatantMetrics(ResolveDisplayName(combatantId));
+            metrics = new SceneCombatantMetrics(ResolveDisplayName(combatantId));
             snapshot.Combatants[combatantId] = metrics;
         }
 
@@ -203,7 +203,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return targets;
     }
 
-    private (long Start, long End) ResolveBattleWindow(HashSet<int> targetIds)
+    private (long Start, long End) ResolveEncounterWindow(HashSet<int> targetIds)
     {
         if (targetIds.Count == 0)
             return (0, 0);
@@ -227,12 +227,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return (0, 0);
 
         if (start == end)
-            ExpandSinglePointBattleWindowFromRelevantRecovery(targetIds, ref start, ref end);
+            ExpandSinglePointEncounterWindowFromRelevantRecovery(targetIds, ref start, ref end);
 
         return (start, end);
     }
 
-    private void ExpandSinglePointBattleWindowFromRelevantRecovery(HashSet<int> targetIds, ref long start, ref long end)
+    private void ExpandSinglePointEncounterWindowFromRelevantRecovery(HashSet<int> targetIds, ref long start, ref long end)
     {
         var relevant = new HashSet<int>();
         foreach (var e in combat.Events)
@@ -250,7 +250,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         foreach (var e in combat.Events)
         {
-            if (IsWithinBattleWindow(e, start, end) || IsSummonDamageTarget(e))
+            if (IsWithinEncounterWindow(e, start, end) || IsSummonDamageTarget(e))
                 continue;
 
             var sourceId = ResolveCombatantId(e.SourceId);
@@ -263,7 +263,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private IEnumerable<BattleEvent> EnumerateBattleEvents(long start, long end, HashSet<int>? filterCombatantIds)
+    private IEnumerable<EncounterEvent> EnumerateEncounterEvents(long start, long end, HashSet<int>? filterCombatantIds)
     {
         if (start <= 0 || end < start)
             yield break;
@@ -271,7 +271,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         var relevant = new HashSet<int>();
         foreach (var e in combat.Events)
         {
-            if (!IsWithinBattleWindow(e, start, end) || IsSummonDamageTarget(e))
+            if (!IsWithinEncounterWindow(e, start, end) || IsSummonDamageTarget(e))
                 continue;
 
             var sourceId = ResolveCombatantId(e.SourceId);
@@ -280,7 +280,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
                 relevant.Add(e.TargetId);
 
             if (filterCombatantIds is null || filterCombatantIds.Contains(sourceId) || filterCombatantIds.Contains(e.TargetId))
-                yield return new BattleEvent(e, sourceId, e.TargetId);
+                yield return new EncounterEvent(e, sourceId, e.TargetId);
         }
 
         if (relevant.Count == 0)
@@ -288,7 +288,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         foreach (var e in combat.Events)
         {
-            if (IsWithinBattleWindow(e, start, end) || IsSummonDamageTarget(e))
+            if (IsWithinEncounterWindow(e, start, end) || IsSummonDamageTarget(e))
                 continue;
 
             var sourceId = ResolveCombatantId(e.SourceId);
@@ -296,7 +296,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
                 continue;
 
             if (filterCombatantIds is null || filterCombatantIds.Contains(sourceId) || filterCombatantIds.Contains(e.TargetId))
-                yield return new BattleEvent(e, sourceId, e.TargetId);
+                yield return new EncounterEvent(e, sourceId, e.TargetId);
         }
     }
 
@@ -328,7 +328,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private bool IsKnownNpcCombatant(int entityId) =>
         entities.TryGet(entityId, out var entity) && (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
 
-    private static bool IsWithinBattleWindow(CombatEventRecord e, long start, long end) =>
+    private static bool IsWithinEncounterWindow(CombatEventRecord e, long start, long end) =>
         ObservedAt(e) >= start && ObservedAt(e) <= end;
 
     private static long ObservedAt(CombatEventRecord e) =>
@@ -565,7 +565,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             observation.Sequence2C38 = entity.Latest2C38?.SequenceId;
             observation.Result2C38 = entity.Latest2C38?.ResultCode;
             observation.Hp = entity.CurrentHp;
-            observation.BattleToggledOn = entity.BattleActive;
+            observation.BattleToggledOn = entity.NpcCombatActive;
         }
 
         observation.PhaseHint = NpcRuntimeObservationInterpreter.InferPhaseHint(observation);
@@ -588,7 +588,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return now;
     }
 
-    private EncounterSummary EvaluateEncounter(int targetId, long battleTime, NpcRuntimeObservation? observation, long nowMilliseconds)
+    private EncounterSummary EvaluateEncounter(int targetId, long encounterTime, NpcRuntimeObservation? observation, long nowMilliseconds)
     {
         if (targetId <= 0 && bossFocus is not null && bossFocus.TryGetObservedBoss(nowMilliseconds, 10_000, out var boss))
         {
@@ -612,9 +612,9 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         {
             TrackingTargetId = targetId,
             PhaseHint = observation?.PhaseHint ?? NpcRuntimePhaseHint.Unknown,
-            IsActive = battleTime > 0 || observation?.BattleToggledOn == true || observation?.Hp.HasValue == true,
+            IsActive = encounterTime > 0 || observation?.BattleToggledOn == true || observation?.Hp.HasValue == true,
             ShouldArchive = false,
-            Reason = battleTime > 0 ? "scene-combat" : observation?.BattleToggledOn == true ? "battle-toggle" : observation?.Hp.HasValue == true ? "hp-observed" : "insufficient-signal"
+            Reason = encounterTime > 0 ? "scene-combat" : observation?.BattleToggledOn == true ? "battle-toggle" : observation?.Hp.HasValue == true ? "hp-observed" : "insufficient-signal"
         };
     }
 
@@ -658,7 +658,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private readonly record struct TargetDecision(HashSet<int> TargetIds, int DamageTargetId, int TrackingTargetId);
 
-    private readonly record struct BattleEvent(CombatEventRecord Record, int SourceId, int TargetId);
+    private readonly record struct EncounterEvent(CombatEventRecord Record, int SourceId, int TargetId);
 
     private struct TargetInfo(int targetId, long damage, long firstDamageAt, long lastDamageAt)
     {

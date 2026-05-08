@@ -198,7 +198,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
 
         if (state.StateCode == StateCodes.NpcBattleToggle)
         {
-            var isActive = !entities.GetOrAdd(state.EntityId).BattleActive && CanNpcBattleActivate(state.EntityId);
+            var isActive = !entities.GetOrAdd(state.EntityId).NpcCombatActive && CanNpcBattleActivate(state.EntityId);
             entities.ApplyBattleToggle(state.EntityId, isActive);
             _bossFocus.ApplyBattleToggle(state.EntityId, isActive, entry.Raw.TimestampMilliseconds);
             return;

@@ -1,34 +1,34 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 
-namespace Cloris.Aion2Flow.Battle.Archive;
+namespace Cloris.Aion2Flow.Scene.Archive;
 
-public sealed class BattleArchiveService
+public sealed class EncounterArchiveService
 {
     private readonly Lock _lock = new();
-    private readonly List<ArchivedBattleRecord> _history = [];
-    private readonly Dictionary<Guid, ArchivedBattleRecord> _historyByBattleId = [];
-    private ImmutableArray<ArchivedBattleRecord> _historySnapshot = [];
+    private readonly List<ArchivedEncounterRecord> _history = [];
+    private readonly Dictionary<Guid, ArchivedEncounterRecord> _historyByEncounterId = [];
+    private ImmutableArray<ArchivedEncounterRecord> _historySnapshot = [];
 
     public event EventHandler? HistoryChanged;
 
-    public IReadOnlyList<ArchivedBattleRecord> History => _historySnapshot;
+    public IReadOnlyList<ArchivedEncounterRecord> History => _historySnapshot;
 
-    public ArchivedBattleRecord? Archive(SceneArchivePayload payload, string trigger, bool isAutomatic)
+    public ArchivedEncounterRecord? Archive(SceneArchivePayload payload, string trigger, bool isAutomatic)
     {
         var archivedPayload = payload.DeepClone();
         return AddArchiveRecord(archivedPayload.Snapshot, archivedPayload, trigger, isAutomatic);
     }
 
-    private ArchivedBattleRecord? AddArchiveRecord(DamageMeterSnapshot archivedSnapshot, SceneArchivePayload scenePayload, string trigger, bool isAutomatic)
+    private ArchivedEncounterRecord? AddArchiveRecord(SceneCombatSnapshot archivedSnapshot, SceneArchivePayload scenePayload, string trigger, bool isAutomatic)
     {
-        if (archivedSnapshot.BattleTime <= 0 || archivedSnapshot.Combatants.Count == 0)
+        if (archivedSnapshot.EncounterTime <= 0 || archivedSnapshot.Combatants.Count == 0)
         {
             return null;
         }
 
-        ArchivedBattleRecord? record;
+        ArchivedEncounterRecord? record;
         bool historyChanged;
         lock (_lock)
         {
@@ -37,9 +37,9 @@ public sealed class BattleArchiveService
                 return null;
             }
 
-            record = new ArchivedBattleRecord
+            record = new ArchivedEncounterRecord
             {
-                BattleId = archivedSnapshot.BattleId,
+                EncounterId = archivedSnapshot.EncounterId,
                 ArchivedAt = DateTimeOffset.Now,
                 Trigger = trigger,
                 IsAutomatic = isAutomatic,
@@ -48,12 +48,12 @@ public sealed class BattleArchiveService
             };
 
             _history.Insert(0, record);
-            _historyByBattleId[record.BattleId] = record;
+            _historyByEncounterId[record.EncounterId] = record;
             if (_history.Count > 100)
             {
                 for (var i = 100; i < _history.Count; i++)
                 {
-                    _historyByBattleId.Remove(_history[i].BattleId);
+                    _historyByEncounterId.Remove(_history[i].EncounterId);
                 }
 
                 _history.RemoveRange(100, _history.Count - 100);
@@ -71,18 +71,18 @@ public sealed class BattleArchiveService
         return record;
     }
 
-    public bool TryGetBattle(Guid battleId, [NotNullWhen(true)] out ArchivedBattleRecord? record)
+    public bool TryGetEncounter(Guid encounterId, [NotNullWhen(true)] out ArchivedEncounterRecord? record)
     {
         lock (_lock)
         {
-            return _historyByBattleId.TryGetValue(battleId, out record);
+            return _historyByEncounterId.TryGetValue(encounterId, out record);
         }
     }
 
-    private static bool IsEquivalent(DamageMeterSnapshot left, DamageMeterSnapshot right)
+    private static bool IsEquivalent(SceneCombatSnapshot left, SceneCombatSnapshot right)
     {
-        return left.BattleTime == right.BattleTime &&
-               left.BattleId == right.BattleId &&
+        return left.EncounterTime == right.EncounterTime &&
+               left.EncounterId == right.EncounterId &&
                string.Equals(left.TargetName, right.TargetName, StringComparison.Ordinal) &&
                left.MapId == right.MapId &&
                left.MapInstanceId == right.MapInstanceId &&
@@ -90,7 +90,7 @@ public sealed class BattleArchiveService
                SumDamage(left) == SumDamage(right);
     }
 
-    private static double SumDamage(DamageMeterSnapshot snapshot)
+    private static double SumDamage(SceneCombatSnapshot snapshot)
     {
         var totalDamage = 0d;
         foreach (var combatant in snapshot.Combatants.Values)

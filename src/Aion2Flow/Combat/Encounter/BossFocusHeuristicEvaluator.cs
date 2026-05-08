@@ -4,7 +4,7 @@ namespace Cloris.Aion2Flow.Combat;
 
 internal static class BossFocusHeuristicEvaluator
 {
-    public static EncounterSummary Evaluate(int trackingTargetId, long battleTime, NpcRuntimeObservation? observation)
+    public static EncounterSummary Evaluate(int trackingTargetId, long encounterTime, NpcRuntimeObservation? observation)
     {
         if (trackingTargetId <= 0)
         {
@@ -25,7 +25,7 @@ internal static class BossFocusHeuristicEvaluator
                 TrackingTargetId = trackingTargetId,
                 PhaseHint = observation.PhaseHint,
                 IsActive = false,
-                ShouldArchive = battleTime > 0 || observation.Hp.HasValue,
+                ShouldArchive = encounterTime > 0 || observation.Hp.HasValue,
                 Reason = "teardown-hint"
             };
         }
@@ -42,7 +42,7 @@ internal static class BossFocusHeuristicEvaluator
             };
         }
 
-        if (battleTime > 0)
+        if (encounterTime > 0)
         {
             return new EncounterSummary
             {
@@ -50,7 +50,7 @@ internal static class BossFocusHeuristicEvaluator
                 PhaseHint = observation?.PhaseHint ?? NpcRuntimePhaseHint.Unknown,
                 IsActive = true,
                 ShouldArchive = false,
-                Reason = "battle-time"
+                Reason = "encounter-time"
             };
         }
 

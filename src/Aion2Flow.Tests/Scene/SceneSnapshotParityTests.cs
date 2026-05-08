@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Battle.Model;
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
@@ -39,12 +39,12 @@ public sealed class SceneSnapshotParityTests
         Assert.True(accepted.GetValueOrDefault(SnapshotDiffClass.TargetTrackingTieBoundary) <= 1, report);
     }
 
-    private static List<SnapshotDiff> BuildDiffs(DamageMeterSnapshot legacy, DamageMeterSnapshot scene)
+    private static List<SnapshotDiff> BuildDiffs(SceneCombatSnapshot legacy, SceneCombatSnapshot scene)
     {
         var diffs = new List<SnapshotDiff>();
-        CompareValue(diffs, "snapshot", "current", "battleTime", legacy.BattleTime, scene.BattleTime);
-        CompareValue(diffs, "snapshot", "current", "battleStart", legacy.BattleStartTime, scene.BattleStartTime);
-        CompareValue(diffs, "snapshot", "current", "battleEnd", legacy.BattleEndTime, scene.BattleEndTime);
+        CompareValue(diffs, "snapshot", "current", "EncounterTime", legacy.EncounterTime, scene.EncounterTime);
+        CompareValue(diffs, "snapshot", "current", "battleStart", legacy.EncounterStartTime, scene.EncounterStartTime);
+        CompareValue(diffs, "snapshot", "current", "battleEnd", legacy.EncounterEndTime, scene.EncounterEndTime);
         CompareValue(diffs, "snapshot", "current", "mapId", legacy.MapId, scene.MapId);
         CompareValue(diffs, "snapshot", "current", "mapInstanceId", legacy.MapInstanceId, scene.MapInstanceId);
         CompareValue(diffs, "encounter", "current", "target", legacy.Encounter.TrackingTargetId, scene.Encounter.TrackingTargetId);

@@ -27,8 +27,8 @@ public partial class MainWindow : Window
         _settingsService = Ioc.Default.GetRequiredService<SettingsService>();
         DataContext.InitializeAsync().ConfigureAwait(false);
         AvaloniaXamlLoader.Load(this);
-        DataContext.BattleHistory.CollectionChanged += OnBattleHistoryCollectionChanged;
-        RebuildBattleHistoryMenuItems();
+        DataContext.EncounterHistory.CollectionChanged += OnEncounterHistoryCollectionChanged;
+        RebuildEncounterHistoryMenuItems();
         _globalHotkeyService.Triggered += OnGlobalHotkeyTriggered;
         if (_settingsService.Current.MainWindowPosition.HasValue)
         {
@@ -39,7 +39,7 @@ public partial class MainWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
-        RebuildBattleHistoryMenuItems();
+        RebuildEncounterHistoryMenuItems();
         AttachGlobalHotkeyHook();
     }
 
@@ -84,7 +84,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        DataContext.BattleHistory.CollectionChanged -= OnBattleHistoryCollectionChanged;
+        DataContext.EncounterHistory.CollectionChanged -= OnEncounterHistoryCollectionChanged;
         _globalHotkeyService.Triggered -= OnGlobalHotkeyTriggered;
         _globalHotkeyService.SetHotkey(null);
         _settingsService.Update(settings => settings.MainWindowPosition = new(Position.X, Position.Y));
@@ -133,20 +133,20 @@ public partial class MainWindow : Window
         DataContext.SelectCombatantCommand.Execute(null);
     }
 
-    private void OnBattleHistoryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private void OnEncounterHistoryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        RebuildBattleHistoryMenuItems();
+        RebuildEncounterHistoryMenuItems();
     }
 
-    private void RebuildBattleHistoryMenuItems()
+    private void RebuildEncounterHistoryMenuItems()
     {
-        if (this.FindControl<Button>("BattleHistoryButton")?.Flyout is not MenuFlyout menu)
+        if (this.FindControl<Button>("EncounterHistoryButton")?.Flyout is not MenuFlyout menu)
         {
             return;
         }
 
         menu.Items.Clear();
-        if (DataContext.BattleHistory.Count == 0)
+        if (DataContext.EncounterHistory.Count == 0)
         {
             var placeholder = new MenuItem
             {
@@ -159,7 +159,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        foreach (var item in DataContext.BattleHistory)
+        foreach (var item in DataContext.EncounterHistory)
         {
             var menuItem = new MenuItem
             {
@@ -167,16 +167,16 @@ public partial class MainWindow : Window
                 Tag = item
             };
             menuItem.Classes.Add("FlyoutMenuItem");
-            menuItem.Click += BattleHistoryMenuItemClicked;
+            menuItem.Click += EncounterHistoryMenuItemClicked;
             menu.Items.Add(menuItem);
         }
     }
 
-    private void BattleHistoryMenuItemClicked(object? sender, RoutedEventArgs e)
+    private void EncounterHistoryMenuItemClicked(object? sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem { Tag: BattleHistoryItemViewModel item })
+        if (sender is MenuItem { Tag: EncounterHistoryItemViewModel item })
         {
-            DataContext.SelectedBattleHistory = item;
+            DataContext.SelectedEncounterHistory = item;
         }
     }
 

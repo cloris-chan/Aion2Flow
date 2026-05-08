@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Battle.Runtime;
+using Cloris.Aion2Flow.Scene.Combat;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
 
@@ -57,7 +57,7 @@ public sealed class CombatMetricsAggregationTests
             EventKind = CombatEventKind.Support
         };
 
-        var metrics = new CombatantMetrics("test");
+        var metrics = new SceneCombatantMetrics("test");
         var counted = metrics.ProcessCombatEvent(packet);
 
         Assert.False(counted);
@@ -97,7 +97,7 @@ public sealed class CombatMetricsAggregationTests
             EventKind = CombatEventKind.Healing
         };
 
-        var metrics = new CombatantMetrics("test");
+        var metrics = new SceneCombatantMetrics("test");
         var counted = metrics.ProcessCombatEvent(packet);
 
         Assert.False(counted);

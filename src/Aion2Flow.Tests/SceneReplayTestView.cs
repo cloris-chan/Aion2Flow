@@ -73,7 +73,7 @@ internal static class SceneReplayTestView
                 entity.CurrentHp,
                 entity.MaxHp,
                 null,
-                entity.BattleActive,
+                entity.NpcCombatActive,
                 entity.Kind,
                 entity.Value2136,
                 entity.Sequence2136,
