@@ -3,7 +3,6 @@ using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Scene;
@@ -15,9 +14,7 @@ using Cloris.Aion2Flow.WinDivert.Network;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
-public sealed class WinDivertCaptureService(
-    CombatMetricsStore store,
-    ProcessPortDiscoveryService processPortDiscoveryService) : IAsyncDisposable
+public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processPortDiscoveryService) : IAsyncDisposable
 {
     private WinDivertSession? _divert;
     private CancellationTokenSource? _cts;
@@ -27,7 +24,7 @@ public sealed class WinDivertCaptureService(
 
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService = processPortDiscoveryService;
     private readonly SceneLiveReadModel _scene = new();
-    private Func<IRuntimeObservationSink> RuntimeSinkFactory { get => field ??= SceneSinkFactory.CreateForStore(store, _scene); }
+    private Func<IRuntimeObservationSink> RuntimeSinkFactory { get => field ??= SceneSinkFactory.CreateForLive(_scene); }
     public PacketCaptureDispatcher Dispatcher { get => field ??= new(RuntimeSinkFactory); }
     public SceneLiveReadModel Scene => _scene;
     public bool IsDriverActive => _divert is not null;

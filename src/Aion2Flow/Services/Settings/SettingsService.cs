@@ -84,7 +84,6 @@ public sealed class SettingsService
     {
         TopmostMode = source.TopmostMode,
         MaxVisibleCombatantRows = source.MaxVisibleCombatantRows,
-        SceneSnapshotReadMode = source.SceneSnapshotReadMode,
         Language = source.Language,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,
         BattleResetHotkeyVirtualKey = source.BattleResetHotkeyVirtualKey,

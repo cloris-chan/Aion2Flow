@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using Cloris.Aion2Flow.Battle.Archive;
 using Cloris.Aion2Flow.Battle.Runtime;
 using Cloris.Aion2Flow.Combat.Classification;
 using Cloris.Aion2Flow.Combat.Metrics;
@@ -30,13 +29,8 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         public long ShieldAmount;
     }
 
-    private readonly CombatMetricsEngine _engine;
-    private readonly CombatMetricsStore _liveStore;
-    private readonly BattleArchiveService _battleArchiveService;
-
     private readonly List<CombatDetailEvent> _detailEvents = [];
     private DamageMeterSnapshot _currentSnapshot = new();
-    private CombatMetricsStore? _currentStore;
     private IReadOnlyDictionary<int, string> _currentSceneDisplayNames = new Dictionary<int, string>();
     private Guid _battleContextId;
     private int? _combatantId;
@@ -52,15 +46,8 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         IncomingShield
     }
 
-    public CombatantDetailsFlyoutViewModel(
-        CombatMetricsEngine engine,
-        CombatMetricsStore liveStore,
-        BattleArchiveService battleArchiveService,
-        LocalizationService localization)
+    public CombatantDetailsFlyoutViewModel(LocalizationService localization)
     {
-        _engine = engine;
-        _liveStore = liveStore;
-        _battleArchiveService = battleArchiveService;
         OutgoingDetail = new CombatDirectionDetailViewModel(localization, "Direction_Targets");
         IncomingDetail = new CombatDirectionDetailViewModel(localization, "Direction_Sources");
         OutgoingDetail.DamageCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
@@ -123,18 +110,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(IsIncomingSelected));
     }
 
-    public void SelectBattleCombatant(
-        Guid battleContextId,
-        int? combatantId,
-        DamageMeterSnapshot? snapshot = null,
-        CombatMetricsStore? store = null,
-        bool forceRefresh = false)
-    {
-        var baselineStart = CaptureBaselineStart();
-        RefreshContext(battleContextId, combatantId, snapshot, store, forceRefresh);
-        LastRefreshBaselineCounters = CaptureRefreshBaselineCounter(baselineStart);
-    }
-
     public void SelectSceneBattleCombatant(Guid battleContextId, int? combatantId, DamageMeterSnapshot snapshot, CombatDetailDelta detail, bool forceRefresh = false)
     {
         var baselineStart = CaptureBaselineStart();
@@ -147,7 +122,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         _battleContextId = Guid.Empty;
         _combatantId = null;
         _currentSnapshot = new DamageMeterSnapshot();
-        _currentStore = null;
         _currentSceneDisplayNames = new Dictionary<int, string>();
         _detailEvents.Clear();
         _detailRevision = -1;
@@ -214,89 +188,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         }
     }
 
-    private void RefreshContext(
-        Guid battleContextId,
-        int? combatantId,
-        DamageMeterSnapshot? snapshotOverride,
-        CombatMetricsStore? storeOverride,
-        bool forceRefresh)
-    {
-        if (combatantId is null || battleContextId == Guid.Empty)
-        {
-            _battleContextId = battleContextId;
-            _combatantId = combatantId;
-            _currentSnapshot = new DamageMeterSnapshot();
-            _currentStore = null;
-            _currentSceneDisplayNames = new Dictionary<int, string>();
-            _detailEvents.Clear();
-            _detailRevision = -1;
-            CombatantName = string.Empty;
-            ClearSectionsOnly();
-            return;
-        }
-
-        if (TryResolveArchivedSceneContext(battleContextId, snapshotOverride, storeOverride, combatantId.Value, out var archivedSnapshot, out var archivedDetail))
-        {
-            RefreshSceneContext(battleContextId, combatantId.Value, archivedSnapshot, archivedDetail, forceRefresh);
-            return;
-        }
-
-        if (!TryResolveLegacyContext(battleContextId, snapshotOverride, storeOverride, out var snapshot, out var store))
-        {
-            _battleContextId = battleContextId;
-            _combatantId = combatantId;
-            _currentSnapshot = new DamageMeterSnapshot();
-            _currentStore = null;
-            _currentSceneDisplayNames = new Dictionary<int, string>();
-            _detailEvents.Clear();
-            _detailRevision = -1;
-            CombatantName = string.Empty;
-            ClearSectionsOnly();
-            return;
-        }
-
-        if (!snapshot.Combatants.ContainsKey(combatantId.Value))
-        {
-            _battleContextId = battleContextId;
-            _combatantId = combatantId;
-            _currentSnapshot = new DamageMeterSnapshot();
-            _currentStore = null;
-            _currentSceneDisplayNames = new Dictionary<int, string>();
-            _detailEvents.Clear();
-            _detailRevision = -1;
-            CombatantName = string.Empty;
-            ClearSectionsOnly();
-            return;
-        }
-
-        var nextDetailRevision = store.GetCombatantDetailRevision(combatantId.Value);
-        var canReuseExistingSections = !forceRefresh &&
-            _battleContextId == battleContextId &&
-            _combatantId == combatantId &&
-            ReferenceEquals(_currentStore, store) &&
-            _detailRevision == nextDetailRevision;
-
-        _battleContextId = battleContextId;
-        _combatantId = combatantId;
-        _currentSnapshot = snapshot;
-        _currentStore = store;
-        _currentSceneDisplayNames = new Dictionary<int, string>();
-        CombatantName = CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, combatantId.Value);
-
-        if (canReuseExistingSections)
-        {
-            RefreshSectionRatesOnly();
-            return;
-        }
-
-        _detailRevision = nextDetailRevision;
-        _detailEvents.Clear();
-        _detailEvents.AddRange(CollectDetailEvents(snapshot, store, combatantId.Value));
-
-        RebuildCounterpartSelections();
-        RefreshAllSections();
-    }
-
     private void RefreshSceneContext(Guid battleContextId, int? combatantId, DamageMeterSnapshot snapshot, CombatDetailDelta detail, bool forceRefresh)
     {
         if (combatantId is null || battleContextId == Guid.Empty || !snapshot.Combatants.ContainsKey(combatantId.Value))
@@ -304,7 +195,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             _battleContextId = battleContextId;
             _combatantId = combatantId;
             _currentSnapshot = new DamageMeterSnapshot();
-            _currentStore = null;
             _currentSceneDisplayNames = new Dictionary<int, string>();
             _detailEvents.Clear();
             _detailRevision = -1;
@@ -317,13 +207,11 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         var canReuseExistingSections = !forceRefresh &&
             _battleContextId == battleContextId &&
             _combatantId == combatantId &&
-            _currentStore is null &&
             _detailRevision == nextDetailRevision;
 
         _battleContextId = battleContextId;
         _combatantId = combatantId;
         _currentSnapshot = snapshot;
-        _currentStore = null;
         _currentSceneDisplayNames = detail.DisplayNames;
         CombatantName = ResolveSceneCombatantDisplayName(snapshot, combatantId.Value);
 
@@ -341,70 +229,8 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         RefreshAllSections();
     }
 
-    private bool TryResolveArchivedSceneContext(
-        Guid battleContextId,
-        DamageMeterSnapshot? snapshotOverride,
-        CombatMetricsStore? storeOverride,
-        int combatantId,
-        out DamageMeterSnapshot snapshot,
-        out CombatDetailDelta detail)
-    {
-        if (storeOverride is null && _battleArchiveService.TryGetBattle(battleContextId, out var record) && record.ScenePayload is { } payload)
-        {
-            snapshot = snapshotOverride ?? record.Snapshot;
-            detail = payload.CreateDetailDelta(combatantId);
-            return true;
-        }
-
-        snapshot = new DamageMeterSnapshot();
-        detail = new CombatDetailDelta();
-        return false;
-    }
-
-    private bool TryResolveLegacyContext(
-        Guid battleContextId,
-        DamageMeterSnapshot? snapshotOverride,
-        CombatMetricsStore? storeOverride,
-        out DamageMeterSnapshot snapshot,
-        out CombatMetricsStore store)
-    {
-        if (snapshotOverride is not null && storeOverride is not null)
-        {
-            snapshot = snapshotOverride;
-            store = storeOverride;
-            return true;
-        }
-
-        if (battleContextId == _engine.CurrentBattleId)
-        {
-            snapshot = _engine.CreateBattleSnapshot();
-            store = _liveStore;
-            return true;
-        }
-
-        snapshot = new DamageMeterSnapshot();
-        store = _liveStore;
-        return false;
-    }
-
-    private static IEnumerable<CombatDetailEvent> CollectDetailEvents(
-        DamageMeterSnapshot snapshot,
-        CombatMetricsStore store,
-        int combatantId)
-    {
-        foreach (var battlePacket in store.EnumerateCombatantDetailPackets(snapshot, combatantId))
-        {
-            yield return new CombatDetailEvent(
-                battlePacket.Packet,
-                battlePacket.SourceId,
-                battlePacket.TargetId);
-        }
-    }
-
     private string ResolveCombatantDisplayName(int combatantId)
-        => _currentStore is not null
-            ? CombatMetricsEngine.ResolveCombatantDisplayName(_currentStore, _currentSnapshot, combatantId)
-            : ResolveSceneCombatantDisplayName(_currentSnapshot, combatantId);
+        => ResolveSceneCombatantDisplayName(_currentSnapshot, combatantId);
 
     private string ResolveSceneCombatantDisplayName(DamageMeterSnapshot snapshot, int combatantId)
         => _currentSceneDisplayNames.TryGetValue(combatantId, out var displayName) && !string.IsNullOrWhiteSpace(displayName)

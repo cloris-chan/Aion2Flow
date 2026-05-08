@@ -9,6 +9,9 @@ namespace Cloris.Aion2Flow.Scene;
 
 public static class SceneSinkFactory
 {
+    public static Func<IRuntimeObservationSink> CreateForLive(SceneLiveReadModel scene) =>
+        () => scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal));
+
     public static Func<IRuntimeObservationSink> CreateForStore(CombatMetricsStore store) => CreateForStore(store, new SceneLiveReadModel());
 
     public static Func<IRuntimeObservationSink> CreateForStore(CombatMetricsStore store, SceneLiveReadModel scene) =>

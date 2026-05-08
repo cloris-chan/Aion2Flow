@@ -115,78 +115,39 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void ShouldDisplayCombatant_Hides_Known_Npc_Even_If_Class_Was_Previously_Inferred()
     {
-        var store = new CombatMetricsStore();
         const int npcInstanceId = 19945;
-        store.AppendNpcCode(npcInstanceId, 2100350);
-        store.AppendNpcKind(npcInstanceId, NpcKind.Monster);
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNpc(npcInstanceId, 2100350, NpcKind.Monster);
+        fixture.AppendSceneDamage(npcInstanceId, 100, 11000010, 200, 1_000, 1);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        var combatant = new CombatantMetrics("Torbas Forest Talekun")
-        {
-            CharacterClass = CharacterClass.Elementalist
-        };
-
-        Assert.False(MainViewModel.ShouldDisplayCombatant(store, npcInstanceId, combatant));
+        Assert.DoesNotContain(fixture.ViewModel.Combatants, x => x.Id == npcInstanceId);
     }
 
     [Fact]
     public void ShouldDisplayCombatant_Hides_Combatants_Without_Player_Class()
     {
-        var store = new CombatMetricsStore();
-        var combatant = new CombatantMetrics("Unknown");
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneDamage(38924, 100, 11000010, 200, 1_000, 1);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        Assert.False(MainViewModel.ShouldDisplayCombatant(store, 38924, combatant));
+        Assert.DoesNotContain(fixture.ViewModel.Combatants, x => x.Id == 38924);
     }
 
     [Fact]
     public void ShouldDisplayCombatant_Keeps_Player_Class_When_Not_Npc()
     {
-        var store = new CombatMetricsStore();
-        var combatant = new CombatantMetrics("Player")
-        {
-            CharacterClass = CharacterClass.Chanter
-        };
-
-        Assert.True(MainViewModel.ShouldDisplayCombatant(store, 12669, combatant));
-    }
-
-    [Fact]
-    public void RefreshCombatStats_LegacyMode_DisplaysLegacySnapshot()
-    {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Legacy);
-        fixture.AppendLegacyBattle(100, "Legacy Player", 200, 1_000, 2_000);
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
-
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneBattle(12669, "Player", 400, 1_000, 2_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.Equal(100, row.Id);
-        Assert.Equal(200, row.Damage);
-        Assert.Equal(1d, fixture.ViewModel.BattleTimeSeconds);
-        Assert.Equal(string.Empty, fixture.ViewModel.LastSceneSnapshotDiff);
-    }
-
-    [Fact]
-    public void RefreshCombatStats_BothMode_DisplaysLegacySnapshotAndRecordsDiff()
-    {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Both);
-        fixture.AppendLegacyBattle(100, "Legacy Player", 200, 1_000, 2_000);
-        fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
-
-        fixture.ViewModel.RefreshCombatStatsForTesting();
-
-        var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.Equal(100, row.Id);
-        Assert.Equal(200, row.Damage);
-        Assert.Equal(1d, fixture.ViewModel.BattleTimeSeconds);
-        Assert.Contains("battleTime", fixture.ViewModel.LastSceneSnapshotDiff);
-        Assert.Contains("combatant:100:damage", fixture.ViewModel.LastSceneSnapshotDiff);
+        Assert.Contains(fixture.ViewModel.Combatants, x => x.Id == 12669);
     }
 
     [Fact]
     public void RefreshCombatStats_SceneMode_DisplaysSceneSnapshot()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
-        fixture.AppendLegacyBattle(100, "Legacy Player", 200, 1_000, 2_000);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
@@ -195,14 +156,12 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal(300, row.Id);
         Assert.Equal(400, row.Damage);
         Assert.Equal(2d, fixture.ViewModel.BattleTimeSeconds);
-        Assert.Equal(string.Empty, fixture.ViewModel.LastSceneSnapshotDiff);
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_UsesSceneDisplayNameWhenLegacyStoreDisagrees()
+    public void RefreshCombatStats_SceneMode_UsesSceneDisplayName()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
-        fixture.AppendLegacyIdentity(300, "Legacy Name");
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Name", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
@@ -212,9 +171,9 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_FiltersNpcFromSceneStoreWhenLegacyStoreIsEmpty()
+    public void RefreshCombatStats_SceneMode_FiltersNpcFromSceneStore()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
         fixture.AppendSceneNpc(900_002, 2_100_350, NpcKind.Monster);
 
@@ -225,9 +184,9 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_UsesSceneBossFocusWhenLegacyStoreIsEmpty()
+    public void RefreshCombatStats_SceneMode_UsesSceneBossFocus()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
         fixture.AppendSceneBossFocus(900_002, "Scene Boss", 25_000, 50_000, 5_500);
 
@@ -243,7 +202,7 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void RefreshCombatStats_SceneMode_RefreshesLiveDetailFromSceneProjection()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
@@ -259,7 +218,7 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void RefreshCombatStats_SceneMode_DoesNotRebuildLiveDetailForIrrelevantSceneCombat()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
@@ -276,7 +235,7 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void RefreshCombatStats_SceneMode_RebuildsLiveDetailForRelevantSceneCombat()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
@@ -292,10 +251,9 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void ArchiveCurrentBattle_SceneMode_WritesScenePayloadWithoutLegacySlice()
+    public void ArchiveCurrentBattle_SceneMode_WritesScenePayload()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
-        fixture.AppendLegacyIdentity(300, "Legacy Name");
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
@@ -303,7 +261,6 @@ public sealed class MainViewModelCombatantFilterTests
 
         var history = Assert.Single(fixture.ViewModel.BattleHistory);
         Assert.NotNull(history.Record.ScenePayload);
-        Assert.Null(history.Record.LegacyPayload);
         Assert.Equal("Scene Player", history.Record.ScenePayload!.DisplayNames[300]);
         Assert.Equal(400, history.Record.ScenePayload.CreateDetailDelta(300).Combatant!.OutgoingDamage);
     }
@@ -311,8 +268,7 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void ArchiveCurrentBattle_SceneMode_ArchivedDetailUsesScenePayload()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
-        fixture.AppendLegacyIdentity(300, "Legacy Name");
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
@@ -325,47 +281,31 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.CombatantName);
         Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
         Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
-        Assert.Null(fixture.ViewModel.BattleHistory[0].Record.LegacyPayload);
+        Assert.NotNull(fixture.ViewModel.BattleHistory[0].Record.ScenePayload);
     }
 
     [Fact]
-    public void ArchiveCurrentBattle_SceneMode_ArchivedDisplayUsesSnapshotWithoutLegacyFallback()
+    public void ArchiveCurrentBattle_SceneMode_ArchivedDisplayUsesSnapshot()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         fixture.ViewModel.ArchiveCurrentBattleCommand.Execute(null);
         var history = Assert.Single(fixture.ViewModel.BattleHistory);
         fixture.ViewModel.ReturnToLiveCommand.Execute(null);
-        fixture.AppendLegacyIdentity(300, "Legacy Name");
-        fixture.AppendLegacyNpc(300, 2_100_350, NpcKind.Monster);
         fixture.ViewModel.SelectedBattleHistory = history;
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Equal(300, row.Id);
         Assert.Equal("Scene Player", row.DisplayName);
-        Assert.Null(history.Record.LegacyPayload);
-    }
-
-    [Fact]
-    public void ArchiveCurrentBattle_LegacyMode_KeepsLegacyArchiveFallback()
-    {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Legacy);
-        fixture.AppendLegacyBattle(100, "Legacy Player", 200, 1_000, 2_000);
-        fixture.ViewModel.RefreshCombatStatsForTesting();
-
-        fixture.ViewModel.ArchiveCurrentBattleCommand.Execute(null);
-
-        var history = Assert.Single(fixture.ViewModel.BattleHistory);
-        Assert.Null(history.Record.ScenePayload);
-        Assert.Equal("Legacy Player", history.Record.LegacyPayload!.Store.Nicknames[100]);
+        Assert.NotNull(history.Record.ScenePayload);
     }
 
     [Fact]
     public void RefreshCombatStats_SceneMode_AutoArchiveWritesScenePayloadOnMapTransition()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneMap(200003, 113515);
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
@@ -378,13 +318,13 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.True(record.IsAutomatic);
         Assert.NotNull(record.ScenePayload);
         Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.OutgoingDamage);
-        Assert.Null(record.LegacyPayload);
+        Assert.NotNull(record.ScenePayload);
     }
 
     [Fact]
     public void ResetCommand_SceneMode_ArchivesScenePayload()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
+        var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneBattle(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
@@ -395,38 +335,25 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.True(record.IsAutomatic);
         Assert.NotNull(record.ScenePayload);
         Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.OutgoingDamage);
-        Assert.Null(record.LegacyPayload);
+        Assert.NotNull(record.ScenePayload);
     }
 
     [Fact]
-    public void ResetLiveModels_ResetsLegacyAndSceneSnapshotsTogether()
+    public void ResetLiveModels_ResetsSceneSnapshot()
     {
-        var fixture = MainViewModelFixture.Create(SceneSnapshotReadMode.Scene);
-        SceneDualWrite.Enabled = true;
-        try
-        {
-            var sink = fixture.CreateLiveSink();
-            AppendLiveBattle(sink, 100, "Player", 800, 1_000, 2_000, 1);
-            var firstLegacy = fixture.CreateLegacySnapshot();
-            var firstScene = fixture.CreateSceneSnapshot();
+        var fixture = MainViewModelFixture.Create();
+        var sink = fixture.CreateLiveSink();
+        AppendLiveBattle(sink, 100, "Player", 800, 1_000, 2_000, 1);
+        var firstScene = fixture.CreateSceneSnapshot();
 
-            fixture.ViewModel.ResetLiveModelsForTesting();
+        fixture.ViewModel.ResetLiveModelsForTesting();
 
-            AppendLiveBattle(sink, 100, "Player", 900, 3_000, 4_000, 3);
-            var secondLegacy = fixture.CreateLegacySnapshot();
-            var secondScene = fixture.CreateSceneSnapshot();
+        AppendLiveBattle(sink, 100, "Player", 900, 3_000, 4_000, 3);
+        var secondScene = fixture.CreateSceneSnapshot();
 
-            Assert.NotEqual(firstLegacy.BattleId, secondLegacy.BattleId);
-            Assert.NotEqual(firstScene.BattleId, secondScene.BattleId);
-            Assert.Equal(900, secondLegacy.Combatants[100].DamageAmount);
-            Assert.Equal(900, secondScene.Combatants[100].DamageAmount);
-            Assert.Equal("Player", secondLegacy.Combatants[100].Nickname);
-            Assert.Equal("Player", secondScene.Combatants[100].Nickname);
-        }
-        finally
-        {
-            SceneDualWrite.Enabled = false;
-        }
+        Assert.NotEqual(firstScene.BattleId, secondScene.BattleId);
+        Assert.Equal(900, secondScene.Combatants[100].DamageAmount);
+        Assert.Equal("Player", secondScene.Combatants[100].Nickname);
     }
 
     [Fact]
@@ -450,13 +377,11 @@ public sealed class MainViewModelCombatantFilterTests
 
     private sealed class MainViewModelFixture
     {
-        private readonly CombatMetricsEngine _engine;
         private readonly WinDivertCaptureService _captureService;
 
-        private MainViewModelFixture(MainViewModel viewModel, CombatMetricsEngine engine, WinDivertCaptureService captureService, BattleArchiveService archive)
+        private MainViewModelFixture(MainViewModel viewModel, WinDivertCaptureService captureService, BattleArchiveService archive)
         {
             ViewModel = viewModel;
-            _engine = engine;
             _captureService = captureService;
             Archive = archive;
         }
@@ -464,58 +389,25 @@ public sealed class MainViewModelCombatantFilterTests
         public MainViewModel ViewModel { get; }
         public BattleArchiveService Archive { get; }
 
-        public static MainViewModelFixture Create(SceneSnapshotReadMode readMode)
+        public static MainViewModelFixture Create()
         {
             CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-            SceneDualWrite.Enabled = false;
             var settingsPath = Path.Combine(Path.GetTempPath(), $"aion2flow-test-{Guid.NewGuid():N}.json");
             var settings = new SettingsService(settingsPath);
-            settings.Update(s => s.SceneSnapshotReadMode = readMode);
             var language = new LanguageService();
             var localization = new LocalizationService(language);
             var resources = new GameResourceService(language);
             var archive = new BattleArchiveService();
-            var store = new CombatMetricsStore();
-            var engine = new CombatMetricsEngine(store);
             var ports = new ProcessPortDiscoveryService();
-            var capture = new WinDivertCaptureService(store, ports);
-            var details = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
-            var viewModel = new MainViewModel(capture, ports, engine, store, language, resources, archive, details, localization, settings, null!);
-            return new MainViewModelFixture(viewModel, engine, capture, archive);
-        }
-
-        public void AppendLegacyBattle(int playerId, string name, int damage, long start, long end)
-        {
-            _engine.Store.AppendNickname(playerId, name);
-            _engine.Store.AppendCombatPacket(new ParsedCombatPacket
-            {
-                SourceId = playerId,
-                TargetId = 900_001,
-                SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
-                Damage = damage / 2,
-                Timestamp = start,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = CombatValueKind.Damage
-            });
-            _engine.Store.AppendCombatPacket(new ParsedCombatPacket
-            {
-                SourceId = playerId,
-                TargetId = 900_001,
-                SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
-                Damage = damage - damage / 2,
-                Timestamp = end,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = CombatValueKind.Damage
-            });
+            var capture = new WinDivertCaptureService(ports);
+            var details = new CombatantDetailsFlyoutViewModel(localization);
+            var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, null!);
+            return new MainViewModelFixture(viewModel, capture, archive);
         }
 
         public void AppendSceneBattle(int playerId, string name, int damage, long start, long end) => MainViewModelCombatantFilterTests.AppendSceneBattle(_captureService.Scene, playerId, name, damage, start, end);
 
-        public IRuntimeObservationSink CreateLiveSink() => SceneSinkFactory.CreateForStore(_engine.Store, _captureService.Scene)();
-
-        public DamageMeterSnapshot CreateLegacySnapshot() => _engine.CreateBattleSnapshot();
+        public IRuntimeObservationSink CreateLiveSink() => SceneSinkFactory.CreateForLive(_captureService.Scene)();
 
         public DamageMeterSnapshot CreateSceneSnapshot() => _captureService.Scene.Owner.CreateSnapshot();
 
@@ -524,14 +416,6 @@ public sealed class MainViewModelCombatantFilterTests
         public void AppendSceneNpc(int instanceId, int npcCode, NpcKind kind) => MainViewModelCombatantFilterTests.AppendSceneNpc(_captureService.Scene, instanceId, npcCode, kind);
 
         public void AppendSceneBossFocus(int instanceId, string name, int hp, int maxHp, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocus(_captureService.Scene, instanceId, name, hp, maxHp, timestamp);
-
-        public void AppendLegacyIdentity(int playerId, string name) => _engine.Store.AppendNickname(playerId, name);
-
-        public void AppendLegacyNpc(int instanceId, int npcCode, NpcKind kind)
-        {
-            _engine.Store.AppendNpcCode(instanceId, npcCode);
-            _engine.Store.AppendNpcKind(instanceId, kind);
-        }
 
         public void AppendSceneMap(uint mapId, uint instanceId) => MainViewModelCombatantFilterTests.AppendSceneMap(_captureService.Scene, mapId, instanceId);
     }

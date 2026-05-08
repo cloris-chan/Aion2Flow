@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia.Threading;
-using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
@@ -45,7 +44,6 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         {
             TopmostMode = persisted.TopmostMode;
             MaxVisibleCombatantRows = persisted.MaxVisibleCombatantRows;
-            SceneSnapshotReadMode = persisted.SceneSnapshotReadMode;
             if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
             {
                 BattleResetHotkey = new HotkeyDefinition((HotkeyModifiers)mods, vk);
@@ -56,7 +54,6 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             _isApplyingPersistedSettings = false;
         }
 
-        ApplySceneSnapshotReadMode(SceneSnapshotReadMode);
         _globalHotkeyService.SetHotkey(BattleResetHotkey);
 
         RebuildLanguageOptions();
@@ -89,9 +86,6 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MaxVisibleCombatantRowsDisplay))]
     public partial int MaxVisibleCombatantRows { get; set; } = 4;
-
-    [ObservableProperty]
-    public partial SceneSnapshotReadMode SceneSnapshotReadMode { get; set; } = SceneSnapshotReadMode.Scene;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
@@ -184,12 +178,6 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     partial void OnMaxVisibleCombatantRowsChanged(int value) => PersistSettings();
 
-    partial void OnSceneSnapshotReadModeChanged(SceneSnapshotReadMode value)
-    {
-        ApplySceneSnapshotReadMode(value);
-        PersistSettings();
-    }
-
     partial void OnSelectedLanguageChanged(LanguageOption? value)
     {
         if (value is not null)
@@ -235,15 +223,11 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         {
             s.TopmostMode = TopmostMode;
             s.MaxVisibleCombatantRows = MaxVisibleCombatantRows;
-            s.SceneSnapshotReadMode = SceneSnapshotReadMode;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
             s.BattleResetHotkeyVirtualKey = BattleResetHotkey?.VirtualKey;
         });
     }
-
-    private static void ApplySceneSnapshotReadMode(SceneSnapshotReadMode value)
-        => SceneDualWrite.Enabled = value != SceneSnapshotReadMode.Legacy;
 
     private void OnForegroundChanged(bool isTopMost)
     {

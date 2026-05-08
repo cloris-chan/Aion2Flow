@@ -10,13 +10,5 @@ public sealed class ArchivedBattleRecord
     public string Trigger { get; init; } = string.Empty;
     public bool IsAutomatic { get; init; }
     public DamageMeterSnapshot Snapshot { get; init; } = new();
-    public SceneArchivePayload? ScenePayload { get; init; }
-    public LegacyArchivePayload? LegacyPayload { get; init; }
-}
-
-public sealed class LegacyArchivePayload
-{
-    internal LegacyArchivePayload(CombatMetricsStore store) => Store = store;
-
-    internal CombatMetricsStore Store { get; }
+    public SceneArchivePayload ScenePayload { get; init; } = new();
 }

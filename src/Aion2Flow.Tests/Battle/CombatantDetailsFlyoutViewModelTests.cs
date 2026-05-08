@@ -9,6 +9,7 @@ using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.Scene;
 using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.Scene.Projection;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Tests.Protocol;
 using Cloris.Aion2Flow.ViewModels;
@@ -24,10 +25,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -45,7 +45,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, addId, 11000010, 200, 5_500, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -71,10 +71,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -87,7 +86,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var counters = viewModel.LastRefreshBaselineCounters;
         Assert.True(counters.Elapsed >= TimeSpan.Zero);
@@ -104,10 +103,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
@@ -159,10 +157,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
@@ -189,31 +186,33 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectBattleCombatant_Uses_Archived_BattleId_Context()
+    public void SelectSceneBattleCombatant_Uses_Archived_BattleId_Context()
     {
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var archive = new BattleArchiveService();
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
-        AppendPacket(store, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        sink.AppendNickname(playerId, "Perigee");
+        AppendScenePacket(sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        var record = archive.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
+        var payload = SceneArchivePayload.Create(scene.Owner, scene.Owner.CreateSnapshot());
+        var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
-        engine.Reset();
-        viewModel.SelectBattleCombatant(record!.BattleId, playerId, record.Snapshot, record.LegacyPayload!.Store);
+        scene.Reset();
+        SelectArchivedSceneCombatant(viewModel, record!, playerId);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -222,23 +221,20 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectBattleCombatant_Uses_Archived_ScenePayload_When_Available()
+    public void SelectSceneBattleCombatant_Uses_Archived_ScenePayload()
     {
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var archive = new BattleArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
         const int playerId = 1001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Legacy Name");
         sink.AppendNickname(playerId, "Scene Player");
         AppendScenePacket(sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
         AppendScenePacket(sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
@@ -249,10 +245,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.Null(record!.LegacyPayload);
+        Assert.Equal(payload.Snapshot.BattleId, record!.BattleId);
 
         scene.Reset();
-        viewModel.SelectBattleCombatant(record.BattleId, playerId);
+        SelectArchivedSceneCombatant(viewModel, record, playerId);
 
         Assert.Equal("Scene Player", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -268,10 +264,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -286,7 +281,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         Assert.Equal(400, snapshot.Combatants[playerId].HealingAmount);
 
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         Assert.Equal(400, viewModel.OutgoingHealing.Total);
         Assert.Equal(400, viewModel.IncomingHealing.Total);
@@ -296,33 +291,35 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectBattleCombatant_Uses_Archived_Store_For_Summon_Attribution()
+    public void SelectSceneBattleCombatant_Uses_Archived_ScenePayload_For_Summon_Attribution()
     {
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var archive = new BattleArchiveService();
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
         const int playerId = 1001;
         const int summonId = 5001;
         const int bossId = 9001;
 
-        store.AppendNickname(playerId, "Perigee");
-        store.AppendSummon(playerId, summonId);
-        AppendPacket(store, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        sink.AppendNickname(playerId, "Perigee");
+        sink.AppendSummon(playerId, summonId);
+        AppendScenePacket(sink, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(sink, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
 
-        var snapshot = engine.CreateBattleSnapshot();
-        var record = archive.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
+        var payload = SceneArchivePayload.Create(scene.Owner, scene.Owner.CreateSnapshot());
+        var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
-        engine.Reset();
-        viewModel.SelectBattleCombatant(record!.BattleId, playerId, record.Snapshot, record.LegacyPayload!.Store);
+        scene.Reset();
+        SelectArchivedSceneCombatant(viewModel, record!, playerId);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -336,10 +333,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int allyId = 1002;
@@ -354,7 +350,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, allyId, 14000010, 200, 4_000, CombatEventKind.Healing, CombatValueKind.Shield);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         Assert.Equal(250, viewModel.OutgoingHealing.Total);
         Assert.Equal(500, viewModel.OutgoingShield.Total);
@@ -378,10 +374,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -395,7 +390,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, bossId, playerId, 14000010, 300, 2_000, CombatEventKind.Support, CombatValueKind.Shield);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         Assert.Equal(90, viewModel.IncomingHealing.Total);
         Assert.Equal(300, viewModel.IncomingShield.Total);
@@ -410,10 +405,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int allyOneId = 1002;
@@ -433,7 +427,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPeriodicTargetPacket(allyThreeId, 4_000);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         Assert.Equal(500, snapshot.Combatants[playerId].DamageAmount);
         Assert.Equal(500, viewModel.OutgoingDamage.Total);
@@ -471,10 +465,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -497,7 +490,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         store.AppendCombatPacket(selfPacket);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         Assert.Equal(500, snapshot.Combatants[playerId].DamageAmount);
         Assert.Equal(500, viewModel.OutgoingDamage.Total);
@@ -513,10 +506,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -527,11 +519,11 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, addId, 11000010, 200, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
         SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
 
         AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         AssertSelectedCounterpartIds(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
@@ -545,10 +537,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -559,7 +550,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, addId, 11000010, 200, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var originalBossCounterpart = Assert.Single(
             viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts,
@@ -568,7 +559,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var refreshedBossCounterpart = Assert.Single(
             viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts,
@@ -586,10 +577,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -601,7 +591,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
@@ -626,10 +616,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -652,7 +641,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             multiHitCount: 1);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
@@ -675,10 +664,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -737,7 +725,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             modifiers: DamageModifiers.Back);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var rows = viewModel.OutgoingDamage.Rows.OrderBy(row => row.SkillCode).ToArray();
 
@@ -756,10 +744,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -772,7 +759,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, bossId, 11000010, int.MaxValue, 4_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var expectedDamage = 4L * int.MaxValue;
 
@@ -799,10 +786,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -824,7 +810,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, bossId, 17030010, 80, 7_000, CombatEventKind.Damage, CombatValueKind.PeriodicDamage, PeriodicEffectRelation.Target, 9);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         Assert.Equal(4, viewModel.OutgoingDamage.Hits);
         Assert.Equal(7, viewModel.OutgoingDamage.PeriodicHits);
@@ -868,10 +854,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -890,7 +875,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, bossId, playerId, 1100020, 1, 9_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block | DamageModifiers.Perfect);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var row = Assert.Single(viewModel.IncomingDamage.Rows);
 
@@ -920,10 +905,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -944,7 +928,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             attemptContribution: 1);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
@@ -968,10 +952,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -993,7 +976,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             attemptContribution: 1);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         var row = Assert.Single(viewModel.IncomingDamage.Rows);
 
@@ -1010,20 +993,17 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
-        var liveStore = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(liveStore);
-        var archive = new BattleArchiveService();
+        var replay = ReplayWithScene(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, liveStore, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
-        var record = archive.ArchiveLegacy(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+        var record = CreateSceneArchiveRecord(replay);
 
         Assert.NotNull(record);
         Assert.Contains(3737, record!.Snapshot.Combatants.Keys);
 
-        viewModel.SelectBattleCombatant(record.BattleId, 3737, record.Snapshot, record.LegacyPayload!.Store);
+        SelectArchivedSceneCombatant(viewModel, record, 3737);
 
         Assert.Equal(18, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
@@ -1036,24 +1016,21 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260412110721.log"));
-        var liveStore = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(liveStore);
-        var archive = new BattleArchiveService();
+        var replay = ReplayWithScene(FixtureHelper.GetPath("logs/aion2flow.stream.20260412110721.log"));
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, liveStore, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
         var primary = replay.Combatants
             .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
             .ThenByDescending(static summary => summary.IncomingDamage)
             .First();
 
-        var record = archive.ArchiveLegacy(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+        var record = CreateSceneArchiveRecord(replay);
 
         Assert.NotNull(record);
         Assert.Contains(primary.CombatantId, record!.Snapshot.Combatants.Keys);
 
-        viewModel.SelectBattleCombatant(record.BattleId, primary.CombatantId, record.Snapshot, record.LegacyPayload!.Store);
+        SelectArchivedSceneCombatant(viewModel, record, primary.CombatantId);
 
         Assert.Equal(10, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
@@ -1066,22 +1043,19 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatMetricsEngine.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var logPath = FixtureHelper.GetPath("logs/aion2flow.stream.20260422222104.log");
-        var replay = PacketLogReplayService.Replay(logPath);
-        var liveStore = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(liveStore);
-        var archive = new BattleArchiveService();
+        var replay = ReplayWithScene(logPath);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, liveStore, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 6485;
         var allyIds = new HashSet<int> { 3738, 4985, 7490 };
-        var record = archive.ArchiveLegacy(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+        var record = CreateSceneArchiveRecord(replay);
 
         Assert.NotNull(record);
         Assert.Contains(playerId, record!.Snapshot.Combatants.Keys);
 
-        viewModel.SelectBattleCombatant(record.BattleId, playerId, record.Snapshot, record.LegacyPayload!.Store);
+        SelectArchivedSceneCombatant(viewModel, record, playerId);
 
         var damageCounterparts = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts
             .Select(static counterpart =>
@@ -1159,10 +1133,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         }
 
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         var snapshot = engine.CreateBattleSnapshot();
         var battlePackets = CombatMetricsEngine.EnumerateBattlePackets(store, snapshot.BattleStartTime, snapshot.BattleEndTime)
@@ -1196,7 +1169,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.True(battleInvincibles.Length == 7, string.Join(Environment.NewLine, battleInvincibles));
         Assert.True(manualInvincibleCount == 7, string.Join(Environment.NewLine, battleInvincibles));
 
-        viewModel.SelectBattleCombatant(snapshot.BattleId, 3737);
+        SelectStoreCombatant(viewModel, engine, store, 3737);
 
         Assert.Equal(18, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
@@ -1433,6 +1406,79 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(expectedRate, actualRate, 10);
     }
 
+    private static void SelectStoreCombatant(CombatantDetailsFlyoutViewModel viewModel, CombatMetricsEngine engine, CombatMetricsStore store, int combatantId, bool forceRefresh = false)
+    {
+        var snapshot = engine.CreateBattleSnapshot();
+        SelectStoreCombatant(viewModel, snapshot, store, combatantId, forceRefresh);
+    }
+
+    private static void SelectStoreCombatant(CombatantDetailsFlyoutViewModel viewModel, DamageMeterSnapshot snapshot, CombatMetricsStore store, int combatantId, bool forceRefresh = false)
+    {
+        var detail = CreateStoreDetailDelta(snapshot, store, combatantId);
+        viewModel.SelectSceneBattleCombatant(snapshot.BattleId, combatantId, snapshot, detail, forceRefresh);
+    }
+
+    private static void SelectArchivedSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, ArchivedBattleRecord record, int combatantId, bool forceRefresh = false)
+    {
+        var detail = record.ScenePayload.CreateDetailDelta(combatantId);
+        viewModel.SelectSceneBattleCombatant(record.BattleId, combatantId, record.Snapshot, detail, forceRefresh);
+    }
+
+    private static ArchivedBattleRecord? CreateSceneArchiveRecord(PacketLogReplayResult replay)
+    {
+        var service = new BattleArchiveService();
+        var payload = SceneArchivePayload.Create(replay.SceneOwner!, replay.SceneOwner!.CreateSnapshot());
+        return service.Archive(payload, "replay", isAutomatic: false);
+    }
+
+    private static PacketLogReplayResult ReplayWithScene(string path)
+    {
+        var previous = SceneDualWrite.Enabled;
+        SceneDualWrite.Enabled = true;
+        try
+        {
+            return PacketLogReplayService.Replay(path);
+        }
+        finally
+        {
+            SceneDualWrite.Enabled = previous;
+        }
+    }
+
+    private static CombatDetailDelta CreateStoreDetailDelta(DamageMeterSnapshot snapshot, CombatMetricsStore store, int combatantId)
+    {
+        var events = store.EnumerateCombatantDetailPackets(snapshot, combatantId)
+            .Select(static packet => new CombatDetailEvent(packet.Packet, packet.SourceId, packet.TargetId))
+            .ToArray();
+        var displayNames = new Dictionary<int, string>();
+        AddDisplayName(displayNames, snapshot, store, combatantId);
+        for (var i = 0; i < events.Length; i++)
+        {
+            AddDisplayName(displayNames, snapshot, store, events[i].SourceId);
+            AddDisplayName(displayNames, snapshot, store, events[i].TargetId);
+        }
+
+        return new CombatDetailDelta
+        {
+            CombatantId = combatantId,
+            Revision = store.GetCombatantDetailRevision(combatantId),
+            OutgoingPairs = events.Where(e => e.SourceId == combatantId && e.TargetId > 0).Select(static e => new DirectedPairKey(e.SourceId, e.TargetId)).Distinct().OrderBy(static p => p.SourceId).ThenBy(static p => p.TargetId).ToArray(),
+            IncomingPairs = events.Where(e => e.TargetId == combatantId && e.SourceId > 0).Select(static e => new DirectedPairKey(e.SourceId, e.TargetId)).Distinct().OrderBy(static p => p.SourceId).ThenBy(static p => p.TargetId).ToArray(),
+            Events = events,
+            DisplayNames = displayNames
+        };
+    }
+
+    private static void AddDisplayName(Dictionary<int, string> names, DamageMeterSnapshot snapshot, CombatMetricsStore store, int combatantId)
+    {
+        if (combatantId <= 0)
+            return;
+
+        var name = CombatMetricsEngine.ResolveCombatantDisplayName(store, snapshot, combatantId);
+        if (!string.IsNullOrWhiteSpace(name))
+            names[combatantId] = name;
+    }
+
     [Fact]
     public void ScopeOptions_Resolve_Npc_Name_From_Catalog_When_NpcCode_Set()
     {
@@ -1441,10 +1487,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var store = new CombatMetricsStore();
         var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
 
         const int playerId = 1001;
         const int npcInstanceId = 29994;
@@ -1458,7 +1503,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, npcInstanceId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
-        viewModel.SelectBattleCombatant(snapshot.BattleId, playerId);
+        SelectStoreCombatant(viewModel, engine, store, playerId);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
@@ -1470,36 +1515,37 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void ScopeOptions_Resolve_Npc_Name_From_Archived_Store()
+    public void ScopeOptions_Resolve_Npc_Name_From_Archived_ScenePayload()
     {
         var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
         CombatMetricsEngine.SetGameResources(BuildSkillMap(), catalog);
 
-        var store = new CombatMetricsStore();
-        var engine = new CombatMetricsEngine(store);
-        var archive = new BattleArchiveService();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(engine, store, archive, localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var archive = new BattleArchiveService();
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
         const int playerId = 1001;
         const int npcInstanceId = 29994;
         const int npcCode = 2400032;
 
-        store.AppendNickname(playerId, "Perigee");
-        store.AppendNpcCode(npcInstanceId, npcCode);
-        store.AppendNpcKind(npcInstanceId, NpcKind.Monster);
-        store.AppendNpcName(npcCode, "訓練用稻草人");
+        sink.AppendNickname(playerId, "Perigee");
+        sink.AppendNpcCode(npcInstanceId, npcCode);
+        sink.AppendNpcKind(npcInstanceId, NpcKind.Monster);
+        sink.AppendNpcName(npcCode, "訓練用稻草人");
+        AppendScenePacket(sink, playerId, npcInstanceId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(sink, playerId, npcInstanceId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        sink.CompleteBatch(1);
+        sink.CompleteBatch(2);
 
-        AppendPacket(store, playerId, npcInstanceId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(store, playerId, npcInstanceId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
-
-        var snapshot = engine.CreateBattleSnapshot();
-        var record = archive.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
+        var payload = SceneArchivePayload.Create(scene.Owner, scene.Owner.CreateSnapshot());
+        var record = archive.Archive(payload, "manual", isAutomatic: false);
         Assert.NotNull(record);
 
-        engine.Reset();
-        viewModel.SelectBattleCombatant(record!.BattleId, playerId, record.Snapshot, record.LegacyPayload!.Store);
+        scene.Reset();
+        SelectArchivedSceneCombatant(viewModel, record!, playerId);
 
         var counterpart = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.FirstOrDefault(x => x.CombatantId == npcInstanceId);
         Assert.NotNull(counterpart);
