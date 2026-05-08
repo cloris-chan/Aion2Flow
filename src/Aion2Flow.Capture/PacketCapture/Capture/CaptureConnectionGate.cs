@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using Cloris.Aion2Flow.Services.Logging;
-using Cloris.Aion2Flow.WinDivert.Network;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
@@ -13,7 +11,7 @@ public static class CaptureConnectionGate
 
     private static volatile LockState? _currentState;
 
-    public static bool ShouldProcessPacket(in TcpConnection connection, TcpControlBits flags, out bool isReversed)
+    public static bool ShouldProcessPacket(in TcpConnection connection, bool hasCloseFlag, out bool isReversed)
     {
         var state = _currentState;
 
@@ -30,7 +28,7 @@ public static class CaptureConnectionGate
         {
             if (Interlocked.CompareExchange(ref _currentState, null, state) == state)
             {
-                AppLog.Write(AppLogLevel.Info, "Connection idle timeout, unlocked");
+                CaptureLog.Write(CaptureLogLevel.Info, "Connection idle timeout, unlocked");
             }
             isReversed = false;
             return true;
@@ -40,11 +38,11 @@ public static class CaptureConnectionGate
         {
             Interlocked.Exchange(ref state.LastActivityTicks, now);
 
-            if ((flags & TcpControlBits.FIN) != 0 || (flags & TcpControlBits.RST) != 0)
+            if (hasCloseFlag)
             {
                 if (Interlocked.CompareExchange(ref _currentState, null, state) == state)
                 {
-                    AppLog.Write(AppLogLevel.Info, "FIN/RST detected, unlocked");
+                    CaptureLog.Write(CaptureLogLevel.Info, "FIN/RST detected, unlocked");
                 }
             }
             return true;

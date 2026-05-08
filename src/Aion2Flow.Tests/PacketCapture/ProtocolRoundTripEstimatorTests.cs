@@ -81,13 +81,13 @@ public sealed class ProtocolRoundTripEstimatorTests
     }
 
     [Fact]
-    public void WinDivertCaptureService_Tracks_Local_Outbound_Payload_Length_For_Protocol_Rtt()
+    public void TrackOutboundFrame_Tracks_Local_Outbound_Payload_Length_For_Protocol_Rtt()
     {
         var estimator = new ProtocolRoundTripEstimator();
         var startedAt = Stopwatch.GetTimestamp();
         var resolvedAt = startedAt + (Stopwatch.Frequency / 40);
 
-        WinDivertCaptureService.TrackLocalProtocolOutboundPayload(estimator, payloadLength: 31, startedAt);
+        estimator.TrackOutboundFrame(frameLength: 31, startedAt);
 
         var resolved = estimator.TryResolveInboundEvent("compact-0638", resolvedAt, out var smoothedMilliseconds);
 
@@ -96,12 +96,12 @@ public sealed class ProtocolRoundTripEstimatorTests
     }
 
     [Fact]
-    public void WinDivertCaptureService_Ignores_Zero_Length_Local_Outbound_Payload()
+    public void TrackOutboundFrame_Ignores_Zero_Length_Local_Outbound_Payload()
     {
         var estimator = new ProtocolRoundTripEstimator();
         var startedAt = Stopwatch.GetTimestamp();
 
-        WinDivertCaptureService.TrackLocalProtocolOutboundPayload(estimator, payloadLength: 0, startedAt);
+        estimator.TrackOutboundFrame(frameLength: 0, startedAt);
 
         var resolved = estimator.TryResolveInboundEvent("remain-hp", startedAt + Stopwatch.Frequency / 40, out _);
 

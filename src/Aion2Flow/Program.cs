@@ -5,6 +5,7 @@ using Avalonia.Themes.Simple;
 using Cloris.Aion2Flow.Assets.Icons;
 using Cloris.Aion2Flow.Scene.Archive;
 using Cloris.Aion2Flow.PacketCapture.Capture;
+using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Logging;
@@ -47,6 +48,8 @@ internal static class Program
         );
         services.AddSingleton(logWriter);
         AppLog.Initialize(logWriter);
+        CaptureLog.Sink = static (level, message) => AppLog.Write(MapLogLevel(level), message);
+        RawPacketDump.ConfigureLogDirectory(LogDirectoryResolver.GetDefaultLogDirectory());
 
         services.AddSingleton<SettingsService>();
         services.AddSingleton<App>();
@@ -68,6 +71,15 @@ internal static class Program
         Ioc.Default.ConfigureServices(serviceProvider);
         return serviceProvider;
     }
+
+    private static AppLogLevel MapLogLevel(CaptureLogLevel level) => level switch
+    {
+        CaptureLogLevel.Debug => AppLogLevel.Debug,
+        CaptureLogLevel.Info => AppLogLevel.Info,
+        CaptureLogLevel.Warning => AppLogLevel.Warning,
+        CaptureLogLevel.Error => AppLogLevel.Error,
+        _ => AppLogLevel.Info
+    };
 }
 
 file sealed class App(IServiceProvider serviceProvider) : Application

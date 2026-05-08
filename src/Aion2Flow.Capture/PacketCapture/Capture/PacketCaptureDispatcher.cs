@@ -1,7 +1,6 @@
 using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Streams;
 using Cloris.Aion2Flow.Scene.Observation;
-using Cloris.Aion2Flow.Services.Logging;
 
 namespace Cloris.Aion2Flow.PacketCapture.Capture;
 
@@ -29,7 +28,7 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
                         }
                         catch (Exception ex)
                         {
-                            AppLog.Write(AppLogLevel.Error, $"Packet dispatch failed: {ex.Message}");
+                            CaptureLog.Write(CaptureLogLevel.Error, $"Packet dispatch failed: {ex.Message}");
                         }
                     }
                     finally

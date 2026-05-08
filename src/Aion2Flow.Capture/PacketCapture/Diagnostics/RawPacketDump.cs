@@ -1,8 +1,8 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Cloris.Aion2Flow.PacketCapture.Streams;
-using Cloris.Aion2Flow.Services.Logging;
 
 namespace Cloris.Aion2Flow.PacketCapture.Diagnostics;
 
@@ -14,7 +14,7 @@ internal static class RawPacketDump
     private static bool IsEnabled => false;
 #endif
     private static readonly Lock SyncRoot = new();
-    private static readonly string _logRootDirectory = LogDirectoryResolver.GetDefaultLogDirectory();
+    private static string _logRootDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
     private static string _rawLogPath = string.Empty;
     private static string _streamLogPath = string.Empty;
     private static string _frameLogPath = string.Empty;
@@ -24,19 +24,17 @@ internal static class RawPacketDump
 
     public static event Action<FrameEventObservation>? FrameEventObserved;
 
-    static RawPacketDump()
-    {
-        if (IsEnabled)
-        {
-            RotateLogs();
-        }
-    }
-
     public static string RawLogPath => _rawLogPath;
     public static string StreamLogPath => _streamLogPath;
     public static string FrameLogPath => _frameLogPath;
 
     private static bool ShouldWriteFrameLog => IsEnabled && _frameWriter is not null;
+
+    public static void ConfigureLogDirectory(string logDirectory)
+    {
+        _logRootDirectory = logDirectory;
+        RotateLogs();
+    }
 
     public static void RotateLogs()
     {
@@ -51,7 +49,7 @@ internal static class RawPacketDump
             DisposeWriter(ref _streamWriter);
             DisposeWriter(ref _frameWriter);
 
-            var sessionDirectory = LogDirectoryResolver.ResolveUniqueDumpLogDirectory(_logRootDirectory, DateTimeOffset.Now);
+            var sessionDirectory = ResolveUniqueDumpLogDirectory(_logRootDirectory, DateTimeOffset.Now);
             Directory.CreateDirectory(sessionDirectory);
             _rawLogPath = Path.Combine(sessionDirectory, "raw.log");
             _streamLogPath = Path.Combine(sessionDirectory, "stream.log");
@@ -162,6 +160,31 @@ internal static class RawPacketDump
         writer?.Dispose();
         writer = null;
     }
+
+    private static string ResolveUniqueDumpLogDirectory(string logDirectory, DateTimeOffset timestamp)
+    {
+        var baseDirectory = ResolveDumpLogDirectory(logDirectory, timestamp);
+        if (!Directory.Exists(baseDirectory))
+        {
+            return baseDirectory;
+        }
+
+        for (var suffix = 1; suffix <= 999; suffix++)
+        {
+            var candidate = string.Create(
+                CultureInfo.InvariantCulture,
+                $"{baseDirectory}-{suffix:00}");
+            if (!Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return $"{baseDirectory}-{Guid.NewGuid():N}";
+    }
+
+    private static string ResolveDumpLogDirectory(string logDirectory, DateTimeOffset timestamp)
+        => Path.Combine(logDirectory, "dumps", timestamp.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture));
 
     public readonly record struct FrameEventObservation(long TimestampTicks, string EventName, TcpConnection Connection, string Detail);
 

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="K4os.Compression.LZ4" />
+    <PackageReference Include="Microsoft.Extensions.ObjectPool" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aion2Flow.Protocol\Aion2Flow.Protocol.csproj" />
+    <ProjectReference Include="..\Aion2Flow.SceneRuntime\Aion2Flow.SceneRuntime.csproj" />
+  </ItemGroup>
+
+</Project>

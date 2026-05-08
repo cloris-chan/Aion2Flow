@@ -1,6 +1,6 @@
 using Cloris.Aion2Flow.Resources;
 
-namespace Cloris.Aion2Flow.PacketCapture.Protocol;
+namespace Cloris.Aion2Flow.Scene.Runtime;
 
 internal static class SceneMapIdClassifier
 {

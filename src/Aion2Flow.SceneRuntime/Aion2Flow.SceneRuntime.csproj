@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aion2Flow.Protocol\Aion2Flow.Protocol.csproj" />
+    <ProjectReference Include="..\Aion2Flow.Resources\Aion2Flow.Resources.csproj" />
+  </ItemGroup>
+
+</Project>

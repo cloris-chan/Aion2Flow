@@ -17,6 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aion2Flow\Aion2Flow.csproj" />
+    <ProjectReference Include="..\Aion2Flow.Capture\Aion2Flow.Capture.csproj" />
+    <ProjectReference Include="..\Aion2Flow.Protocol\Aion2Flow.Protocol.csproj" />
+    <ProjectReference Include="..\Aion2Flow.SceneRuntime\Aion2Flow.SceneRuntime.csproj" />
   </ItemGroup>
 
   <ItemGroup>

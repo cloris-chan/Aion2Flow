@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -15,9 +15,7 @@
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Simple" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
-    <PackageReference Include="K4os.Compression.LZ4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <PackageReference Include="Microsoft.Extensions.ObjectPool" />
     <PackageReference Include="Microsoft.Windows.CsWin32">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
@@ -25,7 +23,9 @@
   </ItemGroup>
 	
   <ItemGroup>
+    <ProjectReference Include="..\Aion2Flow.Capture\Aion2Flow.Capture.csproj" />
     <ProjectReference Include="..\Aion2Flow.Resources\Aion2Flow.Resources.csproj" />
+    <ProjectReference Include="..\Aion2Flow.SceneRuntime\Aion2Flow.SceneRuntime.csproj" />
     <ProjectReference Include="..\Aion2Flow.WinDivert\Aion2Flow.WinDivert.csproj" />
   </ItemGroup>
 	

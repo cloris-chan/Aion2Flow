@@ -8,6 +8,7 @@ using Cloris.Aion2Flow.PacketCapture.Diagnostics;
 using Cloris.Aion2Flow.PacketCapture.Protocol;
 using Cloris.Aion2Flow.PacketCapture.Readers;
 using Cloris.Aion2Flow.Scene.Observation;
+using Cloris.Aion2Flow.Scene.Runtime;
 using K4os.Compression.LZ4;
 
 namespace Cloris.Aion2Flow.PacketCapture.Streams;
