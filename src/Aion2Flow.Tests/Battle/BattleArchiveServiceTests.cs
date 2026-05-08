@@ -15,7 +15,7 @@ namespace Cloris.Aion2Flow.Tests.Battle;
 public sealed class BattleArchiveServiceTests
 {
     [Fact]
-    public void Archive_Stores_DeepCloned_Snapshot()
+    public void ArchiveLegacy_Stores_DeepCloned_Snapshot_And_Explicit_LegacyPayload()
     {
         var service = new BattleArchiveService();
         var store = new CombatMetricsStore();
@@ -45,15 +45,15 @@ public sealed class BattleArchiveServiceTests
         store.MarkSceneArrival();
         store.AppendNickname(1, "Tester", 420);
 
-        var record = service.Archive(snapshot, store, "manual", isAutomatic: false);
+        var record = service.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
         Assert.Single(service.History);
         Assert.Equal("Test Boss", record!.Snapshot.TargetName);
         Assert.Equal((uint)200003, record.Snapshot.MapId);
         Assert.Equal((uint)113515, record.Snapshot.MapInstanceId);
-        Assert.Equal((uint)200003, record.LegacyStore.CurrentMapId);
-        Assert.Equal((uint)113515, record.LegacyStore.CurrentMapInstanceId);
+        Assert.Equal((uint)200003, record.LegacyPayload!.Store.CurrentMapId);
+        Assert.Equal((uint)113515, record.LegacyPayload!.Store.CurrentMapInstanceId);
         Assert.True(service.TryGetBattle(record.BattleId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
 
@@ -61,12 +61,12 @@ public sealed class BattleArchiveServiceTests
         store.AppendNickname(1, "Changed");
 
         Assert.Equal("Test Boss", record.Snapshot.TargetName);
-        Assert.Equal("Tester", record.LegacyStore.Nicknames[1]);
-        Assert.Equal(420, record.LegacyStore.PlayerOriginServerIds[1]);
+        Assert.Equal("Tester", record.LegacyPayload!.Store.Nicknames[1]);
+        Assert.Equal(420, record.LegacyPayload!.Store.PlayerOriginServerIds[1]);
     }
 
     [Fact]
-    public void Archive_Extracts_Relevant_Lookups_Without_Mutating_Live_Store()
+    public void ArchiveLegacy_Extracts_Relevant_Lookups_Without_Mutating_Live_Store()
     {
         var service = new BattleArchiveService();
         var store = new CombatMetricsStore();
@@ -106,19 +106,19 @@ public sealed class BattleArchiveServiceTests
         };
         snapshot.Combatants[playerId] = new CombatantMetrics("Tester");
 
-        var record = service.Archive(snapshot, store, "manual", isAutomatic: false);
+        var record = service.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
-        Assert.True(record!.LegacyStore.Nicknames.ContainsKey(playerId));
-        Assert.False(record.LegacyStore.Nicknames.ContainsKey(unrelatedPlayerId));
-        Assert.True(record.LegacyStore.PlayerOriginServerIds.ContainsKey(playerId));
-        Assert.False(record.LegacyStore.PlayerOriginServerIds.ContainsKey(unrelatedPlayerId));
-        Assert.True(record.LegacyStore.TryGetNpcRuntimeState(bossInstanceId, out var archivedBossState));
+        Assert.True(record!.LegacyPayload!.Store.Nicknames.ContainsKey(playerId));
+        Assert.False(record.LegacyPayload!.Store.Nicknames.ContainsKey(unrelatedPlayerId));
+        Assert.True(record.LegacyPayload!.Store.PlayerOriginServerIds.ContainsKey(playerId));
+        Assert.False(record.LegacyPayload!.Store.PlayerOriginServerIds.ContainsKey(unrelatedPlayerId));
+        Assert.True(record.LegacyPayload!.Store.TryGetNpcRuntimeState(bossInstanceId, out var archivedBossState));
         Assert.Equal(bossCode, archivedBossState.NpcCode);
-        Assert.False(record.LegacyStore.TryGetNpcRuntimeState(unrelatedNpcInstanceId, out _));
-        Assert.True(record.LegacyStore.NpcNameByCode.ContainsKey(bossCode));
-        Assert.False(record.LegacyStore.NpcNameByCode.ContainsKey(unrelatedNpcCode));
+        Assert.False(record.LegacyPayload!.Store.TryGetNpcRuntimeState(unrelatedNpcInstanceId, out _));
+        Assert.True(record.LegacyPayload!.Store.NpcNameByCode.ContainsKey(bossCode));
+        Assert.False(record.LegacyPayload!.Store.NpcNameByCode.ContainsKey(unrelatedNpcCode));
 
         Assert.True(store.Nicknames.ContainsKey(playerId));
         Assert.True(store.Nicknames.ContainsKey(unrelatedPlayerId));
@@ -131,7 +131,7 @@ public sealed class BattleArchiveServiceTests
     }
 
     [Fact]
-    public void Archive_Slice_Uses_Snapshot_Map_When_Live_Store_Has_Advanced()
+    public void ArchiveLegacy_Slice_Uses_Snapshot_Map_When_Live_Store_Has_Advanced()
     {
         var service = new BattleArchiveService();
         var store = new CombatMetricsStore();
@@ -147,13 +147,13 @@ public sealed class BattleArchiveServiceTests
         };
         snapshot.Combatants[1] = new CombatantMetrics("Tester");
 
-        var record = service.Archive(snapshot, store, "map-transition", isAutomatic: true);
+        var record = service.ArchiveLegacy(snapshot, store, "map-transition", isAutomatic: true);
 
         Assert.NotNull(record);
         Assert.Equal((uint)0, record!.Snapshot.MapId);
         Assert.Equal((uint)0, record.Snapshot.MapInstanceId);
-        Assert.Equal((uint)0, record.LegacyStore.CurrentMapId);
-        Assert.Equal((uint)0, record.LegacyStore.CurrentMapInstanceId);
+        Assert.Equal((uint)0, record.LegacyPayload!.Store.CurrentMapId);
+        Assert.Equal((uint)0, record.LegacyPayload!.Store.CurrentMapInstanceId);
     }
 
     [Fact]
@@ -168,8 +168,8 @@ public sealed class BattleArchiveServiceTests
         };
         snapshot.Combatants[1] = new CombatantMetrics("Tester");
 
-        var first = service.Archive(snapshot, store, "manual", isAutomatic: false);
-        var second = service.Archive(snapshot, store, "manual", isAutomatic: false);
+        var first = service.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
+        var second = service.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
 
         Assert.NotNull(first);
         Assert.Null(second);
@@ -197,7 +197,7 @@ public sealed class BattleArchiveServiceTests
                 DamagePerSecond = 1_000 + i
             };
 
-            var record = service.Archive(snapshot, store, "manual", isAutomatic: false);
+            var record = service.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
             Assert.NotNull(record);
 
             if (i == 0)
@@ -285,7 +285,7 @@ public sealed class BattleArchiveServiceTests
     }
 
     [Fact]
-    public void Archive_ScenePayload_Does_Not_Create_Legacy_Store_Slice()
+    public void Archive_ScenePayload_Does_Not_Create_LegacyPayload()
     {
         const int playerId = 100;
         const int bossId = 200;
@@ -298,8 +298,7 @@ public sealed class BattleArchiveServiceTests
         Assert.NotNull(record);
         Assert.NotSame(payload, record!.ScenePayload);
         Assert.Equal(payload.Events.Count, record.ScenePayload!.Events.Count);
-        Assert.Empty(record.LegacyStore.CombatPacketsBySource);
-        Assert.Empty(record.LegacyStore.Nicknames);
+        Assert.Null(record.LegacyPayload);
         Assert.Equal(payload.Snapshot.BattleId, record.BattleId);
     }
 

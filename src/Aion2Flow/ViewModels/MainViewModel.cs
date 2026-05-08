@@ -357,9 +357,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         var battleSeconds = snapshot.BattleTime / 1000.0;
         BattleTimeSeconds = battleSeconds;
         LiveSceneName = ResolveSceneDisplayName(snapshot.MapId);
-        var useSceneDisplay = UseSceneLiveReadPath();
-        var displayStore = useSceneDisplay ? null : ResolveDisplayStore();
-        var sceneOwner = useSceneDisplay ? _captureService.Scene.Owner : null;
+        var sceneOwner = UseSceneLiveReadPath() ? _captureService.Scene.Owner : null;
+        var displayStore = sceneOwner is null ? ResolveDisplayStore() : null;
         RefreshBossFocus(displayStore, sceneOwner, snapshot);
 
         using var deferral = Combatants.SuspendNotifications();
@@ -425,6 +424,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private string ResolveDisplayName(DamageMeterSnapshot snapshot, CombatMetricsStore? store, SceneReadModelOwner? sceneOwner, int id)
         => sceneOwner is not null
             ? ResolveSceneDisplayName(snapshot, sceneOwner.Entities, sceneOwner.Metadata, id)
+            : store is null
+            ? ResolveSnapshotDisplayName(snapshot, id)
             : CombatMetricsEngine.ResolveCombatantDisplayName(store!, snapshot, id);
 
     private static string ResolveSceneDisplayName(DamageMeterSnapshot snapshot, EntityStore entities, MetadataStore metadata, int id)
@@ -452,9 +453,14 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             : id.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private CombatMetricsStore ResolveDisplayStore()
-        => IsViewingArchivedBattle && SelectedBattleHistory is not null
-            ? SelectedBattleHistory.Record.LegacyStore
+    private static string ResolveSnapshotDisplayName(DamageMeterSnapshot snapshot, int id)
+        => snapshot.Combatants.TryGetValue(id, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname)
+            ? combatant.Nickname
+            : id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private CombatMetricsStore? ResolveDisplayStore()
+        => IsViewingArchivedBattle
+            ? SelectedBattleHistory?.Record.LegacyPayload?.Store
             : _store;
 
     private void RefreshBossFocus(CombatMetricsStore? displayStore, SceneReadModelOwner? sceneOwner, DamageMeterSnapshot snapshot)
@@ -545,7 +551,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         if (sceneOwner is not null)
             return ShouldDisplaySceneCombatant(sceneOwner.Entities, combatantId);
 
-        if (!store!.TryGetNpcRuntimeState(combatantId, out var npcState))
+        if (store is null)
+            return true;
+
+        if (!store.TryGetNpcRuntimeState(combatantId, out var npcState))
         {
             return true;
         }
@@ -638,7 +647,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             return _battleArchiveService.Archive(SceneArchivePayload.Create(_captureService.Scene.Owner, snapshot), trigger, isAutomatic);
         }
 
-        return _battleArchiveService.Archive(snapshot, _store, trigger, isAutomatic);
+        return _battleArchiveService.ArchiveLegacy(snapshot, _store, trigger, isAutomatic);
     }
 
     private bool TryAutoResetBattle(DamageMeterSnapshot previousLiveSnapshot, DamageMeterSnapshot latestLiveSnapshot)
@@ -736,15 +745,27 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             ? SelectedBattleHistory.Record.Snapshot
             : _displayedSnapshot;
 
-        var store = IsViewingArchivedBattle && SelectedBattleHistory is not null
-            ? SelectedBattleHistory.Record.LegacyStore
-            : _store;
-
         if (IsViewingArchivedBattle && SelectedBattleHistory?.Record.ScenePayload is { } payload)
         {
             var detail = payload.CreateDetailDelta(SelectedCombatant.Id);
             CombatantDetails.SelectSceneBattleCombatant(battleContextId, SelectedCombatant.Id, snapshot, detail, forceRefresh);
             return;
+        }
+
+        CombatMetricsStore store;
+        if (IsViewingArchivedBattle)
+        {
+            if (SelectedBattleHistory?.Record.LegacyPayload is not { } legacy)
+            {
+                CombatantDetails.Clear();
+                return;
+            }
+
+            store = legacy.Store;
+        }
+        else
+        {
+            store = _store;
         }
 
         if (!IsViewingArchivedBattle && _settingsService.Current.SceneSnapshotReadMode == SceneSnapshotReadMode.Scene)

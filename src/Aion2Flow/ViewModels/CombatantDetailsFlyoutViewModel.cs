@@ -375,13 +375,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             return true;
         }
 
-        if (_battleArchiveService.TryGetBattle(battleContextId, out var record) && record is not null)
-        {
-            snapshot = record.Snapshot;
-            store = record.LegacyStore;
-            return true;
-        }
-
         if (battleContextId == _engine.CurrentBattleId)
         {
             snapshot = _engine.CreateBattleSnapshot();
@@ -390,7 +383,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         }
 
         snapshot = new DamageMeterSnapshot();
-        store = new CombatMetricsStore();
+        store = _liveStore;
         return false;
     }
 

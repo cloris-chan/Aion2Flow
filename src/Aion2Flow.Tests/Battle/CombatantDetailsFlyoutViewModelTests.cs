@@ -208,12 +208,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
-        var record = archive.Archive(snapshot, store, "manual", isAutomatic: false);
+        var record = archive.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
         engine.Reset();
-        viewModel.SelectBattleCombatant(record!.BattleId, playerId);
+        viewModel.SelectBattleCombatant(record!.BattleId, playerId, record.Snapshot, record.LegacyPayload!.Store);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -249,7 +249,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.Empty(record!.LegacyStore.Nicknames);
+        Assert.Null(record!.LegacyPayload);
 
         scene.Reset();
         viewModel.SelectBattleCombatant(record.BattleId, playerId);
@@ -317,12 +317,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
-        var record = archive.Archive(snapshot, store, "manual", isAutomatic: false);
+        var record = archive.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
         engine.Reset();
-        viewModel.SelectBattleCombatant(record!.BattleId, playerId);
+        viewModel.SelectBattleCombatant(record!.BattleId, playerId, record.Snapshot, record.LegacyPayload!.Store);
 
         Assert.Equal("Perigee", viewModel.CombatantName);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
@@ -1018,12 +1018,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(engine, liveStore, archive, localization);
 
-        var record = archive.Archive(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+        var record = archive.ArchiveLegacy(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
 
         Assert.NotNull(record);
         Assert.Contains(3737, record!.Snapshot.Combatants.Keys);
 
-        viewModel.SelectBattleCombatant(record.BattleId, 3737);
+        viewModel.SelectBattleCombatant(record.BattleId, 3737, record.Snapshot, record.LegacyPayload!.Store);
 
         Assert.Equal(18, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
@@ -1048,12 +1048,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             .ThenByDescending(static summary => summary.IncomingDamage)
             .First();
 
-        var record = archive.Archive(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+        var record = archive.ArchiveLegacy(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
 
         Assert.NotNull(record);
         Assert.Contains(primary.CombatantId, record!.Snapshot.Combatants.Keys);
 
-        viewModel.SelectBattleCombatant(record.BattleId, primary.CombatantId);
+        viewModel.SelectBattleCombatant(record.BattleId, primary.CombatantId, record.Snapshot, record.LegacyPayload!.Store);
 
         Assert.Equal(10, viewModel.IncomingDamage.Evades);
         Assert.Equal(7, viewModel.IncomingDamage.Invincible);
@@ -1076,12 +1076,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         const int playerId = 6485;
         var allyIds = new HashSet<int> { 3738, 4985, 7490 };
-        var record = archive.Archive(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
+        var record = archive.ArchiveLegacy(replay.Snapshot, replay.Store, "replay", isAutomatic: false);
 
         Assert.NotNull(record);
         Assert.Contains(playerId, record!.Snapshot.Combatants.Keys);
 
-        viewModel.SelectBattleCombatant(record.BattleId, playerId);
+        viewModel.SelectBattleCombatant(record.BattleId, playerId, record.Snapshot, record.LegacyPayload!.Store);
 
         var damageCounterparts = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts
             .Select(static counterpart =>
@@ -1495,11 +1495,11 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(store, playerId, npcInstanceId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage);
 
         var snapshot = engine.CreateBattleSnapshot();
-        var record = archive.Archive(snapshot, store, "manual", isAutomatic: false);
+        var record = archive.ArchiveLegacy(snapshot, store, "manual", isAutomatic: false);
         Assert.NotNull(record);
 
         engine.Reset();
-        viewModel.SelectBattleCombatant(record!.BattleId, playerId);
+        viewModel.SelectBattleCombatant(record!.BattleId, playerId, record.Snapshot, record.LegacyPayload!.Store);
 
         var counterpart = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.FirstOrDefault(x => x.CombatantId == npcInstanceId);
         Assert.NotNull(counterpart);

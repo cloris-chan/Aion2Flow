@@ -15,16 +15,16 @@ public sealed class BattleArchiveService
 
     public IReadOnlyList<ArchivedBattleRecord> History => _historySnapshot;
 
-    public ArchivedBattleRecord? Archive(DamageMeterSnapshot snapshot, CombatMetricsStore store, string trigger, bool isAutomatic)
-        => AddArchiveRecord(snapshot.DeepClone(), store.CreateArchiveSlice(snapshot), null, trigger, isAutomatic);
+    public ArchivedBattleRecord? ArchiveLegacy(DamageMeterSnapshot snapshot, CombatMetricsStore store, string trigger, bool isAutomatic)
+        => AddArchiveRecord(snapshot.DeepClone(), null, new LegacyArchivePayload(store.CreateArchiveSlice(snapshot)), trigger, isAutomatic);
 
     public ArchivedBattleRecord? Archive(SceneArchivePayload payload, string trigger, bool isAutomatic)
     {
         var archivedPayload = payload.DeepClone();
-        return AddArchiveRecord(archivedPayload.Snapshot, new CombatMetricsStore(), archivedPayload, trigger, isAutomatic);
+        return AddArchiveRecord(archivedPayload.Snapshot, archivedPayload, null, trigger, isAutomatic);
     }
 
-    private ArchivedBattleRecord? AddArchiveRecord(DamageMeterSnapshot archivedSnapshot, CombatMetricsStore archivedStore, SceneArchivePayload? payload, string trigger, bool isAutomatic)
+    private ArchivedBattleRecord? AddArchiveRecord(DamageMeterSnapshot archivedSnapshot, SceneArchivePayload? scenePayload, LegacyArchivePayload? legacyPayload, string trigger, bool isAutomatic)
     {
         if (archivedSnapshot.BattleTime <= 0 || archivedSnapshot.Combatants.Count == 0)
         {
@@ -47,8 +47,8 @@ public sealed class BattleArchiveService
                 Trigger = trigger,
                 IsAutomatic = isAutomatic,
                 Snapshot = archivedSnapshot,
-                ScenePayload = payload,
-                LegacyStore = archivedStore
+                ScenePayload = scenePayload,
+                LegacyPayload = legacyPayload
             };
 
             _history.Insert(0, record);
