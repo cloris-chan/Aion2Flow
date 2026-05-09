@@ -281,17 +281,17 @@ public class SceneTimelineContractTests
                 new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var cursor0 = journal.CreateCursor(0);
-        Assert.Equal(0, cursor0.Position);
+        Assert.Equal(0, cursor0.NextObservationOrdinal);
 
         var cursor5 = journal.CreateCursor(5);
-        Assert.Equal(5, cursor5.Position);
+        Assert.Equal(5, cursor5.NextObservationOrdinal);
 
         var cursorPast = journal.CreateCursor(100);
-        Assert.Equal(10, cursorPast.Position);
+        Assert.Equal(100, cursorPast.NextObservationOrdinal);
     }
 
     [Fact]
-    public void Journal_GetEntries_ReturnsRequestedSlice()
+    public void Journal_CopyEntries_ReturnsRequestedSliceAndNextCursor()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
@@ -301,15 +301,17 @@ public class SceneTimelineContractTests
                 new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var cursor = journal.CreateCursor(3);
-        var entries = journal.GetEntries(cursor, 4);
+        var entries = new ObservedEventEnvelope[4];
+        var result = journal.CopyEntries(cursor, entries);
 
-        Assert.Equal(4, entries.Length);
+        Assert.Equal(4, result.Count);
+        Assert.Equal(7, result.Cursor.NextObservationOrdinal);
         Assert.Equal(3, entries[0].Stamp.ObservationOrdinal);
         Assert.Equal(6, entries[3].Stamp.ObservationOrdinal);
     }
 
     [Fact]
-    public void Journal_GetEntries_ClampsAtEnd()
+    public void Journal_CopyEntries_ClampsAtEnd()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
@@ -319,9 +321,29 @@ public class SceneTimelineContractTests
                 new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var cursor = journal.CreateCursor(1);
-        var entries = journal.GetEntries(cursor, 100);
+        var entries = new ObservedEventEnvelope[100];
+        var result = journal.CopyEntries(cursor, entries);
 
-        Assert.Equal(2, entries.Length);
+        Assert.Equal(2, result.Count);
+        Assert.Equal(3, result.Cursor.NextObservationOrdinal);
+    }
+
+    [Fact]
+    public void Journal_ReadEntries_DoesNotExposeInternalStorage()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+
+        for (int i = 0; i < 3; i++)
+            journal.Append(new ObservedEventEnvelope(sceneId,
+                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+
+        ObservedEventEnvelope[] copied = [];
+        var result = journal.ReadEntries(journal.CreateCursor(1), 10, entries => copied = entries.ToArray());
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(3, result.Cursor.NextObservationOrdinal);
+        Assert.Equal([1L, 2L], copied.Select(static entry => entry.Stamp.ObservationOrdinal));
     }
 
     [Fact]

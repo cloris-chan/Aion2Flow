@@ -98,22 +98,19 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     {
         while (true)
         {
-            var count = journal.CopyEntries(_cursor, _entryBuffer);
-            if (count == 0)
+            var result = journal.CopyEntries(_cursor, _entryBuffer);
+            if (result.Count == 0)
                 break;
 
-            var entries = _entryBuffer.AsSpan(0, count);
+            var entries = _entryBuffer.AsSpan(0, result.Count);
             var appliedCount = 0L;
             foreach (ref readonly var entry in entries)
             {
-                if (entry.Stamp.ObservationOrdinal >= _cursor.StartOrdinal)
-                {
-                    _applier.ApplyEntry(in entry);
-                    appliedCount++;
-                }
+                _applier.ApplyEntry(in entry);
+                appliedCount++;
             }
 
-            _cursor = new JournalCursor(_cursor.Position + count, _cursor.StartOrdinal);
+            _cursor = result.Cursor;
             AppliedObservationOrdinal += appliedCount;
         }
 

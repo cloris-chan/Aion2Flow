@@ -65,9 +65,8 @@ public sealed class CrossModuleProtocolParityHarnessTests
     {
         var replay = ReplayWithSceneJournal(fileName);
         var canonicalizer = new SystemPeriodicRecoveryCanonicalizer();
-        var scene = replay.SceneJournal
-            .GetEntries(replay.SceneJournal.CreateCursor(0), replay.SceneJournal.Count)
-            .ToArray()
+        var entries = CopyEntries(replay.SceneJournal);
+        var scene = entries
             .Where(IsRawSystemPeriodicRecoveryEntry)
             .Select(entry =>
             {
@@ -157,6 +156,13 @@ public sealed class CrossModuleProtocolParityHarnessTests
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
         return new AppliedScene(entities, metadata, combat, applier);
+    }
+
+    private static ObservedEventEnvelope[] CopyEntries(ObservedEventJournal journal)
+    {
+        var entries = new ObservedEventEnvelope[journal.Count];
+        var result = journal.CopyEntries(journal.CreateCursor(journal.FirstObservationOrdinal), entries);
+        return entries.AsSpan(0, result.Count).ToArray();
     }
 
     private static PacketLogReplayResult ReplayWithSceneJournal(string fileName)

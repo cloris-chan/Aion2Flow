@@ -85,8 +85,9 @@ public class SystemPeriodicRecoveryCanonicalizerTests
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426140354.log"));
 
-        var entries = replay.SceneJournal.GetEntries(replay.SceneJournal.CreateCursor(0), replay.SceneJournal.Count)
-            .ToArray()
+        var copied = new ObservedEventEnvelope[replay.SceneJournal.Count];
+        var result = replay.SceneJournal.CopyEntries(replay.SceneJournal.CreateCursor(replay.SceneJournal.FirstObservationOrdinal), copied);
+        var entries = copied.AsSpan(0, result.Count).ToArray()
             .Where(IsRawSystemPeriodicRecoveryEntry)
             .ToArray();
         var canonicalizer = new SystemPeriodicRecoveryCanonicalizer();

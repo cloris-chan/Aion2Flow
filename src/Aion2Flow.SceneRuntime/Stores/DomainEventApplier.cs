@@ -29,15 +29,15 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         var cursor = journal.CreateCursor(0);
         while (true)
         {
-            var count = journal.CopyEntries(cursor, _journalBuffer);
-            if (count == 0)
+            var result = journal.CopyEntries(cursor, _journalBuffer);
+            if (result.Count == 0)
                 break;
 
-            var entries = _journalBuffer.AsSpan(0, count);
+            var entries = _journalBuffer.AsSpan(0, result.Count);
             foreach (ref readonly var entry in entries)
                 ApplyEntry(in entry);
 
-            cursor = new JournalCursor(cursor.Position + count, cursor.StartOrdinal);
+            cursor = result.Cursor;
         }
 
         FlushPendingOutcomeSidecars();
