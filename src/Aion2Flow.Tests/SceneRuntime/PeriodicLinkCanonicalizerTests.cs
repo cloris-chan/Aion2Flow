@@ -1,0 +1,155 @@
+using Cloris.Aion2Flow.Capture.Diagnostics;
+using Cloris.Aion2Flow.Capture.Streams;
+using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
+using Cloris.Aion2Flow.Tests.Protocol;
+
+namespace Cloris.Aion2Flow.Tests.SceneRuntime;
+
+public class PeriodicLinkCanonicalizerTests
+{
+    private static readonly TcpConnection TestConnection = new(0x0100007f, 0x0100007f, 49820, 57080);
+
+    [Fact]
+    public void ScenePath_SynthesizesInvincibleFromPeriodicLinkRecord()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+
+        sink.RegisterPeriodicLink0538(16047, 16047, 29240, 608, 1237540, 1_000, 10, 100);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(29240, 16047, out var pair));
+        Assert.Equal(0, pair!.TotalDamage);
+        Assert.Equal(0, pair.HitCount);
+        Assert.Equal(1, pair.AttemptCount);
+        Assert.Equal(1, pair.InvincibleCount);
+        Assert.Equal(1230000, pair.LastSkillCode);
+        Assert.True(combat.TryGetCombatant(29240, out var source));
+        Assert.True(combat.TryGetCombatant(16047, out var target));
+        Assert.Equal(1, source!.OutgoingInvincibles);
+        Assert.Equal(1, target!.IncomingInvincibles);
+    }
+
+    [Fact]
+    public void ScenePath_IgnoresSelfPeriodicLinkBuffTick()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+
+        sink.RegisterPeriodicLink0538(14190, 14190, 14190, 313, 11800008, 1_000, 10, 100);
+
+        var combat = Apply(journal);
+
+        Assert.False(combat.TryGetPair(14190, 14190, out _));
+        Assert.Equal(0, combat.Revision);
+    }
+
+    [Fact]
+    public void ScenePath_DeduplicatesPeriodicLinkWithinBatch()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+
+        sink.RegisterPeriodicLink0538(16047, 16047, 29240, 608, 1237540, 1_000, 10, 100);
+        sink.RegisterPeriodicLink0538(16047, 16047, 29240, 608, 1237540, 1_001, 11, 100);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(29240, 16047, out var pair));
+        Assert.Equal(1, pair!.AttemptCount);
+        Assert.Equal(1, pair.InvincibleCount);
+    }
+
+    [Fact]
+    public void ScenePath_AllowsSamePeriodicLinkAcrossBatches()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+
+        sink.RegisterPeriodicLink0538(16047, 16047, 29240, 608, 1237540, 1_000, 10, 100);
+        sink.RegisterPeriodicLink0538(16047, 16047, 29240, 608, 1237540, 1_001, 11, 101);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(29240, 16047, out var pair));
+        Assert.Equal(2, pair!.AttemptCount);
+        Assert.Equal(2, pair.InvincibleCount);
+    }
+
+    [Fact]
+    public void JournalingSink_RecordsPeriodicLinkProtocolFields()
+    {
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+
+        sink.RegisterPeriodicLink0538(16047, 16047, 29240, 608, 1237540, 1_000, 10, 100);
+
+        var entry = journal.Read(0);
+        var observation = entry.Combat!.Value;
+        Assert.Equal(0x0538, entry.Raw.Opcode);
+        Assert.Equal(16047, entry.SourceEntityId);
+        Assert.Equal(16047, entry.TargetEntityId);
+        Assert.Equal(1237540, observation.SkillCode);
+        Assert.Equal(1237540, observation.OriginalSkillCode);
+        Assert.Equal(29240, observation.DetailRaw);
+        Assert.Equal(608, observation.Marker);
+        Assert.Equal(48, observation.Type);
+    }
+
+    [Fact]
+    public void ScenePath_StreamMode48PeriodicLinkMatchesFixture()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        using var processor = new PacketStreamProcessor(sink);
+
+        var parsed = processor.AppendAndProcess(HexHelper.FromFixture("combat/0538-mode48-link.hex"), TestConnection);
+
+        Assert.True(parsed);
+        var combat = Apply(journal);
+        Assert.True(combat.TryGetPair(29240, 16047, out var pair));
+        Assert.Equal(1230000, pair!.LastSkillCode);
+        Assert.Equal(1, pair.AttemptCount);
+        Assert.Equal(1, pair.InvincibleCount);
+    }
+
+    [Fact]
+    public void ScenePath_Replay_PeriodicLinkInvincibles_AreProjected()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
+
+        var combat = Apply(replay.SceneJournal);
+        var pairs = combat.Pairs.Values
+            .Where(static pair => pair.InvincibleCount > 0)
+            .ToArray();
+
+        Assert.NotEmpty(pairs);
+        Assert.Contains(pairs, static pair => pair.AttemptCount >= pair.InvincibleCount);
+    }
+
+    private static CombatStore Apply(ObservedEventJournal journal)
+    {
+        var combat = new CombatStore();
+        var applier = new DomainEventApplier(new EntityStore(), new MetadataStore(), combat);
+        applier.ApplyJournal(journal);
+        return combat;
+    }
+
+    private static SkillCollection BuildSkillMap() =>
+    [
+        new Skill(1230000, "Fangs", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
+        new Skill(11800008, "Buff Tick", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+    ];
+}

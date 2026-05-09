@@ -194,7 +194,7 @@ public sealed class PacketCombatParsersTests
         Assert.Equal(sample.Mode, parsed.Mode);
         Assert.Equal(sample.SourceId, parsed.SourceId);
         Assert.Equal(sample.SkillCodeRaw, parsed.SkillCodeRaw);
-        Assert.Equal(sample.LegacySkillCode, parsed.LegacySkillCode);
+        Assert.Equal(sample.NormalizedSkillCode, parsed.NormalizedSkillCode);
         Assert.Equal(sample.Damage, parsed.Damage);
         Assert.Equal(sample.LinkId, parsed.LinkId);
         Assert.Equal(sample.TailLength, parsed.TailLength);

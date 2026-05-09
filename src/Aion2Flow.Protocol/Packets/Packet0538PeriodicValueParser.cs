@@ -8,7 +8,7 @@ internal readonly record struct Packet0538PeriodicValue(
     int SourceId,
     int Unknown,
     int SkillCodeRaw,
-    int LegacySkillCode,
+    int NormalizedSkillCode,
     int Damage,
     int TailLength,
     int TailRaw,

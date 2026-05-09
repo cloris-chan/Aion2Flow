@@ -12,7 +12,7 @@ public static class FixtureCatalog
 
     public sealed record Compact0438Sample(string Path, int TargetId, int SourceId, int SkillCodeRaw, int Marker, int Type, int Unknown, int Value, int Loop, int TailLength);
 
-    public sealed record PeriodicValueSample(string Path, int TargetId, int Mode, int SourceId, int SkillCodeRaw, int LegacySkillCode, int Damage, int LinkId = 0, int TailRaw = 0, bool IsLinkRecord = false, int TailLength = 0, int TailSkillCodeRaw = 0, int TailPrefixValue = 0);
+    public sealed record PeriodicValueSample(string Path, int TargetId, int Mode, int SourceId, int SkillCodeRaw, int NormalizedSkillCode, int Damage, int LinkId = 0, int TailRaw = 0, bool IsLinkRecord = false, int TailLength = 0, int TailSkillCodeRaw = 0, int TailPrefixValue = 0);
 
     public sealed record RemainHpSample(string Path, int NpcId, int Value0, int Value1, int Value2, uint Hp, int TailLength);
 

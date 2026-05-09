@@ -1446,7 +1446,7 @@ public sealed class PacketStreamProcessor : IDisposable
             TargetId = parsed.TargetId,
             SourceId = parsed.SourceId,
             OriginalSkillCode = parsed.SkillCodeRaw,
-            SkillCode = parsed.LegacySkillCode,
+            SkillCode = parsed.NormalizedSkillCode,
             Unknown = parsed.Unknown,
             Damage = parsed.Damage,
             Timestamp = CurrentTimestampMilliseconds,
