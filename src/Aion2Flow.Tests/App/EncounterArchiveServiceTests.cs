@@ -131,6 +131,78 @@ public sealed class EncounterArchiveServiceTests
     }
 
     [Fact]
+    public void SceneArchivePayload_Captures_Target_Detail_Delta_From_Index()
+    {
+        const int playerId = 100;
+        const int bossId = 200;
+        var owner = CreateSceneOwner(playerId, bossId);
+        var snapshot = owner.CreateSnapshot();
+
+        var payload = owner.CreateArchivePayload(snapshot);
+        var delta = payload.CreateDetailDelta(bossId);
+
+        Assert.False(snapshot.Combatants.ContainsKey(bossId));
+        Assert.Equal(2, payload.EventIndicesByCombatant[bossId].Length);
+        Assert.Equal(2, delta.Events.Count);
+        Assert.Equal(bossId, delta.CombatantId);
+        Assert.Equal(751, delta.Combatant!.IncomingDamage);
+        Assert.Empty(delta.OutgoingPairs);
+        var incomingPair = Assert.Single(delta.IncomingPairs);
+        Assert.Equal(new DirectedPairKey(playerId, bossId), incomingPair);
+    }
+
+    [Fact]
+    public void SceneArchivePayload_Detail_Index_Selects_Combatant_Events_And_Survives_Clone()
+    {
+        const int playerId = 100;
+        const int bossId = 200;
+        const int addId = 300;
+        var payload = new SceneArchivePayload
+        {
+            Events =
+            [
+                CreateArchiveEvent(addId, bossId, 400, 3, 3_000),
+                CreateArchiveEvent(playerId, bossId, 100, 1, 1_000),
+                CreateArchiveEvent(bossId, playerId, 75, 2, 2_000)
+            ],
+            Pairs =
+            [
+                CreatePair(playerId, bossId, 100, 1_000, 1_000, 1),
+                CreatePair(bossId, playerId, 75, 2_000, 2_000, 2),
+                CreatePair(addId, bossId, 400, 3_000, 3_000, 3)
+            ],
+            Combatants =
+            [
+                new CombatantSummary { CombatantId = playerId, OutgoingDamage = 100, IncomingDamage = 75, Revision = 2 },
+                new CombatantSummary { CombatantId = bossId, OutgoingDamage = 75, IncomingDamage = 500, Revision = 3 },
+                new CombatantSummary { CombatantId = addId, OutgoingDamage = 400, Revision = 3 }
+            ],
+            DisplayNames = new Dictionary<int, string>
+            {
+                [playerId] = "Tester",
+                [bossId] = "Archive Boss",
+                [addId] = "Add"
+            }
+        };
+
+        var delta = payload.CreateDetailDelta(playerId);
+        var clone = payload.DeepClone();
+        var cloneDelta = clone.CreateDetailDelta(playerId);
+
+        Assert.Equal([1L, 2L], delta.Events.Select(static e => e.Revision));
+        Assert.Equal([1, 2], payload.EventIndicesByCombatant[playerId]);
+        Assert.Equal([new DirectedPairKey(playerId, bossId)], delta.OutgoingPairs);
+        Assert.Equal([new DirectedPairKey(bossId, playerId)], delta.IncomingPairs);
+        Assert.Equal(2, delta.Revision);
+        Assert.Equal(100, delta.Combatant!.OutgoingDamage);
+        Assert.Equal(75, delta.Combatant.IncomingDamage);
+        Assert.Equal([1L, 2L], cloneDelta.Events.Select(static e => e.Revision));
+        Assert.Equal([1, 2], clone.EventIndicesByCombatant[playerId]);
+        Assert.NotSame(payload.Events[1], clone.Events[1]);
+        Assert.NotSame(payload.CombatantsById[playerId], clone.CombatantsById[playerId]);
+    }
+
+    [Fact]
     public void SceneArchivePayload_Is_Independent_Of_Live_Scene_Mutations()
     {
         const int playerId = 100;
@@ -269,4 +341,34 @@ public sealed class EncounterArchiveServiceTests
             }
         });
     }
+
+    private static SceneArchiveCombatEvent CreateArchiveEvent(int sourceId, int targetId, int damage, long revision, long timestamp) => new()
+    {
+        SourceId = sourceId,
+        TargetId = targetId,
+        Revision = revision,
+        Packet = new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = 11000010,
+            Damage = damage,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage,
+            Timestamp = timestamp
+        }
+    };
+
+    private static DirectedPairSnapshot CreatePair(int sourceId, int targetId, long damage, long firstObserved, long lastObserved, long revision) => new()
+    {
+        Key = new DirectedPairKey(sourceId, targetId),
+        TotalDamage = damage,
+        HitCount = 1,
+        AttemptCount = 1,
+        FirstObserved = firstObserved,
+        LastObserved = lastObserved,
+        Revision = revision
+    };
 }

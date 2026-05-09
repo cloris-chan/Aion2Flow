@@ -7,6 +7,8 @@ namespace Cloris.Aion2Flow.SceneRuntime.Archive;
 
 public sealed class SceneArchivePayload
 {
+    private ArchivePayloadIndex? _detailIndex;
+
     public SceneCombatSnapshot Snapshot { get; init; } = new();
     public DateTimeOffset SceneStarted { get; init; }
     public IReadOnlyList<SceneArchiveCombatEvent> Events { get; init; } = [];
@@ -16,6 +18,17 @@ public sealed class SceneArchivePayload
     public IReadOnlyList<SceneArchiveEntityIdentity> Entities { get; init; } = [];
     public IReadOnlyDictionary<int, string> NpcNamesByCode { get; init; } = new Dictionary<int, string>();
     public IReadOnlyList<SceneArchiveBossFocus> Bosses { get; init; } = [];
+
+    internal IReadOnlyDictionary<int, int[]> EventIndicesByCombatant => DetailIndex.EventIndicesByCombatant;
+    internal IReadOnlyDictionary<int, DirectedPairKey[]> OutgoingPairsByCombatant => DetailIndex.OutgoingPairsByCombatant;
+    internal IReadOnlyDictionary<int, DirectedPairKey[]> IncomingPairsByCombatant => DetailIndex.IncomingPairsByCombatant;
+    internal IReadOnlyDictionary<int, CombatantSummary> CombatantsById => DetailIndex.CombatantsById;
+
+    private ArchivePayloadIndex DetailIndex
+    {
+        get => _detailIndex ??= ArchivePayloadIndex.Create(Events, Pairs, Combatants);
+        init => _detailIndex = value;
+    }
 
     internal static SceneArchivePayload CreateLocked(SceneCombatSnapshot snapshot, DateTimeOffset sceneStarted, EntityStore entities, MetadataStore metadata, BossFocusStore bossFocus, CombatPairProjection pairsProjection, SceneCombatSnapshotAdapter adapter)
     {
@@ -38,17 +51,14 @@ public sealed class SceneArchivePayload
             AddCombatantDetailEvents(eventsByKey, displayNames, entityIds, pairsProjection, adapter, archivedSnapshot, targetId);
         }
 
-        var eventsSnapshot = eventsByKey.Values
-            .OrderBy(static e => e.Revision)
-            .ThenBy(static e => e.Packet.Timestamp)
-            .ThenBy(static e => e.SourceId)
-            .ThenBy(static e => e.TargetId)
-            .ToArray();
+        var eventsSnapshot = eventsByKey.Values.ToArray();
+        Array.Sort(eventsSnapshot, CompareEvents);
         var identities = BuildIdentities(entities, entityIds);
         var npcNames = BuildNpcNames(metadata, identities);
         var pairs = BuildPairs(eventsSnapshot);
         var combatants = BuildCombatants(pairs);
         var bosses = BuildBosses(bossFocus, archivedSnapshot);
+        var detailIndex = ArchivePayloadIndex.Create(eventsSnapshot, pairs, combatants);
 
         return new SceneArchivePayload
         {
@@ -60,88 +70,74 @@ public sealed class SceneArchivePayload
             Combatants = combatants,
             Entities = identities,
             NpcNamesByCode = npcNames,
-            Bosses = bosses
+            Bosses = bosses,
+            DetailIndex = detailIndex
         };
     }
 
-    public SceneArchivePayload DeepClone() => new()
+    public SceneArchivePayload DeepClone()
     {
-        Snapshot = Snapshot.DeepClone(),
-        SceneStarted = SceneStarted,
-        Events = Events.Select(static e => e.DeepClone()).ToArray(),
-        DisplayNames = new Dictionary<int, string>(DisplayNames),
-        Pairs = Pairs.Select(ClonePair).ToArray(),
-        Combatants = Combatants.Select(CloneCombatant).ToArray(),
-        Entities = Entities.Select(static e => e.DeepClone()).ToArray(),
-        NpcNamesByCode = new Dictionary<int, string>(NpcNamesByCode),
-        Bosses = Bosses.Select(static b => b.DeepClone()).ToArray()
-    };
+        var events = Events.Select(static e => e.DeepClone()).ToArray();
+        var pairs = Pairs.Select(ClonePair).ToArray();
+        var combatants = Combatants.Select(CloneCombatant).ToArray();
+
+        return new SceneArchivePayload
+        {
+            Snapshot = Snapshot.DeepClone(),
+            SceneStarted = SceneStarted,
+            Events = events,
+            DisplayNames = new Dictionary<int, string>(DisplayNames),
+            Pairs = pairs,
+            Combatants = combatants,
+            Entities = Entities.Select(static e => e.DeepClone()).ToArray(),
+            NpcNamesByCode = new Dictionary<int, string>(NpcNamesByCode),
+            Bosses = Bosses.Select(static b => b.DeepClone()).ToArray(),
+            DetailIndex = ArchivePayloadIndex.Create(events, pairs, combatants)
+        };
+    }
 
     public CombatDetailDelta CreateDetailDelta(int combatantId)
     {
-        if (combatantId <= 0 || !Snapshot.Combatants.ContainsKey(combatantId))
+        if (combatantId <= 0)
         {
             return new CombatDetailDelta
             {
                 CombatantId = combatantId,
-                DisplayNames = new Dictionary<int, string>(DisplayNames)
+                DisplayNames = DisplayNames
             };
         }
 
-        var events = new List<CombatDetailEvent>();
-        var outgoingPairs = new HashSet<DirectedPairKey>();
-        var incomingPairs = new HashSet<DirectedPairKey>();
-        var revision = 0L;
-        for (var i = 0; i < Events.Count; i++)
+        var detailIndex = DetailIndex;
+        var eventIndices = detailIndex.GetEventIndices(combatantId);
+        var combatant = detailIndex.GetCombatant(combatantId);
+        if (eventIndices.Length == 0 && combatant is null && !Snapshot.Combatants.ContainsKey(combatantId))
         {
-            var archiveEvent = Events[i];
-            if (archiveEvent.SourceId != combatantId && archiveEvent.TargetId != combatantId)
-                continue;
-
-            events.Add(archiveEvent.ToDetailEvent());
-            revision = Math.Max(revision, archiveEvent.Revision);
-            if (archiveEvent.SourceId == combatantId && archiveEvent.TargetId > 0)
-                outgoingPairs.Add(new DirectedPairKey(archiveEvent.SourceId, archiveEvent.TargetId));
-            if (archiveEvent.TargetId == combatantId && archiveEvent.SourceId > 0)
-                incomingPairs.Add(new DirectedPairKey(archiveEvent.SourceId, archiveEvent.TargetId));
+            return new CombatDetailDelta
+            {
+                CombatantId = combatantId,
+                DisplayNames = DisplayNames
+            };
         }
 
-        events.Sort(static (a, b) =>
+        var events = new CombatDetailEvent[eventIndices.Length];
+        var revision = 0L;
+        for (var i = 0; i < eventIndices.Length; i++)
         {
-            var cmp = a.Revision.CompareTo(b.Revision);
-            if (cmp != 0)
-                return cmp;
-            cmp = a.Packet.Timestamp.CompareTo(b.Packet.Timestamp);
-            if (cmp != 0)
-                return cmp;
-            cmp = a.SourceId.CompareTo(b.SourceId);
-            if (cmp != 0)
-                return cmp;
-            return a.TargetId.CompareTo(b.TargetId);
-        });
+            var archiveEvent = Events[eventIndices[i]];
+            events[i] = archiveEvent.ToDetailEvent();
+            revision = Math.Max(revision, archiveEvent.Revision);
+        }
 
         return new CombatDetailDelta
         {
             CombatantId = combatantId,
             Revision = revision,
-            OutgoingPairs = outgoingPairs.OrderBy(static p => p.SourceId).ThenBy(static p => p.TargetId).ToArray(),
-            IncomingPairs = incomingPairs.OrderBy(static p => p.SourceId).ThenBy(static p => p.TargetId).ToArray(),
+            OutgoingPairs = detailIndex.GetOutgoingPairs(combatantId),
+            IncomingPairs = detailIndex.GetIncomingPairs(combatantId),
             Events = events,
-            DisplayNames = new Dictionary<int, string>(DisplayNames),
-            Combatant = FindCombatant(combatantId)
+            DisplayNames = DisplayNames,
+            Combatant = combatant is not null ? CloneCombatant(combatant) : null
         };
-    }
-
-    private CombatantSummary? FindCombatant(int combatantId)
-    {
-        for (var i = 0; i < Combatants.Count; i++)
-        {
-            var combatant = Combatants[i];
-            if (combatant.CombatantId == combatantId)
-                return CloneCombatant(combatant);
-        }
-
-        return null;
     }
 
     private static void AddEntity(HashSet<int> entityIds, int entityId)
@@ -204,6 +200,23 @@ public sealed class SceneArchivePayload
     }
 
     private static EventKey CreateKey(in CombatDetailEvent e) => new(e.Revision, e.SourceId, e.TargetId, e.Packet.SkillCode, e.Packet.Timestamp, e.Packet.Damage, e.Packet.EventKind, e.Packet.ValueKind);
+
+    private static int CompareEvents(SceneArchiveCombatEvent left, SceneArchiveCombatEvent right)
+    {
+        var cmp = left.Revision.CompareTo(right.Revision);
+        if (cmp != 0)
+            return cmp;
+        cmp = left.Packet.Timestamp.CompareTo(right.Packet.Timestamp);
+        if (cmp != 0)
+            return cmp;
+        cmp = left.SourceId.CompareTo(right.SourceId);
+        if (cmp != 0)
+            return cmp;
+        return left.TargetId.CompareTo(right.TargetId);
+    }
+
+    private static int CompareEventIndices(int left, int right, IReadOnlyList<SceneArchiveCombatEvent> events)
+        => CompareEvents(events[left], events[right]);
 
     private static DirectedPairSnapshot[] BuildPairs(IReadOnlyList<SceneArchiveCombatEvent> events)
     {
@@ -503,6 +516,146 @@ public sealed class SceneArchivePayload
     }
 
     private readonly record struct EventKey(long Revision, int SourceId, int TargetId, int SkillCode, long Timestamp, int Damage, CombatEventKind EventKind, CombatValueKind ValueKind);
+
+    private sealed class ArchivePayloadIndex
+    {
+        private static readonly int[] EmptyEventIndices = [];
+        private static readonly DirectedPairKey[] EmptyPairs = [];
+
+        private readonly Dictionary<int, int[]> _eventIndicesByCombatant;
+        private readonly Dictionary<int, DirectedPairKey[]> _outgoingPairsByCombatant;
+        private readonly Dictionary<int, DirectedPairKey[]> _incomingPairsByCombatant;
+        private readonly Dictionary<int, CombatantSummary> _combatantsById;
+
+        private ArchivePayloadIndex(Dictionary<int, int[]> eventIndicesByCombatant, Dictionary<int, DirectedPairKey[]> outgoingPairsByCombatant, Dictionary<int, DirectedPairKey[]> incomingPairsByCombatant, Dictionary<int, CombatantSummary> combatantsById)
+        {
+            _eventIndicesByCombatant = eventIndicesByCombatant;
+            _outgoingPairsByCombatant = outgoingPairsByCombatant;
+            _incomingPairsByCombatant = incomingPairsByCombatant;
+            _combatantsById = combatantsById;
+        }
+
+        public IReadOnlyDictionary<int, int[]> EventIndicesByCombatant => _eventIndicesByCombatant;
+        public IReadOnlyDictionary<int, DirectedPairKey[]> OutgoingPairsByCombatant => _outgoingPairsByCombatant;
+        public IReadOnlyDictionary<int, DirectedPairKey[]> IncomingPairsByCombatant => _incomingPairsByCombatant;
+        public IReadOnlyDictionary<int, CombatantSummary> CombatantsById => _combatantsById;
+
+        public static ArchivePayloadIndex Create(IReadOnlyList<SceneArchiveCombatEvent> events, IReadOnlyList<DirectedPairSnapshot> pairs, IReadOnlyList<CombatantSummary> combatants)
+        {
+            var eventBuilders = new Dictionary<int, List<int>>();
+            for (var i = 0; i < events.Count; i++)
+            {
+                var e = events[i];
+                AddEventIndex(eventBuilders, e.SourceId, i);
+                if (e.TargetId != e.SourceId)
+                    AddEventIndex(eventBuilders, e.TargetId, i);
+            }
+
+            var eventIndicesByCombatant = new Dictionary<int, int[]>(eventBuilders.Count);
+            foreach (var (combatantId, indices) in eventBuilders)
+            {
+                indices.Sort((left, right) => CompareEventIndices(left, right, events));
+                eventIndicesByCombatant[combatantId] = [.. indices];
+            }
+
+            var outgoingBuilders = new Dictionary<int, List<DirectedPairKey>>();
+            var incomingBuilders = new Dictionary<int, List<DirectedPairKey>>();
+            if (pairs.Count > 0)
+            {
+                for (var i = 0; i < pairs.Count; i++)
+                    AddPair(outgoingBuilders, incomingBuilders, pairs[i].Key);
+            }
+            else
+            {
+                var pairKeys = new HashSet<DirectedPairKey>();
+                for (var i = 0; i < events.Count; i++)
+                {
+                    var e = events[i];
+                    if (e.SourceId <= 0 || e.TargetId <= 0)
+                        continue;
+
+                    pairKeys.Add(new DirectedPairKey(e.SourceId, e.TargetId));
+                }
+
+                foreach (var key in pairKeys.OrderBy(static p => p.SourceId).ThenBy(static p => p.TargetId))
+                    AddPair(outgoingBuilders, incomingBuilders, key);
+            }
+
+            var outgoingPairsByCombatant = FreezePairs(outgoingBuilders);
+            var incomingPairsByCombatant = FreezePairs(incomingBuilders);
+            var combatantsById = new Dictionary<int, CombatantSummary>(combatants.Count);
+            for (var i = 0; i < combatants.Count; i++)
+            {
+                var combatant = combatants[i];
+                if (combatant.CombatantId > 0)
+                    combatantsById[combatant.CombatantId] = combatant;
+            }
+
+            return new ArchivePayloadIndex(eventIndicesByCombatant, outgoingPairsByCombatant, incomingPairsByCombatant, combatantsById);
+        }
+
+        public int[] GetEventIndices(int combatantId)
+            => _eventIndicesByCombatant.TryGetValue(combatantId, out var indices) ? indices : EmptyEventIndices;
+
+        public DirectedPairKey[] GetOutgoingPairs(int combatantId)
+            => _outgoingPairsByCombatant.TryGetValue(combatantId, out var pairs) ? pairs : EmptyPairs;
+
+        public DirectedPairKey[] GetIncomingPairs(int combatantId)
+            => _incomingPairsByCombatant.TryGetValue(combatantId, out var pairs) ? pairs : EmptyPairs;
+
+        public CombatantSummary? GetCombatant(int combatantId)
+            => _combatantsById.TryGetValue(combatantId, out var combatant) ? combatant : null;
+
+        private static void AddEventIndex(Dictionary<int, List<int>> builders, int combatantId, int eventIndex)
+        {
+            if (combatantId <= 0)
+                return;
+
+            if (!builders.TryGetValue(combatantId, out var indices))
+            {
+                indices = [];
+                builders[combatantId] = indices;
+            }
+
+            indices.Add(eventIndex);
+        }
+
+        private static void AddPair(Dictionary<int, List<DirectedPairKey>> outgoingBuilders, Dictionary<int, List<DirectedPairKey>> incomingBuilders, DirectedPairKey key)
+        {
+            if (key.SourceId <= 0 || key.TargetId <= 0)
+                return;
+
+            AddPairKey(outgoingBuilders, key.SourceId, key);
+            AddPairKey(incomingBuilders, key.TargetId, key);
+        }
+
+        private static void AddPairKey(Dictionary<int, List<DirectedPairKey>> builders, int combatantId, DirectedPairKey key)
+        {
+            if (!builders.TryGetValue(combatantId, out var pairs))
+            {
+                pairs = [];
+                builders[combatantId] = pairs;
+            }
+
+            pairs.Add(key);
+        }
+
+        private static Dictionary<int, DirectedPairKey[]> FreezePairs(Dictionary<int, List<DirectedPairKey>> builders)
+        {
+            var result = new Dictionary<int, DirectedPairKey[]>(builders.Count);
+            foreach (var (combatantId, pairs) in builders)
+            {
+                pairs.Sort(static (left, right) =>
+                {
+                    var cmp = left.SourceId.CompareTo(right.SourceId);
+                    return cmp != 0 ? cmp : left.TargetId.CompareTo(right.TargetId);
+                });
+                result[combatantId] = [.. pairs];
+            }
+
+            return result;
+        }
+    }
 }
 
 public sealed class SceneArchiveCombatEvent
