@@ -9,11 +9,12 @@ public sealed class SceneBoundaryService
 
     public uint CurrentMapId { get; private set; }
     public uint CurrentMapInstanceId { get; private set; }
+    public bool IsEmpty => CurrentMapId == 0 && CurrentMapInstanceId == 0 && !_hasPendingMap && !_hasPendingInstance;
 
-    public void StageDestinationMap(uint mapId)
+    public bool StageDestinationMap(uint mapId)
     {
         if (mapId == 0 || mapId == CurrentMapId)
-            return;
+            return false;
 
         if (!_hasPendingMap || _pendingMapId != mapId)
         {
@@ -21,24 +22,34 @@ public sealed class SceneBoundaryService
             _hasPendingMap = true;
             _pendingInstanceId = 0;
             _hasPendingInstance = false;
+            return true;
         }
+
+        return false;
     }
 
-    public void StageDestinationMapInstance(uint instanceId)
+    public bool StageDestinationMapInstance(uint instanceId)
     {
         if (instanceId == 0)
-            return;
+            return false;
 
         if (!_hasPendingMap)
         {
+            if (CurrentMapInstanceId == instanceId && !_hasPendingInstance)
+                return false;
+
             CurrentMapInstanceId = instanceId;
             _pendingInstanceId = 0;
             _hasPendingInstance = false;
-            return;
+            return true;
         }
+
+        if (_hasPendingInstance && _pendingInstanceId == instanceId)
+            return false;
 
         _pendingInstanceId = instanceId;
         _hasPendingInstance = true;
+        return true;
     }
 
     public SceneTransitionKind MarkSceneArrival()

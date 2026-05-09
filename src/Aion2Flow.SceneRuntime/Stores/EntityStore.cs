@@ -7,9 +7,11 @@ namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 public sealed class EntityStore
 {
     private readonly Dictionary<int, EntityRecord> _entities = [];
+    private long _revision;
 
     public IReadOnlyDictionary<int, EntityRecord> Entities => _entities;
     public int Count => _entities.Count;
+    public long Revision => _revision;
 
     public EntityRecord GetOrAdd(int entityId)
     {
@@ -28,81 +30,134 @@ public sealed class EntityStore
     public void ApplyNpcCode(int instanceId, int npcCode)
     {
         var entity = GetOrAdd(instanceId);
+        if (entity.NpcCode == npcCode)
+            return;
+
         entity.NpcCode = npcCode;
         entity.LastObservedOrdinal++;
+        _revision++;
     }
 
     public void ApplyNpcKind(int instanceId, NpcKind kind)
     {
         var entity = GetOrAdd(instanceId);
+        if (entity.Kind == kind)
+            return;
+
         entity.Kind = kind;
+        _revision++;
     }
 
     public void ApplyNickname(int entityId, string nickname)
     {
         var entity = GetOrAdd(entityId);
+        if (entity.Nickname == nickname && entity.IsPlayer)
+            return;
+
         entity.Nickname = nickname;
         entity.IsPlayer = true;
         entity.LastObservedOrdinal++;
+        _revision++;
     }
 
     public void ApplySummon(int ownerId, int summonInstanceId)
     {
         var entity = GetOrAdd(summonInstanceId);
+        if (entity.OwnerEntityId == ownerId && entity.Kind == NpcKind.Summon)
+            return;
+
         entity.OwnerEntityId = ownerId;
         entity.Kind = NpcKind.Summon;
+        _revision++;
     }
 
     public void ApplyNpcHp(int instanceId, int hp, int maxHp)
     {
         var entity = GetOrAdd(instanceId);
+        var resolvedMaxHp = maxHp > 0 ? Math.Max(maxHp, hp) : Math.Max(entity.MaxHp ?? 0, hp);
+        var combatActive = hp == 0 ? false : entity.NpcCombatActive;
+        if (entity.CurrentHp == hp && entity.MaxHp == resolvedMaxHp && entity.NpcCombatActive == combatActive)
+            return;
+
         entity.CurrentHp = hp;
-        entity.MaxHp = maxHp > 0 ? Math.Max(maxHp, hp) : Math.Max(entity.MaxHp ?? 0, hp);
+        entity.MaxHp = resolvedMaxHp;
         if (hp == 0)
             entity.NpcCombatActive = false;
+        _revision++;
     }
 
     public void ApplyBattleToggle(int instanceId, bool isActive)
     {
         var entity = GetOrAdd(instanceId);
+        if (entity.NpcCombatActive == isActive)
+            return;
+
         entity.NpcCombatActive = isActive;
+        _revision++;
     }
 
     public void ApplyNpc2136State(int instanceId, uint sequence, uint value0)
     {
         var entity = GetOrAdd(instanceId);
+        if (entity.Sequence2136 == sequence && entity.Value2136 == value0)
+            return;
+
         entity.Sequence2136 = sequence;
         entity.Value2136 = value0;
+        _revision++;
     }
 
     public void ApplyNpc0140Value(int instanceId, uint value0)
     {
         var entity = GetOrAdd(instanceId);
+        if (entity.Value0140 == value0)
+            return;
+
         entity.Value0140 = value0;
+        _revision++;
     }
 
     public void ApplyNpc0240Value(int instanceId, uint value0)
     {
         var entity = GetOrAdd(instanceId);
+        if (entity.Value0240 == value0)
+            return;
+
         entity.Value0240 = value0;
+        _revision++;
     }
 
     public void ApplyNpc4636State(int instanceId, byte state0, byte state1)
     {
         var entity = GetOrAdd(instanceId);
+        if (entity.State4636 == (state0, state1))
+            return;
+
         entity.State4636 = (state0, state1);
+        _revision++;
     }
 
     public void ApplyNpc2C38State(int instanceId, int sequenceId, int resultCode)
     {
         var entity = GetOrAdd(instanceId);
+        if (entity.Latest2C38 == (sequenceId, resultCode))
+            return;
+
         entity.Latest2C38 = (sequenceId, resultCode);
+        _revision++;
     }
 
     public bool IsKnownEntity(int entityId) =>
         _entities.ContainsKey(entityId);
 
-    public void Clear() => _entities.Clear();
+    public void Clear()
+    {
+        if (_entities.Count == 0)
+            return;
+
+        _entities.Clear();
+        _revision++;
+    }
 }
 
 public sealed class EntityRecord

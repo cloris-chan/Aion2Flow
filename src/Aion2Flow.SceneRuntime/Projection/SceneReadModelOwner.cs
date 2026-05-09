@@ -18,6 +18,9 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private JournalCursor _cursor = journal.CreateCursor(0);
     private long _appliedBatchOrdinal = -1;
     private long _projectionRevision = -1;
+    private SnapshotCacheKey _snapshotCacheKey;
+    private SceneCombatSnapshot? _snapshotCache;
+    private ProjectionCacheStats _projectionCacheStats;
 
     public SceneReadModelOwner(ObservedEventJournal journal) : this(journal, Guid.NewGuid(), DateTimeOffset.Now)
     {
@@ -45,6 +48,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public DateTimeOffset SceneStarted { get; private set; } = sceneStarted;
     public long AppliedObservationOrdinal { get; private set; }
     public long AppliedBatchOrdinal => _appliedBatchOrdinal;
+    public ProjectionCacheStats ProjectionCacheStats => _projectionCacheStats;
 
     public SceneCombatSnapshot CreateSnapshot()
         => CreateFrame().Snapshot;
@@ -150,14 +154,35 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
     private SceneCombatSnapshot CreateSnapshotCore()
     {
+        var key = SnapshotCacheKey.From(EncounterId, entities, metadata, combat, _applier.BossFocus);
+        if (_snapshotCache is not null && _snapshotCacheKey == key && IsSnapshotCacheStable(_snapshotCache))
+        {
+            _projectionCacheStats = _projectionCacheStats.WithHit();
+            return _snapshotCache;
+        }
+
         var snapshot = CreateAdapter().CreateSnapshot();
         snapshot.ReadModelRevision = combat.Revision;
         ApplyBossFocusSnapshots(snapshot);
+        if (IsSnapshotCacheStable(snapshot))
+        {
+            _snapshotCacheKey = SnapshotCacheKey.From(EncounterId, entities, metadata, combat, _applier.BossFocus);
+            _snapshotCache = snapshot;
+        }
+        else
+        {
+            _snapshotCacheKey = default;
+            _snapshotCache = null;
+        }
+        _projectionCacheStats = _projectionCacheStats.WithMiss();
         return snapshot;
     }
 
     private SceneCombatSnapshotAdapter CreateAdapter()
         => new(entities, combat, metadata, _applier.BossFocus, EncounterId);
+
+    private static bool IsSnapshotCacheStable(SceneCombatSnapshot snapshot) =>
+        snapshot.EncounterEndTime > 0 || snapshot.BossFocuses.Count == 0 && snapshot.Encounter.TrackingTargetId == 0;
 
     private CombatDetailDelta CreateDetailDeltaCore(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh)
     {
@@ -229,8 +254,22 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             AppliedObservationOrdinal = 0;
             _appliedBatchOrdinal = journal.LastCompletedBatchOrdinal;
             _projectionRevision = combat.Revision;
+            _snapshotCache = null;
+            _snapshotCacheKey = default;
         }
     }
+}
+
+internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long EntityRevision, long MetadataRevision, long BossFocusRevision)
+{
+    public static SnapshotCacheKey From(Guid encounterId, EntityStore entities, MetadataStore metadata, CombatStore combat, BossFocusStore bossFocus) =>
+        new(encounterId, combat.Revision, entities.Revision, metadata.Revision, bossFocus.Revision);
+}
+
+public readonly record struct ProjectionCacheStats(long SnapshotBuilds, long SnapshotCacheHits)
+{
+    public ProjectionCacheStats WithMiss() => new(SnapshotBuilds + 1, SnapshotCacheHits);
+    public ProjectionCacheStats WithHit() => new(SnapshotBuilds, SnapshotCacheHits + 1);
 }
 
 public sealed class SceneReadModelFrame

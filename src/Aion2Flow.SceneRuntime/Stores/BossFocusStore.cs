@@ -6,6 +6,9 @@ public sealed class BossFocusStore(EntityStore entities)
 {
     private readonly Dictionary<int, Snapshot> _observed = [];
     private readonly HashSet<int> _focused = [];
+    private long _revision;
+
+    public long Revision => _revision;
 
     public bool TryGetObservedBoss(long nowMilliseconds, long visibilityTimeoutMilliseconds, out Snapshot snapshot)
     {
@@ -46,6 +49,7 @@ public sealed class BossFocusStore(EntityStore entities)
         {
             foreach (var id in expired)
                 _observed.Remove(id);
+            _revision++;
         }
 
         result.Sort(static (a, b) => a.InstanceId.CompareTo(b.InstanceId));
@@ -56,8 +60,10 @@ public sealed class BossFocusStore(EntityStore entities)
     {
         if (kind != NpcKind.Boss)
         {
-            _focused.Remove(instanceId);
-            _observed.Remove(instanceId);
+            var changed = _focused.Remove(instanceId);
+            changed |= _observed.Remove(instanceId);
+            if (changed)
+                _revision++;
             return;
         }
 
@@ -72,8 +78,10 @@ public sealed class BossFocusStore(EntityStore entities)
     {
         if (hp == 0)
         {
-            _focused.Remove(instanceId);
-            _observed.Remove(instanceId);
+            var changed = _focused.Remove(instanceId);
+            changed |= _observed.Remove(instanceId);
+            if (changed)
+                _revision++;
             return;
         }
 
@@ -90,8 +98,10 @@ public sealed class BossFocusStore(EntityStore entities)
             return true;
         }
 
-        _focused.Remove(instanceId);
-        _observed.Remove(instanceId);
+        var removed = _focused.Remove(instanceId);
+        removed |= _observed.Remove(instanceId);
+        if (removed)
+            _revision++;
         return false;
     }
 
@@ -108,11 +118,16 @@ public sealed class BossFocusStore(EntityStore entities)
 
         if (_observed.TryGetValue(instanceId, out var current) && current.HasHp)
         {
-            _observed[instanceId] = current with { LastObservedAtMilliseconds = observedAt };
+            var next = current with { LastObservedAtMilliseconds = observedAt };
+            if (!next.Equals(current))
+            {
+                _observed[instanceId] = next;
+                _revision++;
+            }
             return;
         }
 
-        _observed[instanceId] = new Snapshot
+        var snapshot = new Snapshot
         {
             InstanceId = instanceId,
             Hp = 0,
@@ -120,10 +135,16 @@ public sealed class BossFocusStore(EntityStore entities)
             LastObservedAtMilliseconds = observedAt,
             HasHp = false
         };
+        if (!_observed.TryGetValue(instanceId, out var previous) || !previous.Equals(snapshot))
+        {
+            _observed[instanceId] = snapshot;
+            _revision++;
+        }
     }
 
     private void Remember(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
-        => _observed[instanceId] = new Snapshot
+    {
+        var snapshot = new Snapshot
         {
             InstanceId = instanceId,
             Hp = hp,
@@ -131,6 +152,12 @@ public sealed class BossFocusStore(EntityStore entities)
             LastObservedAtMilliseconds = Math.Max(0, observedAtMilliseconds),
             HasHp = true
         };
+        if (!_observed.TryGetValue(instanceId, out var current) || !current.Equals(snapshot))
+        {
+            _observed[instanceId] = snapshot;
+            _revision++;
+        }
+    }
 
     private int ResolveMaxHp(int instanceId, int hp, int maxHp)
     {

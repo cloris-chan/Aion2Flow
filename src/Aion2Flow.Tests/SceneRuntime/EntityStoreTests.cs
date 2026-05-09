@@ -1026,6 +1026,139 @@ public class SceneCombatSnapshotAdapterTests
 public class SceneReadModelOwnerTests
 {
     [Fact]
+    public void Owner_CreateSnapshot_ReusesProjectionUntilInputRevisionChanges()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        scene.AppendNickname(100, "Player");
+        scene.AppendNpcCode(200, 2_999_999);
+        scene.AppendNpcName(2_999_999, "Target");
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 200,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = 500,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 1_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+
+        var first = scene.CreateSnapshot();
+        var second = scene.Owner.CreateSnapshot();
+
+        Assert.Same(first, second);
+        Assert.Equal(1, scene.Owner.ProjectionCacheStats.SnapshotBuilds);
+        Assert.Equal(1, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
+
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 200,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = 300,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 2_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+
+        var third = scene.CreateSnapshot();
+
+        Assert.NotSame(first, third);
+        Assert.Equal(800, third.Combatants[100].DamageAmount);
+        Assert.Equal(2, scene.Owner.ProjectionCacheStats.SnapshotBuilds);
+        Assert.Equal(1, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
+    }
+
+    [Fact]
+    public void Owner_CreateSnapshot_InvalidatesCacheForMetadataEntityAndBossFocusChanges()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        scene.AppendNickname(100, "Player");
+        scene.AppendNpcKind(200, NpcKind.Boss);
+        scene.AppendNpcCode(200, 2_999_999);
+        scene.SetNpcBattle(200, true, 900);
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 200,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = 500,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 1_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+
+        var first = scene.CreateSnapshot();
+        var cached = scene.Owner.CreateSnapshot();
+        Assert.Same(first, cached);
+
+        scene.AppendNpcName(2_999_999, "Renamed Target");
+        var metadataChanged = scene.Owner.CreateSnapshot();
+        Assert.NotSame(first, metadataChanged);
+        Assert.Equal("Renamed Target", metadataChanged.TargetName);
+
+        scene.AppendNickname(100, "Renamed Player");
+        var entityChanged = scene.Owner.CreateSnapshot();
+        Assert.NotSame(metadataChanged, entityChanged);
+
+        scene.AppendNpcHp(200, 1234, 5000, 2_000);
+        var bossChanged = scene.Owner.CreateSnapshot();
+        Assert.NotSame(entityChanged, bossChanged);
+        Assert.Contains(bossChanged.BossFocuses, static boss => boss.InstanceId == 200 && boss.Hp == 1234);
+
+        Assert.Equal(4, scene.Owner.ProjectionCacheStats.SnapshotBuilds);
+        Assert.Equal(1, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
+    }
+
+    [Fact]
+    public void Owner_CreateSnapshot_ReplayIdleTicksUseSingleProjectionBuild()
+    {
+        SceneReplayFixture.SetResources();
+        var replay = SceneReplayFixture.Replay("aion2flow.stream.20260415211500.log");
+        var before = replay.SceneOwner.ProjectionCacheStats;
+
+        var first = replay.SceneOwner.CreateSnapshot();
+        for (var i = 0; i < 8; i++)
+        {
+            var next = replay.SceneOwner.CreateSnapshot();
+            Assert.Same(first, next);
+        }
+
+        var after = replay.SceneOwner.ProjectionCacheStats;
+        Assert.Equal(0, after.SnapshotBuilds - before.SnapshotBuilds);
+        Assert.Equal(9, after.SnapshotCacheHits - before.SnapshotCacheHits);
+        Assert.True(first.Combatants.Count > 0);
+    }
+
+    [Fact]
+    public void Owner_CreateSnapshot_DoesNotCacheBossFocusOnlySnapshot()
+    {
+        using var scene = new SceneTestHarness();
+        scene.AppendNpcKind(200, NpcKind.Boss);
+        scene.SetNpcBattle(200, true, 1_000);
+
+        var first = scene.Owner.CreateSnapshot();
+        var second = scene.Owner.CreateSnapshot();
+
+        Assert.NotSame(first, second);
+        Assert.Equal(2, scene.Owner.ProjectionCacheStats.SnapshotBuilds);
+        Assert.Equal(0, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
+    }
+
+    [Fact]
     public void Owner_Refresh_AppliesJournalIncrementally()
     {
         var journal = new ObservedEventJournal();
