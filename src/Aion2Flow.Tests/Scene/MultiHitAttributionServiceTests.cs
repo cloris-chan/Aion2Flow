@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
@@ -7,7 +6,6 @@ using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
-using Cloris.Aion2Flow.Protocol.Combat;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
 
@@ -68,7 +66,7 @@ public class MultiHitAttributionServiceTests
     }
 
     [Fact]
-    public void ScenePath_IgnoresAux2C38InvincibleOutsideFrameWindow()
+    public void ScenePath_ConsumesAux2C38InvincibleDamageTargetOnce()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
@@ -108,12 +106,30 @@ public class MultiHitAttributionServiceTests
                 Mode = 1
             }
         });
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 2, FrameOrdinal = 31, BatchOrdinal = 105 },
+            Domain = ObservedEventDomain.Aura,
+            SourceEntityId = 1734,
+            TargetEntityId = 1734,
+            Aura = new AuraObservation
+            {
+                SourceEntityId = 1734,
+                TargetEntityId = 1734,
+                SkillCode = 16330000,
+                SequenceId = 207,
+                ResultCode = 11,
+                Mode = 1
+            }
+        });
 
         var combat = Apply(journal);
 
         Assert.True(combat.TryGetPair(1734, 110150, out var pair));
         Assert.Equal(1900, pair!.TotalDamage);
-        Assert.Equal(1, combat.Revision);
+        Assert.Equal(0, pair.InvincibleCount);
+        Assert.Equal(2, combat.Revision);
     }
 
     [Fact]

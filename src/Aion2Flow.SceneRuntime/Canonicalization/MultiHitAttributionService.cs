@@ -30,7 +30,7 @@ public sealed class MultiHitAttributionService
         if (aura.Mode != 1 || aura.ResultCode != 11 || entry.TargetEntityId <= 0 || entry.SourceEntityId != entry.TargetEntityId || aura.SkillCode <= 0)
             return null;
 
-        if (!TryResolveRecentDamageTarget(entry.TargetEntityId, aura.SkillCode, entry.Stamp.FrameOrdinal, out var targetId))
+        if (!TryResolveDamageTarget(entry.TargetEntityId, aura.SkillCode, entry.Stamp.FrameOrdinal, out var targetId))
             return null;
 
         var observation = new CombatObservation
@@ -49,7 +49,7 @@ public sealed class MultiHitAttributionService
         return new CombatCanonicalizationResult(entry.TargetEntityId, targetId, observation);
     }
 
-    private bool TryResolveRecentDamageTarget(int sourceId, int skillCodeRaw, long frameOrdinal, out int targetId)
+    private bool TryResolveDamageTarget(int sourceId, int skillCodeRaw, long frameOrdinal, out int targetId)
     {
         targetId = 0;
 
@@ -63,14 +63,11 @@ public sealed class MultiHitAttributionService
             if (candidate.SourceId != sourceId || candidate.SkillCode != trackedSkillCode || candidate.TargetId <= 0)
                 continue;
 
-            if (frameOrdinal > 0 && candidate.FrameOrdinal > 0)
-            {
-                var frameDelta = frameOrdinal - candidate.FrameOrdinal;
-                if (frameDelta < 0 || frameDelta > 8)
-                    continue;
-            }
+            if (frameOrdinal > 0 && candidate.FrameOrdinal > 0 && frameOrdinal < candidate.FrameOrdinal)
+                continue;
 
             targetId = candidate.TargetId;
+            _candidates.RemoveAt(i);
             return true;
         }
 
