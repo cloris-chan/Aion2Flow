@@ -23,6 +23,7 @@ public sealed class EncounterArchiveServiceTests
         Assert.NotSame(payload, record!.ScenePayload);
         Assert.Equal("Archive Boss", record.Snapshot.TargetName);
         Assert.Equal("Tester", record.ScenePayload.DisplayNames[playerId]);
+        Assert.Equal(payload.SceneStarted.ToLocalTime(), record.ArchivedAt);
         Assert.True(service.TryGetEncounter(record.EncounterId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
 
@@ -51,6 +52,21 @@ public sealed class EncounterArchiveServiceTests
     }
 
     [Fact]
+    public void Archive_Uses_Scene_Start_As_Display_Time_Not_Combat_Start()
+    {
+        var service = new EncounterArchiveService();
+        var sceneStarted = new DateTimeOffset(2026, 5, 9, 13, 14, 15, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 9)));
+        var owner = CreateSceneOwner(100, 200, sceneStarted);
+        var payload = SceneArchivePayload.Create(owner, owner.CreateSnapshot());
+
+        var record = service.Archive(payload, "manual", isAutomatic: false);
+
+        Assert.NotNull(record);
+        Assert.Equal(sceneStarted.ToLocalTime(), record!.ArchivedAt);
+        Assert.NotEqual(DateTimeOffset.FromUnixTimeMilliseconds(record.Snapshot.EncounterStartTime).ToLocalTime(), record.ArchivedAt);
+    }
+
+    [Fact]
     public void Archive_Trims_History_And_Removes_Lookup_For_Evicted_Record()
     {
         var service = new EncounterArchiveService();
@@ -62,6 +78,8 @@ public sealed class EncounterArchiveServiceTests
             {
                 EncounterId = Guid.NewGuid(),
                 TargetName = $"Boss {i}",
+                EncounterStartTime = 1_000 + i,
+                EncounterEndTime = 11_000 + (i * 2),
                 EncounterTime = 10_000 + i
             };
             snapshot.Combatants[i + 1] = new SceneCombatantMetrics($"Tester {i}")
@@ -72,7 +90,8 @@ public sealed class EncounterArchiveServiceTests
 
             var payload = new SceneArchivePayload
             {
-                Snapshot = snapshot
+                Snapshot = snapshot,
+                SceneStarted = DateTimeOffset.FromUnixTimeMilliseconds(snapshot.EncounterStartTime).ToLocalTime()
             };
             var record = service.Archive(payload, "manual", isAutomatic: false);
             Assert.NotNull(record);
@@ -179,6 +198,9 @@ public sealed class EncounterArchiveServiceTests
     }
 
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId)
+        => CreateSceneOwner(playerId, bossId, DateTimeOffset.Now);
+
+    private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId, DateTimeOffset sceneStarted)
     {
         const int bossCode = 2_999_997;
         var journal = new ObservedEventJournal();
@@ -193,7 +215,7 @@ public sealed class EncounterArchiveServiceTests
         AppendCombat(journal, sceneId, playerId, bossId, 1, 8, 1_501);
         journal.CompleteBatch(1);
 
-        var owner = new SceneReadModelOwner(journal, Guid.NewGuid());
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), sceneStarted);
         owner.Refresh();
         return owner;
     }

@@ -1,9 +1,8 @@
-using Cloris.Aion2Flow.SceneRuntime.Model;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -1290,7 +1289,8 @@ public class SceneReadModelOwnerTests
             var first = scene.Owner.CreateSnapshot();
             var oldSessionId = scene.SessionId;
             var resetStartOrdinal = scene.Clock.NextObservationOrdinal;
-            scene.Reset();
+            var nextStarted = new DateTimeOffset(2026, 5, 9, 14, 30, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 9)));
+            scene.Reset(nextStarted);
             sink.AppendCombatPacket(new ParsedCombatPacket
             {
                 SourceId = 100,
@@ -1326,6 +1326,8 @@ public class SceneReadModelOwnerTests
 
             Assert.NotEqual(oldSessionId, scene.SessionId);
             Assert.NotEqual(first.EncounterId, second.EncounterId);
+            Assert.Equal(nextStarted, scene.SessionStarted);
+            Assert.Equal(nextStarted, scene.Owner.SceneStarted);
             Assert.Equal(resetStartOrdinal, scene.Journal.Read(resetStartOrdinal).Stamp.ObservationOrdinal);
             Assert.Equal(scene.SessionId, scene.Journal.Read(resetStartOrdinal).SceneSessionId);
             Assert.Equal(1000, second.Combatants[100].DamageAmount);

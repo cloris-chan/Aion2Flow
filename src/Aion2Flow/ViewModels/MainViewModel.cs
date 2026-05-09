@@ -227,8 +227,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             ArchiveEncounter(_latestLiveSnapshot, "manual-reset", isAutomatic: true);
-            ResetLiveModels();
-            RawPacketDump.RotateLogs();
+            ResetLiveModels(RawPacketDump.RotateLogs);
 
             _latestLiveSnapshot = new SceneCombatSnapshot();
             _displayedSnapshot = new SceneCombatSnapshot();
@@ -313,7 +312,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     internal void RefreshCombatStatsForTesting() => RefreshCombatStats();
 
-    internal void ResetLiveModelsForTesting() => ResetLiveModels();
+    internal void ResetLiveModelsForTesting() => ResetLiveModels(static () => DateTimeOffset.Now);
 
     private SceneCombatSnapshot CreateLiveSnapshot() => _captureService.Scene.Owner.CreateSnapshot();
 
@@ -575,8 +574,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         if (TryResolveMapTransitionResetReason(previousLiveSnapshot, latestLiveSnapshot, out var mapTransitionReason))
         {
             ArchiveEncounter(previousLiveSnapshot, mapTransitionReason, isAutomatic: true);
-            ResetLiveModels();
-            RawPacketDump.RotateLogs();
+            ResetLiveModels(RawPacketDump.RotateLogs);
             return true;
         }
 
@@ -613,9 +611,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private static bool HasArchivableEncounter(SceneCombatSnapshot snapshot)
         => snapshot.EncounterTime > 0 && snapshot.Combatants.Count > 0;
 
-    private void ResetLiveModels()
+    private void ResetLiveModels(Func<DateTimeOffset> resolveSessionStarted)
     {
-        _captureService.Scene.Reset();
+        _captureService.Scene.Reset(resolveSessionStarted);
     }
 
     private void RefreshCombatantDetails(bool forceRefresh = false)

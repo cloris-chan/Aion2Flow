@@ -5,10 +5,10 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, EntityStore entities, MetadataStore metadata, CombatStore combat)
+public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, MetadataStore metadata, CombatStore combat)
 {
     private readonly Lock _gate = new();
-    private DomainEventApplier _applier = new DomainEventApplier(entities, metadata, combat);
+    private DomainEventApplier _applier = new(entities, metadata, combat);
     private readonly CombatPairProjection _pairs = new();
     private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
     private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
@@ -17,15 +17,19 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private long _appliedBatchOrdinal = -1;
     private long _projectionRevision = -1;
 
-    public SceneReadModelOwner(ObservedEventJournal journal) : this(journal, Guid.NewGuid())
+    public SceneReadModelOwner(ObservedEventJournal journal) : this(journal, Guid.NewGuid(), DateTimeOffset.Now)
     {
     }
 
-    public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId) : this(journal, encounterId, new EntityStore(), new MetadataStore(), new CombatStore())
+    public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId) : this(journal, encounterId, DateTimeOffset.Now)
     {
     }
 
-    public SceneReadModelOwner(ObservedEventJournal journal, EntityStore entities, MetadataStore metadata, CombatStore combat) : this(journal, Guid.NewGuid(), entities, metadata, combat)
+    public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted) : this(journal, encounterId, sceneStarted, new EntityStore(), new MetadataStore(), new CombatStore())
+    {
+    }
+
+    public SceneReadModelOwner(ObservedEventJournal journal, EntityStore entities, MetadataStore metadata, CombatStore combat) : this(journal, Guid.NewGuid(), DateTimeOffset.Now, entities, metadata, combat)
     {
     }
 
@@ -36,6 +40,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public BossFocusStore BossFocus => _applier.BossFocus;
     public CombatPairProjection Pairs => _pairs;
     public Guid EncounterId { get; private set; } = encounterId;
+    public DateTimeOffset SceneStarted { get; private set; } = sceneStarted;
     public long AppliedObservationOrdinal { get; private set; }
     public long AppliedBatchOrdinal => _appliedBatchOrdinal;
 
@@ -121,10 +126,14 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     }
 
     public void ResetCombat(Guid encounterId, long startOrdinal)
+        => ResetCombat(encounterId, startOrdinal, DateTimeOffset.Now);
+
+    public void ResetCombat(Guid encounterId, long startOrdinal, DateTimeOffset sceneStarted)
     {
         lock (_gate)
         {
             EncounterId = encounterId;
+            SceneStarted = sceneStarted;
             combat.Clear();
             _applier = new DomainEventApplier(entities, metadata, combat);
             _pairs.Rebuild(combat);

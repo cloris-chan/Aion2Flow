@@ -9,6 +9,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Archive;
 public sealed class SceneArchivePayload
 {
     public SceneCombatSnapshot Snapshot { get; init; } = new();
+    public DateTimeOffset SceneStarted { get; init; }
     public IReadOnlyList<SceneArchiveCombatEvent> Events { get; init; } = [];
     public IReadOnlyDictionary<int, string> DisplayNames { get; init; } = new Dictionary<int, string>();
     public IReadOnlyList<DirectedPairSnapshot> Pairs { get; init; } = [];
@@ -64,6 +65,7 @@ public sealed class SceneArchivePayload
         return new SceneArchivePayload
         {
             Snapshot = archivedSnapshot,
+            SceneStarted = owner.SceneStarted,
             Events = eventsSnapshot,
             DisplayNames = new Dictionary<int, string>(displayNames),
             Pairs = pairs,
@@ -77,6 +79,7 @@ public sealed class SceneArchivePayload
     public SceneArchivePayload DeepClone() => new()
     {
         Snapshot = Snapshot.DeepClone(),
+        SceneStarted = SceneStarted,
         Events = Events.Select(static e => e.DeepClone()).ToArray(),
         DisplayNames = new Dictionary<int, string>(DisplayNames),
         Pairs = Pairs.Select(ClonePair).ToArray(),

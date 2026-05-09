@@ -23,7 +23,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
     private readonly ProtocolRoundTripEstimator _protocolRttEstimator = new();
 
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService = processPortDiscoveryService;
-    private readonly SceneLiveReadModel _scene = new();
+    private readonly SceneLiveReadModel _scene = new(RawPacketDump.CurrentSessionStarted);
     private Func<IRuntimeObservationSink> RuntimeSinkFactory { get => field ??= SceneSinkFactory.CreateForLive(_scene); }
     public PacketCaptureDispatcher Dispatcher { get => field ??= new(RuntimeSinkFactory); }
     public SceneLiveReadModel Scene => _scene;

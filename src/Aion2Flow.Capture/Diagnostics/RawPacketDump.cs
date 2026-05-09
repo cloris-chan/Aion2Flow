@@ -21,12 +21,14 @@ internal static class RawPacketDump
     private static StreamWriter? _rawWriter;
     private static StreamWriter? _streamWriter;
     private static StreamWriter? _frameWriter;
+    private static DateTimeOffset _currentSessionStarted = DateTimeOffset.Now;
 
     public static event Action<FrameEventObservation>? FrameEventObserved;
 
     public static string RawLogPath => _rawLogPath;
     public static string StreamLogPath => _streamLogPath;
     public static string FrameLogPath => _frameLogPath;
+    public static DateTimeOffset CurrentSessionStarted => _currentSessionStarted;
 
     private static bool ShouldWriteFrameLog => IsEnabled && _frameWriter is not null;
 
@@ -36,20 +38,23 @@ internal static class RawPacketDump
         RotateLogs();
     }
 
-    public static void RotateLogs()
+    public static DateTimeOffset RotateLogs()
     {
-        if (!IsEnabled)
-        {
-            return;
-        }
+        var sessionStarted = DateTimeOffset.Now;
 
         lock (SyncRoot)
         {
+            _currentSessionStarted = sessionStarted;
+            if (!IsEnabled)
+            {
+                return sessionStarted;
+            }
+
             DisposeWriter(ref _rawWriter);
             DisposeWriter(ref _streamWriter);
             DisposeWriter(ref _frameWriter);
 
-            var sessionDirectory = ResolveUniqueDumpLogDirectory(_logRootDirectory, DateTimeOffset.Now);
+            var sessionDirectory = ResolveUniqueDumpLogDirectory(_logRootDirectory, sessionStarted);
             Directory.CreateDirectory(sessionDirectory);
             _rawLogPath = Path.Combine(sessionDirectory, "raw.log");
             _streamLogPath = Path.Combine(sessionDirectory, "stream.log");
@@ -59,6 +64,8 @@ internal static class RawPacketDump
             _streamWriter = CreateWriter(_streamLogPath);
             _frameWriter = CreateWriter(_frameLogPath);
         }
+
+        return sessionStarted;
     }
 
     public static void Append(string direction, ushort srcPort, ushort dstPort, uint sequenceNumber, uint acknowledgmentNumber, long captureTicks, ReadOnlySpan<byte> payload)
