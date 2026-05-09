@@ -74,6 +74,7 @@
   <data name="Metric_Total" xml:space="preserve"><value>總量</value></data>
   <data name="Metric_Dps" xml:space="preserve"><value>DPS</value></data>
   <data name="Metric_Hps" xml:space="preserve"><value>HPS</value></data>
+  <data name="Metric_Duration" xml:space="preserve"><value>戰鬥時長</value></data>
   <data name="Metric_Attacks" xml:space="preserve"><value>攻擊次數</value></data>
   <data name="Metric_HitCount" xml:space="preserve"><value>命中次數</value></data>
   <data name="Metric_Skills" xml:space="preserve"><value>技能</value></data>

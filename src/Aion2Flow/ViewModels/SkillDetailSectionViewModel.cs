@@ -1,6 +1,6 @@
-using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
@@ -87,6 +87,11 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
 
     [ObservableProperty]
     public partial double PerSecond { get; set; }
+
+    [ObservableProperty]
+    public partial double DurationSeconds { get; set; }
+
+    public bool UsesSceneDuration { get; set; }
 
     [ObservableProperty]
     public partial double HitRate { get; set; }
@@ -219,6 +224,8 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
         SkillCount = 0;
         HasSkills = false;
         PerSecond = 0d;
+        DurationSeconds = 0d;
+        UsesSceneDuration = false;
         HitRate = 0d;
         CriticalRate = 0d;
         SmiteRate = 0d;

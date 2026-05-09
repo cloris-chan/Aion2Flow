@@ -415,6 +415,8 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 
         var metrics = new Dictionary<int, SkillMetrics>();
         var hasSubsetFilter = selectableCounterpartCount > 0 && selectedCounterpartIds.Count != selectableCounterpartCount;
+        var firstObserved = long.MaxValue;
+        var lastObserved = long.MinValue;
 
         var packetsSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_detailEvents);
         foreach (ref readonly var detailPacket in packetsSpan)
@@ -442,6 +444,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                 continue;
             }
 
+            var observedAt = ResolveObservedAt(in detailPacket);
+            if (observedAt > 0)
+            {
+                firstObserved = Math.Min(firstObserved, observedAt);
+                lastObserved = Math.Max(lastObserved, observedAt);
+            }
+
             if (!metrics.TryGetValue(detailPacket.Packet.SkillCode, out var skill))
             {
                 skill = new SkillMetrics(detailPacket.Packet);
@@ -457,22 +466,29 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                 ? BuildShieldRows(metrics.Values)
                 : BuildHealingRows(metrics.Values);
 
-        ApplySectionRows(section, metrics.Values, rows, sectionKind);
+        var durationSeconds = hasSubsetFilter
+            ? ResolveObservedDurationSeconds(firstObserved, lastObserved)
+            : ResolveSceneDurationSeconds();
+        ApplySectionRows(section, metrics.Values, rows, sectionKind, durationSeconds, !hasSubsetFilter);
     }
 
     private void ApplySectionRows(
         SkillDetailSectionViewModel section,
         IReadOnlyCollection<SkillMetrics> skills,
         List<SkillDetailRowData> rows,
-        DetailSectionKind sectionKind)
+        DetailSectionKind sectionKind,
+        double durationSeconds,
+        bool usesSceneDuration)
     {
         section.ReplaceRows(rows);
         section.SkillCount = rows.Count;
         section.HasSkills = rows.Count > 0;
+        section.DurationSeconds = durationSeconds;
+        section.UsesSceneDuration = usesSceneDuration;
 
         if (sectionKind is DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage)
         {
-            ApplyDamageSection(section, skills);
+            ApplyDamageSection(section, skills, durationSeconds);
             return;
         }
 
@@ -519,10 +535,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         section.EnduranceCount = 0;
         section.RegenerationCount = 0;
 
-        var encounterSeconds = _currentSnapshot.EncounterTime > 0
-            ? _currentSnapshot.EncounterTime / 1000d
-            : 0d;
-        section.PerSecond = encounterSeconds > 0 ? totalAmount / encounterSeconds : 0d;
+        section.PerSecond = durationSeconds > 0 ? totalAmount / durationSeconds : 0d;
 
         section.HitRate = 0d;
         section.CriticalRate = 0d;
@@ -538,7 +551,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         section.InvincibleRate = 0d;
     }
 
-    private void ApplyDamageSection(SkillDetailSectionViewModel section, IEnumerable<SkillMetrics> skills)
+    private void ApplyDamageSection(SkillDetailSectionViewModel section, IEnumerable<SkillMetrics> skills, double durationSeconds)
     {
         long total = 0, directTotal = 0, periodicTotal = 0;
         int totalHits = 0, totalAttempts = 0, totalPeriodicHits = 0;
@@ -586,10 +599,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         section.EnduranceCount = endurance;
         section.RegenerationCount = regeneration;
 
-        var encounterSeconds = _currentSnapshot.EncounterTime > 0
-            ? _currentSnapshot.EncounterTime / 1000d
-            : 0d;
-        section.PerSecond = encounterSeconds > 0 ? section.Total / encounterSeconds : 0d;
+        section.PerSecond = durationSeconds > 0 ? section.Total / durationSeconds : 0d;
 
         section.HitRate = totalAttempts > 0 ? totalHits / (double)totalAttempts : 0d;
         section.CriticalRate = totalHits > 0 ? critical / (double)totalHits : 0d;
@@ -689,6 +699,15 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             _ => 0L
         };
     }
+
+    private double ResolveSceneDurationSeconds()
+        => _currentSnapshot.EncounterTime > 0 ? Math.Max(1d, _currentSnapshot.EncounterTime / 1000d) : 0d;
+
+    private static double ResolveObservedDurationSeconds(long firstObserved, long lastObserved)
+        => firstObserved != long.MaxValue && lastObserved != long.MinValue ? Math.Max(1d, Math.Max(0, lastObserved - firstObserved) / 1000d) : 0d;
+
+    private static long ResolveObservedAt(in CombatDetailEvent detailPacket)
+        => detailPacket.Packet.Timestamp > 0 ? detailPacket.Packet.Timestamp : detailPacket.Revision;
 
     private static List<SkillDetailRowData> BuildDamageRows(IEnumerable<SkillMetrics> skills)
     {
@@ -890,10 +909,12 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 
     private void RefreshSectionPerSecond(SkillDetailSectionViewModel section)
     {
-        var encounterSeconds = _currentSnapshot.EncounterTime > 0
-            ? _currentSnapshot.EncounterTime / 1000d
-            : 0d;
-        section.PerSecond = encounterSeconds > 0 ? section.Total / encounterSeconds : 0d;
+        if (section.UsesSceneDuration)
+        {
+            section.DurationSeconds = ResolveSceneDurationSeconds();
+        }
+
+        section.PerSecond = section.DurationSeconds > 0 ? section.Total / section.DurationSeconds : 0d;
     }
 
     private void ClearSectionsOnly()

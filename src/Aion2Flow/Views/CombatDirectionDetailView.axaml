@@ -35,6 +35,11 @@
                                                  Value="{Binding DamageSection.PerSecond}"
                                                  FractionDigits="1"
                                                  TrimTrailingZeros="False" />
+                            <controls:MetricTile Label="{markups:Translate Metric_Duration}"
+                                                 Value="{Binding DamageSection.DurationSeconds}"
+                                                 FractionDigits="1"
+                                                 TrimTrailingZeros="False"
+                                                 Suffix="s" />
                             <controls:MetricTile Label="{markups:Translate Column_Direct}"
                                                  Value="{Binding DamageSection.DirectTotal}" />
                             <controls:MetricTile Label="{markups:Translate MetricShort_PeriodicDamage}"
@@ -393,6 +398,11 @@
                                                  Value="{Binding HealingSection.PerSecond}"
                                                  FractionDigits="1"
                                                  TrimTrailingZeros="False" />
+                            <controls:MetricTile Label="{markups:Translate Metric_Duration}"
+                                                 Value="{Binding HealingSection.DurationSeconds}"
+                                                 FractionDigits="1"
+                                                 TrimTrailingZeros="False"
+                                                 Suffix="s" />
                             <controls:MetricTile Label="{markups:Translate MetricShort_Heal}"
                                                  Value="{Binding HealingSection.DirectTotal}" />
                             <controls:MetricTile Label="{markups:Translate MetricShort_Hot}"
@@ -409,6 +419,11 @@
                                                  Value="{Binding HealingSection.SkillCount}" />
                             <controls:MetricTile Label="{markups:Translate Category_Shield}"
                                                  Value="{Binding ShieldSection.Total}" />
+                            <controls:MetricTile Label="{markups:Translate Metric_Duration}"
+                                                 Value="{Binding ShieldSection.DurationSeconds}"
+                                                 FractionDigits="1"
+                                                 TrimTrailingZeros="False"
+                                                 Suffix="s" />
                             <controls:MetricTile Label="{markups:Translate MetricShort_ShieldAbsorbed}"
                                                  Value="{Binding ShieldSection.ShieldAbsorbed}" />
                             <controls:MetricTile Label="{markups:Translate Metric_ShieldHits}"

@@ -62,6 +62,180 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SelectBattleCombatant_Uses_Filtered_Damage_Duration_For_Subset_Counterparts()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+
+        const int playerId = 1001;
+        const int bossId = 9001;
+        const int addId = 9002;
+        const int farTargetId = 9003;
+
+        scene.AppendNickname(playerId, "Perigee");
+
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 20_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, addId, 11000010, 500, 40_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, addId, 11000010, 500, 50_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, farTargetId, 11000010, 500, 70_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, snapshot, playerId);
+
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingDamage.DurationSeconds, 10);
+        Assert.Equal(2500d / viewModel.OutgoingDamage.DurationSeconds, viewModel.OutgoingDamage.PerSecond, 10);
+
+        SelectCounterparts(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId, addId);
+
+        Assert.Equal(2000, viewModel.OutgoingDamage.Total);
+        Assert.Equal(40d, viewModel.OutgoingDamage.DurationSeconds, 10);
+        Assert.Equal(50d, viewModel.OutgoingDamage.PerSecond, 10);
+
+        SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
+
+        Assert.Equal(1000, viewModel.OutgoingDamage.Total);
+        Assert.Equal(10d, viewModel.OutgoingDamage.DurationSeconds, 10);
+        Assert.Equal(100d, viewModel.OutgoingDamage.PerSecond, 10);
+    }
+
+    [Fact]
+    public void SelectBattleCombatant_Uses_Filtered_Support_Duration_For_Subset_Counterparts()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+
+        const int playerId = 1001;
+        const int allyOneId = 1002;
+        const int allyTwoId = 1003;
+        const int allyThreeId = 1004;
+        const int healerOneId = 1005;
+        const int healerTwoId = 1006;
+        const int healerThreeId = 1007;
+        const int bossId = 9001;
+
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(allyOneId, "Alpha");
+        scene.AppendNickname(allyTwoId, "Bravo");
+        scene.AppendNickname(allyThreeId, "Charlie");
+        scene.AppendNickname(healerOneId, "Healer A");
+        scene.AppendNickname(healerTwoId, "Healer B");
+        scene.AppendNickname(healerThreeId, "Healer C");
+
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 100, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 100, 80_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, allyOneId, 12000010, 500, 10_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, allyOneId, 12000010, 500, 20_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, allyTwoId, 12000010, 500, 40_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, allyTwoId, 12000010, 500, 50_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, allyThreeId, 12000010, 500, 70_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, allyOneId, 14000010, 300, 12_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(scene.Sink, playerId, allyOneId, 14000010, 300, 22_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(scene.Sink, playerId, allyTwoId, 14000010, 300, 42_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(scene.Sink, playerId, allyTwoId, 14000010, 300, 52_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(scene.Sink, playerId, allyThreeId, 14000010, 300, 72_000, CombatEventKind.Healing, CombatValueKind.Shield);
+        AppendPacket(scene.Sink, healerOneId, playerId, 13000010, 400, 15_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, healerOneId, playerId, 13000010, 400, 25_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, healerTwoId, playerId, 13000010, 400, 45_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, healerTwoId, playerId, 13000010, 400, 55_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, healerThreeId, playerId, 13000010, 400, 75_000, CombatEventKind.Healing, CombatValueKind.Healing);
+
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, snapshot, playerId);
+
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingHealing.DurationSeconds, 10);
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingShield.DurationSeconds, 10);
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.IncomingHealing.DurationSeconds, 10);
+
+        SelectCounterparts(viewModel.OutgoingDetail.SupportCounterpartFilter, allyOneId, allyTwoId);
+
+        Assert.Equal(2000, viewModel.OutgoingHealing.Total);
+        Assert.Equal(40d, viewModel.OutgoingHealing.DurationSeconds, 10);
+        Assert.Equal(50d, viewModel.OutgoingHealing.PerSecond, 10);
+        Assert.Equal(1200, viewModel.OutgoingShield.Total);
+        Assert.Equal(40d, viewModel.OutgoingShield.DurationSeconds, 10);
+        Assert.Equal(30d, viewModel.OutgoingShield.PerSecond, 10);
+
+        SelectCounterparts(viewModel.IncomingDetail.SupportCounterpartFilter, healerOneId, healerTwoId);
+
+        Assert.Equal(1600, viewModel.IncomingHealing.Total);
+        Assert.Equal(40d, viewModel.IncomingHealing.DurationSeconds, 10);
+        Assert.Equal(40d, viewModel.IncomingHealing.PerSecond, 10);
+    }
+
+    [Fact]
+    public void SelectBattleCombatant_Uses_One_Second_Minimum_For_Single_Filtered_Damage_Event()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+
+        const int playerId = 1001;
+        const int bossId = 9001;
+        const int addId = 9002;
+
+        scene.AppendNickname(playerId, "Perigee");
+
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, addId, 11000010, 300, 50_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, snapshot, playerId);
+
+        SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
+
+        Assert.Equal(700, viewModel.OutgoingDamage.Total);
+        Assert.Equal(1d, viewModel.OutgoingDamage.DurationSeconds, 10);
+        Assert.Equal(700d, viewModel.OutgoingDamage.PerSecond, 10);
+    }
+
+    [Fact]
+    public void SelectBattleCombatant_Uses_One_Second_Minimum_For_Subsecond_Filtered_Support_Events()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+
+        const int playerId = 1001;
+        const int allyId = 1002;
+        const int farAllyId = 1003;
+        const int bossId = 9001;
+
+        scene.AppendNickname(playerId, "Perigee");
+        scene.AppendNickname(allyId, "Alpha");
+        scene.AppendNickname(farAllyId, "Bravo");
+
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 100, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 100, 50_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, allyId, 12000010, 400, 10_000, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, allyId, 12000010, 600, 10_500, CombatEventKind.Healing, CombatValueKind.Healing);
+        AppendPacket(scene.Sink, playerId, farAllyId, 12000010, 200, 40_000, CombatEventKind.Healing, CombatValueKind.Healing);
+
+        var snapshot = scene.CreateSnapshot();
+        SelectSceneCombatant(viewModel, scene, snapshot, playerId);
+
+        SelectOnlyCounterpart(viewModel.OutgoingDetail.SupportCounterpartFilter, allyId);
+
+        Assert.Equal(1000, viewModel.OutgoingHealing.Total);
+        Assert.Equal(1d, viewModel.OutgoingHealing.DurationSeconds, 10);
+        Assert.Equal(1000d, viewModel.OutgoingHealing.PerSecond, 10);
+    }
+
+    [Fact]
     public void SelectBattleCombatant_Records_Detail_Refresh_Baseline_Counters()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
@@ -1519,6 +1693,15 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         foreach (var counterpart in filter.Counterparts)
         {
             counterpart.IsSelected = counterpart.CombatantId == combatantId;
+        }
+    }
+
+    private static void SelectCounterparts(DetailCounterpartFilterViewModel filter, params int[] combatantIds)
+    {
+        var selectedIds = combatantIds.ToHashSet();
+        foreach (var counterpart in filter.Counterparts)
+        {
+            counterpart.IsSelected = selectedIds.Contains(counterpart.CombatantId);
         }
     }
 
