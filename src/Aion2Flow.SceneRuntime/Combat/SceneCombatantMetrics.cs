@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
@@ -49,13 +48,11 @@ public sealed class SceneCombatantMetrics(string nickname)
 
     public bool ProcessCombatEvent(ParsedCombatPacket packet)
     {
-        var contributesOutcomeOnly =
-            packet.AttemptContribution > 0 ||
-            packet.HitContribution > 0 ||
-            (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0;
-
-        if (packet.Damage <= 0 &&
-            !contributesOutcomeOnly &&
+        var contribution = CombatContributionClassifier.Evaluate(packet);
+        if (!contribution.CountsAsDamage &&
+            !contribution.CountsAsHealing &&
+            !contribution.CountsAsShieldGrant &&
+            !contribution.CountsAsShieldAbsorbed &&
             packet.ValueKind is not CombatValueKind.Support &&
             packet.EventKind != CombatEventKind.Support)
         {
@@ -88,15 +85,12 @@ public sealed class SceneCombatantMetrics(string nickname)
                 }
                 return false;
             case CombatValueKind.Shield:
-                if (packet.EffectTag == PacketEffectTag.ShieldAbsorbed)
+                if (contribution.CountsAsShieldAbsorbed)
                 {
-                    if (packet.Damage > 0)
-                    {
-                        AddShieldAbsorbedAmount(packet.Damage);
-                        AddShieldAbsorbedTime();
-                    }
+                    AddShieldAbsorbedAmount(packet.Damage);
+                    AddShieldAbsorbedTime();
                 }
-                else
+                else if (contribution.CountsAsShieldGrant)
                 {
                     AddShieldAmount(packet.Damage);
                     AddShieldTime();
@@ -121,8 +115,9 @@ public sealed class SceneCombatantMetrics(string nickname)
             return false;
         }
 
-        AddDamageAmount(packet.Damage);
-        return packet.Damage > 0;
+        if (contribution.CountsAsDamage)
+            AddDamageAmount(packet.Damage);
+        return contribution.CountsAsDamage && packet.Damage > 0;
     }
 
     public SceneCombatantMetrics DeepClone()

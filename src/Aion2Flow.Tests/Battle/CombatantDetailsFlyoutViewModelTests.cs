@@ -1396,42 +1396,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     private static bool ContributesDamageForDetail(ParsedCombatPacket packet)
-    {
-        if (packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
-            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
-        {
-            return true;
-        }
-
-        return packet.ValueKind switch
-        {
-            CombatValueKind.Damage => packet.Damage > 0,
-            CombatValueKind.PeriodicDamage => packet.Damage > 0,
-            CombatValueKind.DrainDamage => packet.Damage > 0,
-            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
-            _ => false
-        };
-    }
+        => CombatContributionClassifier.Evaluate(packet).CountsAsDamage;
 
     private static bool ContributesDamageForDetail(SceneReplayPacket packet)
-    {
-        if (packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
-            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
-        {
-            return true;
-        }
-
-        return packet.ValueKind switch
-        {
-            CombatValueKind.Damage => packet.Damage > 0,
-            CombatValueKind.PeriodicDamage => packet.Damage > 0,
-            CombatValueKind.DrainDamage => packet.Damage > 0,
-            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
-            _ => false
-        };
-    }
+        => packet.ContributesDamage;
 
     private readonly record struct StreamLogEntry(long TimestampMilliseconds, bool IsInbound, TcpConnection Connection, byte[] Payload);
 

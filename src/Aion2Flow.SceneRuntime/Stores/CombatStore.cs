@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -39,15 +38,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation, long observedAtMilliseconds)
     {
         _revision++;
-        var contributesDamage = ContributesDamage(in observation);
-        var contributesHealing = ContributesHealing(in observation);
-        var contributesShieldGrant = ContributesShieldGrant(in observation);
-        var contributesShieldAbsorbed = ContributesShieldAbsorbed(in observation);
-        var hitCount = contributesDamage ? observation.HitCount : 0;
-        var attemptCount = contributesDamage ? observation.AttemptCount : 0;
-        var evadeCount = contributesDamage && (observation.Modifiers & DamageModifiers.Evade) != 0 ? attemptCount : 0;
-        var invincibleCount = contributesDamage && (observation.Modifiers & DamageModifiers.Invincible) != 0 ? attemptCount : 0;
-        var multiHitCount = contributesDamage && (observation.Modifiers & DamageModifiers.MultiHit) != 0 ? 1 : 0;
+        var contribution = CombatContributionClassifier.Evaluate(in observation);
         var eventRecord = new CombatEventRecord
         {
             SourceId = sourceId,
@@ -55,15 +46,15 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             Observation = observation,
             ObservedAtMilliseconds = observedAtMilliseconds,
             Revision = _revision,
-            ContributesDamage = contributesDamage,
-            ContributesHealing = contributesHealing,
-            ContributesShieldGrant = contributesShieldGrant,
-            ContributesShieldAbsorbed = contributesShieldAbsorbed,
-            HitCount = hitCount,
-            AttemptCount = attemptCount,
-            EvadeCount = evadeCount,
-            InvincibleCount = invincibleCount,
-            MultiHitCount = multiHitCount
+            ContributesDamage = contribution.CountsAsDamage,
+            ContributesHealing = contribution.CountsAsHealing,
+            ContributesShieldGrant = contribution.CountsAsShieldGrant,
+            ContributesShieldAbsorbed = contribution.CountsAsShieldAbsorbed,
+            HitCount = contribution.HitCount,
+            AttemptCount = contribution.AttemptCount,
+            EvadeCount = contribution.EvadeCount,
+            InvincibleCount = contribution.InvincibleCount,
+            MultiHitCount = contribution.MultiHitCount
         };
         _events.Add(eventRecord);
 
@@ -80,17 +71,17 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             pair = new CombatPairRecord { SourceId = sourceId, TargetId = targetId };
             _pairs[pairKey] = pair;
         }
-        pair.TotalDamage += contributesDamage ? observation.Damage : 0;
-        pair.TotalHealing += contributesHealing ? observation.Damage : 0;
-        pair.TotalShield += contributesShieldGrant ? observation.Damage : 0;
-        pair.TotalShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
-        pair.ShieldCount += contributesShieldGrant ? 1 : 0;
-        pair.ShieldAbsorbedCount += contributesShieldAbsorbed ? 1 : 0;
-        pair.HitCount += hitCount;
-        pair.AttemptCount += attemptCount;
-        pair.EvadeCount += evadeCount;
-        pair.InvincibleCount += invincibleCount;
-        pair.MultiHitCount += multiHitCount;
+        pair.TotalDamage += contribution.DamageAmount;
+        pair.TotalHealing += contribution.HealingAmount;
+        pair.TotalShield += contribution.ShieldGrantAmount;
+        pair.TotalShieldAbsorbed += contribution.ShieldAbsorbedAmount;
+        pair.ShieldCount += contribution.ShieldGrantCount;
+        pair.ShieldAbsorbedCount += contribution.ShieldAbsorbedCount;
+        pair.HitCount += contribution.HitCount;
+        pair.AttemptCount += contribution.AttemptCount;
+        pair.EvadeCount += contribution.EvadeCount;
+        pair.InvincibleCount += contribution.InvincibleCount;
+        pair.MultiHitCount += contribution.MultiHitCount;
         pair.LastSkillCode = observation.SkillCode;
         pair.Revision = _revision;
         ApplyObservedAt(pair, observedAtMilliseconds);
@@ -99,17 +90,17 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         MarkDetailRevision(targetId, _revision);
 
         var source = GetOrAddCombatant(sourceId);
-        source.OutgoingDamage += contributesDamage ? observation.Damage : 0;
-        source.OutgoingHealing += contributesHealing ? observation.Damage : 0;
-        source.OutgoingShield += contributesShieldGrant ? observation.Damage : 0;
-        source.OutgoingShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
-        source.OutgoingShieldCount += contributesShieldGrant ? 1 : 0;
-        source.OutgoingShieldAbsorbedCount += contributesShieldAbsorbed ? 1 : 0;
-        source.OutgoingHits += hitCount;
-        source.OutgoingAttempts += attemptCount;
-        source.OutgoingEvades += evadeCount;
-        source.OutgoingInvincibles += invincibleCount;
-        source.OutgoingMultiHits += multiHitCount;
+        source.OutgoingDamage += contribution.DamageAmount;
+        source.OutgoingHealing += contribution.HealingAmount;
+        source.OutgoingShield += contribution.ShieldGrantAmount;
+        source.OutgoingShieldAbsorbed += contribution.ShieldAbsorbedAmount;
+        source.OutgoingShieldCount += contribution.ShieldGrantCount;
+        source.OutgoingShieldAbsorbedCount += contribution.ShieldAbsorbedCount;
+        source.OutgoingHits += contribution.HitCount;
+        source.OutgoingAttempts += contribution.AttemptCount;
+        source.OutgoingEvades += contribution.EvadeCount;
+        source.OutgoingInvincibles += contribution.InvincibleCount;
+        source.OutgoingMultiHits += contribution.MultiHitCount;
         source.Revision = _revision;
         ApplyObservedAt(source, observedAtMilliseconds);
         _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, sourceId, default, _revision));
@@ -117,17 +108,17 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         if (targetId > 0)
         {
             var target = GetOrAddCombatant(targetId);
-            target.IncomingDamage += contributesDamage ? observation.Damage : 0;
-            target.IncomingHealing += contributesHealing ? observation.Damage : 0;
-            target.IncomingShield += contributesShieldGrant ? observation.Damage : 0;
-            target.IncomingShieldAbsorbed += contributesShieldAbsorbed ? observation.Damage : 0;
-            target.IncomingShieldCount += contributesShieldGrant ? 1 : 0;
-            target.IncomingShieldAbsorbedCount += contributesShieldAbsorbed ? 1 : 0;
-            target.IncomingHits += hitCount;
-            target.IncomingAttempts += attemptCount;
-            target.IncomingEvades += evadeCount;
-            target.IncomingInvincibles += invincibleCount;
-            target.IncomingMultiHits += multiHitCount;
+            target.IncomingDamage += contribution.DamageAmount;
+            target.IncomingHealing += contribution.HealingAmount;
+            target.IncomingShield += contribution.ShieldGrantAmount;
+            target.IncomingShieldAbsorbed += contribution.ShieldAbsorbedAmount;
+            target.IncomingShieldCount += contribution.ShieldGrantCount;
+            target.IncomingShieldAbsorbedCount += contribution.ShieldAbsorbedCount;
+            target.IncomingHits += contribution.HitCount;
+            target.IncomingAttempts += contribution.AttemptCount;
+            target.IncomingEvades += contribution.EvadeCount;
+            target.IncomingInvincibles += contribution.InvincibleCount;
+            target.IncomingMultiHits += contribution.MultiHitCount;
             target.Revision = _revision;
             ApplyObservedAt(target, observedAtMilliseconds);
             _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, targetId, default, _revision));
@@ -150,40 +141,6 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             incoming.Add(pairKey);
         }
     }
-
-    private static bool ContributesDamage(in CombatObservation observation)
-    {
-        if (observation.EventKind == CombatEventKind.Damage &&
-            observation.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
-            (observation.AttemptCount > 0 || (observation.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
-        {
-            return true;
-        }
-
-        return observation.ValueKind switch
-        {
-            CombatValueKind.Damage => observation.Damage > 0,
-            CombatValueKind.PeriodicDamage => observation.Damage > 0,
-            CombatValueKind.DrainDamage => observation.Damage > 0,
-            CombatValueKind.Unknown => observation.EventKind == CombatEventKind.Damage && observation.Damage > 0,
-            _ => false
-        };
-    }
-
-    private static bool ContributesHealing(in CombatObservation observation) =>
-        observation.ValueKind switch
-        {
-            CombatValueKind.Healing => observation.Damage > 0,
-            CombatValueKind.PeriodicHealing => observation.Damage > 0,
-            CombatValueKind.DrainHealing => observation.Damage > 0,
-            _ => observation.EventKind == CombatEventKind.Healing && observation.Damage > 0
-        };
-
-    private static bool ContributesShieldGrant(in CombatObservation observation) =>
-        observation.ValueKind == CombatValueKind.Shield && observation.EffectTag != PacketEffectTag.ShieldAbsorbed && observation.Damage > 0;
-
-    private static bool ContributesShieldAbsorbed(in CombatObservation observation) =>
-        observation.ValueKind == CombatValueKind.Shield && observation.EffectTag == PacketEffectTag.ShieldAbsorbed && observation.Damage > 0;
 
     private static void ApplyObservedAt(CombatPairRecord record, long observedAtMilliseconds)
     {

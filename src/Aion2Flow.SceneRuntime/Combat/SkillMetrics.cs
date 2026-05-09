@@ -96,18 +96,13 @@ public sealed class SkillMetrics
 
     public void ProcessEvent(ParsedCombatPacket packet)
     {
-        var contributesOutcomeOnly =
-            packet.AttemptContribution > 0 ||
-            packet.HitContribution > 0 ||
-            (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0;
-        var isOutcomeOnlyDamageAttempt =
-            packet.Damage <= 0 &&
-            contributesOutcomeOnly &&
-            packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown;
+        var contribution = CombatContributionClassifier.Evaluate(packet);
+        var isOutcomeOnlyDamageAttempt = contribution.CountsAsDamage && packet.Damage <= 0;
 
-        if (packet.Damage <= 0 &&
-            !contributesOutcomeOnly &&
+        if (!contribution.CountsAsDamage &&
+            !contribution.CountsAsHealing &&
+            !contribution.CountsAsShieldGrant &&
+            !contribution.CountsAsShieldAbsorbed &&
             packet.ValueKind is not CombatValueKind.Support &&
             packet.EventKind != CombatEventKind.Support)
         {
@@ -116,7 +111,7 @@ public sealed class SkillMetrics
 
         if (isOutcomeOnlyDamageAttempt)
         {
-            ApplyDamageAttemptMetrics(packet);
+            ApplyDamageAttemptMetrics(packet, in contribution);
             return;
         }
 
@@ -151,15 +146,12 @@ public sealed class SkillMetrics
                 SupportTimes++;
                 if (packet.ValueKind == CombatValueKind.Shield)
                 {
-                    if (packet.EffectTag == PacketEffectTag.ShieldAbsorbed)
+                    if (contribution.CountsAsShieldAbsorbed)
                     {
-                        if (packet.Damage > 0)
-                        {
-                            ShieldAbsorbedAmount += packet.Damage;
-                            ShieldAbsorbedTimes++;
-                        }
+                        ShieldAbsorbedAmount += packet.Damage;
+                        ShieldAbsorbedTimes++;
                     }
-                    else
+                    else if (contribution.CountsAsShieldGrant)
                     {
                         ShieldAmount += packet.Damage;
                         ShieldTimes++;
@@ -197,29 +189,19 @@ public sealed class SkillMetrics
             return;
         }
 
-        ApplyDamageAttemptMetrics(packet);
+        ApplyDamageAttemptMetrics(packet, in contribution);
     }
 
-    private void ApplyDamageAttemptMetrics(ParsedCombatPacket packet)
+    private void ApplyDamageAttemptMetrics(ParsedCombatPacket packet, in CombatContribution contribution)
     {
         DamageAmount += packet.Damage;
-        var hitContribution = Math.Max(0, packet.HitContribution);
-        var attemptContribution = Math.Max(hitContribution, Math.Max(0, packet.AttemptContribution));
-        var evadeContribution = (packet.Modifiers & DamageModifiers.Evade) != 0
-            ? attemptContribution
-            : 0;
-        var invincibleContribution = (packet.Modifiers & DamageModifiers.Invincible) != 0
-            ? attemptContribution
-            : 0;
-        var multiHitContribution = (packet.Modifiers & DamageModifiers.MultiHit) != 0
-            ? 1
-            : 0;
+        var hitContribution = contribution.HitCount;
 
         Times += hitContribution;
-        AttemptTimes += attemptContribution;
-        EvadeTimes += evadeContribution;
-        InvincibleTimes += invincibleContribution;
-        MultiHitTimes += multiHitContribution;
+        AttemptTimes += contribution.AttemptCount;
+        EvadeTimes += contribution.EvadeCount;
+        InvincibleTimes += contribution.InvincibleCount;
+        MultiHitTimes += contribution.MultiHitCount;
 
         if (hitContribution > 0 && packet.IsCritical) CriticalTimes += hitContribution;
         if (hitContribution > 0 && (packet.Modifiers & DamageModifiers.Back) != 0) BackTimes += hitContribution;

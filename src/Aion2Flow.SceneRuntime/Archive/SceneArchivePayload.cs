@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -342,40 +341,6 @@ public sealed class SceneArchivePayload
         Revision = combatant.Revision
     };
 
-    private static bool ContributesDamage(ParsedCombatPacket packet)
-    {
-        if (packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
-            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
-        {
-            return true;
-        }
-
-        return packet.ValueKind switch
-        {
-            CombatValueKind.Damage => packet.Damage > 0,
-            CombatValueKind.PeriodicDamage => packet.Damage > 0,
-            CombatValueKind.DrainDamage => packet.Damage > 0,
-            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
-            _ => false
-        };
-    }
-
-    private static bool ContributesHealing(ParsedCombatPacket packet) =>
-        packet.ValueKind switch
-        {
-            CombatValueKind.Healing => packet.Damage > 0,
-            CombatValueKind.PeriodicHealing => packet.Damage > 0,
-            CombatValueKind.DrainHealing => packet.Damage > 0,
-            _ => packet.EventKind == CombatEventKind.Healing && packet.Damage > 0
-        };
-
-    private static bool ContributesShieldGrant(ParsedCombatPacket packet) =>
-        packet.ValueKind == CombatValueKind.Shield && packet.EffectTag != PacketEffectTag.ShieldAbsorbed && packet.Damage > 0;
-
-    private static bool ContributesShieldAbsorbed(ParsedCombatPacket packet) =>
-        packet.ValueKind == CombatValueKind.Shield && packet.EffectTag == PacketEffectTag.ShieldAbsorbed && packet.Damage > 0;
-
     private sealed class PairAccumulator(DirectedPairKey key)
     {
         private long _totalDamage;
@@ -397,24 +362,19 @@ public sealed class SceneArchivePayload
         public void Apply(SceneArchiveCombatEvent e)
         {
             var packet = e.Packet;
-            var contributesDamage = ContributesDamage(packet);
-            var contributesHealing = ContributesHealing(packet);
-            var contributesShieldGrant = ContributesShieldGrant(packet);
-            var contributesShieldAbsorbed = ContributesShieldAbsorbed(packet);
-            var hitCount = contributesDamage ? Math.Max(0, packet.HitContribution) : 0;
-            var attemptCount = contributesDamage ? Math.Max(hitCount, Math.Max(0, packet.AttemptContribution)) : 0;
+            var contribution = CombatContributionClassifier.Evaluate(packet);
 
-            _totalDamage += contributesDamage ? packet.Damage : 0;
-            _totalHealing += contributesHealing ? packet.Damage : 0;
-            _totalShield += contributesShieldGrant ? packet.Damage : 0;
-            _totalShieldAbsorbed += contributesShieldAbsorbed ? packet.Damage : 0;
-            _shieldCount += contributesShieldGrant ? 1 : 0;
-            _shieldAbsorbedCount += contributesShieldAbsorbed ? 1 : 0;
-            _hitCount += hitCount;
-            _attemptCount += attemptCount;
-            _evadeCount += contributesDamage && (packet.Modifiers & DamageModifiers.Evade) != 0 ? attemptCount : 0;
-            _invincibleCount += contributesDamage && (packet.Modifiers & DamageModifiers.Invincible) != 0 ? attemptCount : 0;
-            _multiHitCount += contributesDamage && (packet.Modifiers & DamageModifiers.MultiHit) != 0 ? 1 : 0;
+            _totalDamage += contribution.DamageAmount;
+            _totalHealing += contribution.HealingAmount;
+            _totalShield += contribution.ShieldGrantAmount;
+            _totalShieldAbsorbed += contribution.ShieldAbsorbedAmount;
+            _shieldCount += contribution.ShieldGrantCount;
+            _shieldAbsorbedCount += contribution.ShieldAbsorbedCount;
+            _hitCount += contribution.HitCount;
+            _attemptCount += contribution.AttemptCount;
+            _evadeCount += contribution.EvadeCount;
+            _invincibleCount += contribution.InvincibleCount;
+            _multiHitCount += contribution.MultiHitCount;
             _lastSkillCode = packet.SkillCode;
             _revision = Math.Max(_revision, e.Revision);
             var observedAt = packet.Timestamp > 0 ? packet.Timestamp : e.Revision;

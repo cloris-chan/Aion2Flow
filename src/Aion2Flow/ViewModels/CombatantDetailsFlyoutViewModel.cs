@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
@@ -646,48 +645,15 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 
     private static bool ContributesToSection(ParsedCombatPacket packet, DetailSectionKind sectionKind)
     {
+        var contribution = CombatContributionClassifier.Evaluate(packet);
         return sectionKind switch
         {
-            DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage => ContributesDamage(packet),
-            DetailSectionKind.OutgoingHealing or DetailSectionKind.IncomingHealing => ContributesHealing(packet),
-            DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield => ContributesShield(packet),
+            DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage => contribution.CountsAsDamage,
+            DetailSectionKind.OutgoingHealing or DetailSectionKind.IncomingHealing => contribution.CountsAsHealing,
+            DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield => contribution.CountsAsShieldGrant || contribution.CountsAsShieldAbsorbed,
             _ => false
         };
     }
-
-    private static bool ContributesDamage(ParsedCombatPacket packet)
-    {
-        if (packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
-            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
-        {
-            return true;
-        }
-
-        return packet.ValueKind switch
-        {
-            CombatValueKind.Damage => packet.Damage > 0,
-            CombatValueKind.PeriodicDamage => packet.Damage > 0,
-            CombatValueKind.DrainDamage => packet.Damage > 0,
-            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
-            _ => false
-        };
-    }
-
-    private static bool ContributesHealing(ParsedCombatPacket packet)
-    {
-        return packet.ValueKind switch
-        {
-            CombatValueKind.Healing => packet.Damage > 0,
-            CombatValueKind.PeriodicHealing => packet.Damage > 0,
-            CombatValueKind.DrainHealing => packet.Damage > 0,
-            CombatValueKind.Shield => false,
-            _ => packet.EventKind == CombatEventKind.Healing && packet.Damage > 0
-        };
-    }
-
-    private static bool ContributesShield(ParsedCombatPacket packet)
-        => packet.ValueKind == CombatValueKind.Shield && packet.Damage > 0;
 
     private static long GetSectionContributionAmount(ParsedCombatPacket packet, DetailSectionKind sectionKind)
     {

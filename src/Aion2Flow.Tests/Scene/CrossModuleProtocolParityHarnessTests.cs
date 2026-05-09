@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
@@ -6,7 +5,6 @@ using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
-using Cloris.Aion2Flow.Protocol.Combat;
 
 namespace Cloris.Aion2Flow.Tests.Scene;
 
@@ -231,111 +229,6 @@ public sealed class CrossModuleProtocolParityHarnessTests
             };
         }
         return totals;
-    }
-
-    private static void ApplyToPair(PairTotals totals, ParsedCombatPacket packet)
-    {
-        var contribution = GetContribution(packet);
-        totals.Damage += contribution.Damage;
-        totals.Healing += contribution.Healing;
-        totals.Shield += contribution.Shield;
-        totals.ShieldAbsorbed += contribution.ShieldAbsorbed;
-        totals.Hits += contribution.Hits;
-        totals.Attempts += contribution.Attempts;
-        totals.Evades += contribution.Evades;
-        totals.Invincibles += contribution.Invincibles;
-        totals.MultiHits += contribution.MultiHits;
-    }
-
-    private static Contribution GetContribution(ParsedCombatPacket packet)
-    {
-        if (ContributesDamage(packet))
-        {
-            var hits = Math.Max(0, packet.HitContribution);
-            var attempts = Math.Max(hits, Math.Max(0, packet.AttemptContribution));
-            return new Contribution
-            {
-                Kind = ContributionKind.Damage,
-                Damage = packet.Damage,
-                Hits = hits,
-                Attempts = attempts,
-                Evades = (packet.Modifiers & DamageModifiers.Evade) != 0 ? attempts : 0,
-                Invincibles = (packet.Modifiers & DamageModifiers.Invincible) != 0 ? attempts : 0,
-                MultiHits = (packet.Modifiers & DamageModifiers.MultiHit) != 0 ? 1 : 0
-            };
-        }
-
-        if (ContributesHealing(packet))
-            return new Contribution { Kind = ContributionKind.Healing, Healing = packet.Damage };
-
-        if (ContributesShieldGrant(packet))
-            return new Contribution { Kind = ContributionKind.Shield, Shield = packet.Damage };
-
-        if (ContributesShieldAbsorbed(packet))
-            return new Contribution { Kind = ContributionKind.ShieldAbsorbed, ShieldAbsorbed = packet.Damage };
-
-        return new Contribution();
-    }
-
-    private static bool ContributesDamage(ParsedCombatPacket packet)
-    {
-        if (packet.EventKind == CombatEventKind.Damage &&
-            packet.ValueKind is CombatValueKind.Damage or CombatValueKind.PeriodicDamage or CombatValueKind.DrainDamage or CombatValueKind.Unknown &&
-            (packet.AttemptContribution > 0 || (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0))
-        {
-            return true;
-        }
-
-        return packet.ValueKind switch
-        {
-            CombatValueKind.Damage => packet.Damage > 0,
-            CombatValueKind.PeriodicDamage => packet.Damage > 0,
-            CombatValueKind.DrainDamage => packet.Damage > 0,
-            CombatValueKind.Unknown => packet.EventKind == CombatEventKind.Damage && packet.Damage > 0,
-            _ => false
-        };
-    }
-
-    private static bool ContributesHealing(ParsedCombatPacket packet) =>
-        packet.ValueKind switch
-        {
-            CombatValueKind.Healing => packet.Damage > 0,
-            CombatValueKind.PeriodicHealing => packet.Damage > 0,
-            CombatValueKind.DrainHealing => packet.Damage > 0,
-            _ => packet.EventKind == CombatEventKind.Healing && packet.Damage > 0
-        };
-
-    private static bool ContributesShieldGrant(ParsedCombatPacket packet) =>
-        packet.ValueKind == CombatValueKind.Shield && packet.EffectTag != PacketEffectTag.ShieldAbsorbed && packet.Damage > 0;
-
-    private static bool ContributesShieldAbsorbed(ParsedCombatPacket packet) =>
-        packet.ValueKind == CombatValueKind.Shield && packet.EffectTag == PacketEffectTag.ShieldAbsorbed && packet.Damage > 0;
-
-    private static T GetOrAdd<TKey, T>(Dictionary<TKey, T> values, TKey key) where TKey : notnull where T : new()
-    {
-        if (!values.TryGetValue(key, out var value))
-        {
-            value = new T();
-            values[key] = value;
-        }
-        return value;
-    }
-
-    private static AggregateDiffClass ClassifyAggregateDiff(AggregateDiff diff)
-    {
-        if (diff.Field.Contains("ShieldAbsorbed", StringComparison.OrdinalIgnoreCase) || diff.Field == "shieldAbsorbed")
-            return AggregateDiffClass.ShieldAbsorbedProtocolRefinement;
-
-        if (diff.Scope is "combatant" or "pair" && diff.Field is "outgoingDamage" or "incomingDamage" or "damage" or "outgoingHits" or "incomingHits" or "hits" or "outgoingAttempts" or "incomingAttempts" or "attempts" or "outgoingMultiHits" or "incomingMultiHits" or "multiHits")
-            return AggregateDiffClass.BattleWindowAndSummonProjectionBoundary;
-
-        if (diff.Scope is "combatant" or "pair" && diff.Field is "outgoingHealing" or "incomingHealing" or "healing")
-            return AggregateDiffClass.BattleWindowAndSummonProjectionBoundary;
-
-        if (diff.Scope is "combatant" or "pair" && diff.Field is "outgoingEvades" or "incomingEvades" or "evades" or "outgoingInvincibles" or "incomingInvincibles" or "invincibles")
-            return AggregateDiffClass.OutcomeSidecarProjectionBoundary;
-
-        return AggregateDiffClass.Unexpected;
     }
 
     private static void CompareCombatants(List<AggregateDiff> diffs, Dictionary<int, CombatantTotals> legacy, Dictionary<int, CombatantTotals> scene)
@@ -588,20 +481,6 @@ public sealed class CrossModuleProtocolParityHarnessTests
         public int MultiHits { get; set; }
     }
 
-    private sealed class Contribution
-    {
-        public ContributionKind Kind { get; init; }
-        public long Damage { get; init; }
-        public long Healing { get; init; }
-        public long Shield { get; init; }
-        public long ShieldAbsorbed { get; init; }
-        public int Hits { get; init; }
-        public int Attempts { get; init; }
-        public int Evades { get; init; }
-        public int Invincibles { get; init; }
-        public int MultiHits { get; init; }
-    }
-
     private readonly record struct PairKey(int SourceId, int TargetId);
 
     private readonly record struct AggregateDiff(string Scope, string Key, string Field, long Legacy, long Scene)
@@ -610,15 +489,6 @@ public sealed class CrossModuleProtocolParityHarnessTests
     }
 
     private sealed record AppliedScene(EntityStore Entities, MetadataStore Metadata, CombatStore Combat, DomainEventApplier Applier);
-
-    private enum ContributionKind
-    {
-        None,
-        Damage,
-        Healing,
-        Shield,
-        ShieldAbsorbed
-    }
 
     private enum AggregateDiffClass
     {
