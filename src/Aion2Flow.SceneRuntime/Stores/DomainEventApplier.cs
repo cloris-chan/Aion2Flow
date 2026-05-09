@@ -7,6 +7,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
 public sealed class DomainEventApplier(EntityStore entities, MetadataStore metadata, CombatStore combat)
 {
+    private readonly ObservedEventEnvelope[] _journalBuffer = new ObservedEventEnvelope[256];
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
     private readonly PeriodicChainCanonicalizer _periodicChain = new();
     private readonly OwnerTargetSummonRestoreCanonicalizer _ownerTargetSummonRestore = new(entities);
@@ -28,14 +29,15 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         var cursor = journal.CreateCursor(0);
         while (true)
         {
-            var entries = journal.GetEntries(cursor, 256);
-            if (entries.Length == 0)
+            var count = journal.CopyEntries(cursor, _journalBuffer);
+            if (count == 0)
                 break;
 
+            var entries = _journalBuffer.AsSpan(0, count);
             foreach (ref readonly var entry in entries)
                 ApplyEntry(in entry);
 
-            cursor = new JournalCursor(cursor.Position + entries.Length, cursor.StartOrdinal);
+            cursor = new JournalCursor(cursor.Position + count, cursor.StartOrdinal);
         }
 
         FlushPendingOutcomeSidecars();

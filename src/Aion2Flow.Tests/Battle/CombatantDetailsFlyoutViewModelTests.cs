@@ -372,7 +372,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
-        var payload = SceneArchivePayload.Create(scene.Owner, scene.Owner.CreateSnapshot());
+        var payload = scene.Owner.CreateArchivePayload(scene.Owner.CreateSnapshot());
         var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
@@ -407,7 +407,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
-        var payload = SceneArchivePayload.Create(scene.Owner, scene.Owner.CreateSnapshot());
+        var payload = scene.Owner.CreateArchivePayload(scene.Owner.CreateSnapshot());
         var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
@@ -478,7 +478,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
-        var payload = SceneArchivePayload.Create(scene.Owner, scene.Owner.CreateSnapshot());
+        var payload = scene.Owner.CreateArchivePayload(scene.Owner.CreateSnapshot());
         var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
@@ -1606,7 +1606,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     private static ArchivedEncounterRecord? CreateSceneArchiveRecord(PacketLogReplayResult replay)
     {
         var service = new EncounterArchiveService();
-        var payload = SceneArchivePayload.Create(replay.SceneOwner, replay.SceneOwner.CreateSnapshot());
+        var payload = replay.SceneOwner.CreateArchivePayload(replay.SceneOwner.CreateSnapshot());
         return service.Archive(payload, "replay", isAutomatic: false);
     }
 
@@ -1675,7 +1675,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
-        var payload = SceneArchivePayload.Create(scene.Owner, scene.Owner.CreateSnapshot());
+        var payload = scene.Owner.CreateArchivePayload(scene.Owner.CreateSnapshot());
         var record = archive.Archive(payload, "manual", isAutomatic: false);
         Assert.NotNull(record);
 

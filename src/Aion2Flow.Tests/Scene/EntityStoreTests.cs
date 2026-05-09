@@ -1227,6 +1227,72 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
+    public async Task Owner_CreateFrame_KeepsSnapshotDetailAndArchiveOnOneReadModelRevisionUnderConcurrentAppendAndReset()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var scene = new SceneLiveReadModel();
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        sink.AppendNickname(100, "Player");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var writer = Task.Run(() =>
+        {
+            var batch = 0L;
+            while (!cts.IsCancellationRequested)
+            {
+                var currentBatch = Interlocked.Increment(ref batch);
+                var targetId = 200 + (int)(currentBatch % 4);
+                sink.AppendCombatPacket(new ParsedCombatPacket
+                {
+                    SourceId = 100,
+                    TargetId = targetId,
+                    SkillCode = 11000010,
+                    OriginalSkillCode = 11000010,
+                    Damage = 10,
+                    Timestamp = 1_000 + currentBatch * 25,
+                    BatchOrdinal = currentBatch,
+                    HitContribution = 1,
+                    AttemptContribution = 1,
+                    EventKind = CombatEventKind.Damage,
+                    ValueKind = CombatValueKind.Damage
+                });
+                sink.CompleteBatch(currentBatch);
+                if (currentBatch % 37 == 0)
+                    scene.Reset(new DateTimeOffset(2026, 5, 9, 14, 30, (int)(currentBatch % 60), TimeSpan.Zero));
+            }
+        }, cts.Token);
+
+        for (var i = 0; i < 250; i++)
+        {
+            var frame = scene.Owner.CreateFrame(100, forceDetailRefresh: i % 17 == 0);
+            var snapshot = frame.Snapshot;
+            Assert.Equal(snapshot.ReadModelRevision, frame.ReadModelRevision);
+            Assert.Equal(snapshot.BossFocuses.Count, frame.BossFocuses.Count);
+            Assert.True(snapshot.EncounterTime >= 0);
+            Assert.True(snapshot.EncounterEndTime >= snapshot.EncounterStartTime);
+            if (frame.Detail is { } detail)
+            {
+                Assert.Equal(100, detail.CombatantId);
+                Assert.True(detail.Revision <= snapshot.ReadModelRevision);
+                Assert.All(detail.Events, e => Assert.True(e.SourceId == 100 || e.TargetId == 100));
+            }
+
+            if (snapshot.EncounterTime > 0 && snapshot.Combatants.Count > 0)
+            {
+                var payload = scene.Owner.CreateArchivePayload(snapshot);
+                Assert.Equal(snapshot.EncounterId, payload.Snapshot.EncounterId);
+                Assert.Equal(snapshot.EncounterStartTime, payload.Snapshot.EncounterStartTime);
+                Assert.Equal(snapshot.EncounterEndTime, payload.Snapshot.EncounterEndTime);
+            }
+
+            await Task.Yield();
+        }
+
+        await cts.CancelAsync();
+        await writer;
+    }
+
+    [Fact]
     public void LiveReadModel_CapturesFactoryJournal()
     {
         var scene = new SceneLiveReadModel();

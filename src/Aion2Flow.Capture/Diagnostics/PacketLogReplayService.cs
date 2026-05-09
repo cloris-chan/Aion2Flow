@@ -122,7 +122,7 @@ public sealed class PacketLogReplayService
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = BuildCombatantSummaries(sinkHolder.Owner.Combat, sinkHolder.Owner.Entities, sinkHolder.Owner.Metadata, snapshot);
+        var summaries = sinkHolder.Owner.ReadLocked((entities, metadata, combat) => BuildCombatantSummaries(combat, entities, metadata, snapshot));
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
@@ -198,7 +198,7 @@ public sealed class PacketLogReplayService
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = BuildCombatantSummaries(sinkHolder.Owner.Combat, sinkHolder.Owner.Entities, sinkHolder.Owner.Metadata, snapshot);
+        var summaries = sinkHolder.Owner.ReadLocked((entities, metadata, combat) => BuildCombatantSummaries(combat, entities, metadata, snapshot));
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(

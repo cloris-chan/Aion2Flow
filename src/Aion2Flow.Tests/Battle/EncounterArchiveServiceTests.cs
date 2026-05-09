@@ -15,7 +15,7 @@ public sealed class EncounterArchiveServiceTests
         const int playerId = 100;
         const int bossId = 200;
         var owner = CreateSceneOwner(playerId, bossId);
-        var payload = SceneArchivePayload.Create(owner, owner.CreateSnapshot());
+        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
         var record = service.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
@@ -41,7 +41,7 @@ public sealed class EncounterArchiveServiceTests
         const int playerId = 100;
         const int bossId = 200;
         var owner = CreateSceneOwner(playerId, bossId);
-        var payload = SceneArchivePayload.Create(owner, owner.CreateSnapshot());
+        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
 
         var first = service.Archive(payload, "manual", isAutomatic: false);
         var second = service.Archive(payload, "manual", isAutomatic: false);
@@ -57,7 +57,7 @@ public sealed class EncounterArchiveServiceTests
         var service = new EncounterArchiveService();
         var sceneStarted = new DateTimeOffset(2026, 5, 9, 13, 14, 15, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 9)));
         var owner = CreateSceneOwner(100, 200, sceneStarted);
-        var payload = SceneArchivePayload.Create(owner, owner.CreateSnapshot());
+        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
 
         var record = service.Archive(payload, "manual", isAutomatic: false);
 
@@ -114,7 +114,7 @@ public sealed class EncounterArchiveServiceTests
         var owner = CreateSceneOwner(playerId, bossId);
         var snapshot = owner.CreateSnapshot();
 
-        var payload = SceneArchivePayload.Create(owner, snapshot);
+        var payload = owner.CreateArchivePayload(snapshot);
         var delta = payload.CreateDetailDelta(playerId);
 
         Assert.Equal(snapshot.EncounterId, payload.Snapshot.EncounterId);
@@ -138,7 +138,7 @@ public sealed class EncounterArchiveServiceTests
         var owner = CreateSceneOwner(playerId, bossId);
         var snapshot = owner.CreateSnapshot();
 
-        var payload = SceneArchivePayload.Create(owner, snapshot);
+        var payload = owner.CreateArchivePayload(snapshot);
 
         snapshot.TargetName = "Changed";
         owner.Entities.ApplyNickname(playerId, "Changed");
@@ -169,7 +169,7 @@ public sealed class EncounterArchiveServiceTests
         var owner = CreateSceneOwner(playerId, bossId);
         var snapshot = owner.CreateSnapshot();
 
-        var payload = SceneArchivePayload.Create(owner, snapshot);
+        var payload = owner.CreateArchivePayload(snapshot);
 
         var bossIdentity = Assert.Single(payload.Entities, e => e.EntityId == bossId);
         Assert.Equal(2_999_997, bossIdentity.NpcCode);
@@ -187,7 +187,7 @@ public sealed class EncounterArchiveServiceTests
         const int bossId = 200;
         var service = new EncounterArchiveService();
         var owner = CreateSceneOwner(playerId, bossId);
-        var payload = SceneArchivePayload.Create(owner, owner.CreateSnapshot());
+        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
 
         var record = service.Archive(payload, "manual", isAutomatic: false);
 

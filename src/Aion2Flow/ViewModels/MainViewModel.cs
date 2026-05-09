@@ -5,9 +5,7 @@ using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
-using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -21,7 +19,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private const string IndicatorWarnColor = "#F3C969";
     private const string IndicatorErrorColor = "#F07C82";
     private const string IndicatorInfoColor = "#8DD6FF";
-    private const long BossFocusVisibilityTimeoutMilliseconds = 2_000;
 
     private readonly WinDivertCaptureService _captureService;
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService;
@@ -34,6 +31,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private Task? _refreshTask;
     private SceneCombatSnapshot _latestLiveSnapshot = new();
     private SceneCombatSnapshot _displayedSnapshot = new();
+    private SceneReadModelFrame _latestLiveFrame = new();
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
 
@@ -231,6 +229,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             _latestLiveSnapshot = new SceneCombatSnapshot();
             _displayedSnapshot = new SceneCombatSnapshot();
+            _latestLiveFrame = new SceneReadModelFrame();
             Combatants.Clear();
             CombatantDetails.Clear();
             BossFocuses.Clear();
@@ -292,13 +291,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var previousLiveSnapshot = _latestLiveSnapshot;
-        var nextLiveSnapshot = CreateLiveSnapshot();
-        if (TryAutoResetEncounter(previousLiveSnapshot, nextLiveSnapshot))
+        var selectedCombatantId = IsViewingArchivedEncounter ? 0 : SelectedCombatant?.Id ?? 0;
+        var nextLiveFrame = CreateLiveFrame(selectedCombatantId);
+        if (TryAutoResetEncounter(previousLiveSnapshot, nextLiveFrame.Snapshot))
         {
-            nextLiveSnapshot = CreateLiveSnapshot();
+            nextLiveFrame = CreateLiveFrame(selectedCombatantId);
         }
 
-        _latestLiveSnapshot = nextLiveSnapshot;
+        _latestLiveFrame = nextLiveFrame;
+        _latestLiveSnapshot = nextLiveFrame.Snapshot;
         RefreshCaptureIndicators();
 
         if (IsViewingArchivedEncounter)
@@ -314,23 +315,23 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     internal void ResetLiveModelsForTesting() => ResetLiveModels(static () => DateTimeOffset.Now);
 
-    private SceneCombatSnapshot CreateLiveSnapshot() => _captureService.Scene.Owner.CreateSnapshot();
+    private SceneReadModelFrame CreateLiveFrame(int detailCombatantId = 0, bool forceDetailRefresh = false) => _captureService.Scene.Owner.CreateFrame(detailCombatantId, forceDetailRefresh);
 
     private void ApplySnapshot(SceneCombatSnapshot snapshot, bool forceDetailRefresh = false)
     {
         var encounterSeconds = snapshot.EncounterTime / 1000.0;
         EncounterTimeSeconds = encounterSeconds;
         LiveSceneName = ResolveSceneDisplayName(snapshot.MapId);
-        var sceneOwner = IsViewingArchivedEncounter ? null : _captureService.Scene.Owner;
-        RefreshBossFocus(sceneOwner, snapshot);
+        var liveFrame = IsViewingArchivedEncounter ? null : _latestLiveFrame;
+        RefreshBossFocus(liveFrame, snapshot);
 
         using var deferral = Combatants.SuspendNotifications();
         foreach (var row in deferral.Snapshot)
         {
             if (snapshot.Combatants.TryGetValue(row.Id, out var data) &&
-                ShouldDisplayCombatant(sceneOwner, row.Id, data))
+                ShouldDisplayCombatant(data))
             {
-                row.DisplayName = ResolveDisplayName(snapshot, sceneOwner, row.Id);
+                row.DisplayName = ResolveDisplayName(snapshot, row.Id);
                 row.CharacterClass = data.CharacterClass;
                 row.DamagePerSecond = data.DamagePerSecond;
                 row.HealingPerSecond = data.HealingPerSecond;
@@ -349,9 +350,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             if (Combatants.Contains(id))
                 continue;
 
-            if (!ShouldDisplayCombatant(sceneOwner, id, data))
+            if (!ShouldDisplayCombatant(data))
                 continue;
-            var displayName = ResolveDisplayName(snapshot, sceneOwner, id);
+            var displayName = ResolveDisplayName(snapshot, id);
 
             Combatants.Add(new CombatantRowViewModel
             {
@@ -384,42 +385,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         ApplySnapshot(_displayedSnapshot, forceDetailRefresh);
     }
 
-    private string ResolveDisplayName(SceneCombatSnapshot snapshot, SceneReadModelOwner? sceneOwner, int id)
-        => sceneOwner is not null
-            ? ResolveSceneDisplayName(snapshot, sceneOwner.Entities, sceneOwner.Metadata, id)
-            : ResolveSnapshotDisplayName(snapshot, id);
-
-    private static string ResolveSceneDisplayName(SceneCombatSnapshot snapshot, EntityStore entities, MetadataStore metadata, int id)
-    {
-        if (metadata.TryGetDisplayName(id, out var displayName) && !string.IsNullOrWhiteSpace(displayName))
-            return displayName;
-
-        if (entities.TryGet(id, out var entity))
-        {
-            if (!string.IsNullOrWhiteSpace(entity.Nickname))
-                return entity.Nickname;
-
-            if (entity.NpcCode is int npcCode)
-            {
-                if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
-                    return catalogEntry.Name;
-
-                if (metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName))
-                    return npcName;
-            }
-        }
-
-        return snapshot.Combatants.TryGetValue(id, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname)
-            ? combatant.Nickname
-            : id.ToString(System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    private static string ResolveSnapshotDisplayName(SceneCombatSnapshot snapshot, int id)
+    private static string ResolveDisplayName(SceneCombatSnapshot snapshot, int id)
         => snapshot.Combatants.TryGetValue(id, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname)
             ? combatant.Nickname
             : id.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-    private void RefreshBossFocus(SceneReadModelOwner? sceneOwner, SceneCombatSnapshot snapshot)
+    private void RefreshBossFocus(SceneReadModelFrame? liveFrame, SceneCombatSnapshot snapshot)
     {
         if (IsViewingArchivedEncounter)
         {
@@ -427,20 +398,11 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
-        if (sceneOwner is not null)
-        {
-            var now = ResolveBossFocusNow(snapshot);
-            var snapshots = sceneOwner.BossFocus.GetObservedBosses(now, BossFocusVisibilityTimeoutMilliseconds);
-            SyncBossFocuses(snapshots.Count, i => snapshots[i].InstanceId, i => snapshots[i].Hp, i => snapshots[i].MaxHp, i => snapshots[i].HasHp, id => ResolveSceneDisplayName(snapshot, sceneOwner.Entities, sceneOwner.Metadata, id));
-        }
+        var snapshots = liveFrame?.BossFocuses ?? snapshot.BossFocuses;
+        SyncBossFocuses(snapshots.Count, i => snapshots[i].InstanceId, i => snapshots[i].Hp, i => snapshots[i].MaxHp, i => snapshots[i].HasHp, i => snapshots[i].DisplayName);
     }
 
-    private static long ResolveBossFocusNow(SceneCombatSnapshot snapshot)
-        => snapshot.EncounterEndTime > 0
-            ? snapshot.EncounterEndTime
-            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-    private void SyncBossFocuses(int snapshotCount, Func<int, int> getInstanceId, Func<int, int> getHp, Func<int, int> getMaxHp, Func<int, bool> getHasHp, Func<int, string> resolveDisplayName)
+    private void SyncBossFocuses(int snapshotCount, Func<int, int> getInstanceId, Func<int, int> getHp, Func<int, int> getMaxHp, Func<int, bool> getHasHp, Func<int, string> getDisplayName)
     {
         for (var i = BossFocuses.Count - 1; i >= 0; i--)
         {
@@ -473,7 +435,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 }
             }
 
-            var displayName = resolveDisplayName(instanceId);
+            var displayName = getDisplayName(i);
             if (row is null)
             {
                 row = new BossFocusViewModel { InstanceId = instanceId };
@@ -483,28 +445,14 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    private static bool ShouldDisplayCombatant(SceneReadModelOwner? sceneOwner, int combatantId, SceneCombatantMetrics data)
+    private static bool ShouldDisplayCombatant(SceneCombatantMetrics data)
     {
         if (data.CharacterClass is null)
         {
             return false;
         }
 
-        if (sceneOwner is not null)
-            return ShouldDisplaySceneCombatant(sceneOwner.Entities, combatantId);
-
-        return true;
-    }
-
-    private static bool ShouldDisplaySceneCombatant(EntityStore entities, int combatantId)
-    {
-        if (!entities.TryGet(combatantId, out var entity))
-            return true;
-
-        if (entity.NpcCode.HasValue)
-            return false;
-
-        return entity.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
+        return data.IsVisiblePlayerCombatant;
     }
 
     public async ValueTask DisposeAsync()
@@ -567,7 +515,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     }
 
     private ArchivedEncounterRecord? ArchiveEncounter(SceneCombatSnapshot snapshot, string trigger, bool isAutomatic)
-        => _encounterArchiveService.Archive(SceneArchivePayload.Create(_captureService.Scene.Owner, snapshot), trigger, isAutomatic);
+        => _encounterArchiveService.Archive(_captureService.Scene.Owner.CreateArchivePayload(snapshot), trigger, isAutomatic);
 
     private bool TryAutoResetEncounter(SceneCombatSnapshot previousLiveSnapshot, SceneCombatSnapshot latestLiveSnapshot)
     {
@@ -641,7 +589,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         if (!IsViewingArchivedEncounter)
         {
-            var detail = _captureService.Scene.Owner.CreateDetailDelta(snapshot, SelectedCombatant.Id, forceRefresh);
+            if (_latestLiveFrame.DetailCombatantId != SelectedCombatant.Id || _latestLiveFrame.Detail is null || forceRefresh)
+            {
+                _latestLiveFrame = CreateLiveFrame(SelectedCombatant.Id, forceRefresh);
+                _latestLiveSnapshot = _latestLiveFrame.Snapshot;
+                _displayedSnapshot = _latestLiveFrame.Snapshot;
+                snapshot = _displayedSnapshot;
+            }
+
+            var detail = _latestLiveFrame.Detail!;
             CombatantDetails.SelectSceneEncounterCombatant(encounterContextId, SelectedCombatant.Id, snapshot, detail, forceRefresh);
             return;
         }

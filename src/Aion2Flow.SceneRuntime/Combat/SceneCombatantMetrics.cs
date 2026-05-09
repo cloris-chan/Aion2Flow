@@ -6,6 +6,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 public sealed class SceneCombatantMetrics(string nickname)
 {
     public CharacterClass? CharacterClass { get; set; }
+    public bool IsVisiblePlayerCombatant { get; set; }
 
     public double DamagePerSecond { get; set; }
     public double HealingPerSecond { get; set; }
@@ -129,6 +130,7 @@ public sealed class SceneCombatantMetrics(string nickname)
         var clone = new SceneCombatantMetrics(Nickname)
         {
             CharacterClass = CharacterClass,
+            IsVisiblePlayerCombatant = IsVisiblePlayerCombatant,
             DamagePerSecond = DamagePerSecond,
             HealingPerSecond = HealingPerSecond,
             DamageContribution = DamageContribution,

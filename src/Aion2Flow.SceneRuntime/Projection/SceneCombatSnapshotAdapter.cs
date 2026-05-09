@@ -49,6 +49,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         foreach (var (id, data) in snapshot.Combatants)
         {
             data.CharacterClass = ResolveCharacterClass(id);
+            data.IsVisiblePlayerCombatant = ShouldDisplayCombatant(id);
             if (data.CharacterClass is not null)
                 totalDamage += data.DamageAmount;
         }
@@ -66,7 +67,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     public IReadOnlyList<CombatDetailEvent> CreateDetailEvents(SceneCombatSnapshot snapshot, int combatantId, CombatPairProjection projection)
     {
-        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId))
+        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
             return [];
 
         ResetOwnerInference();
@@ -79,6 +80,9 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     }
 
     public string ResolveDetailDisplayName(int entityId) => ResolveDisplayName(entityId);
+
+    private static bool IsSnapshotTarget(SceneCombatSnapshot snapshot, int entityId) =>
+        snapshot.TargetObservation?.InstanceId == entityId || snapshot.Encounter.TrackingTargetId == entityId;
 
     public int ResolveDetailCombatantId(int entityId)
     {
@@ -323,6 +327,17 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private bool IsKnownNpcCombatant(int entityId) =>
         entities.TryGet(entityId, out var entity) && (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
+
+    private bool ShouldDisplayCombatant(int entityId)
+    {
+        if (!entities.TryGet(entityId, out var entity))
+            return true;
+
+        if (entity.NpcCode.HasValue)
+            return false;
+
+        return entity.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
+    }
 
     private static bool IsWithinEncounterWindow(CombatEventRecord e, long start, long end) =>
         ObservedAt(e) >= start && ObservedAt(e) <= end;

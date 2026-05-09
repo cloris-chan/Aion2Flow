@@ -1,6 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.Tests.Combat;
@@ -60,7 +59,7 @@ public sealed class NpcCatalogSceneTests
         });
 
         var snapshot = scene.CreateSnapshot();
-        var archive = SceneArchivePayload.Create(scene.Owner, snapshot);
+        var archive = scene.Owner.CreateArchivePayload(snapshot);
 
         Assert.True(catalog.TryGetValue(npcCode, out var expectedEntry));
         Assert.Equal(expectedEntry.Name, snapshot.TargetName);
@@ -99,7 +98,7 @@ public sealed class NpcCatalogSceneTests
         });
 
         var snapshot = scene.CreateSnapshot();
-        var archive = SceneArchivePayload.Create(scene.Owner, snapshot);
+        var archive = scene.Owner.CreateArchivePayload(snapshot);
 
         Assert.Equal("CustomNpcName", snapshot.TargetName);
         Assert.True(archive.DisplayNames.TryGetValue(npcInstanceId, out var displayName));
@@ -138,7 +137,7 @@ public sealed class NpcCatalogSceneTests
         });
 
         var snapshot = scene.CreateSnapshot();
-        var archive = SceneArchivePayload.Create(scene.Owner, snapshot);
+        var archive = scene.Owner.CreateArchivePayload(snapshot);
 
         Assert.Equal(catalog[npcCode].Name, snapshot.TargetName);
         Assert.True(archive.DisplayNames.TryGetValue(npcInstanceId, out var displayName));
@@ -258,7 +257,7 @@ public sealed class NpcCatalogSceneTests
         });
 
         var snapshot = scene.CreateSnapshot();
-        var archive = SceneArchivePayload.Create(scene.Owner, snapshot);
+        var archive = scene.Owner.CreateArchivePayload(snapshot);
 
         var identity = Assert.Single(archive.Entities, static e => e.EntityId == npcEntityId);
         Assert.Equal(npcCode, identity.NpcCode);
@@ -328,7 +327,7 @@ public sealed class NpcCatalogSceneTests
         });
 
         var snapshot = scene.CreateSnapshot();
-        var archive = SceneArchivePayload.Create(scene.Owner, snapshot);
+        var archive = scene.Owner.CreateArchivePayload(snapshot);
 
         Assert.Equal(catalog[npcCode].Name, snapshot.TargetName);
         var identity = Assert.Single(archive.Entities, static e => e.EntityId == npcEntityId);
