@@ -46,6 +46,25 @@ public sealed class TcpStreamReassemblerTests
         Assert.Equal([5, 6], collector.Payloads[1]);
     }
 
+    [Fact]
+    public void Keeps_Many_Small_OutOfOrder_Segments_Within_Byte_Budget()
+    {
+        using var reassembler = new TcpStreamReassembler();
+        var collector = new ChunkCollector();
+
+        reassembler.Feed(100, [0], ref collector, Capture);
+        for (var i = 1; i <= 503; i++)
+        {
+            reassembler.Feed((uint)(101 + i), [(byte)i], ref collector, Capture);
+        }
+
+        reassembler.Feed(101, [1], ref collector, Capture);
+
+        Assert.Equal(505, collector.SequenceNumbers.Count);
+        Assert.Equal(604u, collector.SequenceNumbers[^1]);
+        Assert.Equal([247], collector.Payloads[^1]);
+    }
+
     private static void Capture(uint sequenceNumber, ReadOnlySpan<byte> chunk, ref ChunkCollector collector)
     {
         collector.SequenceNumbers.Add(sequenceNumber);

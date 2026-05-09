@@ -4,8 +4,7 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 
 public sealed class PacketStreamProcessor : IDisposable
 {
-    private const int MaxBufferSize = 1024 * 1024;
-    private readonly PacketTailBuffer _tail = new(2 * MaxBufferSize);
+    private readonly PacketTailBuffer _tail = new(CaptureBufferLimits.StreamTailBufferSize);
     private readonly IRuntimeObservationSink _sink;
     private readonly PacketFrameParser _parser;
     private long? _timestampOverrideMilliseconds;

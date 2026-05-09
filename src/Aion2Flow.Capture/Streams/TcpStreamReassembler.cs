@@ -6,12 +6,11 @@ internal delegate void TcpReassembledChunkHandler<TState>(uint sequenceNumber, R
 
 internal sealed class TcpStreamReassembler : IDisposable
 {
-    private const int MaxPendingSegments = 256;
-
     private readonly SortedDictionary<uint, PendingSegment> _pending = [];
 
     private bool _hasExpectedSequence;
     private uint _nextExpectedSequence;
+    private int _pendingBytes;
 
     public void Feed<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, ref TState state, TcpReassembledChunkHandler<TState> handler)
     {
@@ -59,6 +58,7 @@ internal sealed class TcpStreamReassembler : IDisposable
         _pending.Clear();
         _hasExpectedSequence = false;
         _nextExpectedSequence = 0;
+        _pendingBytes = 0;
     }
 
     public void Dispose()
@@ -94,6 +94,7 @@ internal sealed class TcpStreamReassembler : IDisposable
             if (pendingSequenceNumber == _nextExpectedSequence)
             {
                 _pending.Remove(pendingSequenceNumber);
+                _pendingBytes -= chunk.Length;
                 sequenceNumber = pendingSequenceNumber;
                 offset = 0;
                 return true;
@@ -106,6 +107,7 @@ internal sealed class TcpStreamReassembler : IDisposable
 
             offset = (int)(_nextExpectedSequence - pendingSequenceNumber);
             _pending.Remove(pendingSequenceNumber);
+            _pendingBytes -= chunk.Length;
             if (offset >= chunk.Length)
             {
                 chunk.Dispose();
@@ -132,13 +134,15 @@ internal sealed class TcpStreamReassembler : IDisposable
             }
 
             existing.Dispose();
+            _pendingBytes -= existing.Length;
         }
 
         var owner = MemoryPool<byte>.Shared.Rent(payload.Length);
         payload.CopyTo(owner.Memory.Span);
         _pending[sequenceNumber] = new PendingSegment(owner, payload.Length);
+        _pendingBytes += payload.Length;
 
-        while (_pending.Count > MaxPendingSegments)
+        while (_pending.Count > CaptureBufferLimits.ReassemblyPendingSegmentLimit || _pendingBytes > CaptureBufferLimits.ReassemblyPendingByteLimit)
         {
             DropFirstPending();
         }
@@ -152,6 +156,7 @@ internal sealed class TcpStreamReassembler : IDisposable
         }
 
         _pending.Remove(sequenceNumber);
+        _pendingBytes -= segment.Length;
         segment.Dispose();
     }
 

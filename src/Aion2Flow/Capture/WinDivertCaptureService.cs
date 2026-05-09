@@ -89,13 +89,11 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             var address = new WinDivertAddress();
             IMemoryOwner<byte>? bufferOwner = null;
 
-            const int MaxPacketSize = 70 * 1024;
-
             while (!_cts.Token.IsCancellationRequested)
             {
                 try
                 {
-                    bufferOwner ??= MemoryPool<byte>.Shared.Rent(MaxPacketSize);
+                    bufferOwner ??= MemoryPool<byte>.Shared.Rent(CaptureBufferLimits.WinDivertPacketBufferSize);
 
                     var length = _divert.Receive(bufferOwner.Memory.Span, ref address);
 
