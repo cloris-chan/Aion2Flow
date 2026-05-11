@@ -58,6 +58,8 @@
                                            FractionDigits="1"
                                            TrimTrailingZeros="False"
                                            Suffix="s"
+                                           TextAlignment="Right"
+                                           StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
                                            IsHitTestVisible="False"
                                            VerticalAlignment="Center" />
                 </StackPanel>
@@ -185,25 +187,31 @@
                                                     Classes="OverlayRowMetricStrong"
                                                     Value="{Binding DamagePerSecond}"
                                                     VerticalAlignment="Center"
-                                                   HorizontalAlignment="Stretch"
-                                                   UseCompactNotation="True"
-                                                   CompactThreshold="1000"
-                                                   CompactSignificantDigits="3" />
+                                                    HorizontalAlignment="Stretch"
+                                                    TextAlignment="Right"
+                                                    StableWidthScopeKey="{Binding Id}"
+                                                    UseCompactNotation="True"
+                                                    CompactThreshold="1000"
+                                                    CompactSignificantDigits="3" />
 
                             <controls:NumericBlock Grid.Column="4"
                                                      Classes="OverlayRowMetric"
                                                      Value="{Binding Damage}"
                                                      VerticalAlignment="Center"
-                                                    HorizontalAlignment="Stretch"
-                                                    UseCompactNotation="True"
-                                                    CompactThreshold="1000"
-                                                    CompactSignificantDigits="3" />
+                                                     HorizontalAlignment="Stretch"
+                                                     TextAlignment="Right"
+                                                     StableWidthScopeKey="{Binding Id}"
+                                                     UseCompactNotation="True"
+                                                     CompactThreshold="1000"
+                                                     CompactSignificantDigits="3" />
 
                             <controls:NumericBlock Grid.Column="5"
                                                    Classes="OverlayRowMetricShare"
                                                    Value="{Binding DamageContribution}"
                                                    FractionDigits="1"
                                                    UsePercentageNotation="True"
+                                                   TextAlignment="Right"
+                                                   StableWidthScopeKey="{Binding Id}"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Stretch" />
                         </Grid>
@@ -273,6 +281,7 @@
                     <controls:NumericBlock Classes="BottomBarMetric"
                                            Value="{Binding RoundTripTimeMilliseconds}"
                                            Suffix=" ms"
+                                           TextAlignment="Right"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Right" />
                 </StackPanel>

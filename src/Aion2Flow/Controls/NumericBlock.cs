@@ -5,6 +5,16 @@ using Avalonia.Media.TextFormatting;
 
 namespace Cloris.Aion2Flow.Controls;
 
+internal readonly record struct NumericBlockDiagnostics(
+    int MeasureCount,
+    int RenderCount,
+    int TextFormatCount,
+    int GlyphRebuildCount,
+    int TypefaceResolveCount,
+    int ForegroundResolveCount,
+    int MeasureInvalidationCount,
+    int VisualInvalidationCount);
+
 public sealed class NumericBlock : Control
 {
     public static readonly StyledProperty<FontFamily> FontFamilyProperty =
@@ -40,37 +50,92 @@ public sealed class NumericBlock : Control
     public static readonly StyledProperty<bool> UseGroupingProperty =
         AvaloniaProperty.Register<NumericBlock, bool>(nameof(UseGrouping), false);
 
-    public static readonly StyledProperty<bool> UseCompactNotationProperty =
-        AvaloniaProperty.Register<NumericBlock, bool>(nameof(UseCompactNotation), false);
+    public static readonly DirectProperty<NumericBlock, bool> UseCompactNotationProperty =
+        AvaloniaProperty.RegisterDirect<NumericBlock, bool>(
+            nameof(UseCompactNotation),
+            control => control.UseCompactNotation,
+            (control, value) => control.UseCompactNotation = value);
 
     public static readonly StyledProperty<bool> UsePercentageNotationProperty =
         AvaloniaProperty.Register<NumericBlock, bool>(nameof(UsePercentageNotation), false);
 
-    public static readonly StyledProperty<double> CompactThresholdProperty =
-        AvaloniaProperty.Register<NumericBlock, double>(nameof(CompactThreshold), 1000d);
+    public static readonly DirectProperty<NumericBlock, double> CompactThresholdProperty =
+        AvaloniaProperty.RegisterDirect<NumericBlock, double>(
+            nameof(CompactThreshold),
+            control => control.CompactThreshold,
+            (control, value) => control.CompactThreshold = value);
 
-    public static readonly StyledProperty<int> CompactSignificantDigitsProperty =
-        AvaloniaProperty.Register<NumericBlock, int>(nameof(CompactSignificantDigits), 3);
+    public static readonly DirectProperty<NumericBlock, int> CompactSignificantDigitsProperty =
+        AvaloniaProperty.RegisterDirect<NumericBlock, int>(
+            nameof(CompactSignificantDigits),
+            control => control.CompactSignificantDigits,
+            (control, value) => control.CompactSignificantDigits = value);
 
-    public static readonly StyledProperty<string?> PrefixProperty =
-        AvaloniaProperty.Register<NumericBlock, string?>(nameof(Prefix));
+    public static readonly DirectProperty<NumericBlock, string?> PrefixProperty =
+        AvaloniaProperty.RegisterDirect<NumericBlock, string?>(
+            nameof(Prefix),
+            control => control.Prefix,
+            (control, value) => control.Prefix = value);
 
-    public static readonly StyledProperty<string?> SuffixProperty =
-        AvaloniaProperty.Register<NumericBlock, string?>(nameof(Suffix));
+    public static readonly DirectProperty<NumericBlock, string?> SuffixProperty =
+        AvaloniaProperty.RegisterDirect<NumericBlock, string?>(
+            nameof(Suffix),
+            control => control.Suffix,
+            (control, value) => control.Suffix = value);
 
     public static readonly StyledProperty<TextAlignment> TextAlignmentProperty =
         TextBlock.TextAlignmentProperty.AddOwner<NumericBlock>();
 
+    public static readonly DirectProperty<NumericBlock, double?> FixedTextWidthProperty =
+        AvaloniaProperty.RegisterDirect<NumericBlock, double?>(
+            nameof(FixedTextWidth),
+            control => control.FixedTextWidth,
+            (control, value) => control.FixedTextWidth = value);
+
+    public static readonly DirectProperty<NumericBlock, object?> StableWidthScopeKeyProperty =
+        AvaloniaProperty.RegisterDirect<NumericBlock, object?>(
+            nameof(StableWidthScopeKey),
+            control => control.StableWidthScopeKey,
+            (control, value) => control.StableWidthScopeKey = value);
+
     private const int InitialBufferCapacity = 32;
+    private const int MaxCachedTypefaces = 64;
+    private const int MaxCachedGlyphs = 4096;
+
+    private static readonly Lock s_cacheGate = new();
+    private static readonly Dictionary<TypefaceCacheKey, CachedTypeface> s_typefaceCache = [];
+    private static readonly Dictionary<GlyphCacheKey, CachedGlyph> s_glyphCache = [];
 
     private readonly GlyphInfoBuffer _glyphInfos = new();
     private char[] _characterBuffer = new char[InitialBufferCapacity];
+    private char[] _formatBuffer = new char[InitialBufferCapacity];
     private GlyphInfo[] _glyphInfoBuffer = new GlyphInfo[InitialBufferCapacity];
+    private CachedTypeface? _cachedTypeface;
     private GlyphRun? _glyphRun;
-    private Geometry? _glyphGeometry;
     private Rect _glyphBounds;
     private Size _desiredSize;
+    private IBrush? _resolvedForeground;
+    private TypefaceCacheKey _cachedTypefaceKey;
+    private double _cachedBaseline;
+    private double _stableDesiredWidth;
+    private int _formattedCharacterCount;
+    private bool _isFormattedTextDirty = true;
     private bool _isGlyphRunDirty = true;
+    private bool _isTypefaceDirty = true;
+    private bool _isForegroundDirty = true;
+    private int _measureCount;
+    private int _renderCount;
+    private int _textFormatCount;
+    private int _glyphRebuildCount;
+    private int _typefaceResolveCount;
+    private int _foregroundResolveCount;
+    private int _measureInvalidationCount;
+    private int _visualInvalidationCount;
+
+    public NumericBlock()
+    {
+        ActualThemeVariantChanged += (_, _) => InvalidateForeground();
+    }
 
     public double Value
     {
@@ -83,7 +148,7 @@ public sealed class NumericBlock : Control
             }
 
             SetAndRaise(ValueProperty, ref field, value);
-            InvalidateGlyphRun();
+            InvalidateFormattedText();
         }
     }
 
@@ -143,8 +208,8 @@ public sealed class NumericBlock : Control
 
     public bool UseCompactNotation
     {
-        get => GetValue(UseCompactNotationProperty);
-        set => SetValue(UseCompactNotationProperty, value);
+        get;
+        set => SetAndRaise(UseCompactNotationProperty, ref field, value);
     }
 
     public bool UsePercentageNotation
@@ -155,32 +220,50 @@ public sealed class NumericBlock : Control
 
     public double CompactThreshold
     {
-        get => GetValue(CompactThresholdProperty);
-        set => SetValue(CompactThresholdProperty, value);
-    }
+        get;
+        set => SetAndRaise(CompactThresholdProperty, ref field, value);
+    } = 1000d;
 
     public int CompactSignificantDigits
     {
-        get => GetValue(CompactSignificantDigitsProperty);
-        set => SetValue(CompactSignificantDigitsProperty, value);
-    }
+        get;
+        set => SetAndRaise(CompactSignificantDigitsProperty, ref field, value);
+    } = 3;
 
     public string? Prefix
     {
-        get => GetValue(PrefixProperty);
-        set => SetValue(PrefixProperty, value);
+        get;
+        set => SetAndRaise(PrefixProperty, ref field, value);
     }
 
     public string? Suffix
     {
-        get => GetValue(SuffixProperty);
-        set => SetValue(SuffixProperty, value);
+        get;
+        set => SetAndRaise(SuffixProperty, ref field, value);
     }
 
     public TextAlignment TextAlignment
     {
         get => GetValue(TextAlignmentProperty);
         set => SetValue(TextAlignmentProperty, value);
+    }
+
+    public double? FixedTextWidth
+    {
+        get;
+        set => SetAndRaise(FixedTextWidthProperty, ref field, value);
+    }
+
+    public object? StableWidthScopeKey
+    {
+        get;
+        set => SetAndRaise(StableWidthScopeKeyProperty, ref field, value);
+    }
+
+    public void ResetStableWidth()
+    {
+        ResetStableWidthCore();
+        InvalidateGlyphRun(formatDirty: false, forceMeasure: true);
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -195,33 +278,51 @@ public sealed class NumericBlock : Control
             change.Property == CompactThresholdProperty ||
             change.Property == CompactSignificantDigitsProperty ||
             change.Property == PrefixProperty ||
-            change.Property == SuffixProperty ||
-            change.Property == FontFamilyProperty ||
+            change.Property == SuffixProperty)
+        {
+            ResetStableWidthCore();
+            InvalidateGlyphRun(formatDirty: true, forceMeasure: true);
+        }
+        else if (change.Property == FontFamilyProperty ||
             change.Property == FontSizeProperty ||
             change.Property == FontStyleProperty ||
             change.Property == FontWeightProperty ||
             change.Property == FontStretchProperty)
         {
-            InvalidateGlyphRun();
+            InvalidateTypeface();
+            ResetStableWidthCore();
+            InvalidateGlyphRun(formatDirty: false, forceMeasure: true);
         }
-        else if (change.Property == ForegroundProperty || change.Property == TextAlignmentProperty)
+        else if (change.Property == FixedTextWidthProperty ||
+            change.Property == StableWidthScopeKeyProperty)
         {
-            InvalidateVisual();
+            ResetStableWidthCore();
+            InvalidateGlyphRun(formatDirty: false, forceMeasure: true);
+        }
+        else if (change.Property == ForegroundProperty)
+        {
+            InvalidateForeground();
+        }
+        else if (change.Property == TextAlignmentProperty)
+        {
+            RequestVisual();
         }
     }
 
     protected override Size MeasureOverride(Size availableSize)
     {
+        _measureCount++;
         EnsureGlyphRun();
         return _desiredSize;
     }
 
     public override void Render(DrawingContext context)
     {
+        _renderCount++;
         base.Render(context);
         EnsureGlyphRun();
 
-        if (_glyphGeometry is null)
+        if (_glyphRun is null)
         {
             return;
         }
@@ -245,7 +346,7 @@ public sealed class NumericBlock : Control
 
         using (context.PushTransform(translation))
         {
-            context.DrawGeometry(foreground, null, _glyphGeometry);
+            context.DrawGlyphRun(foreground, _glyphRun);
         }
     }
 
@@ -256,11 +357,20 @@ public sealed class NumericBlock : Control
             return;
         }
 
+        RebuildGlyphRun();
+    }
+
+    private void RebuildGlyphRun()
+    {
         _isGlyphRunDirty = false;
         _glyphRun = null;
-        _glyphGeometry = null;
         _glyphBounds = default;
         _desiredSize = default;
+
+        if (_isFormattedTextDirty)
+        {
+            UpdateFormattedCharacters();
+        }
 
         var fontSize = FontSize > 0 ? FontSize : 12d;
         if (fontSize <= 0)
@@ -268,6 +378,45 @@ public sealed class NumericBlock : Control
             return;
         }
 
+        var characterCount = _formattedCharacterCount;
+        if (characterCount <= 0)
+        {
+            return;
+        }
+
+        if (!EnsureTypeface(fontSize))
+        {
+            return;
+        }
+
+        EnsureGlyphBufferCapacity(characterCount);
+        var advanceWidth = 0d;
+        for (var index = 0; index < characterCount; index++)
+        {
+            var cachedGlyph = ResolveGlyph(_characterBuffer[index]);
+            _glyphInfoBuffer[index] = new GlyphInfo(cachedGlyph.GlyphIndex, index, cachedGlyph.Advance, default);
+            advanceWidth += cachedGlyph.Advance;
+        }
+
+        _glyphInfos.SetBuffer(_glyphInfoBuffer, characterCount);
+
+        _glyphRebuildCount++;
+        _glyphRun = new GlyphRun(
+            _cachedTypeface!.GlyphTypeface,
+            fontSize,
+            new ReadOnlyMemory<char>(_characterBuffer, 0, characterCount),
+            _glyphInfos,
+            new Point(0, _cachedBaseline),
+            0);
+
+        _glyphBounds = _glyphRun.Bounds;
+        var width = Math.Ceiling(Math.Max(_glyphBounds.Width, advanceWidth));
+        var height = Math.Ceiling(Math.Max(_glyphBounds.Height, fontSize));
+        _desiredSize = ApplyStableWidth(width, height);
+    }
+
+    private bool UpdateFormattedCharacters()
+    {
         var formatOptions = new NumericFormatOptions(
             FractionDigits,
             TrimTrailingZeros,
@@ -279,110 +428,343 @@ public sealed class NumericBlock : Control
             Prefix,
             Suffix);
 
-        var characterCount = FormatValue(formatOptions);
-        if (characterCount <= 0)
+        _textFormatCount++;
+        var characterCount = FormatValue(formatOptions, ref _formatBuffer);
+        var formattedTextChanged =
+            characterCount != _formattedCharacterCount ||
+            !_formatBuffer.AsSpan(0, characterCount).SequenceEqual(_characterBuffer.AsSpan(0, _formattedCharacterCount));
+
+        if (formattedTextChanged)
+        {
+            (_characterBuffer, _formatBuffer) = (_formatBuffer, _characterBuffer);
+            _formattedCharacterCount = characterCount;
+        }
+
+        _isFormattedTextDirty = false;
+        return formattedTextChanged;
+    }
+
+    private void InvalidateFormattedText()
+    {
+        if (_isGlyphRunDirty)
+        {
+            _isFormattedTextDirty = true;
+            return;
+        }
+
+        if (!UpdateFormattedCharacters())
         {
             return;
         }
 
-        var typeface = new Typeface(FontFamily ?? FontFamily.Default, FontStyle, FontWeight, FontStretch);
+        var previousDesiredSize = _desiredSize;
+        RebuildGlyphRun();
+
+        if (!NearlyEquals(previousDesiredSize, _desiredSize))
+        {
+            RequestMeasure();
+        }
+
+        RequestVisual();
+    }
+
+    private int FormatValue(in NumericFormatOptions formatOptions, ref char[] buffer)
+    {
+        while (true)
+        {
+            if (NumericFormatter.TryFormat(Value, buffer, formatOptions, out var charsWritten))
+            {
+                return charsWritten;
+            }
+
+            EnsureCharacterBufferCapacity(ref buffer, buffer.Length * 2);
+        }
+    }
+
+    private void InvalidateGlyphRun(bool formatDirty, bool forceMeasure)
+    {
+        if (formatDirty)
+        {
+            _isFormattedTextDirty = true;
+        }
+
+        _isGlyphRunDirty = true;
+        if (forceMeasure)
+        {
+            RequestMeasure();
+        }
+
+        RequestVisual();
+    }
+
+    private IBrush? ResolveForeground()
+    {
+        if (!_isForegroundDirty)
+        {
+            return _resolvedForeground;
+        }
+
+        _foregroundResolveCount++;
+        _isForegroundDirty = false;
+        _resolvedForeground = Foreground;
+        if (_resolvedForeground is not null)
+        {
+            return _resolvedForeground;
+        }
+
+        if (Application.Current?.TryGetResource("ThemeForegroundBrush", ActualThemeVariant, out var resource) == true &&
+            resource is IBrush themeForeground)
+        {
+            _resolvedForeground = themeForeground;
+            return _resolvedForeground;
+        }
+
+        _resolvedForeground = Brushes.White;
+        return _resolvedForeground;
+    }
+
+    private bool EnsureTypeface(double fontSize)
+    {
+        var fontFamily = FontFamily ?? FontFamily.Default;
+        var key = new TypefaceCacheKey(
+            fontFamily.ToString() ?? string.Empty,
+            fontSize,
+            FontStyle,
+            FontWeight,
+            FontStretch);
+
+        if (!_isTypefaceDirty &&
+            _cachedTypeface is not null &&
+            _cachedTypefaceKey.Equals(key))
+        {
+            return true;
+        }
+
+        if (TryGetCachedTypeface(key, out var cachedTypeface))
+        {
+            UseCachedTypeface(key, cachedTypeface);
+            return true;
+        }
+
+        _typefaceResolveCount++;
+        var typeface = new Typeface(fontFamily, FontStyle, FontWeight, FontStretch);
         if (!FontManager.Current.TryGetGlyphTypeface(typeface, out var glyphTypeface) || glyphTypeface is null)
         {
-            return;
+            _cachedTypeface = null;
+            _isTypefaceDirty = false;
+            return false;
         }
 
         var fontMetrics = glyphTypeface.Metrics;
         var glyphAdvanceScale = fontMetrics.DesignEmHeight > 0
             ? fontSize / fontMetrics.DesignEmHeight
             : 1d;
-
-        EnsureGlyphBufferCapacity(characterCount);
-        var characterToGlyphMap = glyphTypeface.CharacterToGlyphMap;
-        for (var index = 0; index < characterCount; index++)
-        {
-            var character = _characterBuffer[index];
-            if (!characterToGlyphMap.TryGetGlyph(character, out var glyphIndex))
-            {
-                glyphIndex = characterToGlyphMap.GetGlyph('?');
-            }
-
-            var glyphAdvance = glyphTypeface.TryGetHorizontalGlyphAdvance(glyphIndex, out var advance)
-                ? advance
-                : 0d;
-
-            _glyphInfoBuffer[index] = new GlyphInfo(
-                glyphIndex,
-                index,
-                glyphAdvance * glyphAdvanceScale,
-                default);
-        }
-
-        _glyphInfos.SetBuffer(_glyphInfoBuffer, characterCount);
-
-        var baseline = fontMetrics.DesignEmHeight > 0
+        var ascent = fontMetrics.DesignEmHeight > 0
             ? fontMetrics.Ascent * fontSize / fontMetrics.DesignEmHeight
             : fontSize;
-
-        _glyphRun = new GlyphRun(
-            glyphTypeface,
-            fontSize,
-            new ReadOnlyMemory<char>(_characterBuffer, 0, characterCount),
-            _glyphInfos,
-            new Point(0, baseline),
-            0);
-
-        _glyphGeometry = _glyphRun.BuildGeometry();
-        _glyphBounds = _glyphGeometry.Bounds;
-        var width = Math.Ceiling(_glyphBounds.Width);
-        var height = Math.Ceiling(Math.Max(_glyphBounds.Height, fontSize));
-        _desiredSize = new Size(width, height);
+        cachedTypeface = new CachedTypeface(glyphTypeface, Math.Abs(ascent), glyphAdvanceScale);
+        CacheTypeface(key, cachedTypeface);
+        UseCachedTypeface(key, cachedTypeface);
+        return true;
     }
 
-    private int FormatValue(in NumericFormatOptions formatOptions)
+    private CachedGlyph ResolveGlyph(char character)
     {
-        while (true)
+        var key = new GlyphCacheKey(_cachedTypefaceKey, character);
+        lock (s_cacheGate)
         {
-            if (NumericFormatter.TryFormat(Value, _characterBuffer, formatOptions, out var charsWritten))
+            if (s_glyphCache.TryGetValue(key, out var cachedGlyph))
             {
-                return charsWritten;
+                return cachedGlyph;
+            }
+        }
+
+        var resolvedGlyph = ResolveUncachedGlyph(character);
+        lock (s_cacheGate)
+        {
+            if (s_glyphCache.Count >= MaxCachedGlyphs)
+            {
+                s_glyphCache.Clear();
             }
 
-            EnsureCharacterBufferCapacity(_characterBuffer.Length * 2);
+            s_glyphCache[key] = resolvedGlyph;
+        }
+
+        return resolvedGlyph;
+    }
+
+    private CachedGlyph ResolveUncachedGlyph(char character)
+    {
+        var cachedTypeface = _cachedTypeface!;
+        var glyphTypeface = cachedTypeface.GlyphTypeface;
+        var characterToGlyphMap = glyphTypeface.CharacterToGlyphMap;
+        if (!characterToGlyphMap.TryGetGlyph(character, out var glyphIndex))
+        {
+            glyphIndex = characterToGlyphMap.GetGlyph('?');
+        }
+
+        var glyphAdvance = glyphTypeface.TryGetHorizontalGlyphAdvance(glyphIndex, out var advance)
+            ? advance
+            : 0d;
+        return new CachedGlyph(glyphIndex, glyphAdvance * cachedTypeface.GlyphAdvanceScale);
+    }
+
+    private Size ApplyStableWidth(double width, double height)
+    {
+        if (FixedTextWidth is { } fixedTextWidth && IsValidFixedTextWidth(fixedTextWidth))
+        {
+            return new Size(fixedTextWidth, height);
+        }
+
+        _stableDesiredWidth = Math.Max(_stableDesiredWidth, width);
+        return new Size(_stableDesiredWidth, height);
+    }
+
+    private void ResetStableWidthCore()
+    {
+        _stableDesiredWidth = 0d;
+    }
+
+    private void UseCachedTypeface(TypefaceCacheKey key, CachedTypeface cachedTypeface)
+    {
+        _cachedTypefaceKey = key;
+        _cachedTypeface = cachedTypeface;
+        _cachedBaseline = cachedTypeface.Baseline;
+        _isTypefaceDirty = false;
+    }
+
+    private static bool TryGetCachedTypeface(TypefaceCacheKey key, out CachedTypeface cachedTypeface)
+    {
+        lock (s_cacheGate)
+        {
+            if (s_typefaceCache.TryGetValue(key, out var value))
+            {
+                cachedTypeface = value;
+                return true;
+            }
+        }
+
+        cachedTypeface = null!;
+        return false;
+    }
+
+    private static void CacheTypeface(TypefaceCacheKey key, CachedTypeface cachedTypeface)
+    {
+        lock (s_cacheGate)
+        {
+            if (s_typefaceCache.Count >= MaxCachedTypefaces)
+            {
+                s_typefaceCache.Clear();
+                s_glyphCache.Clear();
+            }
+
+            s_typefaceCache[key] = cachedTypeface;
         }
     }
 
-    private void InvalidateGlyphRun()
+    private void InvalidateTypeface()
     {
-        _isGlyphRunDirty = true;
+        _isTypefaceDirty = true;
+    }
+
+    private void InvalidateForeground()
+    {
+        _isForegroundDirty = true;
+        RequestVisual();
+    }
+
+    private void RequestMeasure()
+    {
+        _measureInvalidationCount++;
         InvalidateMeasure();
+    }
+
+    private void RequestVisual()
+    {
+        _visualInvalidationCount++;
         InvalidateVisual();
     }
 
-    private IBrush? ResolveForeground()
+    private static bool IsValidFixedTextWidth(double width) =>
+        !double.IsNaN(width) && !double.IsInfinity(width) && width >= 0d;
+
+    private static bool NearlyEquals(Size left, Size right) =>
+        Math.Abs(left.Width - right.Width) < 0.001d &&
+        Math.Abs(left.Height - right.Height) < 0.001d;
+
+    internal NumericBlockDiagnostics GetDiagnostics() =>
+        new(
+            _measureCount,
+            _renderCount,
+            _textFormatCount,
+            _glyphRebuildCount,
+            _typefaceResolveCount,
+            _foregroundResolveCount,
+            _measureInvalidationCount,
+            _visualInvalidationCount);
+
+    internal void ResetDiagnostics()
     {
-        if (Foreground is not null)
-        {
-            return Foreground;
-        }
-
-        if (Application.Current?.TryGetResource("ThemeForegroundBrush", ActualThemeVariant, out var resource) == true &&
-            resource is IBrush themeForeground)
-        {
-            return themeForeground;
-        }
-
-        return Brushes.White;
+        _measureCount = 0;
+        _renderCount = 0;
+        _textFormatCount = 0;
+        _glyphRebuildCount = 0;
+        _typefaceResolveCount = 0;
+        _foregroundResolveCount = 0;
+        _measureInvalidationCount = 0;
+        _visualInvalidationCount = 0;
     }
 
-    private void EnsureCharacterBufferCapacity(int requiredCapacity)
+    internal string GetFormattedTextForDiagnostics()
     {
-        if (_characterBuffer.Length >= requiredCapacity)
+        if (_isFormattedTextDirty)
+        {
+            UpdateFormattedCharacters();
+        }
+
+        return new string(_characterBuffer, 0, _formattedCharacterCount);
+    }
+
+    internal Size MeasureForDiagnostics(Size availableSize) => MeasureOverride(availableSize);
+
+    internal static void ClearStaticCachesForDiagnostics()
+    {
+        lock (s_cacheGate)
+        {
+            s_typefaceCache.Clear();
+            s_glyphCache.Clear();
+        }
+    }
+
+    private readonly record struct TypefaceCacheKey(
+        string FontFamily,
+        double FontSize,
+        FontStyle FontStyle,
+        FontWeight FontWeight,
+        FontStretch FontStretch);
+
+    private readonly record struct GlyphCacheKey(TypefaceCacheKey Typeface, char Character);
+
+    private sealed record CachedTypeface(
+        GlyphTypeface GlyphTypeface,
+        double Baseline,
+        double GlyphAdvanceScale);
+
+    private readonly struct CachedGlyph(ushort glyphIndex, double advance)
+    {
+        public readonly ushort GlyphIndex = glyphIndex;
+        public readonly double Advance = advance;
+    }
+
+    private static void EnsureCharacterBufferCapacity(ref char[] buffer, int requiredCapacity)
+    {
+        if (buffer.Length >= requiredCapacity)
         {
             return;
         }
 
-        var nextCapacity = Math.Max(requiredCapacity, _characterBuffer.Length * 2);
-        Array.Resize(ref _characterBuffer, nextCapacity);
+        var nextCapacity = Math.Max(requiredCapacity, buffer.Length * 2);
+        Array.Resize(ref buffer, nextCapacity);
     }
 
     private void EnsureGlyphBufferCapacity(int requiredCapacity)

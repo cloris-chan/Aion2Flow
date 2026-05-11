@@ -52,6 +52,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public partial double EncounterTimeSeconds { get; set; }
 
     [ObservableProperty]
+    public partial Guid NumericStableWidthScopeKey { get; set; }
+
+    [ObservableProperty]
     public partial string LiveSceneName { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -319,6 +322,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void ApplySnapshot(SceneCombatSnapshot snapshot, bool forceDetailRefresh = false)
     {
+        NumericStableWidthScopeKey = snapshot.EncounterId;
         var encounterSeconds = snapshot.EncounterTime / 1000.0;
         EncounterTimeSeconds = encounterSeconds;
         LiveSceneName = ResolveSceneDisplayName(snapshot.MapId);
@@ -475,6 +479,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private void ApplyLocalizedUiText()
     {
         Status = Localization["Status_Ready"];
+        NumericStableWidthScopeKey = _displayedSnapshot.EncounterId;
         EncounterTimeSeconds = 0d;
         RoundTripTimeMilliseconds = 0;
         LiveSceneName = ResolveSceneDisplayName(_displayedSnapshot.MapId);
