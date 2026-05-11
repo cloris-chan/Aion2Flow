@@ -1144,6 +1144,141 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
+    public void Owner_CreateSnapshot_CacheHit_ReturnsFrozenInstance_WithoutAllocation()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        scene.AppendNickname(100, "Player");
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 200,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = 500,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 1_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+
+        var first = scene.CreateSnapshot();
+        var warm = scene.Owner.CreateSnapshot();
+        Assert.Same(first, warm);
+        var beforeStats = scene.Owner.ProjectionCacheStats;
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var beforeBytes = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1_000; i++)
+        {
+            Assert.Same(first, scene.Owner.CreateSnapshot());
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - beforeBytes;
+        var afterStats = scene.Owner.ProjectionCacheStats;
+
+        Assert.Equal(0, allocated);
+        Assert.Equal(beforeStats.SnapshotBuilds, afterStats.SnapshotBuilds);
+        Assert.Equal(beforeStats.SnapshotCacheHits + 1_000, afterStats.SnapshotCacheHits);
+    }
+
+    [Fact]
+    public void Owner_CreateSnapshot_ActiveMiss_DoesNotAllocatePerEventPacketDtos()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var journal = new ObservedEventJournal();
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        entities.ApplyNickname(100, "Player");
+        for (var i = 0; i < 128; i++)
+        {
+            combat.ApplyCombat(100, 200, new CombatObservation
+            {
+                SkillCode = 11000010,
+                OriginalSkillCode = 11000010,
+                Damage = 100 + i,
+                HitCount = 1,
+                AttemptCount = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            }, 1_000 + i);
+        }
+
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now, entities, metadata, combat);
+        owner.Refresh();
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var beforeBytes = GC.GetAllocatedBytesForCurrentThread();
+        var snapshot = owner.CreateSnapshot();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - beforeBytes;
+
+        Assert.True(snapshot.Combatants.TryGetValue(100, out var player));
+        Assert.Equal(20_928, player.DamageAmount);
+        Assert.True(allocated < 160_000, $"active miss allocated {allocated:N0} bytes");
+    }
+
+    [Fact]
+    public void Owner_CreateSkillBreakdown_UsesCompactProjectionAllocation()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        var journal = new ObservedEventJournal();
+        var entities = new EntityStore();
+        var metadata = new MetadataStore();
+        var combat = new CombatStore();
+        entities.ApplyNickname(100, "Player");
+        for (var i = 0; i < 128; i++)
+        {
+            combat.ApplyCombat(100, 200, new CombatObservation
+            {
+                SkillCode = 11000010,
+                OriginalSkillCode = 11000010,
+                Damage = 100 + i,
+                HitCount = 1,
+                AttemptCount = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            }, 1_000 + i);
+        }
+
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now, entities, metadata, combat);
+        owner.Refresh();
+        var snapshot = owner.CreateSnapshot();
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var beforeBytes = GC.GetAllocatedBytesForCurrentThread();
+        var breakdown = owner.CreateSkillBreakdown(snapshot, 100);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - beforeBytes;
+
+        Assert.True(breakdown.Skills.TryGetValue(11000010, out var skill));
+        Assert.Equal(128, skill.Times);
+        Assert.True(allocated < 40_000, $"skill breakdown allocated {allocated:N0} bytes");
+    }
+
+    [Fact]
+    public void SceneCombatSnapshot_PublicApi_DoesNotExposeMutableCollectionsOrSkills()
+    {
+        Assert.Equal(typeof(CombatantSnapshotMap), typeof(SceneCombatSnapshot).GetProperty(nameof(SceneCombatSnapshot.Combatants))!.PropertyType);
+        Assert.Equal(typeof(SnapshotList<SceneBossFocusSnapshot>), typeof(SceneCombatSnapshot).GetProperty(nameof(SceneCombatSnapshot.BossFocuses))!.PropertyType);
+        Assert.NotNull(typeof(CombatantSnapshotMap).GetMethod(nameof(CombatantSnapshotMap.AsSpan), Type.EmptyTypes));
+        Assert.NotNull(typeof(SkillMetricsSnapshotMap).GetMethod(nameof(SkillMetricsSnapshotMap.AsSpan), Type.EmptyTypes));
+        Assert.DoesNotContain(typeof(SceneCombatantMetrics).GetProperties(), static property => property.Name == "Skills");
+    }
+
+    [Fact]
     public void Owner_CreateSnapshot_DoesNotCacheBossFocusOnlySnapshot()
     {
         using var scene = new SceneTestHarness();

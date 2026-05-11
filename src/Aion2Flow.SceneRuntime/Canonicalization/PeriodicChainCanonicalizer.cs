@@ -84,7 +84,7 @@ public sealed class PeriodicChainCanonicalizer
         return new State(CombatValueKind.PeriodicHealing, state.Remaining, state.CasterId, state.GrantSourceId, state.GrantTargetId, healingGrant, state.GrantEmitted);
     }
 
-    private IReadOnlyList<CombatCanonicalizationResult> ApplyShieldContinuation(int sourceId, int targetId, Key key, State state, int mode, in CombatObservation observation)
+    private List<CombatCanonicalizationResult> ApplyShieldContinuation(int sourceId, int targetId, Key key, State state, int mode, in CombatObservation observation)
     {
         var newRemaining = Math.Max(0, observation.Damage);
         var absorbed = Math.Max(0, state.Remaining - newRemaining);
@@ -153,73 +153,7 @@ public sealed class PeriodicChainCanonicalizer
     }
 
     private static CombatObservation NormalizeBaseObservation(int sourceId, int targetId, in CombatObservation observation)
-    {
-        var packet = ToPacket(sourceId, targetId, in observation);
-        CombatResourceRegistry.NormalizePacketForStorage(packet);
-        return FromPacket(packet, in observation);
-    }
-
-    private static ParsedCombatPacket ToPacket(int sourceId, int targetId, in CombatObservation observation)
-    {
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = observation.SkillCode,
-            OriginalSkillCode = observation.OriginalSkillCode,
-            BaseSkillCode = observation.BaseSkillCode,
-            Damage = checked((int)observation.Damage),
-            HitContribution = observation.HitCount,
-            AttemptContribution = observation.AttemptCount,
-            DetailRaw = observation.DetailRaw,
-            Marker = observation.Marker,
-            Type = observation.Type,
-            Flag = observation.Flag,
-            LayoutTag = observation.LayoutTag,
-            Loop = observation.Loop,
-            MultiHitCount = observation.MultiHitCount,
-            DrainHealAmount = observation.DrainHealAmount,
-            RegenerationAmount = observation.RegenerationAmount,
-            Modifiers = observation.Modifiers,
-            ResourceKind = observation.ResourceKind,
-            EventKind = observation.EventKind,
-            ValueKind = observation.ValueKind
-        };
-
-        if (observation.PeriodicRelation != PeriodicEffectRelation.None)
-            packet.SetPeriodicEffect(observation.PeriodicRelation, observation.PeriodicMode);
-
-        if (observation.EffectTag != PacketEffectTag.None)
-            packet.SetEffectTag(observation.EffectTag);
-
-        return packet;
-    }
-
-    private static CombatObservation FromPacket(ParsedCombatPacket packet, in CombatObservation original) => original with
-    {
-        SkillCode = packet.SkillCode,
-        OriginalSkillCode = packet.OriginalSkillCode,
-        BaseSkillCode = packet.BaseSkillCode,
-        Damage = packet.Damage,
-        HitCount = packet.HitContribution,
-        AttemptCount = packet.AttemptContribution,
-        DetailRaw = packet.DetailRaw,
-        Marker = packet.Marker,
-        Type = packet.Type,
-        Flag = packet.Flag,
-        LayoutTag = packet.LayoutTag,
-        Loop = packet.Loop,
-        MultiHitCount = packet.MultiHitCount,
-        DrainHealAmount = packet.DrainHealAmount,
-        RegenerationAmount = packet.RegenerationAmount,
-        Modifiers = packet.Modifiers,
-        ResourceKind = packet.ResourceKind,
-        EventKind = packet.EventKind,
-        ValueKind = packet.ValueKind,
-        EffectTag = packet.EffectTag,
-        PeriodicRelation = packet.PeriodicRelation,
-        PeriodicMode = packet.PeriodicMode
-    };
+        => CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
 
     private static bool IsPeriodicHealingPoolPacket(int sourceId, int targetId, in CombatObservation observation)
     {

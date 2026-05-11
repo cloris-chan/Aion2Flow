@@ -15,6 +15,8 @@ public interface ISnapshotChangeFeed<TChange>
     SnapshotChangeBatch<TChange> ReadChanges(SnapshotChangeCursor cursor, int maxChanges);
 }
 
+public readonly record struct SnapshotChangeCopyResult(SnapshotChangeCursor Cursor, long FromRevision, long ToRevision, int Count, bool HasMore);
+
 public enum CombatSnapshotChangeKind : byte { PairUpdated, CombatantUpdated }
 
 public readonly record struct CombatSnapshotChange(CombatSnapshotChangeKind Kind, int CombatantId, (int Source, int Target) PairKey, long Revision);

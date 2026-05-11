@@ -1,13 +1,36 @@
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
 public static class CombatEventClassifier
 {
-    public static CombatEventKind Classify(ParsedCombatPacket packet) => ClassifyPacket(packet).EventKind;
+    public static CombatEventKind Classify(ParsedCombatPacket packet)
+    {
+        var observation = packet.ToObservation();
+        return Classify(packet.SourceId, packet.TargetId, in observation).EventKind;
+    }
 
-    public static CombatValueKind ClassifyValueKind(ParsedCombatPacket packet) => ClassifyPacket(packet).ValueKind;
+    public static CombatValueKind ClassifyValueKind(ParsedCombatPacket packet)
+    {
+        var observation = packet.ToObservation();
+        return Classify(packet.SourceId, packet.TargetId, in observation).ValueKind;
+    }
+
+    public static (CombatEventKind EventKind, CombatValueKind ValueKind) Classify(int sourceId, int targetId, in CombatObservation observation)
+    {
+        if (IsOutcomeOnlyAvoidance(in observation))
+            return (CombatEventKind.Damage, CombatValueKind.Damage);
+
+        if (IsDrainHealSynthesis(sourceId, targetId, in observation))
+            return (CombatEventKind.Healing, CombatValueKind.DrainHealing);
+
+        if (observation.PeriodicRelation != PeriodicEffectRelation.None)
+            return ClassifyPeriodic(sourceId, targetId, in observation);
+
+        return ClassifyDirect(sourceId, targetId, in observation);
+    }
 
     public static bool CountsTowardsDamage(ParsedCombatPacket packet) => packet.EventKind == CombatEventKind.Damage;
 
@@ -18,156 +41,95 @@ public static class CombatEventClassifier
             : string.Empty;
     }
 
-    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyPacket(ParsedCombatPacket packet)
+    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyDirect(int sourceId, int targetId, in CombatObservation observation)
     {
-        if (IsOutcomeOnlyAvoidance(packet))
-        {
-            return (CombatEventKind.Damage, CombatValueKind.Damage);
-        }
-
-        if (IsDrainHealSynthesis(packet))
-        {
-            return (CombatEventKind.Healing, CombatValueKind.DrainHealing);
-        }
-
-        if (packet.IsPeriodicEffect)
-        {
-            return ClassifyPeriodicPacket(packet);
-        }
-
-        return ClassifyDirectPacket(packet);
-    }
-
-    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyDirectPacket(ParsedCombatPacket packet)
-    {
-        if (packet.ResourceKind == CombatResourceKind.Health)
-        {
+        if (observation.ResourceKind == CombatResourceKind.Health)
             return (CombatEventKind.Healing, CombatValueKind.Healing);
-        }
 
-        if (PacketSkillTraits.IsRestoreHp(packet))
-        {
+        if (CombatObservationTraits.IsRestoreHp(in observation))
             return (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
-        }
 
-        if (PacketSkillTraits.IsDirectHpRestoreShape(packet))
-        {
+        if (CombatObservationTraits.IsDirectHpRestoreShape(sourceId, targetId, in observation))
             return (CombatEventKind.Healing, CombatValueKind.Healing);
-        }
 
-        if (PacketSkillTraits.IsDirectSupportValueShape(packet))
-        {
+        if (CombatObservationTraits.IsDirectSupportValueShape(sourceId, targetId, in observation))
             return (CombatEventKind.Support, CombatValueKind.Support);
-        }
 
-        if (packet.ResourceKind == CombatResourceKind.Mana)
-        {
+        if (observation.ResourceKind == CombatResourceKind.Mana)
             return (CombatEventKind.Support, CombatValueKind.Support);
-        }
 
-        if (PacketSkillTraits.IsKnownDirectPeriodicHealing(packet))
-        {
+        if (CombatObservationTraits.IsKnownDirectPeriodicHealing(sourceId, targetId, in observation))
             return (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
-        }
 
-        if (PacketSkillTraits.IsKnownDirectHealing(packet))
-        {
+        if (CombatObservationTraits.IsKnownDirectHealing(in observation))
             return (CombatEventKind.Healing, CombatValueKind.Healing);
-        }
 
-        if (PacketSkillTraits.IsKnownShield(packet))
-        {
+        if (CombatObservationTraits.IsKnownShield(in observation))
             return (CombatEventKind.Support, CombatValueKind.Shield);
-        }
 
-        if (packet.SourceId > 0 &&
-            packet.TargetId > 0 &&
-            packet.SourceId == packet.TargetId)
-        {
+        if (sourceId > 0 && targetId > 0 && sourceId == targetId)
             return (CombatEventKind.Support, CombatValueKind.Support);
-        }
 
         return (CombatEventKind.Damage, CombatValueKind.Damage);
     }
 
-    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyPeriodicPacket(ParsedCombatPacket packet)
+    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyPeriodic(int sourceId, int targetId, in CombatObservation observation)
     {
-        if (packet.IsPeriodicSelfEffect)
+        if (observation.PeriodicRelation == PeriodicEffectRelation.Self)
         {
-            if (packet.IsPeriodicSelfMode(10))
-            {
+            if (CombatObservationTraits.IsPeriodicSelfMode(in observation, 10))
                 return (CombatEventKind.Support, CombatValueKind.Support);
-            }
 
-            if (packet.ResourceKind == CombatResourceKind.Mana)
-            {
+            if (observation.ResourceKind == CombatResourceKind.Mana)
                 return (CombatEventKind.Support, CombatValueKind.Support);
-            }
 
-            if (packet.ResourceKind == CombatResourceKind.Health ||
-                packet.IsPeriodicSelfMode(11) ||
-                PacketSkillTraits.IsRestoreHp(packet) ||
-                PacketSkillTraits.IsKnownPeriodicHealing(packet))
-            {
+            if (observation.ResourceKind == CombatResourceKind.Health ||
+                CombatObservationTraits.IsPeriodicSelfMode(in observation, 11) ||
+                CombatObservationTraits.IsRestoreHp(in observation) ||
+                CombatObservationTraits.IsKnownPeriodicHealing(sourceId, targetId, in observation))
                 return (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
-            }
 
             return (CombatEventKind.Support, CombatValueKind.Support);
         }
 
-        if (!packet.IsPeriodicTargetEffect)
-        {
+        if (observation.PeriodicRelation != PeriodicEffectRelation.Target)
             return (CombatEventKind.Damage, CombatValueKind.Damage);
-        }
 
-        if (packet.IsPeriodicTargetMode(8))
-        {
+        if (CombatObservationTraits.IsPeriodicTargetMode(in observation, 8))
             return (CombatEventKind.Support, CombatValueKind.Support);
-        }
 
-        if (packet.ResourceKind == CombatResourceKind.Mana)
-        {
+        if (observation.ResourceKind == CombatResourceKind.Mana)
             return (CombatEventKind.Support, CombatValueKind.Support);
-        }
 
-        if (packet.ResourceKind == CombatResourceKind.Health ||
-            PacketSkillTraits.IsKnownPeriodicHealing(packet))
+        if (observation.ResourceKind == CombatResourceKind.Health ||
+            CombatObservationTraits.IsKnownPeriodicHealing(sourceId, targetId, in observation))
         {
-            return packet.IsPeriodicTargetInitialEffect
+            return CombatObservationTraits.IsPeriodicTargetInitialEffect(in observation)
                 ? (CombatEventKind.Healing, CombatValueKind.Healing)
                 : (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
         }
 
-        if (PacketSkillTraits.IsTargetPeriodicSupportSeed(packet))
-        {
+        if (CombatObservationTraits.IsTargetPeriodicSupportSeed(in observation))
             return (CombatEventKind.Support, CombatValueKind.Support);
-        }
 
-        return packet.IsPeriodicTargetInitialEffect
+        return CombatObservationTraits.IsPeriodicTargetInitialEffect(in observation)
             ? (CombatEventKind.Damage, CombatValueKind.Damage)
             : (CombatEventKind.Damage, CombatValueKind.PeriodicDamage);
     }
 
-    private static bool IsOutcomeOnlyAvoidance(ParsedCombatPacket packet)
+    private static bool IsOutcomeOnlyAvoidance(in CombatObservation observation)
     {
-        if (packet.Damage > 0)
-        {
+        if (observation.Damage > 0)
             return false;
-        }
 
-        if ((packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) == 0)
-        {
+        if ((observation.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) == 0)
             return false;
-        }
 
-        return Math.Max(packet.HitContribution, packet.AttemptContribution) > 0;
+        return Math.Max(observation.HitCount, observation.AttemptCount) > 0;
     }
 
-    private static bool IsDrainHealSynthesis(ParsedCombatPacket packet) =>
-        packet.SourceId > 0
-        && packet.SourceId == packet.TargetId
-        && packet.Damage > 0
-        && packet.DrainHealAmount > 0;
+    private static bool IsDrainHealSynthesis(int sourceId, int targetId, in CombatObservation observation) =>
+        sourceId > 0 && sourceId == targetId && observation.Damage > 0 && observation.DrainHealAmount > 0;
 
     private static bool TryGetDisplaySkillName(int skillCode, out string skillName)
     {
@@ -196,14 +158,10 @@ public static class CombatEventClassifier
         return TryGetSkill(skillCode, out skill);
     }
 
-    private static bool TryGetSkill(int skillCode, out Skill skill)
-    {
-        skill = default;
-        return CombatResourceRegistry.SkillMap.TryGetValue(skillCode, out skill);
-    }
+    private static bool TryGetSkill(int skillCode, out Skill skill) => CombatResourceRegistry.SkillMap.TryGetValue(skillCode, out skill);
 }
 
-internal static class PacketSkillTraits
+public static class CombatObservationTraits
 {
     private const int RestoreHpSkillCode = 1010000;
     private const int RestSkillCode = 10001;
@@ -215,181 +173,226 @@ internal static class PacketSkillTraits
     private const ulong DirectHpRestoreDetailMask = 0xFFFFFFFFFFFF0000UL;
     private const int WardingStrikeBaseSkillCode = 12350000;
 
-    public static bool IsRestoreHp(ParsedCombatPacket packet) =>
-        MatchesExact(packet, RestoreHpSkillCode, RestSkillCode);
+    public static bool IsRestoreHp(in CombatObservation observation) =>
+        MatchesExact(in observation, RestoreHpSkillCode, RestSkillCode);
 
-    public static bool IsKnownDirectHealing(ParsedCombatPacket packet) =>
-        IsLightOfProtectionDirectHealing(packet) ||
+    public static bool IsKnownDirectHealing(in CombatObservation observation) =>
+        IsLightOfProtectionDirectHealing(in observation) ||
         MatchesExact(
-            packet,
+            in observation,
             16120000,
             17720000,
             17800000) ||
-        MatchesBase(packet, 13710000, 13790000, 17090000, 17100000, 17120000, 18120000);
+        MatchesBase(in observation, 13710000, 13790000, 17090000, 17100000, 17120000, 18120000);
 
-    public static bool IsKnownDirectPeriodicHealing(ParsedCombatPacket packet) =>
-        IsDirectSelfHpRecoveryEffect(packet) ||
-        MatchesExact(packet, 16120350, 2011101) ||
-        MatchesBase(packet, 18160000);
+    public static bool IsKnownDirectPeriodicHealing(int sourceId, int targetId, in CombatObservation observation) =>
+        IsDirectSelfHpRecoveryEffect(sourceId, targetId, in observation) ||
+        MatchesExact(in observation, 16120350, 2011101) ||
+        MatchesBase(in observation, 18160000);
 
-    public static bool IsDirectSupportValueShape(ParsedCombatPacket packet) =>
-        IsPositiveDirect0438Value(packet) &&
-        IsEnhanceSpiritBenedictionDirectSupportShape(packet);
+    public static bool IsDirectSupportValueShape(int sourceId, int targetId, in CombatObservation observation) =>
+        IsPositiveDirect0438Value(sourceId, targetId, in observation) &&
+        IsEnhanceSpiritBenedictionDirectSupportShape(in observation);
 
-    public static bool IsKnownPeriodicHealing(ParsedCombatPacket packet) =>
-        IsRestoreHp(packet) ||
-        IsKnownDirectHealing(packet) ||
-        IsKnownDirectPeriodicHealing(packet) ||
-        IsKnownPeriodicHealingPool(packet);
+    public static bool IsKnownPeriodicHealing(int sourceId, int targetId, in CombatObservation observation) =>
+        IsRestoreHp(in observation) ||
+        IsKnownDirectHealing(in observation) ||
+        IsKnownDirectPeriodicHealing(sourceId, targetId, in observation) ||
+        IsKnownPeriodicHealingPool(in observation);
 
-    public static bool IsKnownShield(ParsedCombatPacket packet) =>
-        MatchesExact(packet, 2212001, 22120011, 15160000, 18730000) ||
-        MatchesBase(packet, 1742000000);
+    public static bool IsKnownShield(in CombatObservation observation) =>
+        MatchesExact(in observation, 2212001, 22120011, 15160000, 18730000) ||
+        MatchesBase(in observation, 1742000000);
 
-    public static bool IsDirectHpRestoreShape(ParsedCombatPacket packet) =>
-        IsPositiveDirect0438Value(packet) &&
-        packet.Loop == 1 &&
-        HasDetailPrefix(packet.DetailRaw, DirectHpRestoreDetailPrefix, DirectHpRestoreDetailMask);
+    public static bool IsDirectHpRestoreShape(int sourceId, int targetId, in CombatObservation observation) =>
+        IsPositiveDirect0438Value(sourceId, targetId, in observation) &&
+        observation.Loop == 1 &&
+        HasDetailPrefix(observation.DetailRaw, DirectHpRestoreDetailPrefix, DirectHpRestoreDetailMask);
 
-    public static bool IsTargetPeriodicSupportSeed(ParsedCombatPacket packet) =>
-        packet.IsPeriodicTargetMode(9) ||
-        packet.IsPeriodicTargetMode(11);
+    public static bool IsTargetPeriodicSupportSeed(in CombatObservation observation) =>
+        IsPeriodicTargetMode(in observation, 9) ||
+        IsPeriodicTargetMode(in observation, 11);
 
-    public static bool IsKnownPeriodicHealingPool(ParsedCombatPacket packet) =>
-        (packet.IsPeriodicSelfMode(9) ||
-         packet.IsPeriodicSelfMode(11) ||
-         packet.IsPeriodicTargetMode(9) ||
-         packet.IsPeriodicTargetMode(11)) &&
-        IsEnhanceSpiritBenediction(packet);
+    public static bool IsKnownPeriodicHealingPool(in CombatObservation observation) =>
+        (IsPeriodicSelfMode(in observation, 9) ||
+         IsPeriodicSelfMode(in observation, 11) ||
+         IsPeriodicTargetMode(in observation, 9) ||
+         IsPeriodicTargetMode(in observation, 11)) &&
+        IsEnhanceSpiritBenediction(in observation);
 
-    private static bool IsLightOfProtectionDirectHealing(ParsedCombatPacket packet) =>
-        packet.Damage > 0 &&
-        packet.LayoutTag == 4 &&
-        packet.Flag == 0 &&
-        packet.Type == 2 &&
-        packet.Loop == 2 &&
-        packet.DetailRaw == LightOfProtectionDirectHealingDetailRaw;
+    public static bool IsPeriodicSelfMode(in CombatObservation observation, int mode) =>
+        observation.PeriodicRelation == PeriodicEffectRelation.Self && observation.PeriodicMode == mode;
 
-    private static bool IsDirectSelfHpRecoveryEffect(ParsedCombatPacket packet) =>
-        IsHpAbsorptionDirectSelfRestore(packet) ||
-        IsWardingStrikeDirectSelfRestore(packet);
+    public static bool IsPeriodicTargetMode(in CombatObservation observation, int mode) =>
+        observation.PeriodicRelation == PeriodicEffectRelation.Target && observation.PeriodicMode == mode;
 
-    private static bool IsHpAbsorptionDirectSelfRestore(ParsedCombatPacket packet) =>
-        IsPositiveSelfDirect0438Value(packet) &&
+    public static bool IsPeriodicTargetInitialEffect(in CombatObservation observation) =>
+        observation.PeriodicRelation == PeriodicEffectRelation.Target && observation.PeriodicMode == 1;
+
+    public static string FormatEffectLabel(in CombatObservation observation)
+    {
+        if (observation.PeriodicRelation != PeriodicEffectRelation.None)
+            return FormatPeriodicEffectLabel(observation.PeriodicRelation, observation.PeriodicMode);
+
+        return observation.EffectTag == PacketEffectTag.None
+            ? string.Empty
+            : FormatEffectTagLabel(observation.EffectTag);
+    }
+
+    private static bool IsLightOfProtectionDirectHealing(in CombatObservation observation) =>
+        observation.Damage > 0 &&
+        observation.LayoutTag == 4 &&
+        observation.Flag == 0 &&
+        observation.Type == 2 &&
+        observation.Loop == 2 &&
+        observation.DetailRaw == LightOfProtectionDirectHealingDetailRaw;
+
+    private static bool IsDirectSelfHpRecoveryEffect(int sourceId, int targetId, in CombatObservation observation) =>
+        IsHpAbsorptionDirectSelfRestore(sourceId, targetId, in observation) ||
+        IsWardingStrikeDirectSelfRestore(sourceId, targetId, in observation);
+
+    private static bool IsHpAbsorptionDirectSelfRestore(int sourceId, int targetId, in CombatObservation observation) =>
+        IsPositiveSelfDirect0438Value(sourceId, targetId, in observation) &&
         HasDetailPrefix(
-            packet.DetailRaw,
+            observation.DetailRaw,
             HpAbsorptionDirectHealingDetailPrefix,
             HpAbsorptionDirectHealingDetailMask);
 
-    private static bool IsWardingStrikeDirectSelfRestore(ParsedCombatPacket packet) =>
-        IsPositiveSelfDirect0438Value(packet) &&
-        MatchesBase(packet, WardingStrikeBaseSkillCode);
+    private static bool IsWardingStrikeDirectSelfRestore(int sourceId, int targetId, in CombatObservation observation) =>
+        IsPositiveSelfDirect0438Value(sourceId, targetId, in observation) &&
+        MatchesBase(in observation, WardingStrikeBaseSkillCode);
 
-    private static bool IsEnhanceSpiritBenedictionDirectSupportShape(ParsedCombatPacket packet) =>
-        IsEnhanceSpiritBenediction(packet) &&
-        packet.Loop == 2;
+    private static bool IsEnhanceSpiritBenedictionDirectSupportShape(in CombatObservation observation) =>
+        IsEnhanceSpiritBenediction(in observation) &&
+        observation.Loop == 2;
 
-    private static bool IsPositiveSelfDirect0438Value(ParsedCombatPacket packet) =>
-        IsPositiveDirect0438Value(packet) &&
-        packet.SourceId == packet.TargetId;
+    private static bool IsPositiveSelfDirect0438Value(int sourceId, int targetId, in CombatObservation observation) =>
+        IsPositiveDirect0438Value(sourceId, targetId, in observation) &&
+        sourceId == targetId;
 
-    private static bool IsPositiveDirect0438Value(ParsedCombatPacket packet) =>
-        packet.Damage > 0 &&
-        !packet.IsPeriodicEffect &&
-        packet.SourceId > 0 &&
-        packet.TargetId > 0 &&
-        packet.LayoutTag == 4 &&
-        packet.Flag == 0 &&
-        packet.Type == 2;
+    private static bool IsPositiveDirect0438Value(int sourceId, int targetId, in CombatObservation observation) =>
+        observation.Damage > 0 &&
+        observation.PeriodicRelation == PeriodicEffectRelation.None &&
+        sourceId > 0 &&
+        targetId > 0 &&
+        observation.LayoutTag == 4 &&
+        observation.Flag == 0 &&
+        observation.Type == 2;
 
     private static bool HasDetailPrefix(long detailRaw, ulong prefix, ulong mask) =>
         detailRaw > 0 &&
         (((ulong)detailRaw) & mask) == prefix;
 
-    private static bool IsEnhanceSpiritBenediction(ParsedCombatPacket packet) =>
-        MatchesBase(packet, EnhanceSpiritBenedictionBaseSkillCode) ||
-        MatchesExact(packet, EnhanceSpiritBenedictionBaseSkillCode, 16190010, 16190020, 16190030) ||
-        MatchesByHundred(packet, EnhanceSpiritBenedictionBaseSkillCode);
+    private static bool IsEnhanceSpiritBenediction(in CombatObservation observation) =>
+        MatchesBase(in observation, EnhanceSpiritBenedictionBaseSkillCode) ||
+        MatchesExact(in observation, EnhanceSpiritBenedictionBaseSkillCode, 16190010, 16190020, 16190030) ||
+        MatchesByHundred(in observation, EnhanceSpiritBenedictionBaseSkillCode);
 
-    private static bool MatchesExact(ParsedCombatPacket packet, int skillCode)
+    private static bool MatchesExact(in CombatObservation observation, int skillCode)
     {
-        return MatchesSkillCode(packet, skillCode);
+        return MatchesSkillCode(in observation, skillCode);
     }
 
-    private static bool MatchesExact(ParsedCombatPacket packet, int skillCode0, int skillCode1)
+    private static bool MatchesExact(in CombatObservation observation, int skillCode0, int skillCode1)
     {
-        return MatchesSkillCode(packet, skillCode0) ||
-               MatchesSkillCode(packet, skillCode1);
+        return MatchesSkillCode(in observation, skillCode0) ||
+               MatchesSkillCode(in observation, skillCode1);
     }
 
-    private static bool MatchesExact(ParsedCombatPacket packet, int skillCode0, int skillCode1, int skillCode2)
+    private static bool MatchesExact(in CombatObservation observation, int skillCode0, int skillCode1, int skillCode2)
     {
-        return MatchesSkillCode(packet, skillCode0) ||
-               MatchesSkillCode(packet, skillCode1) ||
-               MatchesSkillCode(packet, skillCode2);
+        return MatchesSkillCode(in observation, skillCode0) ||
+               MatchesSkillCode(in observation, skillCode1) ||
+               MatchesSkillCode(in observation, skillCode2);
     }
 
-    private static bool MatchesExact(ParsedCombatPacket packet, int skillCode0, int skillCode1, int skillCode2, int skillCode3)
+    private static bool MatchesExact(in CombatObservation observation, int skillCode0, int skillCode1, int skillCode2, int skillCode3)
     {
-        return MatchesSkillCode(packet, skillCode0) ||
-               MatchesSkillCode(packet, skillCode1) ||
-               MatchesSkillCode(packet, skillCode2) ||
-               MatchesSkillCode(packet, skillCode3);
+        return MatchesSkillCode(in observation, skillCode0) ||
+               MatchesSkillCode(in observation, skillCode1) ||
+               MatchesSkillCode(in observation, skillCode2) ||
+               MatchesSkillCode(in observation, skillCode3);
     }
 
-    private static bool MatchesSkillCode(ParsedCombatPacket packet, int skillCode)
+    private static bool MatchesSkillCode(in CombatObservation observation, int skillCode)
     {
         if (skillCode <= 0)
-        {
             return false;
-        }
 
-        if (packet.SkillCode == skillCode || packet.OriginalSkillCode == skillCode)
-        {
+        if (observation.SkillCode == skillCode || observation.OriginalSkillCode == skillCode)
             return true;
-        }
 
-        return CombatResourceRegistry.InferOriginalSkillCode(packet.OriginalSkillCode) == skillCode ||
-               CombatResourceRegistry.InferOriginalSkillCode(packet.SkillCode) == skillCode;
+        return CombatResourceRegistry.InferOriginalSkillCode(observation.OriginalSkillCode) == skillCode ||
+               CombatResourceRegistry.InferOriginalSkillCode(observation.SkillCode) == skillCode;
     }
 
-    private static bool MatchesBase(ParsedCombatPacket packet, int baseSkillCode)
+    private static bool MatchesBase(in CombatObservation observation, int baseSkillCode)
     {
-        return MatchesBaseSkillCode(packet, baseSkillCode);
+        return MatchesBaseSkillCode(in observation, baseSkillCode);
     }
 
-    private static bool MatchesBase(ParsedCombatPacket packet, int baseSkillCode0, int baseSkillCode1, int baseSkillCode2, int baseSkillCode3, int baseSkillCode4, int baseSkillCode5)
+    private static bool MatchesBase(in CombatObservation observation, int baseSkillCode0, int baseSkillCode1, int baseSkillCode2, int baseSkillCode3, int baseSkillCode4, int baseSkillCode5)
     {
-        return MatchesBaseSkillCode(packet, baseSkillCode0) ||
-               MatchesBaseSkillCode(packet, baseSkillCode1) ||
-               MatchesBaseSkillCode(packet, baseSkillCode2) ||
-               MatchesBaseSkillCode(packet, baseSkillCode3) ||
-               MatchesBaseSkillCode(packet, baseSkillCode4) ||
-               MatchesBaseSkillCode(packet, baseSkillCode5);
+        return MatchesBaseSkillCode(in observation, baseSkillCode0) ||
+               MatchesBaseSkillCode(in observation, baseSkillCode1) ||
+               MatchesBaseSkillCode(in observation, baseSkillCode2) ||
+               MatchesBaseSkillCode(in observation, baseSkillCode3) ||
+               MatchesBaseSkillCode(in observation, baseSkillCode4) ||
+               MatchesBaseSkillCode(in observation, baseSkillCode5);
     }
 
-    private static bool MatchesBaseSkillCode(ParsedCombatPacket packet, int baseSkillCode)
+    private static bool MatchesBaseSkillCode(in CombatObservation observation, int baseSkillCode)
     {
         if (baseSkillCode <= 0)
-        {
             return false;
-        }
 
-        if (packet.BaseSkillCode == baseSkillCode)
-        {
+        if (observation.BaseSkillCode == baseSkillCode)
             return true;
-        }
 
-        return CombatResourceRegistry.ParseSkillVariant(packet.OriginalSkillCode).BaseSkillCode == baseSkillCode ||
-               CombatResourceRegistry.ParseSkillVariant(packet.SkillCode).BaseSkillCode == baseSkillCode;
+        return CombatResourceRegistry.ParseSkillVariant(observation.OriginalSkillCode).BaseSkillCode == baseSkillCode ||
+               CombatResourceRegistry.ParseSkillVariant(observation.SkillCode).BaseSkillCode == baseSkillCode;
     }
 
-    private static bool MatchesByHundred(ParsedCombatPacket packet, int skillCode) =>
-        MatchesByHundred(packet.SkillCode, skillCode) ||
-        MatchesByHundred(packet.OriginalSkillCode, skillCode);
+    private static bool MatchesByHundred(in CombatObservation observation, int skillCode) =>
+        MatchesByHundred(observation.SkillCode, skillCode) ||
+        MatchesByHundred(observation.OriginalSkillCode, skillCode);
 
     private static bool MatchesByHundred(int candidateSkillCode, int skillCode) =>
         candidateSkillCode > 0 &&
         skillCode > 0 &&
         candidateSkillCode / 100 == skillCode;
+
+    private static string FormatPeriodicEffectLabel(PeriodicEffectRelation relation, int mode)
+    {
+        if (relation == PeriodicEffectRelation.None)
+            return string.Empty;
+
+        if (relation == PeriodicEffectRelation.Self)
+        {
+            return mode switch
+            {
+                1 => "periodic-self-initial",
+                3 => "periodic-self-tick",
+                _ => $"periodic-self-mode-{mode}"
+            };
+        }
+
+        return mode switch
+        {
+            1 => "periodic-target-initial",
+            2 => "periodic-target-tick",
+            3 => "periodic-target-tick",
+            _ => $"periodic-target-mode-{mode}"
+        };
+    }
+
+    private static string FormatEffectTagLabel(PacketEffectTag effectTag) =>
+        effectTag switch
+        {
+            PacketEffectTag.ActiveDodgeEvade => "active-dodge-evade",
+            PacketEffectTag.CompactEvade => "compact-evade",
+            PacketEffectTag.PeriodicLinkInvincible => "periodic-link-invincible",
+            PacketEffectTag.Aux2C38Invincible => "aux-2c38-invincible",
+            _ => string.Empty
+        };
 }

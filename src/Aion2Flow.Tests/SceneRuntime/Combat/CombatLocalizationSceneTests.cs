@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
@@ -9,7 +10,7 @@ public sealed class CombatLocalizationSceneTests
     {
         try
         {
-            var packet = new ParsedCombatPacket
+            var observation = new CombatObservation
             {
                 SkillCode = 2011101,
                 OriginalSkillCode = 2011101,
@@ -20,7 +21,7 @@ public sealed class CombatLocalizationSceneTests
 
             CombatResourceRegistry.LoadSkillMap("zh-TW");
             var zhName = ResourceDatabase.LoadSkills("zh-TW")[2011101].Name;
-            var metrics = new SkillMetrics(packet);
+            var metrics = new SkillMetrics(in observation);
 
             Assert.Equal(zhName, metrics.SkillName);
 
@@ -68,14 +69,16 @@ public sealed class CombatLocalizationSceneTests
 
             var zhSnapshot = scene.CreateSnapshot();
             Assert.True(zhSnapshot.Combatants.TryGetValue(sourceId, out var zhCombatant));
-            Assert.True(zhCombatant.Skills.TryGetValue(skillCode, out var zhSkill));
+            var zhSkills = scene.CreateSkillBreakdown(zhSnapshot, sourceId).Skills;
+            Assert.True(zhSkills.TryGetValue(skillCode, out var zhSkill));
             var zhSkillName = zhSkill.SkillName;
 
             CombatResourceRegistry.LoadSkillMap("en-US");
             var enSnapshot = scene.CreateSnapshot();
 
             Assert.True(enSnapshot.Combatants.TryGetValue(sourceId, out var enCombatant));
-            Assert.True(enCombatant.Skills.TryGetValue(skillCode, out var enSkill));
+            var enSkills = scene.CreateSkillBreakdown(enSnapshot, sourceId).Skills;
+            Assert.True(enSkills.TryGetValue(skillCode, out var enSkill));
 
             Assert.Equal(zhCombatant.DamageAmount, enCombatant.DamageAmount);
             Assert.Equal(zhCombatant.HealingAmount, enCombatant.HealingAmount);

@@ -3,6 +3,7 @@ using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
+using Cloris.Aion2Flow.Tests.SceneRuntime;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
@@ -27,7 +28,6 @@ public sealed class EncounterArchiveServiceTests
         Assert.True(service.TryGetEncounter(record.EncounterId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
 
-        payload.Snapshot.TargetName = "Changed";
         owner.Entities.ApplyNickname(playerId, "Changed");
 
         Assert.Equal("Archive Boss", record.Snapshot.TargetName);
@@ -74,19 +74,22 @@ public sealed class EncounterArchiveServiceTests
 
         for (var i = 0; i < 101; i++)
         {
-            var snapshot = new SceneCombatSnapshot
-            {
-                EncounterId = Guid.NewGuid(),
-                TargetName = $"Boss {i}",
-                EncounterStartTime = 1_000 + i,
-                EncounterEndTime = 11_000 + (i * 2),
-                EncounterTime = 10_000 + i
-            };
-            snapshot.Combatants[i + 1] = new SceneCombatantMetrics($"Tester {i}")
-            {
-                DamageContribution = 1,
-                DamagePerSecond = 1_000 + i
-            };
+            var snapshot = SceneSnapshotTestFactory.Create(
+                encounterId: Guid.NewGuid(),
+                targetName: $"Boss {i}",
+                encounterStartTime: 1_000 + i,
+                encounterEndTime: 11_000 + (i * 2),
+                encounterTime: 10_000 + i,
+                combatants:
+                [
+                    SceneSnapshotTestFactory.Combatant(
+                        i + 1,
+                        new SceneCombatantMetrics($"Tester {i}")
+                        {
+                            DamageContribution = 1,
+                            DamagePerSecond = 1_000 + i
+                        })
+                ]);
 
             var payload = new SceneArchivePayload
             {
@@ -123,10 +126,10 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal(2, delta.Events.Count);
         Assert.Equal(playerId, delta.Events[0].SourceId);
         Assert.Equal(bossId, delta.Events[0].TargetId);
-        Assert.Equal(750, delta.Events[0].Packet.Damage);
+        Assert.Equal(750, delta.Events[0].Amount);
         Assert.Equal("Tester", delta.DisplayNames[playerId]);
         Assert.Equal("Archive Boss", delta.DisplayNames[bossId]);
-        Assert.Equal(751, delta.Combatant!.OutgoingDamage);
+        Assert.Equal(751, delta.Combatant!.Value.OutgoingDamage);
         Assert.Single(delta.OutgoingPairs);
     }
 
@@ -145,7 +148,7 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal(2, payload.EventIndicesByCombatant[bossId].Length);
         Assert.Equal(2, delta.Events.Count);
         Assert.Equal(bossId, delta.CombatantId);
-        Assert.Equal(751, delta.Combatant!.IncomingDamage);
+        Assert.Equal(751, delta.Combatant!.Value.IncomingDamage);
         Assert.Empty(delta.OutgoingPairs);
         var incomingPair = Assert.Single(delta.IncomingPairs);
         Assert.Equal(new DirectedPairKey(playerId, bossId), incomingPair);
@@ -194,12 +197,11 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal([new DirectedPairKey(playerId, bossId)], delta.OutgoingPairs);
         Assert.Equal([new DirectedPairKey(bossId, playerId)], delta.IncomingPairs);
         Assert.Equal(2, delta.Revision);
-        Assert.Equal(100, delta.Combatant!.OutgoingDamage);
-        Assert.Equal(75, delta.Combatant.IncomingDamage);
+        Assert.Equal(100, delta.Combatant!.Value.OutgoingDamage);
+        Assert.Equal(75, delta.Combatant.Value.IncomingDamage);
         Assert.Equal([1L, 2L], cloneDelta.Events.Select(static e => e.Revision));
         Assert.Equal([1, 2], clone.EventIndicesByCombatant[playerId]);
-        Assert.NotSame(payload.Events[1], clone.Events[1]);
-        Assert.NotSame(payload.CombatantsById[playerId], clone.CombatantsById[playerId]);
+        Assert.Equal(payload.Events[1], clone.Events[1]);
     }
 
     [Fact]
@@ -212,7 +214,6 @@ public sealed class EncounterArchiveServiceTests
 
         var payload = owner.CreateArchivePayload(snapshot);
 
-        snapshot.TargetName = "Changed";
         owner.Entities.ApplyNickname(playerId, "Changed");
         owner.Combat.ApplyCombat(playerId, bossId, new CombatObservation
         {
@@ -230,7 +231,7 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal("Tester", payload.DisplayNames[playerId]);
         Assert.Equal(2, payload.Events.Count);
         Assert.Equal(2, delta.Events.Count);
-        Assert.Equal(750, delta.Events[0].Packet.Damage);
+        Assert.Equal(750, delta.Events[0].Amount);
     }
 
     [Fact]
@@ -347,17 +348,15 @@ public sealed class EncounterArchiveServiceTests
         SourceId = sourceId,
         TargetId = targetId,
         Revision = revision,
-        Packet = new ParsedCombatPacket
+        ObservedAtMilliseconds = timestamp,
+        Observation = new CombatObservation
         {
-            SourceId = sourceId,
-            TargetId = targetId,
             SkillCode = 11000010,
             Damage = damage,
-            HitContribution = 1,
-            AttemptContribution = 1,
+            HitCount = 1,
+            AttemptCount = 1,
             EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage,
-            Timestamp = timestamp
+            ValueKind = CombatValueKind.Damage
         }
     };
 

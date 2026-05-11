@@ -35,14 +35,10 @@ public static class CombatContributionClassifier
             observation.AttemptCount);
 
     public static CombatContribution Evaluate(ParsedCombatPacket packet)
-        => EvaluateCore(
-            packet.EventKind,
-            packet.ValueKind,
-            packet.EffectTag,
-            packet.Modifiers,
-            packet.Damage,
-            packet.HitContribution,
-            packet.AttemptContribution);
+    {
+        var observation = packet.ToObservation();
+        return Evaluate(in observation);
+    }
 
     private static CombatContribution EvaluateCore(
         CombatEventKind eventKind,

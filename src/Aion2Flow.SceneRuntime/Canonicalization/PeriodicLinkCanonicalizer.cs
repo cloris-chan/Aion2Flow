@@ -36,52 +36,21 @@ public sealed class PeriodicLinkCanonicalizer
     private static CombatObservation CreateInvincible(int sourceId, int targetId, in CombatObservation observation)
     {
         var skillCode = observation.SkillCode > 0 ? observation.SkillCode : SyntheticCombatSkillCodes.UnresolvedInvincible;
-        var packet = new ParsedCombatPacket
+        var invincible = new CombatObservation
         {
-            SourceId = sourceId,
-            TargetId = targetId,
             OriginalSkillCode = skillCode,
             SkillCode = skillCode,
             Marker = observation.Marker,
             DetailRaw = observation.DetailRaw,
-            Timestamp = 0,
-            FrameOrdinal = 0,
-            BatchOrdinal = 0,
             Damage = 0,
-            HitContribution = 0,
-            AttemptContribution = 1,
+            HitCount = 0,
+            AttemptCount = 1,
             Modifiers = DamageModifiers.Invincible,
             EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
+            ValueKind = CombatValueKind.Damage,
+            EffectTag = PacketEffectTag.PeriodicLinkInvincible
         };
-        packet.SetEffectTag(PacketEffectTag.PeriodicLinkInvincible);
-        CombatResourceRegistry.NormalizePacketForStorage(packet);
-        return observation with
-        {
-            SkillCode = packet.SkillCode,
-            OriginalSkillCode = packet.OriginalSkillCode,
-            BaseSkillCode = packet.BaseSkillCode,
-            Damage = packet.Damage,
-            HitCount = packet.HitContribution,
-            AttemptCount = packet.AttemptContribution,
-            DetailRaw = packet.DetailRaw,
-            Marker = packet.Marker,
-            Type = packet.Type,
-            Flag = packet.Flag,
-            LayoutTag = packet.LayoutTag,
-            Loop = packet.Loop,
-            MultiHitCount = packet.MultiHitCount,
-            DrainHealAmount = packet.DrainHealAmount,
-            RegenerationAmount = packet.RegenerationAmount,
-            Modifiers = packet.Modifiers,
-            ResourceKind = packet.ResourceKind,
-            EventKind = packet.EventKind,
-            ValueKind = packet.ValueKind,
-            EffectTag = packet.EffectTag,
-            PeriodicRelation = packet.PeriodicRelation,
-            PeriodicMode = packet.PeriodicMode,
-            ChainId = 0
-        };
+        return CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in invincible) with { ChainId = 0 };
     }
 
     private void TrimResolved()

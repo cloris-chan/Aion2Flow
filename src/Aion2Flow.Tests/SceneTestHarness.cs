@@ -30,6 +30,9 @@ internal sealed class SceneTestHarness : IDisposable
     public CombatDetailDelta CreateDetailDelta(SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false) =>
         Owner.CreateDetailDelta(snapshot, combatantId, forceRefresh);
 
+    public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId) =>
+        Owner.CreateSkillBreakdown(snapshot, combatantId);
+
     public void AppendNickname(int uid, string nickname, int? originServerId = null) =>
         Sink.AppendNickname(uid, nickname, originServerId);
 
@@ -199,7 +202,22 @@ internal sealed class SceneTestHarness : IDisposable
         public void StageDestinationMap(uint mapId) => inner.StageDestinationMap(mapId);
         public void StageDestinationMapInstance(uint instanceId) => inner.StageDestinationMapInstance(instanceId);
         public void MarkSceneArrival() => inner.MarkSceneArrival();
-        public void AppendCombatPacket(ParsedCombatPacket packet) => inner.AppendCombatPacket(owner.PreparePacket(packet));
+        public void AppendCombatObservation(
+            int sourceId,
+            int targetId,
+            long timestamp,
+            long frameOrdinal,
+            long batchOrdinal,
+            in CombatObservation observation,
+            ushort opcode = 0,
+            int payloadLength = 0,
+            long captureSequence = 0)
+        {
+            var packet = ParsedCombatPacket.FromObservation(sourceId, targetId, in observation, timestamp, frameOrdinal, batchOrdinal);
+            packet = owner.PreparePacket(packet);
+            var prepared = packet.ToObservation();
+            inner.AppendCombatObservation(packet.SourceId, packet.TargetId, packet.Timestamp, packet.FrameOrdinal, packet.BatchOrdinal, in prepared, opcode, payloadLength, captureSequence);
+        }
         public void CompleteBatch(long batchOrdinal) => owner.CompleteBatch(batchOrdinal);
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal);
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, value, timestamp, frameOrdinal, batchOrdinal);

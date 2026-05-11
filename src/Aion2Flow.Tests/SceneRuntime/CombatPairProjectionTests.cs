@@ -6,17 +6,18 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public class CombatPairProjectionTests
 {
     [Fact]
-    public void Projection_FromCombatStore_BuildsCorrectly()
+    public void Projection_BuildSnapshotMaps_BuildsCorrectly()
     {
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
         store.ApplyCombat(100, 300, 300, 1, 1, 2000);
         store.ApplyCombat(200, 100, 100, 1, 1, 3000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
+        var pairs = CombatPairProjection.BuildPairSnapshotMap(store);
+        var combatants = CombatPairProjection.BuildCombatantSummaryMap(store);
 
-        Assert.Equal(3, projection.Pairs.Count);
-        Assert.Equal(3, projection.Combatants.Count);
+        Assert.Equal(3, pairs.Count);
+        Assert.Equal(3, combatants.Count);
     }
 
     [Fact]
@@ -25,12 +26,11 @@ public class CombatPairProjectionTests
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var pair = projection.GetPair(100, 200);
+        var pair = CombatPairProjection.GetPair(store, 100, 200);
 
         Assert.NotNull(pair);
-        Assert.Equal(500, pair!.TotalDamage);
-        Assert.Equal(1000, pair.LastSkillCode);
+        Assert.Equal(500, pair.Value.TotalDamage);
+        Assert.Equal(1000, pair.Value.LastSkillCode);
     }
 
     [Fact]
@@ -40,12 +40,11 @@ public class CombatPairProjectionTests
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
         store.ApplyCombat(200, 100, 100, 1, 1, 2000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var source = projection.GetCombatant(100);
+        var source = CombatPairProjection.GetCombatant(store, 100);
 
         Assert.NotNull(source);
-        Assert.Equal(500, source!.OutgoingDamage);
-        Assert.Equal(100, source.IncomingDamage);
+        Assert.Equal(500, source.Value.OutgoingDamage);
+        Assert.Equal(100, source.Value.IncomingDamage);
     }
 
     [Fact]
@@ -55,8 +54,7 @@ public class CombatPairProjectionTests
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
         store.ApplyCombat(100, 300, 300, 1, 1, 2000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var outgoing = projection.GetOutgoingPairs(100);
+        var outgoing = CombatPairProjection.GetOutgoingPairs(store, 100);
 
         Assert.Equal(2, outgoing.Count);
     }
@@ -68,8 +66,7 @@ public class CombatPairProjectionTests
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
         store.ApplyCombat(300, 200, 300, 1, 1, 2000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var incoming = projection.GetIncomingPairs(200);
+        var incoming = CombatPairProjection.GetIncomingPairs(store, 200);
 
         Assert.Equal(2, incoming.Count);
     }
@@ -81,9 +78,9 @@ public class CombatPairProjectionTests
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
         store.ApplyCombat(100, 200, 300, 1, 1, 1000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
+        var pair = CombatPairProjection.GetPair(store, 100, 200);
 
-        Assert.Equal(store.Revision, projection.Revision);
+        Assert.Equal(store.Revision, pair!.Value.Revision);
     }
 
     [Fact]
@@ -92,13 +89,12 @@ public class CombatPairProjectionTests
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        Assert.Single(projection.Pairs);
+        Assert.Single(CombatPairProjection.BuildPairSnapshotMap(store));
 
         store.ApplyCombat(100, 300, 300, 1, 1, 2000);
-        projection.Rebuild(store);
+        var pairs = CombatPairProjection.BuildPairSnapshotMap(store);
 
-        Assert.Equal(2, projection.Pairs.Count);
+        Assert.Equal(2, pairs.Count);
         Assert.Equal(2, store.Revision);
     }
 }

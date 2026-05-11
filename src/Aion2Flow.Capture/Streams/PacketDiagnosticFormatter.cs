@@ -1,6 +1,7 @@
 using System.Text;
 using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
@@ -82,21 +83,28 @@ internal static class PacketDiagnosticFormatter
 
     public static string ResolvedCombatHint(ParsedCombatPacket packet)
     {
-        var skillCode = packet.SkillCode > 0 ? packet.SkillCode : packet.OriginalSkillCode;
+        var observation = packet.ToObservation();
+        return ResolvedCombatHint(packet.SourceId, packet.TargetId, in observation);
+    }
+
+    public static string ResolvedCombatHint(int sourceId, int targetId, in CombatObservation observation)
+    {
+        var skillCode = observation.SkillCode > 0 ? observation.SkillCode : observation.OriginalSkillCode;
         if (skillCode <= 0)
         {
             return string.Empty;
         }
 
         var normalized = CombatResourceRegistry.InferOriginalSkillCode(skillCode) ?? skillCode;
-        var packetForClassification = packet.DeepClone();
-        packetForClassification.SkillCode = normalized;
-        packetForClassification.EventKind = CombatEventKind.Damage;
-        packetForClassification.ValueKind = CombatValueKind.Unknown;
-        packetForClassification.IsNormalized = false;
-
-        var valueKind = CombatEventClassifier.ClassifyValueKind(packetForClassification);
-        var variantHint = SkillVariantHint(packet.SkillVariant);
+        var classificationObservation = observation with
+        {
+            SkillCode = normalized,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Unknown
+        };
+        var valueKind = CombatEventClassifier.Classify(sourceId, targetId, in classificationObservation).ValueKind;
+        var variant = CombatResourceRegistry.ParseSkillVariant(observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode);
+        var variantHint = SkillVariantHint(variant);
 
         if (CombatResourceRegistry.SkillMap.TryGetValue(normalized, out var skill))
         {
@@ -108,7 +116,13 @@ internal static class PacketDiagnosticFormatter
 
     public static string EffectHint(ParsedCombatPacket packet)
     {
-        var effectLabel = packet.FormatEffectLabel();
+        var observation = packet.ToObservation();
+        return EffectHint(in observation);
+    }
+
+    public static string EffectHint(in CombatObservation observation)
+    {
+        var effectLabel = CombatObservationTraits.FormatEffectLabel(in observation);
         return string.IsNullOrEmpty(effectLabel)
             ? string.Empty
             : $"|effect={effectLabel}";

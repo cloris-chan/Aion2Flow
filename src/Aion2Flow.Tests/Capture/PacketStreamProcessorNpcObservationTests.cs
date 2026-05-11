@@ -455,19 +455,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         ];
     }
 
-    private static SkillCollection BuildCompactEvadeSkillMap()
-    {
-        return
-        [
-            new Skill(1216310, "Attack", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
-            new Skill(1216350, "Vine Swipe", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
-            new Skill(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
-            new Skill(11800008, "Murderous Burst", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new Skill(12000100, "Dodge", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
-            new Skill(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
-        ];
-    }
-
     private sealed class BlockingSynchronizedSink : IRuntimeObservationSink, IRuntimeObservationSynchronization
     {
         public Lock Gate { get; } = new();
@@ -486,7 +473,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public void StageDestinationMap(uint mapId) { }
         public void StageDestinationMapInstance(uint instanceId) { }
         public void MarkSceneArrival() => SceneArrivalCalled = true;
-        public void AppendCombatPacket(ParsedCombatPacket packet) { }
+        public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0) { }
         public void CompleteBatch(long batchOrdinal) { }
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal) { }
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal) { }

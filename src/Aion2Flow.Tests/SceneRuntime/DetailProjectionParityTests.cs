@@ -21,16 +21,14 @@ public class DetailProjectionParityTests
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
 
-        var projection = CombatPairProjection.FromCombatStore(combat);
-
         var baselineTopDealer = replay.Snapshot.Combatants
             .Where(static kv => kv.Value.DamageAmount > 0)
             .OrderByDescending(static kv => kv.Value.DamageAmount)
             .First();
 
-        var sceneCombatant = projection.GetCombatant(baselineTopDealer.Key);
+        var sceneCombatant = CombatPairProjection.GetCombatant(combat, baselineTopDealer.Key);
         Assert.NotNull(sceneCombatant);
-        Assert.True(sceneCombatant!.OutgoingDamage > 0, $"Scene projection has 0 outgoing damage for baseline top dealer {baselineTopDealer.Key}");
+        Assert.True(sceneCombatant.Value.OutgoingDamage > 0, $"Scene projection has 0 outgoing damage for baseline top dealer {baselineTopDealer.Key}");
     }
 
     [Fact]
@@ -51,12 +49,11 @@ public class DetailProjectionParityTests
             .OrderByDescending(static kv => kv.Value.DamageAmount)
             .First();
 
-        var projection = CombatPairProjection.FromCombatStore(combat);
-        var sub = new CombatDetailSubscription(combat, projection, baselineTopDealer.Key);
+        var sub = new CombatDetailSubscription(combat, baselineTopDealer.Key);
 
         var delta = sub.Poll();
         Assert.NotNull(delta);
-        Assert.True(delta!.Combatant!.OutgoingDamage > 0);
+        Assert.True(delta!.Combatant!.Value.OutgoingDamage > 0);
         Assert.True(delta.OutgoingPairs.Count > 0, "Scene projection should have outgoing pairs for top dealer");
     }
 
@@ -73,12 +70,10 @@ public class DetailProjectionParityTests
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
 
-        var projection = CombatPairProjection.FromCombatStore(combat);
-
         var baselineWithDamage = replay.Snapshot.Combatants
             .Count(static kv => kv.Value.DamageAmount > 0);
 
-        var sceneWithDamage = projection.Combatants
+        var sceneWithDamage = CombatPairProjection.BuildCombatantSummaryMap(combat)
             .Count(static kv => kv.Value.OutgoingDamage > 0);
 
         Assert.True(sceneWithDamage >= baselineWithDamage,

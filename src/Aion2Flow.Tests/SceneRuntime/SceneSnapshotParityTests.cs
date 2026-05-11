@@ -50,19 +50,19 @@ public sealed class SceneSnapshotParityTests
 
         foreach (var id in legacy.Combatants.Keys.Concat(scene.Combatants.Keys).Distinct().Order())
         {
-            legacy.Combatants.TryGetValue(id, out var l);
-            scene.Combatants.TryGetValue(id, out var s);
-            CompareValue(diffs, "combatant", id.ToString(), "damage", l?.DamageAmount ?? 0, s?.DamageAmount ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "healing", l?.HealingAmount ?? 0, s?.HealingAmount ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "periodicHealing", l?.PeriodicHealingAmount ?? 0, s?.PeriodicHealingAmount ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "drainDamage", l?.DrainDamageAmount ?? 0, s?.DrainDamageAmount ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "drainHealing", l?.DrainHealingAmount ?? 0, s?.DrainHealingAmount ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "regenerationHealing", l?.RegenerationHealingAmount ?? 0, s?.RegenerationHealingAmount ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "shield", l?.ShieldAmount ?? 0, s?.ShieldAmount ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "shieldTimes", l?.ShieldTimes ?? 0, s?.ShieldTimes ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "shieldAbsorbed", l?.ShieldAbsorbedAmount ?? 0, s?.ShieldAbsorbedAmount ?? 0);
-            CompareValue(diffs, "combatant", id.ToString(), "shieldAbsorbedTimes", l?.ShieldAbsorbedTimes ?? 0, s?.ShieldAbsorbedTimes ?? 0);
-            CompareClass(diffs, id.ToString(), l?.CharacterClass, s?.CharacterClass);
+            var hasLegacy = legacy.Combatants.TryGetValue(id, out var l);
+            var hasScene = scene.Combatants.TryGetValue(id, out var s);
+            CompareValue(diffs, "combatant", id.ToString(), "damage", hasLegacy ? l.DamageAmount : 0, hasScene ? s.DamageAmount : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "healing", hasLegacy ? l.HealingAmount : 0, hasScene ? s.HealingAmount : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "periodicHealing", hasLegacy ? l.PeriodicHealingAmount : 0, hasScene ? s.PeriodicHealingAmount : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "drainDamage", hasLegacy ? l.DrainDamageAmount : 0, hasScene ? s.DrainDamageAmount : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "drainHealing", hasLegacy ? l.DrainHealingAmount : 0, hasScene ? s.DrainHealingAmount : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "regenerationHealing", hasLegacy ? l.RegenerationHealingAmount : 0, hasScene ? s.RegenerationHealingAmount : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "shield", hasLegacy ? l.ShieldAmount : 0, hasScene ? s.ShieldAmount : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "shieldTimes", hasLegacy ? l.ShieldTimes : 0, hasScene ? s.ShieldTimes : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "shieldAbsorbed", hasLegacy ? l.ShieldAbsorbedAmount : 0, hasScene ? s.ShieldAbsorbedAmount : 0);
+            CompareValue(diffs, "combatant", id.ToString(), "shieldAbsorbedTimes", hasLegacy ? l.ShieldAbsorbedTimes : 0, hasScene ? s.ShieldAbsorbedTimes : 0);
+            CompareClass(diffs, id.ToString(), hasLegacy ? l.CharacterClass : null, hasScene ? s.CharacterClass : null);
         }
 
         return diffs;

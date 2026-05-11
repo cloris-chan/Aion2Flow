@@ -10,7 +10,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     private readonly Dictionary<int, CombatantRecord> _combatants = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _outgoingBySource = [];
     private readonly Dictionary<int, HashSet<(int, int)>> _incomingByTarget = [];
-    private readonly Dictionary<(int Source, int Target), List<CombatEventRecord>> _eventsByPair = [];
+    private readonly Dictionary<(int Source, int Target), List<int>> _eventIndicesByPair = [];
     private readonly List<CombatEventRecord> _events = [];
     private readonly List<CombatSnapshotChange> _changeLog = [];
     private readonly Dictionary<int, long> _detailRevisionByCombatant = [];
@@ -19,6 +19,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     public IReadOnlyDictionary<(int Source, int Target), CombatPairRecord> Pairs => _pairs;
     public IReadOnlyDictionary<int, CombatantRecord> Combatants => _combatants;
     public IReadOnlyList<CombatEventRecord> Events => _events;
+    public ReadOnlySpan<CombatEventRecord> EventSpan => CollectionsMarshal.AsSpan(_events);
     public long Revision => _revision;
 
     public void ApplyCombat(int sourceId, int targetId, long damage, int hitCount, int attemptCount, int skillCode)
@@ -56,15 +57,16 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
             InvincibleCount = contribution.InvincibleCount,
             MultiHitCount = contribution.MultiHitCount
         };
+        var eventIndex = _events.Count;
         _events.Add(eventRecord);
 
         var pairKey = (sourceId, targetId);
-        if (!_eventsByPair.TryGetValue(pairKey, out var pairEvents))
+        if (!_eventIndicesByPair.TryGetValue(pairKey, out var pairEvents))
         {
             pairEvents = [];
-            _eventsByPair[pairKey] = pairEvents;
+            _eventIndicesByPair[pairKey] = pairEvents;
         }
-        pairEvents.Add(eventRecord);
+        pairEvents.Add(eventIndex);
 
         if (!_pairs.TryGetValue(pairKey, out var pair))
         {
@@ -172,8 +174,19 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
     public IReadOnlyCollection<(int, int)> GetIncomingPairs(int targetId) =>
         _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
 
-    public IReadOnlyList<CombatEventRecord> GetPairEvents(int sourceId, int targetId) =>
-        _eventsByPair.TryGetValue((sourceId, targetId), out var events) ? events : [];
+    public bool TryGetPairEventIndices(int sourceId, int targetId, out IReadOnlyList<int> indices)
+    {
+        if (_eventIndicesByPair.TryGetValue((sourceId, targetId), out var existing))
+        {
+            indices = existing;
+            return true;
+        }
+
+        indices = [];
+        return false;
+    }
+
+    public ref readonly CombatEventRecord GetEvent(int index) => ref CollectionsMarshal.AsSpan(_events)[index];
 
     public long GetCombatantDetailRevision(int combatantId) =>
         combatantId > 0 && _detailRevisionByCombatant.TryGetValue(combatantId, out var revision) ? revision : 0;
@@ -206,7 +219,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         _combatants.Clear();
         _outgoingBySource.Clear();
         _incomingByTarget.Clear();
-        _eventsByPair.Clear();
+        _eventIndicesByPair.Clear();
         _events.Clear();
         _changeLog.Clear();
         _detailRevisionByCombatant.Clear();
@@ -217,6 +230,39 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         new(afterRevision, 0);
 
     public SnapshotChangeBatch<CombatSnapshotChange> ReadChanges(SnapshotChangeCursor cursor, int maxChanges)
+    {
+        maxChanges = Math.Max(1, maxChanges);
+        var (Start, Count) = ResolveChangeReadBounds(cursor, maxChanges);
+        if (Count == 0)
+            return new SnapshotChangeBatch<CombatSnapshotChange>(cursor.Revision, _revision, [], false);
+
+        var changes = _changeLog.GetRange(Start, Count);
+        return new SnapshotChangeBatch<CombatSnapshotChange>(
+            cursor.Revision,
+            changes[^1].Revision,
+            changes,
+            Start + Count < _changeLog.Count);
+    }
+
+    public SnapshotChangeCopyResult CopyChanges(SnapshotChangeCursor cursor, Span<CombatSnapshotChange> destination)
+    {
+        var (Start, Count) = ResolveChangeReadBounds(cursor, destination.Length);
+        if (Count == 0)
+            return new SnapshotChangeCopyResult(cursor, cursor.Revision, _revision, 0, false);
+
+        for (var i = 0; i < Count; i++)
+            destination[i] = _changeLog[Start + i];
+
+        var toRevision = _changeLog[Start + Count - 1].Revision;
+        return new SnapshotChangeCopyResult(
+            new SnapshotChangeCursor(toRevision, 0),
+            cursor.Revision,
+            toRevision,
+            Count,
+            Start + Count < _changeLog.Count);
+    }
+
+    private (int Start, int Count) ResolveChangeReadBounds(SnapshotChangeCursor cursor, int maxChanges)
     {
         maxChanges = Math.Max(1, maxChanges);
 
@@ -232,7 +278,7 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
 
         int start = lo + cursor.Offset;
         if (start >= _changeLog.Count)
-            return new SnapshotChangeBatch<CombatSnapshotChange>(cursor.Revision, _revision, [], false);
+            return default;
 
         int count = Math.Min(maxChanges, _changeLog.Count - start);
         if (count < _changeLog.Count - start)
@@ -250,12 +296,8 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
                 }
             }
         }
-        var changes = _changeLog.GetRange(start, count);
-        return new SnapshotChangeBatch<CombatSnapshotChange>(
-            cursor.Revision,
-            changes[^1].Revision,
-            changes,
-            start + count < _changeLog.Count);
+
+        return (start, count);
     }
 }
 
@@ -280,7 +322,7 @@ public sealed class CombatPairRecord
     public long Revision { get; set; }
 }
 
-public sealed class CombatEventRecord
+public readonly record struct CombatEventRecord
 {
     public int SourceId { get; init; }
     public int TargetId { get; init; }

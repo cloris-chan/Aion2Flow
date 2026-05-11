@@ -7,7 +7,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Attributes_Summon_Damage_To_Owner_In_Snapshot()
     {
-        CombatResourceRegistry.SkillMap = new SkillCollection();
+        CombatResourceRegistry.SkillMap = [];
         using var scene = new SceneTestHarness();
         const int ownerId = 12115;
         const int summonId = 18345;
@@ -45,11 +45,12 @@ public sealed class SummonAttributionSceneTests
         Assert.False(snapshot.Combatants.ContainsKey(summonId));
 
         var owner = snapshot.Combatants[ownerId];
+        var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
         Assert.Equal("Owner", owner.Nickname);
         Assert.Equal(8993, owner.DamageAmount);
-        Assert.Single(owner.Skills);
+        Assert.Single(skills);
 
-        var skill = owner.Skills.Values.Single();
+        var skill = skills.Values.Single();
         Assert.Equal(8993, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
     }
@@ -137,8 +138,9 @@ public sealed class SummonAttributionSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
         Assert.Equal(0, owner.HealingAmount);
-        Assert.True(owner.Skills.TryGetValue(16990004, out var restore));
+        Assert.True(skills.TryGetValue(16990004, out var restore));
         Assert.Equal(0, restore.HealingAmount);
         Assert.Equal(0, restore.HealingTimes);
         Assert.Equal(2, restore.SupportTimes);
@@ -213,8 +215,9 @@ public sealed class SummonAttributionSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
         Assert.Equal(0, owner.HealingAmount);
-        Assert.True(owner.Skills.TryGetValue(16990004, out var restore));
+        Assert.True(skills.TryGetValue(16990004, out var restore));
         Assert.Equal(0, restore.HealingAmount);
         Assert.Equal(0, restore.HealingTimes);
         Assert.Equal(4, restore.SupportTimes);
@@ -251,8 +254,9 @@ public sealed class SummonAttributionSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
         Assert.Equal(0, owner.HealingAmount);
-        Assert.True(owner.Skills.TryGetValue(16990004, out var restore));
+        Assert.True(skills.TryGetValue(16990004, out var restore));
         Assert.Equal(0, restore.HealingAmount);
         Assert.Equal(0, restore.HealingTimes);
         Assert.Equal(4, restore.SupportTimes);

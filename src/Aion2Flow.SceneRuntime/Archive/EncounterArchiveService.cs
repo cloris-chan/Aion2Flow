@@ -93,9 +93,10 @@ public sealed class EncounterArchiveService
     private static double SumDamage(SceneCombatSnapshot snapshot)
     {
         var totalDamage = 0d;
-        foreach (var combatant in snapshot.Combatants.Values)
+        var combatants = snapshot.Combatants.AsSpan();
+        foreach (ref readonly var entry in combatants)
         {
-            totalDamage += combatant.DamageAmount;
+            totalDamage += entry.Metrics.DamageAmount;
         }
 
         return totalDamage;

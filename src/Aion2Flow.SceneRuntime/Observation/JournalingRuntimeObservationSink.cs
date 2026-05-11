@@ -123,14 +123,23 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendCombatPacket(ParsedCombatPacket packet)
+    public void AppendCombatObservation(
+        int sourceId,
+        int targetId,
+        long timestamp,
+        long frameOrdinal,
+        long batchOrdinal,
+        in CombatObservation observation,
+        ushort opcode = 0,
+        int payloadLength = 0,
+        long captureSequence = 0)
     {
-        CombatResourceRegistry.NormalizePacketForStorage(packet);
-        var sourceId = ResolveLifecycleId(packet.SourceId);
-        var targetId = ResolveLifecycleId(packet.TargetId);
+        var normalized = CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
+        sourceId = ResolveLifecycleId(sourceId);
+        targetId = ResolveLifecycleId(targetId);
         AddKnownEntity(sourceId);
         AddKnownEntity(targetId);
-        var stamp = clock.CreateStamp(packet.Timestamp, packet.FrameOrdinal, MapBatchOrdinal(packet.BatchOrdinal));
+        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -140,37 +149,12 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             TargetEntityId = targetId,
             Raw = new RawPacketReference
             {
-                Opcode = 0,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = packet.Timestamp
+                Opcode = opcode,
+                PayloadLength = payloadLength,
+                CaptureSequence = captureSequence,
+                TimestampMilliseconds = timestamp
             },
-            Combat = new CombatObservation
-            {
-                SkillCode = packet.SkillCode,
-                OriginalSkillCode = packet.OriginalSkillCode,
-                BaseSkillCode = packet.BaseSkillCode,
-                Damage = packet.Damage,
-                HitCount = packet.HitContribution,
-                AttemptCount = packet.AttemptContribution,
-                DetailRaw = packet.DetailRaw,
-                Marker = packet.Marker,
-                Type = packet.Type,
-                Flag = packet.Flag,
-                LayoutTag = packet.LayoutTag,
-                Loop = packet.Loop,
-                MultiHitCount = packet.MultiHitCount,
-                DrainHealAmount = packet.DrainHealAmount,
-                RegenerationAmount = packet.RegenerationAmount,
-                Modifiers = packet.Modifiers,
-                ResourceKind = packet.ResourceKind,
-                EventKind = packet.EventKind,
-                ValueKind = packet.ValueKind,
-                EffectTag = packet.EffectTag,
-                PeriodicRelation = packet.PeriodicRelation,
-                PeriodicMode = packet.PeriodicMode,
-                ChainId = packet.Unknown
-            }
+            Combat = normalized
         });
     }
 

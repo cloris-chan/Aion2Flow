@@ -326,7 +326,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         var encounterSeconds = snapshot.EncounterTime / 1000.0;
         EncounterTimeSeconds = encounterSeconds;
         LiveSceneName = ResolveSceneDisplayName(snapshot.MapId);
-        var liveFrame = IsViewingArchivedEncounter ? null : _latestLiveFrame;
+        var liveFrame = IsViewingArchivedEncounter ? (SceneReadModelFrame?)null : _latestLiveFrame;
         RefreshBossFocus(liveFrame, snapshot);
 
         using var deferral = Combatants.SuspendNotifications();
@@ -349,8 +349,11 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             }
         }
 
-        foreach (var (id, data) in snapshot.Combatants)
+        var combatants = snapshot.Combatants.AsSpan();
+        foreach (ref readonly var entry in combatants)
         {
+            var id = entry.Id;
+            var data = entry.Metrics;
             if (Combatants.Contains(id))
                 continue;
 

@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -74,9 +73,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.MarkSceneArrival();
     }
 
-    public void AppendCombatPacket(ParsedCombatPacket packet)
+    public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0)
     {
-        lock (gate) inner.AppendCombatPacket(packet);
+        lock (gate) inner.AppendCombatObservation(sourceId, targetId, timestamp, frameOrdinal, batchOrdinal, in observation, opcode, payloadLength, captureSequence);
     }
 
     public void CompleteBatch(long batchOrdinal)

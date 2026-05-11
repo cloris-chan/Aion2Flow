@@ -89,7 +89,7 @@ public sealed class SkillNormalizationSceneTests
         };
         regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
 
-        CombatResourceRegistry.NormalizePacketForStorage(regenPacket);
+        CombatResourceRegistry.NormalizePacketForStorage(ref regenPacket);
 
         Assert.True(regenPacket.IsNormalized);
         Assert.Equal(1230340, regenPacket.SkillCode);
@@ -126,8 +126,9 @@ public sealed class SkillNormalizationSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
-        Assert.DoesNotContain(17040250, combatant.Skills.Keys);
-        Assert.True(combatant.Skills.TryGetValue(17050250, out var skill));
+        var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
+        Assert.DoesNotContain(17040250, skills.Keys);
+        Assert.True(skills.TryGetValue(17050250, out var skill));
         Assert.Equal("天罰", skill.SkillName);
         Assert.Equal(77282, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
@@ -163,7 +164,8 @@ public sealed class SkillNormalizationSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
-        Assert.True(combatant.Skills.TryGetValue(17040250, out var skill));
+        var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
+        Assert.True(skills.TryGetValue(17040250, out var skill));
         Assert.Equal("審判之電", skill.SkillName);
         Assert.Equal(18816, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
@@ -206,12 +208,13 @@ public sealed class SkillNormalizationSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
-        Assert.True(combatant.Skills.TryGetValue(12240000, out var judgment));
+        var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
+        Assert.True(skills.TryGetValue(12240000, out var judgment));
         Assert.Equal("審判", judgment.SkillName);
         Assert.Equal(39065, judgment.DamageAmount);
         Assert.Equal(2, judgment.Times);
-        Assert.DoesNotContain(12240350, combatant.Skills.Keys);
-        Assert.DoesNotContain(12240030, combatant.Skills.Keys);
+        Assert.DoesNotContain(12240350, skills.Keys);
+        Assert.DoesNotContain(12240030, skills.Keys);
     }
 
     [Fact]
@@ -250,9 +253,10 @@ public sealed class SkillNormalizationSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
-        Assert.True(combatant.Skills.TryGetValue(12240000, out var judgment));
+        var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
+        Assert.True(skills.TryGetValue(12240000, out var judgment));
         Assert.Equal(2000, judgment.DamageAmount);
-        Assert.False(combatant.Skills.ContainsKey(12240150));
+        Assert.False(skills.ContainsKey(12240150));
     }
 
     [Fact]
@@ -285,7 +289,8 @@ public sealed class SkillNormalizationSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
-        Assert.True(combatant.Skills.TryGetValue(11800008, out var skill));
+        var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
+        Assert.True(skills.TryGetValue(11800008, out var skill));
         Assert.Equal("殺氣破裂", skill.SkillName);
         Assert.Equal(155338, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
@@ -355,7 +360,8 @@ public sealed class SkillNormalizationSceneTests
         Assert.Equal(240, combatant.HealingAmount);
         Assert.Equal(240, combatant.DrainHealingAmount);
 
-        Assert.True(combatant.Skills.TryGetValue(13060250, out var skill));
+        var skills = scene.CreateSkillBreakdown(snapshot, playerId).Skills;
+        Assert.True(skills.TryGetValue(13060250, out var skill));
         Assert.Equal(2000, skill.DamageAmount);
         Assert.Equal(240, skill.DrainHealingAmount);
         Assert.Equal(2, skill.Times);
@@ -456,11 +462,12 @@ public sealed class SkillNormalizationSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(50571, combatant.DamageAmount);
 
-        Assert.True(combatant.Skills.TryGetValue(13360120, out var damageSkill));
+        var skills = scene.CreateSkillBreakdown(snapshot, playerId).Skills;
+        Assert.True(skills.TryGetValue(13360120, out var damageSkill));
         Assert.Equal(50571, damageSkill.DamageAmount);
         Assert.Equal(2, damageSkill.Times);
 
-        Assert.True(combatant.Skills.TryGetValue(13360010, out var followupSkill));
+        Assert.True(skills.TryGetValue(13360010, out var followupSkill));
         Assert.Equal(0, followupSkill.DamageAmount);
         Assert.Equal(0, followupSkill.Times);
         Assert.Equal(1, followupSkill.SupportTimes);
@@ -510,11 +517,12 @@ public sealed class SkillNormalizationSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(50571, combatant.DamageAmount);
 
-        Assert.True(combatant.Skills.TryGetValue(13360120, out var damageSkill));
+        var skills = scene.CreateSkillBreakdown(snapshot, playerId).Skills;
+        Assert.True(skills.TryGetValue(13360120, out var damageSkill));
         Assert.Equal(50571, damageSkill.DamageAmount);
         Assert.Equal(2, damageSkill.Times);
 
-        Assert.True(combatant.Skills.TryGetValue(1900001, out var followupSkill));
+        Assert.True(skills.TryGetValue(1900001, out var followupSkill));
         Assert.Equal(0, followupSkill.DamageAmount);
         Assert.Equal(0, followupSkill.Times);
         Assert.Equal(35373, followupSkill.HealingAmount);
@@ -577,11 +585,12 @@ public sealed class SkillNormalizationSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
         Assert.Equal(10036, combatant.DamageAmount);
 
-        Assert.True(combatant.Skills.TryGetValue(11360120, out var damageSkill));
+        var skills = scene.CreateSkillBreakdown(snapshot, playerId).Skills;
+        Assert.True(skills.TryGetValue(11360120, out var damageSkill));
         Assert.Equal(10036, damageSkill.DamageAmount);
         Assert.Equal(2, damageSkill.Times);
 
-        Assert.True(combatant.Skills.TryGetValue(11360017, out var followupSkill));
+        Assert.True(skills.TryGetValue(11360017, out var followupSkill));
         Assert.Equal(0, followupSkill.DamageAmount);
         Assert.Equal(0, followupSkill.Times);
         Assert.Equal(2, followupSkill.SupportTimes);

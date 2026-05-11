@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Protocol.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
@@ -21,7 +22,7 @@ public enum PacketEffectTag : byte
     ShieldAbsorbed
 }
 
-public sealed class ParsedCombatPacket
+public struct ParsedCombatPacket
 {
     public bool IsNormalized { get; set; }
     public int SourceId { get; set; }
@@ -55,16 +56,20 @@ public sealed class ParsedCombatPacket
     public PeriodicEffectRelation PeriodicRelation { get; private set; }
     public int PeriodicMode { get; private set; }
     public PacketEffectTag EffectTag { get; private set; }
-    public bool IsCritical => (Modifiers & DamageModifiers.Critical) != 0;
-    public bool IsPeriodicEffect => PeriodicRelation != PeriodicEffectRelation.None;
-    public bool IsPeriodicSelfEffect => PeriodicRelation == PeriodicEffectRelation.Self;
-    public bool IsPeriodicTargetEffect => PeriodicRelation == PeriodicEffectRelation.Target;
-    public bool IsPeriodicTargetInitialEffect => IsPeriodicTargetEffect && PeriodicMode == 1;
-    public SkillVariantInfo SkillVariant => new(OriginalSkillCode, SkillCode, BaseSkillCode, ChargeStage, SpecializationMask);
+    public readonly bool IsCritical => (Modifiers & DamageModifiers.Critical) != 0;
+    public readonly bool IsPeriodicEffect => PeriodicRelation != PeriodicEffectRelation.None;
+    public readonly bool IsPeriodicSelfEffect => PeriodicRelation == PeriodicEffectRelation.Self;
+    public readonly bool IsPeriodicTargetEffect => PeriodicRelation == PeriodicEffectRelation.Target;
+    public readonly bool IsPeriodicTargetInitialEffect => IsPeriodicTargetEffect && PeriodicMode == 1;
+    public readonly SkillVariantInfo SkillVariant => new(OriginalSkillCode, SkillCode, BaseSkillCode, ChargeStage, SpecializationMask);
 
-    public bool IsPeriodicSelfMode(int mode) => IsPeriodicSelfEffect && PeriodicMode == mode;
+    public ParsedCombatPacket()
+    {
+    }
 
-    public bool IsPeriodicTargetMode(int mode) => IsPeriodicTargetEffect && PeriodicMode == mode;
+    public readonly bool IsPeriodicSelfMode(int mode) => IsPeriodicSelfEffect && PeriodicMode == mode;
+
+    public readonly bool IsPeriodicTargetMode(int mode) => IsPeriodicTargetEffect && PeriodicMode == mode;
 
     public void SetPeriodicEffect(PeriodicEffectRelation relation, int mode)
     {
@@ -85,55 +90,66 @@ public sealed class ParsedCombatPacket
         PeriodicMode = 0;
     }
 
-    public ParsedCombatPacket DeepClone()
+    public readonly CombatObservation ToObservation() => new()
     {
-        var clone = new ParsedCombatPacket
-        {
-            SourceId = SourceId,
-            TargetId = TargetId,
-            Flag = Flag,
-            Damage = Damage,
-            OriginalSkillCode = OriginalSkillCode,
-            SkillCode = SkillCode,
-            BaseSkillCode = BaseSkillCode,
-            ChargeStage = ChargeStage,
-            SpecializationMask = SpecializationMask,
-            Marker = Marker,
-            Type = Type,
-            Unknown = Unknown,
-            LayoutTag = LayoutTag,
-            Loop = Loop,
-            HitContribution = HitContribution,
-            AttemptContribution = AttemptContribution,
-            MultiHitCount = MultiHitCount,
-            DrainHealAmount = DrainHealAmount,
-            RegenerationAmount = RegenerationAmount,
-            DetailRaw = DetailRaw,
-            ResourceKind = ResourceKind,
-            FrameOrdinal = FrameOrdinal,
-            BatchOrdinal = BatchOrdinal,
-            Timestamp = Timestamp,
-            Id = Id,
-            Modifiers = Modifiers,
-            EventKind = EventKind,
-            ValueKind = ValueKind,
-            IsNormalized = IsNormalized
-        };
+        SkillCode = SkillCode,
+        OriginalSkillCode = OriginalSkillCode,
+        BaseSkillCode = BaseSkillCode,
+        Damage = Damage,
+        HitCount = HitContribution,
+        AttemptCount = AttemptContribution,
+        DetailRaw = DetailRaw,
+        Marker = Marker,
+        Type = Type,
+        Flag = Flag,
+        LayoutTag = LayoutTag,
+        Loop = Loop,
+        MultiHitCount = MultiHitCount,
+        DrainHealAmount = DrainHealAmount,
+        RegenerationAmount = RegenerationAmount,
+        Modifiers = Modifiers,
+        ResourceKind = ResourceKind,
+        EventKind = EventKind,
+        ValueKind = ValueKind,
+        EffectTag = EffectTag,
+        PeriodicRelation = PeriodicRelation,
+        PeriodicMode = PeriodicMode,
+        ChainId = Unknown
+    };
 
-        if (IsPeriodicEffect)
-        {
-            clone.SetPeriodicEffect(PeriodicRelation, PeriodicMode);
-        }
+    public static ParsedCombatPacket FromObservation(int sourceId, int targetId, in CombatObservation observation, long timestamp = 0, long frameOrdinal = 0, long batchOrdinal = 0) => new()
+    {
+        SourceId = sourceId,
+        TargetId = targetId,
+        SkillCode = observation.SkillCode,
+        OriginalSkillCode = observation.OriginalSkillCode,
+        BaseSkillCode = observation.BaseSkillCode,
+        Damage = checked((int)observation.Damage),
+        HitContribution = observation.HitCount,
+        AttemptContribution = observation.AttemptCount,
+        DetailRaw = observation.DetailRaw,
+        Marker = observation.Marker,
+        Type = observation.Type,
+        Flag = observation.Flag,
+        LayoutTag = observation.LayoutTag,
+        Loop = observation.Loop,
+        MultiHitCount = observation.MultiHitCount,
+        DrainHealAmount = observation.DrainHealAmount,
+        RegenerationAmount = observation.RegenerationAmount,
+        Modifiers = observation.Modifiers,
+        ResourceKind = observation.ResourceKind,
+        EventKind = observation.EventKind,
+        ValueKind = observation.ValueKind,
+        PeriodicRelation = observation.PeriodicRelation,
+        PeriodicMode = observation.PeriodicMode,
+        EffectTag = observation.EffectTag,
+        Unknown = observation.ChainId,
+        Timestamp = timestamp,
+        FrameOrdinal = frameOrdinal,
+        BatchOrdinal = batchOrdinal
+    };
 
-        if (EffectTag != PacketEffectTag.None)
-        {
-            clone.SetEffectTag(EffectTag);
-        }
-
-        return clone;
-    }
-
-    internal string FormatEffectLabel()
+    internal readonly string FormatEffectLabel()
     {
         if (IsPeriodicEffect)
         {

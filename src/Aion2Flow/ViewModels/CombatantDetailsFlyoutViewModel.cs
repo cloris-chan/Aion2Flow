@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
@@ -130,7 +131,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         IncomingDetail.Clear();
     }
 
-    private DetailBaselineStart CaptureBaselineStart()
+    private static DetailBaselineStart CaptureBaselineStart()
         => new(Stopwatch.GetTimestamp(), GC.GetAllocatedBytesForCurrentThread());
 
     private CombatantDetailRefreshBaselineCounters CaptureRefreshBaselineCounter(DetailBaselineStart start)
@@ -264,13 +265,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         }
 
         var counterpartMetrics = new Dictionary<int, CounterpartAggregateMetrics>();
-        var packetsSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_detailEvents);
+        var packetsSpan = CollectionsMarshal.AsSpan(_detailEvents);
         foreach (ref readonly var detailPacket in packetsSpan)
         {
             foreach (var sectionKind in sectionKinds)
             {
                 if (!MatchesSection(in detailPacket, sectionKind, _combatantId.Value) ||
-                    !ContributesToSection(detailPacket.Packet, sectionKind))
+                    !ContributesToSection(in detailPacket, sectionKind))
                 {
                     continue;
                 }
@@ -289,7 +290,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                     };
                 }
 
-                var amount = GetSectionContributionAmount(detailPacket.Packet, sectionKind);
+                var amount = GetSectionContributionAmount(in detailPacket, sectionKind);
                 switch (sectionKind)
                 {
                     case DetailSectionKind.OutgoingDamage:
@@ -417,7 +418,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         var firstObserved = long.MaxValue;
         var lastObserved = long.MinValue;
 
-        var packetsSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_detailEvents);
+        var packetsSpan = CollectionsMarshal.AsSpan(_detailEvents);
         foreach (ref readonly var detailPacket in packetsSpan)
         {
             if (!MatchesSection(in detailPacket, sectionKind, _combatantId.Value))
@@ -438,7 +439,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                 continue;
             }
 
-            if (!ContributesToSection(detailPacket.Packet, sectionKind))
+            if (!ContributesToSection(in detailPacket, sectionKind))
             {
                 continue;
             }
@@ -450,30 +451,32 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                 lastObserved = Math.Max(lastObserved, observedAt);
             }
 
-            if (!metrics.TryGetValue(detailPacket.Packet.SkillCode, out var skill))
+            ref var skill = ref CollectionsMarshal.GetValueRefOrAddDefault(metrics, detailPacket.SkillCode, out var exists);
+            if (!exists)
             {
-                skill = new SkillMetrics(detailPacket.Packet);
-                metrics[detailPacket.Packet.SkillCode] = skill;
+                var observation = detailPacket.Observation;
+                skill = new SkillMetrics(in observation);
             }
 
-            skill.ProcessEvent(detailPacket.Packet);
+            var skillObservation = detailPacket.Observation;
+            skill.ProcessObservation(in skillObservation);
         }
 
         var rows = sectionKind is DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage
-            ? BuildDamageRows(metrics.Values)
+            ? BuildDamageRows(metrics)
             : sectionKind is DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield
-                ? BuildShieldRows(metrics.Values)
-                : BuildHealingRows(metrics.Values);
+                ? BuildShieldRows(metrics)
+                : BuildHealingRows(metrics);
 
         var durationSeconds = hasSubsetFilter
             ? ResolveObservedDurationSeconds(firstObserved, lastObserved)
             : ResolveSceneDurationSeconds();
-        ApplySectionRows(section, metrics.Values, rows, sectionKind, durationSeconds, !hasSubsetFilter);
+        ApplySectionRows(section, metrics, rows, sectionKind, durationSeconds, !hasSubsetFilter);
     }
 
-    private void ApplySectionRows(
+    private static void ApplySectionRows(
         SkillDetailSectionViewModel section,
-        IReadOnlyCollection<SkillMetrics> skills,
+        Dictionary<int, SkillMetrics> skills,
         List<SkillDetailRowData> rows,
         DetailSectionKind sectionKind,
         double durationSeconds,
@@ -494,7 +497,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         long totalAmount = 0, directAmount = 0, periodicAmount = 0, drainAmount = 0, regenerationAmount = 0, shieldAmount = 0, shieldAbsorbedAmount = 0;
         int hits = 0, attempts = 0, periodicHits = 0, evades = 0, invincible = 0, criticals = 0;
 
-        var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows);
+        var span = CollectionsMarshal.AsSpan(rows);
         foreach (ref var row in span)
         {
             totalAmount += row.TotalAmount;
@@ -550,7 +553,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         section.InvincibleRate = 0d;
     }
 
-    private void ApplyDamageSection(SkillDetailSectionViewModel section, IEnumerable<SkillMetrics> skills, double durationSeconds)
+    private static void ApplyDamageSection(SkillDetailSectionViewModel section, Dictionary<int, SkillMetrics> skills, double durationSeconds)
     {
         long total = 0, directTotal = 0, periodicTotal = 0;
         int totalHits = 0, totalAttempts = 0, totalPeriodicHits = 0;
@@ -558,7 +561,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         int parry = 0, block = 0, endurance = 0, regeneration = 0, back = 0;
         int evades = 0, invincible = 0;
 
-        foreach (var skill in skills)
+        foreach (var (_, skill) in skills)
         {
             directTotal += skill.DamageAmount;
             periodicTotal += skill.PeriodicDamageAmount;
@@ -627,7 +630,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     private static int GetCounterpartCombatantId(in CombatDetailEvent packet, DetailSectionKind sectionKind)
     {
         if (sectionKind == DetailSectionKind.IncomingShield &&
-            packet.Packet.ValueKind == CombatValueKind.Shield &&
+            packet.ValueKind == CombatValueKind.Shield &&
             packet.SourceId > 0 &&
             packet.TargetId > 0 &&
             packet.SourceId != packet.TargetId)
@@ -643,9 +646,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         };
     }
 
-    private static bool ContributesToSection(ParsedCombatPacket packet, DetailSectionKind sectionKind)
+    private static bool ContributesToSection(in CombatDetailEvent packet, DetailSectionKind sectionKind)
     {
-        var contribution = CombatContributionClassifier.Evaluate(packet);
+        var observation = packet.Observation;
+        var contribution = CombatContributionClassifier.Evaluate(in observation);
         return sectionKind switch
         {
             DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage => contribution.CountsAsDamage,
@@ -655,13 +659,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         };
     }
 
-    private static long GetSectionContributionAmount(ParsedCombatPacket packet, DetailSectionKind sectionKind)
+    private static long GetSectionContributionAmount(in CombatDetailEvent packet, DetailSectionKind sectionKind)
     {
         return sectionKind switch
         {
-            DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage => Math.Max(0L, packet.Damage),
-            DetailSectionKind.OutgoingHealing or DetailSectionKind.IncomingHealing => Math.Max(0L, packet.Damage),
-            DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield => Math.Max(0L, packet.Damage),
+            DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage => Math.Max(0L, packet.Amount),
+            DetailSectionKind.OutgoingHealing or DetailSectionKind.IncomingHealing => Math.Max(0L, packet.Amount),
+            DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield => Math.Max(0L, packet.Amount),
             _ => 0L
         };
     }
@@ -673,12 +677,12 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         => firstObserved != long.MaxValue && lastObserved != long.MinValue ? Math.Max(1d, Math.Max(0, lastObserved - firstObserved) / 1000d) : 0d;
 
     private static long ResolveObservedAt(in CombatDetailEvent detailPacket)
-        => detailPacket.Packet.Timestamp > 0 ? detailPacket.Packet.Timestamp : detailPacket.Revision;
+        => detailPacket.ObservedAt;
 
-    private static List<SkillDetailRowData> BuildDamageRows(IEnumerable<SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildDamageRows(Dictionary<int, SkillMetrics> skills)
     {
         var rows = new List<SkillDetailRowData>();
-        foreach (var skill in skills)
+        foreach (var (_, skill) in skills)
         {
             if (IsHiddenDamageOutcomeSkill(skill.SkillCode))
             {
@@ -730,14 +734,14 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         });
 
         var sectionTotal = 0L;
-        foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+        foreach (ref var row in CollectionsMarshal.AsSpan(rows))
         {
             sectionTotal += row.TotalAmount;
         }
 
         if (sectionTotal > 0)
         {
-            foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+            foreach (ref var row in CollectionsMarshal.AsSpan(rows))
             {
                 row.SharePercent = row.TotalAmount / (double)sectionTotal;
             }
@@ -749,10 +753,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     private static bool IsHiddenDamageOutcomeSkill(int skillCode)
         => skillCode == SyntheticCombatSkillCodes.UnresolvedInvincible;
 
-    private static List<SkillDetailRowData> BuildHealingRows(IEnumerable<SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildHealingRows(Dictionary<int, SkillMetrics> skills)
     {
         var rows = new List<SkillDetailRowData>();
-        foreach (var skill in skills)
+        foreach (var (_, skill) in skills)
         {
             var directHealingAmount = Math.Max(0L, skill.HealingAmount - skill.PeriodicHealingAmount - skill.DrainHealingAmount - skill.RegenerationHealingAmount);
             var directHealingHits = Math.Max(0, skill.HealingTimes - skill.PeriodicHealingTimes - skill.DrainHealingTimes - skill.RegenerationHealingTimes);
@@ -788,14 +792,14 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         });
 
         var sectionTotal = 0L;
-        foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+        foreach (ref var row in CollectionsMarshal.AsSpan(rows))
         {
             sectionTotal += row.TotalAmount;
         }
 
         if (sectionTotal > 0)
         {
-            foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+            foreach (ref var row in CollectionsMarshal.AsSpan(rows))
             {
                 row.SharePercent = row.TotalAmount / (double)sectionTotal;
             }
@@ -804,10 +808,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         return rows;
     }
 
-    private static List<SkillDetailRowData> BuildShieldRows(IEnumerable<SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildShieldRows(Dictionary<int, SkillMetrics> skills)
     {
         var rows = new List<SkillDetailRowData>();
-        foreach (var skill in skills)
+        foreach (var (_, skill) in skills)
         {
             if (skill.ShieldAmount <= 0 && skill.ShieldTimes <= 0 &&
                 skill.ShieldAbsorbedAmount <= 0 && skill.ShieldAbsorbedTimes <= 0)
@@ -837,14 +841,14 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         });
 
         var sectionTotal = 0L;
-        foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+        foreach (ref var row in CollectionsMarshal.AsSpan(rows))
         {
             sectionTotal += row.TotalAmount;
         }
 
         if (sectionTotal > 0)
         {
-            foreach (ref var row in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows))
+            foreach (ref var row in CollectionsMarshal.AsSpan(rows))
             {
                 row.SharePercent = row.TotalAmount / (double)sectionTotal;
             }
@@ -893,16 +897,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         IncomingShield.Clear();
     }
 
-    private static void SyncSectionScope(SkillDetailSectionViewModel section, int? combatantId)
-    {
-        var selectedScope = section.ScopeOptions.FirstOrDefault(x => x.CombatantId == combatantId) ?? section.ScopeOptions.FirstOrDefault();
-        if (Equals(section.SelectedScope, selectedScope))
-        {
-            return;
-        }
-
-        section.SelectedScope = selectedScope;
-    }
 
     private readonly record struct DetailBaselineStart(long Timestamp, long AllocatedBytes);
 }

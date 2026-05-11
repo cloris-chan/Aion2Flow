@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -30,25 +32,27 @@ public sealed class SceneArchivePayload
         init => _detailIndex = value;
     }
 
-    internal static SceneArchivePayload CreateLocked(SceneCombatSnapshot snapshot, DateTimeOffset sceneStarted, EntityStore entities, MetadataStore metadata, BossFocusStore bossFocus, CombatPairProjection pairsProjection, SceneCombatSnapshotAdapter adapter)
+    internal static SceneArchivePayload CreateLocked(SceneCombatSnapshot snapshot, DateTimeOffset sceneStarted, EntityStore entities, MetadataStore metadata, BossFocusStore bossFocus, SceneCombatSnapshotAdapter adapter)
     {
         var archivedSnapshot = snapshot.DeepClone();
         var eventsByKey = new Dictionary<EventKey, SceneArchiveCombatEvent>();
         var displayNames = new Dictionary<int, string>();
         var entityIds = new HashSet<int>();
 
-        foreach (var combatantId in archivedSnapshot.Combatants.Keys.Order())
+        var snapshotCombatants = archivedSnapshot.Combatants.AsSpan();
+        foreach (ref readonly var combatant in snapshotCombatants)
         {
+            var combatantId = combatant.Id;
             AddEntity(entityIds, combatantId);
             AddDisplayName(displayNames, adapter, combatantId);
-            AddCombatantDetailEvents(eventsByKey, displayNames, entityIds, pairsProjection, adapter, archivedSnapshot, combatantId);
+            AddCombatantDetailEvents(eventsByKey, displayNames, entityIds, adapter, archivedSnapshot, combatantId);
         }
 
         if (archivedSnapshot.TargetObservation?.InstanceId is int targetId)
         {
             AddEntity(entityIds, targetId);
             AddDisplayName(displayNames, adapter, targetId);
-            AddCombatantDetailEvents(eventsByKey, displayNames, entityIds, pairsProjection, adapter, archivedSnapshot, targetId);
+            AddCombatantDetailEvents(eventsByKey, displayNames, entityIds, adapter, archivedSnapshot, targetId);
         }
 
         var eventsSnapshot = eventsByKey.Values.ToArray();
@@ -77,9 +81,25 @@ public sealed class SceneArchivePayload
 
     public SceneArchivePayload DeepClone()
     {
-        var events = Events.Select(static e => e.DeepClone()).ToArray();
-        var pairs = Pairs.Select(ClonePair).ToArray();
-        var combatants = Combatants.Select(CloneCombatant).ToArray();
+        var events = new SceneArchiveCombatEvent[Events.Count];
+        for (var i = 0; i < events.Length; i++)
+            events[i] = Events[i];
+
+        var pairs = new DirectedPairSnapshot[Pairs.Count];
+        for (var i = 0; i < pairs.Length; i++)
+            pairs[i] = Pairs[i];
+
+        var combatants = new CombatantSummary[Combatants.Count];
+        for (var i = 0; i < combatants.Length; i++)
+            combatants[i] = Combatants[i];
+
+        var entities = new SceneArchiveEntityIdentity[Entities.Count];
+        for (var i = 0; i < entities.Length; i++)
+            entities[i] = Entities[i].DeepClone();
+
+        var bosses = new SceneArchiveBossFocus[Bosses.Count];
+        for (var i = 0; i < bosses.Length; i++)
+            bosses[i] = Bosses[i].DeepClone();
 
         return new SceneArchivePayload
         {
@@ -89,9 +109,9 @@ public sealed class SceneArchivePayload
             DisplayNames = new Dictionary<int, string>(DisplayNames),
             Pairs = pairs,
             Combatants = combatants,
-            Entities = Entities.Select(static e => e.DeepClone()).ToArray(),
+            Entities = entities,
             NpcNamesByCode = new Dictionary<int, string>(NpcNamesByCode),
-            Bosses = Bosses.Select(static b => b.DeepClone()).ToArray(),
+            Bosses = bosses,
             DetailIndex = ArchivePayloadIndex.Create(events, pairs, combatants)
         };
     }
@@ -136,7 +156,7 @@ public sealed class SceneArchivePayload
             IncomingPairs = detailIndex.GetIncomingPairs(combatantId),
             Events = events,
             DisplayNames = DisplayNames,
-            Combatant = combatant is not null ? CloneCombatant(combatant) : null
+            Combatant = combatant
         };
     }
 
@@ -156,9 +176,9 @@ public sealed class SceneArchivePayload
             displayNames[entityId] = displayName;
     }
 
-    private static void AddCombatantDetailEvents(Dictionary<EventKey, SceneArchiveCombatEvent> eventsByKey, Dictionary<int, string> displayNames, HashSet<int> entityIds, CombatPairProjection pairsProjection, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot archivedSnapshot, int combatantId)
+    private static void AddCombatantDetailEvents(Dictionary<EventKey, SceneArchiveCombatEvent> eventsByKey, Dictionary<int, string> displayNames, HashSet<int> entityIds, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot archivedSnapshot, int combatantId)
     {
-        var events = pairsProjection.GetDetailEvents(adapter, archivedSnapshot, combatantId);
+        var events = adapter.CreateDetailEvents(archivedSnapshot, combatantId);
         for (var i = 0; i < events.Count; i++)
         {
             var detailEvent = events[i];
@@ -173,22 +193,37 @@ public sealed class SceneArchivePayload
 
     private static SceneArchiveEntityIdentity[] BuildIdentities(EntityStore entities, HashSet<int> entityIds)
     {
-        var result = new List<SceneArchiveEntityIdentity>(entityIds.Count);
-        foreach (var entityId in entityIds.Order())
+        if (entityIds.Count == 0)
+            return [];
+
+        var ids = new int[entityIds.Count];
+        var idIndex = 0;
+        foreach (var entityId in entityIds)
+            ids[idIndex++] = entityId;
+        Array.Sort(ids);
+
+        var result = new SceneArchiveEntityIdentity[ids.Length];
+        var count = 0;
+        for (var i = 0; i < ids.Length; i++)
         {
+            var entityId = ids[i];
             if (!entities.TryGet(entityId, out var entity))
                 continue;
 
-            result.Add(SceneArchiveEntityIdentity.From(entity));
+            result[count++] = SceneArchiveEntityIdentity.From(entity);
         }
 
-        return [.. result];
+        if (count == result.Length)
+            return result;
+
+        Array.Resize(ref result, count);
+        return result;
     }
 
-    private static Dictionary<int, string> BuildNpcNames(MetadataStore metadata, IReadOnlyList<SceneArchiveEntityIdentity> identities)
+    private static Dictionary<int, string> BuildNpcNames(MetadataStore metadata, SceneArchiveEntityIdentity[] identities)
     {
         var result = new Dictionary<int, string>();
-        for (var i = 0; i < identities.Count; i++)
+        for (var i = 0; i < identities.Length; i++)
         {
             if (identities[i].NpcCode is not int npcCode || !metadata.TryGetNpcName(npcCode, out var npcName) || string.IsNullOrWhiteSpace(npcName))
                 continue;
@@ -199,14 +234,14 @@ public sealed class SceneArchivePayload
         return result;
     }
 
-    private static EventKey CreateKey(in CombatDetailEvent e) => new(e.Revision, e.SourceId, e.TargetId, e.Packet.SkillCode, e.Packet.Timestamp, e.Packet.Damage, e.Packet.EventKind, e.Packet.ValueKind);
+    private static EventKey CreateKey(in CombatDetailEvent e) => new(e.Revision, e.SourceId, e.TargetId, e.SkillCode, e.ObservedAt, e.Amount, e.EventKind, e.ValueKind);
 
     private static int CompareEvents(SceneArchiveCombatEvent left, SceneArchiveCombatEvent right)
     {
         var cmp = left.Revision.CompareTo(right.Revision);
         if (cmp != 0)
             return cmp;
-        cmp = left.Packet.Timestamp.CompareTo(right.Packet.Timestamp);
+        cmp = left.ObservedAt.CompareTo(right.ObservedAt);
         if (cmp != 0)
             return cmp;
         cmp = left.SourceId.CompareTo(right.SourceId);
@@ -218,10 +253,10 @@ public sealed class SceneArchivePayload
     private static int CompareEventIndices(int left, int right, IReadOnlyList<SceneArchiveCombatEvent> events)
         => CompareEvents(events[left], events[right]);
 
-    private static DirectedPairSnapshot[] BuildPairs(IReadOnlyList<SceneArchiveCombatEvent> events)
+    private static DirectedPairSnapshot[] BuildPairs(SceneArchiveCombatEvent[] events)
     {
         var pairs = new Dictionary<DirectedPairKey, PairAccumulator>();
-        for (var i = 0; i < events.Count; i++)
+        for (var i = 0; i < events.Length; i++)
         {
             var e = events[i];
             if (e.SourceId <= 0 || e.TargetId <= 0)
@@ -237,37 +272,26 @@ public sealed class SceneArchivePayload
             pair.Apply(e);
         }
 
-        return pairs.Values
-            .Select(static p => p.ToSnapshot())
-            .OrderBy(static p => p.Key.SourceId)
-            .ThenBy(static p => p.Key.TargetId)
-            .ToArray();
+        if (pairs.Count == 0)
+            return [];
+
+        var result = new DirectedPairSnapshot[pairs.Count];
+        var index = 0;
+        foreach (var pair in pairs.Values)
+            result[index++] = pair.ToSnapshot();
+
+        Array.Sort(result, static (left, right) =>
+        {
+            var cmp = left.Key.SourceId.CompareTo(right.Key.SourceId);
+            return cmp != 0 ? cmp : left.Key.TargetId.CompareTo(right.Key.TargetId);
+        });
+        return result;
     }
 
-    private static DirectedPairSnapshot ClonePair(DirectedPairSnapshot pair) => new()
-    {
-        Key = pair.Key,
-        TotalDamage = pair.TotalDamage,
-        TotalHealing = pair.TotalHealing,
-        TotalShield = pair.TotalShield,
-        TotalShieldAbsorbed = pair.TotalShieldAbsorbed,
-        ShieldCount = pair.ShieldCount,
-        ShieldAbsorbedCount = pair.ShieldAbsorbedCount,
-        HitCount = pair.HitCount,
-        AttemptCount = pair.AttemptCount,
-        EvadeCount = pair.EvadeCount,
-        InvincibleCount = pair.InvincibleCount,
-        MultiHitCount = pair.MultiHitCount,
-        LastSkillCode = pair.LastSkillCode,
-        FirstObserved = pair.FirstObserved,
-        LastObserved = pair.LastObserved,
-        Revision = pair.Revision
-    };
-
-    private static CombatantSummary[] BuildCombatants(IReadOnlyList<DirectedPairSnapshot> pairs)
+    private static CombatantSummary[] BuildCombatants(DirectedPairSnapshot[] pairs)
     {
         var combatants = new Dictionary<int, CombatantAccumulator>();
-        for (var i = 0; i < pairs.Count; i++)
+        for (var i = 0; i < pairs.Length; i++)
         {
             var pair = pairs[i];
             if (pair.Key.SourceId > 0)
@@ -293,66 +317,70 @@ public sealed class SceneArchivePayload
             }
         }
 
-        return combatants.Values
-            .Select(static c => c.ToSummary())
-            .OrderBy(static c => c.CombatantId)
-            .ToArray();
+        if (combatants.Count == 0)
+            return [];
+
+        var result = new CombatantSummary[combatants.Count];
+        var index = 0;
+        foreach (var combatant in combatants.Values)
+            result[index++] = combatant.ToSummary();
+
+        Array.Sort(result, static (left, right) => left.CombatantId.CompareTo(right.CombatantId));
+        return result;
     }
 
     private static SceneArchiveBossFocus[] BuildBosses(BossFocusStore bossFocus, SceneCombatSnapshot snapshot)
     {
-        var targetIds = new HashSet<int>();
-        if (snapshot.TargetObservation?.InstanceId is int targetId && targetId > 0)
-            targetIds.Add(targetId);
-        if (snapshot.Encounter.TrackingTargetId > 0)
-            targetIds.Add(snapshot.Encounter.TrackingTargetId);
-
-        if (targetIds.Count == 0)
+        var targetId = snapshot.TargetObservation?.InstanceId ?? 0;
+        var trackingId = snapshot.Encounter.TrackingTargetId;
+        if (targetId <= 0 && trackingId <= 0)
             return [];
 
-        return bossFocus.GetObservedBosses(0, long.MaxValue)
-            .Where(b => targetIds.Contains(b.InstanceId))
-            .Select(static b => new SceneArchiveBossFocus
-            {
-                InstanceId = b.InstanceId,
-                Hp = b.Hp,
-                MaxHp = b.MaxHp,
-                LastObservedAtMilliseconds = b.LastObservedAtMilliseconds,
-                HasHp = b.HasHp
-            })
-            .OrderBy(static b => b.InstanceId)
-            .ToArray();
-    }
+        var bosses = bossFocus.GetObservedBosses(0, long.MaxValue);
+        if (bosses.Count == 0)
+            return [];
 
-    private static CombatantSummary CloneCombatant(CombatantSummary combatant) => new()
-    {
-        CombatantId = combatant.CombatantId,
-        OutgoingDamage = combatant.OutgoingDamage,
-        OutgoingHits = combatant.OutgoingHits,
-        OutgoingAttempts = combatant.OutgoingAttempts,
-        OutgoingEvades = combatant.OutgoingEvades,
-        OutgoingInvincibles = combatant.OutgoingInvincibles,
-        OutgoingMultiHits = combatant.OutgoingMultiHits,
-        IncomingDamage = combatant.IncomingDamage,
-        IncomingHits = combatant.IncomingHits,
-        IncomingAttempts = combatant.IncomingAttempts,
-        IncomingEvades = combatant.IncomingEvades,
-        IncomingInvincibles = combatant.IncomingInvincibles,
-        IncomingMultiHits = combatant.IncomingMultiHits,
-        OutgoingHealing = combatant.OutgoingHealing,
-        IncomingHealing = combatant.IncomingHealing,
-        OutgoingShield = combatant.OutgoingShield,
-        IncomingShield = combatant.IncomingShield,
-        OutgoingShieldAbsorbed = combatant.OutgoingShieldAbsorbed,
-        IncomingShieldAbsorbed = combatant.IncomingShieldAbsorbed,
-        OutgoingShieldCount = combatant.OutgoingShieldCount,
-        IncomingShieldCount = combatant.IncomingShieldCount,
-        OutgoingShieldAbsorbedCount = combatant.OutgoingShieldAbsorbedCount,
-        IncomingShieldAbsorbedCount = combatant.IncomingShieldAbsorbedCount,
-        FirstObserved = combatant.FirstObserved,
-        LastObserved = combatant.LastObserved,
-        Revision = combatant.Revision
-    };
+        SceneArchiveBossFocus? first = null;
+        SceneArchiveBossFocus? second = null;
+        for (var i = 0; i < bosses.Count; i++)
+        {
+            var boss = bosses[i];
+            if (boss.InstanceId != targetId && boss.InstanceId != trackingId)
+                continue;
+
+            if (first?.InstanceId == boss.InstanceId)
+                continue;
+
+            var focus = new SceneArchiveBossFocus
+            {
+                InstanceId = boss.InstanceId,
+                Hp = boss.Hp,
+                MaxHp = boss.MaxHp,
+                LastObservedAtMilliseconds = boss.LastObservedAtMilliseconds,
+                HasHp = boss.HasHp
+            };
+
+            if (first is null)
+            {
+                first = focus;
+                continue;
+            }
+
+            second = focus;
+            break;
+        }
+
+        if (first is null)
+            return [];
+
+        if (second is null)
+            return [first];
+
+        if (first.InstanceId <= second.InstanceId)
+            return [first, second];
+
+        return [second, first];
+    }
 
     private sealed class PairAccumulator(DirectedPairKey key)
     {
@@ -374,8 +402,8 @@ public sealed class SceneArchivePayload
 
         public void Apply(SceneArchiveCombatEvent e)
         {
-            var packet = e.Packet;
-            var contribution = CombatContributionClassifier.Evaluate(packet);
+            var observation = e.Observation;
+            var contribution = CombatContributionClassifier.Evaluate(in observation);
 
             _totalDamage += contribution.DamageAmount;
             _totalHealing += contribution.HealingAmount;
@@ -388,9 +416,9 @@ public sealed class SceneArchivePayload
             _evadeCount += contribution.EvadeCount;
             _invincibleCount += contribution.InvincibleCount;
             _multiHitCount += contribution.MultiHitCount;
-            _lastSkillCode = packet.SkillCode;
+            _lastSkillCode = observation.SkillCode;
             _revision = Math.Max(_revision, e.Revision);
-            var observedAt = packet.Timestamp > 0 ? packet.Timestamp : e.Revision;
+            var observedAt = e.ObservedAt;
             _firstObserved = _firstObserved > 0 ? Math.Min(_firstObserved, observedAt) : observedAt;
             _lastObserved = Math.Max(_lastObserved, observedAt);
         }
@@ -515,7 +543,7 @@ public sealed class SceneArchivePayload
         }
     }
 
-    private readonly record struct EventKey(long Revision, int SourceId, int TargetId, int SkillCode, long Timestamp, int Damage, CombatEventKind EventKind, CombatValueKind ValueKind);
+    private readonly record struct EventKey(long Revision, int SourceId, int TargetId, int SkillCode, long Timestamp, long Damage, CombatEventKind EventKind, CombatValueKind ValueKind);
 
     private sealed class ArchivePayloadIndex
     {
@@ -542,7 +570,7 @@ public sealed class SceneArchivePayload
 
         public static ArchivePayloadIndex Create(IReadOnlyList<SceneArchiveCombatEvent> events, IReadOnlyList<DirectedPairSnapshot> pairs, IReadOnlyList<CombatantSummary> combatants)
         {
-            var eventBuilders = new Dictionary<int, List<int>>();
+            var eventBuilders = new Dictionary<int, IntArrayBuilder>();
             for (var i = 0; i < events.Count; i++)
             {
                 var e = events[i];
@@ -552,14 +580,15 @@ public sealed class SceneArchivePayload
             }
 
             var eventIndicesByCombatant = new Dictionary<int, int[]>(eventBuilders.Count);
-            foreach (var (combatantId, indices) in eventBuilders)
+            foreach (var (combatantId, builder) in eventBuilders)
             {
-                indices.Sort((left, right) => CompareEventIndices(left, right, events));
-                eventIndicesByCombatant[combatantId] = [.. indices];
+                var indices = builder.ToArray();
+                Array.Sort(indices, (left, right) => CompareEventIndices(left, right, events));
+                eventIndicesByCombatant[combatantId] = indices;
             }
 
-            var outgoingBuilders = new Dictionary<int, List<DirectedPairKey>>();
-            var incomingBuilders = new Dictionary<int, List<DirectedPairKey>>();
+            var outgoingBuilders = new Dictionary<int, PairKeyArrayBuilder>();
+            var incomingBuilders = new Dictionary<int, PairKeyArrayBuilder>();
             if (pairs.Count > 0)
             {
                 for (var i = 0; i < pairs.Count; i++)
@@ -567,18 +596,26 @@ public sealed class SceneArchivePayload
             }
             else
             {
-                var pairKeys = new HashSet<DirectedPairKey>();
+                var pairKeys = new Dictionary<DirectedPairKey, byte>();
                 for (var i = 0; i < events.Count; i++)
                 {
                     var e = events[i];
                     if (e.SourceId <= 0 || e.TargetId <= 0)
                         continue;
 
-                    pairKeys.Add(new DirectedPairKey(e.SourceId, e.TargetId));
+                    pairKeys.TryAdd(new DirectedPairKey(e.SourceId, e.TargetId), 0);
                 }
 
-                foreach (var key in pairKeys.OrderBy(static p => p.SourceId).ThenBy(static p => p.TargetId))
-                    AddPair(outgoingBuilders, incomingBuilders, key);
+                if (pairKeys.Count > 0)
+                {
+                    var keys = new DirectedPairKey[pairKeys.Count];
+                    var index = 0;
+                    foreach (var key in pairKeys.Keys)
+                        keys[index++] = key;
+                    Array.Sort(keys, ComparePairKeys);
+                    for (var i = 0; i < keys.Length; i++)
+                        AddPair(outgoingBuilders, incomingBuilders, keys[i]);
+                }
             }
 
             var outgoingPairsByCombatant = FreezePairs(outgoingBuilders);
@@ -606,21 +643,16 @@ public sealed class SceneArchivePayload
         public CombatantSummary? GetCombatant(int combatantId)
             => _combatantsById.TryGetValue(combatantId, out var combatant) ? combatant : null;
 
-        private static void AddEventIndex(Dictionary<int, List<int>> builders, int combatantId, int eventIndex)
+        private static void AddEventIndex(Dictionary<int, IntArrayBuilder> builders, int combatantId, int eventIndex)
         {
             if (combatantId <= 0)
                 return;
 
-            if (!builders.TryGetValue(combatantId, out var indices))
-            {
-                indices = [];
-                builders[combatantId] = indices;
-            }
-
-            indices.Add(eventIndex);
+            ref var builder = ref CollectionsMarshal.GetValueRefOrAddDefault(builders, combatantId, out _);
+            builder.Add(eventIndex);
         }
 
-        private static void AddPair(Dictionary<int, List<DirectedPairKey>> outgoingBuilders, Dictionary<int, List<DirectedPairKey>> incomingBuilders, DirectedPairKey key)
+        private static void AddPair(Dictionary<int, PairKeyArrayBuilder> outgoingBuilders, Dictionary<int, PairKeyArrayBuilder> incomingBuilders, DirectedPairKey key)
         {
             if (key.SourceId <= 0 || key.TargetId <= 0)
                 return;
@@ -629,59 +661,122 @@ public sealed class SceneArchivePayload
             AddPairKey(incomingBuilders, key.TargetId, key);
         }
 
-        private static void AddPairKey(Dictionary<int, List<DirectedPairKey>> builders, int combatantId, DirectedPairKey key)
+        private static void AddPairKey(Dictionary<int, PairKeyArrayBuilder> builders, int combatantId, DirectedPairKey key)
         {
-            if (!builders.TryGetValue(combatantId, out var pairs))
-            {
-                pairs = [];
-                builders[combatantId] = pairs;
-            }
-
-            pairs.Add(key);
+            ref var builder = ref CollectionsMarshal.GetValueRefOrAddDefault(builders, combatantId, out _);
+            builder.Add(key);
         }
 
-        private static Dictionary<int, DirectedPairKey[]> FreezePairs(Dictionary<int, List<DirectedPairKey>> builders)
+        private static Dictionary<int, DirectedPairKey[]> FreezePairs(Dictionary<int, PairKeyArrayBuilder> builders)
         {
             var result = new Dictionary<int, DirectedPairKey[]>(builders.Count);
-            foreach (var (combatantId, pairs) in builders)
+            foreach (var (combatantId, builder) in builders)
             {
-                pairs.Sort(static (left, right) =>
-                {
-                    var cmp = left.SourceId.CompareTo(right.SourceId);
-                    return cmp != 0 ? cmp : left.TargetId.CompareTo(right.TargetId);
-                });
-                result[combatantId] = [.. pairs];
+                var pairs = builder.ToArray();
+                Array.Sort(pairs, ComparePairKeys);
+                result[combatantId] = pairs;
             }
 
+            return result;
+        }
+
+        private static int ComparePairKeys(DirectedPairKey left, DirectedPairKey right)
+        {
+            var cmp = left.SourceId.CompareTo(right.SourceId);
+            return cmp != 0 ? cmp : left.TargetId.CompareTo(right.TargetId);
+        }
+    }
+
+    private struct IntArrayBuilder
+    {
+        private int[]? _items;
+        private int _count;
+
+        public void Add(int value)
+        {
+            var items = _items;
+            if (items is null)
+            {
+                _items = [value];
+                _count = 1;
+                return;
+            }
+
+            if (_count == items.Length)
+            {
+                Array.Resize(ref items, items.Length << 1);
+                _items = items;
+            }
+
+            items[_count++] = value;
+        }
+
+        public readonly int[] ToArray()
+        {
+            if (_count == 0)
+                return [];
+
+            var result = new int[_count];
+            Array.Copy(_items!, result, _count);
+            return result;
+        }
+    }
+
+    private struct PairKeyArrayBuilder
+    {
+        private DirectedPairKey[]? _items;
+        private int _count;
+
+        public void Add(DirectedPairKey value)
+        {
+            var items = _items;
+            if (items is null)
+            {
+                _items = [value];
+                _count = 1;
+                return;
+            }
+
+            if (_count == items.Length)
+            {
+                Array.Resize(ref items, items.Length << 1);
+                _items = items;
+            }
+
+            items[_count++] = value;
+        }
+
+        public readonly DirectedPairKey[] ToArray()
+        {
+            if (_count == 0)
+                return [];
+
+            var result = new DirectedPairKey[_count];
+            Array.Copy(_items!, result, _count);
             return result;
         }
     }
 }
 
-public sealed class SceneArchiveCombatEvent
+public readonly record struct SceneArchiveCombatEvent
 {
-    public ParsedCombatPacket Packet { get; init; } = new();
     public int SourceId { get; init; }
     public int TargetId { get; init; }
+    public CombatObservation Observation { get; init; }
+    public long ObservedAtMilliseconds { get; init; }
     public long Revision { get; init; }
+    public long ObservedAt => ObservedAtMilliseconds > 0 ? ObservedAtMilliseconds : Revision;
 
     public static SceneArchiveCombatEvent From(in CombatDetailEvent e) => new()
     {
-        Packet = e.Packet.DeepClone(),
         SourceId = e.SourceId,
         TargetId = e.TargetId,
+        Observation = e.Observation,
+        ObservedAtMilliseconds = e.ObservedAtMilliseconds,
         Revision = e.Revision
     };
 
-    public SceneArchiveCombatEvent DeepClone() => new()
-    {
-        Packet = Packet.DeepClone(),
-        SourceId = SourceId,
-        TargetId = TargetId,
-        Revision = Revision
-    };
-
-    public CombatDetailEvent ToDetailEvent() => new(Packet.DeepClone(), SourceId, TargetId, Revision);
+    public CombatDetailEvent ToDetailEvent() => new(Observation, SourceId, TargetId, ObservedAtMilliseconds, Revision);
 }
 
 public sealed class SceneArchiveEntityIdentity

@@ -11,8 +11,7 @@ public class CombatDetailSubscriptionTests
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var sub = new CombatDetailSubscription(store, projection, 100);
+        var sub = new CombatDetailSubscription(store, 100);
 
         var delta = sub.Poll();
         Assert.NotNull(delta);
@@ -27,8 +26,7 @@ public class CombatDetailSubscriptionTests
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var sub = new CombatDetailSubscription(store, projection, 100);
+        var sub = new CombatDetailSubscription(store, 100);
 
         sub.Poll();
 
@@ -40,8 +38,7 @@ public class CombatDetailSubscriptionTests
     public void Subscription_Poll_ReturnsDeltaWhenTargetIsRelevant()
     {
         var store = new CombatStore();
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var sub = new CombatDetailSubscription(store, projection, 200);
+        var sub = new CombatDetailSubscription(store, 200);
 
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
@@ -56,8 +53,7 @@ public class CombatDetailSubscriptionTests
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var sub = new CombatDetailSubscription(store, projection, 999);
+        var sub = new CombatDetailSubscription(store, 999);
 
         var delta = sub.Poll();
         Assert.Null(delta);
@@ -70,8 +66,7 @@ public class CombatDetailSubscriptionTests
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var sub = new CombatDetailSubscription(store, projection, 100);
+        var sub = new CombatDetailSubscription(store, 100);
 
         sub.Poll();
 
@@ -89,24 +84,22 @@ public class CombatDetailSubscriptionTests
         var store = new CombatStore();
         store.ApplyCombat(100, 200, 500, 1, 1, 1000);
 
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var sub = new CombatDetailSubscription(store, projection, 100);
+        var sub = new CombatDetailSubscription(store, 100);
 
         var delta1 = sub.Poll();
-        Assert.Equal(500, delta1!.Combatant!.OutgoingDamage);
+        Assert.Equal(500, delta1!.Combatant!.Value.OutgoingDamage);
 
         store.ApplyCombat(100, 200, 300, 1, 1, 1000);
         var delta2 = sub.Poll();
 
-        Assert.Equal(800, delta2!.Combatant!.OutgoingDamage);
+        Assert.Equal(800, delta2!.Combatant!.Value.OutgoingDamage);
     }
 
     [Fact]
     public void Subscription_DoesNotAdvanceRevisionForIrrelevantCombat()
     {
         var store = new CombatStore();
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var sub = new CombatDetailSubscription(store, projection, 100);
+        var sub = new CombatDetailSubscription(store, 100);
 
         store.ApplyCombat(300, 400, 700, 1, 1, 3000);
 
@@ -121,8 +114,7 @@ public class CombatDetailSubscriptionTests
     public void Subscription_CatchesRelevantChangeAfterLargeIrrelevantBurst()
     {
         var store = new CombatStore();
-        var projection = CombatPairProjection.FromCombatStore(store);
-        var sub = new CombatDetailSubscription(store, projection, 100);
+        var sub = new CombatDetailSubscription(store, 100);
 
         for (int i = 0; i < 80; i++)
             store.ApplyCombat(300 + i, 400 + i, 1, 1, 1, 3000 + i);

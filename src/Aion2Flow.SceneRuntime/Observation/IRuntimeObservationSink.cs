@@ -27,7 +27,16 @@ public interface IRuntimeObservationSink
 
     void MarkSceneArrival();
 
-    void AppendCombatPacket(ParsedCombatPacket packet);
+    void AppendCombatObservation(
+        int sourceId,
+        int targetId,
+        long timestamp,
+        long frameOrdinal,
+        long batchOrdinal,
+        in CombatObservation observation,
+        ushort opcode = 0,
+        int payloadLength = 0,
+        long captureSequence = 0);
 
     void CompleteBatch(long batchOrdinal);
 
@@ -121,6 +130,21 @@ public interface IRuntimeObservationSink
     void AppendNpc4636State(int instanceId, byte state0, byte state1);
 
     void AppendSummon(int ownerId, int summonInstanceId);
+}
+
+public static class RuntimeObservationSinkExtensions
+{
+    public static void AppendCombatPacket(this IRuntimeObservationSink sink, ParsedCombatPacket packet)
+    {
+        var observation = packet.ToObservation();
+        sink.AppendCombatObservation(
+            packet.SourceId,
+            packet.TargetId,
+            packet.Timestamp,
+            packet.FrameOrdinal,
+            packet.BatchOrdinal,
+            in observation);
+    }
 }
 
 public readonly record struct RuntimeNpcStateSnapshot(

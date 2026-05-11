@@ -3,8 +3,10 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjection projection, int combatantId)
+public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
 {
+    private const int ChangeBufferSize = 64;
+
     private SnapshotChangeCursor _cursor = store.CreateCursor(0);
     private long _lastAppliedRevision;
 
@@ -19,17 +21,18 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
 
     private CombatDetailDelta? PollCore(SceneCombatSnapshotAdapter? adapter, SceneCombatSnapshot? snapshot)
     {
-        var batch = store.ReadChanges(_cursor, 64);
-        if (batch.Changes.Count == 0)
+        Span<CombatSnapshotChange> changes = stackalloc CombatSnapshotChange[ChangeBufferSize];
+        var batch = store.CopyChanges(_cursor, changes);
+        if (batch.Count == 0)
             return null;
 
         bool affected = false;
         var detailRevision = _lastAppliedRevision;
         while (true)
         {
-            for (int i = 0; i < batch.Changes.Count; i++)
+            for (var i = 0; i < batch.Count; i++)
             {
-                var change = batch.Changes[i];
+                var change = changes[i];
                 if (IsRelevant(in change, adapter))
                 {
                     affected = true;
@@ -37,12 +40,12 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
                 }
             }
 
-            _cursor = new SnapshotChangeCursor(batch.ToRevision, 0);
+            _cursor = batch.Cursor;
             if (!batch.HasMore)
                 break;
 
-            batch = store.ReadChanges(_cursor, 64);
-            if (batch.Changes.Count == 0)
+            batch = store.CopyChanges(_cursor, changes);
+            if (batch.Count == 0)
                 break;
         }
 
@@ -65,11 +68,8 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
 
     private CombatDetailDelta CreateDelta(long revision, SceneCombatSnapshotAdapter? adapter, SceneCombatSnapshot? snapshot)
     {
-        if (projection.Revision != store.Revision)
-            projection.Rebuild(store);
-
         var events = adapter is not null && snapshot is not null
-            ? projection.GetDetailEvents(adapter, snapshot, combatantId)
+            ? CombatPairProjection.GetDetailEvents(adapter, snapshot, combatantId)
             : [];
         var detailRevision = Math.Max(revision, ResolveDetailRevision(events));
 
@@ -77,11 +77,11 @@ public sealed class CombatDetailSubscription(CombatStore store, CombatPairProjec
         {
             CombatantId = combatantId,
             Revision = detailRevision,
-            OutgoingPairs = projection.GetOutgoingPairs(combatantId),
-            IncomingPairs = projection.GetIncomingPairs(combatantId),
+            OutgoingPairs = CombatPairProjection.GetOutgoingPairs(store, combatantId),
+            IncomingPairs = CombatPairProjection.GetIncomingPairs(store, combatantId),
             Events = events,
-            DisplayNames = adapter is not null ? projection.BuildDetailDisplayNames(adapter, events) : new Dictionary<int, string>(),
-            Combatant = projection.GetCombatant(combatantId)
+            DisplayNames = adapter is not null ? CombatPairProjection.BuildDetailDisplayNames(adapter, events) : new Dictionary<int, string>(),
+            Combatant = CombatPairProjection.GetCombatant(store, combatantId)
         };
     }
 

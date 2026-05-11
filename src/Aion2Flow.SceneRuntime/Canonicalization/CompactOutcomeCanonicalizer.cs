@@ -45,7 +45,7 @@ public sealed class CompactOutcomeCanonicalizer
             return Append(directPrefix, directResult);
         }
 
-        if (IsCompactType2Sidecar(in observation) && IsCompactDamageConfirmation(sourceId, targetId, in observation))
+        if (IsCompactType2Sidecar(in observation) && IsCompactDamageConfirmation(sourceId, targetId))
         {
             _pendingCompactDamage.Add(new PendingCompactAvoidance(sourceId, targetId, observation.SkillCode, observation.Marker, stamp, observedAtMilliseconds));
             _confirmedCompactDamage.Add((targetId, observation.SkillCode));
@@ -127,7 +127,7 @@ public sealed class CompactOutcomeCanonicalizer
         return true;
     }
 
-    private IReadOnlyList<StampedCombatCanonicalizationResult> FinalizeBatch()
+    private List<StampedCombatCanonicalizationResult> FinalizeBatch()
     {
         var results = new List<StampedCombatCanonicalizationResult>(_pendingDirect.Count + _pendingCompact.Count);
 
@@ -174,7 +174,7 @@ public sealed class CompactOutcomeCanonicalizer
         return results;
     }
 
-    private IReadOnlyList<StampedCombatCanonicalizationResult> FinalizeAll()
+    private List<StampedCombatCanonicalizationResult> FinalizeAll()
     {
         var results = new List<StampedCombatCanonicalizationResult>();
         var finalized = FinalizeBatch();
@@ -184,7 +184,7 @@ public sealed class CompactOutcomeCanonicalizer
         return results;
     }
 
-    private IReadOnlyList<StampedCombatCanonicalizationResult> FlushOrphanCompactHits()
+    private List<StampedCombatCanonicalizationResult> FlushOrphanCompactHits()
     {
         var storedKeys = new HashSet<(long Batch, int Source, int Target, int Marker)>();
         var damageMarkersBySource = new HashSet<(int Source, int Marker)>();
@@ -299,7 +299,7 @@ public sealed class CompactOutcomeCanonicalizer
         return results;
     }
 
-    private IReadOnlyList<StampedCombatCanonicalizationResult> EnsureBatch(long batchOrdinal)
+    private List<StampedCombatCanonicalizationResult> EnsureBatch(long batchOrdinal)
     {
         var resolvedBatchOrdinal = batchOrdinal > 0 ? batchOrdinal : 0;
         if (_currentBatchOrdinal == 0)
@@ -329,7 +329,7 @@ public sealed class CompactOutcomeCanonicalizer
             _storedDamage.Add(result);
     }
 
-    private static IReadOnlyList<StampedCombatCanonicalizationResult> Append(IReadOnlyList<StampedCombatCanonicalizationResult> prefix, in StampedCombatCanonicalizationResult result)
+    private static List<StampedCombatCanonicalizationResult> Append(List<StampedCombatCanonicalizationResult> prefix, in StampedCombatCanonicalizationResult result)
     {
         if (prefix.Count == 0)
             return [result];
@@ -371,7 +371,7 @@ public sealed class CompactOutcomeCanonicalizer
             _pendingDirect.RemoveAt(0);
     }
 
-    private static bool IsCompactDamageConfirmation(int sourceId, int targetId, in CombatObservation observation) =>
+    private static bool IsCompactDamageConfirmation(int sourceId, int targetId) =>
         sourceId > 0 && targetId > 0 && sourceId != targetId;
 
     private static bool IsCompactEvadeSignal(int sourceId, int targetId, in CombatObservation observation) =>
@@ -393,24 +393,21 @@ public sealed class CompactOutcomeCanonicalizer
 
     private static CombatObservation ApplyAvoidedModifier(int sourceId, int targetId, in CombatObservation observation, DamageModifiers modifier, PacketEffectTag effectTag)
     {
-        var packet = ToPacket(sourceId, targetId, in observation);
-        packet.Damage = 0;
-        packet.HitContribution = 0;
-        packet.AttemptContribution = Math.Max(packet.AttemptContribution, 1);
-        packet.Modifiers &= ~(DamageModifiers.Evade | DamageModifiers.Invincible | DamageModifiers.Critical);
-        packet.Modifiers |= modifier;
-        packet.SetEffectTag(effectTag);
-        packet.IsNormalized = false;
-        CombatResourceRegistry.NormalizePacketForStorage(packet);
-        return FromPacket(packet, in observation);
+        var modified = observation with
+        {
+            Damage = 0,
+            HitCount = 0,
+            AttemptCount = Math.Max(observation.AttemptCount, 1),
+            Modifiers = (observation.Modifiers & ~(DamageModifiers.Evade | DamageModifiers.Invincible | DamageModifiers.Critical)) | modifier,
+            EffectTag = effectTag,
+            PeriodicRelation = PeriodicEffectRelation.None,
+            PeriodicMode = 0
+        };
+        return CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in modified);
     }
 
     private static CombatObservation NormalizeBaseObservation(int sourceId, int targetId, in CombatObservation observation)
-    {
-        var packet = ToPacket(sourceId, targetId, in observation);
-        CombatResourceRegistry.NormalizePacketForStorage(packet);
-        return FromPacket(packet, in observation);
-    }
+        => CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
 
     private static CombatObservation CreateCompactEvade(in PendingCompactAvoidance pending)
     {
@@ -427,72 +424,8 @@ public sealed class CompactOutcomeCanonicalizer
             ValueKind = CombatValueKind.Damage,
             EffectTag = PacketEffectTag.CompactEvade
         };
-        var packet = ToPacket(pending.SourceId, pending.TargetId, in observation);
-        CombatResourceRegistry.NormalizePacketForStorage(packet);
-        return FromPacket(packet, in observation);
+        return CombatResourceRegistry.NormalizeObservationForStorage(pending.SourceId, pending.TargetId, in observation);
     }
-
-    private static ParsedCombatPacket ToPacket(int sourceId, int targetId, in CombatObservation observation)
-    {
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = observation.SkillCode,
-            OriginalSkillCode = observation.OriginalSkillCode,
-            BaseSkillCode = observation.BaseSkillCode,
-            Damage = checked((int)observation.Damage),
-            HitContribution = observation.HitCount,
-            AttemptContribution = observation.AttemptCount,
-            DetailRaw = observation.DetailRaw,
-            Marker = observation.Marker,
-            Type = observation.Type,
-            Flag = observation.Flag,
-            LayoutTag = observation.LayoutTag,
-            Loop = observation.Loop,
-            MultiHitCount = observation.MultiHitCount,
-            DrainHealAmount = observation.DrainHealAmount,
-            RegenerationAmount = observation.RegenerationAmount,
-            Modifiers = observation.Modifiers,
-            ResourceKind = observation.ResourceKind,
-            EventKind = observation.EventKind,
-            ValueKind = observation.ValueKind
-        };
-
-        if (observation.PeriodicRelation != PeriodicEffectRelation.None)
-            packet.SetPeriodicEffect(observation.PeriodicRelation, observation.PeriodicMode);
-
-        if (observation.EffectTag != PacketEffectTag.None)
-            packet.SetEffectTag(observation.EffectTag);
-
-        return packet;
-    }
-
-    private static CombatObservation FromPacket(ParsedCombatPacket packet, in CombatObservation original) => original with
-    {
-        SkillCode = packet.SkillCode,
-        OriginalSkillCode = packet.OriginalSkillCode,
-        BaseSkillCode = packet.BaseSkillCode,
-        Damage = packet.Damage,
-        HitCount = packet.HitContribution,
-        AttemptCount = packet.AttemptContribution,
-        DetailRaw = packet.DetailRaw,
-        Marker = packet.Marker,
-        Type = packet.Type,
-        Flag = packet.Flag,
-        LayoutTag = packet.LayoutTag,
-        Loop = packet.Loop,
-        MultiHitCount = packet.MultiHitCount,
-        DrainHealAmount = packet.DrainHealAmount,
-        RegenerationAmount = packet.RegenerationAmount,
-        Modifiers = packet.Modifiers,
-        ResourceKind = packet.ResourceKind,
-        EventKind = packet.EventKind,
-        ValueKind = packet.ValueKind,
-        EffectTag = packet.EffectTag,
-        PeriodicRelation = packet.PeriodicRelation,
-        PeriodicMode = packet.PeriodicMode
-    };
 
     private static int ResolveTrackedSkillCode(int skillCode)
     {

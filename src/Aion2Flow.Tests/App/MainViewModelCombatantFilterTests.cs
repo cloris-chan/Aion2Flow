@@ -6,6 +6,7 @@ using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Settings;
+using Cloris.Aion2Flow.Tests.SceneRuntime;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
@@ -30,19 +31,15 @@ public sealed class MainViewModelCombatantFilterTests
         bool expected,
         string expectedReason)
     {
-        var previous = new SceneCombatSnapshot
-        {
-            MapId = previousMapId,
-            MapInstanceId = previousInstanceId,
-            EncounterTime = 12_000
-        };
-        previous.Combatants[1] = new SceneCombatantMetrics("Tester");
+        var previous = SceneSnapshotTestFactory.Create(
+            mapId: previousMapId,
+            mapInstanceId: previousInstanceId,
+            encounterTime: 12_000,
+            combatants: [SceneSnapshotTestFactory.Combatant(1, new SceneCombatantMetrics("Tester"))]);
 
-        var latest = new SceneCombatSnapshot
-        {
-            MapId = latestMapId,
-            MapInstanceId = latestInstanceId
-        };
+        var latest = SceneSnapshotTestFactory.Create(
+            mapId: latestMapId,
+            mapInstanceId: latestInstanceId);
 
         var result = MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason);
 
@@ -53,15 +50,9 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void Map_Change_Without_Battle_Does_Not_Trigger_Reset()
     {
-        var previous = new SceneCombatSnapshot
-        {
-            MapId = 600002
-        };
+        var previous = SceneSnapshotTestFactory.Create(mapId: 600002);
 
-        var latest = new SceneCombatSnapshot
-        {
-            MapId = 1010
-        };
+        var latest = SceneSnapshotTestFactory.Create(mapId: 1010);
 
         var result = MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason);
 
@@ -72,17 +63,12 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void Predictive_MapId_Flip_Without_Confirmation_Does_Not_Archive()
     {
-        var previous = new SceneCombatSnapshot
-        {
-            MapId = 1010,
-            EncounterTime = 12_000
-        };
-        previous.Combatants[1] = new SceneCombatantMetrics("Tester");
+        var previous = SceneSnapshotTestFactory.Create(
+            mapId: 1010,
+            encounterTime: 12_000,
+            combatants: [SceneSnapshotTestFactory.Combatant(1, new SceneCombatantMetrics("Tester"))]);
 
-        var latest = new SceneCombatSnapshot
-        {
-            MapId = 1010
-        };
+        var latest = SceneSnapshotTestFactory.Create(mapId: 1010);
 
         Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
         Assert.Equal(string.Empty, reason);
@@ -91,19 +77,15 @@ public sealed class MainViewModelCombatantFilterTests
     [Fact]
     public void Sub_Instance_Boss_Room_Does_Not_Archive()
     {
-        var previous = new SceneCombatSnapshot
-        {
-            MapId = 910036,
-            MapInstanceId = 113515,
-            EncounterTime = 12_000
-        };
-        previous.Combatants[1] = new SceneCombatantMetrics("Tester");
+        var previous = SceneSnapshotTestFactory.Create(
+            mapId: 910036,
+            mapInstanceId: 113515,
+            encounterTime: 12_000,
+            combatants: [SceneSnapshotTestFactory.Combatant(1, new SceneCombatantMetrics("Tester"))]);
 
-        var latest = new SceneCombatSnapshot
-        {
-            MapId = 910036,
-            MapInstanceId = 113515
-        };
+        var latest = SceneSnapshotTestFactory.Create(
+            mapId: 910036,
+            mapInstanceId: 113515);
 
         Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
         Assert.Equal(string.Empty, reason);
@@ -259,7 +241,7 @@ public sealed class MainViewModelCombatantFilterTests
         var history = Assert.Single(fixture.ViewModel.EncounterHistory);
         Assert.NotNull(history.Record.ScenePayload);
         Assert.Equal("Scene Player", history.Record.ScenePayload!.DisplayNames[300]);
-        Assert.Equal(400, history.Record.ScenePayload.CreateDetailDelta(300).Combatant!.OutgoingDamage);
+        Assert.Equal(400, history.Record.ScenePayload.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
     }
 
     [Fact]
@@ -314,7 +296,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal("map-transition", record.Trigger);
         Assert.True(record.IsAutomatic);
         Assert.NotNull(record.ScenePayload);
-        Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.OutgoingDamage);
+        Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
         Assert.NotNull(record.ScenePayload);
     }
 
@@ -331,7 +313,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal("manual-reset", record.Trigger);
         Assert.True(record.IsAutomatic);
         Assert.NotNull(record.ScenePayload);
-        Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.OutgoingDamage);
+        Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
         Assert.NotNull(record.ScenePayload);
     }
 

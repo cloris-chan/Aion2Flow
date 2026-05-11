@@ -11,13 +11,12 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private const long BossFocusVisibilityTimeoutMilliseconds = 2_000;
     private readonly Lock _gate = new();
     private DomainEventApplier _applier = new(entities, metadata, combat);
-    private readonly CombatPairProjection _pairs = new();
+    private readonly SceneCombatSnapshotBuilder _snapshotBuilder = new();
     private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
     private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
     private long _appliedBatchOrdinal = -1;
-    private long _projectionRevision = -1;
     private SnapshotCacheKey _snapshotCacheKey;
     private SceneCombatSnapshot? _snapshotCache;
     private ProjectionCacheStats _projectionCacheStats;
@@ -43,7 +42,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public CombatStore Combat => combat;
     public DomainEventApplier Applier => _applier;
     public BossFocusStore BossFocus => _applier.BossFocus;
-    public CombatPairProjection Pairs => _pairs;
     public Guid EncounterId { get; private set; } = encounterId;
     public DateTimeOffset SceneStarted { get; private set; } = sceneStarted;
     public long AppliedObservationOrdinal { get; private set; }
@@ -51,7 +49,13 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public ProjectionCacheStats ProjectionCacheStats => _projectionCacheStats;
 
     public SceneCombatSnapshot CreateSnapshot()
-        => CreateFrame().Snapshot;
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            return CreateSnapshotCore();
+        }
+    }
 
     public SceneReadModelFrame CreateFrame(int detailCombatantId = 0, bool forceDetailRefresh = false)
     {
@@ -67,7 +71,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         lock (_gate)
         {
             RefreshCore();
-            return SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, metadata, _applier.BossFocus, _pairs, CreateAdapter());
+            return SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, metadata, _applier.BossFocus, CreateAdapter());
         }
     }
 
@@ -87,6 +91,15 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             RefreshCore();
             var adapter = CreateAdapter();
             return CreateDetailDeltaCore(adapter, snapshot, combatantId, forceRefresh);
+        }
+    }
+
+    public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId)
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            return CreateAdapter().CreateSkillBreakdown(snapshot, combatantId);
         }
     }
 
@@ -124,12 +137,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _applier.CompleteBatch(completedBatch);
             _appliedBatchOrdinal = completedBatch;
         }
-
-        if (_projectionRevision != combat.Revision)
-        {
-            _pairs.Rebuild(combat);
-            _projectionRevision = combat.Revision;
-        }
     }
 
     private SceneReadModelFrame CreateFrameCore(int detailCombatantId, bool forceDetailRefresh)
@@ -161,9 +168,11 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             return _snapshotCache;
         }
 
-        var snapshot = CreateAdapter().CreateSnapshot();
-        snapshot.ReadModelRevision = combat.Revision;
-        ApplyBossFocusSnapshots(snapshot);
+        var adapter = CreateAdapter();
+        _snapshotBuilder.Reset(EncounterId, combat.Combatants.Count, 0);
+        adapter.BuildSnapshot(_snapshotBuilder);
+        ApplyBossFocusSnapshots(_snapshotBuilder, adapter);
+        var snapshot = _snapshotBuilder.ToSnapshot(combat.Revision);
         if (IsSnapshotCacheStable(snapshot))
         {
             _snapshotCacheKey = SnapshotCacheKey.From(EncounterId, entities, metadata, combat, _applier.BossFocus);
@@ -203,17 +212,16 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         return _lastDetailDeltas[combatantId];
     }
 
-    private void ApplyBossFocusSnapshots(SceneCombatSnapshot snapshot)
+    private void ApplyBossFocusSnapshots(SceneCombatSnapshotBuilder builder, SceneCombatSnapshotAdapter adapter)
     {
-        var now = snapshot.EncounterEndTime > 0
-            ? snapshot.EncounterEndTime
+        var now = builder.EncounterEndTime > 0
+            ? builder.EncounterEndTime
             : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var bosses = _applier.BossFocus.GetObservedBosses(now, BossFocusVisibilityTimeoutMilliseconds);
-        var adapter = CreateAdapter();
         for (var i = 0; i < bosses.Count; i++)
         {
             var boss = bosses[i];
-            snapshot.BossFocuses.Add(new SceneBossFocusSnapshot
+            builder.AddBossFocus(new SceneBossFocusSnapshot
             {
                 InstanceId = boss.InstanceId,
                 DisplayName = adapter.ResolveDetailDisplayName(boss.InstanceId),
@@ -229,7 +237,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     {
         if (!_detailSubscriptions.TryGetValue(combatantId, out var subscription))
         {
-            subscription = new CombatDetailSubscription(combat, _pairs, combatantId);
+            subscription = new CombatDetailSubscription(combat, combatantId);
             _detailSubscriptions[combatantId] = subscription;
         }
 
@@ -247,13 +255,11 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             SceneStarted = sceneStarted;
             combat.Clear();
             _applier = new DomainEventApplier(entities, metadata, combat);
-            _pairs.Rebuild(combat);
             _detailSubscriptions.Clear();
             _lastDetailDeltas.Clear();
             _cursor = journal.CreateCursor(startOrdinal);
             AppliedObservationOrdinal = 0;
             _appliedBatchOrdinal = journal.LastCompletedBatchOrdinal;
-            _projectionRevision = combat.Revision;
             _snapshotCache = null;
             _snapshotCacheKey = default;
         }
@@ -272,11 +278,20 @@ public readonly record struct ProjectionCacheStats(long SnapshotBuilds, long Sna
     public ProjectionCacheStats WithHit() => new(SnapshotBuilds, SnapshotCacheHits + 1);
 }
 
-public sealed class SceneReadModelFrame
+public readonly record struct SceneReadModelFrame
 {
-    public SceneCombatSnapshot Snapshot { get; init; } = new();
+    public SceneReadModelFrame()
+    {
+        Snapshot = SceneCombatSnapshot.Empty;
+        ReadModelRevision = 0;
+        DetailCombatantId = 0;
+        Detail = null;
+        BossFocuses = default;
+    }
+
+    public SceneCombatSnapshot Snapshot { get; init; }
     public long ReadModelRevision { get; init; }
     public int DetailCombatantId { get; init; }
     public CombatDetailDelta? Detail { get; init; }
-    public IReadOnlyList<SceneBossFocusSnapshot> BossFocuses { get; init; } = [];
+    public SnapshotList<SceneBossFocusSnapshot> BossFocuses { get; init; }
 }

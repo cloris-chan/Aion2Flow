@@ -234,7 +234,7 @@ public sealed class PacketLogReplayService
     {
         var summariesByCombatantId = new Dictionary<int, MutableCombatantSummary>();
 
-        foreach (var e in EnumerateSummaryEvents(combat, entities, snapshot))
+        foreach (ref readonly var e in EnumerateSummaryEvents(combat, entities, snapshot))
         {
             var sourceId = ResolveCombatantId(entities, e.SourceId);
             var targetId = e.TargetId;
@@ -268,21 +268,21 @@ public sealed class PacketLogReplayService
             }
         }
 
-        return summariesByCombatantId
-            .OrderBy(static pair => pair.Key)
-            .Select(static pair => pair.Value.ToSummary())
-            .ToList();
+        return [.. summariesByCombatantId.OrderBy(static pair => pair.Key).Select(static pair => pair.Value.ToSummary())];
     }
 
-    private static IEnumerable<CombatEventRecord> EnumerateSummaryEvents(CombatStore combat, EntityStore entities, SceneCombatSnapshot snapshot)
+    private static CombatEventSpan EnumerateSummaryEvents(CombatStore combat, EntityStore entities, SceneCombatSnapshot snapshot)
     {
         if (snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime)
-            yield break;
+            return new CombatEventSpan([], []);
 
+        var events = combat.EventSpan;
+        var indices = new List<int>();
         var relevant = new HashSet<int>();
-        foreach (var e in combat.Events)
+        for (var i = 0; i < events.Length; i++)
         {
-            if (!IsWithinEncounterWindow(e, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTarget(entities, e))
+            ref readonly var e = ref events[i];
+            if (!IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTarget(entities, in e))
                 continue;
 
             var sourceId = ResolveCombatantId(entities, e.SourceId);
@@ -290,22 +290,55 @@ public sealed class PacketLogReplayService
             if (e.TargetId > 0)
                 relevant.Add(e.TargetId);
 
-            yield return e;
+            indices.Add(i);
         }
 
         if (relevant.Count == 0)
-            yield break;
+            return new CombatEventSpan(events, indices);
 
-        foreach (var e in combat.Events)
+        for (var i = 0; i < events.Length; i++)
         {
-            if (IsWithinEncounterWindow(e, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTarget(entities, e))
+            ref readonly var e = ref events[i];
+            if (IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTarget(entities, in e))
                 continue;
 
             var sourceId = ResolveCombatantId(entities, e.SourceId);
-            if (!IsRelevantRecoveryEvent(e, sourceId, e.TargetId, relevant))
+            if (!IsRelevantRecoveryEvent(in e, sourceId, e.TargetId, relevant))
                 continue;
 
-            yield return e;
+            indices.Add(i);
+        }
+
+        return new CombatEventSpan(events, indices);
+    }
+
+    private readonly ref struct CombatEventSpan
+    {
+        private readonly ReadOnlySpan<CombatEventRecord> _events;
+        private readonly List<int> _indices;
+
+        public CombatEventSpan(ReadOnlySpan<CombatEventRecord> events, List<int> indices)
+        {
+            _events = events;
+            _indices = indices;
+        }
+
+        public readonly Enumerator GetEnumerator() => new(_events, _indices ?? []);
+
+        public ref struct Enumerator
+        {
+            private readonly ReadOnlySpan<CombatEventRecord> _events;
+            private List<int>.Enumerator _indices;
+
+            public Enumerator(ReadOnlySpan<CombatEventRecord> events, List<int> indices)
+            {
+                _events = events;
+                _indices = indices.GetEnumerator();
+            }
+
+            public readonly ref readonly CombatEventRecord Current => ref _events[_indices.Current];
+
+            public bool MoveNext() => _indices.MoveNext();
         }
     }
 
@@ -425,10 +458,10 @@ public sealed class PacketLogReplayService
         return entities.TryGet(entityId, out var entity) && entity.OwnerEntityId is int ownerId ? ownerId : entityId;
     }
 
-    private static bool IsWithinEncounterWindow(CombatEventRecord e, long start, long end) =>
+    private static bool IsWithinEncounterWindow(in CombatEventRecord e, long start, long end) =>
         e.ObservedAtMilliseconds >= start && e.ObservedAtMilliseconds <= end;
 
-    private static bool IsSummonDamageTarget(EntityStore entities, CombatEventRecord e)
+    private static bool IsSummonDamageTarget(EntityStore entities, in CombatEventRecord e)
     {
         if (e.TargetId <= 0 || !e.ContributesDamage)
             return false;
@@ -442,7 +475,7 @@ public sealed class PacketLogReplayService
     private static bool IsKnownSummon(EntityStore entities, int entityId) =>
         entities.TryGet(entityId, out var entity) && (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon);
 
-    private static bool IsRelevantRecoveryEvent(CombatEventRecord e, int sourceId, int targetId, HashSet<int> relevant)
+    private static bool IsRelevantRecoveryEvent(in CombatEventRecord e, int sourceId, int targetId, HashSet<int> relevant)
     {
         if (e.Observation.Damage <= 0 || (!relevant.Contains(sourceId) && !relevant.Contains(targetId)))
             return false;
@@ -491,7 +524,7 @@ public sealed class PacketLogReplayService
             "compact-0238" => TryReplayCompact0238(store, packet, batchOrdinal),
             "compact-0638" => TryReplayCompact0638(store, packet, timestamp, frameOrdinal, batchOrdinal),
             "sidecar-3538" => TryReplay3538(packet),
-            "wrapped-8456" => TryReplay8456(store, packet),
+            "wrapped-8456" => TryReplay8456(packet),
             "state-0140" => TryReplay0140(store, packet),
             "state-2136" => TryReplay2136(store, packet),
             "map-2e92" => TryReplayMap2E92(store, packet),
@@ -527,70 +560,65 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        var combatPacket = new ParsedCombatPacket
+        var observation = new CombatObservation
         {
-            TargetId = parsed.TargetId,
             LayoutTag = parsed.LayoutTag,
             Flag = parsed.Flag,
-            SourceId = parsed.SourceId,
             OriginalSkillCode = parsed.SkillCodeRaw,
             SkillCode = parsed.SkillCodeRaw,
             Marker = parsed.Marker,
             Type = parsed.Type,
             Modifiers = parsed.Modifiers,
-            Unknown = parsed.Unknown,
+            ChainId = parsed.Unknown,
             Damage = parsed.Damage,
+            HitCount = 1,
+            AttemptCount = 1,
             Loop = parsed.Loop,
             DrainHealAmount = parsed.DrainHealAmount,
             RegenerationAmount = parsed.RegenerationAmount,
             DetailRaw = parsed.DetailRaw,
-            ResourceKind = parsed.ResourceKind,
-            Timestamp = timestamp,
-            FrameOrdinal = frameOrdinal,
-            BatchOrdinal = batchOrdinal
+            ResourceKind = parsed.ResourceKind
         };
 
         if (parsed.TailMultiHitCount > 0)
         {
-            combatPacket.MultiHitCount = parsed.TailMultiHitCount;
-            combatPacket.Modifiers |= DamageModifiers.MultiHit;
+            observation = observation with
+            {
+                MultiHitCount = parsed.TailMultiHitCount,
+                Modifiers = observation.Modifiers | DamageModifiers.MultiHit
+            };
         }
 
-        store.AppendCombatPacket(combatPacket);
+        store.AppendCombatObservation(parsed.SourceId, parsed.TargetId, timestamp, frameOrdinal, batchOrdinal, in observation, 0x0438, packet.Length);
 
         if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(store, parsed.TargetId))
         {
-            var regenPacket = new ParsedCombatPacket
+            var regenObservation = new CombatObservation
             {
-                TargetId = parsed.TargetId,
-                SourceId = parsed.TargetId,
                 OriginalSkillCode = parsed.SkillCodeRaw,
                 SkillCode = parsed.SkillCodeRaw,
                 Damage = parsed.RegenerationAmount,
+                HitCount = 1,
+                AttemptCount = 1,
                 EventKind = CombatEventKind.Healing,
                 ValueKind = CombatValueKind.Healing,
-                Timestamp = timestamp,
-                FrameOrdinal = frameOrdinal,
-                BatchOrdinal = batchOrdinal
+                EffectTag = PacketEffectTag.RegenerationHealing
             };
-            regenPacket.SetEffectTag(PacketEffectTag.RegenerationHealing);
-            store.AppendCombatPacket(regenPacket);
+            store.AppendCombatObservation(parsed.TargetId, parsed.TargetId, timestamp, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, packet.Length);
         }
 
         if (ShouldStoreDrainHealing(parsed))
         {
-            store.AppendCombatPacket(new ParsedCombatPacket
+            var drainObservation = new CombatObservation
             {
-                TargetId = parsed.SourceId,
-                SourceId = parsed.SourceId,
                 OriginalSkillCode = parsed.SkillCodeRaw,
                 SkillCode = parsed.SkillCodeRaw,
                 Damage = parsed.DrainHealAmount,
-                DrainHealAmount = parsed.DrainHealAmount,
-                Timestamp = timestamp,
-                FrameOrdinal = frameOrdinal,
-                BatchOrdinal = batchOrdinal
-            });
+                HitCount = 1,
+                AttemptCount = 1,
+                DrainHealAmount = parsed.DrainHealAmount
+            };
+            store.AppendCombatObservation(parsed.SourceId, parsed.SourceId, timestamp, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, packet.Length);
         }
 
         return true;
@@ -642,23 +670,19 @@ public sealed class PacketLogReplayService
             return true;
         }
 
-        var combatPacket = new ParsedCombatPacket
+        var observation = new CombatObservation
         {
-            TargetId = parsed.TargetId,
-            SourceId = parsed.SourceId,
             OriginalSkillCode = parsed.SkillCodeRaw,
             SkillCode = parsed.NormalizedSkillCode,
-            Unknown = parsed.Unknown,
+            ChainId = parsed.Unknown,
             Damage = parsed.Damage,
-            Timestamp = timestamp,
-            FrameOrdinal = frameOrdinal,
-            BatchOrdinal = batchOrdinal
+            HitCount = 1,
+            AttemptCount = 1,
+            PeriodicRelation = parsed.TargetId == parsed.SourceId ? PeriodicEffectRelation.Self : PeriodicEffectRelation.Target,
+            PeriodicMode = parsed.Mode
         };
-        combatPacket.SetPeriodicEffect(
-            parsed.TargetId == parsed.SourceId ? PeriodicEffectRelation.Self : PeriodicEffectRelation.Target,
-            parsed.Mode);
 
-        store.AppendCombatPacket(combatPacket);
+        store.AppendCombatObservation(parsed.SourceId, parsed.TargetId, timestamp, frameOrdinal, batchOrdinal, in observation, 0x0538, packet.Length);
         return true;
     }
 
@@ -752,15 +776,8 @@ public sealed class PacketLogReplayService
     private static bool TryReplay3538(ReadOnlySpan<byte> packet)
         => Packet3538SidecarParser.TryParse(packet, out _);
 
-    private static bool TryReplay8456(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
-    {
-        if (!Packet8456EnvelopeParser.TryParse(packet, out var parsed))
-        {
-            return false;
-        }
-
-        return true;
-    }
+    private static bool TryReplay8456(ReadOnlySpan<byte> packet)
+        => Packet8456EnvelopeParser.TryParse(packet, out _);
 
     private static bool TryReplay0140(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
     {

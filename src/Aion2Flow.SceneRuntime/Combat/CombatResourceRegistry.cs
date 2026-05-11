@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
@@ -136,34 +137,73 @@ public static class CombatResourceRegistry
         return null;
     }
 
-    public static void NormalizePacketForStorage(ParsedCombatPacket packet)
+    public static void NormalizePacketForStorage(ref ParsedCombatPacket packet)
     {
         if (packet.IsNormalized)
             return;
 
-        var originalSkillCode = packet.OriginalSkillCode != 0 ? packet.OriginalSkillCode : packet.SkillCode;
-        var variant = ParseSkillVariant(originalSkillCode);
-        packet.OriginalSkillCode = variant.OriginalSkillCode;
-        packet.BaseSkillCode = variant.BaseSkillCode;
-        packet.ChargeStage = variant.ChargeStage;
-        packet.SpecializationMask = variant.SpecializationMask;
-        if (packet.Type == 3)
-            packet.Modifiers |= DamageModifiers.Critical;
-
-        packet.SkillCode = ResolveSkillCode(packet.SkillCode, originalSkillCode, variant);
-        if (packet.ValueKind == CombatValueKind.Unknown)
-        {
-            packet.ValueKind = CombatEventClassifier.ClassifyValueKind(packet);
-            packet.EventKind = CombatEventClassifier.Classify(packet);
-        }
-
-        if (packet.ValueKind is CombatValueKind.PeriodicDamage or CombatValueKind.PeriodicHealing && (packet.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) == 0)
-        {
-            packet.HitContribution = 0;
-            packet.AttemptContribution = 0;
-        }
-
+        var observation = packet.ToObservation();
+        var normalized = NormalizeObservationForStorage(packet.SourceId, packet.TargetId, in observation);
+        packet.SkillCode = normalized.SkillCode;
+        packet.OriginalSkillCode = normalized.OriginalSkillCode;
+        packet.BaseSkillCode = normalized.BaseSkillCode;
+        packet.ChargeStage = ParseSkillVariant(normalized.OriginalSkillCode).ChargeStage;
+        packet.SpecializationMask = ParseSkillVariant(normalized.OriginalSkillCode).SpecializationMask;
+        packet.Damage = checked((int)normalized.Damage);
+        packet.HitContribution = normalized.HitCount;
+        packet.AttemptContribution = normalized.AttemptCount;
+        packet.DetailRaw = normalized.DetailRaw;
+        packet.Marker = normalized.Marker;
+        packet.Type = normalized.Type;
+        packet.Flag = normalized.Flag;
+        packet.LayoutTag = normalized.LayoutTag;
+        packet.Loop = normalized.Loop;
+        packet.MultiHitCount = normalized.MultiHitCount;
+        packet.DrainHealAmount = normalized.DrainHealAmount;
+        packet.RegenerationAmount = normalized.RegenerationAmount;
+        packet.Modifiers = normalized.Modifiers;
+        packet.ResourceKind = normalized.ResourceKind;
+        packet.EventKind = normalized.EventKind;
+        packet.ValueKind = normalized.ValueKind;
+        packet.SetPeriodicEffect(normalized.PeriodicRelation, normalized.PeriodicMode);
+        packet.SetEffectTag(normalized.EffectTag);
         packet.IsNormalized = true;
+    }
+
+    public static CombatObservation NormalizeObservationForStorage(int sourceId, int targetId, in CombatObservation observation)
+    {
+        var originalSkillCode = observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
+        var variant = ParseSkillVariant(originalSkillCode);
+        var modifiers = observation.Type == 3 ? observation.Modifiers | DamageModifiers.Critical : observation.Modifiers;
+        var skillCode = ResolveSkillCode(observation.SkillCode, originalSkillCode, variant);
+        var normalized = observation with
+        {
+            SkillCode = skillCode,
+            OriginalSkillCode = variant.OriginalSkillCode,
+            BaseSkillCode = variant.BaseSkillCode,
+            Modifiers = modifiers
+        };
+
+        if (normalized.ValueKind == CombatValueKind.Unknown)
+        {
+            var (EventKind, ValueKind) = CombatEventClassifier.Classify(sourceId, targetId, in normalized);
+            normalized = normalized with
+            {
+                ValueKind = ValueKind,
+                EventKind = EventKind
+            };
+        }
+
+        if (normalized.ValueKind is CombatValueKind.PeriodicDamage or CombatValueKind.PeriodicHealing && (normalized.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) == 0)
+        {
+            normalized = normalized with
+            {
+                HitCount = 0,
+                AttemptCount = 0
+            };
+        }
+
+        return normalized;
     }
 
     public static SkillVariantInfo ParseSkillVariant(int originalSkillCode)

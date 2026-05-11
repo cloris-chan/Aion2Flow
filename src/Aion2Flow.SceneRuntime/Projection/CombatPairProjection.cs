@@ -6,7 +6,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
 public readonly record struct DirectedPairKey(int SourceId, int TargetId);
 
-public sealed class DirectedPairSnapshot
+public readonly record struct DirectedPairSnapshot
 {
     public DirectedPairKey Key { get; init; }
     public long TotalDamage { get; init; }
@@ -26,7 +26,7 @@ public sealed class DirectedPairSnapshot
     public long Revision { get; init; }
 }
 
-public sealed class CombatantSummary
+public readonly record struct CombatantSummary
 {
     public int CombatantId { get; init; }
     public long OutgoingDamage { get; init; }
@@ -56,118 +56,39 @@ public sealed class CombatantSummary
     public long Revision { get; init; }
 }
 
-public sealed class CombatPairProjection
+public static class CombatPairProjection
 {
-    private readonly Dictionary<DirectedPairKey, DirectedPairSnapshot> _pairs = [];
-    private readonly Dictionary<int, CombatantSummary> _combatants = [];
-    private readonly Dictionary<int, List<DirectedPairKey>> _outgoingBySource = [];
-    private readonly Dictionary<int, List<DirectedPairKey>> _incomingByTarget = [];
-    private long _revision;
-
-    public long Revision => _revision;
-    public IReadOnlyDictionary<DirectedPairKey, DirectedPairSnapshot> Pairs => _pairs;
-    public IReadOnlyDictionary<int, CombatantSummary> Combatants => _combatants;
-
-    public static CombatPairProjection FromCombatStore(CombatStore store)
+    public static IReadOnlyDictionary<DirectedPairKey, DirectedPairSnapshot> BuildPairSnapshotMap(CombatStore store)
     {
-        var projection = new CombatPairProjection();
-        projection.Rebuild(store);
-        return projection;
-    }
-
-    public void Rebuild(CombatStore store)
-    {
-        _pairs.Clear();
-        _combatants.Clear();
-        _outgoingBySource.Clear();
-        _incomingByTarget.Clear();
-        _revision = store.Revision;
+        var pairs = new Dictionary<DirectedPairKey, DirectedPairSnapshot>(store.Pairs.Count);
         foreach (var (_, record) in store.Pairs)
         {
             var pairKey = new DirectedPairKey(record.SourceId, record.TargetId);
-            _pairs[pairKey] = new DirectedPairSnapshot
-            {
-                Key = pairKey,
-                TotalDamage = record.TotalDamage,
-                TotalHealing = record.TotalHealing,
-                TotalShield = record.TotalShield,
-                TotalShieldAbsorbed = record.TotalShieldAbsorbed,
-                ShieldCount = record.ShieldCount,
-                ShieldAbsorbedCount = record.ShieldAbsorbedCount,
-                HitCount = record.HitCount,
-                AttemptCount = record.AttemptCount,
-                EvadeCount = record.EvadeCount,
-                InvincibleCount = record.InvincibleCount,
-                MultiHitCount = record.MultiHitCount,
-                LastSkillCode = record.LastSkillCode,
-                FirstObserved = record.FirstObserved,
-                LastObserved = record.LastObserved,
-                Revision = record.Revision
-            };
-
-            if (!_outgoingBySource.TryGetValue(record.SourceId, out var outgoing))
-            {
-                outgoing = [];
-                _outgoingBySource[record.SourceId] = outgoing;
-            }
-            outgoing.Add(pairKey);
-
-            if (record.TargetId > 0)
-            {
-                if (!_incomingByTarget.TryGetValue(record.TargetId, out var incoming))
-                {
-                    incoming = [];
-                    _incomingByTarget[record.TargetId] = incoming;
-                }
-                incoming.Add(pairKey);
-            }
+            pairs[pairKey] = ToSnapshot(record);
         }
 
-        foreach (var (id, record) in store.Combatants)
-        {
-            _combatants[id] = new CombatantSummary
-            {
-                CombatantId = id,
-                OutgoingDamage = record.OutgoingDamage,
-                OutgoingHits = record.OutgoingHits,
-                OutgoingAttempts = record.OutgoingAttempts,
-                OutgoingEvades = record.OutgoingEvades,
-                OutgoingInvincibles = record.OutgoingInvincibles,
-                OutgoingMultiHits = record.OutgoingMultiHits,
-                IncomingDamage = record.IncomingDamage,
-                IncomingHits = record.IncomingHits,
-                IncomingAttempts = record.IncomingAttempts,
-                IncomingEvades = record.IncomingEvades,
-                IncomingInvincibles = record.IncomingInvincibles,
-                IncomingMultiHits = record.IncomingMultiHits,
-                OutgoingHealing = record.OutgoingHealing,
-                IncomingHealing = record.IncomingHealing,
-                OutgoingShield = record.OutgoingShield,
-                IncomingShield = record.IncomingShield,
-                OutgoingShieldAbsorbed = record.OutgoingShieldAbsorbed,
-                IncomingShieldAbsorbed = record.IncomingShieldAbsorbed,
-                OutgoingShieldCount = record.OutgoingShieldCount,
-                IncomingShieldCount = record.IncomingShieldCount,
-                OutgoingShieldAbsorbedCount = record.OutgoingShieldAbsorbedCount,
-                IncomingShieldAbsorbedCount = record.IncomingShieldAbsorbedCount,
-                FirstObserved = record.FirstObserved,
-                LastObserved = record.LastObserved,
-                Revision = record.Revision
-            };
-        }
+        return pairs;
     }
 
-    public IReadOnlyList<DirectedPairKey> GetOutgoingPairs(int sourceId) => _outgoingBySource.TryGetValue(sourceId, out var pairs) ? pairs : [];
+    public static IReadOnlyDictionary<int, CombatantSummary> BuildCombatantSummaryMap(CombatStore store)
+    {
+        var combatants = new Dictionary<int, CombatantSummary>(store.Combatants.Count);
+        foreach (var (id, record) in store.Combatants)
+            combatants[id] = ToSummary(record);
+        return combatants;
+    }
 
-    public IReadOnlyList<DirectedPairKey> GetIncomingPairs(int targetId) => _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
+    public static DirectedPairSnapshot? GetPair(CombatStore store, int sourceId, int targetId) =>
+        store.TryGetPair(sourceId, targetId, out var pair) && pair is not null ? ToSnapshot(pair) : null;
 
-    public DirectedPairSnapshot? GetPair(int sourceId, int targetId) => _pairs.TryGetValue(new DirectedPairKey(sourceId, targetId), out var pair) ? pair : null;
+    public static CombatantSummary? GetCombatant(CombatStore store, int combatantId) =>
+        store.TryGetCombatant(combatantId, out var combatant) && combatant is not null ? ToSummary(combatant) : null;
 
-    public CombatantSummary? GetCombatant(int combatantId) => _combatants.TryGetValue(combatantId, out var c) ? c : null;
+    public static IReadOnlyList<DirectedPairKey> GetOutgoingPairs(CombatStore store, int sourceId) => ToPairKeys(store.GetOutgoingPairs(sourceId));
 
-    public IReadOnlyList<CombatDetailEvent> GetDetailEvents(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, int combatantId) => adapter.CreateDetailEvents(snapshot, combatantId, this);
+    public static IReadOnlyList<DirectedPairKey> GetIncomingPairs(CombatStore store, int targetId) => ToPairKeys(store.GetIncomingPairs(targetId));
 
-    public IReadOnlyDictionary<int, string> BuildDetailDisplayNames(SceneCombatSnapshotAdapter adapter, IReadOnlyList<CombatDetailEvent> events)
+    public static IReadOnlyDictionary<int, string> BuildDetailDisplayNames(SceneCombatSnapshotAdapter adapter, IReadOnlyList<CombatDetailEvent> events)
     {
         var names = new Dictionary<int, string>();
         for (var i = 0; i < events.Count; i++)
@@ -180,5 +101,75 @@ public sealed class CombatPairProjection
         }
 
         return names;
+    }
+
+    public static IReadOnlyList<CombatDetailEvent> GetDetailEvents(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, int combatantId) => adapter.CreateDetailEvents(snapshot, combatantId);
+
+    private static DirectedPairSnapshot ToSnapshot(CombatPairRecord record) => new()
+    {
+        Key = new DirectedPairKey(record.SourceId, record.TargetId),
+        TotalDamage = record.TotalDamage,
+        TotalHealing = record.TotalHealing,
+        TotalShield = record.TotalShield,
+        TotalShieldAbsorbed = record.TotalShieldAbsorbed,
+        ShieldCount = record.ShieldCount,
+        ShieldAbsorbedCount = record.ShieldAbsorbedCount,
+        HitCount = record.HitCount,
+        AttemptCount = record.AttemptCount,
+        EvadeCount = record.EvadeCount,
+        InvincibleCount = record.InvincibleCount,
+        MultiHitCount = record.MultiHitCount,
+        LastSkillCode = record.LastSkillCode,
+        FirstObserved = record.FirstObserved,
+        LastObserved = record.LastObserved,
+        Revision = record.Revision
+    };
+
+    private static CombatantSummary ToSummary(CombatantRecord record) => new()
+    {
+        CombatantId = record.CombatantId,
+        OutgoingDamage = record.OutgoingDamage,
+        OutgoingHits = record.OutgoingHits,
+        OutgoingAttempts = record.OutgoingAttempts,
+        OutgoingEvades = record.OutgoingEvades,
+        OutgoingInvincibles = record.OutgoingInvincibles,
+        OutgoingMultiHits = record.OutgoingMultiHits,
+        IncomingDamage = record.IncomingDamage,
+        IncomingHits = record.IncomingHits,
+        IncomingAttempts = record.IncomingAttempts,
+        IncomingEvades = record.IncomingEvades,
+        IncomingInvincibles = record.IncomingInvincibles,
+        IncomingMultiHits = record.IncomingMultiHits,
+        OutgoingHealing = record.OutgoingHealing,
+        IncomingHealing = record.IncomingHealing,
+        OutgoingShield = record.OutgoingShield,
+        IncomingShield = record.IncomingShield,
+        OutgoingShieldAbsorbed = record.OutgoingShieldAbsorbed,
+        IncomingShieldAbsorbed = record.IncomingShieldAbsorbed,
+        OutgoingShieldCount = record.OutgoingShieldCount,
+        IncomingShieldCount = record.IncomingShieldCount,
+        OutgoingShieldAbsorbedCount = record.OutgoingShieldAbsorbedCount,
+        IncomingShieldAbsorbedCount = record.IncomingShieldAbsorbedCount,
+        FirstObserved = record.FirstObserved,
+        LastObserved = record.LastObserved,
+        Revision = record.Revision
+    };
+
+    private static DirectedPairKey[] ToPairKeys(IReadOnlyCollection<(int, int)> pairs)
+    {
+        if (pairs.Count == 0)
+            return [];
+
+        var result = new DirectedPairKey[pairs.Count];
+        var index = 0;
+        foreach (var (sourceId, targetId) in pairs)
+            result[index++] = new DirectedPairKey(sourceId, targetId);
+
+        Array.Sort(result, static (left, right) =>
+        {
+            var cmp = left.SourceId.CompareTo(right.SourceId);
+            return cmp != 0 ? cmp : left.TargetId.CompareTo(right.TargetId);
+        });
+        return result;
     }
 }
