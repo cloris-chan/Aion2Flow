@@ -25,10 +25,10 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.True(parsed);
         scene.Owner.Refresh();
-        Assert.Equal((uint)0, scene.Owner.Metadata.CurrentMapId);
+        Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapId);
         scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)).MarkSceneArrival();
         scene.Owner.Refresh();
-        Assert.Equal((uint)200003, scene.Owner.Metadata.CurrentMapId);
+        Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         var journal = replay.SceneJournal;
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
 
@@ -83,10 +83,10 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.True(parsed);
         scene.Owner.Refresh();
-        Assert.Equal((uint)0, scene.Owner.Metadata.CurrentMapId);
+        Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapId);
         scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)).MarkSceneArrival();
         scene.Owner.Refresh();
-        Assert.Equal(expectedMapId, scene.Owner.Metadata.CurrentMapId);
+        Assert.Equal(expectedMapId, scene.Owner.Boundary.CurrentMapId);
     }
 
     [Fact]
@@ -102,24 +102,24 @@ public sealed class PacketStreamProcessorNpcObservationTests
         scene.Owner.Refresh();
 
         Assert.True(parsed);
-        Assert.Equal((uint)200003, scene.Owner.Metadata.CurrentMapId);
-        Assert.Equal((uint)113515, scene.Owner.Metadata.CurrentMapInstanceId);
+        Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal((uint)113515, scene.Owner.Boundary.CurrentMapInstanceId);
 
         arrivalSink.MarkSceneArrival();
         scene.Owner.Refresh();
-        Assert.Equal((uint)113515, scene.Owner.Metadata.CurrentMapInstanceId);
+        Assert.Equal((uint)113515, scene.Owner.Boundary.CurrentMapInstanceId);
 
         parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-1010.hex"), TestConnection);
         scene.Owner.Refresh();
 
         Assert.True(parsed);
-        Assert.Equal((uint)200003, scene.Owner.Metadata.CurrentMapId);
-        Assert.Equal((uint)113515, scene.Owner.Metadata.CurrentMapInstanceId);
+        Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal((uint)113515, scene.Owner.Boundary.CurrentMapInstanceId);
 
         arrivalSink.MarkSceneArrival();
         scene.Owner.Refresh();
-        Assert.Equal((uint)1010, scene.Owner.Metadata.CurrentMapId);
-        Assert.Equal((uint)0, scene.Owner.Metadata.CurrentMapInstanceId);
+        Assert.Equal((uint)1010, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapInstanceId);
     }
 
     [Fact]
@@ -131,20 +131,20 @@ public sealed class PacketStreamProcessorNpcObservationTests
         sink.StageDestinationMap(910035);
         sink.MarkSceneArrival();
         scene.Owner.Refresh();
-        Assert.Equal((uint)910035, scene.Owner.Metadata.CurrentMapId);
-        Assert.Equal((uint)0, scene.Owner.Metadata.CurrentMapInstanceId);
+        Assert.Equal((uint)910035, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapInstanceId);
 
         sink.StageDestinationMap(910035);
 
         sink.StageDestinationMapInstance(516446);
         scene.Owner.Refresh();
-        Assert.Equal((uint)516446, scene.Owner.Metadata.CurrentMapInstanceId);
+        Assert.Equal((uint)516446, scene.Owner.Boundary.CurrentMapInstanceId);
 
         sink.StageDestinationMap(910035);
         sink.MarkSceneArrival();
         scene.Owner.Refresh();
-        Assert.Equal((uint)910035, scene.Owner.Metadata.CurrentMapId);
-        Assert.Equal((uint)516446, scene.Owner.Metadata.CurrentMapInstanceId);
+        Assert.Equal((uint)910035, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal((uint)516446, scene.Owner.Boundary.CurrentMapInstanceId);
     }
 
     [Fact]
@@ -221,8 +221,9 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.True(parsed);
         scene.Owner.Refresh();
-        Assert.True(scene.Owner.Metadata.TryGetDisplayName(2007, out var nickname));
-        Assert.Equal("Perigee", nickname);
+        Assert.True(scene.Owner.MetadataRegistry.TryGetPcMetadata(2007, out var metadata));
+        Assert.Equal("Perigee", metadata.Nickname);
+        Assert.Equal(495, metadata.OriginServerId);
     }
 
     [Fact]

@@ -1,11 +1,12 @@
 using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
-public sealed class DomainEventApplier(EntityStore entities, MetadataStore metadata, CombatStore combat)
+public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
 {
     private readonly ObservedEventEnvelope[] _journalBuffer = new ObservedEventEnvelope[256];
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
@@ -16,8 +17,14 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
     private readonly PeriodicLinkCanonicalizer _periodicLink = new();
     private readonly BossFocusStore _bossFocus = new(entities);
 
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat)
+        : this(entities, boundary, new RuntimeMetadataRegistry(), combat)
+    {
+    }
+
     public EntityStore Entities => entities;
-    public MetadataStore Metadata => metadata;
+    public SceneBoundaryStore Boundary => boundary;
+    public RuntimeMetadataRegistry MetadataRegistry => metadataRegistry;
     public CombatStore Combat => combat;
     public BossFocusStore BossFocus => _bossFocus;
 
@@ -140,18 +147,22 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
     {
         if (scene.DiagnosticKey == "stage-destination-map")
         {
-            metadata.StageDestinationMap(scene.MapId);
+            boundary.StageDestinationMap(scene.MapId);
             return;
         }
 
         if (scene.DiagnosticKey == "stage-destination-instance")
         {
-            metadata.StageDestinationMapInstance(scene.MapInstanceId);
+            boundary.StageDestinationMapInstance(scene.MapInstanceId);
+            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
             return;
         }
 
         if (scene.DiagnosticKey == "scene-arrival")
-            metadata.MarkSceneArrival();
+        {
+            boundary.MarkSceneArrival();
+            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+        }
     }
 
     private void ApplyState(in ObservedEventEnvelope entry, in StateObservation state)
@@ -169,15 +180,13 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
                 var nickname = state.Text ?? string.Empty;
                 entities.ApplyNickname(entry.SourceEntityId, nickname);
                 if (!string.IsNullOrWhiteSpace(nickname))
-                    metadata.ApplyDisplayName(entry.SourceEntityId, nickname);
+                    metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.OriginServerId);
             }
             return;
         }
 
         if (state.StateCode == StateCodes.NpcName)
         {
-            if (state.EntityId > 0 && !string.IsNullOrWhiteSpace(state.Text))
-                metadata.ApplyNpcName(state.EntityId, state.Text);
             return;
         }
 
@@ -208,6 +217,7 @@ public sealed class DomainEventApplier(EntityStore entities, MetadataStore metad
         if (state.StateCode is >= 2_000_000 and <= 2_999_999)
         {
             entities.ApplyNpcCode(state.EntityId, state.StateCode);
+            metadataRegistry.UpsertNpcCode(state.EntityId, state.StateCode);
             return;
         }
 

@@ -419,7 +419,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Value0 = 0,
                 Value1 = 0,
                 DetailRaw = 0,
-                Text = nickname
+                Text = nickname,
+                OriginServerId = originServerId
             }
         });
     }

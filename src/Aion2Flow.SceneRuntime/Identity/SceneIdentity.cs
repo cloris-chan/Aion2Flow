@@ -1,0 +1,371 @@
+using System.Globalization;
+using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
+
+namespace Cloris.Aion2Flow.SceneRuntime.Identity;
+
+public readonly record struct PcMetadata(int EntityId, string Nickname, int? OriginServerId)
+{
+    public bool HasNickname => !string.IsNullOrWhiteSpace(Nickname);
+}
+
+public readonly record struct PcMetadataEntry(int EntityId, PcMetadata Metadata);
+
+public readonly record struct NpcCodeEntry(int InstanceId, int NpcCode);
+
+public readonly record struct MapCodeEntry(uint InstanceId, uint MapCode);
+
+public sealed class RuntimeMetadataRegistry
+{
+    private readonly Dictionary<int, PcMetadata> _pcMetadataByEntityId = [];
+    private readonly Dictionary<int, int> _npcCodesByInstanceId = [];
+    private readonly Dictionary<uint, uint> _mapCodesByInstanceId = [];
+    private long _revision;
+
+    public IReadOnlyDictionary<int, PcMetadata> PcMetadataByEntityId => _pcMetadataByEntityId;
+    public IReadOnlyDictionary<int, int> NpcCodesByInstanceId => _npcCodesByInstanceId;
+    public IReadOnlyDictionary<uint, uint> MapCodesByInstanceId => _mapCodesByInstanceId;
+    public long Revision => _revision;
+
+    public bool UpsertPcMetadata(int entityId, string nickname, int? originServerId = null)
+    {
+        if (entityId <= 0)
+            return false;
+
+        nickname ??= string.Empty;
+        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_pcMetadataByEntityId, entityId, out var exists);
+        var resolvedOriginServerId = originServerId ?? (exists ? current.OriginServerId : null);
+        var next = new PcMetadata(entityId, nickname, resolvedOriginServerId);
+        if (exists && current.Equals(next))
+            return false;
+
+        current = next;
+        _revision++;
+        return true;
+    }
+
+    public bool UpsertNpcCode(int instanceId, int npcCode)
+    {
+        if (instanceId <= 0 || npcCode <= 0)
+            return false;
+
+        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_npcCodesByInstanceId, instanceId, out var exists);
+        if (exists && current == npcCode)
+            return false;
+
+        current = npcCode;
+        _revision++;
+        return true;
+    }
+
+    public bool UpsertMapCode(uint mapInstanceId, uint mapCode)
+    {
+        if (mapInstanceId == 0 || mapCode == 0)
+            return false;
+
+        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_mapCodesByInstanceId, mapInstanceId, out var exists);
+        if (exists && current == mapCode)
+            return false;
+
+        current = mapCode;
+        _revision++;
+        return true;
+    }
+
+    public bool TryGetPcMetadata(int entityId, out PcMetadata metadata) =>
+        _pcMetadataByEntityId.TryGetValue(entityId, out metadata);
+
+    public bool TryGetNpcCode(int instanceId, out int npcCode) =>
+        _npcCodesByInstanceId.TryGetValue(instanceId, out npcCode);
+
+    public bool TryGetMapCode(uint mapInstanceId, out uint mapCode) =>
+        _mapCodesByInstanceId.TryGetValue(mapInstanceId, out mapCode);
+
+    public void Clear()
+    {
+        if (_pcMetadataByEntityId.Count == 0 && _npcCodesByInstanceId.Count == 0 && _mapCodesByInstanceId.Count == 0)
+            return;
+
+        _pcMetadataByEntityId.Clear();
+        _npcCodesByInstanceId.Clear();
+        _mapCodesByInstanceId.Clear();
+        _revision++;
+    }
+}
+
+public readonly struct SceneIdentityScope
+{
+    private static readonly PcMetadataEntry[] EmptyPcMetadata = [];
+    private static readonly NpcCodeEntry[] EmptyNpcCodes = [];
+    private static readonly MapCodeEntry[] EmptyMapCodes = [];
+
+    private readonly PcMetadataEntry[]? _pcMetadata;
+    private readonly NpcCodeEntry[]? _npcCodes;
+    private readonly MapCodeEntry[]? _mapCodes;
+
+    internal SceneIdentityScope(PcMetadataEntry[] pcMetadata, NpcCodeEntry[] npcCodes, MapCodeEntry[] mapCodes)
+    {
+        _pcMetadata = pcMetadata.Length == 0 ? EmptyPcMetadata : pcMetadata;
+        _npcCodes = npcCodes.Length == 0 ? EmptyNpcCodes : npcCodes;
+        _mapCodes = mapCodes.Length == 0 ? EmptyMapCodes : mapCodes;
+    }
+
+    public static SceneIdentityScope Empty => default;
+    public bool IsEmpty => PcMetadataSpan.Length == 0 && NpcCodeSpan.Length == 0 && MapCodeSpan.Length == 0;
+    public ReadOnlySpan<PcMetadataEntry> PcMetadataSpan => _pcMetadata ?? EmptyPcMetadata;
+    public ReadOnlySpan<NpcCodeEntry> NpcCodeSpan => _npcCodes ?? EmptyNpcCodes;
+    public ReadOnlySpan<MapCodeEntry> MapCodeSpan => _mapCodes ?? EmptyMapCodes;
+    public ReadOnlySpan<PcMetadataEntry> PcMetadataAsSpan() => PcMetadataSpan;
+    public ReadOnlySpan<NpcCodeEntry> NpcCodesAsSpan() => NpcCodeSpan;
+    public ReadOnlySpan<MapCodeEntry> MapCodesAsSpan() => MapCodeSpan;
+
+    public bool TryGetPcMetadata(int entityId, out PcMetadata metadata)
+    {
+        var span = PcMetadataSpan;
+        var low = 0;
+        var high = span.Length - 1;
+        while (low <= high)
+        {
+            var mid = (int)(((uint)low + (uint)high) >> 1);
+            var current = span[mid].EntityId;
+            if (current == entityId)
+            {
+                metadata = span[mid].Metadata;
+                return true;
+            }
+
+            if (current < entityId)
+                low = mid + 1;
+            else
+                high = mid - 1;
+        }
+
+        metadata = default;
+        return false;
+    }
+
+    public bool TryGetNpcCode(int instanceId, out int npcCode)
+    {
+        var span = NpcCodeSpan;
+        var low = 0;
+        var high = span.Length - 1;
+        while (low <= high)
+        {
+            var mid = (int)(((uint)low + (uint)high) >> 1);
+            var current = span[mid].InstanceId;
+            if (current == instanceId)
+            {
+                npcCode = span[mid].NpcCode;
+                return true;
+            }
+
+            if (current < instanceId)
+                low = mid + 1;
+            else
+                high = mid - 1;
+        }
+
+        npcCode = 0;
+        return false;
+    }
+
+    public bool TryGetMapCode(uint mapInstanceId, out uint mapCode)
+    {
+        var span = MapCodeSpan;
+        var low = 0;
+        var high = span.Length - 1;
+        while (low <= high)
+        {
+            var mid = (int)(((uint)low + (uint)high) >> 1);
+            var current = span[mid].InstanceId;
+            if (current == mapInstanceId)
+            {
+                mapCode = span[mid].MapCode;
+                return true;
+            }
+
+            if (current < mapInstanceId)
+                low = mid + 1;
+            else
+                high = mid - 1;
+        }
+
+        mapCode = 0;
+        return false;
+    }
+
+    public SceneIdentityScope DeepClone()
+    {
+        var pcs = PcMetadataSpan.ToArray();
+        var npcs = NpcCodeSpan.ToArray();
+        var maps = MapCodeSpan.ToArray();
+        return new SceneIdentityScope(pcs, npcs, maps);
+    }
+}
+
+public sealed class SceneIdentityScopeBuilder
+{
+    private readonly Dictionary<int, PcMetadata> _pcMetadata = [];
+    private readonly Dictionary<int, int> _npcCodes = [];
+    private readonly Dictionary<uint, uint> _mapCodes = [];
+
+    public void Reset(int entityCapacity = 0)
+    {
+        _pcMetadata.Clear();
+        _npcCodes.Clear();
+        _mapCodes.Clear();
+        if (entityCapacity > 0)
+        {
+            _pcMetadata.EnsureCapacity(entityCapacity);
+            _npcCodes.EnsureCapacity(entityCapacity);
+        }
+    }
+
+    public void AddPcMetadata(PcMetadata metadata)
+    {
+        if (metadata.EntityId <= 0 || !metadata.HasNickname)
+            return;
+
+        _pcMetadata[metadata.EntityId] = metadata;
+    }
+
+    public void AddNpcCode(int instanceId, int npcCode)
+    {
+        if (instanceId <= 0 || npcCode <= 0)
+            return;
+
+        _npcCodes[instanceId] = npcCode;
+    }
+
+    public void AddMapCode(uint mapInstanceId, uint mapCode)
+    {
+        if (mapInstanceId == 0 || mapCode == 0)
+            return;
+
+        _mapCodes[mapInstanceId] = mapCode;
+    }
+
+    public SceneIdentityScope ToScope()
+    {
+        var pcs = _pcMetadata.Count == 0 ? [] : new PcMetadataEntry[_pcMetadata.Count];
+        var index = 0;
+        foreach (var (entityId, metadata) in _pcMetadata)
+            pcs[index++] = new PcMetadataEntry(entityId, metadata);
+        Array.Sort(pcs, static (left, right) => left.EntityId.CompareTo(right.EntityId));
+
+        var npcs = _npcCodes.Count == 0 ? [] : new NpcCodeEntry[_npcCodes.Count];
+        index = 0;
+        foreach (var (instanceId, npcCode) in _npcCodes)
+            npcs[index++] = new NpcCodeEntry(instanceId, npcCode);
+        Array.Sort(npcs, static (left, right) => left.InstanceId.CompareTo(right.InstanceId));
+
+        var maps = _mapCodes.Count == 0 ? [] : new MapCodeEntry[_mapCodes.Count];
+        index = 0;
+        foreach (var (instanceId, mapCode) in _mapCodes)
+            maps[index++] = new MapCodeEntry(instanceId, mapCode);
+        Array.Sort(maps, static (left, right) => left.InstanceId.CompareTo(right.InstanceId));
+
+        return new SceneIdentityScope(pcs, npcs, maps);
+    }
+}
+
+public readonly struct SceneIdentityResolver(SceneIdentityScope scope, RuntimeMetadataRegistry? registry)
+{
+    public bool TryGetPcMetadata(int entityId, out PcMetadata metadata)
+    {
+        if (scope.TryGetPcMetadata(entityId, out metadata))
+            return true;
+
+        return registry is not null && registry.TryGetPcMetadata(entityId, out metadata);
+    }
+
+    public bool TryGetNpcCode(int instanceId, out int npcCode)
+    {
+        if (scope.TryGetNpcCode(instanceId, out npcCode))
+            return true;
+
+        return registry is not null && registry.TryGetNpcCode(instanceId, out npcCode);
+    }
+
+    public bool TryGetMapCode(uint mapInstanceId, out uint mapCode)
+    {
+        if (scope.TryGetMapCode(mapInstanceId, out mapCode))
+            return true;
+
+        return registry is not null && registry.TryGetMapCode(mapInstanceId, out mapCode);
+    }
+
+    public string ResolveTargetName(EntityStore entities, int entityId)
+    {
+        if (entityId <= 0)
+            return string.Empty;
+
+        if (!TryResolveNpcCode(entities, entityId, out var npcCode))
+            return string.Empty;
+
+        return TryResolveNpcName(npcCode, out var name) ? name : string.Empty;
+    }
+
+    public string ResolveDisplayName(EntityStore entities, int entityId)
+    {
+        if (entityId <= 0)
+            return string.Empty;
+
+        if (TryGetPcMetadata(entityId, out var pc) && pc.HasNickname)
+            return pc.Nickname;
+
+        EntityRecord? entity = null;
+        if (entities.TryGet(entityId, out var resolvedEntity))
+        {
+            entity = resolvedEntity;
+            if (entity.IsPlayer && !string.IsNullOrWhiteSpace(entity.Nickname))
+                return entity.Nickname;
+        }
+
+        if (TryResolveNpcCode(entities, entityId, entity, out var npcCode))
+        {
+            if (TryResolveNpcName(npcCode, out var npcName))
+                return npcName;
+
+            return $"NPC-{npcCode.ToString(CultureInfo.InvariantCulture)}";
+        }
+
+        return entityId.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private bool TryResolveNpcCode(EntityStore entities, int entityId, out int npcCode)
+        => TryResolveNpcCode(entities, entityId, null, out npcCode);
+
+    private bool TryResolveNpcCode(EntityStore entities, int entityId, EntityRecord? knownEntity, out int npcCode)
+    {
+        if (TryGetNpcCode(entityId, out npcCode))
+            return true;
+
+        var entity = knownEntity;
+        if (entity is null && entities.TryGet(entityId, out var resolvedEntity))
+            entity = resolvedEntity;
+
+        if (entity?.NpcCode is int entityNpcCode && entityNpcCode > 0)
+        {
+            npcCode = entityNpcCode;
+            return true;
+        }
+
+        npcCode = 0;
+        return false;
+    }
+
+    private static bool TryResolveNpcName(int npcCode, out string name)
+    {
+        if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
+            !string.IsNullOrWhiteSpace(catalogEntry.Name))
+        {
+            name = catalogEntry.Name;
+            return true;
+        }
+
+        name = string.Empty;
+        return false;
+    }
+}

@@ -173,7 +173,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         var focus = Assert.Single(fixture.ViewModel.BossFocuses);
         Assert.Equal(900_002, focus.InstanceId);
-        Assert.Equal("Scene Boss", focus.DisplayName);
+        Assert.Equal("NPC-2100351", focus.DisplayName);
         Assert.Equal(25_000, focus.Hp);
         Assert.Equal(50_000, focus.MaxHp);
     }
@@ -240,8 +240,9 @@ public sealed class MainViewModelCombatantFilterTests
 
         var history = Assert.Single(fixture.ViewModel.EncounterHistory);
         Assert.NotNull(history.Record.ScenePayload);
-        Assert.Equal("Scene Player", history.Record.ScenePayload!.DisplayNames[300]);
-        Assert.Equal(400, history.Record.ScenePayload.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
+        var detail = history.Record.ScenePayload!.CreateDetailDelta(300);
+        Assert.Equal("Scene Player", detail.DisplayNames[300]);
+        Assert.Equal(400, detail.Combatant!.Value.OutgoingDamage);
     }
 
     [Fact]

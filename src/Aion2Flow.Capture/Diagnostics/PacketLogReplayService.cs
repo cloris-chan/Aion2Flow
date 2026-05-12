@@ -6,6 +6,7 @@ using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.Protocol.Readers;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -122,7 +123,7 @@ public sealed class PacketLogReplayService
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = sinkHolder.Owner.ReadLocked((entities, metadata, combat) => BuildCombatantSummaries(combat, entities, metadata, snapshot));
+        var summaries = sinkHolder.Owner.ReadLocked((entities, _, metadataRegistry, combat) => BuildCombatantSummaries(combat, entities, metadataRegistry, snapshot));
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
@@ -198,7 +199,7 @@ public sealed class PacketLogReplayService
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = sinkHolder.Owner.ReadLocked((entities, metadata, combat) => BuildCombatantSummaries(combat, entities, metadata, snapshot));
+        var summaries = sinkHolder.Owner.ReadLocked((entities, _, metadataRegistry, combat) => BuildCombatantSummaries(combat, entities, metadataRegistry, snapshot));
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
@@ -230,7 +231,7 @@ public sealed class PacketLogReplayService
         return new PacketLogReplayBaselineCounter(elapsed, Math.Max(0, allocatedBytes));
     }
 
-    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(CombatStore combat, EntityStore entities, MetadataStore metadata, SceneCombatSnapshot snapshot)
+    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(CombatStore combat, EntityStore entities, RuntimeMetadataRegistry metadataRegistry, SceneCombatSnapshot snapshot)
     {
         var summariesByCombatantId = new Dictionary<int, MutableCombatantSummary>();
 
@@ -241,12 +242,12 @@ public sealed class PacketLogReplayService
 
             if (sourceId > 0)
             {
-                EnsureSummary(summariesByCombatantId, sourceId, entities, metadata);
+                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry);
             }
 
             if (targetId > 0)
             {
-                EnsureSummary(summariesByCombatantId, targetId, entities, metadata);
+                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry);
             }
 
             var observation = e.Observation;
@@ -346,7 +347,7 @@ public sealed class PacketLogReplayService
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int combatantId,
         EntityStore entities,
-        MetadataStore metadata)
+        RuntimeMetadataRegistry metadataRegistry)
     {
         if (summariesByCombatantId.TryGetValue(combatantId, out var existing))
         {
@@ -355,7 +356,7 @@ public sealed class PacketLogReplayService
 
         var created = new MutableCombatantSummary(
             combatantId,
-            ResolveDisplayName(entities, metadata, combatantId));
+            ResolveDisplayName(entities, metadataRegistry, combatantId));
         summariesByCombatantId[combatantId] = created;
         return created;
     }
@@ -484,29 +485,10 @@ public sealed class PacketLogReplayService
                || e.Observation.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing or CombatValueKind.Shield or CombatValueKind.Support;
     }
 
-    private static string ResolveDisplayName(EntityStore entities, MetadataStore metadata, int entityId)
+    private static string ResolveDisplayName(EntityStore entities, RuntimeMetadataRegistry metadataRegistry, int entityId)
     {
-        if (metadata.TryGetDisplayName(entityId, out var displayName) && !string.IsNullOrWhiteSpace(displayName))
-            return displayName;
-
-        if (entities.TryGet(entityId, out var entity))
-        {
-            if (!string.IsNullOrWhiteSpace(entity.Nickname))
-                return entity.Nickname;
-
-            if (entity.NpcCode is int npcCode)
-            {
-                if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
-                    return catalogEntry.Name;
-
-                if (metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName))
-                    return npcName;
-
-                return $"NPC-{npcCode}";
-            }
-        }
-
-        return entityId.ToString(CultureInfo.InvariantCulture);
+        var resolver = new SceneIdentityResolver(SceneIdentityScope.Empty, metadataRegistry);
+        return resolver.ResolveDisplayName(entities, entityId);
     }
 
     private static bool TryReplayEntry(IRuntimeObservationSink store, FrameReplayEntry entry, long frameOrdinal, long batchOrdinal)

@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -23,7 +24,7 @@ public sealed class EncounterArchiveServiceTests
         Assert.Single(service.History);
         Assert.NotSame(payload, record!.ScenePayload);
         Assert.Equal("Archive Boss", record.Snapshot.TargetName);
-        Assert.Equal("Tester", record.ScenePayload.DisplayNames[playerId]);
+        Assert.Equal("Tester", record.ScenePayload.CreateDetailDelta(playerId).DisplayNames[playerId]);
         Assert.Equal(payload.SceneStarted.ToLocalTime(), record.ArchivedAt);
         Assert.True(service.TryGetEncounter(record.EncounterId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
@@ -31,7 +32,7 @@ public sealed class EncounterArchiveServiceTests
         owner.Entities.ApplyNickname(playerId, "Changed");
 
         Assert.Equal("Archive Boss", record.Snapshot.TargetName);
-        Assert.Equal("Tester", record.ScenePayload.DisplayNames[playerId]);
+        Assert.Equal("Tester", record.ScenePayload.CreateDetailDelta(playerId).DisplayNames[playerId]);
     }
 
     [Fact]
@@ -179,13 +180,7 @@ public sealed class EncounterArchiveServiceTests
                 new CombatantSummary { CombatantId = playerId, OutgoingDamage = 100, IncomingDamage = 75, Revision = 2 },
                 new CombatantSummary { CombatantId = bossId, OutgoingDamage = 75, IncomingDamage = 500, Revision = 3 },
                 new CombatantSummary { CombatantId = addId, OutgoingDamage = 400, Revision = 3 }
-            ],
-            DisplayNames = new Dictionary<int, string>
-            {
-                [playerId] = "Tester",
-                [bossId] = "Archive Boss",
-                [addId] = "Add"
-            }
+            ]
         };
 
         var delta = payload.CreateDetailDelta(playerId);
@@ -228,7 +223,7 @@ public sealed class EncounterArchiveServiceTests
         var delta = payload.CreateDetailDelta(playerId);
 
         Assert.Equal("Archive Boss", payload.Snapshot.TargetName);
-        Assert.Equal("Tester", payload.DisplayNames[playerId]);
+        Assert.Equal("Tester", delta.DisplayNames[playerId]);
         Assert.Equal(2, payload.Events.Count);
         Assert.Equal(2, delta.Events.Count);
         Assert.Equal(750, delta.Events[0].Amount);
@@ -247,7 +242,8 @@ public sealed class EncounterArchiveServiceTests
         var bossIdentity = Assert.Single(payload.Entities, e => e.EntityId == bossId);
         Assert.Equal(2_999_997, bossIdentity.NpcCode);
         Assert.Equal(NpcKind.Boss, bossIdentity.Kind);
-        Assert.True(payload.NpcNamesByCode.ContainsKey(2_999_997));
+        Assert.True(payload.IdentityScope.TryGetNpcCode(bossId, out var scopedNpcCode));
+        Assert.Equal(2_999_997, scopedNpcCode);
         var focus = Assert.Single(payload.Bosses, b => b.InstanceId == bossId);
         Assert.True(focus.HasHp);
         Assert.Equal(50_000, focus.Hp);
@@ -276,6 +272,11 @@ public sealed class EncounterArchiveServiceTests
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId, DateTimeOffset sceneStarted)
     {
         const int bossCode = 2_999_997;
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
+        {
+            [bossCode] = new(bossCode, "Archive Boss", NpcCatalogKind.Boss)
+        });
+
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         AppendState(journal, sceneId, playerId, 0, StateCodes.PlayerIdentity, 0, 0, "Tester", 1, 1_000);

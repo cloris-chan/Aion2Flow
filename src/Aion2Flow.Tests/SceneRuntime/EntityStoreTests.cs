@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -98,29 +99,30 @@ public class EntityStoreTests
     }
 
     [Fact]
-    public void MetadataStore_ApplyNpcName_LookupWorks()
+    public void RuntimeMetadataRegistry_UpsertNpcCode_LookupWorks()
     {
-        var store = new MetadataStore();
-        store.ApplyNpcName(2310108, "Nazarak");
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertNpcCode(56688, 2310108);
 
-        Assert.True(store.TryGetNpcName(2310108, out var name));
-        Assert.Equal("Nazarak", name);
+        Assert.True(registry.TryGetNpcCode(56688, out var npcCode));
+        Assert.Equal(2310108, npcCode);
     }
 
     [Fact]
-    public void MetadataStore_ApplyDisplayName_LookupWorks()
+    public void RuntimeMetadataRegistry_UpsertPcMetadata_LookupWorks()
     {
-        var store = new MetadataStore();
-        store.ApplyDisplayName(2007, "Perigee");
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(2007, "Perigee", 495);
 
-        Assert.True(store.TryGetDisplayName(2007, out var name));
-        Assert.Equal("Perigee", name);
+        Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
+        Assert.Equal("Perigee", metadata.Nickname);
+        Assert.Equal(495, metadata.OriginServerId);
     }
 
     [Fact]
-    public void MetadataStore_MapStaging_CommitsOnArrival()
+    public void SceneBoundaryStore_MapStaging_CommitsOnArrival()
     {
-        var store = new MetadataStore();
+        var store = new SceneBoundaryStore();
 
         store.StageDestinationMap(200003);
         store.StageDestinationMapInstance(515552);
@@ -135,9 +137,9 @@ public class EntityStoreTests
     }
 
     [Fact]
-    public void MetadataStore_Clear_ResetsMapIdentity()
+    public void SceneBoundaryStore_Clear_ResetsMapIdentity()
     {
-        var store = new MetadataStore();
+        var store = new SceneBoundaryStore();
         store.StageDestinationMap(200003);
         store.StageDestinationMapInstance(515552);
         store.MarkSceneArrival();
@@ -178,7 +180,7 @@ public class DomainEventApplierTests
         });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
@@ -215,7 +217,7 @@ public class DomainEventApplierTests
         });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
@@ -242,7 +244,7 @@ public class DomainEventApplierTests
         });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
@@ -280,7 +282,7 @@ public class DomainEventApplierTests
         });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
 
@@ -350,7 +352,7 @@ public class DomainEventApplierTests
         });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
@@ -395,7 +397,7 @@ public class DomainEventApplierTests
         });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
@@ -419,7 +421,7 @@ public class DomainEventApplierTests
         });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
@@ -433,7 +435,7 @@ public class DomainEventApplierTests
     {
         var journal = new ObservedEventJournal();
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
@@ -451,7 +453,7 @@ public class DomainEventApplierTests
         Assert.True(journal.Count > 0);
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(journal);
@@ -466,13 +468,13 @@ public class DomainEventApplierTests
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
 
         applier.ApplyJournal(replay.SceneJournal);
 
-        Assert.Equal(replay.SceneOwner.Metadata.CurrentMapId, metadata.CurrentMapId);
-        Assert.Equal(replay.SceneOwner.Metadata.CurrentMapInstanceId, metadata.CurrentMapInstanceId);
+        Assert.Equal(replay.SceneOwner.Boundary.CurrentMapId, metadata.CurrentMapId);
+        Assert.Equal(replay.SceneOwner.Boundary.CurrentMapInstanceId, metadata.CurrentMapInstanceId);
     }
 }
 
@@ -575,7 +577,7 @@ public class CombatStoreTests
         });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
 
@@ -711,7 +713,7 @@ public class SceneSnapshotAdapterBasicTests
             ValueKind = CombatValueKind.Damage
         }, 1_001);
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore());
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new SceneBoundaryStore());
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Single(snapshot.Combatants);
@@ -744,7 +746,7 @@ public class SceneSnapshotAdapterBasicTests
             ValueKind = CombatValueKind.Damage
         }, 1_001);
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore());
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new SceneBoundaryStore());
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Equal("Perigee", snapshot.Combatants[100].Nickname);
@@ -756,7 +758,7 @@ public class SceneSnapshotAdapterBasicTests
         var entities = new EntityStore();
         var combat = new CombatStore();
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore());
+        var adapter = new SceneCombatSnapshotAdapter(entities, combat, new SceneBoundaryStore());
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Empty(snapshot.Combatants);
@@ -766,7 +768,7 @@ public class SceneSnapshotAdapterBasicTests
     public void Adapter_CreateSnapshot_UsesMetadataMapIdentity()
     {
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         metadata.StageDestinationMap(200003);
         metadata.StageDestinationMapInstance(515552);
@@ -785,12 +787,16 @@ public class SceneCombatSnapshotAdapterTests
     [Fact]
     public void Adapter_CreateSnapshot_ProjectsSceneTotalsAndWindow()
     {
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
+        {
+            [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss)
+        });
+
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         entities.ApplyNickname(100, "Perigee");
         entities.ApplyNpcCode(200, 9_999_999);
-        metadata.ApplyNpcName(9_999_999, "Nazarak");
         metadata.StageDestinationMap(200003);
         metadata.StageDestinationMapInstance(515552);
         metadata.MarkSceneArrival();
@@ -846,14 +852,16 @@ public class SceneCombatSnapshotAdapterTests
         [
             new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
             new Skill(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+        ], new Dictionary<int, NpcCatalogEntry>
+        {
+            [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss)
+        });
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         entities.ApplyNickname(100, "Perigee");
         entities.ApplyNpcCode(200, 9_999_999);
-        metadata.ApplyNpcName(9_999_999, "Nazarak");
 
         combat.ApplyCombat(100, 200, new CombatObservation
         {
@@ -929,7 +937,7 @@ public class SceneCombatSnapshotAdapterTests
             ValueKind = CombatValueKind.Support
         }, 1_020);
 
-        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore()).CreateSnapshot();
+        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, new SceneBoundaryStore()).CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(314, out var owner));
         Assert.False(snapshot.Combatants.ContainsKey(900));
@@ -970,7 +978,7 @@ public class SceneCombatSnapshotAdapterTests
             ValueKind = CombatValueKind.Damage
         }, 1_100);
 
-        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, new MetadataStore()).CreateSnapshot();
+        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, new SceneBoundaryStore()).CreateSnapshot();
 
         Assert.Equal(CharacterClass.Gladiator, snapshot.Combatants[100].CharacterClass);
         Assert.Null(snapshot.Combatants[200].CharacterClass);
@@ -980,7 +988,7 @@ public class SceneCombatSnapshotAdapterTests
     public void Adapter_CreateSnapshot_UsesTimelineNowForBossFallbackWithoutCombat()
     {
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var bossFocus = new BossFocusStore(entities);
         entities.ApplyNpcKind(3518, NpcKind.Boss);
@@ -997,7 +1005,7 @@ public class SceneCombatSnapshotAdapterTests
     public void Adapter_CreateSnapshot_ExpiresBossFallbackAgainstLatestSceneObservation()
     {
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var bossFocus = new BossFocusStore(entities);
         entities.ApplyNpcKind(3518, NpcKind.Boss);
@@ -1078,7 +1086,7 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
-    public void Owner_CreateSnapshot_InvalidatesCacheForMetadataEntityAndBossFocusChanges()
+    public void Owner_CreateSnapshot_DoesNotInvalidateCacheForNpcNameEventButInvalidatesForEntityAndBossFocusChanges()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -1106,21 +1114,20 @@ public class SceneReadModelOwnerTests
         Assert.Same(first, cached);
 
         scene.AppendNpcName(2_999_999, "Renamed Target");
-        var metadataChanged = scene.Owner.CreateSnapshot();
-        Assert.NotSame(first, metadataChanged);
-        Assert.Equal("Renamed Target", metadataChanged.TargetName);
+        var ignoredNpcName = scene.Owner.CreateSnapshot();
+        Assert.Same(first, ignoredNpcName);
 
         scene.AppendNickname(100, "Renamed Player");
         var entityChanged = scene.Owner.CreateSnapshot();
-        Assert.NotSame(metadataChanged, entityChanged);
+        Assert.NotSame(ignoredNpcName, entityChanged);
 
         scene.AppendNpcHp(200, 1234, 5000, 2_000);
         var bossChanged = scene.Owner.CreateSnapshot();
         Assert.NotSame(entityChanged, bossChanged);
         Assert.Contains(bossChanged.BossFocuses, static boss => boss.InstanceId == 200 && boss.Hp == 1234);
 
-        Assert.Equal(4, scene.Owner.ProjectionCacheStats.SnapshotBuilds);
-        Assert.Equal(1, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
+        Assert.Equal(3, scene.Owner.ProjectionCacheStats.SnapshotBuilds);
+        Assert.Equal(2, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
     }
 
     [Fact]
@@ -1194,7 +1201,7 @@ public class SceneReadModelOwnerTests
 
         var journal = new ObservedEventJournal();
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         entities.ApplyNickname(100, "Player");
         for (var i = 0; i < 128; i++)
@@ -1234,7 +1241,7 @@ public class SceneReadModelOwnerTests
 
         var journal = new ObservedEventJournal();
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         entities.ApplyNickname(100, "Player");
         for (var i = 0; i < 128; i++)
@@ -1761,7 +1768,7 @@ public class DualReadParityTests
         Assert.True(journal.Count > 0);
 
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
@@ -1792,7 +1799,7 @@ public class DualReadParityTests
 
         var journal = replay.SceneJournal;
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);

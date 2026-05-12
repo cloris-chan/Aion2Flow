@@ -76,7 +76,7 @@ public sealed class PacketLogReplayServiceTests
             Assert.Equal(5, replay.ReplayedLines);
             Assert.Equal(4, replay.ReplayedEventCounts["state-0140"]);
             Assert.Equal(1, replay.ReplayedEventCounts["nickname"]);
-            Assert.Equal(50u, replay.SceneOwner.Metadata.CurrentMapId);
+            Assert.Equal(50u, replay.SceneOwner.Boundary.CurrentMapId);
             Assert.Equal(50u, replay.Snapshot.MapId);
         }
         finally
@@ -98,13 +98,13 @@ public sealed class PacketLogReplayServiceTests
             var stagedReplay = PacketLogReplayService.Replay(stagedPath);
 
             Assert.Equal(1, stagedReplay.ReplayedLines);
-            Assert.Equal(0u, stagedReplay.SceneOwner.Metadata.CurrentMapId);
+            Assert.Equal(0u, stagedReplay.SceneOwner.Boundary.CurrentMapId);
             Assert.Equal(0u, stagedReplay.Snapshot.MapId);
 
             var arrivedReplay = PacketLogReplayService.Replay(arrivedPath);
 
             Assert.Equal(2, arrivedReplay.ReplayedLines);
-            Assert.Equal(50u, arrivedReplay.SceneOwner.Metadata.CurrentMapId);
+            Assert.Equal(50u, arrivedReplay.SceneOwner.Boundary.CurrentMapId);
             Assert.Equal(50u, arrivedReplay.Snapshot.MapId);
         }
         finally
@@ -127,7 +127,7 @@ public sealed class PacketLogReplayServiceTests
             CreateStreamReplayEntry("2026-05-02T15:52:42.0000000+08:00", "combat/0538-dot.hex")
         };
 
-        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        var path = WriteTempReplayLog("stream", [.. entries.Select(BuildStreamReplayLine)]);
         try
         {
             var sinkReplay = PacketLogReplayService.Replay(path);
@@ -154,7 +154,7 @@ public sealed class PacketLogReplayServiceTests
             CreateStreamReplayEntry("2026-05-02T15:52:42.0000000+08:00", "combat/0538-dot.hex")
         };
 
-        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        var path = WriteTempReplayLog("stream", [.. entries.Select(BuildStreamReplayLine)]);
         try
         {
             var first = PacketLogReplayService.Replay(path);
@@ -183,7 +183,7 @@ public sealed class PacketLogReplayServiceTests
             CreateStreamReplayEntry("2026-05-02T15:52:42.0000000+08:00", "combat/0538-dot.hex")
         };
 
-        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        var path = WriteTempReplayLog("stream", [.. entries.Select(BuildStreamReplayLine)]);
         try
         {
             var replay = PacketLogReplayService.Replay(path);
@@ -680,7 +680,7 @@ public sealed class PacketLogReplayServiceTests
                 {
                     Target = pair.Key,
                     Damage = pair.Value.Where(static packet => packet.EventKind == CombatEventKind.Damage).Sum(static packet => packet.Damage),
-                    Count = pair.Value.Count
+                    pair.Value.Count
                 })
                 .OrderByDescending(static entry => entry.Damage)
                 .Select(entry => $"target={entry.Target} damage={entry.Damage} packets={entry.Count}"));
@@ -883,7 +883,7 @@ public sealed class PacketLogReplayServiceTests
             CreateStreamReplayEntry("2026-05-02T15:52:42.0000000+08:00", "combat/0538-dot.hex")
         };
 
-        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        var path = WriteTempReplayLog("stream", [.. entries.Select(BuildStreamReplayLine)]);
         try
         {
             var replay = PacketLogReplayService.Replay(path);
@@ -908,7 +908,7 @@ public sealed class PacketLogReplayServiceTests
             CreateStreamReplayEntry("2026-05-02T15:52:41.0000000+08:00", "combat/0438-damage.hex"),
         };
 
-        var path = WriteTempReplayLog("stream", entries.Select(BuildStreamReplayLine).ToArray());
+        var path = WriteTempReplayLog("stream", [.. entries.Select(BuildStreamReplayLine)]);
         try
         {
             var replay = PacketLogReplayService.Replay(path);
@@ -930,7 +930,7 @@ public sealed class PacketLogReplayServiceTests
 
     private static DomainEventApplier ApplySceneJournal(ObservedEventJournal journal)
     {
-        var applier = new DomainEventApplier(new EntityStore(), new MetadataStore(), new CombatStore());
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), new CombatStore());
         applier.ApplyJournal(journal);
         return applier;
     }

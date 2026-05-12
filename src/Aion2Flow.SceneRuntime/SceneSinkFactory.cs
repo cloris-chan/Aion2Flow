@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -16,7 +17,8 @@ public static class SceneSinkFactory
         var sceneId = Guid.NewGuid();
         var clock = new SceneRuntimeClock(DateTimeOffset.UtcNow.Ticks);
         var journaling = new JournalingRuntimeObservationSink(journal, clock, sceneId);
-        return new ReplaySinkHolder(journaling, journal, new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now));
+        var metadataRegistry = new RuntimeMetadataRegistry();
+        return new ReplaySinkHolder(journaling, journal, new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now, metadataRegistry));
     }
 }
 
@@ -29,6 +31,7 @@ public sealed class SceneLiveReadModel
     public DateTimeOffset SessionStarted { get; private set; }
     public ObservedEventJournal Journal { get; } = new();
     public SceneRuntimeClock Clock { get; } = new(DateTimeOffset.UtcNow.Ticks);
+    public RuntimeMetadataRegistry MetadataRegistry { get; } = new();
     public SceneReadModelOwner Owner { get; }
 
     public SceneLiveReadModel() : this(DateTimeOffset.Now)
@@ -39,7 +42,7 @@ public sealed class SceneLiveReadModel
     {
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
-        Owner = new SceneReadModelOwner(Journal, SessionId, sessionStarted);
+        Owner = new SceneReadModelOwner(Journal, SessionId, sessionStarted, MetadataRegistry);
     }
 
     public void Reset()
@@ -71,8 +74,7 @@ public sealed class SceneLiveReadModel
 
     public IRuntimeObservationSink Synchronize(IRuntimeObservationSink sink) => new SynchronizedRuntimeObservationSink(sink, _gate);
 
-    private void ResetCore()
-        => ResetCore(DateTimeOffset.Now);
+    private void ResetCore() => ResetCore(DateTimeOffset.Now);
 
     public void Reset(DateTimeOffset sessionStarted)
     {
@@ -93,7 +95,9 @@ public sealed class SceneLiveReadModel
 public readonly struct ReplaySinkHolder(IRuntimeObservationSink sink, ObservedEventJournal journal, SceneReadModelOwner owner) : IDisposable
 {
     public IRuntimeObservationSink Sink { get; } = sink;
+
     public ObservedEventJournal Journal { get; } = journal;
+
     public SceneReadModelOwner Owner { get; } = owner;
 
     public void Dispose() { }

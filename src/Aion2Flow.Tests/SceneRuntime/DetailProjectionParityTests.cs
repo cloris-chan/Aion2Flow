@@ -16,7 +16,7 @@ public class DetailProjectionParityTests
 
         var journal = replay.SceneJournal;
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
@@ -39,7 +39,7 @@ public class DetailProjectionParityTests
 
         var journal = replay.SceneJournal;
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
@@ -65,7 +65,7 @@ public class DetailProjectionParityTests
 
         var journal = replay.SceneJournal;
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);

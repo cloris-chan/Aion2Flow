@@ -126,11 +126,11 @@ public sealed class CrossModuleProtocolParityHarnessTests
     private static void AssertMapIdentitySceneInvariant(List<string> diffs, string fileName)
     {
         var replay = ReplayWithSceneJournal(fileName);
-        var metadata = ApplyScene(replay.SceneJournal).Metadata;
-        if (metadata.CurrentMapId != replay.SceneOwner.Metadata.CurrentMapId)
-            diffs.Add($"{fileName}|map-identity|mapId|owner={replay.SceneOwner.Metadata.CurrentMapId}|scene={metadata.CurrentMapId}");
-        if (metadata.CurrentMapInstanceId != replay.SceneOwner.Metadata.CurrentMapInstanceId)
-            diffs.Add($"{fileName}|map-identity|mapInstanceId|owner={replay.SceneOwner.Metadata.CurrentMapInstanceId}|scene={metadata.CurrentMapInstanceId}");
+        var metadata = ApplyScene(replay.SceneJournal).Boundary;
+        if (metadata.CurrentMapId != replay.SceneOwner.Boundary.CurrentMapId)
+            diffs.Add($"{fileName}|map-identity|mapId|owner={replay.SceneOwner.Boundary.CurrentMapId}|scene={metadata.CurrentMapId}");
+        if (metadata.CurrentMapInstanceId != replay.SceneOwner.Boundary.CurrentMapInstanceId)
+            diffs.Add($"{fileName}|map-identity|mapInstanceId|owner={replay.SceneOwner.Boundary.CurrentMapInstanceId}|scene={metadata.CurrentMapInstanceId}");
     }
 
     private static void AssertShieldAbsorbedSceneInvariant(List<string> diffs, string fileName)
@@ -151,7 +151,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
     private static AppliedScene ApplyScene(ObservedEventJournal journal)
     {
         var entities = new EntityStore();
-        var metadata = new MetadataStore();
+        var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
         var applier = new DomainEventApplier(entities, metadata, combat);
         applier.ApplyJournal(journal);
@@ -176,13 +176,13 @@ public sealed class CrossModuleProtocolParityHarnessTests
         }
     }
 
-    private static IReadOnlyList<AggregateDiff> BuildAggregateDiffs(PacketLogReplayResult replay, AppliedScene scene)
+    private static List<AggregateDiff> BuildAggregateDiffs(PacketLogReplayResult replay, AppliedScene scene)
     {
         var diffs = new List<AggregateDiff>();
         CompareCombatants(diffs, BuildSceneCombatants(replay.SceneOwner.Combat), BuildSceneCombatants(scene.Combat));
         ComparePairs(diffs, BuildScenePairs(replay.SceneOwner.Combat), BuildScenePairs(scene.Combat));
-        CompareValue(diffs, "metadata", "current", "mapId", replay.SceneOwner.Metadata.CurrentMapId, scene.Metadata.CurrentMapId);
-        CompareValue(diffs, "metadata", "current", "mapInstanceId", replay.SceneOwner.Metadata.CurrentMapInstanceId, scene.Metadata.CurrentMapInstanceId);
+        CompareValue(diffs, "metadata", "current", "mapId", replay.SceneOwner.Boundary.CurrentMapId, scene.Boundary.CurrentMapId);
+        CompareValue(diffs, "metadata", "current", "mapInstanceId", replay.SceneOwner.Boundary.CurrentMapInstanceId, scene.Boundary.CurrentMapInstanceId);
         return diffs;
     }
 
@@ -494,7 +494,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
         public override string ToString() => $"{Scope}|{Key}|{Field}|baseline={Baseline}|scene={Scene}|delta={Scene - Baseline}";
     }
 
-    private sealed record AppliedScene(EntityStore Entities, MetadataStore Metadata, CombatStore Combat, DomainEventApplier Applier);
+    private sealed record AppliedScene(EntityStore Entities, SceneBoundaryStore Boundary, CombatStore Combat, DomainEventApplier Applier);
 
     private enum AggregateDiffClass
     {

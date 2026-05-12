@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -14,11 +16,10 @@ public sealed class SceneArchivePayload
     public SceneCombatSnapshot Snapshot { get; init; } = new();
     public DateTimeOffset SceneStarted { get; init; }
     public IReadOnlyList<SceneArchiveCombatEvent> Events { get; init; } = [];
-    public IReadOnlyDictionary<int, string> DisplayNames { get; init; } = new Dictionary<int, string>();
+    public SceneIdentityScope IdentityScope { get; init; } = SceneIdentityScope.Empty;
     public IReadOnlyList<DirectedPairSnapshot> Pairs { get; init; } = [];
     public IReadOnlyList<CombatantSummary> Combatants { get; init; } = [];
     public IReadOnlyList<SceneArchiveEntityIdentity> Entities { get; init; } = [];
-    public IReadOnlyDictionary<int, string> NpcNamesByCode { get; init; } = new Dictionary<int, string>();
     public IReadOnlyList<SceneArchiveBossFocus> Bosses { get; init; } = [];
 
     internal IReadOnlyDictionary<int, int[]> EventIndicesByCombatant => DetailIndex.EventIndicesByCombatant;
@@ -32,11 +33,17 @@ public sealed class SceneArchivePayload
         init => _detailIndex = value;
     }
 
-    internal static SceneArchivePayload CreateLocked(SceneCombatSnapshot snapshot, DateTimeOffset sceneStarted, EntityStore entities, MetadataStore metadata, BossFocusStore bossFocus, SceneCombatSnapshotAdapter adapter)
+    internal static SceneArchivePayload CreateLocked(
+        SceneCombatSnapshot snapshot,
+        DateTimeOffset sceneStarted,
+        EntityStore entities,
+        SceneBoundaryStore boundary,
+        RuntimeMetadataRegistry metadataRegistry,
+        BossFocusStore bossFocus,
+        SceneCombatSnapshotAdapter adapter)
     {
         var archivedSnapshot = snapshot.DeepClone();
         var eventsByKey = new Dictionary<EventKey, SceneArchiveCombatEvent>();
-        var displayNames = new Dictionary<int, string>();
         var entityIds = new HashSet<int>();
 
         var snapshotCombatants = archivedSnapshot.Combatants.AsSpan();
@@ -44,21 +51,19 @@ public sealed class SceneArchivePayload
         {
             var combatantId = combatant.Id;
             AddEntity(entityIds, combatantId);
-            AddDisplayName(displayNames, adapter, combatantId);
-            AddCombatantDetailEvents(eventsByKey, displayNames, entityIds, adapter, archivedSnapshot, combatantId);
+            AddCombatantDetailEvents(eventsByKey, entityIds, adapter, archivedSnapshot, combatantId);
         }
 
         if (archivedSnapshot.TargetObservation?.InstanceId is int targetId)
         {
             AddEntity(entityIds, targetId);
-            AddDisplayName(displayNames, adapter, targetId);
-            AddCombatantDetailEvents(eventsByKey, displayNames, entityIds, adapter, archivedSnapshot, targetId);
+            AddCombatantDetailEvents(eventsByKey, entityIds, adapter, archivedSnapshot, targetId);
         }
 
         var eventsSnapshot = eventsByKey.Values.ToArray();
         Array.Sort(eventsSnapshot, CompareEvents);
         var identities = BuildIdentities(entities, entityIds);
-        var npcNames = BuildNpcNames(metadata, identities);
+        var identityScope = BuildIdentityScope(identities, boundary, metadataRegistry);
         var pairs = BuildPairs(eventsSnapshot);
         var combatants = BuildCombatants(pairs);
         var bosses = BuildBosses(bossFocus, archivedSnapshot);
@@ -69,11 +74,10 @@ public sealed class SceneArchivePayload
             Snapshot = archivedSnapshot,
             SceneStarted = sceneStarted,
             Events = eventsSnapshot,
-            DisplayNames = new Dictionary<int, string>(displayNames),
+            IdentityScope = identityScope,
             Pairs = pairs,
             Combatants = combatants,
             Entities = identities,
-            NpcNamesByCode = npcNames,
             Bosses = bosses,
             DetailIndex = detailIndex
         };
@@ -106,11 +110,10 @@ public sealed class SceneArchivePayload
             Snapshot = Snapshot.DeepClone(),
             SceneStarted = SceneStarted,
             Events = events,
-            DisplayNames = new Dictionary<int, string>(DisplayNames),
+            IdentityScope = IdentityScope.DeepClone(),
             Pairs = pairs,
             Combatants = combatants,
             Entities = entities,
-            NpcNamesByCode = new Dictionary<int, string>(NpcNamesByCode),
             Bosses = bosses,
             DetailIndex = ArchivePayloadIndex.Create(events, pairs, combatants)
         };
@@ -123,7 +126,7 @@ public sealed class SceneArchivePayload
             return new CombatDetailDelta
             {
                 CombatantId = combatantId,
-                DisplayNames = DisplayNames
+                DisplayNames = new Dictionary<int, string>()
             };
         }
 
@@ -135,7 +138,7 @@ public sealed class SceneArchivePayload
             return new CombatDetailDelta
             {
                 CombatantId = combatantId,
-                DisplayNames = DisplayNames
+                DisplayNames = BuildDetailDisplayNames(eventIndices, combatantId)
             };
         }
 
@@ -155,9 +158,95 @@ public sealed class SceneArchivePayload
             OutgoingPairs = detailIndex.GetOutgoingPairs(combatantId),
             IncomingPairs = detailIndex.GetIncomingPairs(combatantId),
             Events = events,
-            DisplayNames = DisplayNames,
+            DisplayNames = BuildDetailDisplayNames(eventIndices, combatantId),
             Combatant = combatant
         };
+    }
+
+    private Dictionary<int, string> BuildDetailDisplayNames(int[] eventIndices, int combatantId)
+    {
+        var displayNames = new Dictionary<int, string>();
+        AddArchiveDisplayName(displayNames, combatantId);
+        if (Snapshot.TargetObservation?.InstanceId is int targetId)
+            AddArchiveDisplayName(displayNames, targetId);
+        AddArchiveDisplayName(displayNames, Snapshot.Encounter.TrackingTargetId);
+        for (var i = 0; i < eventIndices.Length; i++)
+        {
+            var archiveEvent = Events[eventIndices[i]];
+            AddArchiveDisplayName(displayNames, archiveEvent.SourceId);
+            AddArchiveDisplayName(displayNames, archiveEvent.TargetId);
+        }
+
+        return displayNames;
+    }
+
+    private void AddArchiveDisplayName(Dictionary<int, string> displayNames, int entityId)
+    {
+        if (entityId <= 0 || displayNames.ContainsKey(entityId))
+            return;
+
+        var displayName = ResolveArchiveDisplayName(entityId);
+        if (!string.IsNullOrWhiteSpace(displayName))
+            displayNames[entityId] = displayName;
+    }
+
+    private string ResolveArchiveDisplayName(int entityId)
+    {
+        if (IdentityScope.TryGetPcMetadata(entityId, out var pcMetadata) && pcMetadata.HasNickname)
+            return pcMetadata.Nickname;
+
+        var identity = FindIdentity(entityId);
+        if (identity is not null)
+        {
+            if (identity.IsPlayer && !string.IsNullOrWhiteSpace(identity.Nickname))
+                return identity.Nickname;
+
+            if (ResolveArchiveNpcCode(entityId, identity, out var npcCode))
+                return ResolveNpcDisplayName(npcCode);
+        }
+
+        if (IdentityScope.TryGetNpcCode(entityId, out var scopedNpcCode))
+            return ResolveNpcDisplayName(scopedNpcCode);
+
+        return entityId.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private bool ResolveArchiveNpcCode(int entityId, SceneArchiveEntityIdentity identity, out int npcCode)
+    {
+        if (IdentityScope.TryGetNpcCode(entityId, out npcCode))
+            return true;
+
+        if (identity.NpcCode is int identityNpcCode && identityNpcCode > 0)
+        {
+            npcCode = identityNpcCode;
+            return true;
+        }
+
+        npcCode = 0;
+        return false;
+    }
+
+    private SceneArchiveEntityIdentity? FindIdentity(int entityId)
+    {
+        for (var i = 0; i < Entities.Count; i++)
+        {
+            var identity = Entities[i];
+            if (identity.EntityId == entityId)
+                return identity;
+        }
+
+        return null;
+    }
+
+    private static string ResolveNpcDisplayName(int npcCode)
+    {
+        if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
+            !string.IsNullOrWhiteSpace(catalogEntry.Name))
+        {
+            return catalogEntry.Name;
+        }
+
+        return $"NPC-{npcCode.ToString(CultureInfo.InvariantCulture)}";
     }
 
     private static void AddEntity(HashSet<int> entityIds, int entityId)
@@ -166,17 +255,7 @@ public sealed class SceneArchivePayload
             entityIds.Add(entityId);
     }
 
-    private static void AddDisplayName(Dictionary<int, string> displayNames, SceneCombatSnapshotAdapter adapter, int entityId)
-    {
-        if (entityId <= 0)
-            return;
-
-        var displayName = adapter.ResolveDetailDisplayName(entityId);
-        if (!string.IsNullOrWhiteSpace(displayName))
-            displayNames[entityId] = displayName;
-    }
-
-    private static void AddCombatantDetailEvents(Dictionary<EventKey, SceneArchiveCombatEvent> eventsByKey, Dictionary<int, string> displayNames, HashSet<int> entityIds, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot archivedSnapshot, int combatantId)
+    private static void AddCombatantDetailEvents(Dictionary<EventKey, SceneArchiveCombatEvent> eventsByKey, HashSet<int> entityIds, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot archivedSnapshot, int combatantId)
     {
         var events = adapter.CreateDetailEvents(archivedSnapshot, combatantId);
         for (var i = 0; i < events.Count; i++)
@@ -184,8 +263,6 @@ public sealed class SceneArchivePayload
             var detailEvent = events[i];
             AddEntity(entityIds, detailEvent.SourceId);
             AddEntity(entityIds, detailEvent.TargetId);
-            AddDisplayName(displayNames, adapter, detailEvent.SourceId);
-            AddDisplayName(displayNames, adapter, detailEvent.TargetId);
             var archiveEvent = SceneArchiveCombatEvent.From(in detailEvent);
             eventsByKey.TryAdd(CreateKey(in detailEvent), archiveEvent);
         }
@@ -220,18 +297,28 @@ public sealed class SceneArchivePayload
         return result;
     }
 
-    private static Dictionary<int, string> BuildNpcNames(MetadataStore metadata, SceneArchiveEntityIdentity[] identities)
+    private static SceneIdentityScope BuildIdentityScope(SceneArchiveEntityIdentity[] identities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry)
     {
-        var result = new Dictionary<int, string>();
+        var builder = new SceneIdentityScopeBuilder();
+        builder.Reset(identities.Length);
         for (var i = 0; i < identities.Length; i++)
         {
-            if (identities[i].NpcCode is not int npcCode || !metadata.TryGetNpcName(npcCode, out var npcName) || string.IsNullOrWhiteSpace(npcName))
-                continue;
+            var identity = identities[i];
+            if (metadataRegistry.TryGetPcMetadata(identity.EntityId, out var pcMetadata))
+                builder.AddPcMetadata(pcMetadata);
+            else if (identity.IsPlayer && !string.IsNullOrWhiteSpace(identity.Nickname))
+                builder.AddPcMetadata(new PcMetadata(identity.EntityId, identity.Nickname, null));
 
-            result[npcCode] = npcName;
+            if (metadataRegistry.TryGetNpcCode(identity.EntityId, out var registryNpcCode))
+                builder.AddNpcCode(identity.EntityId, registryNpcCode);
+            else if (identity.NpcCode is int entityNpcCode)
+                builder.AddNpcCode(identity.EntityId, entityNpcCode);
         }
 
-        return result;
+        if (boundary.CurrentMapInstanceId > 0 && boundary.CurrentMapId > 0)
+            builder.AddMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+
+        return builder.ToScope();
     }
 
     private static EventKey CreateKey(in CombatDetailEvent e) => new(e.Revision, e.SourceId, e.TargetId, e.SkillCode, e.ObservedAt, e.Amount, e.EventKind, e.ValueKind);

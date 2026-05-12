@@ -1,15 +1,15 @@
-using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, MetadataStore metadata, BossFocusStore? bossFocus = null, Guid encounterId = default)
+public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, BossFocusStore? bossFocus = null, Guid encounterId = default, SceneIdentityScope identityScope = default)
 {
     private const int SmallSetStackCapacity = 64;
 
@@ -17,7 +17,18 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private readonly Dictionary<int, int> _inferredOwnerBySummon = [];
     private readonly Dictionary<int, SummonOwnerInferenceAccumulator> _ownerInferenceBySource = [];
     private readonly Dictionary<SkillCategory, OwnerCandidateAccumulator> _ownerCandidatesByCategory = [];
+    private readonly SceneIdentityResolver _identityResolver = new(identityScope, metadataRegistry);
     private bool _ownerInferenceReady;
+
+    public SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary)
+        : this(entities, combat, boundary, new RuntimeMetadataRegistry(), null, default, SceneIdentityScope.Empty)
+    {
+    }
+
+    public SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary, BossFocusStore? bossFocus, Guid encounterId = default)
+        : this(entities, combat, boundary, new RuntimeMetadataRegistry(), bossFocus, encounterId, SceneIdentityScope.Empty)
+    {
+    }
 
     public SceneCombatSnapshot CreateSnapshot()
     {
@@ -32,7 +43,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         _classEvidence.Clear();
         ResetOwnerInference();
         EnsureOwnerInference();
-        builder.SetMap(metadata.CurrentMapId, metadata.CurrentMapInstanceId);
+        builder.SetMap(boundary.CurrentMapId, boundary.CurrentMapInstanceId);
 
         var targetDecision = DecideTarget();
         var now = ResolveSnapshotNow();
@@ -437,40 +448,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     }
 
     private string ResolveTargetName(int targetId)
-    {
-        if (targetId <= 0 || !entities.TryGet(targetId, out var entity) || entity.NpcCode is not int npcCode)
-            return string.Empty;
-
-        if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
-            return catalogEntry.Name;
-
-        return metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName) ? npcName : string.Empty;
-    }
+        => _identityResolver.ResolveTargetName(entities, targetId);
 
     private string ResolveDisplayName(int entityId)
-    {
-        if (metadata.TryGetDisplayName(entityId, out var displayName) && !string.IsNullOrWhiteSpace(displayName))
-            return displayName;
-
-        if (entities.TryGet(entityId, out var entity))
-        {
-            if (!string.IsNullOrWhiteSpace(entity.Nickname))
-                return entity.Nickname;
-
-            if (entity.NpcCode is int npcCode)
-            {
-                if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) && !string.IsNullOrWhiteSpace(catalogEntry.Name))
-                    return catalogEntry.Name;
-
-                if (metadata.TryGetNpcName(npcCode, out var npcName) && !string.IsNullOrWhiteSpace(npcName))
-                    return npcName;
-
-                return $"NPC-{npcCode}";
-            }
-        }
-
-        return entityId.ToString(CultureInfo.InvariantCulture);
-    }
+        => _identityResolver.ResolveDisplayName(entities, entityId);
 
     private int ResolveTrackingTargetId(int trackingTargetId, long nowMilliseconds)
     {

@@ -46,6 +46,21 @@ public sealed class DetailProjectionAllocationGuardTests
         }
     }
 
+    [Fact]
+    public void SceneMetadataAndArchivePayload_DoNotExposeOldDisplayNameStores()
+    {
+        var root = FindRepositoryRoot();
+        var boundaryStore = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Stores", "SceneBoundaryStore.cs"));
+        var archivePayload = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Archive", "SceneArchivePayload.cs"));
+
+        Assert.DoesNotContain("DisplayNamesByEntityId", boundaryStore, StringComparison.Ordinal);
+        Assert.DoesNotContain("NpcNamesByCode", boundaryStore, StringComparison.Ordinal);
+        Assert.DoesNotContain("TryGetDisplayName", boundaryStore, StringComparison.Ordinal);
+        Assert.DoesNotContain("TryGetNpcName", boundaryStore, StringComparison.Ordinal);
+        Assert.DoesNotContain("public IReadOnlyDictionary<int, string> DisplayNames", archivePayload, StringComparison.Ordinal);
+        Assert.DoesNotContain("NpcNamesByCode", archivePayload, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

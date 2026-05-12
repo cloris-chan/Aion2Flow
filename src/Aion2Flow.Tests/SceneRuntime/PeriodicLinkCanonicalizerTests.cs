@@ -142,7 +142,7 @@ public class PeriodicLinkCanonicalizerTests
     private static CombatStore Apply(ObservedEventJournal journal)
     {
         var combat = new CombatStore();
-        var applier = new DomainEventApplier(new EntityStore(), new MetadataStore(), combat);
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat);
         applier.ApplyJournal(journal);
         return combat;
     }
