@@ -686,16 +686,18 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return false;
 
         var mappedClass = MapSkillCategoryToClass(skill.Category);
-        if (mappedClass is null || skill.SourceType != SkillSourceType.PcSkill || observation.PeriodicRelation != PeriodicEffectRelation.None || observation.EventKind == CombatEventKind.Support && targetId == sourceId)
+        if (mappedClass is null || skill.SourceType != SkillSourceType.PcSkill || observation.PeriodicRelation != PeriodicEffectRelation.None || observation.EffectTag == PacketEffectTag.RegenerationHealing)
             return false;
 
         score = observation.EventKind == CombatEventKind.Damage
             ? 6
             : observation.ValueKind == CombatValueKind.Shield
                 ? 4
-                : observation.EventKind == CombatEventKind.Healing && observation.ValueKind == CombatValueKind.Healing
+                : observation.EventKind == CombatEventKind.Healing
                     ? 3
-                    : 0;
+                    : observation.EventKind == CombatEventKind.Support
+                        ? 2
+                        : 0;
 
         if (score <= 0)
             return false;

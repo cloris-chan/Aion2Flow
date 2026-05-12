@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
@@ -113,5 +114,86 @@ public sealed class CharacterClassInferenceSceneTests
         Assert.Equal(CharacterClass.Ranger, combatant.CharacterClass);
         Assert.Equal(1500, combatant.DamageAmount);
         Assert.Equal(1d, combatant.DamageContribution, 10);
+    }
+
+    [Fact]
+    public void Ignores_Derived_RegenerationHealing_ClassEvidence_And_Uses_SourceSupportEvidence()
+    {
+        CombatResourceRegistry.SetGameResources(
+        [
+            new Skill(13352450, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null),
+            new Skill(16790001, "Revitalization Contract", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new Skill(16200130, "Defiance", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new Skill(16190040, "Enhance: Spirit's Benediction", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        const int assassinId = 9942;
+        const int playerId = 10190;
+        const int targetId = 12225;
+
+        scene.AppendNickname(playerId, "Elementalist");
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = assassinId,
+            TargetId = playerId,
+            SkillCode = 13352450,
+            OriginalSkillCode = 13352450,
+            Damage = 12000,
+            Timestamp = 1_000
+        });
+
+        var regeneration = new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = playerId,
+            SkillCode = 13352450,
+            OriginalSkillCode = 13352450,
+            Damage = 781,
+            EventKind = CombatEventKind.Healing,
+            ValueKind = CombatValueKind.Healing,
+            Timestamp = 1_010
+        };
+        regeneration.SetEffectTag(PacketEffectTag.RegenerationHealing);
+        scene.AppendCombatPacket(regeneration);
+
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = playerId,
+            SkillCode = 16790001,
+            OriginalSkillCode = 16790001,
+            Damage = 1,
+            EventKind = CombatEventKind.Support,
+            ValueKind = CombatValueKind.Support,
+            Timestamp = 1_020
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = playerId,
+            SkillCode = 16200130,
+            OriginalSkillCode = 16200130,
+            Damage = 1,
+            EventKind = CombatEventKind.Support,
+            ValueKind = CombatValueKind.Support,
+            Timestamp = 1_030
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = targetId,
+            SkillCode = 16190040,
+            OriginalSkillCode = 16190040,
+            Damage = 1,
+            EventKind = CombatEventKind.Support,
+            ValueKind = CombatValueKind.Support,
+            Timestamp = 1_040
+        });
+
+        var snapshot = scene.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
+        Assert.Equal(CharacterClass.Elementalist, combatant.CharacterClass);
     }
 }
