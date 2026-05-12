@@ -13,12 +13,9 @@ public sealed class GameResourceService : IDisposable
 
     public string CurrentLanguage { get; private set; }
     public SkillCollection Skills { get; private set; } = [];
-    public IReadOnlyDictionary<int, NpcCatalogEntry> NpcCatalog { get; private set; } =
-        new Dictionary<int, NpcCatalogEntry>();
-    public IReadOnlyDictionary<string, NpcName> NpcNames { get; private set; } =
-        new Dictionary<string, NpcName>(StringComparer.Ordinal);
-    public IReadOnlyDictionary<uint, string> Maps { get; private set; } =
-        new Dictionary<uint, string>();
+    public IReadOnlyDictionary<int, NpcCatalogEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcCatalogEntry>();
+    public IReadOnlyDictionary<string, NpcName> NpcNames { get; private set; } = new Dictionary<string, NpcName>(StringComparer.Ordinal);
+    public IReadOnlyDictionary<uint, string> Maps { get; private set; } = new Dictionary<uint, string>();
 
     public GameResourceService(LanguageService languageService)
     {
@@ -55,6 +52,18 @@ public sealed class GameResourceService : IDisposable
 
         entry = default;
         return false;
+    }
+
+    public string ResolveNpcName(int npcCode)
+    {
+        if (npcCode <= 0)
+        {
+            return string.Empty;
+        }
+
+        return TryResolveNpcCatalogEntry(npcCode, out var entry) && !string.IsNullOrWhiteSpace(entry.Name)
+            ? entry.Name
+            : $"NPC-{npcCode.ToString(CultureInfo.InvariantCulture)}";
     }
 
     public string ResolveMapName(uint mapId)

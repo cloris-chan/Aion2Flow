@@ -5,6 +5,7 @@ using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -43,6 +44,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<EncounterHistoryItemViewModel> EncounterHistory { get; } = [];
 
     [ObservableProperty]
+    public partial SceneDisplayContext? DisplayContext { get; set; }
+
+    [ObservableProperty]
     public partial string Status { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -55,7 +59,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public partial Guid NumericStableWidthScopeKey { get; set; }
 
     [ObservableProperty]
-    public partial string LiveSceneName { get; set; } = string.Empty;
+    public partial uint LiveSceneMapId { get; set; }
 
     [ObservableProperty]
     public partial string DriverIndicatorColor { get; set; } = IndicatorIdleColor;
@@ -114,6 +118,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _combatantDetails = combatantDetails;
         Localization = localization;
         SettingsFlyout = settingsFlyout;
+        DisplayContext = CreateLiveDisplayContext(_displayedSnapshot);
+        _combatantDetails.DisplayContext = DisplayContext;
 
         _captureService.StatusChanged += OnCaptureStatusChanged;
         _captureService.RttResolved += OnRttResolved;
@@ -322,10 +328,11 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void ApplySnapshot(SceneCombatSnapshot snapshot, bool forceDetailRefresh = false)
     {
+        UpdateDisplayContext(snapshot);
         NumericStableWidthScopeKey = snapshot.EncounterId;
         var encounterSeconds = snapshot.EncounterTime / 1000.0;
         EncounterTimeSeconds = encounterSeconds;
-        LiveSceneName = ResolveSceneDisplayName(snapshot.MapId);
+        LiveSceneMapId = snapshot.MapId;
         var liveFrame = IsViewingArchivedEncounter ? (SceneReadModelFrame?)null : _latestLiveFrame;
         RefreshBossFocus(liveFrame, snapshot);
 
@@ -335,7 +342,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             if (snapshot.Combatants.TryGetValue(row.Id, out var data) &&
                 ShouldDisplayCombatant(data))
             {
-                row.DisplayName = ResolveDisplayName(snapshot, row.Id);
                 row.CharacterClass = data.CharacterClass;
                 row.DamagePerSecond = data.DamagePerSecond;
                 row.HealingPerSecond = data.HealingPerSecond;
@@ -359,12 +365,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             if (!ShouldDisplayCombatant(data))
                 continue;
-            var displayName = ResolveDisplayName(snapshot, id);
 
             Combatants.Add(new CombatantRowViewModel
             {
                 Id = id,
-                DisplayName = displayName,
                 CharacterClass = data.CharacterClass,
                 DamagePerSecond = data.DamagePerSecond,
                 HealingPerSecond = data.HealingPerSecond,
@@ -392,11 +396,6 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         ApplySnapshot(_displayedSnapshot, forceDetailRefresh);
     }
 
-    private static string ResolveDisplayName(SceneCombatSnapshot snapshot, int id)
-        => snapshot.Combatants.TryGetValue(id, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname)
-            ? combatant.Nickname
-            : id.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
     private void RefreshBossFocus(SceneReadModelFrame? liveFrame, SceneCombatSnapshot snapshot)
     {
         if (IsViewingArchivedEncounter)
@@ -406,10 +405,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var snapshots = liveFrame?.BossFocuses ?? snapshot.BossFocuses;
-        SyncBossFocuses(snapshots.Count, i => snapshots[i].InstanceId, i => snapshots[i].Hp, i => snapshots[i].MaxHp, i => snapshots[i].HasHp, i => snapshots[i].DisplayName);
+        SyncBossFocuses(snapshots.Count, i => snapshots[i].InstanceId, i => snapshots[i].Hp, i => snapshots[i].MaxHp, i => snapshots[i].HasHp);
     }
 
-    private void SyncBossFocuses(int snapshotCount, Func<int, int> getInstanceId, Func<int, int> getHp, Func<int, int> getMaxHp, Func<int, bool> getHasHp, Func<int, string> getDisplayName)
+    private void SyncBossFocuses(int snapshotCount, Func<int, int> getInstanceId, Func<int, int> getHp, Func<int, int> getMaxHp, Func<int, bool> getHasHp)
     {
         for (var i = BossFocuses.Count - 1; i >= 0; i--)
         {
@@ -442,13 +441,12 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 }
             }
 
-            var displayName = getDisplayName(i);
             if (row is null)
             {
                 row = new BossFocusViewModel { InstanceId = instanceId };
                 BossFocuses.Add(row);
             }
-            row.Update(displayName, getHp(i), getMaxHp(i), getHasHp(i));
+            row.Update(getHp(i), getMaxHp(i), getHasHp(i));
         }
     }
 
@@ -485,7 +483,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         NumericStableWidthScopeKey = _displayedSnapshot.EncounterId;
         EncounterTimeSeconds = 0d;
         RoundTripTimeMilliseconds = 0;
-        LiveSceneName = ResolveSceneDisplayName(_displayedSnapshot.MapId);
+        LiveSceneMapId = _displayedSnapshot.MapId;
+        UpdateDisplayContext(_displayedSnapshot);
     }
 
     private void RebuildEncounterHistory()
@@ -494,33 +493,33 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         EncounterHistory.Clear();
         foreach (var record in _encounterArchiveService.History)
         {
-            EncounterHistory.Add(new EncounterHistoryItemViewModel(record, BuildHistoryDisplayName(record)));
+            EncounterHistory.Add(new EncounterHistoryItemViewModel(
+                record,
+                CreateArchivedDisplayContext(record),
+                record.Snapshot.MapId,
+                record.ArchivedAt.ToString("HH:mm:ss")));
         }
 
         HasArchivedEncounters = EncounterHistory.Count > 0;
         SelectedEncounterHistory = EncounterHistory.FirstOrDefault(x => x.Record.Id == selectedId);
     }
 
-    private string BuildHistoryDisplayName(ArchivedEncounterRecord record)
-        => $"{ResolveSceneDisplayName(record.Snapshot.MapId)} {record.ArchivedAt:HH:mm:ss}";
-
-    private string ResolveSceneDisplayName(uint mapId)
+    private void UpdateDisplayContext(SceneCombatSnapshot snapshot)
     {
-        var mapName = mapId == 0
-            ? string.Empty
-            : _gameResourceService.ResolveMapName(mapId);
-
-        if (string.IsNullOrEmpty(mapName))
-        {
-            mapName = Localization["Scene_Unknown"];
-            if (string.IsNullOrEmpty(mapName))
-            {
-                mapName = "Scene_Unknown";
-            }
-        }
-
-        return $"[{mapName}]";
+        DisplayContext = IsViewingArchivedEncounter && SelectedEncounterHistory is not null
+            ? CreateArchivedDisplayContext(SelectedEncounterHistory.Record)
+            : CreateLiveDisplayContext(snapshot);
+        _combatantDetails.DisplayContext = DisplayContext;
     }
+
+    private SceneDisplayContext CreateLiveDisplayContext(SceneCombatSnapshot snapshot)
+        => CreateDisplayContext(snapshot, SceneIdentityScope.Empty, _captureService.Scene.Owner.MetadataRegistry);
+
+    private SceneDisplayContext CreateArchivedDisplayContext(ArchivedEncounterRecord record)
+        => CreateDisplayContext(record.Snapshot, record.ScenePayload.IdentityScope, null);
+
+    private SceneDisplayContext CreateDisplayContext(SceneCombatSnapshot snapshot, SceneIdentityScope scope, RuntimeMetadataRegistry? metadataRegistry)
+        => new(scope, metadataRegistry, snapshot, _gameResourceService, Localization["Scene_Unknown"]);
 
     private ArchivedEncounterRecord? ArchiveEncounter(SceneCombatSnapshot snapshot, string trigger, bool isAutomatic)
         => _encounterArchiveService.Archive(_captureService.Scene.Owner.CreateArchivePayload(snapshot), trigger, isAutomatic);

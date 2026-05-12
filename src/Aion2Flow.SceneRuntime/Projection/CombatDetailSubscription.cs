@@ -80,7 +80,6 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
             OutgoingPairs = CombatPairProjection.GetOutgoingPairs(store, combatantId),
             IncomingPairs = CombatPairProjection.GetIncomingPairs(store, combatantId),
             Events = events,
-            DisplayNames = adapter is not null ? CombatPairProjection.BuildDetailDisplayNames(adapter, events) : new Dictionary<int, string>(),
             Combatant = CombatPairProjection.GetCombatant(store, combatantId)
         };
     }
@@ -114,6 +113,5 @@ public sealed class CombatDetailDelta
     public IReadOnlyList<DirectedPairKey> OutgoingPairs { get; init; } = [];
     public IReadOnlyList<DirectedPairKey> IncomingPairs { get; init; } = [];
     public IReadOnlyList<CombatDetailEvent> Events { get; init; } = [];
-    public IReadOnlyDictionary<int, string> DisplayNames { get; init; } = new Dictionary<int, string>();
     public CombatantSummary? Combatant { get; init; }
 }

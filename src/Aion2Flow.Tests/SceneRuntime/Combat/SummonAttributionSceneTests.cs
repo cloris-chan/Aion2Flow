@@ -46,7 +46,8 @@ public sealed class SummonAttributionSceneTests
 
         var owner = snapshot.Combatants[ownerId];
         var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
-        Assert.Equal("Owner", owner.Nickname);
+        Assert.True(scene.Owner.MetadataRegistry.TryGetPcMetadata(ownerId, out var ownerMetadata));
+        Assert.Equal("Owner", ownerMetadata.Nickname);
         Assert.Equal(8993, owner.DamageAmount);
         Assert.Single(skills);
 

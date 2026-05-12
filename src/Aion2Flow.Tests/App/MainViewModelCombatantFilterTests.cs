@@ -2,6 +2,7 @@ using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.Services;
@@ -35,7 +36,7 @@ public sealed class MainViewModelCombatantFilterTests
             mapId: previousMapId,
             mapInstanceId: previousInstanceId,
             encounterTime: 12_000,
-            combatants: [SceneSnapshotTestFactory.Combatant(1, new SceneCombatantMetrics("Tester"))]);
+            combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
 
         var latest = SceneSnapshotTestFactory.Create(
             mapId: latestMapId,
@@ -66,7 +67,7 @@ public sealed class MainViewModelCombatantFilterTests
         var previous = SceneSnapshotTestFactory.Create(
             mapId: 1010,
             encounterTime: 12_000,
-            combatants: [SceneSnapshotTestFactory.Combatant(1, new SceneCombatantMetrics("Tester"))]);
+            combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
 
         var latest = SceneSnapshotTestFactory.Create(mapId: 1010);
 
@@ -81,7 +82,7 @@ public sealed class MainViewModelCombatantFilterTests
             mapId: 910036,
             mapInstanceId: 113515,
             encounterTime: 12_000,
-            combatants: [SceneSnapshotTestFactory.Combatant(1, new SceneCombatantMetrics("Tester"))]);
+            combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
 
         var latest = SceneSnapshotTestFactory.Create(
             mapId: 910036,
@@ -146,7 +147,7 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.Equal("Scene Name", row.DisplayName);
+        Assert.Equal("Scene Name", fixture.ViewModel.DisplayContext!.ResolveEntityName(row.Id));
     }
 
     [Fact]
@@ -173,7 +174,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         var focus = Assert.Single(fixture.ViewModel.BossFocuses);
         Assert.Equal(900_002, focus.InstanceId);
-        Assert.Equal("NPC-2100351", focus.DisplayName);
+        Assert.Equal("NPC-2100351", fixture.ViewModel.DisplayContext!.ResolveNpcName(focus.InstanceId));
         Assert.Equal(25_000, focus.Hp);
         Assert.Equal(50_000, focus.MaxHp);
     }
@@ -187,7 +188,8 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
         fixture.ViewModel.SelectedCombatant = Assert.Single(fixture.ViewModel.Combatants);
 
-        Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.CombatantName);
+        Assert.Equal(300, fixture.ViewModel.CombatantDetails.SelectedCombatantId);
+        Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.DisplayContext!.ResolveEntityName(300));
         Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
         Assert.Equal(2, fixture.ViewModel.CombatantDetails.OutgoingDamage.Hits);
         Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
@@ -241,7 +243,8 @@ public sealed class MainViewModelCombatantFilterTests
         var history = Assert.Single(fixture.ViewModel.EncounterHistory);
         Assert.NotNull(history.Record.ScenePayload);
         var detail = history.Record.ScenePayload!.CreateDetailDelta(300);
-        Assert.Equal("Scene Player", detail.DisplayNames[300]);
+        Assert.True(history.Record.ScenePayload!.IdentityScope.TryGetPcMetadata(300, out var archivedPc));
+        Assert.Equal("Scene Player", archivedPc.Nickname);
         Assert.Equal(400, detail.Combatant!.Value.OutgoingDamage);
     }
 
@@ -258,7 +261,8 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.SelectedCombatant = null;
         fixture.ViewModel.SelectedCombatant = row;
 
-        Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.CombatantName);
+        Assert.Equal(300, fixture.ViewModel.CombatantDetails.SelectedCombatantId);
+        Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.DisplayContext!.ResolveEntityName(300));
         Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
         Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
         Assert.NotNull(fixture.ViewModel.EncounterHistory[0].Record.ScenePayload);
@@ -278,7 +282,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Equal(300, row.Id);
-        Assert.Equal("Scene Player", row.DisplayName);
+        Assert.Equal("Scene Player", fixture.ViewModel.DisplayContext!.ResolveEntityName(row.Id));
         Assert.NotNull(history.Record.ScenePayload);
     }
 
@@ -333,7 +337,8 @@ public sealed class MainViewModelCombatantFilterTests
 
         Assert.NotEqual(firstScene.EncounterId, secondScene.EncounterId);
         Assert.Equal(900, secondScene.Combatants[100].DamageAmount);
-        Assert.Equal("Player", secondScene.Combatants[100].Nickname);
+        Assert.True(fixture.MetadataRegistry.TryGetPcMetadata(100, out var livePc));
+        Assert.Equal("Player", livePc.Nickname);
     }
 
     [Fact]
@@ -351,7 +356,8 @@ public sealed class MainViewModelCombatantFilterTests
 
         Assert.NotEqual(first.EncounterId, reset.EncounterId);
         Assert.Empty(reset.Combatants);
-        Assert.Equal("Scene Player", second.Combatants[300].Nickname);
+        Assert.True(scene.Owner.MetadataRegistry.TryGetPcMetadata(300, out var scenePc));
+        Assert.Equal("Scene Player", scenePc.Nickname);
         Assert.Equal(401, second.Combatants[300].DamageAmount);
     }
 
@@ -368,6 +374,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         public MainViewModel ViewModel { get; }
         public EncounterArchiveService Archive { get; }
+        public RuntimeMetadataRegistry MetadataRegistry => _captureService.Scene.Owner.MetadataRegistry;
 
         public static MainViewModelFixture Create()
         {

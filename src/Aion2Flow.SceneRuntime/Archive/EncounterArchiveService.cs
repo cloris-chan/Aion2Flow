@@ -83,7 +83,8 @@ public sealed class EncounterArchiveService
     {
         return left.EncounterTime == right.EncounterTime &&
                left.EncounterId == right.EncounterId &&
-               string.Equals(left.TargetName, right.TargetName, StringComparison.Ordinal) &&
+               left.Encounter.TrackingTargetId == right.Encounter.TrackingTargetId &&
+               (left.TargetObservation?.InstanceId ?? 0) == (right.TargetObservation?.InstanceId ?? 0) &&
                left.MapId == right.MapId &&
                left.MapInstanceId == right.MapInstanceId &&
                left.Combatants.Count == right.Combatants.Count &&

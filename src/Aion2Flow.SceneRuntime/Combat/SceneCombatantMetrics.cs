@@ -5,14 +5,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
 public readonly record struct SceneCombatantMetrics
 {
-    public SceneCombatantMetrics(string nickname)
-        : this()
-    {
-        Nickname = nickname;
-    }
-
     internal SceneCombatantMetrics(
-        string nickname,
         CharacterClass? characterClass,
         bool isVisiblePlayerCombatant,
         double damagePerSecond,
@@ -29,7 +22,6 @@ public readonly record struct SceneCombatantMetrics
         int shieldAbsorbedTimes,
         double damageContribution)
     {
-        Nickname = nickname;
         CharacterClass = characterClass;
         IsVisiblePlayerCombatant = isVisiblePlayerCombatant;
         DamagePerSecond = damagePerSecond;
@@ -76,13 +68,10 @@ public readonly record struct SceneCombatantMetrics
     public int ShieldAbsorbedTimes { get; init; }
 
     public double DamageContribution { get; init; }
-
-    public string Nickname { get; init; } = string.Empty;
 }
 
-internal struct SceneCombatantMetricsAccumulator(string nickname)
+internal struct SceneCombatantMetricsAccumulator
 {
-    public string Nickname = nickname;
     public CharacterClass? CharacterClass;
     public bool IsVisiblePlayerCombatant;
     public double DamagePerSecond;
@@ -99,9 +88,9 @@ internal struct SceneCombatantMetricsAccumulator(string nickname)
     public int ShieldAbsorbedTimes;
     public double DamageContribution;
 
-    public void Reset(string nickname)
+    public void Reset()
     {
-        this = new SceneCombatantMetricsAccumulator(nickname);
+        this = default;
     }
 
     public void ProcessCombatObservation(in CombatObservation observation)
@@ -153,7 +142,6 @@ internal struct SceneCombatantMetricsAccumulator(string nickname)
     public readonly SceneCombatantMetrics ToSnapshot()
     {
         return new SceneCombatantMetrics(
-            Nickname,
             CharacterClass,
             IsVisiblePlayerCombatant,
             DamagePerSecond,

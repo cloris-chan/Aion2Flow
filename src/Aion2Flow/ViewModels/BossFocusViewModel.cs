@@ -8,9 +8,6 @@ public sealed partial class BossFocusViewModel : ObservableObject
     public int InstanceId { get; init; }
 
     [ObservableProperty]
-    public partial string DisplayName { get; set; } = string.Empty;
-
-    [ObservableProperty]
     public partial double Hp { get; set; }
 
     [ObservableProperty]
@@ -25,13 +22,12 @@ public sealed partial class BossFocusViewModel : ObservableObject
     [ObservableProperty]
     public partial string MaxHpText { get; set; } = "--";
 
-    public void Update(string displayName, int hp, int maxHp)
-        => Update(displayName, hp, maxHp, hasHp: true);
+    public void Update(int hp, int maxHp)
+        => Update(hp, maxHp, hasHp: true);
 
-    public void Update(string displayName, int hp, int maxHp, bool hasHp)
+    public void Update(int hp, int maxHp, bool hasHp)
     {
         var resolvedMaxHp = Math.Max(1, maxHp);
-        DisplayName = displayName;
         if (hasHp)
         {
             Hp = Math.Max(0, hp);
@@ -52,7 +48,6 @@ public sealed partial class BossFocusViewModel : ObservableObject
 
     public void Clear()
     {
-        DisplayName = string.Empty;
         Hp = 0;
         MaxHp = 1;
         HpRatio = 1;

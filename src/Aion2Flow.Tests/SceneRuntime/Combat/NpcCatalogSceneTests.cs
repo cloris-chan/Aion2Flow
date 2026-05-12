@@ -29,7 +29,7 @@ public sealed class NpcCatalogSceneTests
     }
 
     [Fact]
-    public void SceneSnapshot_Uses_NpcCatalog_Name_When_NpcCode_Set()
+    public void SceneArchiveScope_Captures_NpcCode_When_NpcCode_Set()
     {
         const int npcInstanceId = 29994;
         const int npcCode = 2400032;
@@ -62,14 +62,14 @@ public sealed class NpcCatalogSceneTests
         var archive = scene.Owner.CreateArchivePayload(snapshot);
 
         Assert.True(catalog.TryGetValue(npcCode, out var expectedEntry));
-        Assert.Equal(expectedEntry.Name, snapshot.TargetName);
-        var detail = archive.CreateDetailDelta(playerId);
-        Assert.True(detail.DisplayNames.TryGetValue(npcInstanceId, out var displayName));
-        Assert.Equal(expectedEntry.Name, displayName);
+        Assert.Equal(npcInstanceId, snapshot.TargetObservation?.InstanceId);
+        Assert.True(archive.IdentityScope.TryGetNpcCode(npcInstanceId, out var scopedNpcCode));
+        Assert.Equal(npcCode, scopedNpcCode);
+        Assert.Equal(expectedEntry.Name, catalog[scopedNpcCode].Name);
     }
 
     [Fact]
-    public void SceneSnapshot_Falls_Back_To_NpcCode_When_Catalog_Missing()
+    public void SceneArchiveScope_Captures_NpcCode_When_Catalog_Missing()
     {
         const int npcInstanceId = 5555;
         const int unknownNpcCode = 2999999;
@@ -101,14 +101,13 @@ public sealed class NpcCatalogSceneTests
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
 
-        Assert.Equal(string.Empty, snapshot.TargetName);
-        var detail = archive.CreateDetailDelta(playerId);
-        Assert.True(detail.DisplayNames.TryGetValue(npcInstanceId, out var displayName));
-        Assert.Equal($"NPC-{unknownNpcCode}", displayName);
+        Assert.Equal(npcInstanceId, snapshot.TargetObservation?.InstanceId);
+        Assert.True(archive.IdentityScope.TryGetNpcCode(npcInstanceId, out var scopedNpcCode));
+        Assert.Equal(unknownNpcCode, scopedNpcCode);
     }
 
     [Fact]
-    public void SceneSnapshot_Preserves_Explicit_Nickname_Over_NpcCatalog_Name()
+    public void SceneArchiveScope_Captures_ExplicitPcMetadata_AlongsideNpcCode()
     {
         const int npcInstanceId = 29994;
         const int npcCode = 2400032;
@@ -141,10 +140,11 @@ public sealed class NpcCatalogSceneTests
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
 
-        Assert.Equal(catalog[npcCode].Name, snapshot.TargetName);
-        var detail = archive.CreateDetailDelta(playerId);
-        Assert.True(detail.DisplayNames.TryGetValue(npcInstanceId, out var displayName));
-        Assert.Equal("PlayerNick", displayName);
+        Assert.Equal(npcInstanceId, snapshot.TargetObservation?.InstanceId);
+        Assert.True(archive.IdentityScope.TryGetPcMetadata(npcInstanceId, out var pc));
+        Assert.Equal("PlayerNick", pc.Nickname);
+        Assert.True(archive.IdentityScope.TryGetNpcCode(npcInstanceId, out var scopedNpcCode));
+        Assert.Equal(npcCode, scopedNpcCode);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class NpcCatalogSceneTests
     }
 
     [Fact]
-    public void SceneSnapshot_Returns_Numeric_Id_Without_NpcCode()
+    public void SceneSnapshot_Keeps_Combatant_Facts_Without_DisplayName()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         using var scene = new SceneTestHarness();
@@ -219,7 +219,7 @@ public sealed class NpcCatalogSceneTests
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
-        Assert.Equal("12345", combatant.Nickname);
+        Assert.Equal(1_001, combatant.DamageAmount);
     }
 
     [Fact]
@@ -267,9 +267,7 @@ public sealed class NpcCatalogSceneTests
         Assert.Equal(NpcKind.Monster, identity.Kind);
         Assert.True(archive.IdentityScope.TryGetNpcCode(npcEntityId, out var scopedNpcCode));
         Assert.Equal(npcCode, scopedNpcCode);
-        var detail = archive.CreateDetailDelta(playerId);
-        Assert.True(detail.DisplayNames.TryGetValue(npcEntityId, out var displayName));
-        Assert.Equal(catalog[npcCode].Name, displayName);
+        Assert.Equal(catalog[npcCode].Name, catalog[scopedNpcCode].Name);
     }
 
     [Fact]
@@ -333,12 +331,11 @@ public sealed class NpcCatalogSceneTests
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
 
-        Assert.Equal(catalog[npcCode].Name, snapshot.TargetName);
+        Assert.Equal(npcEntityId, snapshot.TargetObservation?.InstanceId);
         var identity = Assert.Single(archive.Entities, static e => e.EntityId == npcEntityId);
         Assert.Equal(npcCode, identity.NpcCode);
-        var detail = archive.CreateDetailDelta(playerId);
-        Assert.True(detail.DisplayNames.TryGetValue(npcEntityId, out var displayName));
-        Assert.Equal(catalog[npcCode].Name, displayName);
+        Assert.True(archive.IdentityScope.TryGetNpcCode(npcEntityId, out var scopedNpcCode));
+        Assert.Equal(npcCode, scopedNpcCode);
     }
 
     [Fact]

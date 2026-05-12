@@ -4,7 +4,6 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed partial class DetailCounterpartSelectionViewModel(
     int combatantId,
-    string displayName,
     long damageAmount,
     double damageShare,
     long healingAmount,
@@ -14,9 +13,6 @@ public sealed partial class DetailCounterpartSelectionViewModel(
     bool initiallySelected) : ObservableObject
 {
     public int CombatantId { get; } = combatantId;
-
-    [ObservableProperty]
-    public partial string DisplayName { get; set; } = displayName;
 
     [ObservableProperty]
     public partial long DamageAmount { get; set; } = damageAmount;
@@ -41,7 +37,6 @@ public sealed partial class DetailCounterpartSelectionViewModel(
 
     public void ApplyFrom(DetailCounterpartOption option)
     {
-        DisplayName = option.DisplayName;
         DamageAmount = option.DamageAmount;
         DamageShare = option.DamageShare;
         HealingAmount = option.HealingAmount;

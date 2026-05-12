@@ -721,7 +721,7 @@ public class SceneSnapshotAdapterBasicTests
     }
 
     [Fact]
-    public void Adapter_CreateSnapshot_ResolvesDisplayName()
+    public void Adapter_CreateSnapshot_ProjectsCombatantFactsWithoutDisplayName()
     {
         var entities = new EntityStore();
         var combat = new CombatStore();
@@ -749,7 +749,7 @@ public class SceneSnapshotAdapterBasicTests
         var adapter = new SceneCombatSnapshotAdapter(entities, combat, new SceneBoundaryStore());
         var snapshot = adapter.CreateSnapshot();
 
-        Assert.Equal("Perigee", snapshot.Combatants[100].Nickname);
+        Assert.Equal(501, snapshot.Combatants[100].DamageAmount);
     }
 
     [Fact]
@@ -831,14 +831,12 @@ public class SceneCombatSnapshotAdapterTests
 
         Assert.Equal(200003u, snapshot.MapId);
         Assert.Equal(515552u, snapshot.MapInstanceId);
-        Assert.Equal("Nazarak", snapshot.TargetName);
         Assert.Equal(200, snapshot.TargetObservation?.InstanceId);
         Assert.Equal(1_000, snapshot.EncounterStartTime);
         Assert.Equal(2_600, snapshot.EncounterEndTime);
         Assert.Equal(1_600, snapshot.EncounterTime);
         Assert.True(snapshot.Encounter.IsActive);
         var player = snapshot.Combatants[100];
-        Assert.Equal("Perigee", player.Nickname);
         Assert.Equal(1500, player.DamageAmount);
         Assert.Equal(600, player.HealingAmount);
         Assert.Equal(300, player.ShieldAbsorbedAmount);
@@ -884,7 +882,6 @@ public class SceneCombatSnapshotAdapterTests
         var snapshot = adapter.CreateSnapshot();
 
         var player = snapshot.Combatants[100];
-        Assert.Equal("Perigee", player.Nickname);
         Assert.Equal(1500, player.DamageAmount);
         Assert.Equal(600, player.HealingAmount);
         Assert.Equal(CharacterClass.Gladiator, player.CharacterClass);
@@ -1672,7 +1669,8 @@ public class SceneReadModelOwnerTests
             Assert.Equal(resetStartOrdinal, scene.Journal.Read(resetStartOrdinal).Stamp.ObservationOrdinal);
             Assert.Equal(scene.SessionId, scene.Journal.Read(resetStartOrdinal).SceneSessionId);
             Assert.Equal(1000, second.Combatants[100].DamageAmount);
-            Assert.Equal("Player", second.Combatants[100].Nickname);
+            Assert.True(scene.Owner.MetadataRegistry.TryGetPcMetadata(100, out var pc));
+            Assert.Equal("Player", pc.Nickname);
             Assert.DoesNotContain(200, second.Combatants.Keys);
         }
         finally

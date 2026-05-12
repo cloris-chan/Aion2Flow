@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -31,25 +30,22 @@ public sealed class SceneIdentityTests
     }
 
     [Fact]
-    public void SceneIdentityResolver_UsesSceneScopeBeforeGlobalRegistryAndResources()
+    public void SceneIdentityResolver_UsesSceneScopeBeforeGlobalRegistry()
     {
         const int entityId = 9002;
         var registry = new RuntimeMetadataRegistry();
         registry.UpsertPcMetadata(100, "Global Player", 1);
         registry.UpsertNpcCode(entityId, 2_100_350);
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
-        {
-            [2_100_350] = new(2_100_350, "Global NPC", NpcCatalogKind.Monster),
-            [2_100_351] = new(2_100_351, "Scoped NPC", NpcCatalogKind.Boss)
-        });
 
         var builder = new SceneIdentityScopeBuilder();
         builder.AddPcMetadata(new PcMetadata(100, "Scoped Player", 2));
         builder.AddNpcCode(entityId, 2_100_351);
         var resolver = new SceneIdentityResolver(builder.ToScope(), registry);
 
-        Assert.Equal("Scoped Player", resolver.ResolveDisplayName(new EntityStore(), 100));
-        Assert.Equal("Scoped NPC", resolver.ResolveDisplayName(new EntityStore(), entityId));
+        Assert.True(resolver.TryGetPcMetadata(100, out var pc));
+        Assert.Equal("Scoped Player", pc.Nickname);
+        Assert.True(resolver.TryGetNpcCode(entityId, out var npcCode));
+        Assert.Equal(2_100_351, npcCode);
     }
 
     [Fact]
@@ -58,15 +54,13 @@ public sealed class SceneIdentityTests
         var registry = new RuntimeMetadataRegistry();
         registry.UpsertPcMetadata(100, "Live Player", 495);
         registry.UpsertNpcCode(9001, 2_100_350);
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
-        {
-            [2_100_350] = new(2_100_350, "Live NPC", NpcCatalogKind.Monster)
-        });
 
         var resolver = new SceneIdentityResolver(SceneIdentityScope.Empty, registry);
 
-        Assert.Equal("Live Player", resolver.ResolveDisplayName(new EntityStore(), 100));
-        Assert.Equal("Live NPC", resolver.ResolveDisplayName(new EntityStore(), 9001));
+        Assert.True(resolver.TryGetPcMetadata(100, out var pc));
+        Assert.Equal("Live Player", pc.Nickname);
+        Assert.True(resolver.TryGetNpcCode(9001, out var npcCode));
+        Assert.Equal(2_100_350, npcCode);
     }
 
     [Fact]

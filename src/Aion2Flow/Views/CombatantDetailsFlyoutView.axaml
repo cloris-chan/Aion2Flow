@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
+             xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
              xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.CombatantDetailsFlyoutView"
@@ -15,15 +16,15 @@
             MaxWidth="1080"
             MaxHeight="720">
         <Grid RowDefinitions="Auto,*"
-              RowSpacing="14">
+              RowSpacing="14"
+              controls:DisplayContextProvider.DisplayContext="{Binding DisplayContext}">
             <Grid Grid.Row="0"
                   ColumnDefinitions="*,Auto"
                   ColumnSpacing="16">
-                <TextBlock Grid.Column="0"
-                           Classes="DetailHeaderName"
-                           Text="{Binding CombatantName}"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
+                <controls:PcDisplay Grid.Column="0"
+                                    TextClasses="DetailHeaderName"
+                                    EntityId="{Binding SelectedCombatantId}"
+                                    VerticalAlignment="Center" />
 
                 <StackPanel Grid.Column="1"
                             Classes="DetailDirectionTabs"

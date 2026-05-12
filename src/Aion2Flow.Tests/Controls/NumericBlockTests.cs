@@ -1,4 +1,6 @@
+using System.Reflection;
 using Avalonia;
+using Avalonia.Threading;
 using Cloris.Aion2Flow.Controls;
 
 namespace Cloris.Aion2Flow.Tests.Controls;
@@ -6,7 +8,8 @@ namespace Cloris.Aion2Flow.Tests.Controls;
 public sealed class NumericBlockTests
 {
     private static readonly Size InfiniteSize = new(double.PositiveInfinity, double.PositiveInfinity);
-    private static int s_avaloniaInitialized;
+    private static readonly Lock s_avaloniaGate = new();
+    private static bool s_avaloniaInitialized;
 
     public NumericBlockTests()
     {
@@ -150,16 +153,29 @@ public sealed class NumericBlockTests
 
     private static void EnsureAvalonia()
     {
-        if (Application.Current is not null ||
-            Interlocked.Exchange(ref s_avaloniaInitialized, 1) != 0)
+        if (Application.Current is not null || s_avaloniaInitialized)
         {
             return;
         }
 
-        AppBuilder
-            .Configure<TestApplication>()
-            .UsePlatformDetect()
-            .SetupWithoutStarting();
+        lock (s_avaloniaGate)
+        {
+            if (Application.Current is not null || s_avaloniaInitialized)
+            {
+                return;
+            }
+
+            typeof(Dispatcher)
+                .GetMethod("ResetBeforeUnitTests", BindingFlags.Static | BindingFlags.NonPublic)
+                ?.Invoke(null, null);
+
+            AppBuilder
+                .Configure<TestApplication>()
+                .UsePlatformDetect()
+                .SetupWithoutStarting();
+
+            s_avaloniaInitialized = true;
+        }
     }
 
     private sealed class TestApplication : Application;

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -22,7 +21,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 {
     private struct CounterpartAggregateMetrics
     {
-        public string DisplayName;
         public long DamageAmount;
         public long HealingAmount;
         public long ShieldAmount;
@@ -30,7 +28,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
 
     private readonly List<CombatDetailEvent> _detailEvents = [];
     private SceneCombatSnapshot _currentSnapshot = new();
-    private IReadOnlyDictionary<int, string> _currentSceneDisplayNames = new Dictionary<int, string>();
     private Guid _encounterContextId;
     private int? _combatantId;
     private long _detailRevision = -1;
@@ -74,7 +71,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     public CombatantDetailRefreshBaselineCounters LastRefreshBaselineCounters { get; private set; }
 
     [ObservableProperty]
-    public partial string CombatantName { get; set; } = string.Empty;
+    public partial SceneDisplayContext? DisplayContext { get; set; }
+
+    [ObservableProperty]
+    public partial int SelectedCombatantId { get; set; }
 
     [ObservableProperty]
     public partial int SelectedDirectionIndex { get; set; }
@@ -121,10 +121,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         _encounterContextId = Guid.Empty;
         _combatantId = null;
         _currentSnapshot = new SceneCombatSnapshot();
-        _currentSceneDisplayNames = new Dictionary<int, string>();
         _detailEvents.Clear();
         _detailRevision = -1;
-        CombatantName = string.Empty;
+        SelectedCombatantId = 0;
         SelectedDirectionIndex = 0;
         LastRefreshBaselineCounters = CombatantDetailRefreshBaselineCounters.Empty;
         OutgoingDetail.Clear();
@@ -194,10 +193,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             _encounterContextId = encounterContextId;
             _combatantId = combatantId;
             _currentSnapshot = new SceneCombatSnapshot();
-            _currentSceneDisplayNames = new Dictionary<int, string>();
             _detailEvents.Clear();
             _detailRevision = -1;
-            CombatantName = string.Empty;
+            SelectedCombatantId = 0;
             ClearSectionsOnly();
             return;
         }
@@ -211,8 +209,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         _encounterContextId = encounterContextId;
         _combatantId = combatantId;
         _currentSnapshot = snapshot;
-        _currentSceneDisplayNames = detail.DisplayNames;
-        CombatantName = ResolveSceneCombatantDisplayName(snapshot, combatantId.Value);
+        SelectedCombatantId = combatantId.Value;
 
         if (canReuseExistingSections)
         {
@@ -227,16 +224,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         RebuildCounterpartSelections();
         RefreshAllSections();
     }
-
-    private string ResolveCombatantDisplayName(int combatantId)
-        => ResolveSceneCombatantDisplayName(_currentSnapshot, combatantId);
-
-    private string ResolveSceneCombatantDisplayName(SceneCombatSnapshot snapshot, int combatantId)
-        => _currentSceneDisplayNames.TryGetValue(combatantId, out var displayName) && !string.IsNullOrWhiteSpace(displayName)
-            ? displayName
-            : snapshot.Combatants.TryGetValue(combatantId, out var combatant) && !string.IsNullOrWhiteSpace(combatant.Nickname)
-            ? combatant.Nickname
-            : combatantId.ToString(CultureInfo.InvariantCulture);
 
     private void RebuildCounterpartSelections()
     {
@@ -282,13 +269,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                     break;
                 }
 
-                if (!counterpartMetrics.TryGetValue(combatantId, out var metrics))
-                {
-                    metrics = new CounterpartAggregateMetrics
-                    {
-                        DisplayName = ResolveCombatantDisplayName(combatantId)
-                    };
-                }
+                counterpartMetrics.TryGetValue(combatantId, out var metrics);
 
                 var amount = GetSectionContributionAmount(in detailPacket, sectionKind);
                 switch (sectionKind)
@@ -350,7 +331,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
                 return cmp;
             }
 
-            return StringComparer.CurrentCulture.Compare(leftMetrics.DisplayName, rightMetrics.DisplayName);
+            var leftName = DisplayContext?.GetEntitySortKey(left) ?? left.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var rightName = DisplayContext?.GetEntitySortKey(right) ?? right.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return StringComparer.CurrentCulture.Compare(leftName, rightName);
         });
 
         var options = new List<DetailCounterpartOption>(sortedCombatantIds.Count);
@@ -359,7 +342,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             var metrics = counterpartMetrics[combatantId];
             options.Add(new DetailCounterpartOption(
                 combatantId,
-                metrics.DisplayName,
                 metrics.DamageAmount,
                 totalDamage > 0 ? metrics.DamageAmount / (double)totalDamage : 0d,
                 metrics.HealingAmount,
@@ -463,10 +445,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         }
 
         var rows = sectionKind is DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage
-            ? BuildDamageRows(metrics)
+            ? BuildDamageRows(metrics, DisplayContext)
             : sectionKind is DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield
-                ? BuildShieldRows(metrics)
-                : BuildHealingRows(metrics);
+                ? BuildShieldRows(metrics, DisplayContext)
+                : BuildHealingRows(metrics, DisplayContext);
 
         var durationSeconds = hasSubsetFilter
             ? ResolveObservedDurationSeconds(firstObserved, lastObserved)
@@ -679,7 +661,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     private static long ResolveObservedAt(in CombatDetailEvent detailPacket)
         => detailPacket.ObservedAt;
 
-    private static List<SkillDetailRowData> BuildDamageRows(Dictionary<int, SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildDamageRows(Dictionary<int, SkillMetrics> skills, SceneDisplayContext? displayContext)
     {
         var rows = new List<SkillDetailRowData>();
         foreach (var (_, skill) in skills)
@@ -703,7 +685,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             rows.Add(new SkillDetailRowData
             {
                 SkillCode = skill.SkillCode,
-                SkillName = ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
                 TotalAmount = totalAmount,
                 DirectAmount = skill.DamageAmount,
                 PeriodicAmount = skill.PeriodicDamageAmount,
@@ -724,13 +705,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             });
         }
 
-        rows.Sort(static (a, b) =>
+        rows.Sort((a, b) =>
         {
             var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
             if (cmp != 0) return cmp;
             cmp = b.Hits.CompareTo(a.Hits);
             if (cmp != 0) return cmp;
-            return StringComparer.CurrentCulture.Compare(a.SkillName, b.SkillName);
+            return CompareSkillNames(a.SkillCode, b.SkillCode, displayContext);
         });
 
         var sectionTotal = 0L;
@@ -753,7 +734,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
     private static bool IsHiddenDamageOutcomeSkill(int skillCode)
         => skillCode == SyntheticCombatSkillCodes.UnresolvedInvincible;
 
-    private static List<SkillDetailRowData> BuildHealingRows(Dictionary<int, SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildHealingRows(Dictionary<int, SkillMetrics> skills, SceneDisplayContext? displayContext)
     {
         var rows = new List<SkillDetailRowData>();
         foreach (var (_, skill) in skills)
@@ -770,7 +751,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             rows.Add(new SkillDetailRowData
             {
                 SkillCode = skill.SkillCode,
-                SkillName = ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
                 TotalAmount = totalAmount,
                 DirectAmount = directHealingAmount,
                 PeriodicAmount = skill.PeriodicHealingAmount,
@@ -782,13 +762,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             });
         }
 
-        rows.Sort(static (a, b) =>
+        rows.Sort((a, b) =>
         {
             var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
             if (cmp != 0) return cmp;
             cmp = b.Hits.CompareTo(a.Hits);
             if (cmp != 0) return cmp;
-            return StringComparer.CurrentCulture.Compare(a.SkillName, b.SkillName);
+            return CompareSkillNames(a.SkillCode, b.SkillCode, displayContext);
         });
 
         var sectionTotal = 0L;
@@ -808,7 +788,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         return rows;
     }
 
-    private static List<SkillDetailRowData> BuildShieldRows(Dictionary<int, SkillMetrics> skills)
+    private static List<SkillDetailRowData> BuildShieldRows(Dictionary<int, SkillMetrics> skills, SceneDisplayContext? displayContext)
     {
         var rows = new List<SkillDetailRowData>();
         foreach (var (_, skill) in skills)
@@ -822,7 +802,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             rows.Add(new SkillDetailRowData
             {
                 SkillCode = skill.SkillCode,
-                SkillName = ResolveSkillDisplayName(skill.SkillCode, skill.SkillName),
                 TotalAmount = skill.ShieldAmount,
                 ShieldAmount = skill.ShieldAmount,
                 ShieldAbsorbedAmount = skill.ShieldAbsorbedAmount,
@@ -831,13 +810,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
             });
         }
 
-        rows.Sort(static (a, b) =>
+        rows.Sort((a, b) =>
         {
             var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
             if (cmp != 0) return cmp;
             cmp = b.Hits.CompareTo(a.Hits);
             if (cmp != 0) return cmp;
-            return StringComparer.CurrentCulture.Compare(a.SkillName, b.SkillName);
+            return CompareSkillNames(a.SkillCode, b.SkillCode, displayContext);
         });
 
         var sectionTotal = 0L;
@@ -857,14 +836,11 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject
         return rows;
     }
 
-    private static string ResolveSkillDisplayName(int skillCode, string fallbackName)
+    private static int CompareSkillNames(int leftSkillCode, int rightSkillCode, SceneDisplayContext? displayContext)
     {
-        if (!string.IsNullOrWhiteSpace(fallbackName) && fallbackName != skillCode.ToString(CultureInfo.InvariantCulture))
-        {
-            return fallbackName;
-        }
-
-        return CombatEventClassifier.DisplaySkillNameFor(skillCode);
+        var leftName = displayContext?.GetSkillSortKey(leftSkillCode) ?? leftSkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var rightName = displayContext?.GetSkillSortKey(rightSkillCode) ?? rightSkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return StringComparer.CurrentCulture.Compare(leftName, rightName);
     }
 
     private void RefreshSectionRatesOnly()

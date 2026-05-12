@@ -34,7 +34,6 @@ public struct SkillMetrics(in CombatObservation observation)
     public int AttemptTimes { get; set; }
     public int EvadeTimes { get; set; }
     public int InvincibleTimes { get; set; }
-    public readonly string SkillName => CombatEventClassifier.DisplaySkillNameFor(SkillCode);
     public int MultiHitTimes { get; set; }
     public int BackTimes { get; set; }
     public int PerfectTimes { get; set; }
@@ -295,7 +294,6 @@ public readonly record struct SkillMetricsSnapshot(
     int RegenerationTimes,
     int DefensivePerfectTimes)
 {
-    public string SkillName => CombatEventClassifier.DisplaySkillNameFor(SkillCode);
 }
 
 public readonly record struct SkillMetricsSnapshotEntry(int SkillCode, SkillMetricsSnapshot Metrics)

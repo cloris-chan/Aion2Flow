@@ -185,7 +185,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         var adapter = CreateAdapter();
         _snapshotBuilder.Reset(EncounterId, combat.Combatants.Count, 0);
         adapter.BuildSnapshot(_snapshotBuilder);
-        ApplyBossFocusSnapshots(_snapshotBuilder, adapter);
+        ApplyBossFocusSnapshots(_snapshotBuilder);
         var snapshot = _snapshotBuilder.ToSnapshot(combat.Revision);
         if (IsSnapshotCacheStable(snapshot))
         {
@@ -202,7 +202,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     }
 
     private SceneCombatSnapshotAdapter CreateAdapter()
-        => new(entities, combat, boundary, metadataRegistry, _applier.BossFocus, EncounterId, SceneIdentityScope.Empty);
+        => new(entities, combat, boundary, _applier.BossFocus, EncounterId);
 
     private static bool IsSnapshotCacheStable(SceneCombatSnapshot snapshot) =>
         snapshot.EncounterEndTime > 0 || snapshot.BossFocuses.Count == 0 && snapshot.Encounter.TrackingTargetId == 0;
@@ -226,7 +226,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         return _lastDetailDeltas[combatantId];
     }
 
-    private void ApplyBossFocusSnapshots(SceneCombatSnapshotBuilder builder, SceneCombatSnapshotAdapter adapter)
+    private void ApplyBossFocusSnapshots(SceneCombatSnapshotBuilder builder)
     {
         var now = builder.EncounterEndTime > 0
             ? builder.EncounterEndTime
@@ -238,7 +238,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             builder.AddBossFocus(new SceneBossFocusSnapshot
             {
                 InstanceId = boss.InstanceId,
-                DisplayName = adapter.ResolveDetailDisplayName(boss.InstanceId),
                 Hp = boss.Hp,
                 MaxHp = boss.MaxHp,
                 LastObservedAtMilliseconds = boss.LastObservedAtMilliseconds,

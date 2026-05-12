@@ -43,15 +43,12 @@ public sealed class LiveClassInferenceSceneTests
 
             if (combatant.CharacterClass is { } characterClass)
             {
-                if (firstResolvedClass is null)
-                {
-                    firstResolvedClass = characterClass;
-                }
+                firstResolvedClass ??= characterClass;
 
                 if (combatant.DamageContribution > 1.0000000001d)
                 {
                     overflowSnapshots.Add(
-                        $"ts={entry.TimestampMilliseconds} dmg={combatant.DamageAmount} dps={combatant.DamagePerSecond:F2} share={combatant.DamageContribution:P4} encounter={snapshot.EncounterTime} name={combatant.Nickname}");
+                        $"ts={entry.TimestampMilliseconds} dmg={combatant.DamageAmount} dps={combatant.DamagePerSecond:F2} share={combatant.DamageContribution:P4} encounter={snapshot.EncounterTime}");
                 }
 
                 continue;
@@ -60,7 +57,7 @@ public sealed class LiveClassInferenceSceneTests
             if (firstResolvedClass is not null && combatant.DamageAmount > 0)
             {
                 lostClassSnapshots.Add(
-                    $"ts={entry.TimestampMilliseconds} dmg={combatant.DamageAmount} dps={combatant.DamagePerSecond:F2} share={combatant.DamageContribution:P4} encounter={snapshot.EncounterTime} name={combatant.Nickname}");
+                    $"ts={entry.TimestampMilliseconds} dmg={combatant.DamageAmount} dps={combatant.DamagePerSecond:F2} share={combatant.DamageContribution:P4} encounter={snapshot.EncounterTime}");
                 break;
             }
         }

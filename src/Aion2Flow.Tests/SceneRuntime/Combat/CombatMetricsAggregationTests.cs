@@ -57,7 +57,7 @@ public sealed class CombatMetricsAggregationTests
             EventKind = CombatEventKind.Support
         };
 
-        var accumulator = new SceneCombatantMetricsAccumulator("test");
+        var accumulator = new SceneCombatantMetricsAccumulator();
         accumulator.ProcessCombatObservation(in observation);
         var metrics = accumulator.ToSnapshot();
 
@@ -97,7 +97,7 @@ public sealed class CombatMetricsAggregationTests
             EventKind = CombatEventKind.Healing
         };
 
-        var accumulator = new SceneCombatantMetricsAccumulator("test");
+        var accumulator = new SceneCombatantMetricsAccumulator();
         accumulator.ProcessCombatObservation(in observation);
         var metrics = accumulator.ToSnapshot();
 

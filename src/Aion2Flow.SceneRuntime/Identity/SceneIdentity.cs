@@ -1,7 +1,4 @@
-using System.Globalization;
 using System.Runtime.InteropServices;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Identity;
 
@@ -296,76 +293,4 @@ public readonly struct SceneIdentityResolver(SceneIdentityScope scope, RuntimeMe
         return registry is not null && registry.TryGetMapCode(mapInstanceId, out mapCode);
     }
 
-    public string ResolveTargetName(EntityStore entities, int entityId)
-    {
-        if (entityId <= 0)
-            return string.Empty;
-
-        if (!TryResolveNpcCode(entities, entityId, out var npcCode))
-            return string.Empty;
-
-        return TryResolveNpcName(npcCode, out var name) ? name : string.Empty;
-    }
-
-    public string ResolveDisplayName(EntityStore entities, int entityId)
-    {
-        if (entityId <= 0)
-            return string.Empty;
-
-        if (TryGetPcMetadata(entityId, out var pc) && pc.HasNickname)
-            return pc.Nickname;
-
-        EntityRecord? entity = null;
-        if (entities.TryGet(entityId, out var resolvedEntity))
-        {
-            entity = resolvedEntity;
-            if (entity.IsPlayer && !string.IsNullOrWhiteSpace(entity.Nickname))
-                return entity.Nickname;
-        }
-
-        if (TryResolveNpcCode(entities, entityId, entity, out var npcCode))
-        {
-            if (TryResolveNpcName(npcCode, out var npcName))
-                return npcName;
-
-            return $"NPC-{npcCode.ToString(CultureInfo.InvariantCulture)}";
-        }
-
-        return entityId.ToString(CultureInfo.InvariantCulture);
-    }
-
-    private bool TryResolveNpcCode(EntityStore entities, int entityId, out int npcCode)
-        => TryResolveNpcCode(entities, entityId, null, out npcCode);
-
-    private bool TryResolveNpcCode(EntityStore entities, int entityId, EntityRecord? knownEntity, out int npcCode)
-    {
-        if (TryGetNpcCode(entityId, out npcCode))
-            return true;
-
-        var entity = knownEntity;
-        if (entity is null && entities.TryGet(entityId, out var resolvedEntity))
-            entity = resolvedEntity;
-
-        if (entity?.NpcCode is int entityNpcCode && entityNpcCode > 0)
-        {
-            npcCode = entityNpcCode;
-            return true;
-        }
-
-        npcCode = 0;
-        return false;
-    }
-
-    private static bool TryResolveNpcName(int npcCode, out string name)
-    {
-        if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
-            !string.IsNullOrWhiteSpace(catalogEntry.Name))
-        {
-            name = catalogEntry.Name;
-            return true;
-        }
-
-        name = string.Empty;
-        return false;
-    }
 }

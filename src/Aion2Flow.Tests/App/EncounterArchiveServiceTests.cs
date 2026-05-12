@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -23,16 +24,18 @@ public sealed class EncounterArchiveServiceTests
         Assert.NotNull(record);
         Assert.Single(service.History);
         Assert.NotSame(payload, record!.ScenePayload);
-        Assert.Equal("Archive Boss", record.Snapshot.TargetName);
-        Assert.Equal("Tester", record.ScenePayload.CreateDetailDelta(playerId).DisplayNames[playerId]);
+        Assert.Equal(bossId, record.Snapshot.TargetObservation?.InstanceId);
+        Assert.True(record.ScenePayload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
+        Assert.Equal("Tester", archivedPc.Nickname);
         Assert.Equal(payload.SceneStarted.ToLocalTime(), record.ArchivedAt);
         Assert.True(service.TryGetEncounter(record.EncounterId, out var archivedRecord));
         Assert.Same(record, archivedRecord);
 
         owner.Entities.ApplyNickname(playerId, "Changed");
 
-        Assert.Equal("Archive Boss", record.Snapshot.TargetName);
-        Assert.Equal("Tester", record.ScenePayload.CreateDetailDelta(playerId).DisplayNames[playerId]);
+        Assert.Equal(bossId, record.Snapshot.TargetObservation?.InstanceId);
+        Assert.True(record.ScenePayload.IdentityScope.TryGetPcMetadata(playerId, out archivedPc));
+        Assert.Equal("Tester", archivedPc.Nickname);
     }
 
     [Fact]
@@ -77,7 +80,6 @@ public sealed class EncounterArchiveServiceTests
         {
             var snapshot = SceneSnapshotTestFactory.Create(
                 encounterId: Guid.NewGuid(),
-                targetName: $"Boss {i}",
                 encounterStartTime: 1_000 + i,
                 encounterEndTime: 11_000 + (i * 2),
                 encounterTime: 10_000 + i,
@@ -85,11 +87,9 @@ public sealed class EncounterArchiveServiceTests
                 [
                     SceneSnapshotTestFactory.Combatant(
                         i + 1,
-                        new SceneCombatantMetrics($"Tester {i}")
-                        {
-                            DamageContribution = 1,
-                            DamagePerSecond = 1_000 + i
-                        })
+                        SceneSnapshotTestFactory.VisibleMetrics(
+                            damagePerSecond: 1_000 + i,
+                            damageContribution: 1))
                 ]);
 
             var payload = new SceneArchivePayload
@@ -128,8 +128,6 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal(playerId, delta.Events[0].SourceId);
         Assert.Equal(bossId, delta.Events[0].TargetId);
         Assert.Equal(750, delta.Events[0].Amount);
-        Assert.Equal("Tester", delta.DisplayNames[playerId]);
-        Assert.Equal("Archive Boss", delta.DisplayNames[bossId]);
         Assert.Equal(751, delta.Combatant!.Value.OutgoingDamage);
         Assert.Single(delta.OutgoingPairs);
     }
@@ -222,8 +220,9 @@ public sealed class EncounterArchiveServiceTests
 
         var delta = payload.CreateDetailDelta(playerId);
 
-        Assert.Equal("Archive Boss", payload.Snapshot.TargetName);
-        Assert.Equal("Tester", delta.DisplayNames[playerId]);
+        Assert.Equal(bossId, payload.Snapshot.TargetObservation?.InstanceId);
+        Assert.True(payload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
+        Assert.Equal("Tester", archivedPc.Nickname);
         Assert.Equal(2, payload.Events.Count);
         Assert.Equal(2, delta.Events.Count);
         Assert.Equal(750, delta.Events[0].Amount);
@@ -247,6 +246,28 @@ public sealed class EncounterArchiveServiceTests
         var focus = Assert.Single(payload.Bosses, b => b.InstanceId == bossId);
         Assert.True(focus.HasHp);
         Assert.Equal(50_000, focus.Hp);
+    }
+
+    [Fact]
+    public void SceneArchivePayload_Freezes_GlobalPcMetadata_For_CombatOnly_Entity()
+    {
+        const int playerId = 100;
+        const int targetId = 200;
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(playerId, "Global Tester", 495);
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendCombat(journal, sceneId, playerId, targetId, 100, 1, 1_000);
+        AppendCombat(journal, sceneId, playerId, targetId, 1, 2, 1_001);
+        journal.CompleteBatch(1);
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now, registry);
+        owner.Refresh();
+
+        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
+
+        Assert.True(payload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
+        Assert.Equal("Global Tester", archivedPc.Nickname);
+        Assert.Equal(495, archivedPc.OriginServerId);
     }
 
     [Fact]

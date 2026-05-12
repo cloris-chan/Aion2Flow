@@ -487,8 +487,34 @@ public sealed class PacketLogReplayService
 
     private static string ResolveDisplayName(EntityStore entities, RuntimeMetadataRegistry metadataRegistry, int entityId)
     {
-        var resolver = new SceneIdentityResolver(SceneIdentityScope.Empty, metadataRegistry);
-        return resolver.ResolveDisplayName(entities, entityId);
+        if (metadataRegistry.TryGetPcMetadata(entityId, out var pc) && pc.HasNickname)
+        {
+            return pc.Nickname;
+        }
+
+        if (metadataRegistry.TryGetNpcCode(entityId, out var npcCode) &&
+            CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
+            !string.IsNullOrWhiteSpace(catalogEntry.Name))
+        {
+            return catalogEntry.Name;
+        }
+
+        if (entities.TryGet(entityId, out var entity))
+        {
+            if (entity.IsPlayer && !string.IsNullOrWhiteSpace(entity.Nickname))
+            {
+                return entity.Nickname;
+            }
+
+            if (entity.NpcCode is int entityNpcCode &&
+                CombatResourceRegistry.TryResolveNpcCatalogEntry(entityNpcCode, out var entityCatalogEntry) &&
+                !string.IsNullOrWhiteSpace(entityCatalogEntry.Name))
+            {
+                return entityCatalogEntry.Name;
+            }
+        }
+
+        return entityId.ToString(CultureInfo.InvariantCulture);
     }
 
     private static bool TryReplayEntry(IRuntimeObservationSink store, FrameReplayEntry entry, long frameOrdinal, long batchOrdinal)

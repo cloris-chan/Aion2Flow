@@ -4,7 +4,6 @@
         xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
         xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
         xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
-        xmlns:conv="clr-namespace:Cloris.Aion2Flow.Converters"
         x:Class="Cloris.Aion2Flow.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Classes="OverlayWindow"
@@ -18,17 +17,14 @@
         Icon="/Assets/Images/Aion2Flow.png"
         Topmost="{Binding SettingsFlyout.IsAlwaysOnTop}">
 
-    <Window.Resources>
-        <conv:ClassToIconConverter x:Key="ClassToIconConverter" />
-    </Window.Resources>
-
     <Window.Styles>
         <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
     </Window.Styles>
 
     <Grid RowDefinitions="Auto,Auto,Auto,Auto"
           RowSpacing="2"
-          Margin="3">
+          Margin="3"
+          controls:DisplayContextProvider.DisplayContext="{Binding DisplayContext}">
         <Grid Grid.Row="0"
               ColumnDefinitions="Auto,*,Auto"
               ColumnSpacing="2"
@@ -50,9 +46,10 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             IsHitTestVisible="False">
-                    <TextBlock Classes="OverlayHeaderScene"
-                               Text="{Binding LiveSceneName}"
-                               VerticalAlignment="Center" />
+                    <controls:MapDisplay TextClasses="OverlayHeaderScene"
+                                         MapId="{Binding LiveSceneMapId}"
+                                         UseBrackets="True"
+                                         VerticalAlignment="Center" />
                     <controls:NumericBlock Classes="OverlayHeaderMetric"
                                            Value="{Binding EncounterTimeSeconds}"
                                            FractionDigits="1"
@@ -101,11 +98,10 @@
                             <Grid ColumnDefinitions="*,Auto"
                                 ColumnSpacing="8"
                                 Margin="6,4">
-                                <TextBlock Grid.Column="0"
-                                           Classes="BossFocusName"
-                                           Text="{Binding DisplayName}"
-                                           TextTrimming="CharacterEllipsis"
-                                           VerticalAlignment="Center" />
+                                <controls:NpcDisplay Grid.Column="0"
+                                                     TextClasses="BossFocusName"
+                                                     EntityId="{Binding InstanceId}"
+                                                     VerticalAlignment="Center" />
 
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -155,33 +151,11 @@
                                     Name="RowAccent"
                                     Classes="MainRowAccent" />
 
-                            <Panel Grid.Column="1">
-                                <Panel Width="30"
-                                       Height="30"
-                                       ClipToBounds="True"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center">
-                                    <Image Name="BaseImage"
-                                           Width="30"
-                                           Height="60"
-                                           Source="{Binding CharacterClass, Converter={StaticResource ClassToIconConverter}}"
-                                           VerticalAlignment="Top" />
-                                </Panel>
-
-                                <Image Name="OverlayImage"
-                                       Width="32"
-                                       Height="32"
-                                       Source="/Assets/Images/Overlay.webp"
-                                       ZIndex="10"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
-                            </Panel>
-
-                            <TextBlock Grid.Column="2"
-                                       Classes="OverlayRowName"
-                                       Text="{Binding DisplayName}"
-                                       VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis" />
+                            <controls:PcDisplay Grid.Column="1"
+                                                Grid.ColumnSpan="2"
+                                                TextClasses="OverlayRowName"
+                                                EntityId="{Binding Id}"
+                                                VerticalAlignment="Center" />
 
                             <controls:NumericBlock Grid.Column="3"
                                                     Classes="OverlayRowMetricStrong"

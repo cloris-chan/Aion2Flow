@@ -4,7 +4,9 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Cloris.Aion2Flow.Controls;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
@@ -161,9 +163,25 @@ public partial class MainWindow : Window
 
         foreach (var item in DataContext.EncounterHistory)
         {
+            var header = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6
+            };
+            DisplayContextProvider.SetDisplayContext(header, item.DisplayContext);
+            header.Children.Add(new MapDisplay
+            {
+                MapId = item.MapId,
+                UseBrackets = true
+            });
+            header.Children.Add(new TextBlock
+            {
+                Text = item.ArchivedAtText
+            });
+
             var menuItem = new MenuItem
             {
-                Header = item.DisplayName,
+                Header = header,
                 Tag = item
             };
             menuItem.Classes.Add("FlyoutMenuItem");

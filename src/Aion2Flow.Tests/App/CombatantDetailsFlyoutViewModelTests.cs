@@ -44,7 +44,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var snapshot = scene.CreateSnapshot();
         SelectSceneCombatant(viewModel, scene, playerId);
 
-        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(3, viewModel.OutgoingDamage.Hits);
         Assert.Equal(250, viewModel.OutgoingHealing.Total);
@@ -57,7 +57,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
         Assert.Single(viewModel.OutgoingDamage.Rows);
-        Assert.Equal("Strike", viewModel.OutgoingDamage.Rows[0].SkillName);
+        Assert.Equal("Strike", SkillName(viewModel.OutgoingDamage.Rows[0]));
         Assert.Equal(800, viewModel.OutgoingDamage.Rows[0].TotalAmount);
     }
 
@@ -297,7 +297,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var detail = scene.Owner.CreateDetailDelta(snapshot, playerId);
         viewModel.SelectSceneEncounterCombatant(snapshot.EncounterId, playerId, snapshot, detail);
 
-        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(3, viewModel.OutgoingDamage.Hits);
         Assert.Equal(250, viewModel.OutgoingHealing.Total);
@@ -306,15 +306,15 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(6, viewModel.LastRefreshBaselineCounters.DetailEventCount);
         Assert.Equal(2, viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.Count);
         Assert.Single(viewModel.OutgoingDetail.SupportCounterpartFilter.Counterparts);
-        Assert.Contains(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, x => x.CombatantId == bossId && x.DisplayName == bossId.ToString(CultureInfo.InvariantCulture));
-        Assert.Contains(viewModel.OutgoingDetail.SupportCounterpartFilter.Counterparts, x => x.CombatantId == playerId && x.DisplayName == "Perigee");
-        Assert.Contains(viewModel.IncomingDetail.SupportCounterpartFilter.Counterparts, x => x.CombatantId == healerId && x.DisplayName == "Helper");
+        Assert.Contains(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, x => x.CombatantId == bossId);
+        Assert.Contains(viewModel.OutgoingDetail.SupportCounterpartFilter.Counterparts, x => x.CombatantId == playerId);
+        Assert.Contains(viewModel.IncomingDetail.SupportCounterpartFilter.Counterparts, x => x.CombatantId == healerId);
 
         SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
 
         Assert.Equal(800, viewModel.OutgoingDamage.Total);
         Assert.Single(viewModel.OutgoingDamage.Rows);
-        Assert.Equal("Strike", viewModel.OutgoingDamage.Rows[0].SkillName);
+        Assert.Equal("Strike", SkillName(viewModel.OutgoingDamage.Rows[0]));
         Assert.Equal(800, viewModel.OutgoingDamage.Rows[0].TotalAmount);
     }
 
@@ -344,7 +344,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var detail = scene.Owner.CreateDetailDelta(snapshot, playerId);
         viewModel.SelectSceneEncounterCombatant(snapshot.EncounterId, playerId, snapshot, detail);
 
-        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(2, viewModel.OutgoingDamage.Hits);
         Assert.Equal(2, viewModel.LastRefreshBaselineCounters.DetailEventCount);
@@ -380,7 +380,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         scene.Reset();
         SelectArchivedSceneCombatant(viewModel, record!, playerId);
 
-        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(2, viewModel.OutgoingDamage.Hits);
         Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
@@ -416,7 +416,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         scene.Reset();
         SelectArchivedSceneCombatant(viewModel, record, playerId);
 
-        Assert.Equal("Scene Player", viewModel.CombatantName);
+        Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(2, viewModel.OutgoingDamage.Hits);
         Assert.Equal(2, viewModel.LastRefreshBaselineCounters.DetailEventCount);
@@ -451,8 +451,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(400, viewModel.OutgoingHealing.Total);
         Assert.Equal(400, viewModel.IncomingHealing.Total);
         Assert.Equal(2, viewModel.OutgoingHealing.Rows.Count);
-        Assert.Contains(viewModel.OutgoingHealing.Rows, static row => row.SkillName == "Second Wind");
-        Assert.Contains(viewModel.OutgoingHealing.Rows, static row => row.SkillName == "Support Heal");
+        Assert.Contains(viewModel.OutgoingHealing.Rows, static row => SkillName(row) == "Second Wind");
+        Assert.Contains(viewModel.OutgoingHealing.Rows, static row => SkillName(row) == "Support Heal");
     }
 
     [Fact]
@@ -486,7 +486,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         scene.Reset();
         SelectArchivedSceneCombatant(viewModel, record!, playerId);
 
-        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(2, viewModel.OutgoingDamage.Hits);
     }
@@ -528,7 +528,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(0, viewModel.OutgoingHealing.Total);
         Assert.Equal(200, viewModel.OutgoingShield.Total);
         Assert.Single(viewModel.OutgoingShield.Rows);
-        Assert.Equal("Barrier Ward", viewModel.OutgoingShield.Rows[0].SkillName);
+        Assert.Equal("Barrier Ward", SkillName(viewModel.OutgoingShield.Rows[0]));
     }
 
     [Fact]
@@ -599,7 +599,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.DoesNotContain(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == allyTwoId);
         Assert.DoesNotContain(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, static counterpart => counterpart.CombatantId == allyThreeId);
         Assert.Single(viewModel.OutgoingDamage.Rows);
-        Assert.Equal("Strike", viewModel.OutgoingDamage.Rows[0].SkillName);
+        Assert.Equal("Strike", SkillName(viewModel.OutgoingDamage.Rows[0]));
 
         void AppendPeriodicTargetPacket(int targetId, long timestamp)
         {
@@ -886,9 +886,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var rows = viewModel.OutgoingDamage.Rows.OrderBy(row => row.SkillCode).ToArray();
 
         Assert.Equal(2, rows.Length);
-        Assert.Equal("大地報應", rows[0].SkillName);
+        Assert.Equal("大地報應", SkillName(rows[0]));
         AssertModifierValues(rows[0].MultiHit, rows[0].MultiHitRate, 2, 2);
-        Assert.Equal("主神恩寵", rows[1].SkillName);
+        Assert.Equal("主神恩寵", SkillName(rows[1]));
         AssertModifierValues(rows[1].MultiHit, rows[1].MultiHitRate, 0, 2);
         AssertModifierValues(viewModel.OutgoingDamage.MultiHitCount, viewModel.OutgoingDamage.MultiHitRate, 2, 4);
     }
@@ -972,10 +972,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AssertModifierValues(viewModel.OutgoingDamage.BackCount, viewModel.OutgoingDamage.BackRate, 1, 4);
 
         Assert.Collection(
-            viewModel.OutgoingDamage.Rows.OrderBy(static row => row.SkillName, StringComparer.Ordinal),
+            viewModel.OutgoingDamage.Rows.OrderBy(static row => SkillName(row), StringComparer.Ordinal),
             row =>
             {
-                Assert.Equal("弱化之印", row.SkillName);
+                Assert.Equal("弱化之印", SkillName(row));
                 Assert.Equal(2, row.Hits);
                 Assert.Equal(3, row.PeriodicHits);
                 AssertModifierValues(row.Criticals, row.CriticalRate, 0, 2);
@@ -983,14 +983,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             },
             row =>
             {
-                Assert.Equal("痛苦連鎖", row.SkillName);
+                Assert.Equal("痛苦連鎖", SkillName(row));
                 Assert.Equal(1, row.Hits);
                 Assert.Equal(2, row.PeriodicHits);
                 AssertModifierValues(row.Criticals, row.CriticalRate, 0, 1);
             },
             row =>
             {
-                Assert.Equal("破滅之語", row.SkillName);
+                Assert.Equal("破滅之語", SkillName(row));
                 Assert.Equal(1, row.Hits);
                 Assert.Equal(2, row.PeriodicHits);
                 AssertModifierValues(row.Criticals, row.CriticalRate, 1, 1);
@@ -1084,7 +1084,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
-        Assert.Equal("Strike", row.SkillName);
+        Assert.Equal("Strike", SkillName(row));
         Assert.Equal(2, viewModel.OutgoingDamage.Attempts);
         Assert.Equal(1, viewModel.OutgoingDamage.Hits);
         Assert.Equal(0, viewModel.OutgoingDamage.Evades);
@@ -1131,7 +1131,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var row = Assert.Single(viewModel.IncomingDamage.Rows);
 
-        Assert.Equal("Boss Slam", row.SkillName);
+        Assert.Equal("Boss Slam", SkillName(row));
         Assert.Equal(2, viewModel.IncomingDamage.Attempts);
         Assert.Equal(1, viewModel.IncomingDamage.Hits);
         Assert.Equal(1, viewModel.IncomingDamage.Invincible);
@@ -1210,11 +1210,11 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var damageCounterparts = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts
             .Select(static counterpart =>
-                $"id={counterpart.CombatantId}|name={counterpart.DisplayName}|damage={counterpart.DamageAmount}|share={counterpart.DamageShare:F4}|selected={counterpart.IsSelected}")
+                $"id={counterpart.CombatantId}|damage={counterpart.DamageAmount}|share={counterpart.DamageShare:F4}|selected={counterpart.IsSelected}")
             .ToArray();
         var damageRows = viewModel.OutgoingDamage.Rows
             .Select(static row =>
-                $"skill={row.SkillCode}|name={row.SkillName}|total={row.TotalAmount}|hits={row.Hits}|attempts={row.Attempts}|evades={row.Evades}|invincible={row.Invincible}")
+                $"skill={row.SkillCode}|total={row.TotalAmount}|hits={row.Hits}|attempts={row.Attempts}|evades={row.Evades}|invincible={row.Invincible}")
             .ToArray();
 
         var sourceIds = SceneReplayTestView.SummonOwnerByInstance(replay)
@@ -1547,6 +1547,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(expectedRate, actualRate, 10);
     }
 
+    private static string SkillName(SkillDetailRowViewModel row)
+        => CombatEventClassifier.DisplaySkillNameFor(row.SkillCode);
+
     private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, int combatantId, bool forceRefresh = false)
     {
         var snapshot = scene.CreateSnapshot();
@@ -1608,13 +1611,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var snapshot = scene.CreateSnapshot();
         SelectSceneCombatant(viewModel, scene, playerId);
 
-        Assert.Equal("Perigee", viewModel.CombatantName);
+        Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
 
         var counterpart = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.FirstOrDefault(x => x.CombatantId == npcInstanceId);
         Assert.NotNull(counterpart);
-        Assert.True(catalog.TryGetValue(npcCode, out var entry));
-        Assert.Equal(entry.Name, counterpart!.DisplayName);
+        Assert.True(catalog.ContainsKey(npcCode));
+        Assert.Equal(npcInstanceId, counterpart!.CombatantId);
     }
 
     [Fact]
@@ -1652,8 +1655,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var counterpart = viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.FirstOrDefault(x => x.CombatantId == npcInstanceId);
         Assert.NotNull(counterpart);
-        Assert.True(catalog.TryGetValue(npcCode, out var entry));
-        Assert.Equal(entry.Name, counterpart!.DisplayName);
+        Assert.True(catalog.ContainsKey(npcCode));
+        Assert.Equal(npcInstanceId, counterpart!.CombatantId);
     }
 
     private static void SelectOnlyCounterpart(DetailCounterpartFilterViewModel filter, int combatantId)

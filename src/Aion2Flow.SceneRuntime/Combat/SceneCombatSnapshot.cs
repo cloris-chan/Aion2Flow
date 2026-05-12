@@ -13,7 +13,6 @@ public sealed class SceneCombatSnapshot
         readModelRevision: 0,
         mapId: 0,
         mapInstanceId: 0,
-        targetName: string.Empty,
         encounterStartTime: 0,
         encounterEndTime: 0,
         encounterTime: 0,
@@ -28,7 +27,6 @@ public sealed class SceneCombatSnapshot
             readModelRevision: 0,
             mapId: 0,
             mapInstanceId: 0,
-            targetName: string.Empty,
             encounterStartTime: 0,
             encounterEndTime: 0,
             encounterTime: 0,
@@ -44,7 +42,6 @@ public sealed class SceneCombatSnapshot
         long readModelRevision,
         uint mapId,
         uint mapInstanceId,
-        string targetName,
         long encounterStartTime,
         long encounterEndTime,
         long encounterTime,
@@ -57,7 +54,6 @@ public sealed class SceneCombatSnapshot
         ReadModelRevision = readModelRevision;
         MapId = mapId;
         MapInstanceId = mapInstanceId;
-        TargetName = targetName;
         EncounterStartTime = encounterStartTime;
         EncounterEndTime = encounterEndTime;
         EncounterTime = encounterTime;
@@ -74,8 +70,6 @@ public sealed class SceneCombatSnapshot
     public uint MapId { get; }
 
     public uint MapInstanceId { get; }
-
-    public string TargetName { get; }
 
     public long EncounterStartTime { get; }
 
@@ -462,8 +456,6 @@ public readonly record struct NpcRuntimeObservationSnapshot(
 public readonly record struct SceneBossFocusSnapshot
 {
     public int InstanceId { get; init; }
-
-    public string DisplayName { get; init; }
 
     public int Hp { get; init; }
 

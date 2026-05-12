@@ -96,7 +96,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
         }
 
         var selectNewOptions = previousSelections.Count == 0 || previousSelections.Values.All(static value => value);
-        var optionList = options as IList<DetailCounterpartOption> ?? options.ToList();
+        var optionList = options as IList<DetailCounterpartOption> ?? [.. options];
         var expectedCombatantIds = new HashSet<int>(optionList.Count);
 
         _suppressSelectionChanged = true;
@@ -114,7 +114,6 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
                 {
                     counterpart = new DetailCounterpartSelectionViewModel(
                         option.CombatantId,
-                        option.DisplayName,
                         option.DamageAmount,
                         option.DamageShare,
                         option.HealingAmount,

@@ -540,6 +540,15 @@
         </Setter>
     </Style>
 
+    <Style Selector="Image#OverlayImage">
+        <Setter Property="Opacity" Value="0" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+            </Transitions>
+        </Setter>
+    </Style>
+
     <Style Selector="controls|AnimatedItemsViewItem:pointerover Border#RowRoot Image#BaseImage">
         <Setter Property="RenderTransform">
             <TranslateTransform Y="-30" />
@@ -554,11 +563,6 @@
 
     <Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#OverlayImage">
         <Setter Property="Opacity" Value="0" />
-        <Setter Property="Transitions">
-            <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
-            </Transitions>
-        </Setter>
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#OverlayImage">

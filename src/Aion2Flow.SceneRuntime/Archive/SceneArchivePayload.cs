@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -63,7 +62,7 @@ public sealed class SceneArchivePayload
         var eventsSnapshot = eventsByKey.Values.ToArray();
         Array.Sort(eventsSnapshot, CompareEvents);
         var identities = BuildIdentities(entities, entityIds);
-        var identityScope = BuildIdentityScope(identities, boundary, metadataRegistry);
+        var identityScope = BuildIdentityScope(entityIds, identities, boundary, metadataRegistry);
         var pairs = BuildPairs(eventsSnapshot);
         var combatants = BuildCombatants(pairs);
         var bosses = BuildBosses(bossFocus, archivedSnapshot);
@@ -125,8 +124,7 @@ public sealed class SceneArchivePayload
         {
             return new CombatDetailDelta
             {
-                CombatantId = combatantId,
-                DisplayNames = new Dictionary<int, string>()
+                CombatantId = combatantId
             };
         }
 
@@ -137,8 +135,7 @@ public sealed class SceneArchivePayload
         {
             return new CombatDetailDelta
             {
-                CombatantId = combatantId,
-                DisplayNames = BuildDetailDisplayNames(eventIndices, combatantId)
+                CombatantId = combatantId
             };
         }
 
@@ -158,95 +155,8 @@ public sealed class SceneArchivePayload
             OutgoingPairs = detailIndex.GetOutgoingPairs(combatantId),
             IncomingPairs = detailIndex.GetIncomingPairs(combatantId),
             Events = events,
-            DisplayNames = BuildDetailDisplayNames(eventIndices, combatantId),
             Combatant = combatant
         };
-    }
-
-    private Dictionary<int, string> BuildDetailDisplayNames(int[] eventIndices, int combatantId)
-    {
-        var displayNames = new Dictionary<int, string>();
-        AddArchiveDisplayName(displayNames, combatantId);
-        if (Snapshot.TargetObservation?.InstanceId is int targetId)
-            AddArchiveDisplayName(displayNames, targetId);
-        AddArchiveDisplayName(displayNames, Snapshot.Encounter.TrackingTargetId);
-        for (var i = 0; i < eventIndices.Length; i++)
-        {
-            var archiveEvent = Events[eventIndices[i]];
-            AddArchiveDisplayName(displayNames, archiveEvent.SourceId);
-            AddArchiveDisplayName(displayNames, archiveEvent.TargetId);
-        }
-
-        return displayNames;
-    }
-
-    private void AddArchiveDisplayName(Dictionary<int, string> displayNames, int entityId)
-    {
-        if (entityId <= 0 || displayNames.ContainsKey(entityId))
-            return;
-
-        var displayName = ResolveArchiveDisplayName(entityId);
-        if (!string.IsNullOrWhiteSpace(displayName))
-            displayNames[entityId] = displayName;
-    }
-
-    private string ResolveArchiveDisplayName(int entityId)
-    {
-        if (IdentityScope.TryGetPcMetadata(entityId, out var pcMetadata) && pcMetadata.HasNickname)
-            return pcMetadata.Nickname;
-
-        var identity = FindIdentity(entityId);
-        if (identity is not null)
-        {
-            if (identity.IsPlayer && !string.IsNullOrWhiteSpace(identity.Nickname))
-                return identity.Nickname;
-
-            if (ResolveArchiveNpcCode(entityId, identity, out var npcCode))
-                return ResolveNpcDisplayName(npcCode);
-        }
-
-        if (IdentityScope.TryGetNpcCode(entityId, out var scopedNpcCode))
-            return ResolveNpcDisplayName(scopedNpcCode);
-
-        return entityId.ToString(CultureInfo.InvariantCulture);
-    }
-
-    private bool ResolveArchiveNpcCode(int entityId, SceneArchiveEntityIdentity identity, out int npcCode)
-    {
-        if (IdentityScope.TryGetNpcCode(entityId, out npcCode))
-            return true;
-
-        if (identity.NpcCode is int identityNpcCode && identityNpcCode > 0)
-        {
-            npcCode = identityNpcCode;
-            return true;
-        }
-
-        npcCode = 0;
-        return false;
-    }
-
-    private SceneArchiveEntityIdentity? FindIdentity(int entityId)
-    {
-        for (var i = 0; i < Entities.Count; i++)
-        {
-            var identity = Entities[i];
-            if (identity.EntityId == entityId)
-                return identity;
-        }
-
-        return null;
-    }
-
-    private static string ResolveNpcDisplayName(int npcCode)
-    {
-        if (CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
-            !string.IsNullOrWhiteSpace(catalogEntry.Name))
-        {
-            return catalogEntry.Name;
-        }
-
-        return $"NPC-{npcCode.ToString(CultureInfo.InvariantCulture)}";
     }
 
     private static void AddEntity(HashSet<int> entityIds, int entityId)
@@ -297,21 +207,23 @@ public sealed class SceneArchivePayload
         return result;
     }
 
-    private static SceneIdentityScope BuildIdentityScope(SceneArchiveEntityIdentity[] identities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry)
+    private static SceneIdentityScope BuildIdentityScope(HashSet<int> entityIds, SceneArchiveEntityIdentity[] identities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry)
     {
         var builder = new SceneIdentityScopeBuilder();
-        builder.Reset(identities.Length);
+        builder.Reset(entityIds.Count);
+        foreach (var entityId in entityIds)
+        {
+            if (metadataRegistry.TryGetPcMetadata(entityId, out var pcMetadata))
+                builder.AddPcMetadata(pcMetadata);
+
+            if (metadataRegistry.TryGetNpcCode(entityId, out var registryNpcCode))
+                builder.AddNpcCode(entityId, registryNpcCode);
+        }
+
         for (var i = 0; i < identities.Length; i++)
         {
             var identity = identities[i];
-            if (metadataRegistry.TryGetPcMetadata(identity.EntityId, out var pcMetadata))
-                builder.AddPcMetadata(pcMetadata);
-            else if (identity.IsPlayer && !string.IsNullOrWhiteSpace(identity.Nickname))
-                builder.AddPcMetadata(new PcMetadata(identity.EntityId, identity.Nickname, null));
-
-            if (metadataRegistry.TryGetNpcCode(identity.EntityId, out var registryNpcCode))
-                builder.AddNpcCode(identity.EntityId, registryNpcCode);
-            else if (identity.NpcCode is int entityNpcCode)
+            if (!metadataRegistry.TryGetNpcCode(identity.EntityId, out _) && identity.NpcCode is int entityNpcCode)
                 builder.AddNpcCode(identity.EntityId, entityNpcCode);
         }
 
@@ -871,8 +783,6 @@ public sealed class SceneArchiveEntityIdentity
     public int EntityId { get; init; }
     public int? NpcCode { get; init; }
     public NpcKind Kind { get; init; }
-    public string Nickname { get; init; } = string.Empty;
-    public bool IsPlayer { get; init; }
     public int? OwnerEntityId { get; init; }
     public int? CurrentHp { get; init; }
     public int? MaxHp { get; init; }
@@ -890,8 +800,6 @@ public sealed class SceneArchiveEntityIdentity
         EntityId = e.EntityId,
         NpcCode = e.NpcCode,
         Kind = e.Kind,
-        Nickname = e.Nickname ?? string.Empty,
-        IsPlayer = e.IsPlayer,
         OwnerEntityId = e.OwnerEntityId,
         CurrentHp = e.CurrentHp,
         MaxHp = e.MaxHp,
@@ -910,8 +818,6 @@ public sealed class SceneArchiveEntityIdentity
         EntityId = EntityId,
         NpcCode = NpcCode,
         Kind = Kind,
-        Nickname = Nickname,
-        IsPlayer = IsPlayer,
         OwnerEntityId = OwnerEntityId,
         CurrentHp = CurrentHp,
         MaxHp = MaxHp,

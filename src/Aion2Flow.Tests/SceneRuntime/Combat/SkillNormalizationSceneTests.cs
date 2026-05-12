@@ -129,7 +129,7 @@ public sealed class SkillNormalizationSceneTests
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         Assert.DoesNotContain(17040250, skills.Keys);
         Assert.True(skills.TryGetValue(17050250, out var skill));
-        Assert.Equal("天罰", skill.SkillName);
+        Assert.Equal("天罰", CombatEventClassifier.DisplaySkillNameFor(skill.SkillCode));
         Assert.Equal(77282, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
     }
@@ -166,7 +166,7 @@ public sealed class SkillNormalizationSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         Assert.True(skills.TryGetValue(17040250, out var skill));
-        Assert.Equal("審判之電", skill.SkillName);
+        Assert.Equal("審判之電", CombatEventClassifier.DisplaySkillNameFor(skill.SkillCode));
         Assert.Equal(18816, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
     }
@@ -210,7 +210,7 @@ public sealed class SkillNormalizationSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         Assert.True(skills.TryGetValue(12240000, out var judgment));
-        Assert.Equal("審判", judgment.SkillName);
+        Assert.Equal("審判", CombatEventClassifier.DisplaySkillNameFor(judgment.SkillCode));
         Assert.Equal(39065, judgment.DamageAmount);
         Assert.Equal(2, judgment.Times);
         Assert.DoesNotContain(12240350, skills.Keys);
@@ -291,7 +291,7 @@ public sealed class SkillNormalizationSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out var combatant));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         Assert.True(skills.TryGetValue(11800008, out var skill));
-        Assert.Equal("殺氣破裂", skill.SkillName);
+        Assert.Equal("殺氣破裂", CombatEventClassifier.DisplaySkillNameFor(skill.SkillCode));
         Assert.Equal(155338, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
         Assert.Equal(0, skill.SupportTimes);

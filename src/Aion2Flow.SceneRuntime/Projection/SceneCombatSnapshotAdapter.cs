@@ -2,14 +2,13 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, BossFocusStore? bossFocus = null, Guid encounterId = default, SceneIdentityScope identityScope = default)
+public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary, BossFocusStore? bossFocus = null, Guid encounterId = default)
 {
     private const int SmallSetStackCapacity = 64;
 
@@ -17,16 +16,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private readonly Dictionary<int, int> _inferredOwnerBySummon = [];
     private readonly Dictionary<int, SummonOwnerInferenceAccumulator> _ownerInferenceBySource = [];
     private readonly Dictionary<SkillCategory, OwnerCandidateAccumulator> _ownerCandidatesByCategory = [];
-    private readonly SceneIdentityResolver _identityResolver = new(identityScope, metadataRegistry);
     private bool _ownerInferenceReady;
 
     public SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary)
-        : this(entities, combat, boundary, new RuntimeMetadataRegistry(), null, default, SceneIdentityScope.Empty)
-    {
-    }
-
-    public SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary, BossFocusStore? bossFocus, Guid encounterId = default)
-        : this(entities, combat, boundary, new RuntimeMetadataRegistry(), bossFocus, encounterId, SceneIdentityScope.Empty)
+        : this(entities, combat, boundary, null, default)
     {
     }
 
@@ -48,9 +41,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         var targetDecision = DecideTarget();
         var now = ResolveSnapshotNow();
         var trackingTargetId = ResolveTrackingTargetId(targetDecision.TrackingTargetId, now);
-        var damageTargetId = targetDecision.DamageTargetId > 0 ? targetDecision.DamageTargetId : trackingTargetId;
         var targetObservation = BuildTargetObservation(trackingTargetId);
-        builder.SetTarget(ResolveTargetName(damageTargetId), targetObservation);
+        builder.SetTarget(targetObservation);
 
         var (start, end) = ResolveEncounterWindow(targetDecision.TargetIds);
         var encounterTime = end > start ? end - start : 0;
@@ -109,8 +101,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return CombatSkillBreakdownSnapshot.From(skills);
     }
 
-    public string ResolveDetailDisplayName(int entityId) => ResolveDisplayName(entityId);
-
     private static bool IsSnapshotTarget(SceneCombatSnapshot snapshot, int entityId) =>
         snapshot.TargetObservation?.InstanceId == entityId || snapshot.Encounter.TrackingTargetId == entityId;
 
@@ -125,7 +115,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (sourceId <= 0)
             return;
 
-        ref var metrics = ref builder.GetOrAddCombatant(sourceId, ResolveDisplayName(sourceId));
+        ref var metrics = ref builder.GetOrAddCombatant(sourceId);
         var observation = record.Observation;
         if (!IsKnownNpcCombatant(sourceId) && !IsKnownSummon(sourceId) && record.SourceId == sourceId && TryGetClassEvidence(sourceId, targetId, in observation, out var characterClass, out var score))
         {
@@ -446,12 +436,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return e.Observation.EventKind is CombatEventKind.Healing or CombatEventKind.Support
                || e.Observation.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing or CombatValueKind.Shield or CombatValueKind.Support;
     }
-
-    private string ResolveTargetName(int targetId)
-        => _identityResolver.ResolveTargetName(entities, targetId);
-
-    private string ResolveDisplayName(int entityId)
-        => _identityResolver.ResolveDisplayName(entities, entityId);
 
     private int ResolveTrackingTargetId(int trackingTargetId, long nowMilliseconds)
     {

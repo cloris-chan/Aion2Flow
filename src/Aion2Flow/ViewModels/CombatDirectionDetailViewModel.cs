@@ -5,7 +5,6 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public readonly record struct DetailCounterpartOption(
     int CombatantId,
-    string DisplayName,
     long DamageAmount,
     double DamageShare,
     long HealingAmount,

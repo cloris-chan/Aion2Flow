@@ -3,7 +3,6 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-
 public readonly record struct DirectedPairKey(int SourceId, int TargetId);
 
 public readonly record struct DirectedPairSnapshot
@@ -87,21 +86,6 @@ public static class CombatPairProjection
     public static IReadOnlyList<DirectedPairKey> GetOutgoingPairs(CombatStore store, int sourceId) => ToPairKeys(store.GetOutgoingPairs(sourceId));
 
     public static IReadOnlyList<DirectedPairKey> GetIncomingPairs(CombatStore store, int targetId) => ToPairKeys(store.GetIncomingPairs(targetId));
-
-    public static IReadOnlyDictionary<int, string> BuildDetailDisplayNames(SceneCombatSnapshotAdapter adapter, IReadOnlyList<CombatDetailEvent> events)
-    {
-        var names = new Dictionary<int, string>();
-        for (var i = 0; i < events.Count; i++)
-        {
-            var detailEvent = events[i];
-            if (detailEvent.SourceId > 0)
-                names.TryAdd(detailEvent.SourceId, adapter.ResolveDetailDisplayName(detailEvent.SourceId));
-            if (detailEvent.TargetId > 0)
-                names.TryAdd(detailEvent.TargetId, adapter.ResolveDetailDisplayName(detailEvent.TargetId));
-        }
-
-        return names;
-    }
 
     public static IReadOnlyList<CombatDetailEvent> GetDetailEvents(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, int combatantId) => adapter.CreateDetailEvents(snapshot, combatantId);
 

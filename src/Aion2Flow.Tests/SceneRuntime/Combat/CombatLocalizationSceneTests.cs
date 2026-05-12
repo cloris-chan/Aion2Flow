@@ -6,7 +6,7 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 public sealed class CombatLocalizationSceneTests
 {
     [Fact]
-    public void SkillMetrics_SkillName_Tracks_Current_Language_Resources()
+    public void CombatEventClassifier_DisplaySkillName_Tracks_Current_Language_Resources()
     {
         try
         {
@@ -21,14 +21,13 @@ public sealed class CombatLocalizationSceneTests
 
             CombatResourceRegistry.LoadSkillMap("zh-TW");
             var zhName = ResourceDatabase.LoadSkills("zh-TW")[2011101].Name;
-            var metrics = new SkillMetrics(in observation);
 
-            Assert.Equal(zhName, metrics.SkillName);
+            Assert.Equal(zhName, CombatEventClassifier.DisplaySkillNameFor(observation.SkillCode));
 
             CombatResourceRegistry.LoadSkillMap("en-US");
             var enName = ResourceDatabase.LoadSkills("en-US")[2011101].Name;
 
-            Assert.Equal(enName, metrics.SkillName);
+            Assert.Equal(enName, CombatEventClassifier.DisplaySkillNameFor(observation.SkillCode));
             Assert.NotEqual(zhName, enName);
         }
         finally
@@ -71,7 +70,7 @@ public sealed class CombatLocalizationSceneTests
             Assert.True(zhSnapshot.Combatants.TryGetValue(sourceId, out var zhCombatant));
             var zhSkills = scene.CreateSkillBreakdown(zhSnapshot, sourceId).Skills;
             Assert.True(zhSkills.TryGetValue(skillCode, out var zhSkill));
-            var zhSkillName = zhSkill.SkillName;
+            var zhSkillName = CombatEventClassifier.DisplaySkillNameFor(zhSkill.SkillCode);
 
             CombatResourceRegistry.LoadSkillMap("en-US");
             var enSnapshot = scene.CreateSnapshot();
@@ -92,8 +91,9 @@ public sealed class CombatLocalizationSceneTests
             Assert.Equal(zhSkill.EventKind, enSkill.EventKind);
 
             Assert.Equal("殺氣破裂", zhSkillName);
-            Assert.Equal("Murderous Burst", enSkill.SkillName);
-            Assert.NotEqual(zhSkillName, enSkill.SkillName);
+            var enSkillName = CombatEventClassifier.DisplaySkillNameFor(enSkill.SkillCode);
+            Assert.Equal("Murderous Burst", enSkillName);
+            Assert.NotEqual(zhSkillName, enSkillName);
         }
         finally
         {

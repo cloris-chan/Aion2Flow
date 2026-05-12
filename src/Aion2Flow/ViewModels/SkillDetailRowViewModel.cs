@@ -7,9 +7,6 @@ public sealed partial class SkillDetailRowViewModel : ObservableObject
     public int SkillCode { get; set; }
 
     [ObservableProperty]
-    public partial string SkillName { get; set; } = string.Empty;
-
-    [ObservableProperty]
     public partial long TotalAmount { get; set; }
 
     [ObservableProperty]
@@ -111,7 +108,6 @@ public sealed partial class SkillDetailRowViewModel : ObservableObject
     public void ApplyFrom(in SkillDetailRowData data)
     {
         SkillCode = data.SkillCode;
-        SkillName = data.SkillName;
         TotalAmount = data.TotalAmount;
         DirectAmount = data.DirectAmount;
         PeriodicAmount = data.PeriodicAmount;
@@ -152,7 +148,6 @@ public sealed partial class SkillDetailRowViewModel : ObservableObject
 public struct SkillDetailRowData
 {
     public int SkillCode;
-    public string SkillName;
     public long TotalAmount;
     public long DirectAmount;
     public long PeriodicAmount;

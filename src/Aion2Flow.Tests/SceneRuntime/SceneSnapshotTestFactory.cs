@@ -1,3 +1,5 @@
+using Cloris.Aion2Flow.SceneRuntime.Model;
+
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
 internal static class SceneSnapshotTestFactory
@@ -7,7 +9,6 @@ internal static class SceneSnapshotTestFactory
         long readModelRevision = 0,
         uint mapId = 0,
         uint mapInstanceId = 0,
-        string targetName = "",
         long encounterStartTime = 0,
         long encounterEndTime = 0,
         long encounterTime = 0,
@@ -26,7 +27,6 @@ internal static class SceneSnapshotTestFactory
             readModelRevision,
             mapId,
             mapInstanceId,
-            targetName,
             encounterStartTime,
             encounterEndTime,
             encounterTime,
@@ -39,5 +39,21 @@ internal static class SceneSnapshotTestFactory
     public static CombatantSnapshotEntry Combatant(int id, SceneCombatantMetrics metrics)
     {
         return new CombatantSnapshotEntry(id, metrics);
+    }
+
+    public static SceneCombatantMetrics VisibleMetrics(
+        CharacterClass characterClass = CharacterClass.Gladiator,
+        long damageAmount = 1,
+        double damagePerSecond = 1,
+        double damageContribution = 1)
+    {
+        return new SceneCombatantMetrics
+        {
+            CharacterClass = characterClass,
+            IsVisiblePlayerCombatant = true,
+            DamageAmount = damageAmount,
+            DamagePerSecond = damagePerSecond,
+            DamageContribution = damageContribution
+        };
     }
 }

@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
-using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Tests;
@@ -88,8 +87,17 @@ internal static class SceneReplayTestView
 
     public static string ResolveDisplayName(PacketLogReplayResult replay, int entityId)
     {
-        var resolver = new SceneIdentityResolver(SceneIdentityScope.Empty, replay.SceneOwner.MetadataRegistry);
-        return resolver.ResolveDisplayName(replay.SceneOwner.Entities, entityId);
+        if (replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(entityId, out var pc) && pc.HasNickname)
+            return pc.Nickname;
+
+        if (replay.SceneOwner.MetadataRegistry.TryGetNpcCode(entityId, out var npcCode) &&
+            CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
+            !string.IsNullOrWhiteSpace(catalogEntry.Name))
+        {
+            return catalogEntry.Name;
+        }
+
+        return entityId.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 }
 

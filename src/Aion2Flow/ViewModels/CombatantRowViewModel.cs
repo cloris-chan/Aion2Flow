@@ -8,9 +8,6 @@ public sealed partial class CombatantRowViewModel : ObservableObject
     public int Id { get; set; }
 
     [ObservableProperty]
-    public partial string DisplayName { get; set; }
-
-    [ObservableProperty]
     public partial CharacterClass? CharacterClass { get; set; }
 
     [ObservableProperty]

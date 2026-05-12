@@ -15,8 +15,6 @@ internal sealed class SceneCombatSnapshotBuilder
 
     public uint MapInstanceId { get; private set; }
 
-    public string TargetName { get; private set; } = string.Empty;
-
     public long EncounterStartTime { get; private set; }
 
     public long EncounterEndTime { get; private set; }
@@ -41,7 +39,6 @@ internal sealed class SceneCombatSnapshotBuilder
         EncounterId = encounterId == default ? Guid.NewGuid() : encounterId;
         MapId = 0;
         MapInstanceId = 0;
-        TargetName = string.Empty;
         EncounterStartTime = 0;
         EncounterEndTime = 0;
         EncounterTime = 0;
@@ -55,9 +52,8 @@ internal sealed class SceneCombatSnapshotBuilder
         MapInstanceId = mapInstanceId;
     }
 
-    public void SetTarget(string targetName, NpcRuntimeObservationSnapshot? targetObservation)
+    public void SetTarget(NpcRuntimeObservationSnapshot? targetObservation)
     {
-        TargetName = targetName;
         TargetObservation = targetObservation;
     }
 
@@ -78,12 +74,12 @@ internal sealed class SceneCombatSnapshotBuilder
         _bossFocuses.Add(focus);
     }
 
-    public ref SceneCombatantMetricsAccumulator GetOrAddCombatant(int combatantId, string nickname)
+    public ref SceneCombatantMetricsAccumulator GetOrAddCombatant(int combatantId)
     {
         ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(_combatants, combatantId, out var exists);
         if (!exists)
         {
-            metrics = new SceneCombatantMetricsAccumulator(nickname);
+            metrics = default;
         }
 
         return ref metrics;
@@ -107,7 +103,6 @@ internal sealed class SceneCombatSnapshotBuilder
             readModelRevision == 0 &&
             MapId == 0 &&
             MapInstanceId == 0 &&
-            TargetName.Length == 0 &&
             EncounterStartTime == 0 &&
             EncounterEndTime == 0 &&
             EncounterTime == 0 &&
@@ -141,7 +136,6 @@ internal sealed class SceneCombatSnapshotBuilder
             readModelRevision,
             MapId,
             MapInstanceId,
-            TargetName,
             EncounterStartTime,
             EncounterEndTime,
             EncounterTime,
