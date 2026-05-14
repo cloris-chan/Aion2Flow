@@ -34,9 +34,17 @@ public class EntityDisplay : UserControl
     public static readonly DirectProperty<EntityDisplay, string> TextClassesProperty =
         AvaloniaProperty.RegisterDirect<EntityDisplay, string>(nameof(TextClasses), x => x.TextClasses, (x, value) => x.TextClasses = value);
 
+    public static readonly StyledProperty<bool> IsClassIconAlternateProperty =
+        AvaloniaProperty.Register<EntityDisplay, bool>(nameof(IsClassIconAlternate));
+
+    public static readonly StyledProperty<double> ClassIconOverlayOpacityProperty =
+        AvaloniaProperty.Register<EntityDisplay, double>(nameof(ClassIconOverlayOpacity));
+
     private readonly Grid _layout;
     private readonly TextBlock _textBlock;
     private Image? _classImage;
+    private Image? _overlayImage;
+    private TranslateTransform? _classImageTransform;
     private Panel? _iconHost;
     private string _appliedTextClasses = string.Empty;
     private string _currentText = string.Empty;
@@ -84,12 +92,32 @@ public class EntityDisplay : UserControl
         set => SetAndRaise(TextClassesProperty, ref field, value ?? string.Empty);
     } = string.Empty;
 
+    public bool IsClassIconAlternate
+    {
+        get => GetValue(IsClassIconAlternateProperty);
+        set => SetValue(IsClassIconAlternateProperty, value);
+    }
+
+    public double ClassIconOverlayOpacity
+    {
+        get => GetValue(ClassIconOverlayOpacityProperty);
+        set => SetValue(ClassIconOverlayOpacityProperty, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
         if (ShouldUpdate(change.Property))
         {
             UpdateDisplay();
+        }
+        else if (change.Property == IsClassIconAlternateProperty)
+        {
+            UpdateClassIconTransform();
+        }
+        else if (change.Property == ClassIconOverlayOpacityProperty)
+        {
+            UpdateClassIconOverlayOpacity();
         }
     }
 
@@ -161,6 +189,7 @@ public class EntityDisplay : UserControl
         else
         {
             _iconHost?.IsVisible = false;
+            UpdateClassIconTransform();
         }
 
         Grid.SetColumn(_textBlock, visible ? 1 : 0);
@@ -175,19 +204,22 @@ public class EntityDisplay : UserControl
             return _classImage;
         }
 
+        _classImageTransform = new TranslateTransform();
         _classImage = new Image
         {
             Name = "BaseImage",
             Width = 30,
             Height = 60,
-            VerticalAlignment = VerticalAlignment.Top
+            VerticalAlignment = VerticalAlignment.Top,
+            RenderTransform = _classImageTransform
         };
-        var overlayImage = new Image
+        _overlayImage = new Image
         {
             Name = "OverlayImage",
             Width = 32,
             Height = 32,
             Source = DisplayIconCache.OverlayIcon,
+            Opacity = ClassIconOverlayOpacity,
             ZIndex = 10,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
@@ -210,11 +242,30 @@ public class EntityDisplay : UserControl
                     VerticalAlignment = VerticalAlignment.Center,
                     Children = { _classImage }
                 },
-                overlayImage
+                _overlayImage
             }
         };
         _layout.Children.Insert(0, _iconHost);
         return _classImage;
+    }
+
+    private void UpdateClassIconTransform()
+    {
+        if (_classImage is null)
+        {
+            return;
+        }
+
+        (_classImageTransform ??= new TranslateTransform()).Y = IsClassIconAlternate ? -30 : 0;
+        _classImage.RenderTransform ??= _classImageTransform;
+    }
+
+    private void UpdateClassIconOverlayOpacity()
+    {
+        if (_overlayImage is not null)
+        {
+            _overlayImage.Opacity = ClassIconOverlayOpacity;
+        }
     }
 }
 

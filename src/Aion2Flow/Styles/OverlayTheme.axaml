@@ -547,39 +547,18 @@
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
 
-    <Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#BaseImage">
-        <Setter Property="RenderTransform">
-            <TranslateTransform Y="0" />
-        </Setter>
+    <Style Selector="controls|PcDisplay">
+        <Setter Property="IsClassIconAlternate" Value="False" />
+        <Setter Property="ClassIconOverlayOpacity" Value="0" />
     </Style>
 
-    <Style Selector="Image#OverlayImage">
-        <Setter Property="Opacity" Value="0" />
-        <Setter Property="Transitions">
-            <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
-            </Transitions>
-        </Setter>
+    <Style Selector="controls|AnimatedItemsViewItem:pointerover Border#RowRoot controls|PcDisplay">
+        <Setter Property="IsClassIconAlternate" Value="True" />
     </Style>
 
-    <Style Selector="controls|AnimatedItemsViewItem:pointerover Border#RowRoot Image#BaseImage">
-        <Setter Property="RenderTransform">
-            <TranslateTransform Y="-30" />
-        </Setter>
-    </Style>
-
-    <Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#BaseImage">
-        <Setter Property="RenderTransform">
-            <TranslateTransform Y="-30" />
-        </Setter>
-    </Style>
-
-    <Style Selector="controls|AnimatedItemsViewItem Border#RowRoot Image#OverlayImage">
-        <Setter Property="Opacity" Value="0" />
-    </Style>
-
-    <Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot Image#OverlayImage">
-        <Setter Property="Opacity" Value="0.58" />
+    <Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot controls|PcDisplay">
+        <Setter Property="IsClassIconAlternate" Value="True" />
+        <Setter Property="ClassIconOverlayOpacity" Value="0.58" />
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem Border.OverlayRowCard">
@@ -613,18 +592,6 @@
 
     <Style Selector="controls|AnimatedItemsViewItem:selected Border.MainRowAccent">
         <Setter Property="Opacity" Value="1" />
-    </Style>
-
-    <Style Selector="controls|AnimatedItemsViewItem:pointerover Border.OverlayRowCard Image#BaseImage">
-        <Setter Property="RenderTransform">
-            <TranslateTransform Y="-30" />
-        </Setter>
-    </Style>
-
-    <Style Selector="controls|AnimatedItemsViewItem:selected Border.OverlayRowCard Image#BaseImage">
-        <Setter Property="RenderTransform">
-            <TranslateTransform Y="-30" />
-        </Setter>
     </Style>
 
     <Style Selector="TextBlock.OverlayRowName">
