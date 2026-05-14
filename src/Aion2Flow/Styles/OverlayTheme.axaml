@@ -132,7 +132,20 @@
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
+    <Style Selector="controls|NumericBlock.BossFocusHp">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
     <Style Selector="TextBlock.BossFocusHpMuted">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.88" />
+    </Style>
+
+    <Style Selector="controls|NumericBlock.BossFocusHpMuted">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="10" />
         <Setter Property="FontWeight" Value="SemiBold" />

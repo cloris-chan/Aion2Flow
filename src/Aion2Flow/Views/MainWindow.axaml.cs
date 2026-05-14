@@ -18,7 +18,10 @@ public partial class MainWindow : Window
 {
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly SettingsService _settingsService;
+    private readonly UiFrameBatchService _frameBatchService;
+    private readonly Action<TimeSpan> _animationFrameCallback;
     private bool _hotkeyAttached;
+    private bool _frameLoopRunning;
 
     public new MainViewModel DataContext { get => (MainViewModel)base.DataContext!; set => base.DataContext = value; }
 
@@ -27,6 +30,8 @@ public partial class MainWindow : Window
         DataContext = Ioc.Default.GetRequiredService<MainViewModel>();
         _globalHotkeyService = Ioc.Default.GetRequiredService<GlobalHotkeyService>();
         _settingsService = Ioc.Default.GetRequiredService<SettingsService>();
+        _frameBatchService = Ioc.Default.GetRequiredService<UiFrameBatchService>();
+        _animationFrameCallback = OnAnimationFrame;
         DataContext.InitializeAsync().ConfigureAwait(false);
         AvaloniaXamlLoader.Load(this);
         DataContext.EncounterHistory.CollectionChanged += OnEncounterHistoryCollectionChanged;
@@ -43,6 +48,39 @@ public partial class MainWindow : Window
         base.OnOpened(e);
         RebuildEncounterHistoryMenuItems();
         AttachGlobalHotkeyHook();
+        StartFrameLoop();
+    }
+
+    private void StartFrameLoop()
+    {
+        if (_frameLoopRunning)
+        {
+            return;
+        }
+
+        _frameLoopRunning = true;
+        RequestAnimationFrame(_animationFrameCallback);
+    }
+
+    private void OnAnimationFrame(TimeSpan timestamp)
+    {
+        if (!_frameLoopRunning)
+        {
+            return;
+        }
+
+        try
+        {
+            DataContext.ProcessUiFrame();
+            _frameBatchService.FlushFrame();
+        }
+        finally
+        {
+            if (_frameLoopRunning)
+            {
+                RequestAnimationFrame(_animationFrameCallback);
+            }
+        }
     }
 
     private void AttachGlobalHotkeyHook()
@@ -95,6 +133,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _frameLoopRunning = false;
         base.OnClosed(e);
         DataContext.DisposeAsync().AsTask().ConfigureAwait(false);
     }

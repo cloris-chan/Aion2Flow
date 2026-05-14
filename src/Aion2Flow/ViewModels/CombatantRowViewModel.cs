@@ -1,27 +1,64 @@
 using Cloris.Aion2Flow.SceneRuntime.Model;
-using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed partial class CombatantRowViewModel : ObservableObject
+public sealed class CombatantRowViewModel : FrameBatchedObservableObject
 {
+    public CombatantRowViewModel(
+        UiFrameBatchService frameBatchService,
+        int id,
+        CharacterClass? characterClass,
+        double damagePerSecond,
+        double healingPerSecond,
+        double damage,
+        double healing,
+        double damageContribution)
+        : base(frameBatchService)
+    {
+        Id = id;
+        CharacterClass = characterClass;
+        DamagePerSecond = damagePerSecond;
+        HealingPerSecond = healingPerSecond;
+        Damage = damage;
+        Healing = healing;
+        DamageContribution = damageContribution;
+    }
+
     public int Id { get; set; }
 
-    [ObservableProperty]
-    public partial CharacterClass? CharacterClass { get; set; }
+    public CharacterClass? CharacterClass
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial double DamagePerSecond { get; set; }
+    public double DamagePerSecond
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial double HealingPerSecond { get; set; }
+    public double HealingPerSecond
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial double Damage { get; set; }
+    public double Damage
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial double Healing { get; set; }
+    public double Healing
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial double DamageContribution { get; set; }
+    public double DamageContribution
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 }

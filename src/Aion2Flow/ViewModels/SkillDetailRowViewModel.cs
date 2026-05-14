@@ -1,112 +1,60 @@
-using CommunityToolkit.Mvvm.ComponentModel;
-
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed partial class SkillDetailRowViewModel : ObservableObject
+public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
     public int SkillCode { get; set; }
 
-    [ObservableProperty]
-    public partial long TotalAmount { get; set; }
-
-    [ObservableProperty]
-    public partial long DirectAmount { get; set; }
-
-    [ObservableProperty]
-    public partial long PeriodicAmount { get; set; }
-
-    [ObservableProperty]
-    public partial long DrainAmount { get; set; }
-
-    [ObservableProperty]
-    public partial long RegenerationAmount { get; set; }
-
-    [ObservableProperty]
-    public partial long ShieldAmount { get; set; }
-
-    [ObservableProperty]
-    public partial long ShieldAbsorbedAmount { get; set; }
-
-    [ObservableProperty]
-    public partial int Hits { get; set; }
-
-    [ObservableProperty]
-    public partial int Attempts { get; set; }
-
-    [ObservableProperty]
-    public partial int PeriodicHits { get; set; }
-
-    [ObservableProperty]
-    public partial int Evades { get; set; }
-
-    [ObservableProperty]
-    public partial int Invincible { get; set; }
-
-    [ObservableProperty]
-    public partial int Criticals { get; set; }
-
-    [ObservableProperty]
-    public partial int Back { get; set; }
-
-    [ObservableProperty]
-    public partial int Parry { get; set; }
-
-    [ObservableProperty]
-    public partial int Perfect { get; set; }
-
-    [ObservableProperty]
-    public partial int Smite { get; set; }
-
-    [ObservableProperty]
-    public partial int MultiHit { get; set; }
-
-    [ObservableProperty]
-    public partial int Endurance { get; set; }
-
-    [ObservableProperty]
-    public partial int Regeneration { get; set; }
-
-    [ObservableProperty]
-    public partial int Block { get; set; }
-
-    [ObservableProperty]
-    public partial double SharePercent { get; set; }
-
-    [ObservableProperty]
-    public partial double CriticalRate { get; set; }
-
-    [ObservableProperty]
-    public partial double BackRate { get; set; }
-
-    [ObservableProperty]
-    public partial double ParryRate { get; set; }
-
-    [ObservableProperty]
-    public partial double PerfectRate { get; set; }
-
-    [ObservableProperty]
-    public partial double SmiteRate { get; set; }
-
-    [ObservableProperty]
-    public partial double MultiHitRate { get; set; }
-
-    [ObservableProperty]
-    public partial double EnduranceRate { get; set; }
-
-    [ObservableProperty]
-    public partial double RegenerationRate { get; set; }
-
-    [ObservableProperty]
-    public partial double BlockRate { get; set; }
-
-    [ObservableProperty]
-    public partial double EvadeRate { get; set; }
-
-    [ObservableProperty]
-    public partial double InvincibleRate { get; set; }
+    public long TotalAmount { get; set => SetFrameProperty(ref field, value); }
+    public long DirectAmount { get; set => SetFrameProperty(ref field, value); }
+    public long PeriodicAmount { get; set => SetFrameProperty(ref field, value); }
+    public long DrainAmount { get; set => SetFrameProperty(ref field, value); }
+    public long RegenerationAmount { get; set => SetFrameProperty(ref field, value); }
+    public long ShieldAmount { get; set => SetFrameProperty(ref field, value); }
+    public long ShieldAbsorbedAmount { get; set => SetFrameProperty(ref field, value); }
+    public int Hits { get; set => SetFrameProperty(ref field, value); }
+    public int Attempts { get; set => SetFrameProperty(ref field, value); }
+    public int PeriodicHits { get; set => SetFrameProperty(ref field, value); }
+    public int Evades { get; set => SetFrameProperty(ref field, value); }
+    public int Invincible { get; set => SetFrameProperty(ref field, value); }
+    public int Criticals { get; set => SetFrameProperty(ref field, value); }
+    public int Back { get; set => SetFrameProperty(ref field, value); }
+    public int Parry { get; set => SetFrameProperty(ref field, value); }
+    public int Perfect { get; set => SetFrameProperty(ref field, value); }
+    public int Smite { get; set => SetFrameProperty(ref field, value); }
+    public int MultiHit { get; set => SetFrameProperty(ref field, value); }
+    public int Endurance { get; set => SetFrameProperty(ref field, value); }
+    public int Regeneration { get; set => SetFrameProperty(ref field, value); }
+    public int Block { get; set => SetFrameProperty(ref field, value); }
+    public double SharePercent { get; set => SetFrameProperty(ref field, value); }
+    public double CriticalRate { get; set => SetFrameProperty(ref field, value); }
+    public double BackRate { get; set => SetFrameProperty(ref field, value); }
+    public double ParryRate { get; set => SetFrameProperty(ref field, value); }
+    public double PerfectRate { get; set => SetFrameProperty(ref field, value); }
+    public double SmiteRate { get; set => SetFrameProperty(ref field, value); }
+    public double MultiHitRate { get; set => SetFrameProperty(ref field, value); }
+    public double EnduranceRate { get; set => SetFrameProperty(ref field, value); }
+    public double RegenerationRate { get; set => SetFrameProperty(ref field, value); }
+    public double BlockRate { get; set => SetFrameProperty(ref field, value); }
+    public double EvadeRate { get; set => SetFrameProperty(ref field, value); }
+    public double InvincibleRate { get; set => SetFrameProperty(ref field, value); }
 
     public void ApplyFrom(in SkillDetailRowData data)
+        => ApplyFromCore(in data);
+
+    private void ApplyFromCore(in SkillDetailRowData data)
     {
+        var criticalRate = data.Hits > 0 ? data.Criticals / (double)data.Hits : 0d;
+        var backRate = data.Hits > 0 ? data.Back / (double)data.Hits : 0d;
+        var parryRate = data.Hits > 0 ? data.Parry / (double)data.Hits : 0d;
+        var perfectRate = data.Hits > 0 ? data.Perfect / (double)data.Hits : 0d;
+        var smiteRate = data.Hits > 0 ? data.Smite / (double)data.Hits : 0d;
+        var multiHitRate = data.Hits > 0 ? data.MultiHit / (double)data.Hits : 0d;
+        var enduranceRate = data.Hits > 0 ? data.Endurance / (double)data.Hits : 0d;
+        var regenerationRate = data.Hits > 0 ? data.Regeneration / (double)data.Hits : 0d;
+        var blockRate = data.Hits > 0 ? data.Block / (double)data.Hits : 0d;
+        var evadeRate = data.Attempts > 0 ? data.Evades / (double)data.Attempts : 0d;
+        var invincibleRate = data.Attempts > 0 ? data.Invincible / (double)data.Attempts : 0d;
+
         SkillCode = data.SkillCode;
         TotalAmount = data.TotalAmount;
         DirectAmount = data.DirectAmount;
@@ -130,18 +78,17 @@ public sealed partial class SkillDetailRowViewModel : ObservableObject
         Regeneration = data.Regeneration;
         Block = data.Block;
         SharePercent = data.SharePercent;
-
-        CriticalRate = data.Hits > 0 ? data.Criticals / (double)data.Hits : 0d;
-        BackRate = data.Hits > 0 ? data.Back / (double)data.Hits : 0d;
-        ParryRate = data.Hits > 0 ? data.Parry / (double)data.Hits : 0d;
-        PerfectRate = data.Hits > 0 ? data.Perfect / (double)data.Hits : 0d;
-        SmiteRate = data.Hits > 0 ? data.Smite / (double)data.Hits : 0d;
-        MultiHitRate = data.Hits > 0 ? data.MultiHit / (double)data.Hits : 0d;
-        EnduranceRate = data.Hits > 0 ? data.Endurance / (double)data.Hits : 0d;
-        RegenerationRate = data.Hits > 0 ? data.Regeneration / (double)data.Hits : 0d;
-        BlockRate = data.Hits > 0 ? data.Block / (double)data.Hits : 0d;
-        EvadeRate = data.Attempts > 0 ? data.Evades / (double)data.Attempts : 0d;
-        InvincibleRate = data.Attempts > 0 ? data.Invincible / (double)data.Attempts : 0d;
+        CriticalRate = criticalRate;
+        BackRate = backRate;
+        ParryRate = parryRate;
+        PerfectRate = perfectRate;
+        SmiteRate = smiteRate;
+        MultiHitRate = multiHitRate;
+        EnduranceRate = enduranceRate;
+        RegenerationRate = regenerationRate;
+        BlockRate = blockRate;
+        EvadeRate = evadeRate;
+        InvincibleRate = invincibleRate;
     }
 }
 

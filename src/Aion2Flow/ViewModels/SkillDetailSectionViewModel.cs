@@ -4,8 +4,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed partial class SkillDetailSectionViewModel : ObservableObject
+public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
+    private readonly UiFrameBatchService _frameBatchService = frameBatchService;
+    private readonly Dictionary<int, SkillDetailRowViewModel> _existingBySkillCode = [];
+    private readonly HashSet<int> _newSkillCodes = [];
+
     public ObservableCollection<SkillDetailScopeOption> ScopeOptions { get; } = [];
     public ObservableCollection<SkillDetailRowViewModel> Rows { get; } = [];
 
@@ -16,118 +20,46 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
     [ObservableProperty]
     public partial SkillDetailScopeOption? SelectedScope { get; set; }
 
-    [ObservableProperty]
-    public partial long Total { get; set; }
-
-    [ObservableProperty]
-    public partial long DirectTotal { get; set; }
-
-    [ObservableProperty]
-    public partial long PeriodicTotal { get; set; }
-
-    [ObservableProperty]
-    public partial long DrainTotal { get; set; }
-
-    [ObservableProperty]
-    public partial long RegenerationTotal { get; set; }
-
-    [ObservableProperty]
-    public partial int Hits { get; set; }
-
-    [ObservableProperty]
-    public partial int Attempts { get; set; }
-
-    [ObservableProperty]
-    public partial int PeriodicHits { get; set; }
-
-    [ObservableProperty]
-    public partial int Evades { get; set; }
-
-    [ObservableProperty]
-    public partial int Invincible { get; set; }
-
-    [ObservableProperty]
-    public partial int Criticals { get; set; }
-
-    [ObservableProperty]
-    public partial int PerfectCount { get; set; }
-
-    [ObservableProperty]
-    public partial int SmiteCount { get; set; }
-
-    [ObservableProperty]
-    public partial int MultiHitCount { get; set; }
-
-    [ObservableProperty]
-    public partial int BackCount { get; set; }
-
-    [ObservableProperty]
-    public partial int ParryCount { get; set; }
-
-    [ObservableProperty]
-    public partial int BlockCount { get; set; }
-
-    [ObservableProperty]
-    public partial int EnduranceCount { get; set; }
-
-    [ObservableProperty]
-    public partial int RegenerationCount { get; set; }
-
-    [ObservableProperty]
-    public partial long Shield { get; set; }
-
-    [ObservableProperty]
-    public partial long ShieldAbsorbed { get; set; }
-
-    [ObservableProperty]
-    public partial int SkillCount { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasSkills { get; set; }
-
-    [ObservableProperty]
-    public partial double PerSecond { get; set; }
-
-    [ObservableProperty]
-    public partial double DurationSeconds { get; set; }
+    public long Total { get; set => SetFrameProperty(ref field, value); }
+    public long DirectTotal { get; set => SetFrameProperty(ref field, value); }
+    public long PeriodicTotal { get; set => SetFrameProperty(ref field, value); }
+    public long DrainTotal { get; set => SetFrameProperty(ref field, value); }
+    public long RegenerationTotal { get; set => SetFrameProperty(ref field, value); }
+    public int Hits { get; set => SetFrameProperty(ref field, value); }
+    public int Attempts { get; set => SetFrameProperty(ref field, value); }
+    public int PeriodicHits { get; set => SetFrameProperty(ref field, value); }
+    public int Evades { get; set => SetFrameProperty(ref field, value); }
+    public int Invincible { get; set => SetFrameProperty(ref field, value); }
+    public int Criticals { get; set => SetFrameProperty(ref field, value); }
+    public int PerfectCount { get; set => SetFrameProperty(ref field, value); }
+    public int SmiteCount { get; set => SetFrameProperty(ref field, value); }
+    public int MultiHitCount { get; set => SetFrameProperty(ref field, value); }
+    public int BackCount { get; set => SetFrameProperty(ref field, value); }
+    public int ParryCount { get; set => SetFrameProperty(ref field, value); }
+    public int BlockCount { get; set => SetFrameProperty(ref field, value); }
+    public int EnduranceCount { get; set => SetFrameProperty(ref field, value); }
+    public int RegenerationCount { get; set => SetFrameProperty(ref field, value); }
+    public long Shield { get; set => SetFrameProperty(ref field, value); }
+    public long ShieldAbsorbed { get; set => SetFrameProperty(ref field, value); }
+    public int SkillCount { get; set => SetFrameProperty(ref field, value); }
+    public bool HasSkills { get; set => SetFrameProperty(ref field, value); }
+    public double PerSecond { get; set => SetFrameProperty(ref field, value); }
+    public double DurationSeconds { get; set => SetFrameProperty(ref field, value); }
 
     public bool UsesSceneDuration { get; set; }
 
-    [ObservableProperty]
-    public partial double HitRate { get; set; }
-
-    [ObservableProperty]
-    public partial double CriticalRate { get; set; }
-
-    [ObservableProperty]
-    public partial double SmiteRate { get; set; }
-
-    [ObservableProperty]
-    public partial double MultiHitRate { get; set; }
-
-    [ObservableProperty]
-    public partial double ParryRate { get; set; }
-
-    [ObservableProperty]
-    public partial double PerfectRate { get; set; }
-
-    [ObservableProperty]
-    public partial double EnduranceRate { get; set; }
-
-    [ObservableProperty]
-    public partial double BackRate { get; set; }
-
-    [ObservableProperty]
-    public partial double RegenerationRate { get; set; }
-
-    [ObservableProperty]
-    public partial double BlockRate { get; set; }
-
-    [ObservableProperty]
-    public partial double EvadeRate { get; set; }
-
-    [ObservableProperty]
-    public partial double InvincibleRate { get; set; }
+    public double HitRate { get; set => SetFrameProperty(ref field, value); }
+    public double CriticalRate { get; set => SetFrameProperty(ref field, value); }
+    public double SmiteRate { get; set => SetFrameProperty(ref field, value); }
+    public double MultiHitRate { get; set => SetFrameProperty(ref field, value); }
+    public double ParryRate { get; set => SetFrameProperty(ref field, value); }
+    public double PerfectRate { get; set => SetFrameProperty(ref field, value); }
+    public double EnduranceRate { get; set => SetFrameProperty(ref field, value); }
+    public double BackRate { get; set => SetFrameProperty(ref field, value); }
+    public double RegenerationRate { get; set => SetFrameProperty(ref field, value); }
+    public double BlockRate { get; set => SetFrameProperty(ref field, value); }
+    public double EvadeRate { get; set => SetFrameProperty(ref field, value); }
+    public double InvincibleRate { get; set => SetFrameProperty(ref field, value); }
 
     partial void OnSelectedScopeChanged(SkillDetailScopeOption? value)
     {
@@ -147,21 +79,21 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
 
     public void ReplaceRows(List<SkillDetailRowData> dataRows)
     {
-        var existingBySkillCode = new Dictionary<int, SkillDetailRowViewModel>(Rows.Count);
+        _existingBySkillCode.Clear();
         foreach (var row in Rows)
         {
-            existingBySkillCode.TryAdd(row.SkillCode, row);
+            _existingBySkillCode.TryAdd(row.SkillCode, row);
         }
 
-        var newSkillCodes = new HashSet<int>(dataRows.Count);
+        _newSkillCodes.Clear();
         for (var i = 0; i < dataRows.Count; i++)
         {
-            newSkillCodes.Add(dataRows[i].SkillCode);
+            _newSkillCodes.Add(dataRows[i].SkillCode);
         }
 
         for (var i = Rows.Count - 1; i >= 0; i--)
         {
-            if (!newSkillCodes.Contains(Rows[i].SkillCode))
+            if (!_newSkillCodes.Contains(Rows[i].SkillCode))
             {
                 Rows.RemoveAt(i);
             }
@@ -170,7 +102,7 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
         for (var i = 0; i < dataRows.Count; i++)
         {
             ref var data = ref CollectionsMarshal.AsSpan(dataRows)[i];
-            if (existingBySkillCode.TryGetValue(data.SkillCode, out var existing))
+            if (_existingBySkillCode.TryGetValue(data.SkillCode, out var existing))
             {
                 existing.ApplyFrom(in data);
                 var currentIndex = Rows.IndexOf(existing);
@@ -181,7 +113,7 @@ public sealed partial class SkillDetailSectionViewModel : ObservableObject
             }
             else
             {
-                var vm = new SkillDetailRowViewModel();
+                var vm = new SkillDetailRowViewModel(_frameBatchService);
                 vm.ApplyFrom(in data);
                 if (i < Rows.Count)
                 {

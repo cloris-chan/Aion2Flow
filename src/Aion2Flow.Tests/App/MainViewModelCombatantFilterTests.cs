@@ -192,7 +192,6 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.DisplayContext!.ResolveEntityName(300));
         Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
         Assert.Equal(2, fixture.ViewModel.CombatantDetails.OutgoingDamage.Hits);
-        Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
         Assert.Single(fixture.ViewModel.CombatantDetails.OutgoingDetail.DamageCounterpartFilter.Counterparts);
     }
 
@@ -210,7 +209,6 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.Same(row, fixture.ViewModel.CombatantDetails.OutgoingDamage.Rows[0]);
-        Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
     }
 
     [Fact]
@@ -228,7 +226,26 @@ public sealed class MainViewModelCombatantFilterTests
 
         Assert.Equal(600, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
         Assert.True(fixture.ViewModel.CombatantDetails.OutgoingDamage.Total > firstTotal);
-        Assert.Equal(3, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_DeactivatingDetailKeepsRowsWarmForFlyoutReopen()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        fixture.ViewModel.SelectedCombatant = row;
+        var detailRow = fixture.ViewModel.CombatantDetails.OutgoingDamage.Rows[0];
+
+        fixture.ViewModel.SelectedCombatant = null;
+
+        Assert.Same(detailRow, fixture.ViewModel.CombatantDetails.OutgoingDamage.Rows[0]);
+
+        fixture.ViewModel.SelectedCombatant = row;
+
+        Assert.Same(detailRow, fixture.ViewModel.CombatantDetails.OutgoingDamage.Rows[0]);
     }
 
     [Fact]
@@ -264,7 +281,6 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal(300, fixture.ViewModel.CombatantDetails.SelectedCombatantId);
         Assert.Equal("Scene Player", fixture.ViewModel.CombatantDetails.DisplayContext!.ResolveEntityName(300));
         Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
-        Assert.Equal(2, fixture.ViewModel.CombatantDetails.LastRefreshBaselineCounters.DetailEventCount);
         Assert.NotNull(fixture.ViewModel.EncounterHistory[0].Record.ScenePayload);
     }
 
@@ -342,6 +358,48 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void FrameTick_Stopped_DoesNotRefreshLiveStats()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.ProcessUiFrameForTesting();
+
+        Assert.Empty(fixture.ViewModel.Combatants);
+    }
+
+    [Fact]
+    public void FrameTick_Capturing_RefreshesLiveStats()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.ViewModel.IsCapturing = true;
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.ProcessUiFrameForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(300, row.Id);
+        Assert.Equal(400, row.Damage);
+    }
+
+    [Fact]
+    public void FrameTick_ArchiveView_DoesNotOverwriteDisplayedArchive()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Archived Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        fixture.ViewModel.ArchiveCurrentEncounterCommand.Execute(null);
+
+        fixture.ViewModel.IsCapturing = true;
+        fixture.AppendSceneEncounter(301, "Live Player", 800, 6_000, 8_000);
+        fixture.ViewModel.ProcessUiFrameForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(300, row.Id);
+        Assert.Equal("Archived Player", fixture.ViewModel.DisplayContext!.ResolveEntityName(row.Id));
+    }
+
+    [Fact]
     public void SceneLiveReadModel_Reset_StartsNewBattleWithoutDroppingIdentity()
     {
         var scene = new SceneLiveReadModel();
@@ -387,8 +445,9 @@ public sealed class MainViewModelCombatantFilterTests
             var archive = new EncounterArchiveService();
             var ports = new ProcessPortDiscoveryService();
             var capture = new WinDivertCaptureService(ports);
-            var details = new CombatantDetailsFlyoutViewModel(localization);
-            var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, null!);
+            var frameBatch = new UiFrameBatchService();
+            var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
+            var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, null!, frameBatch);
             return new MainViewModelFixture(viewModel, capture, archive);
         }
 

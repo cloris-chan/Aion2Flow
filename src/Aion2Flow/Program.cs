@@ -3,9 +3,9 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Themes.Simple;
 using Cloris.Aion2Flow.Assets.Icons;
-using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
+using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Logging;
@@ -57,6 +57,7 @@ internal static class Program
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<AppUpdateService>();
         services.AddSingleton<EncounterArchiveService>();
+        services.AddSingleton<UiFrameBatchService>();
         services.AddSingleton<CombatantDetailsFlyoutViewModel>();
         services.AddSingleton<ProcessPortDiscoveryService>();
         services.AddSingleton<ProcessForegroundWatcher>();

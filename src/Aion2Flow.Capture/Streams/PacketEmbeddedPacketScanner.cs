@@ -88,7 +88,7 @@ internal static class PacketEmbeddedPacketScanner
 
         if (value0 == 2 && value1 == 1 && value2 == 0)
         {
-            context.Sink.AppendNpcHp(npcId, checked((int)npcHp), context.TimestampMilliseconds);
+            context.Sink.AppendNpcHp(npcId, checked(npcHp), context.TimestampMilliseconds);
         }
         consumed = reader.Offset;
         var eventName = value0 == 2 && value1 == 1 && value2 == 0 ? "remain-hp" : "entity-value-008d";

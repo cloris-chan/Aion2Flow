@@ -107,14 +107,23 @@
                                             Orientation="Horizontal"
                                             Spacing="2"
                                             VerticalAlignment="Center">
-                                    <TextBlock Classes="BossFocusHp"
-                                               Text="{Binding HpText}"
-                                               VerticalAlignment="Center" />
+                                    <controls:NumericBlock Classes="BossFocusHp"
+                                                           Value="{Binding Hp}"
+                                                           UseGrouping="True"
+                                                           IsVisible="{Binding HasHp}"
+                                                           VerticalAlignment="Center" />
                                     <TextBlock Classes="BossFocusHpSlash"
                                                Text="/"
+                                               IsVisible="{Binding HasHp}"
                                                VerticalAlignment="Center" />
+                                    <controls:NumericBlock Classes="BossFocusHpMuted"
+                                                           Value="{Binding MaxHp}"
+                                                           UseGrouping="True"
+                                                           IsVisible="{Binding HasHp}"
+                                                           VerticalAlignment="Center" />
                                     <TextBlock Classes="BossFocusHpMuted"
-                                               Text="{Binding MaxHpText}"
+                                               Text="-- / --"
+                                               IsVisible="{Binding IsHpUnknown}"
                                                VerticalAlignment="Center" />
                                 </StackPanel>
                             </Grid>

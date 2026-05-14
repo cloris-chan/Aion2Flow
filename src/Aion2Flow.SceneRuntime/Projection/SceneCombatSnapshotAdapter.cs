@@ -79,13 +79,54 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
             return [];
 
+        var events = new List<CombatDetailEvent>();
+        WriteDetailEvents(snapshot, combatantId, new ListDetailEventWriter(events));
+        return events;
+    }
+
+    internal CombatDetailWriteResult WriteDetailEvents(SceneCombatSnapshot snapshot, int combatantId, ICombatDetailEventWriter writer)
+    {
+        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
+            return default;
+
         ResetOwnerInference();
         EnsureOwnerInference();
-        var events = new List<CombatDetailEvent>();
-        AppendDetailEvents(events, snapshot, combatantId, combat.Pairs.Values);
-        events.Sort(static (a, b) => a.Revision.CompareTo(b.Revision));
 
-        return events;
+        var count = 0;
+        var revision = 0L;
+        var records = combat.EventSpan;
+        foreach (ref readonly var record in records)
+        {
+            if (!TryCreateDetailEvent(snapshot, combatantId, in record, out var detailEvent))
+                continue;
+
+            writer.Add(in detailEvent);
+            count++;
+            revision = Math.Max(revision, detailEvent.Revision);
+        }
+
+        return new CombatDetailWriteResult(count, revision);
+    }
+
+    internal bool TryCreateDetailEvent(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, out CombatDetailEvent detailEvent)
+    {
+        EnsureOwnerInference();
+
+        var eventSourceId = ResolveCombatantId(record.SourceId);
+        if (eventSourceId != combatantId && record.TargetId != combatantId)
+        {
+            detailEvent = default;
+            return false;
+        }
+
+        if (!ShouldIncludeDetailEvent(in record, eventSourceId, record.TargetId, snapshot))
+        {
+            detailEvent = default;
+            return false;
+        }
+
+        detailEvent = new CombatDetailEvent(record.Observation, eventSourceId, record.TargetId, ObservedAt(record), record.Revision);
+        return true;
     }
 
     public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId)
@@ -124,29 +165,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
 
         metrics.ProcessCombatObservation(in observation);
-    }
-
-    private void AppendDetailEvents(List<CombatDetailEvent> events, SceneCombatSnapshot snapshot, int combatantId, IEnumerable<CombatPairRecord> pairs)
-    {
-        foreach (var pair in pairs)
-        {
-            var sourceId = ResolveCombatantId(pair.SourceId);
-            if (sourceId != combatantId && pair.TargetId != combatantId)
-                continue;
-
-            if (!combat.TryGetPairEventIndices(pair.SourceId, pair.TargetId, out var indices))
-                continue;
-
-            for (var i = 0; i < indices.Count; i++)
-            {
-                ref readonly var record = ref combat.GetEvent(indices[i]);
-                var eventSourceId = ResolveCombatantId(record.SourceId);
-                if (!ShouldIncludeDetailEvent(in record, eventSourceId, record.TargetId, snapshot))
-                    continue;
-
-                events.Add(new CombatDetailEvent(record.Observation, eventSourceId, record.TargetId, ObservedAt(record), record.Revision));
-            }
-        }
     }
 
     private bool ShouldIncludeDetailEvent(in CombatEventRecord e, int sourceId, int targetId, SceneCombatSnapshot snapshot)
@@ -985,5 +1003,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
                     secondScore = candidateScore;
             }
         }
+    }
+
+    private sealed class ListDetailEventWriter(List<CombatDetailEvent> events) : ICombatDetailEventWriter
+    {
+        public void Clear() => events.Clear();
+
+        public void Add(in CombatDetailEvent detailEvent) => events.Add(detailEvent);
     }
 }

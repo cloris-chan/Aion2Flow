@@ -188,6 +188,22 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
 
     public ref readonly CombatEventRecord GetEvent(int index) => ref CollectionsMarshal.AsSpan(_events)[index];
 
+    public bool TryGetEventByRevision(long revision, out CombatEventRecord record)
+    {
+        if (revision > 0 && revision <= _events.Count)
+        {
+            var candidate = _events[(int)revision - 1];
+            if (candidate.Revision == revision)
+            {
+                record = candidate;
+                return true;
+            }
+        }
+
+        record = default;
+        return false;
+    }
+
     public long GetCombatantDetailRevision(int combatantId) =>
         combatantId > 0 && _detailRevisionByCombatant.TryGetValue(combatantId, out var revision) ? revision : 0;
 

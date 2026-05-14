@@ -13,7 +13,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
+public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsyncDisposable
 {
     private const string IndicatorIdleColor = "#6F7A8A";
     private const string IndicatorOkColor = "#6FD38A";
@@ -27,12 +27,16 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     private readonly GameResourceService _gameResourceService;
     private readonly EncounterArchiveService _encounterArchiveService;
     private readonly CombatantDetailsFlyoutViewModel _combatantDetails;
+    private readonly UiFrameBatchService _frameBatchService;
 
-    private PeriodicTimer? _refreshTimer;
-    private Task? _refreshTask;
     private SceneCombatSnapshot _latestLiveSnapshot = new();
     private SceneCombatSnapshot _displayedSnapshot = new();
     private SceneReadModelFrame _latestLiveFrame = new();
+    private SceneCombatSnapshot? _displayContextSnapshot;
+    private ArchivedEncounterRecord? _displayContextArchivedRecord;
+    private int _displayContextVersion;
+    private int _displayContextBuiltVersion = -1;
+    private bool _displayContextIsArchived;
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
 
@@ -43,47 +47,86 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
     public ObservableCollection<EncounterHistoryItemViewModel> EncounterHistory { get; } = [];
 
-    [ObservableProperty]
-    public partial SceneDisplayContext? DisplayContext { get; set; }
+    public SceneDisplayContext? DisplayContext
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
     [ObservableProperty]
     public partial string Status { get; set; } = string.Empty;
 
-    [ObservableProperty]
-    public partial int RoundTripTimeMilliseconds { get; set; }
+    public int RoundTripTimeMilliseconds
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial double EncounterTimeSeconds { get; set; }
+    public double EncounterTimeSeconds
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial Guid NumericStableWidthScopeKey { get; set; }
+    public Guid NumericStableWidthScopeKey
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial uint LiveSceneMapId { get; set; }
+    public uint LiveSceneMapId
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
 
-    [ObservableProperty]
-    public partial string DriverIndicatorColor { get; set; } = IndicatorIdleColor;
+    public string DriverIndicatorColor
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = IndicatorIdleColor;
 
-    [ObservableProperty]
-    public partial string GamePortIndicatorColor { get; set; } = IndicatorIdleColor;
+    public string GamePortIndicatorColor
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = IndicatorIdleColor;
 
-    [ObservableProperty]
-    public partial string CaptureLockIndicatorColor { get; set; } = IndicatorIdleColor;
+    public string CaptureLockIndicatorColor
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = IndicatorIdleColor;
 
-    [ObservableProperty]
-    public partial string LatencyIndicatorColor { get; set; } = IndicatorIdleColor;
+    public string LatencyIndicatorColor
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = IndicatorIdleColor;
 
-    [ObservableProperty]
-    public partial string DriverIndicatorToolTip { get; set; } = string.Empty;
+    public string DriverIndicatorToolTip
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = string.Empty;
 
-    [ObservableProperty]
-    public partial string GamePortIndicatorToolTip { get; set; } = string.Empty;
+    public string GamePortIndicatorToolTip
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = string.Empty;
 
-    [ObservableProperty]
-    public partial string CaptureLockIndicatorToolTip { get; set; } = string.Empty;
+    public string CaptureLockIndicatorToolTip
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = string.Empty;
 
-    [ObservableProperty]
-    public partial string LatencyToolTip { get; set; } = string.Empty;
+    public string LatencyToolTip
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = string.Empty;
 
     [ObservableProperty]
     public partial bool IsCapturing { get; set; }
@@ -108,7 +151,9 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         EncounterArchiveService encounterArchiveService,
         CombatantDetailsFlyoutViewModel combatantDetails,
         LocalizationService localization,
-        SettingsFlyoutViewModel settingsFlyout)
+        SettingsFlyoutViewModel settingsFlyout,
+        UiFrameBatchService frameBatchService)
+        : base(frameBatchService)
     {
         _captureService = captureService;
         _processPortDiscoveryService = processPortDiscoveryService;
@@ -116,6 +161,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         _gameResourceService = gameResourceService;
         _encounterArchiveService = encounterArchiveService;
         _combatantDetails = combatantDetails;
+        _frameBatchService = frameBatchService;
         Localization = localization;
         SettingsFlyout = settingsFlyout;
         DisplayContext = CreateLiveDisplayContext(_displayedSnapshot);
@@ -152,6 +198,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
+            _displayContextVersion++;
             RebuildEncounterHistory();
             ApplyLocalizedUiText();
             RefreshCaptureIndicators();
@@ -163,6 +210,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
+            _displayContextVersion++;
             RebuildEncounterHistory();
             RefreshDisplayedSnapshot(forceDetailRefresh: true);
         });
@@ -184,10 +232,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         if (IsCapturing) return;
         try
         {
-            _refreshTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
             await _processPortDiscoveryService.StartAsync();
             await _captureService.StartAsync();
-            _refreshTask = RunRefreshLoopAsync(_refreshTimer);
             IsCapturing = true;
             RefreshCaptureIndicators();
         }
@@ -203,23 +249,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         if (!IsCapturing) return;
         await _captureService.StopAsync();
         await _processPortDiscoveryService.StopAsync();
-        _refreshTimer?.Dispose();
-        if (_refreshTask is not null)
-        {
-            await _refreshTask;
-        }
-        _refreshTimer = null;
-        _refreshTask = null;
         IsCapturing = false;
         RefreshCaptureIndicators();
-    }
-
-    private async Task RunRefreshLoopAsync(PeriodicTimer timer)
-    {
-        while (await timer.WaitForNextTickAsync().ConfigureAwait(false))
-        {
-            Dispatcher.UIThread.Post(RefreshCombatStats);
-        }
     }
 
     [RelayCommand]
@@ -320,11 +351,24 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         ApplySnapshot(_displayedSnapshot);
     }
 
+    public void ProcessUiFrame()
+    {
+        if (!_isDisposed && IsCapturing)
+        {
+            RefreshCombatStats();
+        }
+    }
+
     internal void RefreshCombatStatsForTesting() => RefreshCombatStats();
+
+    internal void ProcessUiFrameForTesting() => ProcessUiFrame();
 
     internal void ResetLiveModelsForTesting() => ResetLiveModels(static () => DateTimeOffset.Now);
 
-    private SceneReadModelFrame CreateLiveFrame(int detailCombatantId = 0, bool forceDetailRefresh = false) => _captureService.Scene.Owner.CreateFrame(detailCombatantId, forceDetailRefresh);
+    private SceneReadModelFrame CreateLiveFrame(int detailCombatantId = 0, bool forceDetailRefresh = false) =>
+        detailCombatantId > 0
+            ? _captureService.Scene.Owner.CreateFrame(detailCombatantId, _combatantDetails, forceDetailRefresh)
+            : _captureService.Scene.Owner.CreateFrame();
 
     private void ApplySnapshot(SceneCombatSnapshot snapshot, bool forceDetailRefresh = false)
     {
@@ -366,16 +410,15 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             if (!ShouldDisplayCombatant(data))
                 continue;
 
-            Combatants.Add(new CombatantRowViewModel
-            {
-                Id = id,
-                CharacterClass = data.CharacterClass,
-                DamagePerSecond = data.DamagePerSecond,
-                HealingPerSecond = data.HealingPerSecond,
-                Damage = data.DamageAmount,
-                Healing = data.HealingAmount,
-                DamageContribution = data.DamageContribution
-            });
+            Combatants.Add(new CombatantRowViewModel(
+                _frameBatchService,
+                id,
+                data.CharacterClass,
+                data.DamagePerSecond,
+                data.HealingPerSecond,
+                data.DamageAmount,
+                data.HealingAmount,
+                data.DamageContribution));
         }
 
         Combatants.Sort((a, b) => b.Damage.CompareTo(a.Damage));
@@ -405,18 +448,18 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         var snapshots = liveFrame?.BossFocuses ?? snapshot.BossFocuses;
-        SyncBossFocuses(snapshots.Count, i => snapshots[i].InstanceId, i => snapshots[i].Hp, i => snapshots[i].MaxHp, i => snapshots[i].HasHp);
+        SyncBossFocuses(snapshots);
     }
 
-    private void SyncBossFocuses(int snapshotCount, Func<int, int> getInstanceId, Func<int, int> getHp, Func<int, int> getMaxHp, Func<int, bool> getHasHp)
+    private void SyncBossFocuses(SnapshotList<SceneBossFocusSnapshot> snapshots)
     {
         for (var i = BossFocuses.Count - 1; i >= 0; i--)
         {
             var existing = BossFocuses[i];
             var stillPresent = false;
-            for (var j = 0; j < snapshotCount; j++)
+            for (var j = 0; j < snapshots.Count; j++)
             {
-                if (getInstanceId(j) == existing.InstanceId)
+                if (snapshots[j].InstanceId == existing.InstanceId)
                 {
                     stillPresent = true;
                     break;
@@ -428,9 +471,10 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
             }
         }
 
-        for (var i = 0; i < snapshotCount; i++)
+        for (var i = 0; i < snapshots.Count; i++)
         {
-            var instanceId = getInstanceId(i);
+            var snapshot = snapshots[i];
+            var instanceId = snapshot.InstanceId;
             BossFocusViewModel? row = null;
             for (var j = 0; j < BossFocuses.Count; j++)
             {
@@ -443,10 +487,11 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             if (row is null)
             {
-                row = new BossFocusViewModel { InstanceId = instanceId };
+                row = new BossFocusViewModel(_frameBatchService, instanceId, snapshot.Hp, snapshot.MaxHp, snapshot.HasHp);
                 BossFocuses.Add(row);
+                continue;
             }
-            row.Update(getHp(i), getMaxHp(i), getHasHp(i));
+            row.Update(snapshot.Hp, snapshot.MaxHp, snapshot.HasHp);
         }
     }
 
@@ -506,8 +551,22 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void UpdateDisplayContext(SceneCombatSnapshot snapshot)
     {
-        DisplayContext = IsViewingArchivedEncounter && SelectedEncounterHistory is not null
-            ? CreateArchivedDisplayContext(SelectedEncounterHistory.Record)
+        var isArchived = IsViewingArchivedEncounter && SelectedEncounterHistory is not null;
+        var archivedRecord = isArchived ? SelectedEncounterHistory!.Record : null;
+        if (ReferenceEquals(_displayContextSnapshot, snapshot) &&
+            ReferenceEquals(_displayContextArchivedRecord, archivedRecord) &&
+            _displayContextBuiltVersion == _displayContextVersion &&
+            _displayContextIsArchived == isArchived)
+        {
+            return;
+        }
+
+        _displayContextSnapshot = snapshot;
+        _displayContextArchivedRecord = archivedRecord;
+        _displayContextBuiltVersion = _displayContextVersion;
+        _displayContextIsArchived = isArchived;
+        DisplayContext = isArchived
+            ? CreateArchivedDisplayContext(archivedRecord!)
             : CreateLiveDisplayContext(snapshot);
         _combatantDetails.DisplayContext = DisplayContext;
     }
@@ -575,7 +634,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         if (SelectedCombatant is null)
         {
-            CombatantDetails.Clear();
+            CombatantDetails.Deactivate();
             return;
         }
 
@@ -596,7 +655,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         if (!IsViewingArchivedEncounter)
         {
-            if (_latestLiveFrame.DetailCombatantId != SelectedCombatant.Id || _latestLiveFrame.Detail is null || forceRefresh)
+            if (_latestLiveFrame.DetailCombatantId != SelectedCombatant.Id || _latestLiveFrame.DetailUpdate.CombatantId != SelectedCombatant.Id || forceRefresh)
             {
                 _latestLiveFrame = CreateLiveFrame(SelectedCombatant.Id, forceRefresh);
                 _latestLiveSnapshot = _latestLiveFrame.Snapshot;
@@ -604,8 +663,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
                 snapshot = _displayedSnapshot;
             }
 
-            var detail = _latestLiveFrame.Detail!;
-            CombatantDetails.SelectSceneEncounterCombatant(encounterContextId, SelectedCombatant.Id, snapshot, detail, forceRefresh);
+            CombatantDetails.SelectLiveSceneEncounterCombatant(encounterContextId, SelectedCombatant.Id, snapshot, _latestLiveFrame.DetailUpdate, forceRefresh);
             return;
         }
 

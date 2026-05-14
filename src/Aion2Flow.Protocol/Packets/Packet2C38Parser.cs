@@ -41,7 +41,7 @@ internal static class Packet2C38Parser
                 tailReader.TryReadUInt32Le(out var parsedTailSkillCodeRaw))
             {
                 tailSourceId = parsedTailSourceId;
-                tailSkillCodeRaw = unchecked((int)parsedTailSkillCodeRaw);
+                tailSkillCodeRaw = unchecked(parsedTailSkillCodeRaw);
             }
         }
 

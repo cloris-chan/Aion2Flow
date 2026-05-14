@@ -7,17 +7,19 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed class DetailCounterpartFilterViewModel : ObservableObject
 {
-    private readonly LocalizationService _localization;
+    private readonly Dictionary<int, bool> _previousSelections = [];
+    private readonly Dictionary<int, DetailCounterpartSelectionViewModel> _existingByCombatantId = [];
+    private readonly HashSet<int> _expectedCombatantIds = [];
     private bool _suppressSelectionChanged;
 
     public DetailCounterpartFilterViewModel(LocalizationService localization, string counterpartTitleKey)
     {
-        _localization = localization;
+        Localization = localization;
         CounterpartTitleKey = counterpartTitleKey;
-        _localization.PropertyChanged += HandleLocalizationPropertyChanged;
+        Localization.PropertyChanged += HandleLocalizationPropertyChanged;
     }
 
-    public LocalizationService Localization => _localization;
+    public LocalizationService Localization { get; }
 
     public string CounterpartTitleKey { get; }
 
@@ -70,34 +72,32 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
 
     public event EventHandler? SelectionChanged;
 
-    public HashSet<int> GetSelectedCounterpartIds()
+    public void CopySelectedCounterpartIds(HashSet<int> destination)
     {
-        var selectedIds = new HashSet<int>();
+        destination.Clear();
         foreach (var counterpart in Counterparts)
         {
             if (counterpart.IsSelected)
             {
-                selectedIds.Add(counterpart.CombatantId);
+                destination.Add(counterpart.CombatantId);
             }
         }
-
-        return selectedIds;
     }
 
     public void ReplaceCounterparts(IReadOnlyCollection<DetailCounterpartOption> options)
     {
-        var previousSelections = new Dictionary<int, bool>(Counterparts.Count);
-        var existingByCombatantId = new Dictionary<int, DetailCounterpartSelectionViewModel>(Counterparts.Count);
+        _previousSelections.Clear();
+        _existingByCombatantId.Clear();
+        _expectedCombatantIds.Clear();
         foreach (var counterpart in Counterparts)
         {
-            previousSelections[counterpart.CombatantId] = counterpart.IsSelected;
-            existingByCombatantId[counterpart.CombatantId] = counterpart;
+            _previousSelections[counterpart.CombatantId] = counterpart.IsSelected;
+            _existingByCombatantId[counterpart.CombatantId] = counterpart;
             counterpart.SelectionChanged -= HandleCounterpartSelectionChanged;
         }
 
-        var selectNewOptions = previousSelections.Count == 0 || previousSelections.Values.All(static value => value);
+        var selectNewOptions = _previousSelections.Count == 0 || _previousSelections.Values.All(static value => value);
         var optionList = options as IList<DetailCounterpartOption> ?? [.. options];
-        var expectedCombatantIds = new HashSet<int>(optionList.Count);
 
         _suppressSelectionChanged = true;
         try
@@ -105,12 +105,12 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
             for (var index = 0; index < optionList.Count; index++)
             {
                 var option = optionList[index];
-                expectedCombatantIds.Add(option.CombatantId);
-                var isSelected = previousSelections.TryGetValue(option.CombatantId, out var preservedSelection)
+                _expectedCombatantIds.Add(option.CombatantId);
+                var isSelected = _previousSelections.TryGetValue(option.CombatantId, out var preservedSelection)
                     ? preservedSelection
                     : selectNewOptions;
 
-                if (!existingByCombatantId.TryGetValue(option.CombatantId, out var counterpart))
+                if (!_existingByCombatantId.TryGetValue(option.CombatantId, out var counterpart))
                 {
                     counterpart = new DetailCounterpartSelectionViewModel(
                         option.CombatantId,
@@ -132,7 +132,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
                         Counterparts.Add(counterpart);
                     }
 
-                    existingByCombatantId[option.CombatantId] = counterpart;
+                    _existingByCombatantId[option.CombatantId] = counterpart;
                     continue;
                 }
 
@@ -150,7 +150,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
             for (var index = Counterparts.Count - 1; index >= 0; index--)
             {
                 var counterpart = Counterparts[index];
-                if (expectedCombatantIds.Contains(counterpart.CombatantId))
+                if (_expectedCombatantIds.Contains(counterpart.CombatantId))
                 {
                     continue;
                 }

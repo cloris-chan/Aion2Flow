@@ -24,7 +24,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -69,7 +69,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -111,7 +111,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int allyOneId = 1002;
@@ -179,7 +179,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -208,7 +208,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int allyId = 1002;
@@ -236,44 +236,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
-    public void SelectBattleCombatant_Records_Detail_Refresh_Baseline_Counters()
-    {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        using var scene = new SceneTestHarness();
-        var language = new LanguageService();
-        using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
-
-        const int playerId = 1001;
-        const int healerId = 1002;
-        const int bossId = 9001;
-
-        scene.AppendNickname(playerId, "Perigee");
-        scene.AppendNickname(healerId, "Helper");
-        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(scene.Sink, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage);
-        AppendPacket(scene.Sink, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing);
-
-        var snapshot = scene.CreateSnapshot();
-        SelectSceneCombatant(viewModel, scene, playerId);
-
-        var counters = viewModel.LastRefreshBaselineCounters;
-        Assert.True(counters.Elapsed >= TimeSpan.Zero);
-        Assert.True(counters.AllocatedBytes >= 0);
-        Assert.True(counters.DetailEventCount > 0);
-        Assert.True(counters.DetailRowCount > 0);
-        Assert.True(counters.CounterpartCount > 0);
-    }
-
-    [Fact]
     public void SelectSceneEncounterCombatant_Builds_Live_Detail_From_Scene_Projection()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
@@ -303,7 +272,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(250, viewModel.OutgoingHealing.Total);
         Assert.Equal(180, viewModel.IncomingDamage.Total);
         Assert.Equal(340, viewModel.IncomingHealing.Total);
-        Assert.Equal(6, viewModel.LastRefreshBaselineCounters.DetailEventCount);
         Assert.Equal(2, viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts.Count);
         Assert.Single(viewModel.OutgoingDetail.SupportCounterpartFilter.Counterparts);
         Assert.Contains(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts, x => x.CombatantId == bossId);
@@ -325,7 +293,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
@@ -347,7 +315,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(2, viewModel.OutgoingDamage.Hits);
-        Assert.Equal(2, viewModel.LastRefreshBaselineCounters.DetailEventCount);
         Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
     }
 
@@ -358,7 +325,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -393,7 +360,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -419,7 +386,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(playerId, viewModel.SelectedCombatantId);
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
         Assert.Equal(2, viewModel.OutgoingDamage.Hits);
-        Assert.Equal(2, viewModel.LastRefreshBaselineCounters.DetailEventCount);
         Assert.Single(viewModel.OutgoingDetail.DamageCounterpartFilter.Counterparts);
     }
 
@@ -431,7 +397,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -462,7 +428,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -499,7 +465,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int allyId = 1002;
@@ -539,7 +505,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -569,7 +535,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int allyOneId = 1002;
@@ -628,7 +594,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -668,7 +634,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -698,7 +664,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -737,7 +703,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -775,7 +741,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -822,7 +788,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -901,7 +867,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -918,7 +884,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var expectedDamage = 4L * int.MaxValue;
 
-        Assert.Equal(expectedDamage, (long)snapshot.Combatants[playerId].DamageAmount);
+        Assert.Equal(expectedDamage, snapshot.Combatants[playerId].DamageAmount);
         Assert.Equal(expectedDamage, viewModel.OutgoingDamage.Total);
         Assert.Equal(0, viewModel.OutgoingDamage.Hits);
         Assert.Equal(4, viewModel.OutgoingDamage.PeriodicHits);
@@ -942,7 +908,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -1009,7 +975,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -1059,7 +1025,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -1105,7 +1071,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -1147,7 +1113,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var replay = ReplayWithScene(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         var record = CreateSceneArchiveRecord(replay);
 
@@ -1170,7 +1136,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var replay = ReplayWithScene(FixtureHelper.GetPath("logs/aion2flow.stream.20260412110721.log"));
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var primary = replay.Combatants
             .OrderByDescending(static summary => summary.IncomingEvades + summary.IncomingInvincibles)
             .ThenByDescending(static summary => summary.IncomingDamage)
@@ -1197,7 +1163,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var replay = ReplayWithScene(logPath);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 6485;
         var allyIds = new HashSet<int> { 3738, 4985, 7490 };
@@ -1285,7 +1251,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         scene.Owner.Refresh();
         var snapshot = scene.Owner.CreateSnapshot();
@@ -1595,7 +1561,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
 
         const int playerId = 1001;
         const int npcInstanceId = 29994;
@@ -1628,7 +1594,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);

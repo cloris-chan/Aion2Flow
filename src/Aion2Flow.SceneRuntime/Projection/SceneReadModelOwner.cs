@@ -76,7 +76,16 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         lock (_gate)
         {
             RefreshCore();
-            return CreateFrameCore(detailCombatantId, forceDetailRefresh);
+            return CreateFrameWithMarkers(detailCombatantId, forceDetailRefresh, null);
+        }
+    }
+
+    public SceneReadModelFrame CreateFrame(int detailCombatantId, ICombatDetailEventWriter detailWriter, bool forceDetailRefresh = false)
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            return CreateFrameWithMarkers(detailCombatantId, forceDetailRefresh, detailWriter);
         }
     }
 
@@ -153,14 +162,25 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
-    private SceneReadModelFrame CreateFrameCore(int detailCombatantId, bool forceDetailRefresh)
+    private SceneReadModelFrame CreateFrameWithMarkers(int detailCombatantId, bool forceDetailRefresh, ICombatDetailEventWriter? detailWriter)
+        => CreateFrameCore(detailCombatantId, forceDetailRefresh, detailWriter);
+
+    private SceneReadModelFrame CreateFrameCore(int detailCombatantId, bool forceDetailRefresh, ICombatDetailEventWriter? detailWriter)
     {
         var snapshot = CreateSnapshotCore();
         CombatDetailDelta? detail = null;
+        CombatDetailUpdateResult detailUpdate = default;
         if (detailCombatantId > 0)
         {
             var adapter = CreateAdapter();
-            detail = CreateDetailDeltaCore(adapter, snapshot, detailCombatantId, forceDetailRefresh);
+            if (detailWriter is not null)
+            {
+                detailUpdate = CreateDetailUpdateCore(adapter, snapshot, detailCombatantId, forceDetailRefresh, detailWriter);
+            }
+            else
+            {
+                detail = CreateDetailDeltaCore(adapter, snapshot, detailCombatantId, forceDetailRefresh);
+            }
         }
 
         return new SceneReadModelFrame
@@ -169,6 +189,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             ReadModelRevision = snapshot.ReadModelRevision,
             DetailCombatantId = detailCombatantId,
             Detail = detail,
+            DetailUpdate = detailUpdate,
             BossFocuses = snapshot.BossFocuses
         };
     }
@@ -224,6 +245,12 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
 
         return _lastDetailDeltas[combatantId];
+    }
+
+    private CombatDetailUpdateResult CreateDetailUpdateCore(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh, ICombatDetailEventWriter writer)
+    {
+        var subscription = GetDetailSubscription(combatantId);
+        return subscription.Update(adapter, snapshot, forceRefresh, writer);
     }
 
     private void ApplyBossFocusSnapshots(SceneCombatSnapshotBuilder builder)
@@ -299,6 +326,7 @@ public readonly record struct SceneReadModelFrame
         ReadModelRevision = 0;
         DetailCombatantId = 0;
         Detail = null;
+        DetailUpdate = default;
         BossFocuses = default;
     }
 
@@ -306,5 +334,6 @@ public readonly record struct SceneReadModelFrame
     public long ReadModelRevision { get; init; }
     public int DetailCombatantId { get; init; }
     public CombatDetailDelta? Detail { get; init; }
+    public CombatDetailUpdateResult DetailUpdate { get; init; }
     public SnapshotList<SceneBossFocusSnapshot> BossFocuses { get; init; }
 }

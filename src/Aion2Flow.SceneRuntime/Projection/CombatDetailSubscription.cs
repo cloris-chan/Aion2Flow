@@ -9,6 +9,8 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
 
     private SnapshotChangeCursor _cursor = store.CreateCursor(0);
     private long _lastAppliedRevision;
+    private CombatDetailContextKey _liveContextKey;
+    private bool _hasLiveContext;
 
     public int CombatantId => combatantId;
     public long LastAppliedRevision => _lastAppliedRevision;
@@ -64,6 +66,91 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
         var delta = CreateDelta(detailRevision, adapter, snapshot);
         _lastAppliedRevision = delta.Revision;
         return delta;
+    }
+
+    public CombatDetailUpdateResult Update(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, bool forceRefresh, ICombatDetailEventWriter writer)
+    {
+        var context = CombatDetailContextKey.From(snapshot, combatantId);
+        if (forceRefresh || !_hasLiveContext || _liveContextKey != context)
+            return CreateSnapshotUpdate(adapter, snapshot, context, writer);
+
+        return PollUpdate(adapter, snapshot, writer);
+    }
+
+    private CombatDetailUpdateResult CreateSnapshotUpdate(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, CombatDetailContextKey context, ICombatDetailEventWriter writer)
+    {
+        writer.Clear();
+        var detailRevision = store.GetCombatantDetailRevision(combatantId);
+        var write = adapter.WriteDetailEvents(snapshot, combatantId, writer);
+        detailRevision = Math.Max(detailRevision, write.Revision);
+        _cursor = store.CreateCursor(store.Revision);
+        _lastAppliedRevision = detailRevision;
+        _liveContextKey = context;
+        _hasLiveContext = true;
+
+        return new CombatDetailUpdateResult
+        {
+            CombatantId = combatantId,
+            Revision = detailRevision,
+            IsFullSnapshot = true,
+            HasChanges = true,
+            AddedEventCount = write.Count,
+            Combatant = CombatPairProjection.GetCombatant(store, combatantId)
+        };
+    }
+
+    private CombatDetailUpdateResult PollUpdate(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, ICombatDetailEventWriter writer)
+    {
+        Span<CombatSnapshotChange> changes = stackalloc CombatSnapshotChange[ChangeBufferSize];
+        var batch = store.CopyChanges(_cursor, changes);
+        if (batch.Count == 0)
+            return CombatDetailUpdateResult.None(combatantId, _lastAppliedRevision, CombatPairProjection.GetCombatant(store, combatantId));
+
+        var affected = false;
+        var addedEventCount = 0;
+        var detailRevision = _lastAppliedRevision;
+        while (true)
+        {
+            for (var i = 0; i < batch.Count; i++)
+            {
+                var change = changes[i];
+                if (!IsRelevant(in change, adapter))
+                    continue;
+
+                affected = true;
+                detailRevision = Math.Max(detailRevision, change.Revision);
+                if (change.Kind != CombatSnapshotChangeKind.PairUpdated ||
+                    !store.TryGetEventByRevision(change.Revision, out var record) ||
+                    !adapter.TryCreateDetailEvent(snapshot, combatantId, in record, out var detailEvent))
+                {
+                    continue;
+                }
+
+                writer.Add(in detailEvent);
+                addedEventCount++;
+            }
+
+            _cursor = batch.Cursor;
+            if (!batch.HasMore)
+                break;
+
+            batch = store.CopyChanges(_cursor, changes);
+            if (batch.Count == 0)
+                break;
+        }
+
+        if (!affected)
+            return CombatDetailUpdateResult.None(combatantId, _lastAppliedRevision, CombatPairProjection.GetCombatant(store, combatantId));
+
+        _lastAppliedRevision = detailRevision;
+        return new CombatDetailUpdateResult
+        {
+            CombatantId = combatantId,
+            Revision = detailRevision,
+            HasChanges = true,
+            AddedEventCount = addedEventCount,
+            Combatant = CombatPairProjection.GetCombatant(store, combatantId)
+        };
     }
 
     private CombatDetailDelta CreateDelta(long revision, SceneCombatSnapshotAdapter? adapter, SceneCombatSnapshot? snapshot)

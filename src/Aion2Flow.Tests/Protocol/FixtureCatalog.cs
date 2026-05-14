@@ -206,9 +206,9 @@ public static class FixtureCatalog
 
     public static IEnumerable<object[]> Aux2B38Samples()
     {
-        yield return [new Aux2B38Sample("state/2b38-aux.hex", 3374, 19, 1301, unchecked((int)0x0AD79417))];
-        yield return [new Aux2B38Sample("state/2b38-hot-refresh.hex", 6370, 19, 97, unchecked((int)0x0A2FEAF5))];
-        yield return [new Aux2B38Sample("state/2b38-dot-refresh.hex", 17640, 19, 94, unchecked((int)0x0A2E3CE1))];
+        yield return [new Aux2B38Sample("state/2b38-aux.hex", 3374, 19, 1301, unchecked(0x0AD79417))];
+        yield return [new Aux2B38Sample("state/2b38-hot-refresh.hex", 6370, 19, 97, unchecked(0x0A2FEAF5))];
+        yield return [new Aux2B38Sample("state/2b38-dot-refresh.hex", 17640, 19, 94, unchecked(0x0A2E3CE1))];
     }
 
     public static IEnumerable<object[]> Aux2A38Samples()
