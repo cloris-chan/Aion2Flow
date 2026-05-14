@@ -98,10 +98,12 @@
   <data name="Stat_Smite" xml:space="preserve"><value>強擊</value></data>
   <data name="Stat_MultiHit" xml:space="preserve"><value>多段打擊</value></data>
   <data name="Stat_Parry" xml:space="preserve"><value>武器格擋</value></data>
+  <data name="Stat_PerfectParry" xml:space="preserve"><value>完美武器格擋</value></data>
   <data name="Stat_Endurance" xml:space="preserve"><value>鐵壁</value></data>
   <data name="Stat_Regeneration" xml:space="preserve"><value>再生</value></data>
   <data name="Stat_Back" xml:space="preserve"><value>背後</value></data>
   <data name="Stat_Block" xml:space="preserve"><value>盾牌格擋</value></data>
+  <data name="Stat_PerfectBlock" xml:space="preserve"><value>完美盾牌格擋</value></data>
   <data name="Stat_Evade" xml:space="preserve"><value>迴避</value></data>
   <data name="Stat_Invincible" xml:space="preserve"><value>無敵</value></data>
 

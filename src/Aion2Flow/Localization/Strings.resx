@@ -98,10 +98,12 @@
   <data name="Stat_Smite" xml:space="preserve"><value>Smite</value></data>
   <data name="Stat_MultiHit" xml:space="preserve"><value>Multi-Hit</value></data>
   <data name="Stat_Parry" xml:space="preserve"><value>Weapon Parry</value></data>
+  <data name="Stat_PerfectParry" xml:space="preserve"><value>Perfect Weapon Parry</value></data>
   <data name="Stat_Endurance" xml:space="preserve"><value>Endurance</value></data>
   <data name="Stat_Regeneration" xml:space="preserve"><value>Regeneration</value></data>
   <data name="Stat_Back" xml:space="preserve"><value>Back Attack</value></data>
   <data name="Stat_Block" xml:space="preserve"><value>Shield Block</value></data>
+  <data name="Stat_PerfectBlock" xml:space="preserve"><value>Perfect Shield Block</value></data>
   <data name="Stat_Evade" xml:space="preserve"><value>Evade</value></data>
   <data name="Stat_Invincible" xml:space="preserve"><value>Invincible</value></data>
 

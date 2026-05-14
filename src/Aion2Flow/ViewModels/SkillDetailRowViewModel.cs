@@ -19,22 +19,26 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
     public int Criticals { get; set => SetFrameProperty(ref field, value); }
     public int Back { get; set => SetFrameProperty(ref field, value); }
     public int Parry { get; set => SetFrameProperty(ref field, value); }
+    public int PerfectParry { get; set => SetFrameProperty(ref field, value); }
     public int Perfect { get; set => SetFrameProperty(ref field, value); }
     public int Smite { get; set => SetFrameProperty(ref field, value); }
     public int MultiHit { get; set => SetFrameProperty(ref field, value); }
     public int Endurance { get; set => SetFrameProperty(ref field, value); }
     public int Regeneration { get; set => SetFrameProperty(ref field, value); }
     public int Block { get; set => SetFrameProperty(ref field, value); }
+    public int PerfectBlock { get; set => SetFrameProperty(ref field, value); }
     public double SharePercent { get; set => SetFrameProperty(ref field, value); }
     public double CriticalRate { get; set => SetFrameProperty(ref field, value); }
     public double BackRate { get; set => SetFrameProperty(ref field, value); }
     public double ParryRate { get; set => SetFrameProperty(ref field, value); }
+    public double PerfectParryRate { get; set => SetFrameProperty(ref field, value); }
     public double PerfectRate { get; set => SetFrameProperty(ref field, value); }
     public double SmiteRate { get; set => SetFrameProperty(ref field, value); }
     public double MultiHitRate { get; set => SetFrameProperty(ref field, value); }
     public double EnduranceRate { get; set => SetFrameProperty(ref field, value); }
     public double RegenerationRate { get; set => SetFrameProperty(ref field, value); }
     public double BlockRate { get; set => SetFrameProperty(ref field, value); }
+    public double PerfectBlockRate { get; set => SetFrameProperty(ref field, value); }
     public double EvadeRate { get; set => SetFrameProperty(ref field, value); }
     public double InvincibleRate { get; set => SetFrameProperty(ref field, value); }
 
@@ -46,12 +50,14 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         var criticalRate = data.Hits > 0 ? data.Criticals / (double)data.Hits : 0d;
         var backRate = data.Hits > 0 ? data.Back / (double)data.Hits : 0d;
         var parryRate = data.Hits > 0 ? data.Parry / (double)data.Hits : 0d;
+        var perfectParryRate = data.Hits > 0 ? data.PerfectParry / (double)data.Hits : 0d;
         var perfectRate = data.Hits > 0 ? data.Perfect / (double)data.Hits : 0d;
         var smiteRate = data.Hits > 0 ? data.Smite / (double)data.Hits : 0d;
         var multiHitRate = data.Hits > 0 ? data.MultiHit / (double)data.Hits : 0d;
         var enduranceRate = data.Hits > 0 ? data.Endurance / (double)data.Hits : 0d;
         var regenerationRate = data.Hits > 0 ? data.Regeneration / (double)data.Hits : 0d;
         var blockRate = data.Hits > 0 ? data.Block / (double)data.Hits : 0d;
+        var perfectBlockRate = data.Hits > 0 ? data.PerfectBlock / (double)data.Hits : 0d;
         var evadeRate = data.Attempts > 0 ? data.Evades / (double)data.Attempts : 0d;
         var invincibleRate = data.Attempts > 0 ? data.Invincible / (double)data.Attempts : 0d;
 
@@ -71,22 +77,26 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         Criticals = data.Criticals;
         Back = data.Back;
         Parry = data.Parry;
+        PerfectParry = data.PerfectParry;
         Perfect = data.Perfect;
         Smite = data.Smite;
         MultiHit = data.MultiHit;
         Endurance = data.Endurance;
         Regeneration = data.Regeneration;
         Block = data.Block;
+        PerfectBlock = data.PerfectBlock;
         SharePercent = data.SharePercent;
         CriticalRate = criticalRate;
         BackRate = backRate;
         ParryRate = parryRate;
+        PerfectParryRate = perfectParryRate;
         PerfectRate = perfectRate;
         SmiteRate = smiteRate;
         MultiHitRate = multiHitRate;
         EnduranceRate = enduranceRate;
         RegenerationRate = regenerationRate;
         BlockRate = blockRate;
+        PerfectBlockRate = perfectBlockRate;
         EvadeRate = evadeRate;
         InvincibleRate = invincibleRate;
     }
@@ -110,11 +120,13 @@ public struct SkillDetailRowData
     public int Criticals;
     public int Back;
     public int Parry;
+    public int PerfectParry;
     public int Perfect;
     public int Smite;
     public int MultiHit;
     public int Endurance;
     public int Regeneration;
     public int Block;
+    public int PerfectBlock;
     public double SharePercent;
 }

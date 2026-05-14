@@ -40,9 +40,10 @@ public struct SkillMetrics(in CombatObservation observation)
     public int SmiteTimes { get; set; }
     public int ParryTimes { get; set; }
     public int BlockTimes { get; set; }
+    public int PerfectParryTimes { get; set; }
+    public int PerfectBlockTimes { get; set; }
     public int EnduranceTimes { get; set; }
     public int RegenerationTimes { get; set; }
-    public int DefensivePerfectTimes { get; set; }
 
     internal readonly SkillMetricsSnapshot ToSnapshot()
     {
@@ -79,9 +80,10 @@ public struct SkillMetrics(in CombatObservation observation)
             SmiteTimes,
             ParryTimes,
             BlockTimes,
+            PerfectParryTimes,
+            PerfectBlockTimes,
             EnduranceTimes,
-            RegenerationTimes,
-            DefensivePerfectTimes);
+            RegenerationTimes);
     }
 
     private void ApplyDamageAttemptMetrics(long damage, DamageModifiers modifiers, in CombatContribution contribution)
@@ -101,9 +103,10 @@ public struct SkillMetrics(in CombatObservation observation)
         if (hitContribution > 0 && (modifiers & DamageModifiers.Smite) != 0) SmiteTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Perfect) != 0) PerfectTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Block) != 0) BlockTimes += hitContribution;
+        if (hitContribution > 0 && (modifiers & (DamageModifiers.Parry | DamageModifiers.DefensivePerfect)) == (DamageModifiers.Parry | DamageModifiers.DefensivePerfect)) PerfectParryTimes += hitContribution;
+        if (hitContribution > 0 && (modifiers & (DamageModifiers.Block | DamageModifiers.DefensivePerfect)) == (DamageModifiers.Block | DamageModifiers.DefensivePerfect)) PerfectBlockTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Endurance) != 0) EnduranceTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Regeneration) != 0) RegenerationTimes += hitContribution;
-        if (hitContribution > 0 && (modifiers & DamageModifiers.DefensivePerfect) != 0) DefensivePerfectTimes += hitContribution;
     }
 
     public void ProcessObservation(in CombatObservation observation)
@@ -290,9 +293,10 @@ public readonly record struct SkillMetricsSnapshot(
     int SmiteTimes,
     int ParryTimes,
     int BlockTimes,
+    int PerfectParryTimes,
+    int PerfectBlockTimes,
     int EnduranceTimes,
-    int RegenerationTimes,
-    int DefensivePerfectTimes)
+    int RegenerationTimes)
 {
 }
 

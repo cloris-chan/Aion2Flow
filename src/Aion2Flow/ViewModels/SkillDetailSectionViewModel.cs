@@ -37,6 +37,8 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
     public int BackCount { get; set => SetFrameProperty(ref field, value); }
     public int ParryCount { get; set => SetFrameProperty(ref field, value); }
     public int BlockCount { get; set => SetFrameProperty(ref field, value); }
+    public int PerfectParryCount { get; set => SetFrameProperty(ref field, value); }
+    public int PerfectBlockCount { get; set => SetFrameProperty(ref field, value); }
     public int EnduranceCount { get; set => SetFrameProperty(ref field, value); }
     public int RegenerationCount { get; set => SetFrameProperty(ref field, value); }
     public long Shield { get; set => SetFrameProperty(ref field, value); }
@@ -54,10 +56,12 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
     public double MultiHitRate { get; set => SetFrameProperty(ref field, value); }
     public double ParryRate { get; set => SetFrameProperty(ref field, value); }
     public double PerfectRate { get; set => SetFrameProperty(ref field, value); }
+    public double PerfectParryRate { get; set => SetFrameProperty(ref field, value); }
     public double EnduranceRate { get; set => SetFrameProperty(ref field, value); }
     public double BackRate { get; set => SetFrameProperty(ref field, value); }
     public double RegenerationRate { get; set => SetFrameProperty(ref field, value); }
     public double BlockRate { get; set => SetFrameProperty(ref field, value); }
+    public double PerfectBlockRate { get; set => SetFrameProperty(ref field, value); }
     public double EvadeRate { get; set => SetFrameProperty(ref field, value); }
     public double InvincibleRate { get; set => SetFrameProperty(ref field, value); }
 
@@ -149,6 +153,8 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         BackCount = 0;
         ParryCount = 0;
         BlockCount = 0;
+        PerfectParryCount = 0;
+        PerfectBlockCount = 0;
         EnduranceCount = 0;
         RegenerationCount = 0;
         Shield = 0;
@@ -164,10 +170,12 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         MultiHitRate = 0d;
         ParryRate = 0d;
         PerfectRate = 0d;
+        PerfectParryRate = 0d;
         EnduranceRate = 0d;
         BackRate = 0d;
         RegenerationRate = 0d;
         BlockRate = 0d;
+        PerfectBlockRate = 0d;
         EvadeRate = 0d;
         InvincibleRate = 0d;
         OnPropertyChanged(nameof(HasMultipleScopes));

@@ -1068,9 +1068,10 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(expected.SmiteTimes, actual.SmiteTimes);
         Assert.Equal(expected.ParryTimes, actual.ParryTimes);
         Assert.Equal(expected.BlockTimes, actual.BlockTimes);
+        Assert.Equal(expected.PerfectParryTimes, actual.PerfectParryTimes);
+        Assert.Equal(expected.PerfectBlockTimes, actual.PerfectBlockTimes);
         Assert.Equal(expected.EnduranceTimes, actual.EnduranceTimes);
         Assert.Equal(expected.RegenerationTimes, actual.RegenerationTimes);
-        Assert.Equal(expected.DefensivePerfectTimes, actual.DefensivePerfectTimes);
     }
 
     private static string[] BuildEncounterPacketFacts(IReadOnlyList<SceneReplayPacket> packets, SceneCombatSnapshot snapshot)

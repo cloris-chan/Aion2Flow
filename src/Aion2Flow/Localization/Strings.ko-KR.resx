@@ -98,10 +98,12 @@
   <data name="Stat_Smite" xml:space="preserve"><value>강타</value></data>
   <data name="Stat_MultiHit" xml:space="preserve"><value>다단타격</value></data>
   <data name="Stat_Parry" xml:space="preserve"><value>무기막기</value></data>
+  <data name="Stat_PerfectParry" xml:space="preserve"><value>완벽 무기 막기</value></data>
   <data name="Stat_Endurance" xml:space="preserve"><value>철벽</value></data>
   <data name="Stat_Regeneration" xml:space="preserve"><value>재생</value></data>
   <data name="Stat_Back" xml:space="preserve"><value>후방 공격</value></data>
   <data name="Stat_Block" xml:space="preserve"><value>방패막기</value></data>
+  <data name="Stat_PerfectBlock" xml:space="preserve"><value>완벽 방패 막기</value></data>
   <data name="Stat_Evade" xml:space="preserve"><value>회피</value></data>
   <data name="Stat_Invincible" xml:space="preserve"><value>무적</value></data>
 

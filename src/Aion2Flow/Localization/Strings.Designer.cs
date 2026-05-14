@@ -682,6 +682,24 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Perfect Shield Block.
+        /// </summary>
+        internal static string Stat_PerfectBlock {
+            get {
+                return ResourceManager.GetString("Stat_PerfectBlock", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Perfect Weapon Parry.
+        /// </summary>
+        internal static string Stat_PerfectParry {
+            get {
+                return ResourceManager.GetString("Stat_PerfectParry", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Regeneration.
         /// </summary>
         internal static string Stat_Regeneration {

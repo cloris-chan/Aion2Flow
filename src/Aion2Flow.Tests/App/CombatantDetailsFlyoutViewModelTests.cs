@@ -713,21 +713,30 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3, modifiers: DamageModifiers.Back | DamageModifiers.Smite);
         AppendPacket(scene.Sink, playerId, bossId, 11000010, 400, 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.Perfect);
         AppendPacket(scene.Sink, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 200, 4_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.DefensivePerfect);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 100, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 50, 6_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block | DamageModifiers.DefensivePerfect);
 
         var snapshot = scene.CreateSnapshot();
         SelectSceneCombatant(viewModel, scene, playerId);
 
         var row = Assert.Single(viewModel.OutgoingDamage.Rows);
 
-        Assert.Equal(3, row.Hits);
-        AssertModifierValues(row.Criticals, row.CriticalRate, 1, 3);
-        AssertModifierValues(row.Perfect, row.PerfectRate, 1, 3);
-        AssertModifierValues(row.Smite, row.SmiteRate, 1, 3);
-        AssertModifierValues(row.Parry, row.ParryRate, 1, 3);
-        AssertModifierValues(row.Endurance, row.EnduranceRate, 1, 3);
-        AssertModifierValues(row.Back, row.BackRate, 1, 3);
-        AssertModifierValues(row.Block, row.BlockRate, 0, 3);
-        AssertModifierValues(row.Evades, row.EvadeRate, 0, 3);
+        Assert.Equal(6, row.Hits);
+        AssertModifierValues(row.Criticals, row.CriticalRate, 1, 6);
+        AssertModifierValues(row.Perfect, row.PerfectRate, 1, 6);
+        AssertModifierValues(row.Smite, row.SmiteRate, 1, 6);
+        AssertModifierValues(row.Parry, row.ParryRate, 2, 6);
+        AssertModifierValues(row.PerfectParry, row.PerfectParryRate, 1, 6);
+        AssertModifierValues(row.Endurance, row.EnduranceRate, 1, 6);
+        AssertModifierValues(row.Back, row.BackRate, 1, 6);
+        AssertModifierValues(row.Block, row.BlockRate, 2, 6);
+        AssertModifierValues(row.PerfectBlock, row.PerfectBlockRate, 1, 6);
+        AssertModifierValues(row.Evades, row.EvadeRate, 0, 6);
+        AssertModifierValues(viewModel.OutgoingDamage.ParryCount, viewModel.OutgoingDamage.ParryRate, 2, 6);
+        AssertModifierValues(viewModel.OutgoingDamage.PerfectParryCount, viewModel.OutgoingDamage.PerfectParryRate, 1, 6);
+        AssertModifierValues(viewModel.OutgoingDamage.BlockCount, viewModel.OutgoingDamage.BlockRate, 2, 6);
+        AssertModifierValues(viewModel.OutgoingDamage.PerfectBlockCount, viewModel.OutgoingDamage.PerfectBlockRate, 1, 6);
     }
 
     [Fact]
@@ -992,26 +1001,32 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendPacket(scene.Sink, bossId, playerId, 1100020, 0, 7_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Evade, hitContribution: 0, attemptContribution: 1);
         AppendPacket(scene.Sink, bossId, playerId, 1100020, 11, 8_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block);
         AppendPacket(scene.Sink, bossId, playerId, 1100020, 1, 9_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block | DamageModifiers.Perfect);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 1, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.DefensivePerfect);
+        AppendPacket(scene.Sink, bossId, playerId, 1100020, 1, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Block | DamageModifiers.DefensivePerfect);
 
         var snapshot = scene.CreateSnapshot();
         SelectSceneCombatant(viewModel, scene, playerId);
 
         var row = Assert.Single(viewModel.IncomingDamage.Rows);
 
-        Assert.Equal(26, viewModel.IncomingDamage.Total);
-        Assert.Equal(9, viewModel.IncomingDamage.Attempts);
-        Assert.Equal(6, viewModel.IncomingDamage.Hits);
+        Assert.Equal(28, viewModel.IncomingDamage.Total);
+        Assert.Equal(11, viewModel.IncomingDamage.Attempts);
+        Assert.Equal(8, viewModel.IncomingDamage.Hits);
         Assert.Equal(3, viewModel.IncomingDamage.Evades);
-        Assert.Equal(9, row.Attempts);
-        Assert.Equal(6, row.Hits);
-        AssertModifierValues(row.Parry, row.ParryRate, 1, 6);
-        AssertModifierValues(row.Endurance, row.EnduranceRate, 3, 6);
-        AssertModifierValues(row.Regeneration, row.RegenerationRate, 1, 6);
-        AssertModifierValues(row.Block, row.BlockRate, 2, 6);
-        AssertModifierValues(row.Perfect, row.PerfectRate, 1, 6);
-        AssertModifierValues(row.Evades, row.EvadeRate, 3, 9);
-        AssertModifierValues(viewModel.IncomingDamage.RegenerationCount, viewModel.IncomingDamage.RegenerationRate, 1, 6);
-        AssertModifierValues(viewModel.IncomingDamage.Evades, viewModel.IncomingDamage.EvadeRate, 3, 9);
+        Assert.Equal(11, row.Attempts);
+        Assert.Equal(8, row.Hits);
+        AssertModifierValues(row.Parry, row.ParryRate, 2, 8);
+        AssertModifierValues(row.PerfectParry, row.PerfectParryRate, 1, 8);
+        AssertModifierValues(row.Endurance, row.EnduranceRate, 3, 8);
+        AssertModifierValues(row.Regeneration, row.RegenerationRate, 1, 8);
+        AssertModifierValues(row.Block, row.BlockRate, 3, 8);
+        AssertModifierValues(row.PerfectBlock, row.PerfectBlockRate, 1, 8);
+        AssertModifierValues(row.Perfect, row.PerfectRate, 1, 8);
+        AssertModifierValues(row.Evades, row.EvadeRate, 3, 11);
+        AssertModifierValues(viewModel.IncomingDamage.PerfectParryCount, viewModel.IncomingDamage.PerfectParryRate, 1, 8);
+        AssertModifierValues(viewModel.IncomingDamage.PerfectBlockCount, viewModel.IncomingDamage.PerfectBlockRate, 1, 8);
+        AssertModifierValues(viewModel.IncomingDamage.RegenerationCount, viewModel.IncomingDamage.RegenerationRate, 1, 8);
+        AssertModifierValues(viewModel.IncomingDamage.Evades, viewModel.IncomingDamage.EvadeRate, 3, 11);
     }
 
     [Fact]
