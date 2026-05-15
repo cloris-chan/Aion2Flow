@@ -101,7 +101,7 @@
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
-    <Style Selector="TextBlock.OverlayHeaderScene">
+    <Style Selector="controls|MapDisplay.OverlayHeaderScene TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -120,7 +120,7 @@
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
-    <Style Selector="TextBlock.BossFocusName">
+    <Style Selector="controls|NpcDisplay.BossFocusName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -548,17 +548,17 @@
     </Style>
 
     <Style Selector="controls|PcDisplay">
-        <Setter Property="IsClassIconAlternate" Value="False" />
-        <Setter Property="ClassIconOverlayOpacity" Value="0" />
+        <Setter Property="IsIconAlternate" Value="False" />
+        <Setter Property="IconOverlayOpacity" Value="0" />
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem:pointerover Border#RowRoot controls|PcDisplay">
-        <Setter Property="IsClassIconAlternate" Value="True" />
+        <Setter Property="IsIconAlternate" Value="True" />
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot controls|PcDisplay">
-        <Setter Property="IsClassIconAlternate" Value="True" />
-        <Setter Property="ClassIconOverlayOpacity" Value="0.58" />
+        <Setter Property="IsIconAlternate" Value="True" />
+        <Setter Property="IconOverlayOpacity" Value="0.58" />
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem Border.OverlayRowCard">
@@ -594,7 +594,7 @@
         <Setter Property="Opacity" Value="1" />
     </Style>
 
-    <Style Selector="TextBlock.OverlayRowName">
+    <Style Selector="controls|PcDisplay.OverlayRowName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -656,7 +656,7 @@
         <Setter Property="VerticalScrollBarVisibility" Value="Hidden" />
     </Style>
 
-    <Style Selector="TextBlock.DetailHeaderName">
+    <Style Selector="controls|PcDisplay.DetailHeaderName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="18" />
         <Setter Property="FontWeight" Value="Bold" />
@@ -957,7 +957,7 @@
 
     <Style Selector="Border.CounterpartRow">
         <Setter Property="CornerRadius" Value="6" />
-        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="Padding" Value="8,4" />
         <Setter Property="Background" Value="#10000000" />
         <Setter Property="Margin" Value="0,0,0,4" />
     </Style>
@@ -966,10 +966,15 @@
         <Setter Property="Background" Value="#18000000" />
     </Style>
 
-    <Style Selector="TextBlock.CounterpartName">
+    <Style Selector="controls|CombatantDisplay.CounterpartName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="controls|CombatantDisplay.CounterpartName">
+        <Setter Property="IconSize" Value="20" />
+        <Setter Property="IconSpacing" Value="0" />
     </Style>
 
     <Style Selector="controls|NumericBlock.CounterpartMetricValue">
@@ -1135,7 +1140,7 @@
         <Setter Property="UsePercentageNotation" Value="True" />
     </Style>
 
-    <Style Selector="TextBlock.DetailRowText">
+    <Style Selector="controls|SkillDisplay.DetailRowText TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="Margin" Value="0,2" />

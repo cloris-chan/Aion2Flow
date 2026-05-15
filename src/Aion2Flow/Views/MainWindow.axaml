@@ -46,7 +46,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             IsHitTestVisible="False">
-                    <controls:MapDisplay TextClasses="OverlayHeaderScene"
+                    <controls:MapDisplay Classes="OverlayHeaderScene"
                                          MapId="{Binding LiveSceneMapId}"
                                          UseBrackets="True"
                                          VerticalAlignment="Center" />
@@ -99,7 +99,8 @@
                                 ColumnSpacing="8"
                                 Margin="6,4">
                                 <controls:NpcDisplay Grid.Column="0"
-                                                     TextClasses="BossFocusName"
+                                                     Classes="BossFocusName"
+                                                     IconSize="24"
                                                      EntityId="{Binding InstanceId}"
                                                      VerticalAlignment="Center" />
 
@@ -162,7 +163,7 @@
 
                             <controls:PcDisplay Grid.Column="1"
                                                 Grid.ColumnSpan="2"
-                                                TextClasses="OverlayRowName"
+                                                Classes="OverlayRowName"
                                                 EntityId="{Binding Id}"
                                                 VerticalAlignment="Center" />
 

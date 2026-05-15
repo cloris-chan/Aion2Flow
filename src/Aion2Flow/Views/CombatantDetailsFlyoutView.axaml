@@ -22,7 +22,7 @@
                   ColumnDefinitions="*,Auto"
                   ColumnSpacing="16">
                 <controls:PcDisplay Grid.Column="0"
-                                    TextClasses="DetailHeaderName"
+                                    Classes="DetailHeaderName"
                                     EntityId="{Binding SelectedCombatantId}"
                                     VerticalAlignment="Center" />
 

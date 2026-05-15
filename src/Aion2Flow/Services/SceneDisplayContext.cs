@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -64,6 +65,21 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
 
     public string ResolveNpcCodeName(int npcCode)
         => npcCode > 0 ? Resources.ResolveNpcName(npcCode) : string.Empty;
+
+    public NpcCatalogEntry? ResolveNpcCodeCatalogEntry(int npcCode)
+        => npcCode > 0 && Resources.TryResolveNpcCatalogEntry(npcCode, out var entry)
+            ? entry
+            : null;
+
+    public NpcCatalogEntry? ResolveNpcCatalogEntry(int instanceId)
+    {
+        if (instanceId <= 0 || !TryGetNpcCode(instanceId, out var npcCode))
+        {
+            return null;
+        }
+
+        return ResolveNpcCodeCatalogEntry(npcCode);
+    }
 
     public string ResolveSkillName(int skillCode)
         => skillCode > 0 ? Resources.ResolveSkillName(skillCode) : string.Empty;
