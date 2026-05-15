@@ -7,6 +7,7 @@ internal static class SceneSnapshotTestFactory
     public static SceneCombatSnapshot Create(
         Guid? encounterId = null,
         long readModelRevision = 0,
+        long sceneTransitionRevision = 0,
         uint mapId = 0,
         uint mapInstanceId = 0,
         long encounterStartTime = 0,
@@ -25,6 +26,7 @@ internal static class SceneSnapshotTestFactory
         return new SceneCombatSnapshot(
             encounterId ?? Guid.NewGuid(),
             readModelRevision,
+            sceneTransitionRevision,
             mapId,
             mapInstanceId,
             encounterStartTime,

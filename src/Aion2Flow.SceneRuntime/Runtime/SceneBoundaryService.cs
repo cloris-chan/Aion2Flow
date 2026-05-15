@@ -2,30 +2,34 @@ namespace Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 public sealed class SceneBoundaryService
 {
-    private uint _pendingMapId;
-    private uint _pendingInstanceId;
-    private bool _hasPendingMap;
-    private bool _hasPendingInstance;
+    private bool _hasPendingSameMapReload;
 
     public uint CurrentMapId { get; private set; }
     public uint CurrentMapInstanceId { get; private set; }
-    public bool IsEmpty => CurrentMapId == 0 && CurrentMapInstanceId == 0 && !_hasPendingMap && !_hasPendingInstance;
+    public long SceneTransitionRevision { get; private set; }
+    public bool IsEmpty => CurrentMapId == 0 && CurrentMapInstanceId == 0 && SceneTransitionRevision == 0 && !_hasPendingSameMapReload;
 
-    public bool StageDestinationMap(uint mapId)
+    public bool StageDestinationMap(uint mapId) => StageDestinationMap(mapId, allowSameMapReload: false);
+
+    public bool StageDestinationMap(uint mapId, bool allowSameMapReload)
     {
-        if (mapId == 0 || mapId == CurrentMapId)
+        if (mapId == 0)
             return false;
 
-        if (!_hasPendingMap || _pendingMapId != mapId)
+        if (mapId == CurrentMapId)
         {
-            _pendingMapId = mapId;
-            _hasPendingMap = true;
-            _pendingInstanceId = 0;
-            _hasPendingInstance = false;
+            if (!allowSameMapReload || _hasPendingSameMapReload)
+                return false;
+
+            _hasPendingSameMapReload = true;
             return true;
         }
 
-        return false;
+        CurrentMapId = mapId;
+        CurrentMapInstanceId = 0;
+        SceneTransitionRevision++;
+        _hasPendingSameMapReload = false;
+        return true;
     }
 
     public bool StageDestinationMapInstance(uint instanceId)
@@ -33,22 +37,10 @@ public sealed class SceneBoundaryService
         if (instanceId == 0)
             return false;
 
-        if (!_hasPendingMap)
-        {
-            if (CurrentMapInstanceId == instanceId && !_hasPendingInstance)
-                return false;
-
-            CurrentMapInstanceId = instanceId;
-            _pendingInstanceId = 0;
-            _hasPendingInstance = false;
-            return true;
-        }
-
-        if (_hasPendingInstance && _pendingInstanceId == instanceId)
+        if (CurrentMapInstanceId == instanceId)
             return false;
 
-        _pendingInstanceId = instanceId;
-        _hasPendingInstance = true;
+        CurrentMapInstanceId = instanceId;
         return true;
     }
 
@@ -56,40 +48,38 @@ public sealed class SceneBoundaryService
     {
         var kind = SceneTransitionKind.None;
 
-        if (_hasPendingMap)
+        if (_hasPendingSameMapReload)
         {
-            var mapChanged = CurrentMapId != _pendingMapId;
-            CurrentMapId = _pendingMapId;
-            if (mapChanged)
+            _hasPendingSameMapReload = false;
+            if (kind == SceneTransitionKind.None)
             {
-                CurrentMapInstanceId = 0;
-                kind = SceneTransitionKind.MapChanged;
+                kind = SceneTransitionKind.SceneReload;
             }
-            _pendingMapId = 0;
-            _hasPendingMap = false;
         }
 
-        if (_hasPendingInstance)
+        if (kind != SceneTransitionKind.None)
         {
-            CurrentMapInstanceId = _pendingInstanceId;
-            _pendingInstanceId = 0;
-            _hasPendingInstance = false;
-            if (kind == SceneTransitionKind.None)
-                kind = SceneTransitionKind.InstanceChanged;
+            SceneTransitionRevision++;
         }
 
         return kind;
     }
 
+    public SceneTransitionKind MarkSceneTransportBoundary()
+    {
+        if (_hasPendingSameMapReload)
+            return MarkSceneArrival();
+
+        return SceneTransitionKind.None;
+    }
+
     public void Clear()
     {
-        _pendingMapId = 0;
-        _pendingInstanceId = 0;
-        _hasPendingMap = false;
-        _hasPendingInstance = false;
+        _hasPendingSameMapReload = false;
         CurrentMapId = 0;
         CurrentMapInstanceId = 0;
+        SceneTransitionRevision = 0;
     }
 }
 
-public enum SceneTransitionKind : byte { None, MapChanged, InstanceChanged }
+public enum SceneTransitionKind : byte { None, MapChanged, InstanceChanged, SceneReload, TransportBoundary }

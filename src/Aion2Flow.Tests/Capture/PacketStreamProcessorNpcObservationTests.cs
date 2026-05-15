@@ -25,7 +25,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.True(parsed);
         scene.Owner.Refresh();
-        Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
         scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)).MarkSceneArrival();
         scene.Owner.Refresh();
         Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
@@ -74,7 +74,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     [InlineData("state/2136-boss-scene-200003.hex", 200003)]
     [InlineData("state/0140-boss-tail-430d03.hex", 200003)]
     [InlineData("state/0240-boss-tail-430d03.hex", 200003)]
-    public void Scene_State_Frames_Stage_Map_Id_Until_Arrival(string fixture, uint expectedMapId)
+    public void Scene_State_Frames_Commit_Map_Id_Immediately(string fixture, uint expectedMapId)
     {
         var scene = new SceneLiveReadModel();
         var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
@@ -83,7 +83,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.True(parsed);
         scene.Owner.Refresh();
-        Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal(expectedMapId, scene.Owner.Boundary.CurrentMapId);
         scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)).MarkSceneArrival();
         scene.Owner.Refresh();
         Assert.Equal(expectedMapId, scene.Owner.Boundary.CurrentMapId);
@@ -113,8 +113,8 @@ public sealed class PacketStreamProcessorNpcObservationTests
         scene.Owner.Refresh();
 
         Assert.True(parsed);
-        Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
-        Assert.Equal((uint)113515, scene.Owner.Boundary.CurrentMapInstanceId);
+        Assert.Equal((uint)1010, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapInstanceId);
 
         arrivalSink.MarkSceneArrival();
         scene.Owner.Refresh();
@@ -472,8 +472,10 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public int ResolveNpcObservationSource() => 0;
         public void RememberNpcObservationSource(int instanceId) { }
         public void StageDestinationMap(uint mapId) { }
+        public void StageDestinationMap(uint mapId, bool allowSameMapReload) { }
         public void StageDestinationMapInstance(uint instanceId) { }
         public void MarkSceneArrival() => SceneArrivalCalled = true;
+        public void MarkSceneTransportBoundary() { }
         public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0) { }
         public void CompleteBatch(long batchOrdinal) { }
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal) { }

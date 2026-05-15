@@ -11,6 +11,7 @@ public sealed class SceneCombatSnapshot
     public static SceneCombatSnapshot Empty { get; } = new(
         encounterId: Guid.Empty,
         readModelRevision: 0,
+        sceneTransitionRevision: 0,
         mapId: 0,
         mapInstanceId: 0,
         encounterStartTime: 0,
@@ -25,6 +26,7 @@ public sealed class SceneCombatSnapshot
         : this(
             encounterId: Guid.NewGuid(),
             readModelRevision: 0,
+            sceneTransitionRevision: 0,
             mapId: 0,
             mapInstanceId: 0,
             encounterStartTime: 0,
@@ -40,6 +42,7 @@ public sealed class SceneCombatSnapshot
     internal SceneCombatSnapshot(
         Guid encounterId,
         long readModelRevision,
+        long sceneTransitionRevision,
         uint mapId,
         uint mapInstanceId,
         long encounterStartTime,
@@ -52,6 +55,7 @@ public sealed class SceneCombatSnapshot
     {
         EncounterId = encounterId;
         ReadModelRevision = readModelRevision;
+        SceneTransitionRevision = sceneTransitionRevision;
         MapId = mapId;
         MapInstanceId = mapInstanceId;
         EncounterStartTime = encounterStartTime;
@@ -66,6 +70,8 @@ public sealed class SceneCombatSnapshot
     public Guid EncounterId { get; }
 
     public long ReadModelRevision { get; }
+
+    public long SceneTransitionRevision { get; }
 
     public uint MapId { get; }
 

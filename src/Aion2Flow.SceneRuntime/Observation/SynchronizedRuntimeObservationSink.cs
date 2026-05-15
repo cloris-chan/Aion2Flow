@@ -63,6 +63,11 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.StageDestinationMap(mapId);
     }
 
+    public void StageDestinationMap(uint mapId, bool allowSameMapReload)
+    {
+        lock (gate) inner.StageDestinationMap(mapId, allowSameMapReload);
+    }
+
     public void StageDestinationMapInstance(uint instanceId)
     {
         lock (gate) inner.StageDestinationMapInstance(instanceId);
@@ -71,6 +76,11 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
     public void MarkSceneArrival()
     {
         lock (gate) inner.MarkSceneArrival();
+    }
+
+    public void MarkSceneTransportBoundary()
+    {
+        lock (gate) inner.MarkSceneTransportBoundary();
     }
 
     public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0)

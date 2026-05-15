@@ -58,6 +58,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
     }
 
     public void StageDestinationMap(uint mapId)
+        => StageDestinationMap(mapId, allowSameMapReload: false);
+
+    public void StageDestinationMap(uint mapId, bool allowSameMapReload)
     {
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
@@ -72,7 +75,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             {
                 MapId = mapId,
                 MapInstanceId = 0,
-                Value0 = 0,
+                Value0 = allowSameMapReload ? 1 : 0,
                 Value1 = 0,
                 DiagnosticKey = "stage-destination-map"
             }
@@ -119,6 +122,28 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Value0 = 0,
                 Value1 = 0,
                 DiagnosticKey = "scene-arrival"
+            }
+        });
+    }
+
+    public void MarkSceneTransportBoundary()
+    {
+        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneSessionId(),
+            Stamp = stamp,
+            Domain = ObservedEventDomain.Scene,
+            SourceEntityId = 0,
+            TargetEntityId = 0,
+            Raw = default,
+            Scene = new SceneObservation
+            {
+                MapId = 0,
+                MapInstanceId = 0,
+                Value0 = 0,
+                Value1 = 0,
+                DiagnosticKey = "scene-transport-boundary"
             }
         });
     }

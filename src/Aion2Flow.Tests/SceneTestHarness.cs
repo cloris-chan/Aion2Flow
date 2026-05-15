@@ -200,8 +200,10 @@ internal sealed class SceneTestHarness : IDisposable
         public int ResolveNpcObservationSource() => inner.ResolveNpcObservationSource();
         public void RememberNpcObservationSource(int instanceId) => inner.RememberNpcObservationSource(instanceId);
         public void StageDestinationMap(uint mapId) => inner.StageDestinationMap(mapId);
+        public void StageDestinationMap(uint mapId, bool allowSameMapReload) => inner.StageDestinationMap(mapId, allowSameMapReload);
         public void StageDestinationMapInstance(uint instanceId) => inner.StageDestinationMapInstance(instanceId);
         public void MarkSceneArrival() => inner.MarkSceneArrival();
+        public void MarkSceneTransportBoundary() => inner.MarkSceneTransportBoundary();
         public void AppendCombatObservation(
             int sourceId,
             int targetId,

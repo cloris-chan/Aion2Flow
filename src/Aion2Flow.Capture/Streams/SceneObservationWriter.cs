@@ -55,7 +55,7 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
             return false;
         }
 
-        sink.StageDestinationMap(value);
+        sink.StageDestinationMap(value, allowSameMapReload: true);
         return true;
     }
 }

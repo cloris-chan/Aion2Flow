@@ -11,6 +11,8 @@ internal sealed class SceneCombatSnapshotBuilder
 
     public Guid EncounterId { get; private set; }
 
+    public long SceneTransitionRevision { get; private set; }
+
     public uint MapId { get; private set; }
 
     public uint MapInstanceId { get; private set; }
@@ -37,6 +39,7 @@ internal sealed class SceneCombatSnapshotBuilder
         _bossFocuses.EnsureCapacity(Math.Max(0, bossFocusCapacity));
 
         EncounterId = encounterId == default ? Guid.NewGuid() : encounterId;
+        SceneTransitionRevision = 0;
         MapId = 0;
         MapInstanceId = 0;
         EncounterStartTime = 0;
@@ -46,10 +49,11 @@ internal sealed class SceneCombatSnapshotBuilder
         Encounter = EncounterSummarySnapshot.Empty;
     }
 
-    public void SetMap(uint mapId, uint mapInstanceId)
+    public void SetMap(uint mapId, uint mapInstanceId, long sceneTransitionRevision)
     {
         MapId = mapId;
         MapInstanceId = mapInstanceId;
+        SceneTransitionRevision = sceneTransitionRevision;
     }
 
     public void SetTarget(NpcRuntimeObservationSnapshot? targetObservation)
@@ -101,6 +105,7 @@ internal sealed class SceneCombatSnapshotBuilder
         if (_combatants.Count == 0 &&
             _bossFocuses.Count == 0 &&
             readModelRevision == 0 &&
+            SceneTransitionRevision == 0 &&
             MapId == 0 &&
             MapInstanceId == 0 &&
             EncounterStartTime == 0 &&
@@ -134,6 +139,7 @@ internal sealed class SceneCombatSnapshotBuilder
         return new SceneCombatSnapshot(
             EncounterId,
             readModelRevision,
+            SceneTransitionRevision,
             MapId,
             MapInstanceId,
             EncounterStartTime,

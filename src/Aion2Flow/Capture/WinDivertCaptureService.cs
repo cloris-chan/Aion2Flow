@@ -134,16 +134,26 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                     var connection = new TcpConnection(ip.SourceAddress, ip.DestinationAddress, srcPort, dstPort);
 
                     var hasCloseFlag = (tcp.Flags & (TcpControlBits.FIN | TcpControlBits.RST)) != 0;
-                    if (!CaptureConnectionGate.ShouldProcessPacket(in connection, hasCloseFlag, out var isReversed))
-                        continue;
-
                     var payloadOffset = ipHeaderLen + tcpHeaderLen;
                     var payloadLength = packetSpan.Length - payloadOffset;
                     var captureTicks = address.Timestamp;
+                    var gateAccepted = CaptureConnectionGate.ShouldProcessPacket(in connection, hasCloseFlag, out var isReversed);
+                    if (!gateAccepted)
+                    {
+                        if (payloadLength == 0 ||
+                            hasCloseFlag ||
+                            !connection.DestinationIsLocal ||
+                            !_processPortDiscoveryService.AllPorts.Contains(dstPort))
+                        {
+                            continue;
+                        }
+
+                        isReversed = false;
+                    }
 
                     var isLocal = isReversed ? connection.DestinationIsLocal : connection.SourceIsLocal;
 
-                    if (CaptureConnectionGate.IsLocked)
+                    if (gateAccepted && CaptureConnectionGate.IsLocked)
                     {
                         if (isLocal)
                         {

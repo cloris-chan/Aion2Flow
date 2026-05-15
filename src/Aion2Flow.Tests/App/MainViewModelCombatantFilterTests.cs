@@ -18,12 +18,16 @@ public sealed class MainViewModelCombatantFilterTests
     [InlineData(1010u, 0u, 200003u, 113515u, true, "map-transition")]
     [InlineData(1010u, 0u, 1010u, 0u, false, "")]
     [InlineData(200003u, 113515u, 200003u, 113515u, false, "")]
-    [InlineData(200003u, 113515u, 200003u, 113526u, true, "map-instance-transition")]
+    [InlineData(200003u, 113515u, 200003u, 113526u, false, "")]
     [InlineData(200003u, 0u, 200003u, 113515u, true, "map-instance-transition")]
-    [InlineData(0u, 0u, 1010u, 0u, true, "map-transition")]
-    [InlineData(0u, 0u, 50u, 0u, true, "map-transition")]
+    [InlineData(0u, 0u, 1010u, 0u, false, "")]
+    [InlineData(0u, 0u, 50u, 0u, false, "")]
     [InlineData(0u, 0u, 0u, 0u, false, "")]
     [InlineData(600002u, 396972u, 1010u, 0u, true, "map-transition")]
+    [InlineData(1010u, 0u, 1020u, 0u, false, "")]
+    [InlineData(1010u, 0u, 500020u, 0u, true, "map-transition")]
+    [InlineData(500020u, 0u, 1010u, 0u, true, "map-transition")]
+    [InlineData(600011u, 679397u, 600012u, 679397u, false, "")]
     public void Map_Transitions_Select_Automatic_Reset_Scope(
         uint previousMapId,
         uint previousInstanceId,
@@ -70,6 +74,25 @@ public sealed class MainViewModelCombatantFilterTests
             combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
 
         var latest = SceneSnapshotTestFactory.Create(mapId: 1010);
+
+        Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
+        Assert.Equal(string.Empty, reason);
+    }
+
+    [Fact]
+    public void Scene_Transition_Revision_Does_Not_Archive_When_Map_And_Instance_Are_Unchanged()
+    {
+        var previous = SceneSnapshotTestFactory.Create(
+            mapId: 1010,
+            mapInstanceId: 0,
+            sceneTransitionRevision: 7,
+            encounterTime: 12_000,
+            combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
+
+        var latest = SceneSnapshotTestFactory.Create(
+            mapId: 1010,
+            mapInstanceId: 0,
+            sceneTransitionRevision: 8);
 
         Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
         Assert.Equal(string.Empty, reason);
@@ -383,6 +406,38 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void FrameTick_Capturing_RefreshesMapWithoutCombat()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.ViewModel.IsCapturing = true;
+        var changed = new List<string?>();
+        fixture.ViewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        fixture.AppendSceneMap(1010, 0);
+        fixture.ViewModel.ProcessUiFrameForTesting();
+        fixture.FlushFrame();
+
+        Assert.Equal(1010u, fixture.ViewModel.LiveSceneMapId);
+        Assert.Contains(nameof(MainViewModel.LiveSceneMapId), changed);
+
+        changed.Clear();
+        fixture.AppendSceneMap(500015, 719460);
+        fixture.ViewModel.ProcessUiFrameForTesting();
+        fixture.FlushFrame();
+
+        Assert.Equal(500015u, fixture.ViewModel.LiveSceneMapId);
+        Assert.Contains(nameof(MainViewModel.LiveSceneMapId), changed);
+
+        changed.Clear();
+        fixture.AppendSceneMap(1010, 0);
+        fixture.ViewModel.ProcessUiFrameForTesting();
+        fixture.FlushFrame();
+
+        Assert.Equal(1010u, fixture.ViewModel.LiveSceneMapId);
+        Assert.Contains(nameof(MainViewModel.LiveSceneMapId), changed);
+    }
+
+    [Fact]
     public void FrameTick_ArchiveView_DoesNotOverwriteDisplayedArchive()
     {
         var fixture = MainViewModelFixture.Create();
@@ -422,12 +477,14 @@ public sealed class MainViewModelCombatantFilterTests
     private sealed class MainViewModelFixture
     {
         private readonly WinDivertCaptureService _captureService;
+        private readonly UiFrameBatchService _frameBatch;
 
-        private MainViewModelFixture(MainViewModel viewModel, WinDivertCaptureService captureService, EncounterArchiveService archive)
+        private MainViewModelFixture(MainViewModel viewModel, WinDivertCaptureService captureService, EncounterArchiveService archive, UiFrameBatchService frameBatch)
         {
             ViewModel = viewModel;
             _captureService = captureService;
             Archive = archive;
+            _frameBatch = frameBatch;
         }
 
         public MainViewModel ViewModel { get; }
@@ -448,7 +505,7 @@ public sealed class MainViewModelCombatantFilterTests
             var frameBatch = new UiFrameBatchService();
             var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
             var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, null!, frameBatch);
-            return new MainViewModelFixture(viewModel, capture, archive);
+            return new MainViewModelFixture(viewModel, capture, archive, frameBatch);
         }
 
         public void AppendSceneEncounter(int playerId, string name, int damage, long start, long end) => MainViewModelCombatantFilterTests.AppendSceneEncounter(_captureService.Scene, playerId, name, damage, start, end);
@@ -464,6 +521,8 @@ public sealed class MainViewModelCombatantFilterTests
         public void AppendSceneBossFocus(int instanceId, string name, int hp, int maxHp, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocus(_captureService.Scene, instanceId, name, hp, maxHp, timestamp);
 
         public void AppendSceneMap(uint mapId, uint instanceId) => MainViewModelCombatantFilterTests.AppendSceneMap(_captureService.Scene, mapId, instanceId);
+
+        public void FlushFrame() => _frameBatch.FlushFrame();
     }
 
     private static void AppendSceneEncounter(SceneLiveReadModel scene, int playerId, string name, int damage, long start, long end)

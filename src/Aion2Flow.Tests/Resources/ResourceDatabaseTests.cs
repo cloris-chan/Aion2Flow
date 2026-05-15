@@ -77,6 +77,7 @@ public sealed class ResourceDatabaseTests
     [InlineData(22u, "渾沌艾雷修藍塔中層")]
     [InlineData(50u, "萬神殿")]
     [InlineData(1010u, "斐爾特朗")]
+    [InlineData(154001u, "科赫塔監視哨所")]
     [InlineData(200003u, "惡夢")]
     [InlineData(503001u, "深淵迴廊")]
     [InlineData(503006u, "深淵迴廊")]

@@ -10,6 +10,7 @@ namespace Cloris.Aion2Flow.Tests.Capture;
 public sealed class PacketCaptureDispatcherTests
 {
     private static readonly TcpConnection InboundConnection = new(0x0100007f, 0x0100007f, 57080, 49820);
+    private static readonly TcpConnection SecondInboundConnection = new(0x0100007f, 0x0100007f, 57081, 49820);
 
     [Fact]
     public void Continues_To_Parse_Inbound_Payload_Into_Scene_Journal()
@@ -57,6 +58,71 @@ public sealed class PacketCaptureDispatcherTests
         finally
         {
             packet.Return();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public void New_Parsed_Inbound_Connection_Appends_Transport_Boundary()
+    {
+        var scene = new SceneLiveReadModel();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+        var payload = HexHelper.FromFixture("combat/0538-dot.hex");
+        var first = CreatePacket(InboundConnection, payload, sequenceNumber: 200);
+        var second = CreatePacket(SecondInboundConnection, payload, sequenceNumber: 200);
+
+        try
+        {
+            Assert.True(dispatcher.DispatchCapturedPacket(first));
+            CaptureConnectionGate.Unlock();
+
+            Assert.True(dispatcher.DispatchCapturedPacket(second));
+
+            var found = false;
+            for (var i = 0; i < scene.Journal.Count; i++)
+            {
+                if (scene.Journal.Read(i).Scene?.DiagnosticKey == "scene-transport-boundary")
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            Assert.True(found);
+        }
+        finally
+        {
+            first.Return();
+            second.Return();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public void Parsed_New_Inbound_Connection_Switches_Locked_Connection()
+    {
+        var scene = new SceneLiveReadModel();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+        var payload = HexHelper.FromFixture("combat/0538-dot.hex");
+        var first = CreatePacket(InboundConnection, payload, sequenceNumber: 200);
+        var second = CreatePacket(SecondInboundConnection, payload, sequenceNumber: 200);
+
+        try
+        {
+            Assert.True(dispatcher.DispatchCapturedPacket(first));
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var locked));
+            Assert.True(locked.IsSameConnection(InboundConnection, out _));
+
+            Assert.True(dispatcher.DispatchCapturedPacket(second));
+
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out locked));
+            Assert.True(locked.IsSameConnection(SecondInboundConnection, out _));
+            Assert.Contains(Enumerable.Range(0, scene.Journal.Count), i => scene.Journal.Read(i).Scene?.DiagnosticKey == "scene-transport-boundary");
+        }
+        finally
+        {
+            first.Return();
+            second.Return();
             CaptureConnectionGate.Unlock();
         }
     }

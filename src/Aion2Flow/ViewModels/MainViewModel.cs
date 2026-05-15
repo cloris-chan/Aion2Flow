@@ -602,25 +602,56 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         reason = string.Empty;
 
-        if (latestLiveSnapshot.MapId == 0 || !HasArchivableEncounter(previousLiveSnapshot))
+        if (previousLiveSnapshot.MapId == 0 ||
+            latestLiveSnapshot.MapId == 0 ||
+            !HasArchivableEncounter(previousLiveSnapshot))
         {
             return false;
         }
 
         if (previousLiveSnapshot.MapId != latestLiveSnapshot.MapId)
         {
-            reason = "map-transition";
-            return true;
+            if (ShouldArchiveMapIdTransition(previousLiveSnapshot, latestLiveSnapshot))
+            {
+                reason = "map-transition";
+                return true;
+            }
+
+            return false;
         }
 
         if (previousLiveSnapshot.MapInstanceId != latestLiveSnapshot.MapInstanceId)
         {
-            reason = "map-instance-transition";
-            return true;
+            if ((previousLiveSnapshot.MapInstanceId == 0) != (latestLiveSnapshot.MapInstanceId == 0))
+            {
+                reason = "map-instance-transition";
+                return true;
+            }
+
+            return false;
         }
 
         return false;
     }
+
+    private static bool ShouldArchiveMapIdTransition(
+        SceneCombatSnapshot previousLiveSnapshot,
+        SceneCombatSnapshot latestLiveSnapshot)
+    {
+        if (previousLiveSnapshot.MapInstanceId != 0 &&
+            latestLiveSnapshot.MapInstanceId != 0 &&
+            previousLiveSnapshot.MapInstanceId == latestLiveSnapshot.MapInstanceId)
+        {
+            return false;
+        }
+
+        return IsBoundaryLayerMap(previousLiveSnapshot.MapId) ||
+            IsBoundaryLayerMap(latestLiveSnapshot.MapId) ||
+            previousLiveSnapshot.MapInstanceId != 0 ||
+            latestLiveSnapshot.MapInstanceId != 0;
+    }
+
+    private static bool IsBoundaryLayerMap(uint mapId) => mapId >= 100000;
 
     private static bool HasArchivableEncounter(SceneCombatSnapshot snapshot)
         => snapshot.EncounterTime > 0 && snapshot.Combatants.Count > 0;

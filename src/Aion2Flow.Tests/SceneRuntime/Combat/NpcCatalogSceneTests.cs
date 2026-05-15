@@ -346,7 +346,7 @@ public sealed class NpcCatalogSceneTests
 
         var logPath = Path.Combine(
             AppContext.BaseDirectory, "..", "..", "..", "..", "..",
-            "artifacts", "replay-scan", "aion2flow.frame.20260415173658.log");
+            "artifacts", "replay-scan", "aion2flow.event.20260415173658.log");
         if (!File.Exists(logPath))
         {
             return;

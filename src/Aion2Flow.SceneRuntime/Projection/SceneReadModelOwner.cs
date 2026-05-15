@@ -306,10 +306,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     }
 }
 
-internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long EntityRevision, long BoundaryRevision, long BossFocusRevision)
+internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long EntityRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision)
 {
     public static SnapshotCacheKey From(Guid encounterId, EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, BossFocusStore bossFocus) =>
-        new(encounterId, combat.Revision, entities.Revision, boundary.Revision, bossFocus.Revision);
+        new(encounterId, combat.Revision, entities.Revision, boundary.Revision, boundary.SceneTransitionRevision, bossFocus.Revision);
 }
 
 public readonly record struct ProjectionCacheStats(long SnapshotBuilds, long SnapshotCacheHits)

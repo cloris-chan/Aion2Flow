@@ -7,6 +7,8 @@ namespace Cloris.Aion2Flow.Capture;
 public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFactory)
 {
     private readonly Dictionary<TcpConnection, TcpCaptureStreamState> _tcpStreams = [];
+    private TcpConnection _lastParsedConnection;
+    private bool _hasLastParsedConnection;
     private Task? _worker;
     private CancellationTokenSource? _cts;
 
@@ -69,22 +71,38 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
 
     internal bool DispatchCapturedPacket(CapturedPacket packet)
     {
-        if (!_tcpStreams.TryGetValue(packet.Connection, out var tcpStream))
+        var connection = packet.Connection;
+        if (!_tcpStreams.TryGetValue(connection, out var tcpStream))
         {
             tcpStream = TcpCaptureStreamState.Create(sinkFactory);
-            _tcpStreams[packet.Connection] = tcpStream;
+            _tcpStreams[connection] = tcpStream;
         }
 
-        var context = new DispatchContext(tcpStream, packet.Connection);
+        var context = new DispatchContext(tcpStream, connection);
         tcpStream.Reassembler.Feed(packet.SequenceNumber, packet.Payload, ref context, HandleReassembledChunk);
 
-        if (context.HasParsed && !CaptureConnectionGate.IsLocked)
+        if (context.HasParsed && ShouldLockParsedConnection(in connection))
         {
-            CaptureConnectionGate.LockOn(packet.Connection);
-            DisposeOtherStreams(packet.Connection);
+            if (_hasLastParsedConnection && !_lastParsedConnection.IsSameConnection(in connection, out _))
+            {
+                tcpStream.Sink.MarkSceneTransportBoundary();
+            }
+
+            _lastParsedConnection = connection;
+            _hasLastParsedConnection = true;
+            CaptureConnectionGate.LockOn(connection);
+            DisposeOtherStreams(connection);
         }
 
         return context.HasParsed;
+    }
+
+    private static bool ShouldLockParsedConnection(in TcpConnection connection)
+    {
+        if (!CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection))
+            return true;
+
+        return !lockedConnection.IsSameConnection(in connection, out _);
     }
 
     private static void HandleReassembledChunk(uint sequenceNumber, ReadOnlySpan<byte> chunk, ref DispatchContext context)
@@ -127,6 +145,8 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
         }
 
         _tcpStreams.Clear();
+        _hasLastParsedConnection = false;
+        _lastParsedConnection = default;
     }
 
     private void DisposeStream(TcpConnection connection)
@@ -144,11 +164,13 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
         public bool HasParsed;
     }
 
-    private sealed class TcpCaptureStreamState(TcpStreamReassembler reassembler, PacketStreamProcessor processor) : IDisposable
+    private sealed class TcpCaptureStreamState(TcpStreamReassembler reassembler, PacketStreamProcessor processor, IRuntimeObservationSink sink) : IDisposable
     {
         public TcpStreamReassembler Reassembler { get; } = reassembler;
 
         public PacketStreamProcessor Processor { get; } = processor;
+
+        public IRuntimeObservationSink Sink { get; } = sink;
 
         public void Dispose()
         {
@@ -158,9 +180,11 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
 
         public static TcpCaptureStreamState Create(Func<IRuntimeObservationSink> sinkFactory)
         {
+            var sink = sinkFactory();
             return new TcpCaptureStreamState(
                 new TcpStreamReassembler(),
-                new PacketStreamProcessor(sinkFactory()));
+                new PacketStreamProcessor(sink),
+                sink);
         }
     }
 }

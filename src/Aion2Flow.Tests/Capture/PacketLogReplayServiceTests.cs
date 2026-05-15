@@ -14,7 +14,7 @@ namespace Cloris.Aion2Flow.Tests.Capture;
 public sealed class PacketLogReplayServiceTests
 {
     [Fact]
-    public void Replay_Reconstructs_Battle_Snapshot_And_Combatant_Summaries_From_Frame_Log()
+    public void Replay_Reconstructs_Battle_Snapshot_And_Combatant_Summaries_From_Event_Log()
     {
         CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -28,7 +28,7 @@ public sealed class PacketLogReplayServiceTests
             DateTimeOffset.Parse("2026-04-10T16:15:36.3112138+08:00").ToUnixTimeMilliseconds() -
             DateTimeOffset.Parse("2026-04-10T16:15:36.2148073+08:00").ToUnixTimeMilliseconds();
 
-        var path = WriteTempReplayLog("frame", metaLine, firstLine, secondLine);
+        var path = WriteTempReplayLog("event", metaLine, firstLine, secondLine);
         try
         {
             var replay = PacketLogReplayService.Replay(path);
@@ -68,7 +68,7 @@ public sealed class PacketLogReplayServiceTests
         var pantheonLine = "2026-05-02T15:52:39.1861829+08:00|state-0140|16777343:51528->16777343:53941|target=15498|value0=50|value1=1|sceneMap=True|data=150140320000000000000000000000000100";
         var ownNicknameLine = "2026-05-02T15:52:40.0000000+08:00|nickname|16777343:51528->16777343:53941|playerId=2007|kind=own|len=7|originServer=495|data=D1143336D70F5FB17904070750657269676565EF0306000000012D000000";
 
-        var path = WriteTempReplayLog("frame", lowerReshantaLine, crossServerLine, artifactDungeonLine, pantheonLine, ownNicknameLine);
+        var path = WriteTempReplayLog("event", lowerReshantaLine, crossServerLine, artifactDungeonLine, pantheonLine, ownNicknameLine);
         try
         {
             var replay = PacketLogReplayService.Replay(path);
@@ -86,20 +86,20 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Frame_Replay_Stages_Scene_Map_Until_Nickname_Arrival()
+    public void Frame_Replay_Commits_Scene_Map_Before_Nickname_Arrival()
     {
         var pantheonLine = "2026-05-02T15:52:39.1861829+08:00|state-0140|16777343:51528->16777343:53941|target=15498|value0=50|value1=1|sceneMap=True|data=150140320000000000000000000000000100";
         var ownNicknameLine = "2026-05-02T15:52:40.0000000+08:00|nickname|16777343:51528->16777343:53941|playerId=2007|kind=own|len=7|originServer=495|data=D1143336D70F5FB17904070750657269676565EF0306000000012D000000";
 
-        var stagedPath = WriteTempReplayLog("frame", pantheonLine);
-        var arrivedPath = WriteTempReplayLog("frame", pantheonLine, ownNicknameLine);
+        var stagedPath = WriteTempReplayLog("event", pantheonLine);
+        var arrivedPath = WriteTempReplayLog("event", pantheonLine, ownNicknameLine);
         try
         {
             var stagedReplay = PacketLogReplayService.Replay(stagedPath);
 
             Assert.Equal(1, stagedReplay.ReplayedLines);
-            Assert.Equal(0u, stagedReplay.SceneOwner.Boundary.CurrentMapId);
-            Assert.Equal(0u, stagedReplay.Snapshot.MapId);
+            Assert.Equal(50u, stagedReplay.SceneOwner.Boundary.CurrentMapId);
+            Assert.Equal(50u, stagedReplay.Snapshot.MapId);
 
             var arrivedReplay = PacketLogReplayService.Replay(arrivedPath);
 
@@ -215,10 +215,10 @@ public sealed class PacketLogReplayServiceTests
         var activeLine = "2026-05-01T21:37:40.6646403+08:00|battle-toggle|16777343:60154->16777343:65518|npcId=56688|active=True|tailLen=2|data=0B218DF0BA030001";
         var hpLine = "2026-05-01T21:37:41.4785243+08:00|remain-hp|16777343:60154->16777343:65518|npcId=56688|value0=2|value1=1|value2=0|value=22847|data=14008DF0BA030201003F590000";
         var exitLine = "2026-05-01T21:38:08.1582599+08:00|battle-toggle|16777343:60154->16777343:65518|npcId=56688|active=False|tailLen=2|data=0B218DF0BA030000";
-        var spawnOnlyPath = WriteTempReplayLog("frame", spawnLine);
-        var sidecarOnlyPath = WriteTempReplayLog("frame", spawnLine, pulseLine);
-        var hpPath = WriteTempReplayLog("frame", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine);
-        var exitPath = WriteTempReplayLog("frame", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine, exitLine);
+        var spawnOnlyPath = WriteTempReplayLog("event", spawnLine);
+        var sidecarOnlyPath = WriteTempReplayLog("event", spawnLine, pulseLine);
+        var hpPath = WriteTempReplayLog("event", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine);
+        var exitPath = WriteTempReplayLog("event", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine, exitLine);
         try
         {
             var spawnOnlyReplay = PacketLogReplayService.Replay(spawnOnlyPath);
@@ -523,7 +523,7 @@ public sealed class PacketLogReplayServiceTests
 
         var summonLine = "2026-04-25T00:58:41.8295743+08:00|summon|16777343:58107->16777343:50695|kind=create-177|owner=314|summon=17755|npcCode=2920107|data=BC014036DB8A015F1000AB8E2C004002003F18C70079064700FC1A461A2C7E42302D01C249C249740B0000740B000000000000D078020064000000F04902000100000000000000A08601000000000090D00300010101110143AA9809FFFFFFFFFFFFFFFF8075D52ABB030000BA0207028FBB18C736A9054700001A460702063A010000FA0200000000EF030641657468657201000200000000000000000000000000000002CD004C040000D000B202000017000000D71D030000";
         var damageLine = "2026-04-25T00:58:46.2662741+08:00|damage|16777343:58107->16777343:50695|target=17755|source=24468|skillRaw=1232480|damage=16|skill=10000|baseSkill=1230000|charge=0|specs=2+4|skillName=Account Security|valueKind=Damage|data=230438DB8A01060094BF0160CE1200020240038B9D580701000000904E1001";
-        var path = WriteTempReplayLog("frame", summonLine, damageLine);
+        var path = WriteTempReplayLog("event", summonLine, damageLine);
         try
         {
             var replay = PacketLogReplayService.Replay(path);

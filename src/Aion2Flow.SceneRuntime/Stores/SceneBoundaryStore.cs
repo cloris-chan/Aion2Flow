@@ -11,11 +11,19 @@ public sealed class SceneBoundaryStore
 
     public uint CurrentMapInstanceId => _sceneBoundary.CurrentMapInstanceId;
 
+    public long SceneTransitionRevision => _sceneBoundary.SceneTransitionRevision;
+
     public long Revision => _revision;
 
     public void StageDestinationMap(uint mapId)
     {
         if (_sceneBoundary.StageDestinationMap(mapId))
+            _revision++;
+    }
+
+    public void StageDestinationMap(uint mapId, bool allowSameMapReload)
+    {
+        if (_sceneBoundary.StageDestinationMap(mapId, allowSameMapReload))
             _revision++;
     }
 
@@ -28,6 +36,14 @@ public sealed class SceneBoundaryStore
     public SceneTransitionKind MarkSceneArrival()
     {
         var kind = _sceneBoundary.MarkSceneArrival();
+        if (kind != SceneTransitionKind.None)
+            _revision++;
+        return kind;
+    }
+
+    public SceneTransitionKind MarkSceneTransportBoundary()
+    {
+        var kind = _sceneBoundary.MarkSceneTransportBoundary();
         if (kind != SceneTransitionKind.None)
             _revision++;
         return kind;

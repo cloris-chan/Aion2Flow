@@ -23,9 +23,13 @@ public interface IRuntimeObservationSink
 
     void StageDestinationMap(uint mapId);
 
+    void StageDestinationMap(uint mapId, bool allowSameMapReload);
+
     void StageDestinationMapInstance(uint instanceId);
 
     void MarkSceneArrival();
+
+    void MarkSceneTransportBoundary();
 
     void AppendCombatObservation(
         int sourceId,

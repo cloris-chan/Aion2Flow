@@ -120,15 +120,15 @@ public class EntityStoreTests
     }
 
     [Fact]
-    public void SceneBoundaryStore_MapStaging_CommitsOnArrival()
+    public void SceneBoundaryStore_MapState_CommitsImmediately()
     {
         var store = new SceneBoundaryStore();
 
         store.StageDestinationMap(200003);
         store.StageDestinationMapInstance(515552);
 
-        Assert.Equal(0u, store.CurrentMapId);
-        Assert.Equal(0u, store.CurrentMapInstanceId);
+        Assert.Equal(200003u, store.CurrentMapId);
+        Assert.Equal(515552u, store.CurrentMapInstanceId);
 
         store.MarkSceneArrival();
 
@@ -407,7 +407,7 @@ public class DomainEventApplierTests
     }
 
     [Fact]
-    public void Applier_SceneObservations_DoNotCommitStagedMapBeforeArrival()
+    public void Applier_SceneObservations_CommitMapStateImmediately()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
@@ -426,7 +426,7 @@ public class DomainEventApplierTests
 
         applier.ApplyJournal(journal);
 
-        Assert.Equal(0u, metadata.CurrentMapId);
+        Assert.Equal(910035u, metadata.CurrentMapId);
         Assert.Equal(0u, metadata.CurrentMapInstanceId);
     }
 

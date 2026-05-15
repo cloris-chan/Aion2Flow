@@ -36,7 +36,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         _classEvidence.Clear();
         ResetOwnerInference();
         EnsureOwnerInference();
-        builder.SetMap(boundary.CurrentMapId, boundary.CurrentMapInstanceId);
+        builder.SetMap(boundary.CurrentMapId, boundary.CurrentMapInstanceId, boundary.SceneTransitionRevision);
 
         var targetDecision = DecideTarget();
         var now = ResolveSnapshotNow();
@@ -158,7 +158,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         ref var metrics = ref builder.GetOrAddCombatant(sourceId);
         var observation = record.Observation;
-        if (!IsKnownNpcCombatant(sourceId) && !IsKnownSummon(sourceId) && record.SourceId == sourceId && TryGetClassEvidence(sourceId, targetId, in observation, out var characterClass, out var score))
+        if (!IsKnownNpcCombatant(sourceId) && !IsKnownSummon(sourceId) && record.SourceId == sourceId && TryGetClassEvidence(in observation, out var characterClass, out var score))
         {
             ref var evidence = ref CollectionsMarshal.GetValueRefOrAddDefault(_classEvidence, sourceId, out _);
             evidence.Add(characterClass, score);
@@ -695,7 +695,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private static bool IsPreexistingSummonSignatureSkill(Skill skill) =>
         skill.Category == SkillCategory.Elementalist && skill.Name.Contains("Spirit:", StringComparison.OrdinalIgnoreCase);
 
-    private static bool TryGetClassEvidence(int sourceId, int targetId, in CombatObservation observation, out CharacterClass characterClass, out int score)
+    private static bool TryGetClassEvidence(in CombatObservation observation, out CharacterClass characterClass, out int score)
     {
         characterClass = default;
         score = 0;

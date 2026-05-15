@@ -147,7 +147,7 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
     {
         if (scene.DiagnosticKey == "stage-destination-map")
         {
-            boundary.StageDestinationMap(scene.MapId);
+            boundary.StageDestinationMap(scene.MapId, scene.Value0 != 0);
             return;
         }
 
@@ -161,6 +161,13 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
         if (scene.DiagnosticKey == "scene-arrival")
         {
             boundary.MarkSceneArrival();
+            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            return;
+        }
+
+        if (scene.DiagnosticKey == "scene-transport-boundary")
+        {
+            boundary.MarkSceneTransportBoundary();
             metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
         }
     }

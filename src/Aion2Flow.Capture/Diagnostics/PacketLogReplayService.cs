@@ -155,6 +155,8 @@ public sealed class PacketLogReplayService
         var totalLines = 0;
         var replayedLines = 0;
         var skippedLines = 0;
+        var lastParsedConnection = default(TcpConnection);
+        var hasLastParsedConnection = false;
         var ingestStart = CaptureBaselineStart();
 
         foreach (var line in lines)
@@ -181,6 +183,14 @@ public sealed class PacketLogReplayService
 
             if (parsed)
             {
+                var connection = entry.Connection;
+                if (hasLastParsedConnection && !lastParsedConnection.IsSameConnection(in connection, out _))
+                {
+                    sink.MarkSceneTransportBoundary();
+                }
+
+                lastParsedConnection = connection;
+                hasLastParsedConnection = true;
                 IncrementCount(replayedEventCounts, entry.Direction);
                 replayedLines++;
             }
@@ -868,7 +878,7 @@ public sealed class PacketLogReplayService
     {
         if (IsSceneStateMapId(value))
         {
-            store.StageDestinationMap(value);
+            store.StageDestinationMap(value, allowSameMapReload: true);
         }
     }
 
@@ -1325,13 +1335,6 @@ public sealed class PacketLogReplayService
             sourceName.EndsWith("stream.log", StringComparison.OrdinalIgnoreCase))
         {
             logKind = ReplayLogKind.Stream;
-            return true;
-        }
-
-        if (sourceName.Contains(".frame.", StringComparison.OrdinalIgnoreCase) ||
-            sourceName.EndsWith("frame.log", StringComparison.OrdinalIgnoreCase))
-        {
-            logKind = ReplayLogKind.Frame;
             return true;
         }
 
