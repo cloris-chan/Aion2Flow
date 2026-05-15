@@ -17,20 +17,15 @@ internal static class RawPacketDump
     private static string _logRootDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
     private static string _rawLogPath = string.Empty;
     private static string _streamLogPath = string.Empty;
-    private static string _frameLogPath = string.Empty;
     private static StreamWriter? _rawWriter;
     private static StreamWriter? _streamWriter;
-    private static StreamWriter? _frameWriter;
     private static DateTimeOffset _currentSessionStarted = DateTimeOffset.Now;
 
     public static event Action<FrameEventObservation>? FrameEventObserved;
 
     public static string RawLogPath => _rawLogPath;
     public static string StreamLogPath => _streamLogPath;
-    public static string FrameLogPath => _frameLogPath;
     public static DateTimeOffset CurrentSessionStarted => _currentSessionStarted;
-
-    private static bool ShouldWriteFrameLog => IsEnabled && _frameWriter is not null;
 
     public static void ConfigureLogDirectory(string logDirectory)
     {
@@ -52,17 +47,14 @@ internal static class RawPacketDump
 
             DisposeWriter(ref _rawWriter);
             DisposeWriter(ref _streamWriter);
-            DisposeWriter(ref _frameWriter);
 
             var sessionDirectory = ResolveUniqueDumpLogDirectory(_logRootDirectory, sessionStarted);
             Directory.CreateDirectory(sessionDirectory);
             _rawLogPath = Path.Combine(sessionDirectory, "raw.log");
             _streamLogPath = Path.Combine(sessionDirectory, "stream.log");
-            _frameLogPath = Path.Combine(sessionDirectory, "frame.log");
 
             _rawWriter = CreateWriter(_rawLogPath);
             _streamWriter = CreateWriter(_streamLogPath);
-            _frameWriter = CreateWriter(_frameLogPath);
         }
 
         return sessionStarted;
@@ -110,9 +102,7 @@ internal static class RawPacketDump
 
     public static void AppendFrameEvent(string eventName, in TcpConnection connection, FrameEventDetail detail, ReadOnlySpan<byte> payload)
     {
-        var hasObserver = FrameEventObserved is not null;
-        var shouldWrite = ShouldWriteFrameLog;
-        if (!shouldWrite && !hasObserver)
+        if (FrameEventObserved is null)
         {
             return;
         }
@@ -120,26 +110,12 @@ internal static class RawPacketDump
         try
         {
             var timestampTicks = Stopwatch.GetTimestamp();
-            var detailText = detail.ToString();
-            if (shouldWrite && _frameWriter is not null)
+            try
             {
-                var timestamp = DateTimeOffset.Now;
-                var line = $"{timestamp:O}|{eventName}|{connection.SourceAddress}:{connection.SourcePort}->{connection.DestinationAddress}:{connection.DestinationPort}|{detailText}|data={Convert.ToHexString(payload)}";
-                lock (SyncRoot)
-                {
-                    _frameWriter.WriteLine(line);
-                }
+                FrameEventObserved?.Invoke(new FrameEventObservation(timestampTicks, eventName, connection));
             }
-
-            if (hasObserver)
+            catch
             {
-                try
-                {
-                    FrameEventObserved?.Invoke(new FrameEventObservation(timestampTicks, eventName, connection, detailText));
-                }
-                catch
-                {
-                }
             }
         }
         catch
@@ -193,7 +169,7 @@ internal static class RawPacketDump
     private static string ResolveDumpLogDirectory(string logDirectory, DateTimeOffset timestamp)
         => Path.Combine(logDirectory, "dumps", timestamp.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture));
 
-    public readonly record struct FrameEventObservation(long TimestampTicks, string EventName, TcpConnection Connection, string Detail);
+    public readonly record struct FrameEventObservation(long TimestampTicks, string EventName, TcpConnection Connection);
 
     [InterpolatedStringHandler]
     public ref struct FrameEventDetail
@@ -203,11 +179,9 @@ internal static class RawPacketDump
 
         public FrameEventDetail(int literalLength, int formattedCount, out bool shouldAppend)
         {
-            _isEnabled = ShouldWriteFrameLog;
+            _isEnabled = false;
             shouldAppend = _isEnabled;
-            _handler = _isEnabled
-                ? new DefaultInterpolatedStringHandler(literalLength, formattedCount)
-                : default;
+            _handler = default;
         }
 
         public void AppendLiteral(string value)
