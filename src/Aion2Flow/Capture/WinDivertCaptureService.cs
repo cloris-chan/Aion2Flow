@@ -61,7 +61,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         {
             _cts = new CancellationTokenSource();
             _divert = new WinDivertSession("tcp", WinDivertLayer.Network, WinDivertFlags.Sniff | WinDivertFlags.ReceiveOnly);
-            RawPacketDump.FrameEventObserved += OnFrameEventObserved;
+            RawPacketDump.ParsedPacketObserved += OnParsedPacketObserved;
             _worker = Task.Factory.StartNew(DivertCaptureWorker, TaskCreationOptions.LongRunning);
 
             _ = Dispatcher.StartAsync(_cts.Token).ConfigureAwait(false);
@@ -229,7 +229,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         CaptureConnectionGate.Unlock();
         _tcpRttEstimator.Clear();
         _protocolRttEstimator.Clear();
-        RawPacketDump.FrameEventObserved -= OnFrameEventObserved;
+        RawPacketDump.ParsedPacketObserved -= OnParsedPacketObserved;
 
         if (_worker is not null)
         {
@@ -272,7 +272,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         StatusChanged?.Invoke(message);
     }
 
-    private void OnFrameEventObserved(RawPacketDump.FrameEventObservation observation)
+    private void OnParsedPacketObserved(RawPacketDump.ParsedPacketObservation observation)
     {
         if (!CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection))
         {

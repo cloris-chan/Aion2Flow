@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Text;
 using Cloris.Aion2Flow.Capture.Streams;
 
@@ -21,7 +20,7 @@ internal static class RawPacketDump
     private static StreamWriter? _streamWriter;
     private static DateTimeOffset _currentSessionStarted = DateTimeOffset.Now;
 
-    public static event Action<FrameEventObservation>? FrameEventObserved;
+    public static event Action<ParsedPacketObservation>? ParsedPacketObserved;
 
     public static string RawLogPath => _rawLogPath;
     public static string StreamLogPath => _streamLogPath;
@@ -100,9 +99,9 @@ internal static class RawPacketDump
         }
     }
 
-    public static void AppendFrameEvent(string eventName, in TcpConnection connection, FrameEventDetail detail, ReadOnlySpan<byte> payload)
+    public static void ObserveParsedPacket(string eventName, in TcpConnection connection)
     {
-        if (FrameEventObserved is null)
+        if (ParsedPacketObserved is null)
         {
             return;
         }
@@ -112,7 +111,7 @@ internal static class RawPacketDump
             var timestampTicks = Stopwatch.GetTimestamp();
             try
             {
-                FrameEventObserved?.Invoke(new FrameEventObservation(timestampTicks, eventName, connection));
+                ParsedPacketObserved?.Invoke(new ParsedPacketObservation(timestampTicks, eventName, connection));
             }
             catch
             {
@@ -169,88 +168,5 @@ internal static class RawPacketDump
     private static string ResolveDumpLogDirectory(string logDirectory, DateTimeOffset timestamp)
         => Path.Combine(logDirectory, "dumps", timestamp.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture));
 
-    public readonly record struct FrameEventObservation(long TimestampTicks, string EventName, TcpConnection Connection);
-
-    [InterpolatedStringHandler]
-    public ref struct FrameEventDetail
-    {
-        private DefaultInterpolatedStringHandler _handler;
-        private readonly bool _isEnabled;
-
-        public FrameEventDetail(int literalLength, int formattedCount, out bool shouldAppend)
-        {
-            _isEnabled = false;
-            shouldAppend = _isEnabled;
-            _handler = default;
-        }
-
-        public void AppendLiteral(string value)
-        {
-            if (_isEnabled)
-            {
-                _handler.AppendLiteral(value);
-            }
-        }
-
-        public void AppendFormatted<T>(T value)
-        {
-            if (_isEnabled)
-            {
-                _handler.AppendFormatted(value);
-            }
-        }
-
-        public void AppendFormatted<T>(T value, string? format)
-        {
-            if (_isEnabled)
-            {
-                _handler.AppendFormatted(value, format);
-            }
-        }
-
-        public void AppendFormatted<T>(T value, int alignment)
-        {
-            if (_isEnabled)
-            {
-                _handler.AppendFormatted(value, alignment);
-            }
-        }
-
-        public void AppendFormatted<T>(T value, int alignment, string? format)
-        {
-            if (_isEnabled)
-            {
-                _handler.AppendFormatted(value, alignment, format);
-            }
-        }
-
-        public void AppendFormatted(string? value)
-        {
-            if (_isEnabled)
-            {
-                _handler.AppendFormatted(value);
-            }
-        }
-
-        public void AppendFormatted(string? value, int alignment = 0, string? format = null)
-        {
-            if (_isEnabled)
-            {
-                _handler.AppendFormatted(value, alignment, format);
-            }
-        }
-
-        public void AppendFormatted(ReadOnlySpan<char> value)
-        {
-            if (_isEnabled)
-            {
-                _handler.AppendFormatted(value);
-            }
-        }
-
-        public override string ToString()
-        {
-            return _isEnabled ? _handler.ToStringAndClear() : string.Empty;
-        }
-    }
+    public readonly record struct ParsedPacketObservation(long TimestampTicks, string EventName, TcpConnection Connection);
 }

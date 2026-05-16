@@ -1,5 +1,4 @@
 using System.Buffers;
-using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using K4os.Compression.LZ4;
 
@@ -45,15 +44,9 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
             return;
         }
 
-        if (packet.EndsWith(Pattern))
-        {
-            RawPacketDump.AppendFrameEvent("tail-pattern", context.Connection, $"packetLen={packet.Length}", packet);
-        }
-
         if (TryParsePacketContainer(packet, ref context)) return;
         if (ParseFramePayload(payload, ref context)) return;
 
-        RawPacketDump.AppendFrameEvent("recovery-path", context.Connection, $"payloadLen={payload.Length}", payload);
         ParseRecoveryPacket(payload, ref context);
     }
 
@@ -71,10 +64,8 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
         }
 
         var offset = lengthInfo.ByteCount;
-        var extraFlag = false;
         if (offset < packet.Length && packet[offset] is >= 0xf0 and < 0xff)
         {
-            extraFlag = true;
             offset++;
         }
 
@@ -115,7 +106,6 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
             }
 
             var restored = rented.AsSpan(0, decoded);
-            RawPacketDump.AppendFrameEvent("compressed-container", context.Connection, $"extraFlag={extraFlag}|decoded={decoded}|encoded={packet.Length - offset}", restored);
             return TryParseFrameBatch(restored, ref context) || TryParsePacketContainer(restored, ref context) || ParseFramePayload(restored, ref context);
         }
         catch
@@ -167,7 +157,6 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
                 }
 
                 frameCount++;
-                RawPacketDump.AppendFrameEvent("frame-batch", context.Connection, $"offset={offset}|frameLength={frameLength}", frame);
 
                 if (ParseFramePayload(framePayload, ref context))
                 {
@@ -185,7 +174,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
         }
     }
 
-    private bool TryParsePacketContainer(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    private static bool TryParsePacketContainer(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         var parsed = false;
 
@@ -214,14 +203,13 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
                 continue;
             }
 
-            RawPacketDump.AppendFrameEvent("container-candidate", context.Connection, $"offset={offset}|declaredLength={declaredLength}", candidate);
             parsed |= ParsePerfectPacket(candidate[..bodyLength], ref context);
         }
 
         return parsed;
     }
 
-    private bool ParsePerfectPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    private static bool ParsePerfectPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (packet.Length < 3) return false;
         return PacketOpcodeDispatcher.TryParseExactFrame(packet, ref context);
@@ -229,7 +217,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
 
     private bool ParseFramePayload(ReadOnlySpan<byte> payload, ref PacketParseContext context)
     {
-        var previous = _ordinals.BeginFramePayload();
+        var (Frame, Batch) = _ordinals.BeginFramePayload();
 
         try
         {
@@ -237,7 +225,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
         }
         finally
         {
-            _ordinals.EndFramePayload(previous.Frame, previous.Batch);
+            _ordinals.EndFramePayload(Frame, Batch);
         }
     }
 

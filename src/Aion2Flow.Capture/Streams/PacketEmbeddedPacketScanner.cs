@@ -89,10 +89,9 @@ internal static class PacketEmbeddedPacketScanner
         if (value0 == 2 && value1 == 1 && value2 == 0)
         {
             context.Sink.AppendNpcHp(npcId, checked(npcHp), context.TimestampMilliseconds);
+            RawPacketDump.ObserveParsedPacket("remain-hp", context.Connection);
         }
         consumed = reader.Offset;
-        var eventName = value0 == 2 && value1 == 1 && value2 == 0 ? "remain-hp" : "entity-value-008d";
-        RawPacketDump.AppendFrameEvent(eventName, context.Connection, $"npcId={npcId}|value0={value0}|value1={value1}|value2={value2}|value={npcHp}", payload[..consumed]);
         return context.MarkParsed();
     }
 
@@ -129,7 +128,6 @@ internal static class PacketEmbeddedPacketScanner
             context.Sink.ToggleNpcBattle(npcId);
         }
         consumed = reader.Offset;
-        RawPacketDump.AppendFrameEvent("battle-toggle", context.Connection, $"npcId={npcId}{PacketDiagnosticFormatter.ActiveHint(isActive)}", payload[..consumed]);
         return context.MarkParsed();
     }
 
@@ -150,7 +148,6 @@ internal static class PacketEmbeddedPacketScanner
 
         consumed = parsed.TailOffset;
         context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
-        RawPacketDump.AppendFrameEvent("nickname", context.Connection, $"playerId={parsed.PlayerId}|len={parsed.NicknameLength}{PacketDiagnosticFormatter.OriginServerHint(parsed.OriginServerId)}", payload[..consumed]);
         return context.MarkParsed();
     }
 
@@ -167,7 +164,6 @@ internal static class PacketEmbeddedPacketScanner
         context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
         context.Sink.MarkSceneArrival();
         consumed = parsed.TailOffset;
-        RawPacketDump.AppendFrameEvent("nickname", context.Connection, $"playerId={parsed.PlayerId}|kind=own|len={parsed.NicknameLength}{PacketDiagnosticFormatter.OriginServerHint(parsed.OriginServerId)}|embedded=true", payload[..consumed]);
         return context.MarkParsed();
     }
 
@@ -186,10 +182,8 @@ internal static class PacketEmbeddedPacketScanner
         if (!reader.TryReadVarInt(out var summonId)) return false;
         if (!reader.TryAdvance(3)) return false;
 
-        int? npcCode = null;
         if (reader.TryReadUInt32Le(out var npcValue) && npcValue is >= 2_000_000 and <= 2_999_999)
         {
-            npcCode = npcValue;
             context.Writer.ApplyNpcCatalog(summonId, npcValue);
             context.Sink.AppendNpcKind(summonId, NpcKind.Summon);
         }
@@ -211,9 +205,6 @@ internal static class PacketEmbeddedPacketScanner
 
         context.Sink.AppendSummon(realSourceId, summonId);
         consumed = Math.Max(offset + 2, reader.Offset);
-        var payloadLength = consumed > 0 ? consumed : payload.Length;
-        var kind = Packet4036Descriptors.ClassifyKind(payloadLength);
-        RawPacketDump.AppendFrameEvent("summon", context.Connection, $"kind={Packet4036Descriptors.FormatKind(kind, payloadLength)}|owner={realSourceId}|summon={summonId}{PacketDiagnosticFormatter.NpcCodeHint(npcCode)}", payload[..consumed]);
         return context.MarkParsed();
     }
 }

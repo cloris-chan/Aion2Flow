@@ -23,7 +23,6 @@ internal sealed class PacketStateHandler
 
             context.Sink.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
             context.Sink.AppendSummon(parsed.OwnerId, parsed.SummonId);
-            RawPacketDump.AppendFrameEvent("summon", context.Connection, $"kind={Packet4036Descriptors.FormatKind(parsed.Kind, parsed.TailOffset)}|owner={parsed.OwnerId}|summon={parsed.SummonId}{PacketDiagnosticFormatter.NpcCodeHint(parsed.NpcCode)}", packet[..Math.Min(parsed.TailOffset, packet.Length)]);
             return context.MarkParsed();
         }
 
@@ -38,8 +37,6 @@ internal sealed class PacketStateHandler
             {
                 context.Sink.AppendNpcHp(spawn.EntityId, currentHp, maxHp, context.TimestampMilliseconds);
             }
-
-            RawPacketDump.AppendFrameEvent("npc-spawn", context.Connection, $"kind={Packet4036Descriptors.FormatKind(spawn.Kind, packet.Length)}|entity={spawn.EntityId}{PacketDiagnosticFormatter.NpcCodeHint(spawn.NpcCode)}{PacketDiagnosticFormatter.NpcHpHint(spawn.CurrentHp, spawn.MaxHp)}", packet);
             return context.MarkParsed();
         }
 
@@ -48,16 +45,10 @@ internal sealed class PacketStateHandler
 
     public static bool ParseAux2B38Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet2B38Parser.TryParse(packet, out var parsed))
+        if (!Packet2B38Parser.TryParse(packet, out _))
         {
             return false;
         }
-
-        RawPacketDump.AppendFrameEvent(
-            "aux-2b38",
-            context.Connection,
-            $"source={parsed.SourceId}|source2={parsed.SourceIdCopy}|phase={parsed.Phase}|marker={parsed.Marker}|action=0x{parsed.ActionCode:x8}|seq={parsed.Sequence}|state={parsed.StateValue}|detail={parsed.DetailValue}|tailLen={parsed.TailLength}",
-            packet);
 
         return context.MarkParsed();
     }
@@ -83,12 +74,7 @@ internal sealed class PacketStateHandler
             frameOrdinal,
             batchOrdinal);
 
-        RawPacketDump.AppendFrameEvent(
-            "aux-2a38",
-            context.Connection,
-            $"source={parsed.SourceId}|mode={parsed.Mode}|group={parsed.GroupCode}|seq={parsed.SequenceId}|head=0x{parsed.HeadCode:x8}|headValue=0x{parsed.HeadValue:x4}|timeline=0x{parsed.TimelineValue:x8}|stable=0x{parsed.StableValue:x8}|echoSource={parsed.EchoSourceId}|stack={parsed.StackValue}|buff=0x{parsed.BuffCodeRaw:x8}{PacketDiagnosticFormatter.SkillHint(parsed.BuffCodeRaw)}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
-            packet);
-
+        RawPacketDump.ObserveParsedPacket("aux-2a38", context.Connection);
         return context.MarkParsed();
     }
 
@@ -113,59 +99,37 @@ internal sealed class PacketStateHandler
             frameOrdinal,
             batchOrdinal);
 
-        RawPacketDump.AppendFrameEvent(
-            "aux-2c38",
-            context.Connection,
-            $"source={parsed.SourceId}|mode={parsed.Mode}|state={parsed.StateCode}|seq={parsed.SequenceId}|result={parsed.ResultCode}|tailLen={parsed.TailLength}|tailSource={parsed.TailSourceId}|tailSkillRaw={parsed.TailSkillCodeRaw}{PacketDiagnosticFormatter.SkillHint((uint)parsed.TailSkillCodeRaw)}",
-            packet);
-
+        RawPacketDump.ObserveParsedPacket("aux-2c38", context.Connection);
         return context.MarkParsed();
     }
 
     public static bool ParseState1D37Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet1D37Parser.TryParse(packet, out var parsed))
+        if (!Packet1D37Parser.TryParse(packet, out _))
         {
             return false;
         }
 
-        RawPacketDump.AppendFrameEvent(
-            "state-1d37",
-            context.Connection,
-            $"source={parsed.SourceId}|group={parsed.GroupCode}|state={parsed.StateCode}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
-            packet);
-
+        RawPacketDump.ObserveParsedPacket("state-1d37", context.Connection);
         return context.MarkParsed();
     }
 
     public static bool ParseState4136Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet4136Parser.TryParse(packet, out var parsed))
+        if (!Packet4136Parser.TryParse(packet, out _))
         {
             return false;
         }
-
-        RawPacketDump.AppendFrameEvent(
-            "state-4136",
-            context.Connection,
-            $"source={parsed.SourceId}|state0={parsed.State0}|state1={parsed.State1}|tailLen={parsed.TailLength}",
-            packet);
 
         return context.MarkParsed();
     }
 
     public static bool ParseWrapped8456Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet8456EnvelopeParser.TryParse(packet, out var parsed))
+        if (!Packet8456EnvelopeParser.TryParse(packet, out _))
         {
             return false;
         }
-
-        RawPacketDump.AppendFrameEvent(
-            "wrapped-8456",
-            context.Connection,
-            $"p0=0x{parsed.Prefix0:x2}|p1=0x{parsed.Prefix1:x2}|p2=0x{parsed.Prefix2:x2}|innerOpcode=0x{parsed.InnerOpcode:x4}|innerValue={parsed.InnerValue}|stamp=0x{parsed.Stamp:x16}|trailer=0x{parsed.Trailer:x2}|tailLen={parsed.TailLength}",
-            packet);
 
         return context.MarkParsed();
     }
@@ -177,7 +141,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        var sceneMap = context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
+        context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -187,12 +151,6 @@ internal sealed class PacketStateHandler
                 context.Writer.ApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
-
-        RawPacketDump.AppendFrameEvent(
-            "state-0140",
-            context.Connection,
-            $"target={targetId}|value0={parsed.Value0}|value1={parsed.Value1}|sceneMap={sceneMap}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
-            packet);
 
         return context.MarkParsed();
     }
@@ -204,7 +162,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        var sceneMap = context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
+        context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
 
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -215,12 +173,6 @@ internal sealed class PacketStateHandler
                 context.Writer.ApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
-
-        RawPacketDump.AppendFrameEvent(
-            "state-2136",
-            context.Connection,
-            $"target={targetId}|seq={parsed.Sequence}|value0={parsed.Value0}|value1={parsed.Value1}|value2={parsed.Value2}|sceneMap={sceneMap}|value3=0x{parsed.Value3:x8}|value4=0x{parsed.Value4:x8}|value5=0x{parsed.Value5:x8}|value6=0x{parsed.Value6:x8}|value7={parsed.Value7}|tailMarker=0x{parsed.TailMarker:x4}|tailLen={parsed.TailLength}",
-            packet);
 
         return context.MarkParsed();
     }
@@ -234,12 +186,6 @@ internal sealed class PacketStateHandler
 
         context.Sink.StageDestinationMapInstance(parsed.InstanceId);
 
-        RawPacketDump.AppendFrameEvent(
-            "map-2e92",
-            context.Connection,
-            $"instance={parsed.InstanceId}|contentKey={parsed.ContentKey}",
-            packet);
-
         return context.MarkParsed();
     }
 
@@ -250,7 +196,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        var sceneMap = context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
+        context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -260,12 +206,6 @@ internal sealed class PacketStateHandler
                 context.Writer.ApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
-
-        RawPacketDump.AppendFrameEvent(
-            "state-0240",
-            context.Connection,
-            $"target={targetId}|value0={parsed.Value0}|value1={parsed.Value1}|sceneMap={sceneMap}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
-            packet);
 
         return context.MarkParsed();
     }
@@ -280,12 +220,6 @@ internal sealed class PacketStateHandler
         context.Sink.AppendNpc4636State(parsed.SourceId, parsed.State0, parsed.State1);
         context.Sink.RememberNpcObservationSource(parsed.SourceId);
 
-        RawPacketDump.AppendFrameEvent(
-            "state-4636",
-            context.Connection,
-            $"source={parsed.SourceId}|state0={parsed.State0}|state1={parsed.State1}|tailLen={parsed.TailLength}",
-            packet);
-
         return context.MarkParsed();
     }
 
@@ -298,27 +232,15 @@ internal sealed class PacketStateHandler
 
         context.Sink.RememberNpcObservationSource(parsed.SourceId);
 
-        RawPacketDump.AppendFrameEvent(
-            "state-4536",
-            context.Connection,
-            $"source={parsed.SourceId}|value0={parsed.Value0}|tailLen={parsed.TailLength}",
-            packet);
-
         return context.MarkParsed();
     }
 
     public static bool ParseState4936Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet4936Parser.TryParse(packet, out var parsed))
+        if (!Packet4936Parser.TryParse(packet, out _))
         {
             return false;
         }
-
-        RawPacketDump.AppendFrameEvent(
-            "state-4936",
-            context.Connection,
-            $"source={parsed.SourceId}|mode={parsed.Mode}|group={parsed.GroupCode}|flag={parsed.Flag}|value0=0x{parsed.Value0:x8}|marker=0x{parsed.Marker:x4}|value1=0x{parsed.Value1:x8}|tailSig={parsed.TailSignature}|tailLen={parsed.TailLength}",
-            packet);
 
         return context.MarkParsed();
     }
@@ -336,8 +258,11 @@ internal sealed class PacketStateHandler
             context.Sink.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp), context.TimestampMilliseconds);
         }
 
-        var eventName = isHealth ? "remain-hp" : "entity-value-008d";
-        RawPacketDump.AppendFrameEvent(eventName, context.Connection, $"npcId={parsed.NpcId}|value0={parsed.Value0}|value1={parsed.Value1}|value2={parsed.Value2}|value={parsed.Hp}", packet[..(packet.Length - parsed.TailLength)]);
+        if (isHealth)
+        {
+            RawPacketDump.ObserveParsedPacket("remain-hp", context.Connection);
+        }
+
         return context.MarkParsed();
     }
 
@@ -357,7 +282,6 @@ internal sealed class PacketStateHandler
             context.Sink.ToggleNpcBattle(parsed.NpcId);
         }
 
-        RawPacketDump.AppendFrameEvent("battle-toggle", context.Connection, $"npcId={parsed.NpcId}{PacketDiagnosticFormatter.ActiveHint(parsed.IsActive)}|tailLen={parsed.TailLength}", packet);
         return context.MarkParsed();
     }
 
@@ -377,16 +301,10 @@ internal sealed class PacketStateHandler
             context.Sink.AppendSummon(ownerId, entityId);
         }
 
-        if (!Packet4036Parser.TryParse(packet, out var parsed))
+        if (!Packet4036Parser.TryParse(packet, out _))
         {
             return false;
         }
-
-        RawPacketDump.AppendFrameEvent(
-            "state-4036",
-            context.Connection,
-            $"kind={Packet4036Descriptors.FormatKind(parsed.Kind, parsed.PayloadLength)}|layout={Packet4036Descriptors.FormatLayout(parsed.Kind, parsed.LayoutKind, parsed.PayloadLength, parsed.BodyLength, parsed.Mode0, parsed.Mode1, parsed.Mode2)}|source={parsed.SourceId}|mode={parsed.Mode0:x2}{parsed.Mode1:x2}{parsed.Mode2:x2}|seed=0x{parsed.Seed:x8}|tag=0x{parsed.Tag:x4}|p0=0x{parsed.P0:x8}|p1=0x{parsed.P1:x8}|p2=0x{parsed.P2:x8}|marker=0x{parsed.Marker:x8}|repeat0={parsed.Repeat0}|repeat1={parsed.Repeat1}|linked={parsed.LinkedValue}|gauge0={parsed.Gauge0}|gauge1={parsed.Gauge1}|tailMode={parsed.TailMode}|tailState={parsed.TailState}|tailFlags={parsed.TailFlag0}/{parsed.TailFlag1}|tailValue={parsed.TailValue}|tailHash=0x{parsed.TailHash:x8}|tailTerm={parsed.TailTerminator}|sharedTag=0x{parsed.SharedTag:x8}|sharedGauge={parsed.SharedGauge0}/{parsed.SharedGauge1}/{parsed.SharedGauge2}/{parsed.SharedGauge3}|sharedFlag={parsed.SharedFlag}|sharedMini0=0x{parsed.SharedMini0:x8}|sharedMini1=0x{parsed.SharedMini1:x8}|heavyGauge={parsed.HeavyGauge0}/{parsed.HeavyGauge1}|heavyValue={parsed.HeavyValue0}/{parsed.HeavyValue1}|heavyFlag={parsed.HeavyFlag}|heavyMini0=0x{parsed.HeavyMini0:x8}|heavySentinel=0x{parsed.HeavySentinel0:x8}/0x{parsed.HeavySentinel1:x8}|heavyTrailer=0x{parsed.HeavyTrailer0:x8}/0x{parsed.HeavyTrailer1:x8}|tail0=0x{parsed.Tail0:x8}|tail1=0x{parsed.Tail1:x8}|bodyLen={parsed.BodyLength}",
-            packet);
 
         return context.MarkParsed();
     }

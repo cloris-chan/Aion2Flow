@@ -78,7 +78,6 @@ internal static class PacketCombatHandler
                 context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, packet.Length);
             }
 
-            RawPacketDump.AppendFrameEvent("damage", context.Connection, $"target={parsed.TargetId}|source={parsed.SourceId}|skillRaw={parsed.SkillCodeRaw}|damage={parsed.Damage}{PacketDiagnosticFormatter.ResolvedCombatHint(parsed.SourceId, parsed.TargetId, in observation)}", packet[..(packet.Length - parsed.TailLength)]);
             return context.MarkParsed();
         }
 
@@ -95,11 +94,7 @@ internal static class PacketCombatHandler
                 context.TimestampMilliseconds,
                 frameOrdinal,
                 batchOrdinal);
-            RawPacketDump.AppendFrameEvent(
-                "compact-value",
-                context.Connection,
-                $"target={compact.TargetId}|source={compact.SourceId}|switch={compact.LayoutTag}|flag={compact.Flag}|marker={compact.Marker}|type={compact.Type}|skillRaw={compact.SkillCodeRaw}|unknown={compact.Unknown}|value={compact.Value}|loop={compact.Loop}|tailLen={compact.TailLength}|tailRaw={compact.TailRaw}{PacketDiagnosticFormatter.ResolvedSkillHint(compact.SkillCodeRaw)}{PacketDiagnosticFormatter.ResolvedReferenceHint("tailSkill", compact.TailRaw)}",
-                packet[..(packet.Length - compact.TailLength)]);
+            RawPacketDump.ObserveParsedPacket("compact-value", context.Connection);
             return context.MarkParsed();
         }
 
@@ -118,11 +113,6 @@ internal static class PacketCombatHandler
             context.TimestampMilliseconds,
             frameOrdinal,
             batchOrdinal);
-        RawPacketDump.AppendFrameEvent(
-            "compact-outcome",
-            context.Connection,
-            $"target={compactOutcome.TargetId}|source={compactOutcome.SourceId}|layout={compactOutcome.LayoutTag}|flag={compactOutcome.Flag}|marker={compactOutcome.Marker}|type={compactOutcome.Type}|skillRaw={compactOutcome.SkillCodeRaw}|tailLen={compactOutcome.TailLength}{PacketDiagnosticFormatter.SkillHint((uint)compactOutcome.SkillCodeRaw)}",
-            packet);
         return context.MarkParsed();
     }
 
@@ -148,11 +138,6 @@ internal static class PacketCombatHandler
                 frameOrdinal,
                 batchOrdinal);
 
-            RawPacketDump.AppendFrameEvent(
-                "periodic-link",
-                context.Connection,
-                $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|linkId={parsed.LinkId}|unknown={parsed.Unknown}|tailRaw={parsed.TailRaw}|effect={Packet0538PeriodicValueParser.FormatEffectLabel(parsed.TargetId, parsed.SourceId, parsed.Mode)}{PacketDiagnosticFormatter.ResolvedReferenceHint("tailSkill", parsed.TailRaw)}",
-                packet);
             return context.MarkParsed();
         }
 
@@ -169,7 +154,6 @@ internal static class PacketCombatHandler
         };
 
         context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, packet.Length);
-        RawPacketDump.AppendFrameEvent("periodic", context.Connection, $"target={parsed.TargetId}|source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|unknown={parsed.Unknown}|damage={parsed.Damage}{PacketDiagnosticFormatter.PeriodicTailHint(parsed)}{PacketDiagnosticFormatter.EffectHint(in observation)}{PacketDiagnosticFormatter.ResolvedCombatHint(parsed.SourceId, parsed.TargetId, in observation)}", packet);
         return context.MarkParsed();
     }
 
@@ -181,11 +165,7 @@ internal static class PacketCombatHandler
         }
 
         context.Sink.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.BatchOrdinal);
-        RawPacketDump.AppendFrameEvent(
-            "compact-0238",
-            context.Connection,
-            $"source={parsed.SourceId}|mode={parsed.Mode}|skillRaw={parsed.SkillCodeRaw}|marker={parsed.Marker}|flag={parsed.Flag}|echoSource={parsed.EchoSourceId}|zero=0x{parsed.ZeroValue:x8}|tailValue=0x{parsed.TailValue:x8}{PacketDiagnosticFormatter.SkillHint((uint)parsed.SkillCodeRaw)}",
-            packet);
+        RawPacketDump.ObserveParsedPacket("compact-0238", context.Connection);
         return context.MarkParsed();
     }
 
@@ -197,26 +177,17 @@ internal static class PacketCombatHandler
         }
 
         context.Sink.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.TimestampMilliseconds, context.FrameOrdinal, context.BatchOrdinal);
-        RawPacketDump.AppendFrameEvent(
-            "compact-0638",
-            context.Connection,
-            $"source={parsed.SourceId}|skillRaw={parsed.SkillCodeRaw}|marker={parsed.Marker}|flag={parsed.Flag}{PacketDiagnosticFormatter.SkillHint((uint)parsed.SkillCodeRaw)}",
-            packet);
+        RawPacketDump.ObserveParsedPacket("compact-0638", context.Connection);
         return context.MarkParsed();
     }
 
     public static bool Parse3538SidecarPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet3538SidecarParser.TryParse(packet, out var parsed))
+        if (!Packet3538SidecarParser.TryParse(packet, out _))
         {
             return false;
         }
 
-        RawPacketDump.AppendFrameEvent(
-            "sidecar-3538",
-            context.Connection,
-            $"target={parsed.TargetId}|state={parsed.State}|source={parsed.SourceId}",
-            packet);
         return context.MarkParsed();
     }
 
@@ -294,7 +265,6 @@ internal static class PacketCombatHandler
             context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, consumed);
         }
 
-        RawPacketDump.AppendFrameEvent("damage", context.Connection, $"target={parsed.TargetId}|source={parsed.SourceId}|skillRaw={parsed.SkillCodeRaw}|damage={parsed.Damage}{PacketDiagnosticFormatter.ResolvedCombatHint(parsed.SourceId, parsed.TargetId, in observation)}", payload[..consumed]);
         return context.MarkParsed();
     }
 
@@ -351,7 +321,6 @@ internal static class PacketCombatHandler
         context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, consumed);
 
         consumed = reader.Offset;
-        RawPacketDump.AppendFrameEvent("periodic", context.Connection, $"target={targetId}|source={sourceId}|skill={resolvedSkillCode.Value}|damage={damage}{PacketDiagnosticFormatter.EffectHint(in observation)}", payload[..consumed]);
         return context.MarkParsed();
     }
 

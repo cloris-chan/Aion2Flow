@@ -1,119 +1,14 @@
 using System.Globalization;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Capture.Streams;
-using Cloris.Aion2Flow.Protocol.Packets;
-using Cloris.Aion2Flow.Protocol.Readers;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime;
-using Cloris.Aion2Flow.SceneRuntime.Journal;
-using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
 
 public sealed class PacketLogReplayServiceTests
 {
-    [Fact]
-    public void Replay_Reconstructs_Battle_Snapshot_And_Combatant_Summaries_From_Event_Log()
-    {
-        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var firstLine = "2026-04-10T16:15:36.2148073+08:00|damage|16777343:62420->16777343:52250|target=200287|source=16039|skillRaw=17010230|damage=3593|skill=17010230|baseSkill=17010000|charge=0|specs=2+3|skillName=Earth's Retribution|valueKind=Damage|data=230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01";
-        var secondLine = "2026-04-10T16:15:36.3112138+08:00|damage|16777343:62420->16777343:52250|target=200287|source=16039|skillRaw=17730001|damage=2875|skill=17730000|baseSkill=17730000|charge=1|skillName=Empyrean Lord's Grace|valueKind=Damage|data=220438DF9C0C0400A77DD1890E015002AFD5AD6901000000D88501BB1601";
-        var metaLine = "2026-04-10T16:15:36.1000000+08:00|frame-batch|16777343:62420->16777343:52250|offset=0|frameLength=35|data=230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01";
-
-        var firstPacket = ParseDamagePacket("230438DF9C0C1400A77D368E03014E02033F636501000000D88501891C01");
-        var secondPacket = ParseDamagePacket("220438DF9C0C0400A77DD1890E015002AFD5AD6901000000D88501BB1601");
-        var expectedEncounterTime =
-            DateTimeOffset.Parse("2026-04-10T16:15:36.3112138+08:00").ToUnixTimeMilliseconds() -
-            DateTimeOffset.Parse("2026-04-10T16:15:36.2148073+08:00").ToUnixTimeMilliseconds();
-
-        var path = WriteTempReplayLog("event", metaLine, firstLine, secondLine);
-        try
-        {
-            var replay = PacketLogReplayService.Replay(path);
-
-            Assert.Equal(3, replay.TotalLines);
-            Assert.Equal(2, replay.ReplayedLines);
-            Assert.Equal(1, replay.SkippedLines);
-            Assert.Equal(2, replay.ReplayedEventCounts["damage"]);
-            Assert.Equal(1, replay.SkippedEventCounts["frame-batch"]);
-            Assert.Equal(expectedEncounterTime, replay.Snapshot.EncounterTime);
-            Assert.Equal(200287, replay.Snapshot.TargetObservation?.InstanceId);
-
-            var source = Assert.Single(replay.Combatants, static summary => summary.CombatantId == 16039);
-            Assert.Equal(firstPacket.Damage + secondPacket.Damage, source.OutgoingDamage);
-            Assert.Equal((firstPacket.IsCritical ? 1 : 0) + (secondPacket.IsCritical ? 1 : 0), source.OutgoingCriticals);
-            Assert.Equal(2, source.OutgoingHits);
-            Assert.Equal(2, source.OutgoingAttempts);
-
-            var target = Assert.Single(replay.Combatants, static summary => summary.CombatantId == 200287);
-            Assert.Equal(firstPacket.Damage + secondPacket.Damage, target.IncomingDamage);
-            Assert.Equal(source.OutgoingCriticals, target.IncomingCriticals);
-            Assert.Equal(2, target.IncomingHits);
-            Assert.Equal(2, target.IncomingAttempts);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [Fact]
-    public void Replay_Tracks_Cross_Server_And_Artifact_Dungeon_Scene_Ids()
-    {
-        var lowerReshantaLine = "2026-05-02T15:18:07.1029891+08:00|state-0140|16777343:60154->16777343:65518|target=8709|value0=20|value1=1|sceneMap=True|data=150140140000000000000000000000000100";
-        var crossServerLine = "2026-05-02T15:18:11.3272281+08:00|state-0140|16777343:60154->16777343:65518|target=8709|value0=22|value1=1|sceneMap=True|data=150140160000000000000000000000000100";
-        var artifactDungeonLine = "2026-05-02T15:18:45.0172805+08:00|state-0140|16777343:60154->16777343:65518|target=21120|value0=503006|value1=1|sceneMap=True|data=150140DEAC07000000000000000000000100";
-        var pantheonLine = "2026-05-02T15:52:39.1861829+08:00|state-0140|16777343:51528->16777343:53941|target=15498|value0=50|value1=1|sceneMap=True|data=150140320000000000000000000000000100";
-        var ownNicknameLine = "2026-05-02T15:52:40.0000000+08:00|nickname|16777343:51528->16777343:53941|playerId=2007|kind=own|len=7|originServer=495|data=D1143336D70F5FB17904070750657269676565EF0306000000012D000000";
-
-        var path = WriteTempReplayLog("event", lowerReshantaLine, crossServerLine, artifactDungeonLine, pantheonLine, ownNicknameLine);
-        try
-        {
-            var replay = PacketLogReplayService.Replay(path);
-
-            Assert.Equal(5, replay.ReplayedLines);
-            Assert.Equal(4, replay.ReplayedEventCounts["state-0140"]);
-            Assert.Equal(1, replay.ReplayedEventCounts["nickname"]);
-            Assert.Equal(50u, replay.SceneOwner.Boundary.CurrentMapId);
-            Assert.Equal(50u, replay.Snapshot.MapId);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [Fact]
-    public void Frame_Replay_Commits_Scene_Map_Before_Nickname_Arrival()
-    {
-        var pantheonLine = "2026-05-02T15:52:39.1861829+08:00|state-0140|16777343:51528->16777343:53941|target=15498|value0=50|value1=1|sceneMap=True|data=150140320000000000000000000000000100";
-        var ownNicknameLine = "2026-05-02T15:52:40.0000000+08:00|nickname|16777343:51528->16777343:53941|playerId=2007|kind=own|len=7|originServer=495|data=D1143336D70F5FB17904070750657269676565EF0306000000012D000000";
-
-        var stagedPath = WriteTempReplayLog("event", pantheonLine);
-        var arrivedPath = WriteTempReplayLog("event", pantheonLine, ownNicknameLine);
-        try
-        {
-            var stagedReplay = PacketLogReplayService.Replay(stagedPath);
-
-            Assert.Equal(1, stagedReplay.ReplayedLines);
-            Assert.Equal(50u, stagedReplay.SceneOwner.Boundary.CurrentMapId);
-            Assert.Equal(50u, stagedReplay.Snapshot.MapId);
-
-            var arrivedReplay = PacketLogReplayService.Replay(arrivedPath);
-
-            Assert.Equal(2, arrivedReplay.ReplayedLines);
-            Assert.Equal(50u, arrivedReplay.SceneOwner.Boundary.CurrentMapId);
-            Assert.Equal(50u, arrivedReplay.Snapshot.MapId);
-        }
-        finally
-        {
-            File.Delete(stagedPath);
-            File.Delete(arrivedPath);
-        }
-    }
-
     [Fact]
     public void Stream_Replay_Runtime_Sink_Path_Matches_Direct_Scene_Processor()
     {
@@ -196,74 +91,6 @@ public sealed class PacketLogReplayServiceTests
         finally
         {
             File.Delete(path);
-        }
-    }
-
-    [Fact]
-    public void Replay_Reconstructs_Boss_Activity_From_Battle_And_Health_Frame()
-    {
-        CombatResourceRegistry.SetGameResources(
-            BuildReplaySkillMap(),
-            new Dictionary<int, NpcCatalogEntry>
-            {
-                [2310108] = new NpcCatalogEntry(2310108, "Boss", NpcCatalogKind.Boss)
-            });
-
-        var spawnLine = "2026-05-01T21:36:18.6000332+08:00|npc-spawn|16777343:60154->16777343:65518|kind=create-177|entity=56688|npcCode=2310108|data=BB014036F0BA030C2200DC3F230000021E6D28C7A8157F4600000B4300003441000801B08003B0800364000000640000000000000000000000000000000000000001000000000000000000000000000000000000000602110181969800FFFFFFFFFFFFFFFF8075D52ABB030000F0BA0301141E6D28C7A8157F4600000B431102BC060000FFFFFFFFFFFFFFFF8075D52ABB030000F0BA03011E6D28C7A8157F4600000B430100160000000301960000009600000098308BB500";
-        var pulseLine = "2026-05-01T21:37:31.3028167+08:00|sidecar-3538|16777343:60154->16777343:65518|target=56688|state=0|source=0|data=0B3538F0BA030000";
-        var activeSidecarLine = "2026-05-01T21:37:40.6643590+08:00|sidecar-3538|16777343:60154->16777343:65518|target=56688|state=0|source=11946|data=0C3538F0BA0300AA5D";
-        var activeLine = "2026-05-01T21:37:40.6646403+08:00|battle-toggle|16777343:60154->16777343:65518|npcId=56688|active=True|tailLen=2|data=0B218DF0BA030001";
-        var hpLine = "2026-05-01T21:37:41.4785243+08:00|remain-hp|16777343:60154->16777343:65518|npcId=56688|value0=2|value1=1|value2=0|value=22847|data=14008DF0BA030201003F590000";
-        var exitLine = "2026-05-01T21:38:08.1582599+08:00|battle-toggle|16777343:60154->16777343:65518|npcId=56688|active=False|tailLen=2|data=0B218DF0BA030000";
-        var spawnOnlyPath = WriteTempReplayLog("event", spawnLine);
-        var sidecarOnlyPath = WriteTempReplayLog("event", spawnLine, pulseLine);
-        var hpPath = WriteTempReplayLog("event", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine);
-        var exitPath = WriteTempReplayLog("event", spawnLine, pulseLine, activeSidecarLine, activeLine, hpLine, exitLine);
-        try
-        {
-            var spawnOnlyReplay = PacketLogReplayService.Replay(spawnOnlyPath);
-            var afterSpawn = DateTimeOffset.Parse("2026-05-01T21:36:18.7000332+08:00").ToUnixTimeMilliseconds();
-            Assert.False(spawnOnlyReplay.SceneOwner.BossFocus.TryGetObservedBoss(afterSpawn, 2_000, out _));
-
-            var sidecarOnlyReplay = PacketLogReplayService.Replay(sidecarOnlyPath);
-            var afterPulse = DateTimeOffset.Parse("2026-05-01T21:37:31.4028167+08:00").ToUnixTimeMilliseconds();
-            Assert.False(sidecarOnlyReplay.SceneOwner.BossFocus.TryGetObservedBoss(afterPulse, 2_000, out _));
-
-            var replay = PacketLogReplayService.Replay(hpPath);
-            var afterHp = DateTimeOffset.Parse("2026-05-01T21:37:41.5785243+08:00").ToUnixTimeMilliseconds();
-
-            Assert.Equal(1, replay.ReplayedEventCounts["npc-spawn"]);
-            Assert.Equal(2, replay.ReplayedEventCounts["sidecar-3538"]);
-            Assert.Equal(1, replay.ReplayedEventCounts["battle-toggle"]);
-            Assert.Equal(1, replay.ReplayedEventCounts["remain-hp"]);
-            Assert.True(replay.SceneOwner.BossFocus.TryGetObservedBoss(afterHp, 2_000, out var boss));
-            Assert.True(boss.HasHp);
-            Assert.Equal(56_688, boss.InstanceId);
-            Assert.Equal(22_847, boss.Hp);
-            Assert.Equal(49_200, boss.MaxHp);
-            var sceneReplay = PacketLogReplayService.Replay(hpPath);
-            var applier = ApplySceneJournal(sceneReplay.SceneJournal);
-
-            Assert.True(applier.BossFocus.TryGetObservedBoss(afterHp, 2_000, out var sceneBoss));
-            Assert.True(sceneBoss.HasHp);
-            Assert.Equal(56_688, sceneBoss.InstanceId);
-            Assert.Equal(22_847, sceneBoss.Hp);
-            Assert.Equal(49_200, sceneBoss.MaxHp);
-
-            var exitReplay = PacketLogReplayService.Replay(exitPath);
-            var afterExit = DateTimeOffset.Parse("2026-05-01T21:38:08.2582599+08:00").ToUnixTimeMilliseconds();
-            Assert.False(exitReplay.SceneOwner.BossFocus.TryGetObservedBoss(afterExit, 2_000, out _));
-            var sceneExitReplay = PacketLogReplayService.Replay(exitPath);
-            var exitApplier = ApplySceneJournal(sceneExitReplay.SceneJournal);
-
-            Assert.False(exitApplier.BossFocus.TryGetObservedBoss(afterExit, 2_000, out _));
-        }
-        finally
-        {
-            File.Delete(spawnOnlyPath);
-            File.Delete(sidecarOnlyPath);
-            File.Delete(hpPath);
-            File.Delete(exitPath);
         }
     }
 
@@ -514,33 +341,6 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(visibleCombatants.Length >= 2, combatantDump);
         Assert.True(visibleContributionTotal <= 1.0000000001d,
             $"visibleContributionTotal={visibleContributionTotal:P8}\n{combatantDump}");
-    }
-
-    [Fact]
-    public void Replay_Does_Not_Synthesize_Regeneration_Healing_For_Known_Summons()
-    {
-        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
-
-        var summonLine = "2026-04-25T00:58:41.8295743+08:00|summon|16777343:58107->16777343:50695|kind=create-177|owner=314|summon=17755|npcCode=2920107|data=BC014036DB8A015F1000AB8E2C004002003F18C70079064700FC1A461A2C7E42302D01C249C249740B0000740B000000000000D078020064000000F04902000100000000000000A08601000000000090D00300010101110143AA9809FFFFFFFFFFFFFFFF8075D52ABB030000BA0207028FBB18C736A9054700001A460702063A010000FA0200000000EF030641657468657201000200000000000000000000000000000002CD004C040000D000B202000017000000D71D030000";
-        var damageLine = "2026-04-25T00:58:46.2662741+08:00|damage|16777343:58107->16777343:50695|target=17755|source=24468|skillRaw=1232480|damage=16|skill=10000|baseSkill=1230000|charge=0|specs=2+4|skillName=Account Security|valueKind=Damage|data=230438DB8A01060094BF0160CE1200020240038B9D580701000000904E1001";
-        var path = WriteTempReplayLog("event", summonLine, damageLine);
-        try
-        {
-            var replay = PacketLogReplayService.Replay(path);
-
-            Assert.Equal(1, replay.ReplayedEventCounts["summon"]);
-            Assert.Equal(1, replay.ReplayedEventCounts["damage"]);
-            Assert.False(
-                SceneReplayTestView.BySource(replay).TryGetValue(17755, out var summonPackets) &&
-                summonPackets.Any(static packet => packet.SourceId == 17755 && packet.TargetId == 17755 && packet.Damage == 3));
-            Assert.DoesNotContain(
-                replay.Snapshot.Combatants,
-                static pair => pair.Key == 314 && pair.Value.HealingAmount > 0);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
     }
 
     [Fact]
@@ -928,13 +728,6 @@ public sealed class PacketLogReplayServiceTests
         return path;
     }
 
-    private static DomainEventApplier ApplySceneJournal(ObservedEventJournal journal)
-    {
-        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), new CombatStore());
-        applier.ApplyJournal(journal);
-        return applier;
-    }
-
     private static StreamReplayEntry CreateStreamReplayEntry(string timestamp, string fixture)
     {
         return new StreamReplayEntry(
@@ -1108,32 +901,6 @@ public sealed class PacketLogReplayServiceTests
                 .ThenByDescending(static summary => summary.IncomingDamage)
                 .Select(static summary =>
                     $"id={summary.CombatantId} incoming(evade={summary.IncomingEvades}, invincible={summary.IncomingInvincibles}, damage={summary.IncomingDamage}, hits={summary.IncomingHits}, attempts={summary.IncomingAttempts}) outgoing(damage={summary.OutgoingDamage}, hits={summary.OutgoingHits}, attempts={summary.OutgoingAttempts})"));
-    }
-
-    private static ParsedCombatPacket ParseDamagePacket(string hex)
-    {
-        var packet = HexHelper.Parse(hex);
-        var ok = Packet0438DamageParser.TryParse(packet, out var parsed);
-        if (!ok)
-        {
-            var reader = new PacketSpanReader(packet);
-            Assert.True(reader.TryReadVarInt(out _));
-            ok = Packet0438DamageParser.TryParsePayload(packet.AsSpan()[reader.Offset..], out parsed, out _);
-        }
-
-        Assert.True(ok);
-
-        return new ParsedCombatPacket
-        {
-            SourceId = parsed.SourceId,
-            TargetId = parsed.TargetId,
-            OriginalSkillCode = parsed.SkillCodeRaw,
-            SkillCode = parsed.SkillCodeRaw,
-            Marker = parsed.Marker,
-            Type = parsed.Type,
-            Damage = parsed.Damage,
-            Modifiers = parsed.Modifiers
-        };
     }
 
     private static SkillCollection BuildReplaySkillMap()

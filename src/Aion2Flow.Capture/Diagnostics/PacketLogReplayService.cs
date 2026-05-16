@@ -49,7 +49,6 @@ public sealed class PacketLogReplayService
             return sourceLogKind switch
             {
                 ReplayLogKind.Stream => ReplayStreamLines(ReadLines(reader), sourceName),
-                ReplayLogKind.Frame => ReplayFrameLines(ReadLines(reader), sourceName),
                 ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
                 _ => throw new InvalidOperationException($"Unsupported replay log kind: {sourceLogKind}.")
             };
@@ -65,9 +64,8 @@ public sealed class PacketLogReplayService
         return logKind switch
         {
             ReplayLogKind.Stream => ReplayStreamLines(lines, sourceName),
-            ReplayLogKind.Frame => ReplayFrameLines(lines, sourceName),
             ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
-            _ => throw new InvalidOperationException($"Unsupported replay log kind: {logKind}.")
+            _ => throw new NotSupportedException("Only stream log replay is supported. Raw logs are not supported yet.")
         };
     }
 
@@ -77,72 +75,6 @@ public sealed class PacketLogReplayService
         {
             yield return line;
         }
-    }
-
-    private static PacketLogReplayResult ReplayFrameLines(IEnumerable<string> lines, string sourceName)
-    {
-        using var sinkHolder = SceneSinkFactory.CreateForReplay();
-        IRuntimeObservationSink sink = sinkHolder.Sink;
-        var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        long frameOrdinal = 0;
-        var totalLines = 0;
-        var replayedLines = 0;
-        var skippedLines = 0;
-        var ingestStart = CaptureBaselineStart();
-
-        foreach (var line in lines)
-        {
-            totalLines++;
-            if (!TryParseEntry(line, out var entry))
-            {
-                IncrementCount(skippedEventCounts, "<invalid>");
-                skippedLines++;
-                continue;
-            }
-
-            frameOrdinal++;
-            var batchOrdinal = entry.Timestamp.UtcDateTime.Ticks;
-            if (TryReplayEntry(sink, entry, frameOrdinal, batchOrdinal))
-            {
-                IncrementCount(replayedEventCounts, entry.EventName);
-                replayedLines++;
-            }
-            else
-            {
-                IncrementCount(skippedEventCounts, entry.EventName);
-                skippedLines++;
-            }
-        }
-
-        sink.CompleteBatch(long.MaxValue);
-        var ingestCounter = CaptureBaselineCounter(ingestStart);
-
-        var snapshotStart = CaptureBaselineStart();
-        var snapshot = sinkHolder.Owner.CreateSnapshot();
-        var snapshotCounter = CaptureBaselineCounter(snapshotStart);
-
-        var summaryStart = CaptureBaselineStart();
-        var summaries = sinkHolder.Owner.ReadLocked((entities, _, metadataRegistry, combat) => BuildCombatantSummaries(combat, entities, metadataRegistry, snapshot));
-        var summaryCounter = CaptureBaselineCounter(summaryStart);
-
-        return new PacketLogReplayResult(
-            sourceName,
-            totalLines,
-            replayedLines,
-            skippedLines,
-            snapshot,
-            sinkHolder.Journal,
-            sinkHolder.Owner,
-            summaries,
-            replayedEventCounts,
-            skippedEventCounts)
-        {
-            BaselineCounters = new PacketLogReplayBaselineCounters(
-                ingestCounter,
-                snapshotCounter,
-                summaryCounter),
-        };
     }
 
     private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName)
@@ -526,50 +458,6 @@ public sealed class PacketLogReplayService
 
         return entityId.ToString(CultureInfo.InvariantCulture);
     }
-
-    private static bool TryReplayEntry(IRuntimeObservationSink store, FrameReplayEntry entry, long frameOrdinal, long batchOrdinal)
-    {
-        var timestamp = entry.Timestamp.ToUnixTimeMilliseconds();
-        var packet = entry.Payload;
-
-        return entry.EventName switch
-        {
-            "damage" => TryReplayDamage(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "periodic" => TryReplayPeriodic(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "periodic-link" => TryReplayPeriodicLink(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "compact-value" => TryReplayCompactValue(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "compact-outcome" => TryReplayCompactOutcome(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "compact-0238" => TryReplayCompact0238(store, packet, batchOrdinal),
-            "compact-0638" => TryReplayCompact0638(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "sidecar-3538" => TryReplay3538(packet),
-            "wrapped-8456" => TryReplay8456(packet),
-            "state-0140" => TryReplay0140(store, packet),
-            "state-2136" => TryReplay2136(store, packet),
-            "map-2e92" => TryReplayMap2E92(store, packet),
-            "state-0240" => TryReplay0240(store, packet),
-            "state-4636" => TryReplay4636(store, packet),
-            "state-4536" => TryReplay4536(store, packet),
-            "state-4036" => TryReplayState4036(store, packet, timestamp),
-            "state-4136" => Packet4136Parser.TryParse(packet, out _),
-            "state-1d37" => Packet1D37Parser.TryParse(packet, out _),
-            "state-4936" => Packet4936Parser.TryParse(packet, out _),
-            "aux-2a38" => TryReplay2A38(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "aux-2b38" => Packet2B38Parser.TryParse(packet, out _),
-            "aux-2c38" => TryReplay2C38(store, packet, timestamp, frameOrdinal, batchOrdinal),
-            "nickname" => TryReplayNickname(store, packet),
-            "remain-hp" => TryReplayRemainHp(store, packet, timestamp),
-            "entity-value-008d" => Packet008DRemainHpParser.TryParse(packet, out _),
-            "battle-toggle" => TryReplayBattleToggle(store, packet, timestamp),
-            "summon" => TryReplaySummon(store, packet, entry.Metadata),
-            "npc-spawn" => TryReplayNpcSpawn(store, packet, entry.Metadata, timestamp),
-            "frame-batch" => TryReplayFrameBatch(store, packet),
-            "recovery-path" => TryReplayRecoveryPath(store, packet, timestamp),
-            _ => false
-        };
-    }
-
-    private static bool TryReplayFrameBatch(IRuntimeObservationSink store, ReadOnlySpan<byte> packet)
-        => TryReplayNickname(store, packet);
 
     private static bool TryReplayDamage(IRuntimeObservationSink store, ReadOnlySpan<byte> packet, long timestamp, long frameOrdinal, long batchOrdinal)
     {
@@ -1254,49 +1142,6 @@ public sealed class PacketLogReplayService
         }
     }
 
-    private static bool TryParseEntry(string line, out FrameReplayEntry entry)
-    {
-        entry = default;
-        if (!TryReadLineSegments(line, out var timestampText, out var eventName, out var connectionText, out var dataText, out var metadata))
-        {
-            return false;
-        }
-
-        if (!DateTimeOffset.TryParse(
-                timestampText,
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.RoundtripKind,
-                out var timestamp))
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(eventName))
-        {
-            return false;
-        }
-
-        if (!TryParseConnection(connectionText, out var connection))
-        {
-            return false;
-        }
-
-        try
-        {
-            entry = new FrameReplayEntry(
-                timestamp,
-                eventName,
-                connection,
-                Convert.FromHexString(dataText),
-                metadata);
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
-
     private static ReplayLogKind DetectLogKind(IReadOnlyList<string> lines, string sourceName)
     {
         if (TryDetectLogKindFromSourceName(sourceName, out var sourceLogKind))
@@ -1318,7 +1163,7 @@ public sealed class PacketLogReplayService
 
             if (!secondSegment.StartsWith("dir=", StringComparison.Ordinal))
             {
-                return ReplayLogKind.Frame;
+                return ReplayLogKind.Unknown;
             }
 
             return thirdSegment.Contains(':')
@@ -1326,7 +1171,7 @@ public sealed class PacketLogReplayService
                 : ReplayLogKind.Raw;
         }
 
-        return ReplayLogKind.Frame;
+        return ReplayLogKind.Unknown;
     }
 
     private static bool TryDetectLogKindFromSourceName(string sourceName, out ReplayLogKind logKind)
@@ -1591,13 +1436,6 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private readonly record struct FrameReplayEntry(
-        DateTimeOffset Timestamp,
-        string EventName,
-        TcpConnection Connection,
-        byte[] Payload,
-        string Metadata);
-
     private readonly record struct StreamReplayEntry(
         DateTimeOffset Timestamp,
         string Direction,
@@ -1606,7 +1444,7 @@ public sealed class PacketLogReplayService
 
     private enum ReplayLogKind
     {
-        Frame,
+        Unknown,
         Stream,
         Raw
     }
