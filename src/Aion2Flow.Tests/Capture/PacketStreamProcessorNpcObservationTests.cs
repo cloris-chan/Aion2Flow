@@ -2,6 +2,7 @@ using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -485,7 +486,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public void RegisterPeriodicLink0538(int targetId, int sourceId, int linkId, int sequenceId, int tailRaw, long timestamp, long frameOrdinal, long batchOrdinal) { }
         public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal) { }
         public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal) { }
-        public void AppendNickname(int uid, string nickname, int? originServerId = null)
+        public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
         {
             NicknameEntered.SetResult();
             AllowNickname.Task.GetAwaiter().GetResult();

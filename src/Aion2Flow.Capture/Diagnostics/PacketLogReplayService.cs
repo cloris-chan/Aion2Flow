@@ -831,20 +831,20 @@ public sealed class PacketLogReplayService
     {
         if (Packet3336NicknameParser.TryParse(packet, out var ownParsed))
         {
-            store.AppendNickname(ownParsed.PlayerId, ownParsed.Nickname, ownParsed.OriginServerId);
+            store.AppendNickname(ownParsed.PlayerId, ownParsed.Nickname, ownParsed.OriginServerId, PacketFactionMapper.ToFaction(ownParsed.FactionCode));
             store.MarkSceneArrival();
             return true;
         }
 
         if (Packet4436NicknameParser.TryParse(packet, out var otherParsed))
         {
-            store.AppendNickname(otherParsed.PlayerId, otherParsed.Nickname, otherParsed.OriginServerId);
+            store.AppendNickname(otherParsed.PlayerId, otherParsed.Nickname, otherParsed.OriginServerId, PacketFactionMapper.ToFaction(otherParsed.FactionCode));
             return true;
         }
 
         if (Packet048DNicknameParser.TryParse(packet, out var parsed))
         {
-            store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+            store.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
             return true;
         }
 

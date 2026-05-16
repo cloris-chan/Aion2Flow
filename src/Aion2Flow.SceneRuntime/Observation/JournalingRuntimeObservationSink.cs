@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
@@ -424,7 +425,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null)
+    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
     {
         uid = ResolveLifecycleId(uid);
         AddKnownEntity(uid);
@@ -445,7 +446,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Value1 = 0,
                 DetailRaw = 0,
                 Text = nickname,
-                OriginServerId = originServerId
+                OriginServerId = originServerId,
+                Faction = faction
             }
         });
     }

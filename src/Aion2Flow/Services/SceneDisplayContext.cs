@@ -51,6 +51,11 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
             ? combatant.CharacterClass
             : null;
 
+    public Faction ResolveFaction(int entityId)
+        => TryGetPcMetadata(entityId, out var pc)
+            ? pc.Faction
+            : Faction.Unknown;
+
     public string ResolveNpcName(int instanceId)
     {
         if (instanceId <= 0)

@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -33,7 +34,15 @@ public readonly record struct CombatObservation
     public int ChainId { get; init; }
 }
 
-public readonly record struct StateObservation(int EntityId, int StateCode, int Value0, int Value1, long DetailRaw, string? Text, int? OriginServerId = null);
+public readonly record struct StateObservation(
+    int EntityId,
+    int StateCode,
+    int Value0,
+    int Value1,
+    long DetailRaw,
+    string? Text,
+    int? OriginServerId = null,
+    Faction Faction = Faction.Unknown);
 
 public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, int Value0, int Value1, string? DiagnosticKey);
 

@@ -11,7 +11,7 @@ public sealed class SceneIdentityTests
     {
         var builder = new SceneIdentityScopeBuilder();
         builder.Reset(2);
-        builder.AddPcMetadata(new PcMetadata(300, "Player B", 495));
+        builder.AddPcMetadata(new PcMetadata(300, "Player B", 495, Faction.Light));
         builder.AddPcMetadata(new PcMetadata(100, "Player A", null));
         builder.AddNpcCode(9002, 2_100_351);
         builder.AddNpcCode(9001, 2_100_350);
@@ -23,6 +23,7 @@ public sealed class SceneIdentityTests
         Assert.True(scope.TryGetPcMetadata(300, out var pc));
         Assert.Equal("Player B", pc.Nickname);
         Assert.Equal(495, pc.OriginServerId);
+        Assert.Equal(Faction.Light, pc.Faction);
         Assert.True(scope.TryGetNpcCode(9001, out var npcCode));
         Assert.Equal(2_100_350, npcCode);
         Assert.True(scope.TryGetMapCode(515552, out var mapCode));
@@ -34,16 +35,17 @@ public sealed class SceneIdentityTests
     {
         const int entityId = 9002;
         var registry = new RuntimeMetadataRegistry();
-        registry.UpsertPcMetadata(100, "Global Player", 1);
+        registry.UpsertPcMetadata(100, "Global Player", 1, Faction.Dark);
         registry.UpsertNpcCode(entityId, 2_100_350);
 
         var builder = new SceneIdentityScopeBuilder();
-        builder.AddPcMetadata(new PcMetadata(100, "Scoped Player", 2));
+        builder.AddPcMetadata(new PcMetadata(100, "Scoped Player", 2, Faction.Light));
         builder.AddNpcCode(entityId, 2_100_351);
         var resolver = new SceneIdentityResolver(builder.ToScope(), registry);
 
         Assert.True(resolver.TryGetPcMetadata(100, out var pc));
         Assert.Equal("Scoped Player", pc.Nickname);
+        Assert.Equal(Faction.Light, pc.Faction);
         Assert.True(resolver.TryGetNpcCode(entityId, out var npcCode));
         Assert.Equal(2_100_351, npcCode);
     }
@@ -52,13 +54,14 @@ public sealed class SceneIdentityTests
     public void SceneIdentityResolver_FallsBackToGlobalRegistryForLiveEmptyScope()
     {
         var registry = new RuntimeMetadataRegistry();
-        registry.UpsertPcMetadata(100, "Live Player", 495);
+        registry.UpsertPcMetadata(100, "Live Player", 495, Faction.Light);
         registry.UpsertNpcCode(9001, 2_100_350);
 
         var resolver = new SceneIdentityResolver(SceneIdentityScope.Empty, registry);
 
         Assert.True(resolver.TryGetPcMetadata(100, out var pc));
         Assert.Equal("Live Player", pc.Nickname);
+        Assert.Equal(Faction.Light, pc.Faction);
         Assert.True(resolver.TryGetNpcCode(9001, out var npcCode));
         Assert.Equal(2_100_350, npcCode);
     }
@@ -75,12 +78,13 @@ public sealed class SceneIdentityTests
         {
             Domain = ObservedEventDomain.State,
             SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", 495)
+            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", 495, Faction.Light)
         });
 
         Assert.True(registry.TryGetPcMetadata(100, out var metadata));
         Assert.Equal("Perigee", metadata.Nickname);
         Assert.Equal(495, metadata.OriginServerId);
+        Assert.Equal(Faction.Light, metadata.Faction);
     }
 
     [Fact]

@@ -187,7 +187,7 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
                 var nickname = state.Text ?? string.Empty;
                 entities.ApplyNickname(entry.SourceEntityId, nickname);
                 if (!string.IsNullOrWhiteSpace(nickname))
-                    metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.OriginServerId);
+                    metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.OriginServerId, state.Faction);
             }
             return;
         }

@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -109,7 +110,7 @@ public interface IRuntimeObservationSink
         long frameOrdinal,
         long batchOrdinal);
 
-    void AppendNickname(int uid, string nickname, int? originServerId = null);
+    void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown);
 
     void AppendNpcCode(int instanceId, int npcCode);
 

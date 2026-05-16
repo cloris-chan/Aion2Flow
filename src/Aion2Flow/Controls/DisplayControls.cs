@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
 
@@ -55,6 +56,7 @@ public abstract class IconTextDisplay : UserControl
     private IImage? _currentIcon;
     private bool _currentIconUsesSpriteSheet;
     private bool _isIconVisible;
+    private IBrush? _currentTextForeground;
 
     protected IconTextDisplay()
     {
@@ -155,6 +157,29 @@ public abstract class IconTextDisplay : UserControl
            property == ShowIconProperty ||
            property == DisplayContextProvider.DisplayContextProperty;
 
+    protected virtual void UpdateStateCore(SceneDisplayContext? context, int entityId)
+    {
+    }
+
+    protected void SetTextForeground(IBrush? foreground)
+    {
+        if (ReferenceEquals(_currentTextForeground, foreground))
+        {
+            return;
+        }
+
+        if (foreground is null)
+        {
+            _textBlock.ClearValue(TextBlock.ForegroundProperty);
+        }
+        else
+        {
+            _textBlock.Foreground = foreground;
+        }
+
+        _currentTextForeground = foreground;
+    }
+
     protected abstract string ResolveTextCore(SceneDisplayContext? context, int entityId);
 
     protected abstract DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId);
@@ -166,6 +191,7 @@ public abstract class IconTextDisplay : UserControl
     {
         var context = DisplayContextProvider.GetDisplayContext(this);
         var entityId = EntityId;
+        UpdateStateCore(context, entityId);
         var text = ResolveTextCore(context, entityId);
         if (!string.Equals(_currentText, text, StringComparison.Ordinal))
         {
@@ -373,6 +399,20 @@ public sealed class CombatantDisplay : IconTextDisplay
 
 public sealed class PcDisplay : IconTextDisplay
 {
+    private static readonly SolidColorBrush LightNameForeground = new(Color.Parse("#72e1ff"));
+    private static readonly SolidColorBrush DarkNameForeground = new(Color.Parse("#d275ff"));
+
+    protected override void UpdateStateCore(SceneDisplayContext? context, int entityId)
+    {
+        var faction = context?.ResolveFaction(entityId) ?? Faction.Unknown;
+        SetTextForeground(faction switch
+        {
+            Faction.Light => LightNameForeground,
+            Faction.Dark => DarkNameForeground,
+            _ => null
+        });
+    }
+
     protected override string ResolveTextCore(SceneDisplayContext? context, int entityId)
         => context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
 

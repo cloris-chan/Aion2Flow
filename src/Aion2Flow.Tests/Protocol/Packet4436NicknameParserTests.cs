@@ -28,6 +28,7 @@ public sealed class Packet4436NicknameParserTests
         Assert.Equal(3120, parsed.PlayerId);
         Assert.Equal("浅尝", parsed.Nickname);
         Assert.Equal(420, parsed.OriginServerId);
+        Assert.Equal(1, parsed.FactionCode);
     }
 
     [Fact]
@@ -41,5 +42,30 @@ public sealed class Packet4436NicknameParserTests
         Assert.Equal(1630, parsed.PlayerId);
         Assert.Equal("以月之名", parsed.Nickname);
         Assert.Equal(160, parsed.OriginServerId);
+        Assert.Equal(2, parsed.FactionCode);
+    }
+
+    [Fact]
+    public void Parses_Light_Faction_From_4436_Nickname_Tail()
+    {
+        var packet = Convert.FromHexString("C90C4436E2080320A401070CE7BAA2E8B186E586B0E7B3951E000000010280D2");
+
+        var ok = Packet4436NicknameParser.TryParse(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal("红豆冰糕", parsed.Nickname);
+        Assert.Equal(1, parsed.FactionCode);
+    }
+
+    [Fact]
+    public void Parses_Dark_Faction_From_4436_Nickname_Tail()
+    {
+        var packet = Convert.FromHexString("C80D44368B5A0320A001070CE98791E889B2E8AA93E7BAA610000000020280D2");
+
+        var ok = Packet4436NicknameParser.TryParse(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal("金色誓约", parsed.Nickname);
+        Assert.Equal(2, parsed.FactionCode);
     }
 }

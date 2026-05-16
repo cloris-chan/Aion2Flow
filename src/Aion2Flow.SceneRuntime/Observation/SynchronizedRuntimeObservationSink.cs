@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -128,9 +129,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal);
     }
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null)
+    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
     {
-        lock (gate) inner.AppendNickname(uid, nickname, originServerId);
+        lock (gate) inner.AppendNickname(uid, nickname, originServerId, faction);
     }
 
     public void AppendNpcCode(int instanceId, int npcCode)

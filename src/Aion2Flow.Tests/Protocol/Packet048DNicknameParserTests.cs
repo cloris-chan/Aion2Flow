@@ -16,6 +16,7 @@ public sealed class Packet048DNicknameParserTests
         Assert.Equal("雅昂", parsed.Nickname);
         Assert.Equal(6, parsed.NicknameLength);
         Assert.Equal(495, parsed.OriginServerId);
+        Assert.Equal(1, parsed.FactionCode);
     }
 
     [Fact]
@@ -43,6 +44,19 @@ public sealed class Packet048DNicknameParserTests
         Assert.Equal("以月之名", parsed.Nickname);
         Assert.Equal(12, parsed.NicknameLength);
         Assert.Equal(982, parsed.OriginServerId);
+        Assert.Equal(2, parsed.FactionCode);
+    }
+
+    [Fact]
+    public void Parses_Dark_Faction_From_048d_Nickname_Tail()
+    {
+        var packet = Convert.FromHexString("2B048D8CBD0A1ABACB00C812DE0709E890A7E8AFA7E4B8B606E69A97E6B2B3020000000000000100");
+
+        var ok = Packet048DNicknameParser.TryParse(packet, out var parsed);
+
+        Assert.True(ok);
+        Assert.Equal("萧诧丶", parsed.Nickname);
+        Assert.Equal(2, parsed.FactionCode);
     }
 
     [Fact]

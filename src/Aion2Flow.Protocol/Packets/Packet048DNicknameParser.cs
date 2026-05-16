@@ -7,7 +7,8 @@ internal readonly record struct Packet048DNickname(
     string Nickname,
     int NicknameLength,
     int TailOffset,
-    int? OriginServerId);
+    int? OriginServerId,
+    byte FactionCode);
 
 internal static class Packet048DNicknameParser
 {
@@ -71,7 +72,8 @@ internal static class Packet048DNicknameParser
             return false;
         }
 
-        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, originServerId);
+        var factionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset);
+        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, originServerId, factionCode);
         return true;
     }
 
@@ -88,7 +90,8 @@ internal static class Packet048DNicknameParser
             return false;
         }
 
-        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, OriginServerId: null);
+        var factionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset);
+        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, null, factionCode);
         return true;
     }
 

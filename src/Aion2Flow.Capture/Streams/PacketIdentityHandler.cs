@@ -11,7 +11,7 @@ internal static class PacketIdentityHandler
             return false;
         }
 
-        context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
         context.Sink.MarkSceneArrival();
         return context.MarkParsed();
     }
@@ -20,7 +20,7 @@ internal static class PacketIdentityHandler
     {
         if (Packet4436NicknameParser.TryParse(packet, out var parsed))
         {
-            context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+            context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
             return context.MarkParsed();
         }
 
@@ -45,7 +45,7 @@ internal static class PacketIdentityHandler
             return false;
         }
 
-        context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId);
+        context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
         return context.MarkParsed();
     }
 }

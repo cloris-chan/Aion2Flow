@@ -112,11 +112,24 @@ public class EntityStoreTests
     public void RuntimeMetadataRegistry_UpsertPcMetadata_LookupWorks()
     {
         var registry = new RuntimeMetadataRegistry();
-        registry.UpsertPcMetadata(2007, "Perigee", 495);
+        registry.UpsertPcMetadata(2007, "Perigee", 495, Faction.Light);
 
         Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
         Assert.Equal("Perigee", metadata.Nickname);
         Assert.Equal(495, metadata.OriginServerId);
+        Assert.Equal(Faction.Light, metadata.Faction);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_UpsertPcMetadata_PreservesFaction_WhenUnknownArrivesLater()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(2007, "Perigee", 495, Faction.Light);
+        registry.UpsertPcMetadata(2007, "Perigee", null);
+
+        Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
+        Assert.Equal(495, metadata.OriginServerId);
+        Assert.Equal(Faction.Light, metadata.Faction);
     }
 
     [Fact]

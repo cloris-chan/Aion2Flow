@@ -2,9 +2,17 @@ using System.Runtime.InteropServices;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Identity;
 
-public readonly record struct PcMetadata(int EntityId, string Nickname, int? OriginServerId)
+public enum Faction : byte
+{
+    Unknown = 0,
+    Light = 1,
+    Dark = 2
+}
+
+public readonly record struct PcMetadata(int EntityId, string Nickname, int? OriginServerId, Faction Faction = Faction.Unknown)
 {
     public bool HasNickname => !string.IsNullOrWhiteSpace(Nickname);
+    public bool HasFaction => Faction != Faction.Unknown;
 }
 
 public readonly record struct PcMetadataEntry(int EntityId, PcMetadata Metadata);
@@ -25,7 +33,7 @@ public sealed class RuntimeMetadataRegistry
     public IReadOnlyDictionary<uint, uint> MapCodesByInstanceId => _mapCodesByInstanceId;
     public long Revision => _revision;
 
-    public bool UpsertPcMetadata(int entityId, string nickname, int? originServerId = null)
+    public bool UpsertPcMetadata(int entityId, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
     {
         if (entityId <= 0)
             return false;
@@ -33,7 +41,12 @@ public sealed class RuntimeMetadataRegistry
         nickname ??= string.Empty;
         ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_pcMetadataByEntityId, entityId, out var exists);
         var resolvedOriginServerId = originServerId ?? (exists ? current.OriginServerId : null);
-        var next = new PcMetadata(entityId, nickname, resolvedOriginServerId);
+        var resolvedFaction = faction != Faction.Unknown
+            ? faction
+            : exists
+                ? current.Faction
+                : Faction.Unknown;
+        var next = new PcMetadata(entityId, nickname, resolvedOriginServerId, resolvedFaction);
         if (exists && current.Equals(next))
             return false;
 

@@ -108,6 +108,16 @@ internal static class NicknameParserUtil
         return false;
     }
 
+    public static byte TryReadFactionCode(ReadOnlySpan<byte> packet, int offset)
+    {
+        if ((uint)offset >= (uint)packet.Length)
+        {
+            return 0;
+        }
+
+        return packet[offset] is 1 or 2 ? packet[offset] : (byte)0;
+    }
+
     private static bool TryReadVarInt(ReadOnlySpan<byte> bytes, int offset, out int value, out int byteCount)
     {
         value = 0;
