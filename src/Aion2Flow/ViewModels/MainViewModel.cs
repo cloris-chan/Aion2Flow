@@ -602,56 +602,30 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         reason = string.Empty;
 
-        if (previousLiveSnapshot.MapId == 0 ||
-            latestLiveSnapshot.MapId == 0 ||
-            !HasArchivableEncounter(previousLiveSnapshot))
+        if (!HasArchivableEncounter(previousLiveSnapshot))
         {
             return false;
         }
 
-        if (previousLiveSnapshot.MapId != latestLiveSnapshot.MapId)
-        {
-            if (ShouldArchiveMapIdTransition(previousLiveSnapshot, latestLiveSnapshot))
-            {
-                reason = "map-transition";
-                return true;
-            }
+        var previousMapId = previousLiveSnapshot.MapId;
+        var latestMapId = latestLiveSnapshot.MapId;
+        var previousInstanceId = previousLiveSnapshot.MapInstanceId;
+        var latestInstanceId = latestLiveSnapshot.MapInstanceId;
 
-            return false;
+        if (previousMapId != latestMapId)
+        {
+            reason = "map-transition";
+            return true;
         }
 
-        if (previousLiveSnapshot.MapInstanceId != latestLiveSnapshot.MapInstanceId)
+        if (previousInstanceId != latestInstanceId)
         {
-            if ((previousLiveSnapshot.MapInstanceId == 0) != (latestLiveSnapshot.MapInstanceId == 0))
-            {
-                reason = "map-instance-transition";
-                return true;
-            }
-
-            return false;
+            reason = "map-instance-transition";
+            return true;
         }
 
         return false;
     }
-
-    private static bool ShouldArchiveMapIdTransition(
-        SceneCombatSnapshot previousLiveSnapshot,
-        SceneCombatSnapshot latestLiveSnapshot)
-    {
-        if (previousLiveSnapshot.MapInstanceId != 0 &&
-            latestLiveSnapshot.MapInstanceId != 0 &&
-            previousLiveSnapshot.MapInstanceId == latestLiveSnapshot.MapInstanceId)
-        {
-            return false;
-        }
-
-        return IsBoundaryLayerMap(previousLiveSnapshot.MapId) ||
-            IsBoundaryLayerMap(latestLiveSnapshot.MapId) ||
-            previousLiveSnapshot.MapInstanceId != 0 ||
-            latestLiveSnapshot.MapInstanceId != 0;
-    }
-
-    private static bool IsBoundaryLayerMap(uint mapId) => mapId >= 100000;
 
     private static bool HasArchivableEncounter(SceneCombatSnapshot snapshot)
         => snapshot.EncounterTime > 0 && snapshot.Combatants.Count > 0;

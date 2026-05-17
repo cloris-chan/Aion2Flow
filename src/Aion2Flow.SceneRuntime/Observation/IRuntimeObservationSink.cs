@@ -26,7 +26,13 @@ public interface IRuntimeObservationSink
 
     void StageDestinationMap(uint mapId, bool allowSameMapReload);
 
+    void StagePendingDestinationMap(uint mapId, bool allowSameMapReload);
+
+    void ConfirmDestinationMap(uint mapId, bool allowSameMapReload);
+
     void StageDestinationMapInstance(uint instanceId);
+
+    void ConfirmDestinationMapInstance(uint instanceId);
 
     void MarkSceneArrival();
 

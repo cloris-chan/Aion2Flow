@@ -18,16 +18,21 @@ public sealed class MainViewModelCombatantFilterTests
     [InlineData(1010u, 0u, 200003u, 113515u, true, "map-transition")]
     [InlineData(1010u, 0u, 1010u, 0u, false, "")]
     [InlineData(200003u, 113515u, 200003u, 113515u, false, "")]
-    [InlineData(200003u, 113515u, 200003u, 113526u, false, "")]
+    [InlineData(200003u, 113515u, 200003u, 113526u, true, "map-instance-transition")]
     [InlineData(200003u, 0u, 200003u, 113515u, true, "map-instance-transition")]
-    [InlineData(0u, 0u, 1010u, 0u, false, "")]
-    [InlineData(0u, 0u, 50u, 0u, false, "")]
+    [InlineData(0u, 0u, 20u, 0u, true, "map-transition")]
+    [InlineData(1010u, 0u, 20u, 0u, true, "map-transition")]
+    [InlineData(20u, 0u, 1010u, 0u, true, "map-transition")]
+    [InlineData(1010u, 0u, 130u, 0u, true, "map-transition")]
+    [InlineData(0u, 0u, 1010u, 0u, true, "map-transition")]
+    [InlineData(0u, 0u, 50u, 0u, true, "map-transition")]
     [InlineData(0u, 0u, 0u, 0u, false, "")]
+    [InlineData(0u, 100u, 0u, 101u, true, "map-instance-transition")]
     [InlineData(600002u, 396972u, 1010u, 0u, true, "map-transition")]
-    [InlineData(1010u, 0u, 1020u, 0u, false, "")]
+    [InlineData(1010u, 0u, 1020u, 0u, true, "map-transition")]
     [InlineData(1010u, 0u, 500020u, 0u, true, "map-transition")]
     [InlineData(500020u, 0u, 1010u, 0u, true, "map-transition")]
-    [InlineData(600011u, 679397u, 600012u, 679397u, false, "")]
+    [InlineData(600011u, 679397u, 600012u, 679397u, true, "map-transition")]
     public void Map_Transitions_Select_Automatic_Reset_Scope(
         uint previousMapId,
         uint previousInstanceId,
@@ -342,6 +347,23 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.NotNull(record.ScenePayload);
         Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
         Assert.NotNull(record.ScenePayload);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_AutoArchivesWhenPreviousMapIsUnknown()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        fixture.AppendSceneMap(20, 0);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var record = Assert.Single(fixture.Archive.History);
+        Assert.Equal("map-transition", record.Trigger);
+        Assert.True(record.IsAutomatic);
+        Assert.NotNull(record.ScenePayload);
+        Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
     }
 
     [Fact]

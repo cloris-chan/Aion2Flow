@@ -27,9 +27,27 @@ public sealed class SceneBoundaryStore
             _revision++;
     }
 
+    public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload)
+    {
+        if (_sceneBoundary.StagePendingDestinationMap(mapId, allowSameMapReload))
+            _revision++;
+    }
+
+    public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload)
+    {
+        if (_sceneBoundary.ConfirmDestinationMap(mapId, allowSameMapReload))
+            _revision++;
+    }
+
     public void StageDestinationMapInstance(uint instanceId)
     {
         if (_sceneBoundary.StageDestinationMapInstance(instanceId))
+            _revision++;
+    }
+
+    public void ConfirmDestinationMapInstance(uint instanceId)
+    {
+        if (_sceneBoundary.ConfirmDestinationMapInstance(instanceId))
             _revision++;
     }
 

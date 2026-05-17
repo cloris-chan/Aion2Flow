@@ -151,9 +151,29 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
             return;
         }
 
+        if (scene.DiagnosticKey == "pending-destination-map")
+        {
+            boundary.StagePendingDestinationMap(scene.MapId, scene.Value0 != 0);
+            return;
+        }
+
+        if (scene.DiagnosticKey == "confirm-destination-map")
+        {
+            boundary.ConfirmDestinationMap(scene.MapId, scene.Value0 != 0);
+            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            return;
+        }
+
         if (scene.DiagnosticKey == "stage-destination-instance")
         {
             boundary.StageDestinationMapInstance(scene.MapInstanceId);
+            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            return;
+        }
+
+        if (scene.DiagnosticKey == "confirm-destination-instance")
+        {
+            boundary.ConfirmDestinationMapInstance(scene.MapInstanceId);
             metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
             return;
         }

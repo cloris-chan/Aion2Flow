@@ -692,7 +692,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        StageDestinationMapFromSceneState(store, parsed.Value0);
+        ConfirmDestinationMapFromSceneState(store, parsed.Value0);
 
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -714,7 +714,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        StageDestinationMapFromSceneState(store, parsed.Value0);
+        StagePendingDestinationMapFromSceneState(store, parsed.Value0);
 
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -736,7 +736,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        store.StageDestinationMapInstance(parsed.InstanceId);
+        store.ConfirmDestinationMapInstance(parsed.InstanceId);
         return true;
     }
 
@@ -747,7 +747,7 @@ public sealed class PacketLogReplayService
             return false;
         }
 
-        StageDestinationMapFromSceneState(store, parsed.Value0);
+        ConfirmDestinationMapFromSceneState(store, parsed.Value0);
 
         var targetId = store.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -762,11 +762,19 @@ public sealed class PacketLogReplayService
         return true;
     }
 
-    private static void StageDestinationMapFromSceneState(IRuntimeObservationSink store, uint value)
+    private static void StagePendingDestinationMapFromSceneState(IRuntimeObservationSink store, uint value)
     {
         if (IsSceneStateMapId(value))
         {
-            store.StageDestinationMap(value, allowSameMapReload: true);
+            store.StagePendingDestinationMap(value, allowSameMapReload: true);
+        }
+    }
+
+    private static void ConfirmDestinationMapFromSceneState(IRuntimeObservationSink store, uint value)
+    {
+        if (IsSceneStateMapId(value))
+        {
+            store.ConfirmDestinationMap(value, allowSameMapReload: true);
         }
     }
 

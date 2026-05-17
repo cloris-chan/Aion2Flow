@@ -62,6 +62,15 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         => StageDestinationMap(mapId, allowSameMapReload: false);
 
     public void StageDestinationMap(uint mapId, bool allowSameMapReload)
+        => AppendSceneMapObservation(mapId, allowSameMapReload, "stage-destination-map");
+
+    public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload)
+        => AppendSceneMapObservation(mapId, allowSameMapReload, "pending-destination-map");
+
+    public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload)
+        => AppendSceneMapObservation(mapId, allowSameMapReload, "confirm-destination-map");
+
+    private void AppendSceneMapObservation(uint mapId, bool allowSameMapReload, string diagnosticKey)
     {
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
         journal.Append(new ObservedEventEnvelope
@@ -78,7 +87,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 MapInstanceId = 0,
                 Value0 = allowSameMapReload ? 1 : 0,
                 Value1 = 0,
-                DiagnosticKey = "stage-destination-map"
+                DiagnosticKey = diagnosticKey
             }
         });
     }
@@ -101,6 +110,28 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Value0 = 0,
                 Value1 = 0,
                 DiagnosticKey = "stage-destination-instance"
+            }
+        });
+    }
+
+    public void ConfirmDestinationMapInstance(uint instanceId)
+    {
+        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneSessionId(),
+            Stamp = stamp,
+            Domain = ObservedEventDomain.Scene,
+            SourceEntityId = 0,
+            TargetEntityId = 0,
+            Raw = default,
+            Scene = new SceneObservation
+            {
+                MapId = 0,
+                MapInstanceId = instanceId,
+                Value0 = 0,
+                Value1 = 0,
+                DiagnosticKey = "confirm-destination-instance"
             }
         });
     }

@@ -48,14 +48,25 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
         }
     }
 
-    public bool StageDestinationMapFromSceneState(uint value)
+    public bool StagePendingDestinationMapFromSceneState(uint value)
     {
         if (!SceneMapIdClassifier.IsSceneStateMapId(value))
         {
             return false;
         }
 
-        sink.StageDestinationMap(value, allowSameMapReload: true);
+        sink.StagePendingDestinationMap(value, allowSameMapReload: true);
+        return true;
+    }
+
+    public bool ConfirmDestinationMapFromSceneState(uint value)
+    {
+        if (!SceneMapIdClassifier.IsSceneStateMapId(value))
+        {
+            return false;
+        }
+
+        sink.ConfirmDestinationMap(value, allowSameMapReload: true);
         return true;
     }
 }

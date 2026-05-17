@@ -439,8 +439,14 @@ public sealed class CrossModuleProtocolParityHarnessTests
 
         private void ObserveScene(in SceneObservation scene)
         {
-            if (scene.DiagnosticKey is "stage-destination-map" or "stage-destination-instance")
+            if (scene.DiagnosticKey is "stage-destination-map"
+                or "stage-destination-instance"
+                or "pending-destination-map"
+                or "confirm-destination-map"
+                or "confirm-destination-instance")
+            {
                 MapStaging++;
+            }
             if (scene.DiagnosticKey == "scene-arrival")
                 SceneArrival++;
         }

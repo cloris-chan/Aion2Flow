@@ -496,6 +496,38 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
+    public void Boundary_PendingDestinationMap_DoesNotCommitUntilConfirmed()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(1010);
+        var before = svc.SceneTransitionRevision;
+
+        Assert.True(svc.StagePendingDestinationMap(500015, allowSameMapReload: true));
+        Assert.Equal(1010u, svc.CurrentMapId);
+        Assert.Equal(before, svc.SceneTransitionRevision);
+
+        Assert.True(svc.ConfirmDestinationMap(500015, allowSameMapReload: true));
+        Assert.Equal(500015u, svc.CurrentMapId);
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+    }
+
+    [Fact]
+    public void Boundary_PendingEventMap_CommitsWithConfirmedInstance()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(1010);
+        var before = svc.SceneTransitionRevision;
+
+        Assert.True(svc.StagePendingDestinationMap(500015, allowSameMapReload: true));
+        Assert.Equal(1010u, svc.CurrentMapId);
+
+        Assert.True(svc.ConfirmDestinationMapInstance(719460));
+        Assert.Equal(500015u, svc.CurrentMapId);
+        Assert.Equal(719460u, svc.CurrentMapInstanceId);
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+    }
+
+    [Fact]
     public void Boundary_SameMap_DoesNotTriggerTransition()
     {
         var svc = new SceneBoundaryService();
@@ -534,13 +566,11 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(1010);
-        svc.MarkSceneArrival();
         var before = svc.SceneTransitionRevision;
 
-        Assert.True(svc.StageDestinationMap(1010, allowSameMapReload: true));
-        var kind = svc.MarkSceneArrival();
+        Assert.True(svc.StagePendingDestinationMap(1010, allowSameMapReload: true));
+        Assert.True(svc.ConfirmDestinationMap(1010, allowSameMapReload: true));
 
-        Assert.Equal(SceneTransitionKind.SceneReload, kind);
         Assert.Equal(1010u, svc.CurrentMapId);
         Assert.Equal(0u, svc.CurrentMapInstanceId);
         Assert.Equal(before + 1, svc.SceneTransitionRevision);
@@ -551,14 +581,12 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(154001);
-        svc.MarkSceneArrival();
         svc.StageDestinationMapInstance(89730);
         var before = svc.SceneTransitionRevision;
 
-        Assert.True(svc.StageDestinationMap(154001, allowSameMapReload: true));
-        var kind = svc.MarkSceneArrival();
+        Assert.True(svc.StagePendingDestinationMap(154001, allowSameMapReload: true));
+        Assert.True(svc.ConfirmDestinationMap(154001, allowSameMapReload: true));
 
-        Assert.Equal(SceneTransitionKind.SceneReload, kind);
         Assert.Equal(154001u, svc.CurrentMapId);
         Assert.Equal(89730u, svc.CurrentMapInstanceId);
         Assert.Equal(before + 1, svc.SceneTransitionRevision);
@@ -611,7 +639,7 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void Boundary_TransportBoundary_WithPendingSameMapReload_DoesNotFallbackOutOfInstance()
+    public void Boundary_TransportBoundary_WithPendingSameMapReload_DoesNotConfirmArrival()
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(1010);
@@ -623,14 +651,14 @@ public class SceneTimelineContractTests
         svc.StageDestinationMapInstance(679398);
         Assert.Equal(SceneTransitionKind.None, svc.MarkSceneTransportBoundary());
 
-        svc.StageDestinationMap(600011, allowSameMapReload: true);
+        svc.StagePendingDestinationMap(600011, allowSameMapReload: true);
         var before = svc.SceneTransitionRevision;
         var kind = svc.MarkSceneTransportBoundary();
 
-        Assert.Equal(SceneTransitionKind.SceneReload, kind);
+        Assert.Equal(SceneTransitionKind.None, kind);
         Assert.Equal(600011u, svc.CurrentMapId);
         Assert.Equal(679398u, svc.CurrentMapInstanceId);
-        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+        Assert.Equal(before, svc.SceneTransitionRevision);
     }
 
     [Fact]

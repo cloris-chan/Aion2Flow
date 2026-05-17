@@ -17,7 +17,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
     private static readonly TcpConnection TestConnection = new(0x0100007f, 0x0100007f, 49820, 57080);
 
     [Fact]
-    public void Runtime_Sink_Constructor_Writes_To_Scene_Journal()
+    public void Runtime_Sink_Constructor_Keeps_2136_Map_Pending_Until_Confirmed()
     {
         var scene = new SceneLiveReadModel();
         using var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
@@ -26,9 +26,11 @@ public sealed class PacketStreamProcessorNpcObservationTests
 
         Assert.True(parsed);
         scene.Owner.Refresh();
-        Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
-        scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)).MarkSceneArrival();
+        Assert.Equal(0u, scene.Owner.Boundary.CurrentMapId);
+
+        parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/0140-boss-tail-430d03.hex"), TestConnection);
         scene.Owner.Refresh();
+        Assert.True(parsed);
         Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
     }
 
@@ -69,13 +71,11 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Theory]
-    [InlineData("state/2136-boss-scene-1010.hex", 1010)]
     [InlineData("state/0140-boss-tail-f203.hex", 1010)]
     [InlineData("state/0240-boss-tail-f203.hex", 1010)]
-    [InlineData("state/2136-boss-scene-200003.hex", 200003)]
     [InlineData("state/0140-boss-tail-430d03.hex", 200003)]
     [InlineData("state/0240-boss-tail-430d03.hex", 200003)]
-    public void Scene_State_Frames_Commit_Map_Id_Immediately(string fixture, uint expectedMapId)
+    public void Scene_Arrival_State_Frames_Commit_Map_Id_Immediately(string fixture, uint expectedMapId)
     {
         var scene = new SceneLiveReadModel();
         var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
@@ -85,9 +85,21 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.True(parsed);
         scene.Owner.Refresh();
         Assert.Equal(expectedMapId, scene.Owner.Boundary.CurrentMapId);
-        scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)).MarkSceneArrival();
+    }
+
+    [Theory]
+    [InlineData("state/2136-boss-scene-1010.hex")]
+    [InlineData("state/2136-boss-scene-200003.hex")]
+    public void Scene_2136_State_Frames_Only_Stage_Pending_Map(string fixture)
+    {
+        var scene = new SceneLiveReadModel();
+        var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
+
+        var parsed = processor.AppendAndProcess(HexHelper.FromFixture(fixture), TestConnection);
+
+        Assert.True(parsed);
         scene.Owner.Refresh();
-        Assert.Equal(expectedMapId, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal(0u, scene.Owner.Boundary.CurrentMapId);
     }
 
     [Fact]
@@ -111,6 +123,13 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Equal((uint)113515, scene.Owner.Boundary.CurrentMapInstanceId);
 
         parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-1010.hex"), TestConnection);
+        scene.Owner.Refresh();
+
+        Assert.True(parsed);
+        Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
+        Assert.Equal((uint)113515, scene.Owner.Boundary.CurrentMapInstanceId);
+
+        parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/0240-boss-tail-f203.hex"), TestConnection);
         scene.Owner.Refresh();
 
         Assert.True(parsed);
@@ -474,7 +493,10 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public void RememberNpcObservationSource(int instanceId) { }
         public void StageDestinationMap(uint mapId) { }
         public void StageDestinationMap(uint mapId, bool allowSameMapReload) { }
+        public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload) { }
+        public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload) { }
         public void StageDestinationMapInstance(uint instanceId) { }
+        public void ConfirmDestinationMapInstance(uint instanceId) { }
         public void MarkSceneArrival() => SceneArrivalCalled = true;
         public void MarkSceneTransportBoundary() { }
         public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0) { }

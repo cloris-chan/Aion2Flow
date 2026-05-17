@@ -2,34 +2,40 @@ namespace Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 public sealed class SceneBoundaryService
 {
-    private bool _hasPendingSameMapReload;
+    private uint _pendingMapId;
+    private bool _pendingAllowSameMapReload;
 
     public uint CurrentMapId { get; private set; }
     public uint CurrentMapInstanceId { get; private set; }
     public long SceneTransitionRevision { get; private set; }
-    public bool IsEmpty => CurrentMapId == 0 && CurrentMapInstanceId == 0 && SceneTransitionRevision == 0 && !_hasPendingSameMapReload;
+    public bool IsEmpty => CurrentMapId == 0 && CurrentMapInstanceId == 0 && SceneTransitionRevision == 0 && _pendingMapId == 0;
 
     public bool StageDestinationMap(uint mapId) => StageDestinationMap(mapId, allowSameMapReload: false);
 
     public bool StageDestinationMap(uint mapId, bool allowSameMapReload)
+        => CommitConfirmedMap(mapId, allowSameMapReload);
+
+    public bool StagePendingDestinationMap(uint mapId, bool allowSameMapReload)
     {
         if (mapId == 0)
             return false;
 
-        if (mapId == CurrentMapId)
-        {
-            if (!allowSameMapReload || _hasPendingSameMapReload)
-                return false;
+        if (_pendingMapId == mapId && _pendingAllowSameMapReload == allowSameMapReload)
+            return false;
 
-            _hasPendingSameMapReload = true;
-            return true;
-        }
-
-        CurrentMapId = mapId;
-        CurrentMapInstanceId = 0;
-        SceneTransitionRevision++;
-        _hasPendingSameMapReload = false;
+        _pendingMapId = mapId;
+        _pendingAllowSameMapReload = allowSameMapReload;
         return true;
+    }
+
+    public bool ConfirmDestinationMap(uint mapId, bool allowSameMapReload)
+    {
+        if (mapId == 0)
+            return false;
+
+        var confirmsPendingMap = _pendingMapId == mapId;
+        ClearPendingDestination();
+        return CommitConfirmedMap(mapId, allowSameMapReload && confirmsPendingMap);
     }
 
     public bool StageDestinationMapInstance(uint instanceId)
@@ -44,38 +50,58 @@ public sealed class SceneBoundaryService
         return true;
     }
 
-    public SceneTransitionKind MarkSceneArrival()
+    public bool ConfirmDestinationMapInstance(uint instanceId)
     {
-        var kind = SceneTransitionKind.None;
+        if (instanceId == 0)
+            return false;
 
-        if (_hasPendingSameMapReload)
+        var changed = false;
+        if (_pendingMapId != 0)
         {
-            _hasPendingSameMapReload = false;
-            if (kind == SceneTransitionKind.None)
-            {
-                kind = SceneTransitionKind.SceneReload;
-            }
+            changed |= CommitConfirmedMap(_pendingMapId, _pendingAllowSameMapReload && _pendingMapId == CurrentMapId);
+            ClearPendingDestination();
         }
 
-        if (kind != SceneTransitionKind.None)
-        {
-            SceneTransitionRevision++;
-        }
-
-        return kind;
+        changed |= StageDestinationMapInstance(instanceId);
+        return changed;
     }
 
-    public SceneTransitionKind MarkSceneTransportBoundary()
-    {
-        if (_hasPendingSameMapReload)
-            return MarkSceneArrival();
+    public SceneTransitionKind MarkSceneArrival() => SceneTransitionKind.None;
 
-        return SceneTransitionKind.None;
+    public SceneTransitionKind MarkSceneTransportBoundary()
+        => SceneTransitionKind.None;
+
+    private bool CommitConfirmedMap(uint mapId, bool allowSameMapReload)
+    {
+        if (mapId == 0)
+            return false;
+
+        if (mapId == CurrentMapId)
+        {
+            if (!allowSameMapReload)
+                return false;
+
+            ClearPendingDestination();
+            SceneTransitionRevision++;
+            return true;
+        }
+
+        CurrentMapId = mapId;
+        CurrentMapInstanceId = 0;
+        SceneTransitionRevision++;
+        ClearPendingDestination();
+        return true;
+    }
+
+    private void ClearPendingDestination()
+    {
+        _pendingMapId = 0;
+        _pendingAllowSameMapReload = false;
     }
 
     public void Clear()
     {
-        _hasPendingSameMapReload = false;
+        ClearPendingDestination();
         CurrentMapId = 0;
         CurrentMapInstanceId = 0;
         SceneTransitionRevision = 0;

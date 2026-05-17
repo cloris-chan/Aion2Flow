@@ -141,7 +141,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
+        context.Writer.ConfirmDestinationMapFromSceneState(parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -162,7 +162,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
+        context.Writer.StagePendingDestinationMapFromSceneState(parsed.Value0);
 
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -184,7 +184,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.StageDestinationMapInstance(parsed.InstanceId);
+        context.Sink.ConfirmDestinationMapInstance(parsed.InstanceId);
 
         return context.MarkParsed();
     }
@@ -196,7 +196,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Writer.StageDestinationMapFromSceneState(parsed.Value0);
+        context.Writer.ConfirmDestinationMapFromSceneState(parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
