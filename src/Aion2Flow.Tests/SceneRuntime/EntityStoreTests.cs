@@ -143,8 +143,6 @@ public class EntityStoreTests
         Assert.Equal(200003u, store.CurrentMapId);
         Assert.Equal(515552u, store.CurrentMapInstanceId);
 
-        store.MarkSceneArrival();
-
         Assert.Equal(200003u, store.CurrentMapId);
         Assert.Equal(515552u, store.CurrentMapInstanceId);
     }
@@ -155,7 +153,6 @@ public class EntityStoreTests
         var store = new SceneBoundaryStore();
         store.StageDestinationMap(200003);
         store.StageDestinationMapInstance(515552);
-        store.MarkSceneArrival();
 
         store.Clear();
 
@@ -399,14 +396,6 @@ public class DomainEventApplierTests
             Stamp = new TimelineStamp { ObservationOrdinal = 1 },
             Domain = ObservedEventDomain.Scene,
             Scene = new SceneObservation { MapInstanceId = 515552, DiagnosticKey = "stage-destination-instance" }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 2 },
-            Domain = ObservedEventDomain.Scene,
-            Scene = new SceneObservation { DiagnosticKey = "scene-arrival" }
         });
 
         var entities = new EntityStore();
@@ -785,7 +774,6 @@ public class SceneSnapshotAdapterBasicTests
         var combat = new CombatStore();
         metadata.StageDestinationMap(200003);
         metadata.StageDestinationMapInstance(515552);
-        metadata.MarkSceneArrival();
 
         var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata);
         var snapshot = adapter.CreateSnapshot();
@@ -812,7 +800,6 @@ public class SceneCombatSnapshotAdapterTests
         entities.ApplyNpcCode(200, 9_999_999);
         metadata.StageDestinationMap(200003);
         metadata.StageDestinationMapInstance(515552);
-        metadata.MarkSceneArrival();
 
         combat.ApplyCombat(100, 200, new CombatObservation
         {

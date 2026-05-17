@@ -204,9 +204,9 @@ internal sealed class SceneTestHarness : IDisposable
         public void StageDestinationMap(uint mapId, bool allowSameMapReload) => inner.StageDestinationMap(mapId, allowSameMapReload);
         public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload) => inner.StagePendingDestinationMap(mapId, allowSameMapReload);
         public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload) => inner.ConfirmDestinationMap(mapId, allowSameMapReload);
+        public void ConfirmPendingDestinationMapArrival() => inner.ConfirmPendingDestinationMapArrival();
         public void StageDestinationMapInstance(uint instanceId) => inner.StageDestinationMapInstance(instanceId);
         public void ConfirmDestinationMapInstance(uint instanceId) => inner.ConfirmDestinationMapInstance(instanceId);
-        public void MarkSceneArrival() => inner.MarkSceneArrival();
         public void MarkSceneTransportBoundary() => inner.MarkSceneTransportBoundary();
         public void AppendCombatObservation(
             int sourceId,

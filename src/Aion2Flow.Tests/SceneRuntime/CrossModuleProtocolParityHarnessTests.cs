@@ -290,17 +290,6 @@ public sealed class CrossModuleProtocolParityHarnessTests
             diffs.Add(new AggregateDiff(scope, key, field, legacy, scene));
     }
 
-    private static void CompareDictionaries(List<string> diffs, string fileName, string label, Dictionary<int, long> legacy, Dictionary<int, long> scene)
-    {
-        foreach (var key in legacy.Keys.Concat(scene.Keys).Distinct().Order())
-        {
-            legacy.TryGetValue(key, out var l);
-            scene.TryGetValue(key, out var s);
-            if (l != s)
-                diffs.Add($"{fileName}|{label}|{key}|baseline={l}|scene={s}");
-        }
-    }
-
     private static IEnumerable<string> VendoredStreamLogNames()
     {
         var dir = FixtureHelper.GetPath("logs");
@@ -317,11 +306,6 @@ public sealed class CrossModuleProtocolParityHarnessTests
         return CombatResourceRegistry.ParseSkillVariant(originalSkillCode).BaseSkillCode == 190000000;
     }
 
-    private static string BuildAggregateDiffReport(Dictionary<AggregateDiffClass, int> accepted, List<string> unexpected)
-    {
-        var acceptedLines = accepted.OrderBy(static pair => pair.Key).Select(static pair => $"{pair.Key}={pair.Value}");
-        return $"accepted={string.Join(", ", acceptedLines)}{Environment.NewLine}{string.Join(Environment.NewLine, unexpected.Take(80))}";
-    }
 
     private sealed class ProtocolEvidence
     {
@@ -341,7 +325,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
         public int PeriodicLink;
         public int BossFocus;
         public int MapStaging;
-        public int SceneArrival;
+        public int MapArrivalConfirm;
 
         public void Observe(ObservedEventJournal journal)
         {
@@ -393,12 +377,12 @@ public sealed class CrossModuleProtocolParityHarnessTests
             AddMissing(missing, "periodic link mode 48", PeriodicLink);
             AddMissing(missing, "boss focus evidence", BossFocus);
             AddMissing(missing, "map staging", MapStaging);
-            AddMissing(missing, "scene arrival", SceneArrival);
+            AddMissing(missing, "map arrival confirm", MapArrivalConfirm);
             return missing;
         }
 
         public string Format() =>
-            $"evidence combat={Combat} state={State} aura={Aura} resource={Resource} scene={Scene} summon={Summon} extendedNpcState={ExtendedNpcState} periodicChain={PeriodicChain} systemRecovery={SystemRecovery} multiHit={MultiHit} compact0438={Compact0438} compact0238={Compact0238} compact0638={Compact0638} periodicLink={PeriodicLink} bossFocus={BossFocus} mapStaging={MapStaging} sceneArrival={SceneArrival}";
+            $"evidence combat={Combat} state={State} aura={Aura} resource={Resource} scene={Scene} summon={Summon} extendedNpcState={ExtendedNpcState} periodicChain={PeriodicChain} systemRecovery={SystemRecovery} multiHit={MultiHit} compact0438={Compact0438} compact0238={Compact0238} compact0638={Compact0638} periodicLink={PeriodicLink} bossFocus={BossFocus} mapStaging={MapStaging} mapArrivalConfirm={MapArrivalConfirm}";
 
         public string FormatMissing(List<string> missing) =>
             $"{Format()}{Environment.NewLine}missing={string.Join(", ", missing)}";
@@ -447,8 +431,8 @@ public sealed class CrossModuleProtocolParityHarnessTests
             {
                 MapStaging++;
             }
-            if (scene.DiagnosticKey == "scene-arrival")
-                SceneArrival++;
+            if (scene.DiagnosticKey == "confirm-pending-destination-map-arrival")
+                MapArrivalConfirm++;
         }
 
         private static void AddMissing(List<string> missing, string label, int count)

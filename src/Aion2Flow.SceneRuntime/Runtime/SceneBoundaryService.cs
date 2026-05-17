@@ -38,6 +38,16 @@ public sealed class SceneBoundaryService
         return CommitConfirmedMap(mapId, allowSameMapReload && confirmsPendingMap);
     }
 
+    public bool ConfirmPendingDestinationMapArrival()
+    {
+        if (_pendingMapId == 0)
+            return false;
+
+        var mapId = _pendingMapId;
+        ClearPendingDestination();
+        return CommitConfirmedMap(mapId, allowSameMapReload: false);
+    }
+
     public bool StageDestinationMapInstance(uint instanceId)
     {
         if (instanceId == 0)
@@ -65,8 +75,6 @@ public sealed class SceneBoundaryService
         changed |= StageDestinationMapInstance(instanceId);
         return changed;
     }
-
-    public SceneTransitionKind MarkSceneArrival() => SceneTransitionKind.None;
 
     public SceneTransitionKind MarkSceneTransportBoundary()
         => SceneTransitionKind.None;

@@ -12,7 +12,6 @@ internal static class PacketIdentityHandler
         }
 
         context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
-        context.Sink.MarkSceneArrival();
         return context.MarkParsed();
     }
 

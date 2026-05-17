@@ -30,11 +30,11 @@ public interface IRuntimeObservationSink
 
     void ConfirmDestinationMap(uint mapId, bool allowSameMapReload);
 
+    void ConfirmPendingDestinationMapArrival();
+
     void StageDestinationMapInstance(uint instanceId);
 
     void ConfirmDestinationMapInstance(uint instanceId);
-
-    void MarkSceneArrival();
 
     void MarkSceneTransportBoundary();
 

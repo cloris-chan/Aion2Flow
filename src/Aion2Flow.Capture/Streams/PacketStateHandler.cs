@@ -177,6 +177,17 @@ internal sealed class PacketStateHandler
         return context.MarkParsed();
     }
 
+    public static bool ParsePendingMapArrival2336Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        if (!Packet2336ArrivalParser.TryParse(packet))
+        {
+            return false;
+        }
+
+        context.Sink.ConfirmPendingDestinationMapArrival();
+        return context.MarkParsed();
+    }
+
     public static bool ParseMap2E92Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (!Packet2E92Parser.TryParse(packet, out var parsed))

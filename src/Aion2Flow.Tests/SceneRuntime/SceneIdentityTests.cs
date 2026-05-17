@@ -104,11 +104,6 @@ public sealed class SceneIdentityTests
             Domain = ObservedEventDomain.Scene,
             Scene = new SceneObservation(0, 515552, 0, 0, "stage-destination-instance")
         });
-        applier.ApplyEntry(new ObservedEventEnvelope
-        {
-            Domain = ObservedEventDomain.Scene,
-            Scene = new SceneObservation(0, 0, 0, 0, "scene-arrival")
-        });
 
         Assert.True(registry.TryGetMapCode(515552, out var mapCode));
         Assert.Equal(200003u, mapCode);

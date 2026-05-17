@@ -164,6 +164,13 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
             return;
         }
 
+        if (scene.DiagnosticKey == "confirm-pending-destination-map-arrival")
+        {
+            boundary.ConfirmPendingDestinationMapArrival();
+            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            return;
+        }
+
         if (scene.DiagnosticKey == "stage-destination-instance")
         {
             boundary.StageDestinationMapInstance(scene.MapInstanceId);
@@ -174,13 +181,6 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
         if (scene.DiagnosticKey == "confirm-destination-instance")
         {
             boundary.ConfirmDestinationMapInstance(scene.MapInstanceId);
-            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
-            return;
-        }
-
-        if (scene.DiagnosticKey == "scene-arrival")
-        {
-            boundary.MarkSceneArrival();
             metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
             return;
         }

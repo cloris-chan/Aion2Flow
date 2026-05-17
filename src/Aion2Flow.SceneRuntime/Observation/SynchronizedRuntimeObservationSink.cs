@@ -79,6 +79,11 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.ConfirmDestinationMap(mapId, allowSameMapReload);
     }
 
+    public void ConfirmPendingDestinationMapArrival()
+    {
+        lock (gate) inner.ConfirmPendingDestinationMapArrival();
+    }
+
     public void StageDestinationMapInstance(uint instanceId)
     {
         lock (gate) inner.StageDestinationMapInstance(instanceId);
@@ -87,11 +92,6 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
     public void ConfirmDestinationMapInstance(uint instanceId)
     {
         lock (gate) inner.ConfirmDestinationMapInstance(instanceId);
-    }
-
-    public void MarkSceneArrival()
-    {
-        lock (gate) inner.MarkSceneArrival();
     }
 
     public void MarkSceneTransportBoundary()

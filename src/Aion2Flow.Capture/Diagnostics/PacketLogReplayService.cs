@@ -2,13 +2,13 @@ using System.Diagnostics;
 using System.Globalization;
 using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Protocol.Combat;
-using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.Capture.Diagnostics;
@@ -76,11 +76,15 @@ public sealed class PacketLogReplayService
 
     private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName)
     {
-        using var sinkHolder = SceneSinkFactory.CreateForReplay();
-        IRuntimeObservationSink sink = sinkHolder.Sink;
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        var clock = new SceneRuntimeClock(DateTimeOffset.UtcNow.Ticks);
+        var metadataRegistry = new RuntimeMetadataRegistry();
+        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now, metadataRegistry);
+        long nextBatchOrdinal = 0;
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        using var inboundProcessor = new PacketStreamProcessor(sink);
+        var inboundProcessors = new Dictionary<TcpConnection, ReplayConnectionProcessor>();
         var totalLines = 0;
         var replayedLines = 0;
         var skippedLines = 0;
@@ -105,7 +109,20 @@ public sealed class PacketLogReplayService
                 continue;
             }
 
-            var parsed = inboundProcessor.AppendAndProcess(
+            if (!inboundProcessors.TryGetValue(entry.Connection, out var inboundProcessor))
+            {
+                var connectionSink = new JournalingRuntimeObservationSink(
+                    journal,
+                    clock,
+                    () => sceneId,
+                    () => Interlocked.Increment(ref nextBatchOrdinal));
+                inboundProcessor = new ReplayConnectionProcessor(
+                    connectionSink,
+                    new PacketStreamProcessor(connectionSink));
+                inboundProcessors[entry.Connection] = inboundProcessor;
+            }
+
+            var parsed = inboundProcessor.Processor.AppendAndProcess(
                 entry.Payload,
                 entry.Connection,
                 entry.Timestamp.ToUnixTimeMilliseconds());
@@ -115,7 +132,7 @@ public sealed class PacketLogReplayService
                 var connection = entry.Connection;
                 if (hasLastParsedConnection && !lastParsedConnection.IsSameConnection(in connection, out _))
                 {
-                    sink.MarkSceneTransportBoundary();
+                    inboundProcessor.Sink.MarkSceneTransportBoundary();
                 }
 
                 lastParsedConnection = connection;
@@ -130,15 +147,18 @@ public sealed class PacketLogReplayService
             }
         }
 
-        sink.CompleteBatch(long.MaxValue);
+        journal.CompleteBatch(long.MaxValue);
+        foreach (var processor in inboundProcessors.Values)
+            processor.Processor.Dispose();
+
         var ingestCounter = CaptureBaselineCounter(ingestStart);
 
         var snapshotStart = CaptureBaselineStart();
-        var snapshot = sinkHolder.Owner.CreateSnapshot();
+        var snapshot = owner.CreateSnapshot();
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = sinkHolder.Owner.ReadLocked((entities, _, metadataRegistry, combat) => BuildCombatantSummaries(combat, entities, metadataRegistry, snapshot));
+        var summaries = owner.ReadLocked((entities, _, metadataRegistry, combat) => BuildCombatantSummaries(combat, entities, metadataRegistry, snapshot));
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
@@ -147,8 +167,8 @@ public sealed class PacketLogReplayService
             replayedLines,
             skippedLines,
             snapshot,
-            sinkHolder.Journal,
-            sinkHolder.Owner,
+            journal,
+            owner,
             summaries,
             replayedEventCounts,
             skippedEventCounts)
@@ -641,6 +661,10 @@ public sealed class PacketLogReplayService
         string Direction,
         TcpConnection Connection,
         byte[] Payload);
+
+    private readonly record struct ReplayConnectionProcessor(
+        IRuntimeObservationSink Sink,
+        PacketStreamProcessor Processor);
 
     private enum ReplayLogKind
     {

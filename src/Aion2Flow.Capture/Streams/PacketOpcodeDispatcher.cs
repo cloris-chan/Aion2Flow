@@ -23,6 +23,7 @@ internal static class PacketOpcodeDispatcher
             (0x05, 0x38) => PacketCombatHandler.ParsePeriodicValuePacket(packet, ref context),
             (0x06, 0x38) => PacketCombatHandler.ParseCompactControl0638Packet(packet, ref context),
             (0x21, 0x36) => PacketStateHandler.ParseState2136Packet(packet, ref context),
+            (0x23, 0x36) => PacketStateHandler.ParsePendingMapArrival2336Packet(packet, ref context),
             (0x2e, 0x92) => PacketStateHandler.ParseMap2E92Packet(packet, ref context),
             (0x01, 0x40) => PacketStateHandler.ParseState0140Packet(packet, ref context),
             (0x02, 0x40) => PacketStateHandler.ParseState0240Packet(packet, ref context),

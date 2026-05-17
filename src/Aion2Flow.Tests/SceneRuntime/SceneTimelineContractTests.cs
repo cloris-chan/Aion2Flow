@@ -408,20 +408,6 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void JournalingSink_RecordsMarkSceneArrival()
-    {
-        var journal = new ObservedEventJournal();
-        var clock = new SceneRuntimeClock(0);
-        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-
-        sink.MarkSceneArrival();
-
-        Assert.Equal(1, journal.Count);
-        Assert.Equal(ObservedEventDomain.Scene, journal.Read(0).Domain);
-        Assert.Equal("scene-arrival", journal.Read(0).Scene!.Value.DiagnosticKey);
-    }
-
-    [Fact]
     public void JournalingSink_RecordsAppendSummonAndState()
     {
         var journal = new ObservedEventJournal();
@@ -489,9 +475,6 @@ public class SceneTimelineContractTests
         Assert.True(svc.StageDestinationMap(910035));
         Assert.Equal(910035u, svc.CurrentMapId);
         Assert.Equal(1, svc.SceneTransitionRevision);
-
-        var kind = svc.MarkSceneArrival();
-        Assert.Equal(SceneTransitionKind.None, kind);
         Assert.Equal(910035u, svc.CurrentMapId);
     }
 
@@ -508,6 +491,21 @@ public class SceneTimelineContractTests
 
         Assert.True(svc.ConfirmDestinationMap(500015, allowSameMapReload: true));
         Assert.Equal(500015u, svc.CurrentMapId);
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+    }
+
+    [Fact]
+    public void Boundary_PendingDestinationMap_CommitsOnArrivalSignal()
+    {
+        var svc = new SceneBoundaryService();
+        svc.StageDestinationMap(1010);
+        var before = svc.SceneTransitionRevision;
+
+        Assert.True(svc.StagePendingDestinationMap(500015, allowSameMapReload: true));
+        Assert.True(svc.ConfirmPendingDestinationMapArrival());
+
+        Assert.Equal(500015u, svc.CurrentMapId);
+        Assert.Equal(0u, svc.CurrentMapInstanceId);
         Assert.Equal(before + 1, svc.SceneTransitionRevision);
     }
 
@@ -532,10 +530,9 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(100);
-        svc.MarkSceneArrival();
+        var before = svc.SceneTransitionRevision;
         svc.StageDestinationMap(100);
-        var kind = svc.MarkSceneArrival();
-        Assert.Equal(SceneTransitionKind.None, kind);
+        Assert.Equal(before, svc.SceneTransitionRevision);
     }
 
     [Fact]
@@ -543,7 +540,6 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(200003);
-        svc.MarkSceneArrival();
         svc.StageDestinationMapInstance(113515);
         Assert.Equal(113515u, svc.CurrentMapInstanceId);
     }
@@ -553,10 +549,8 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(200003);
-        svc.MarkSceneArrival();
         svc.StageDestinationMapInstance(113515);
         svc.StageDestinationMap(1010);
-        svc.MarkSceneArrival();
         Assert.Equal(1010u, svc.CurrentMapId);
         Assert.Equal(0u, svc.CurrentMapInstanceId);
     }
@@ -597,11 +591,9 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(1010);
-        svc.MarkSceneArrival();
         Assert.Equal(SceneTransitionKind.None, svc.MarkSceneTransportBoundary());
 
         svc.StageDestinationMap(500015, allowSameMapReload: true);
-        svc.MarkSceneArrival();
         svc.StageDestinationMapInstance(622949);
         Assert.Equal(500015u, svc.CurrentMapId);
         Assert.Equal(622949u, svc.CurrentMapInstanceId);
@@ -620,11 +612,9 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(1010);
-        svc.MarkSceneArrival();
         Assert.Equal(SceneTransitionKind.None, svc.MarkSceneTransportBoundary());
 
         svc.StageDestinationMap(600011, allowSameMapReload: true);
-        svc.MarkSceneArrival();
         svc.StageDestinationMapInstance(679398);
         Assert.Equal(SceneTransitionKind.None, svc.MarkSceneTransportBoundary());
 
@@ -643,11 +633,9 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(1010);
-        svc.MarkSceneArrival();
         Assert.Equal(SceneTransitionKind.None, svc.MarkSceneTransportBoundary());
 
         svc.StageDestinationMap(600011, allowSameMapReload: true);
-        svc.MarkSceneArrival();
         svc.StageDestinationMapInstance(679398);
         Assert.Equal(SceneTransitionKind.None, svc.MarkSceneTransportBoundary());
 
@@ -666,11 +654,9 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(1010);
-        svc.MarkSceneArrival();
         Assert.Equal(SceneTransitionKind.None, svc.MarkSceneTransportBoundary());
 
         svc.StageDestinationMap(500020, allowSameMapReload: true);
-        svc.MarkSceneArrival();
         Assert.Equal(500020u, svc.CurrentMapId);
         Assert.Equal(0u, svc.CurrentMapInstanceId);
 
@@ -689,7 +675,6 @@ public class SceneTimelineContractTests
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(200003);
         svc.StageDestinationMapInstance(515552);
-        svc.MarkSceneArrival();
         Assert.Equal(200003u, svc.CurrentMapId);
         Assert.Equal(515552u, svc.CurrentMapInstanceId);
     }
@@ -699,10 +684,8 @@ public class SceneTimelineContractTests
     {
         var svc = new SceneBoundaryService();
         svc.StageDestinationMap(910035);
-        svc.MarkSceneArrival();
         svc.StageDestinationMapInstance(516446);
         svc.StageDestinationMap(910035);
-        svc.MarkSceneArrival();
         Assert.Equal(910035u, svc.CurrentMapId);
         Assert.Equal(516446u, svc.CurrentMapInstanceId);
     }

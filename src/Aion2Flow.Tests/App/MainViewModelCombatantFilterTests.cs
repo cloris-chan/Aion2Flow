@@ -654,7 +654,6 @@ public sealed class MainViewModelCombatantFilterTests
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
         sink.StageDestinationMap(mapId);
         sink.StageDestinationMapInstance(instanceId);
-        sink.MarkSceneArrival();
     }
 
     private static SkillCollection BuildSkillMap()

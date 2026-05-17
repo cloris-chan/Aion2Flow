@@ -103,6 +103,25 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
+    public void Scene_2336_Arrival_Frame_Commits_Pending_Map()
+    {
+        var scene = new SceneLiveReadModel();
+        var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
+
+        Assert.True(processor.AppendAndProcess(HexHelper.FromFixture("state/2136-boss-scene-1010.hex"), TestConnection));
+        scene.Owner.Refresh();
+        Assert.Equal(0u, scene.Owner.Boundary.CurrentMapId);
+
+        var parsed = processor.AppendAndProcess(
+            HexHelper.Parse("1E233600000000006014B0475FDB45480044DF4605000000BF32060036"),
+            TestConnection);
+        scene.Owner.Refresh();
+
+        Assert.True(parsed);
+        Assert.Equal(1010u, scene.Owner.Boundary.CurrentMapId);
+    }
+
+    [Fact]
     public void Map_Instance_Frame_Stages_Instance_And_Is_Cleared_On_Confirmed_Map_Change()
     {
         var scene = new SceneLiveReadModel();
@@ -110,7 +129,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
 
         arrivalSink.StageDestinationMap(200003);
-        arrivalSink.MarkSceneArrival();
         var parsed = processor.AppendAndProcess(HexHelper.FromFixture("state/2e92-bosschallenge-map-event.hex"), TestConnection);
         scene.Owner.Refresh();
 
@@ -118,7 +136,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Equal((uint)200003, scene.Owner.Boundary.CurrentMapId);
         Assert.Equal((uint)113515, scene.Owner.Boundary.CurrentMapInstanceId);
 
-        arrivalSink.MarkSceneArrival();
         scene.Owner.Refresh();
         Assert.Equal((uint)113515, scene.Owner.Boundary.CurrentMapInstanceId);
 
@@ -136,7 +153,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Equal((uint)1010, scene.Owner.Boundary.CurrentMapId);
         Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapInstanceId);
 
-        arrivalSink.MarkSceneArrival();
         scene.Owner.Refresh();
         Assert.Equal((uint)1010, scene.Owner.Boundary.CurrentMapId);
         Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapInstanceId);
@@ -149,7 +165,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         var sink = scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal));
 
         sink.StageDestinationMap(910035);
-        sink.MarkSceneArrival();
         scene.Owner.Refresh();
         Assert.Equal((uint)910035, scene.Owner.Boundary.CurrentMapId);
         Assert.Equal((uint)0, scene.Owner.Boundary.CurrentMapInstanceId);
@@ -161,7 +176,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Equal((uint)516446, scene.Owner.Boundary.CurrentMapInstanceId);
 
         sink.StageDestinationMap(910035);
-        sink.MarkSceneArrival();
         scene.Owner.Refresh();
         Assert.Equal((uint)910035, scene.Owner.Boundary.CurrentMapId);
         Assert.Equal((uint)516446, scene.Owner.Boundary.CurrentMapInstanceId);
@@ -270,7 +284,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.True(await running.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
         await acquired.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         await waiter.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
-        Assert.True(sink.SceneArrivalCalled);
     }
 
     [Fact]
@@ -482,7 +495,6 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public TaskCompletionSource NicknameEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource AllowNickname { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int CurrentTarget { get; set; }
-        public bool SceneArrivalCalled { get; private set; }
 
         public int ResolveLifecycleId(int rawInstanceId) => rawInstanceId;
         public int RebindInstanceLifecycle(int rawInstanceId) => rawInstanceId;
@@ -495,9 +507,9 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public void StageDestinationMap(uint mapId, bool allowSameMapReload) { }
         public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload) { }
         public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload) { }
+        public void ConfirmPendingDestinationMapArrival() { }
         public void StageDestinationMapInstance(uint instanceId) { }
         public void ConfirmDestinationMapInstance(uint instanceId) { }
-        public void MarkSceneArrival() => SceneArrivalCalled = true;
         public void MarkSceneTransportBoundary() { }
         public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0) { }
         public void CompleteBatch(long batchOrdinal) { }

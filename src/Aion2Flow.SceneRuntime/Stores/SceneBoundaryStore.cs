@@ -39,6 +39,12 @@ public sealed class SceneBoundaryStore
             _revision++;
     }
 
+    public void ConfirmPendingDestinationMapArrival()
+    {
+        if (_sceneBoundary.ConfirmPendingDestinationMapArrival())
+            _revision++;
+    }
+
     public void StageDestinationMapInstance(uint instanceId)
     {
         if (_sceneBoundary.StageDestinationMapInstance(instanceId))
@@ -49,14 +55,6 @@ public sealed class SceneBoundaryStore
     {
         if (_sceneBoundary.ConfirmDestinationMapInstance(instanceId))
             _revision++;
-    }
-
-    public SceneTransitionKind MarkSceneArrival()
-    {
-        var kind = _sceneBoundary.MarkSceneArrival();
-        if (kind != SceneTransitionKind.None)
-            _revision++;
-        return kind;
     }
 
     public SceneTransitionKind MarkSceneTransportBoundary()

@@ -70,6 +70,28 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
     public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload)
         => AppendSceneMapObservation(mapId, allowSameMapReload, "confirm-destination-map");
 
+    public void ConfirmPendingDestinationMapArrival()
+    {
+        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneSessionId(),
+            Stamp = stamp,
+            Domain = ObservedEventDomain.Scene,
+            SourceEntityId = 0,
+            TargetEntityId = 0,
+            Raw = default,
+            Scene = new SceneObservation
+            {
+                MapId = 0,
+                MapInstanceId = 0,
+                Value0 = 0,
+                Value1 = 0,
+                DiagnosticKey = "confirm-pending-destination-map-arrival"
+            }
+        });
+    }
+
     private void AppendSceneMapObservation(uint mapId, bool allowSameMapReload, string diagnosticKey)
     {
         var stamp = clock.CreateStampFromOffset(0, 0, 0);
@@ -132,28 +154,6 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Value0 = 0,
                 Value1 = 0,
                 DiagnosticKey = "confirm-destination-instance"
-            }
-        });
-    }
-
-    public void MarkSceneArrival()
-    {
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Scene,
-            SourceEntityId = 0,
-            TargetEntityId = 0,
-            Raw = default,
-            Scene = new SceneObservation
-            {
-                MapId = 0,
-                MapInstanceId = 0,
-                Value0 = 0,
-                Value1 = 0,
-                DiagnosticKey = "scene-arrival"
             }
         });
     }
