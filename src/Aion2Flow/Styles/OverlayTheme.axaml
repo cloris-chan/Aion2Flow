@@ -662,6 +662,18 @@
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
+    <Style Selector="controls|CombatantDisplay.DetailHeaderName controls|PcDisplay TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <Style Selector="controls|CombatantDisplay.DetailHeaderName controls|NpcDisplay TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
     <Style Selector="StackPanel.DetailDirectionTabs">
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="HorizontalAlignment" Value="Right" />

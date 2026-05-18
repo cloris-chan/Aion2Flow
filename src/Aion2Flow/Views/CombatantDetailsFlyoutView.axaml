@@ -21,10 +21,10 @@
             <Grid Grid.Row="0"
                   ColumnDefinitions="*,Auto"
                   ColumnSpacing="16">
-                <controls:PcDisplay Grid.Column="0"
-                                    Classes="DetailHeaderName"
-                                    EntityId="{Binding SelectedCombatantId}"
-                                    VerticalAlignment="Center" />
+                <controls:CombatantDisplay Grid.Column="0"
+                                            Classes="DetailHeaderName"
+                                            EntityId="{Binding SelectedCombatantId}"
+                                            VerticalAlignment="Center" />
 
                 <StackPanel Grid.Column="1"
                             Classes="DetailDirectionTabs"

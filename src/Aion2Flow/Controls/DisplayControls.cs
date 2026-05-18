@@ -475,6 +475,8 @@ public sealed class CombatantDisplay : UserControl
         if (entityId <= 0)
         {
             Content = null;
+            _pcDisplay = null;
+            _npcDisplay = null;
             _selectedKind = SelectedCombatantDisplayKind.Unset;
             return;
         }
