@@ -27,6 +27,9 @@ public sealed class DisplayContextProvider
 
 public abstract class IconTextDisplay : UserControl
 {
+    private static readonly SolidColorBrush LightNameForeground = new(Color.Parse("#72e1ff"));
+    private static readonly SolidColorBrush DarkNameForeground = new(Color.Parse("#d275ff"));
+
     public static readonly DirectProperty<IconTextDisplay, int> EntityIdProperty =
         AvaloniaProperty.RegisterDirect<IconTextDisplay, int>(nameof(EntityId), x => x.EntityId, (x, value) => x.EntityId = value);
 
@@ -179,6 +182,14 @@ public abstract class IconTextDisplay : UserControl
 
         _currentTextForeground = foreground;
     }
+
+    protected static IBrush? ResolveFactionNameForeground(Faction faction)
+        => faction switch
+        {
+            Faction.Light => LightNameForeground,
+            Faction.Dark => DarkNameForeground,
+            _ => null
+        };
 
     protected abstract string ResolveTextCore(SceneDisplayContext? context, int entityId);
 
@@ -374,43 +385,186 @@ public abstract class IconTextDisplay : UserControl
     protected readonly record struct DisplayIcon(IImage Source, bool UsesSpriteSheet);
 }
 
-public sealed class CombatantDisplay : IconTextDisplay
+public sealed class CombatantDisplay : UserControl
 {
-    protected override string ResolveTextCore(SceneDisplayContext? context, int entityId)
-        => context?.ResolveEntityName(entityId) ?? FormatEntityId(entityId);
+    public static readonly DirectProperty<CombatantDisplay, int> EntityIdProperty =
+        AvaloniaProperty.RegisterDirect<CombatantDisplay, int>(nameof(EntityId), x => x.EntityId, (x, value) => x.EntityId = value);
 
-    protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId)
+    public static readonly DirectProperty<CombatantDisplay, bool> ShowIconProperty =
+        AvaloniaProperty.RegisterDirect<CombatantDisplay, bool>(nameof(ShowIcon), x => x.ShowIcon, (x, value) => x.ShowIcon = value);
+
+    public static readonly StyledProperty<bool> IsIconAlternateProperty =
+        AvaloniaProperty.Register<CombatantDisplay, bool>(nameof(IsIconAlternate));
+
+    public static readonly StyledProperty<double> IconOverlayOpacityProperty =
+        AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconOverlayOpacity));
+
+    public static readonly StyledProperty<double> IconSizeProperty =
+        AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconSize), 30);
+
+    public static readonly StyledProperty<double> IconSpacingProperty =
+        AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconSpacing), 4);
+
+    private PcDisplay? _pcDisplay;
+    private NpcDisplay? _npcDisplay;
+    private SelectedCombatantDisplayKind _selectedKind = SelectedCombatantDisplayKind.Unset;
+
+    public int EntityId
     {
-        if (context is null)
+        get;
+        set => SetAndRaise(EntityIdProperty, ref field, value);
+    }
+
+    public bool ShowIcon
+    {
+        get;
+        set => SetAndRaise(ShowIconProperty, ref field, value);
+    } = true;
+
+    public bool IsIconAlternate
+    {
+        get => GetValue(IsIconAlternateProperty);
+        set => SetValue(IsIconAlternateProperty, value);
+    }
+
+    public double IconOverlayOpacity
+    {
+        get => GetValue(IconOverlayOpacityProperty);
+        set => SetValue(IconOverlayOpacityProperty, value);
+    }
+
+    public double IconSize
+    {
+        get => GetValue(IconSizeProperty);
+        set => SetValue(IconSizeProperty, value);
+    }
+
+    public double IconSpacing
+    {
+        get => GetValue(IconSpacingProperty);
+        set => SetValue(IconSpacingProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == EntityIdProperty ||
+            change.Property == DisplayContextProvider.DisplayContextProperty)
         {
-            return null;
+            UpdateSelectedDisplay();
+        }
+        else if (change.Property == ShowIconProperty ||
+                 change.Property == IsIconAlternateProperty ||
+                 change.Property == IconOverlayOpacityProperty ||
+                 change.Property == IconSizeProperty ||
+                 change.Property == IconSpacingProperty)
+        {
+            SyncChildDisplayProperties();
+        }
+    }
+
+    protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToLogicalTree(e);
+        UpdateSelectedDisplay();
+    }
+
+    private void UpdateSelectedDisplay()
+    {
+        var entityId = EntityId;
+        if (entityId <= 0)
+        {
+            Content = null;
+            _selectedKind = SelectedCombatantDisplayKind.Unset;
+            return;
         }
 
-        var classIcon = DisplayIconCache.ResolveClassIcon(context.ResolvePcClass(entityId));
-        if (classIcon is not null)
+        var context = DisplayContextProvider.GetDisplayContext(this);
+        var nextKind = ResolveDisplayKind(context, entityId);
+        var nextDisplay = GetOrCreateDisplay(nextKind);
+
+        if (_selectedKind != nextKind)
         {
-            return new DisplayIcon(classIcon, UsesSpriteSheet: true);
+            Content = nextDisplay;
+            _selectedKind = nextKind;
         }
 
-        var npcIcon = DisplayIconCache.ResolveNpcMarkerIcon(context.ResolveNpcCatalogEntry(entityId));
-        return npcIcon is null ? null : new DisplayIcon(npcIcon, UsesSpriteSheet: false);
+        nextDisplay.EntityId = entityId;
+    }
+
+    private void SyncChildDisplayProperties()
+    {
+        if (_pcDisplay is not null)
+        {
+            SyncChildDisplayProperties(_pcDisplay);
+        }
+
+        if (_npcDisplay is not null)
+        {
+            SyncChildDisplayProperties(_npcDisplay);
+        }
+    }
+
+    private IconTextDisplay GetOrCreateDisplay(SelectedCombatantDisplayKind kind)
+    {
+        if (kind == SelectedCombatantDisplayKind.Npc)
+        {
+            return _npcDisplay ??= CreateChildDisplay<NpcDisplay>();
+        }
+
+        return _pcDisplay ??= CreateChildDisplay<PcDisplay>();
+    }
+
+    private TDisplay CreateChildDisplay<TDisplay>()
+        where TDisplay : IconTextDisplay, new()
+    {
+        var display = new TDisplay();
+        SyncChildDisplayProperties(display);
+        display.EntityId = EntityId;
+        return display;
+    }
+
+    private void SyncChildDisplayProperties(IconTextDisplay display)
+    {
+        display.ShowIcon = ShowIcon;
+        display.IsIconAlternate = IsIconAlternate;
+        display.IconOverlayOpacity = IconOverlayOpacity;
+        display.IconSize = IconSize;
+        display.IconSpacing = IconSpacing;
+    }
+
+    private static SelectedCombatantDisplayKind ResolveDisplayKind(SceneDisplayContext? context, int entityId)
+    {
+        if (context is not null)
+        {
+            if (context.HasPcMetadata(entityId))
+            {
+                return SelectedCombatantDisplayKind.Pc;
+            }
+
+            if (context.HasNpcCode(entityId))
+            {
+                return SelectedCombatantDisplayKind.Npc;
+            }
+        }
+
+        return SelectedCombatantDisplayKind.Pc;
+    }
+
+    private enum SelectedCombatantDisplayKind
+    {
+        Unset,
+        Pc,
+        Npc
     }
 }
 
 public sealed class PcDisplay : IconTextDisplay
 {
-    private static readonly SolidColorBrush LightNameForeground = new(Color.Parse("#72e1ff"));
-    private static readonly SolidColorBrush DarkNameForeground = new(Color.Parse("#d275ff"));
-
     protected override void UpdateStateCore(SceneDisplayContext? context, int entityId)
     {
         var faction = context?.ResolveFaction(entityId) ?? Faction.Unknown;
-        SetTextForeground(faction switch
-        {
-            Faction.Light => LightNameForeground,
-            Faction.Dark => DarkNameForeground,
-            _ => null
-        });
+        SetTextForeground(ResolveFactionNameForeground(faction));
     }
 
     protected override string ResolveTextCore(SceneDisplayContext? context, int entityId)

@@ -46,6 +46,9 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
             : entityId.ToString(CultureInfo.InvariantCulture);
     }
 
+    public bool HasPcMetadata(int entityId)
+        => entityId > 0 && TryGetPcMetadata(entityId, out _);
+
     public CharacterClass? ResolvePcClass(int entityId)
         => Snapshot.Combatants.TryGetValue(entityId, out var combatant)
             ? combatant.CharacterClass
@@ -67,6 +70,9 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
             ? Resources.ResolveNpcName(npcCode)
             : instanceId.ToString(CultureInfo.InvariantCulture);
     }
+
+    public bool HasNpcCode(int instanceId)
+        => instanceId > 0 && TryGetNpcCode(instanceId, out _);
 
     public string ResolveNpcCodeName(int npcCode)
         => npcCode > 0 ? Resources.ResolveNpcName(npcCode) : string.Empty;
