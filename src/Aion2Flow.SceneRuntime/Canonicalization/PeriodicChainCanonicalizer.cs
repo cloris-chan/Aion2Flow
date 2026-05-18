@@ -9,6 +9,14 @@ public sealed class PeriodicChainCanonicalizer
     private readonly record struct State(CombatValueKind GrantKind, long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatObservation Grant, bool GrantEmitted);
     private readonly Dictionary<Key, State> _chains = [];
 
+    public PeriodicChainCanonicalizer DeepClone()
+    {
+        var clone = new PeriodicChainCanonicalizer();
+        foreach (var pair in _chains)
+            clone._chains.Add(pair.Key, pair.Value);
+        return clone;
+    }
+
     public IReadOnlyList<CombatCanonicalizationResult> Normalize(int sourceId, int targetId, in CombatObservation observation)
     {
         var normalized = NormalizeBaseObservation(sourceId, targetId, in observation);
@@ -36,7 +44,7 @@ public sealed class PeriodicChainCanonicalizer
         }
 
         if (state.GrantKind == CombatValueKind.Shield)
-            return ApplyShieldContinuation(sourceId, targetId, key, state, mode, in normalized);
+            return ApplyShieldContinuation(targetId, key, state, mode, in normalized);
 
         if (state.GrantKind == CombatValueKind.PeriodicHealing && mode == 11)
             return ApplyPeriodicHealingContinuation(sourceId, targetId, key, state, in normalized);
@@ -84,7 +92,7 @@ public sealed class PeriodicChainCanonicalizer
         return new State(CombatValueKind.PeriodicHealing, state.Remaining, state.CasterId, state.GrantSourceId, state.GrantTargetId, healingGrant, state.GrantEmitted);
     }
 
-    private List<CombatCanonicalizationResult> ApplyShieldContinuation(int sourceId, int targetId, Key key, State state, int mode, in CombatObservation observation)
+    private List<CombatCanonicalizationResult> ApplyShieldContinuation(int targetId, Key key, State state, int mode, in CombatObservation observation)
     {
         var newRemaining = Math.Max(0, observation.Damage);
         var absorbed = Math.Max(0, state.Remaining - newRemaining);
@@ -115,14 +123,14 @@ public sealed class PeriodicChainCanonicalizer
         if (rawDamage >= state.Remaining)
         {
             _chains.Remove(key);
-            return AppendGrantIfNeeded(sourceId, targetId, state, [new CombatCanonicalizationResult(sourceId, targetId, observation)]);
+            return AppendGrantIfNeeded(state, [new CombatCanonicalizationResult(sourceId, targetId, observation)]);
         }
 
         var healingAmount = state.Remaining - rawDamage;
         if (healingAmount <= 0)
         {
             _chains.Remove(key);
-            return AppendGrantIfNeeded(sourceId, targetId, state, [new CombatCanonicalizationResult(sourceId, targetId, observation)]);
+            return AppendGrantIfNeeded(state, [new CombatCanonicalizationResult(sourceId, targetId, observation)]);
         }
 
         if (rawDamage == 0)
@@ -136,10 +144,10 @@ public sealed class PeriodicChainCanonicalizer
             EventKind = CombatEventKind.Healing,
             ValueKind = CombatValueKind.PeriodicHealing
         });
-        return AppendGrantIfNeeded(sourceId, targetId, state, [tick]);
+        return AppendGrantIfNeeded(state, [tick]);
     }
 
-    private static IReadOnlyList<CombatCanonicalizationResult> AppendGrantIfNeeded(int sourceId, int targetId, State state, IReadOnlyList<CombatCanonicalizationResult> tail)
+    private static IReadOnlyList<CombatCanonicalizationResult> AppendGrantIfNeeded(State state, IReadOnlyList<CombatCanonicalizationResult> tail)
     {
         if (state.GrantEmitted)
             return tail;

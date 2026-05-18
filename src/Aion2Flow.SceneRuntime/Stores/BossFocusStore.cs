@@ -176,6 +176,16 @@ public sealed class BossFocusStore(EntityStore entities)
     private bool IsObservedDead(int instanceId) =>
         entities.TryGet(instanceId, out var entity) && entity.CurrentHp == 0;
 
+    public BossFocusStore DeepClone(EntityStore clonedEntities)
+    {
+        var clone = new BossFocusStore(clonedEntities);
+        foreach (var pair in _observed)
+            clone._observed.Add(pair.Key, pair.Value);
+        clone._focused.UnionWith(_focused);
+        clone._revision = _revision;
+        return clone;
+    }
+
     public readonly record struct Snapshot
     {
         public int InstanceId { get; init; }

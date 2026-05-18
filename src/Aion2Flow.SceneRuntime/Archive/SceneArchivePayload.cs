@@ -4,6 +4,7 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Archive;
@@ -12,8 +13,10 @@ public sealed class SceneArchivePayload
 {
     private ArchivePayloadIndex? _detailIndex;
 
-    public SceneCombatSnapshot Snapshot { get; init; } = new();
     public DateTimeOffset SceneStarted { get; init; }
+    public long PlaybackEndTimeMilliseconds { get; init; }
+    public IReadOnlyList<ObservedEventEnvelope> Timeline { get; init; } = [];
+    public IReadOnlyList<SceneRuntimeCheckpoint> Checkpoints { get; init; } = [];
     public IReadOnlyList<SceneArchiveCombatEvent> Events { get; init; } = [];
     public SceneIdentityScope IdentityScope { get; init; } = SceneIdentityScope.Empty;
     public IReadOnlyList<DirectedPairSnapshot> Pairs { get; init; } = [];
@@ -39,7 +42,9 @@ public sealed class SceneArchivePayload
         SceneBoundaryStore boundary,
         RuntimeMetadataRegistry metadataRegistry,
         BossFocusStore bossFocus,
-        SceneCombatSnapshotAdapter adapter)
+        SceneCombatSnapshotAdapter adapter,
+        IReadOnlyList<ObservedEventEnvelope> timeline,
+        IReadOnlyList<SceneRuntimeCheckpoint> checkpoints)
     {
         var archivedSnapshot = snapshot.DeepClone();
         var eventsByKey = new Dictionary<EventKey, SceneArchiveCombatEvent>();
@@ -70,8 +75,10 @@ public sealed class SceneArchivePayload
 
         return new SceneArchivePayload
         {
-            Snapshot = archivedSnapshot,
             SceneStarted = sceneStarted,
+            PlaybackEndTimeMilliseconds = archivedSnapshot.EncounterEndTime,
+            Timeline = CloneTimeline(timeline),
+            Checkpoints = CloneCheckpoints(checkpoints),
             Events = eventsSnapshot,
             IdentityScope = identityScope,
             Pairs = pairs,
@@ -84,6 +91,8 @@ public sealed class SceneArchivePayload
 
     public SceneArchivePayload DeepClone()
     {
+        var timeline = CloneTimeline(Timeline);
+        var checkpoints = CloneCheckpoints(Checkpoints);
         var events = new SceneArchiveCombatEvent[Events.Count];
         for (var i = 0; i < events.Length; i++)
             events[i] = Events[i];
@@ -106,8 +115,10 @@ public sealed class SceneArchivePayload
 
         return new SceneArchivePayload
         {
-            Snapshot = Snapshot.DeepClone(),
             SceneStarted = SceneStarted,
+            PlaybackEndTimeMilliseconds = PlaybackEndTimeMilliseconds,
+            Timeline = timeline,
+            Checkpoints = checkpoints,
             Events = events,
             IdentityScope = IdentityScope.DeepClone(),
             Pairs = pairs,
@@ -131,7 +142,7 @@ public sealed class SceneArchivePayload
         var detailIndex = DetailIndex;
         var eventIndices = detailIndex.GetEventIndices(combatantId);
         var combatant = detailIndex.GetCombatant(combatantId);
-        if (eventIndices.Length == 0 && combatant is null && !Snapshot.Combatants.ContainsKey(combatantId))
+        if (eventIndices.Length == 0 && combatant is null)
         {
             return new CombatDetailDelta
             {
@@ -157,6 +168,44 @@ public sealed class SceneArchivePayload
             Events = events,
             Combatant = combatant
         };
+    }
+
+    public SceneCombatSnapshot CreateSnapshot()
+        => Checkpoints.Count == 0 ? SceneCombatSnapshot.Empty : SceneRuntimePlayback.FromArchive(this).CreateSnapshotAt(ResolvePlaybackEndTime());
+
+    public SceneReadModelFrame CreateFrameAt(long observedAtMilliseconds, int detailCombatantId = 0, bool forceDetailRefresh = false)
+        => Checkpoints.Count == 0 ? new SceneReadModelFrame() : SceneRuntimePlayback.FromArchive(this).CreateFrameAt(observedAtMilliseconds, detailCombatantId, forceDetailRefresh);
+
+    private long ResolvePlaybackEndTime()
+    {
+        if (PlaybackEndTimeMilliseconds > 0)
+            return PlaybackEndTimeMilliseconds;
+
+        var timeline = Timeline;
+        for (var i = timeline.Count - 1; i >= 0; i--)
+        {
+            var timestamp = timeline[i].Raw.TimestampMilliseconds;
+            if (timestamp > 0)
+                return timestamp;
+        }
+
+        return 0;
+    }
+
+    private static ObservedEventEnvelope[] CloneTimeline(IReadOnlyList<ObservedEventEnvelope> timeline)
+    {
+        var result = new ObservedEventEnvelope[timeline.Count];
+        for (var i = 0; i < result.Length; i++)
+            result[i] = timeline[i];
+        return result;
+    }
+
+    private static SceneRuntimeCheckpoint[] CloneCheckpoints(IReadOnlyList<SceneRuntimeCheckpoint> checkpoints)
+    {
+        var result = new SceneRuntimeCheckpoint[checkpoints.Count];
+        for (var i = 0; i < result.Length; i++)
+            result[i] = checkpoints[i].DeepClone();
+        return result;
     }
 
     private static void AddEntity(HashSet<int> entityIds, int entityId)

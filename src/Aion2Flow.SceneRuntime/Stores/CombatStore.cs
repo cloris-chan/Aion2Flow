@@ -242,6 +242,27 @@ public sealed class CombatStore : ISnapshotChangeFeed<CombatSnapshotChange>
         _revision = 0;
     }
 
+    public CombatStore DeepClone()
+    {
+        var clone = new CombatStore();
+        foreach (var pair in _pairs)
+            clone._pairs.Add(pair.Key, pair.Value.DeepClone());
+        foreach (var pair in _combatants)
+            clone._combatants.Add(pair.Key, pair.Value.DeepClone());
+        foreach (var pair in _outgoingBySource)
+            clone._outgoingBySource.Add(pair.Key, [.. pair.Value]);
+        foreach (var pair in _incomingByTarget)
+            clone._incomingByTarget.Add(pair.Key, [.. pair.Value]);
+        foreach (var pair in _eventIndicesByPair)
+            clone._eventIndicesByPair.Add(pair.Key, [.. pair.Value]);
+        clone._events.AddRange(_events);
+        clone._changeLog.AddRange(_changeLog);
+        foreach (var pair in _detailRevisionByCombatant)
+            clone._detailRevisionByCombatant.Add(pair.Key, pair.Value);
+        clone._revision = _revision;
+        return clone;
+    }
+
     public SnapshotChangeCursor CreateCursor(long afterRevision) =>
         new(afterRevision, 0);
 
@@ -336,6 +357,27 @@ public sealed class CombatPairRecord
     public long FirstObserved { get; set; }
     public long LastObserved { get; set; }
     public long Revision { get; set; }
+
+    public CombatPairRecord DeepClone() => new()
+    {
+        SourceId = SourceId,
+        TargetId = TargetId,
+        TotalDamage = TotalDamage,
+        TotalHealing = TotalHealing,
+        TotalShield = TotalShield,
+        TotalShieldAbsorbed = TotalShieldAbsorbed,
+        ShieldCount = ShieldCount,
+        ShieldAbsorbedCount = ShieldAbsorbedCount,
+        HitCount = HitCount,
+        AttemptCount = AttemptCount,
+        EvadeCount = EvadeCount,
+        InvincibleCount = InvincibleCount,
+        MultiHitCount = MultiHitCount,
+        LastSkillCode = LastSkillCode,
+        FirstObserved = FirstObserved,
+        LastObserved = LastObserved,
+        Revision = Revision
+    };
 }
 
 public readonly record struct CombatEventRecord
@@ -384,4 +426,34 @@ public sealed class CombatantRecord
     public long FirstObserved { get; set; }
     public long LastObserved { get; set; }
     public long Revision { get; set; }
+
+    public CombatantRecord DeepClone() => new()
+    {
+        CombatantId = CombatantId,
+        OutgoingDamage = OutgoingDamage,
+        OutgoingHits = OutgoingHits,
+        OutgoingAttempts = OutgoingAttempts,
+        OutgoingEvades = OutgoingEvades,
+        OutgoingInvincibles = OutgoingInvincibles,
+        OutgoingMultiHits = OutgoingMultiHits,
+        IncomingDamage = IncomingDamage,
+        IncomingHits = IncomingHits,
+        IncomingAttempts = IncomingAttempts,
+        IncomingEvades = IncomingEvades,
+        IncomingInvincibles = IncomingInvincibles,
+        IncomingMultiHits = IncomingMultiHits,
+        OutgoingHealing = OutgoingHealing,
+        IncomingHealing = IncomingHealing,
+        OutgoingShield = OutgoingShield,
+        IncomingShield = IncomingShield,
+        OutgoingShieldAbsorbed = OutgoingShieldAbsorbed,
+        IncomingShieldAbsorbed = IncomingShieldAbsorbed,
+        OutgoingShieldCount = OutgoingShieldCount,
+        IncomingShieldCount = IncomingShieldCount,
+        OutgoingShieldAbsorbedCount = OutgoingShieldAbsorbedCount,
+        IncomingShieldAbsorbedCount = IncomingShieldAbsorbedCount,
+        FirstObserved = FirstObserved,
+        LastObserved = LastObserved,
+        Revision = Revision
+    };
 }

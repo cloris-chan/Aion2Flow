@@ -75,7 +75,7 @@ public sealed class EntityStore
     {
         var entity = GetOrAdd(instanceId);
         var resolvedMaxHp = maxHp > 0 ? Math.Max(maxHp, hp) : Math.Max(entity.MaxHp ?? 0, hp);
-        var combatActive = hp == 0 ? false : entity.NpcCombatActive;
+        var combatActive = hp != 0 && entity.NpcCombatActive;
         if (entity.CurrentHp == hp && entity.MaxHp == resolvedMaxHp && entity.NpcCombatActive == combatActive)
             return;
 
@@ -158,6 +158,15 @@ public sealed class EntityStore
         _entities.Clear();
         _revision++;
     }
+
+    public EntityStore DeepClone()
+    {
+        var clone = new EntityStore();
+        foreach (var pair in _entities)
+            clone._entities.Add(pair.Key, pair.Value.DeepClone());
+        clone._revision = _revision;
+        return clone;
+    }
 }
 
 public sealed class EntityRecord
@@ -178,4 +187,24 @@ public sealed class EntityRecord
     public (byte State0, byte State1)? State4636 { get; set; }
     public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
     public long LastObservedOrdinal { get; set; }
+
+    public EntityRecord DeepClone() => new()
+    {
+        EntityId = EntityId,
+        NpcCode = NpcCode,
+        Kind = Kind,
+        Nickname = Nickname,
+        IsPlayer = IsPlayer,
+        OwnerEntityId = OwnerEntityId,
+        CurrentHp = CurrentHp,
+        MaxHp = MaxHp,
+        NpcCombatActive = NpcCombatActive,
+        Value2136 = Value2136,
+        Sequence2136 = Sequence2136,
+        Value0140 = Value0140,
+        Value0240 = Value0240,
+        State4636 = State4636,
+        Latest2C38 = Latest2C38,
+        LastObservedOrdinal = LastObservedOrdinal
+    };
 }

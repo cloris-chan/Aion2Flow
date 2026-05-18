@@ -11,6 +11,13 @@ public sealed class MultiHitAttributionService
     private readonly record struct Candidate(int SourceId, int TargetId, int SkillCode, long FrameOrdinal);
     private readonly List<Candidate> _candidates = [];
 
+    public MultiHitAttributionService DeepClone()
+    {
+        var clone = new MultiHitAttributionService();
+        clone._candidates.AddRange(_candidates);
+        return clone;
+    }
+
     public void ObserveCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation)
     {
         if (!IsDirectDamageCandidate(sourceId, targetId, in observation) || observation.HitCount == 0)

@@ -1551,10 +1551,11 @@ public class SceneReadModelOwnerTests
 
             if (snapshot.EncounterTime > 0 && snapshot.Combatants.Count > 0)
             {
-                var payload = scene.Owner.CreateArchivePayload(snapshot);
-                Assert.Equal(snapshot.EncounterId, payload.Snapshot.EncounterId);
-                Assert.Equal(snapshot.EncounterStartTime, payload.Snapshot.EncounterStartTime);
-                Assert.Equal(snapshot.EncounterEndTime, payload.Snapshot.EncounterEndTime);
+                var payload = scene.Owner.CreateArchivePayload();
+                var archivedSnapshot = payload.CreateSnapshot();
+                if (payload.PlaybackEndTimeMilliseconds > 0)
+                    Assert.Equal(payload.PlaybackEndTimeMilliseconds, archivedSnapshot.EncounterEndTime);
+                Assert.True(archivedSnapshot.EncounterEndTime >= archivedSnapshot.EncounterStartTime);
             }
 
             await Task.Yield();

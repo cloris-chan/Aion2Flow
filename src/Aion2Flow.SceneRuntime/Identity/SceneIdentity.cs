@@ -102,6 +102,19 @@ public sealed class RuntimeMetadataRegistry
         _mapCodesByInstanceId.Clear();
         _revision++;
     }
+
+    public RuntimeMetadataRegistry DeepClone()
+    {
+        var clone = new RuntimeMetadataRegistry();
+        foreach (var pair in _pcMetadataByEntityId)
+            clone._pcMetadataByEntityId.Add(pair.Key, pair.Value);
+        foreach (var pair in _npcCodesByInstanceId)
+            clone._npcCodesByInstanceId.Add(pair.Key, pair.Value);
+        foreach (var pair in _mapCodesByInstanceId)
+            clone._mapCodesByInstanceId.Add(pair.Key, pair.Value);
+        clone._revision = _revision;
+        return clone;
+    }
 }
 
 public readonly struct SceneIdentityScope

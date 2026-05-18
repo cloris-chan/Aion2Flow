@@ -12,6 +12,16 @@ public sealed class PeriodicLinkCanonicalizer
     private readonly HashSet<Signature> _resolved = [];
     private readonly Queue<Signature> _order = [];
 
+    public PeriodicLinkCanonicalizer DeepClone()
+    {
+        var clone = new PeriodicLinkCanonicalizer();
+        foreach (var signature in _resolved)
+            clone._resolved.Add(signature);
+        foreach (var signature in _order)
+            clone._order.Enqueue(signature);
+        return clone;
+    }
+
     public static bool IsLinkObservation(in CombatObservation observation) => observation.Type == 48 && observation.Damage == 0 && observation.HitCount == 0 && observation.AttemptCount == 0;
 
     public CombatCanonicalizationResult? Normalize(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation)

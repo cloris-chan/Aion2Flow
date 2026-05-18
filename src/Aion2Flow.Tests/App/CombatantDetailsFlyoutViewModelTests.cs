@@ -378,7 +378,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.Equal(payload.Snapshot.EncounterId, record!.EncounterId);
+        Assert.Equal(payload.CreateSnapshot().EncounterId, record!.EncounterId);
 
         scene.Reset();
         SelectArchivedSceneCombatant(viewModel, record, playerId);

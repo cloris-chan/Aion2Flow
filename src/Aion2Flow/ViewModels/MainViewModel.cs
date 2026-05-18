@@ -264,7 +264,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _suppressRefresh = true;
         try
         {
-            ArchiveEncounter(_latestLiveSnapshot, "manual-reset", isAutomatic: true);
+            ArchiveEncounter("manual-reset", isAutomatic: true);
             ResetLiveModels(RawPacketDump.RotateLogs);
 
             _latestLiveSnapshot = new SceneCombatSnapshot();
@@ -305,7 +305,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     [RelayCommand]
     private void ArchiveCurrentEncounter()
     {
-        var record = ArchiveEncounter(_latestLiveSnapshot, "manual", isAutomatic: false);
+        var record = ArchiveEncounter("manual", isAutomatic: false);
         if (record is null)
         {
             return;
@@ -580,14 +580,14 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private SceneDisplayContext CreateDisplayContext(SceneCombatSnapshot snapshot, SceneIdentityScope scope, RuntimeMetadataRegistry? metadataRegistry)
         => new(scope, metadataRegistry, snapshot, _gameResourceService, Localization["Scene_Unknown"]);
 
-    private ArchivedEncounterRecord? ArchiveEncounter(SceneCombatSnapshot snapshot, string trigger, bool isAutomatic)
-        => _encounterArchiveService.Archive(_captureService.Scene.Owner.CreateArchivePayload(snapshot), trigger, isAutomatic);
+    private ArchivedEncounterRecord? ArchiveEncounter(string trigger, bool isAutomatic)
+        => _encounterArchiveService.Archive(_captureService.Scene.Owner.CreateArchivePayload(), trigger, isAutomatic);
 
     private bool TryAutoResetEncounter(SceneCombatSnapshot previousLiveSnapshot, SceneCombatSnapshot latestLiveSnapshot)
     {
         if (TryResolveMapTransitionResetReason(previousLiveSnapshot, latestLiveSnapshot, out var mapTransitionReason))
         {
-            ArchiveEncounter(previousLiveSnapshot, mapTransitionReason, isAutomatic: true);
+            ArchiveEncounter(mapTransitionReason, isAutomatic: true);
             ResetLiveModels(RawPacketDump.RotateLogs);
             return true;
         }

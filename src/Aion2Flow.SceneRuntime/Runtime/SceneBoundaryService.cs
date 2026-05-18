@@ -76,8 +76,19 @@ public sealed class SceneBoundaryService
         return changed;
     }
 
-    public SceneTransitionKind MarkSceneTransportBoundary()
-        => SceneTransitionKind.None;
+    public SceneTransitionKind MarkSceneTransportBoundary() => SceneTransitionKind.None;
+
+    public SceneBoundaryService DeepClone()
+    {
+        return new SceneBoundaryService
+        {
+            _pendingMapId = _pendingMapId,
+            _pendingAllowSameMapReload = _pendingAllowSameMapReload,
+            CurrentMapId = CurrentMapId,
+            CurrentMapInstanceId = CurrentMapInstanceId,
+            SceneTransitionRevision = SceneTransitionRevision
+        };
+    }
 
     private bool CommitConfirmedMap(uint mapId, bool allowSameMapReload)
     {

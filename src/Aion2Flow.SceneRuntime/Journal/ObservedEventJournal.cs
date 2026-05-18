@@ -31,6 +31,32 @@ public sealed class ObservedEventJournal
         get { lock (_gate) return _lastCompletedBatchOrdinal; }
     }
 
+    public static ObservedEventJournal FromEntries(IReadOnlyList<ObservedEventEnvelope> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var journal = new ObservedEventJournal();
+        if (entries.Count == 0)
+            return journal;
+
+        journal._firstObservationOrdinal = entries[0].Stamp.ObservationOrdinal;
+        journal._nextObservationOrdinal = journal._firstObservationOrdinal;
+        var lastBatchOrdinal = -1L;
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            if (entry.Stamp.ObservationOrdinal != journal._nextObservationOrdinal)
+                throw new ArgumentException("Entries must be ordered by contiguous observation ordinal.", nameof(entries));
+
+            journal._entries.Add(entry);
+            journal._nextObservationOrdinal++;
+            lastBatchOrdinal = Math.Max(lastBatchOrdinal, entry.Stamp.BatchOrdinal);
+        }
+
+        journal._lastCompletedBatchOrdinal = lastBatchOrdinal;
+        return journal;
+    }
+
     public void Append(in ObservedEventEnvelope observedEvent)
     {
         lock (_gate)
@@ -67,6 +93,14 @@ public sealed class ObservedEventJournal
             if (index >= _entries.Count || _entries[index].Stamp.ObservationOrdinal != observationOrdinal)
                 throw new ArgumentOutOfRangeException(nameof(observationOrdinal));
             return _entries[index];
+        }
+    }
+
+    public ObservedEventEnvelope[] ToArray()
+    {
+        lock (_gate)
+        {
+            return [.. _entries];
         }
     }
 

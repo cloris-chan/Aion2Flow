@@ -18,7 +18,8 @@ public sealed class EncounterArchiveService
     public ArchivedEncounterRecord? Archive(SceneArchivePayload payload, string trigger, bool isAutomatic)
     {
         var archivedPayload = payload.DeepClone();
-        return AddArchiveRecord(archivedPayload.Snapshot, archivedPayload, trigger, isAutomatic);
+        var archivedSnapshot = archivedPayload.CreateSnapshot();
+        return AddArchiveRecord(archivedSnapshot, archivedPayload, trigger, isAutomatic);
     }
 
     private ArchivedEncounterRecord? AddArchiveRecord(SceneCombatSnapshot archivedSnapshot, SceneArchivePayload scenePayload, string trigger, bool isAutomatic)

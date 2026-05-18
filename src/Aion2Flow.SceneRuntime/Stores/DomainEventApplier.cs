@@ -6,27 +6,84 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
-public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
+public sealed class DomainEventApplier
 {
     private readonly ObservedEventEnvelope[] _journalBuffer = new ObservedEventEnvelope[256];
-    private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
-    private readonly PeriodicChainCanonicalizer _periodicChain = new();
-    private readonly OwnerTargetSummonRestoreCanonicalizer _ownerTargetSummonRestore = new(entities);
-    private readonly MultiHitAttributionService _multiHitAttribution = new();
-    private readonly CompactOutcomeCanonicalizer _compactOutcome = new();
-    private readonly PeriodicLinkCanonicalizer _periodicLink = new();
-    private readonly BossFocusStore _bossFocus = new(entities);
+    private readonly EntityStore _entities;
+    private readonly SceneBoundaryStore _boundary;
+    private readonly RuntimeMetadataRegistry _metadataRegistry;
+    private readonly CombatStore _combat;
+    private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery;
+    private readonly PeriodicChainCanonicalizer _periodicChain;
+    private readonly OwnerTargetSummonRestoreCanonicalizer _ownerTargetSummonRestore;
+    private readonly MultiHitAttributionService _multiHitAttribution;
+    private readonly CompactOutcomeCanonicalizer _compactOutcome;
+    private readonly PeriodicLinkCanonicalizer _periodicLink;
+    private readonly BossFocusStore _bossFocus;
+
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
+        : this(
+            entities,
+            boundary,
+            metadataRegistry,
+            combat,
+            new SystemPeriodicRecoveryCanonicalizer(),
+            new PeriodicChainCanonicalizer(),
+            new MultiHitAttributionService(),
+            new CompactOutcomeCanonicalizer(),
+            new PeriodicLinkCanonicalizer(),
+            new BossFocusStore(entities))
+    {
+    }
 
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat)
         : this(entities, boundary, new RuntimeMetadataRegistry(), combat)
     {
     }
 
-    public EntityStore Entities => entities;
-    public SceneBoundaryStore Boundary => boundary;
-    public RuntimeMetadataRegistry MetadataRegistry => metadataRegistry;
-    public CombatStore Combat => combat;
+    private DomainEventApplier(
+        EntityStore entities,
+        SceneBoundaryStore boundary,
+        RuntimeMetadataRegistry metadataRegistry,
+        CombatStore combat,
+        SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery,
+        PeriodicChainCanonicalizer periodicChain,
+        MultiHitAttributionService multiHitAttribution,
+        CompactOutcomeCanonicalizer compactOutcome,
+        PeriodicLinkCanonicalizer periodicLink,
+        BossFocusStore bossFocus)
+    {
+        _entities = entities;
+        _boundary = boundary;
+        _metadataRegistry = metadataRegistry;
+        _combat = combat;
+        _systemPeriodicRecovery = systemPeriodicRecovery;
+        _periodicChain = periodicChain;
+        _ownerTargetSummonRestore = new OwnerTargetSummonRestoreCanonicalizer(entities);
+        _multiHitAttribution = multiHitAttribution;
+        _compactOutcome = compactOutcome;
+        _periodicLink = periodicLink;
+        _bossFocus = bossFocus;
+    }
+
+    public EntityStore Entities => _entities;
+    public SceneBoundaryStore Boundary => _boundary;
+    public RuntimeMetadataRegistry MetadataRegistry => _metadataRegistry;
+    public CombatStore Combat => _combat;
     public BossFocusStore BossFocus => _bossFocus;
+
+    public DomainEventApplier DeepClone(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
+        => new(
+            entities,
+            boundary,
+            metadataRegistry,
+            combat,
+            _systemPeriodicRecovery.DeepClone(),
+            _periodicChain.DeepClone(),
+            _multiHitAttribution.DeepClone(),
+            _compactOutcome.DeepClone(),
+            _periodicLink.DeepClone(),
+            _bossFocus.DeepClone(entities));
 
     public void ApplyJournal(ObservedEventJournal journal)
     {
@@ -61,7 +118,7 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
                 ApplyState(in entry, in state);
                 break;
             case ObservedEventDomain.Resource when entry.Resource is { } resource:
-                entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
+                _entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
                 _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), entry.Raw.TimestampMilliseconds);
                 break;
             case ObservedEventDomain.Scene when entry.Scene is { } scene:
@@ -127,14 +184,14 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
     private void ApplyCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
     {
         var observation = result.Observation;
-        combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
+        _combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
         _multiHitAttribution.ObserveCombat(result.SourceId, result.TargetId, in stamp, in observation);
     }
 
     private void ApplyAura(in ObservedEventEnvelope entry, in AuraObservation aura)
     {
         if (aura.TargetEntityId > 0 && aura.SequenceId > 0)
-            entities.ApplyNpc2C38State(aura.TargetEntityId, aura.SequenceId, aura.ResultCode);
+            _entities.ApplyNpc2C38State(aura.TargetEntityId, aura.SequenceId, aura.ResultCode);
 
         if (_multiHitAttribution.TrySynthesize2C38Invincible(in entry, in aura) is { } result)
         {
@@ -147,48 +204,48 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
     {
         if (scene.DiagnosticKey == "stage-destination-map")
         {
-            boundary.StageDestinationMap(scene.MapId, scene.Value0 != 0);
+            _boundary.StageDestinationMap(scene.MapId, scene.Value0 != 0);
             return;
         }
 
         if (scene.DiagnosticKey == "pending-destination-map")
         {
-            boundary.StagePendingDestinationMap(scene.MapId, scene.Value0 != 0);
+            _boundary.StagePendingDestinationMap(scene.MapId, scene.Value0 != 0);
             return;
         }
 
         if (scene.DiagnosticKey == "confirm-destination-map")
         {
-            boundary.ConfirmDestinationMap(scene.MapId, scene.Value0 != 0);
-            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            _boundary.ConfirmDestinationMap(scene.MapId, scene.Value0 != 0);
+            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
             return;
         }
 
         if (scene.DiagnosticKey == "confirm-pending-destination-map-arrival")
         {
-            boundary.ConfirmPendingDestinationMapArrival();
-            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            _boundary.ConfirmPendingDestinationMapArrival();
+            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
             return;
         }
 
         if (scene.DiagnosticKey == "stage-destination-instance")
         {
-            boundary.StageDestinationMapInstance(scene.MapInstanceId);
-            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            _boundary.StageDestinationMapInstance(scene.MapInstanceId);
+            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
             return;
         }
 
         if (scene.DiagnosticKey == "confirm-destination-instance")
         {
-            boundary.ConfirmDestinationMapInstance(scene.MapInstanceId);
-            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            _boundary.ConfirmDestinationMapInstance(scene.MapInstanceId);
+            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
             return;
         }
 
         if (scene.DiagnosticKey == "scene-transport-boundary")
         {
-            boundary.MarkSceneTransportBoundary();
-            metadataRegistry.UpsertMapCode(boundary.CurrentMapInstanceId, boundary.CurrentMapId);
+            _boundary.MarkSceneTransportBoundary();
+            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
         }
     }
 
@@ -196,7 +253,7 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
     {
         if (entry.TargetEntityId != 0 && state.EntityId == entry.TargetEntityId && entry.SourceEntityId != entry.TargetEntityId)
         {
-            entities.ApplySummon(entry.SourceEntityId, entry.TargetEntityId);
+            _entities.ApplySummon(entry.SourceEntityId, entry.TargetEntityId);
             return;
         }
 
@@ -205,9 +262,9 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
             if (entry.SourceEntityId > 0)
             {
                 var nickname = state.Text ?? string.Empty;
-                entities.ApplyNickname(entry.SourceEntityId, nickname);
+                _entities.ApplyNickname(entry.SourceEntityId, nickname);
                 if (!string.IsNullOrWhiteSpace(nickname))
-                    metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.OriginServerId, state.Faction);
+                    _metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.OriginServerId, state.Faction);
             }
             return;
         }
@@ -220,7 +277,7 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
         if (state.StateCode == StateCodes.NpcKind)
         {
             var kind = Enum.IsDefined((NpcKind)state.Value0) ? (NpcKind)state.Value0 : NpcKind.Unknown;
-            entities.ApplyNpcKind(state.EntityId, kind);
+            _entities.ApplyNpcKind(state.EntityId, kind);
             _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Raw.TimestampMilliseconds);
             return;
         }
@@ -228,53 +285,53 @@ public sealed class DomainEventApplier(EntityStore entities, SceneBoundaryStore 
         if (state.StateCode == StateCodes.NpcBattle)
         {
             var isActive = state.Value0 != 0 && CanNpcBattleActivate(state.EntityId);
-            entities.ApplyBattleToggle(state.EntityId, isActive);
+            _entities.ApplyBattleToggle(state.EntityId, isActive);
             _bossFocus.ApplyBattle(state.EntityId, isActive, entry.Raw.TimestampMilliseconds);
             return;
         }
 
         if (state.StateCode == StateCodes.NpcBattleToggle)
         {
-            var isActive = !entities.GetOrAdd(state.EntityId).NpcCombatActive && CanNpcBattleActivate(state.EntityId);
-            entities.ApplyBattleToggle(state.EntityId, isActive);
+            var isActive = !_entities.GetOrAdd(state.EntityId).NpcCombatActive && CanNpcBattleActivate(state.EntityId);
+            _entities.ApplyBattleToggle(state.EntityId, isActive);
             _bossFocus.ApplyBattleToggle(state.EntityId, isActive, entry.Raw.TimestampMilliseconds);
             return;
         }
 
         if (state.StateCode is >= 2_000_000 and <= 2_999_999)
         {
-            entities.ApplyNpcCode(state.EntityId, state.StateCode);
-            metadataRegistry.UpsertNpcCode(state.EntityId, state.StateCode);
+            _entities.ApplyNpcCode(state.EntityId, state.StateCode);
+            _metadataRegistry.UpsertNpcCode(state.EntityId, state.StateCode);
             return;
         }
 
         if (state.StateCode == 2136)
         {
-            entities.ApplyNpc2136State(state.EntityId, checked((uint)state.Value0), checked((uint)state.Value1));
+            _entities.ApplyNpc2136State(state.EntityId, checked((uint)state.Value0), checked((uint)state.Value1));
             return;
         }
 
         if (state.StateCode == 140)
         {
-            entities.ApplyNpc0140Value(state.EntityId, checked((uint)state.Value0));
+            _entities.ApplyNpc0140Value(state.EntityId, checked((uint)state.Value0));
             return;
         }
 
         if (state.StateCode == 240)
         {
-            entities.ApplyNpc0240Value(state.EntityId, checked((uint)state.Value0));
+            _entities.ApplyNpc0240Value(state.EntityId, checked((uint)state.Value0));
             return;
         }
 
         if (state.StateCode == 4636)
         {
-            entities.ApplyNpc4636State(state.EntityId, checked((byte)state.Value0), checked((byte)state.Value1));
+            _entities.ApplyNpc4636State(state.EntityId, checked((byte)state.Value0), checked((byte)state.Value1));
             return;
         }
 
-        _ = entities.GetOrAdd(state.EntityId);
+        _ = _entities.GetOrAdd(state.EntityId);
     }
 
     private bool CanNpcBattleActivate(int instanceId) =>
-        !entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
+        !_entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
 }

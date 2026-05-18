@@ -11,6 +11,14 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
     private readonly record struct State(long Damage, long FrameOrdinal, long BatchOrdinal);
     private readonly Dictionary<Key, State> _seeds = [];
 
+    public SystemPeriodicRecoveryCanonicalizer DeepClone()
+    {
+        var clone = new SystemPeriodicRecoveryCanonicalizer();
+        foreach (var pair in _seeds)
+            clone._seeds.Add(pair.Key, pair.Value);
+        return clone;
+    }
+
     public CombatCanonicalizationResult Normalize(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation)
     {
         if (!TryGetKey(sourceId, targetId, in observation, out var key, out var isSeed))

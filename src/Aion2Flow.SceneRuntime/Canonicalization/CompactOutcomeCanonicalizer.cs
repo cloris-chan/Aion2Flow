@@ -22,6 +22,23 @@ public sealed class CompactOutcomeCanonicalizer
     private readonly HashSet<(int TargetId, int SkillCode)> _confirmedCompactDamage = [];
     private long _currentBatchOrdinal;
 
+    public CompactOutcomeCanonicalizer DeepClone()
+    {
+        var clone = new CompactOutcomeCanonicalizer
+        {
+            _currentBatchOrdinal = _currentBatchOrdinal
+        };
+        clone._pendingDirect.AddRange(_pendingDirect);
+        clone._pendingCompact.AddRange(_pendingCompact);
+        clone._pendingCompactDamage.AddRange(_pendingCompactDamage);
+        clone._pendingCompactControls0638.AddRange(_pendingCompactControls0638);
+        clone._storedDamage.AddRange(_storedDamage);
+        clone._currentBatchDodgeTargets.UnionWith(_currentBatchDodgeTargets);
+        clone._resolvedAvoidanceSignatures.UnionWith(_resolvedAvoidanceSignatures);
+        clone._confirmedCompactDamage.UnionWith(_confirmedCompactDamage);
+        return clone;
+    }
+
     public IReadOnlyList<StampedCombatCanonicalizationResult> NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
     {
         var prefix = EnsureBatch(stamp.BatchOrdinal);

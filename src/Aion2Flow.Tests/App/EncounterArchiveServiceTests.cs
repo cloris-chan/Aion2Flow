@@ -5,7 +5,6 @@ using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
-using Cloris.Aion2Flow.Tests.SceneRuntime;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
@@ -78,25 +77,8 @@ public sealed class EncounterArchiveServiceTests
 
         for (var i = 0; i < 101; i++)
         {
-            var snapshot = SceneSnapshotTestFactory.Create(
-                encounterId: Guid.NewGuid(),
-                encounterStartTime: 1_000 + i,
-                encounterEndTime: 11_000 + (i * 2),
-                encounterTime: 10_000 + i,
-                combatants:
-                [
-                    SceneSnapshotTestFactory.Combatant(
-                        i + 1,
-                        SceneSnapshotTestFactory.VisibleMetrics(
-                            damagePerSecond: 1_000 + i,
-                            damageContribution: 1))
-                ]);
-
-            var payload = new SceneArchivePayload
-            {
-                Snapshot = snapshot,
-                SceneStarted = DateTimeOffset.FromUnixTimeMilliseconds(snapshot.EncounterStartTime).ToLocalTime()
-            };
+            var owner = CreateSceneOwner(i + 1, 10_000 + i, DateTimeOffset.FromUnixTimeMilliseconds(1_000 + i).ToLocalTime());
+            var payload = owner.CreateArchivePayload();
             var record = service.Archive(payload, "manual", isAutomatic: false);
             Assert.NotNull(record);
 
@@ -121,7 +103,7 @@ public sealed class EncounterArchiveServiceTests
         var payload = owner.CreateArchivePayload(snapshot);
         var delta = payload.CreateDetailDelta(playerId);
 
-        Assert.Equal(snapshot.EncounterId, payload.Snapshot.EncounterId);
+        Assert.Equal(snapshot.EncounterId, payload.CreateSnapshot().EncounterId);
         Assert.Equal(2, payload.Events.Count);
         Assert.Equal(playerId, delta.CombatantId);
         Assert.Equal(2, delta.Events.Count);
@@ -220,7 +202,7 @@ public sealed class EncounterArchiveServiceTests
 
         var delta = payload.CreateDetailDelta(playerId);
 
-        Assert.Equal(bossId, payload.Snapshot.TargetObservation?.InstanceId);
+        Assert.Equal(bossId, payload.CreateSnapshot().TargetObservation?.InstanceId);
         Assert.True(payload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
         Assert.Equal("Tester", archivedPc.Nickname);
         Assert.Equal(2, payload.Events.Count);
@@ -284,7 +266,7 @@ public sealed class EncounterArchiveServiceTests
         Assert.NotNull(record);
         Assert.NotSame(payload, record!.ScenePayload);
         Assert.Equal(payload.Events.Count, record.ScenePayload.Events.Count);
-        Assert.Equal(payload.Snapshot.EncounterId, record.EncounterId);
+        Assert.Equal(payload.CreateSnapshot().EncounterId, record.EncounterId);
     }
 
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId)

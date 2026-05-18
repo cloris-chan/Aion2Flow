@@ -4,8 +4,18 @@ namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
 public sealed class SceneBoundaryStore
 {
-    private readonly SceneBoundaryService _sceneBoundary = new();
+    private readonly SceneBoundaryService _sceneBoundary;
     private long _revision;
+
+    public SceneBoundaryStore() : this(new SceneBoundaryService(), 0)
+    {
+    }
+
+    private SceneBoundaryStore(SceneBoundaryService sceneBoundary, long revision)
+    {
+        _sceneBoundary = sceneBoundary;
+        _revision = revision;
+    }
 
     public uint CurrentMapId => _sceneBoundary.CurrentMapId;
 
@@ -73,4 +83,7 @@ public sealed class SceneBoundaryStore
         _sceneBoundary.Clear();
         _revision++;
     }
+
+    public SceneBoundaryStore DeepClone()
+        => new(_sceneBoundary.DeepClone(), _revision);
 }
