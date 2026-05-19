@@ -9,12 +9,32 @@ public sealed class PeriodicChainCanonicalizer
     private readonly record struct State(CombatValueKind GrantKind, long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatObservation Grant, bool GrantEmitted);
     private readonly Dictionary<Key, State> _chains = [];
 
-    public PeriodicChainCanonicalizer DeepClone()
+    internal StateSnapshot CreateStateSnapshot()
     {
-        var clone = new PeriodicChainCanonicalizer();
+        var chains = new ChainStateSnapshot[_chains.Count];
+        var index = 0;
         foreach (var pair in _chains)
-            clone._chains.Add(pair.Key, pair.Value);
-        return clone;
+            chains[index++] = new ChainStateSnapshot(pair.Key.TargetId, pair.Key.ChainId, pair.Key.OriginalSkillCode, pair.Value.GrantKind, pair.Value.Remaining, pair.Value.CasterId, pair.Value.GrantSourceId, pair.Value.GrantTargetId, pair.Value.Grant, pair.Value.GrantEmitted);
+        Array.Sort(chains, static (left, right) =>
+        {
+            var cmp = left.TargetId.CompareTo(right.TargetId);
+            if (cmp != 0) return cmp;
+            cmp = left.ChainId.CompareTo(right.ChainId);
+            return cmp != 0 ? cmp : left.OriginalSkillCode.CompareTo(right.OriginalSkillCode);
+        });
+        return new StateSnapshot(chains);
+    }
+
+    internal void RestoreState(StateSnapshot snapshot)
+    {
+        _chains.Clear();
+        _chains.EnsureCapacity(snapshot.Chains.Length);
+        foreach (ref readonly var chain in snapshot.Chains.AsSpan())
+        {
+            var key = new Key(chain.TargetId, chain.ChainId, chain.OriginalSkillCode);
+            var state = new State(chain.GrantKind, chain.Remaining, chain.CasterId, chain.GrantSourceId, chain.GrantTargetId, chain.Grant, chain.GrantEmitted);
+            _chains.Add(key, state);
+        }
     }
 
     public CombatCanonicalizationBatch Normalize(int sourceId, int targetId, in CombatObservation observation)
@@ -187,6 +207,30 @@ public sealed class PeriodicChainCanonicalizer
 
     private static int ResolveOriginalSkillCode(in CombatObservation observation) =>
         observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
+
+    internal sealed class StateSnapshot(ChainStateSnapshot[] chains)
+    {
+        public ChainStateSnapshot[] Chains { get; } = chains;
+
+        public StateSnapshot DeepClone()
+        {
+            var chains = new ChainStateSnapshot[Chains.Length];
+            Array.Copy(Chains, chains, chains.Length);
+            return new StateSnapshot(chains);
+        }
+    }
+
+    internal readonly record struct ChainStateSnapshot(
+        int TargetId,
+        int ChainId,
+        int OriginalSkillCode,
+        CombatValueKind GrantKind,
+        long Remaining,
+        int CasterId,
+        int GrantSourceId,
+        int GrantTargetId,
+        CombatObservation Grant,
+        bool GrantEmitted);
 }
 
 public readonly record struct CombatCanonicalizationResult(int SourceId, int TargetId, CombatObservation Observation);

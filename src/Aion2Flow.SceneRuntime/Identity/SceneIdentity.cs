@@ -124,17 +124,68 @@ public sealed class RuntimeMetadataRegistry
         _revision++;
     }
 
-    public RuntimeMetadataRegistry DeepClone()
+    public RuntimeMetadataRegistryStateSnapshot CreateStateSnapshot()
     {
-        var clone = new RuntimeMetadataRegistry();
+        var pcMetadata = new PcMetadataEntry[_pcMetadataByEntityId.Count];
+        var index = 0;
         foreach (var pair in _pcMetadataByEntityId)
-            clone._pcMetadataByEntityId.Add(pair.Key, pair.Value);
+            pcMetadata[index++] = new PcMetadataEntry(pair.Key, pair.Value);
+        Array.Sort(pcMetadata, static (left, right) => left.EntityId.CompareTo(right.EntityId));
+
+        var npcCodes = new NpcCodeEntry[_npcCodesByInstanceId.Count];
+        index = 0;
         foreach (var pair in _npcCodesByInstanceId)
-            clone._npcCodesByInstanceId.Add(pair.Key, pair.Value);
+            npcCodes[index++] = new NpcCodeEntry(pair.Key, pair.Value);
+        Array.Sort(npcCodes, static (left, right) => left.InstanceId.CompareTo(right.InstanceId));
+
+        var mapCodes = new MapCodeEntry[_mapCodesByInstanceId.Count];
+        index = 0;
         foreach (var pair in _mapCodesByInstanceId)
-            clone._mapCodesByInstanceId.Add(pair.Key, pair.Value);
-        clone._revision = _revision;
-        return clone;
+            mapCodes[index++] = new MapCodeEntry(pair.Key, pair.Value);
+        Array.Sort(mapCodes, static (left, right) => left.InstanceId.CompareTo(right.InstanceId));
+
+        return new RuntimeMetadataRegistryStateSnapshot(_revision, pcMetadata, npcCodes, mapCodes);
+    }
+
+    public void RestoreState(RuntimeMetadataRegistryStateSnapshot snapshot)
+    {
+        _pcMetadataByEntityId.Clear();
+        _npcCodesByInstanceId.Clear();
+        _mapCodesByInstanceId.Clear();
+
+        _pcMetadataByEntityId.EnsureCapacity(snapshot.PcMetadata.Length);
+        foreach (ref readonly var entry in snapshot.PcMetadata.AsSpan())
+            _pcMetadataByEntityId.Add(entry.EntityId, entry.Metadata);
+
+        _npcCodesByInstanceId.EnsureCapacity(snapshot.NpcCodes.Length);
+        foreach (ref readonly var entry in snapshot.NpcCodes.AsSpan())
+            _npcCodesByInstanceId.Add(entry.InstanceId, entry.NpcCode);
+
+        _mapCodesByInstanceId.EnsureCapacity(snapshot.MapCodes.Length);
+        foreach (ref readonly var entry in snapshot.MapCodes.AsSpan())
+            _mapCodesByInstanceId.Add(entry.InstanceId, entry.MapCode);
+
+        _revision = snapshot.Revision;
+    }
+
+}
+
+public sealed class RuntimeMetadataRegistryStateSnapshot(long revision, PcMetadataEntry[] pcMetadata, NpcCodeEntry[] npcCodes, MapCodeEntry[] mapCodes)
+{
+    public long Revision { get; } = revision;
+    public PcMetadataEntry[] PcMetadata { get; } = pcMetadata;
+    public NpcCodeEntry[] NpcCodes { get; } = npcCodes;
+    public MapCodeEntry[] MapCodes { get; } = mapCodes;
+
+    public RuntimeMetadataRegistryStateSnapshot DeepClone()
+    {
+        var pcMetadata = new PcMetadataEntry[PcMetadata.Length];
+        Array.Copy(PcMetadata, pcMetadata, pcMetadata.Length);
+        var npcCodes = new NpcCodeEntry[NpcCodes.Length];
+        Array.Copy(NpcCodes, npcCodes, npcCodes.Length);
+        var mapCodes = new MapCodeEntry[MapCodes.Length];
+        Array.Copy(MapCodes, mapCodes, mapCodes.Length);
+        return new RuntimeMetadataRegistryStateSnapshot(Revision, pcMetadata, npcCodes, mapCodes);
     }
 }
 

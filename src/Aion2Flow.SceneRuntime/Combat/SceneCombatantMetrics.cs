@@ -99,28 +99,13 @@ internal struct SceneCombatantMetricsAccumulator
         ApplyContribution(contribution, observation.ValueKind, observation.EffectTag, observation.DrainHealAmount);
     }
 
-    public void ProcessStoredCombatObservation(
-        in CombatObservation observation,
-        bool contributesDamage,
-        bool contributesHealing,
-        bool contributesShieldGrant,
-        bool contributesShieldAbsorbed)
-    {
-        ApplyValues(
-            contributesDamage ? observation.Damage : 0,
-            contributesHealing ? observation.Damage : 0,
-            contributesShieldGrant ? observation.Damage : 0,
-            contributesShieldGrant ? 1 : 0,
-            contributesShieldAbsorbed ? observation.Damage : 0,
-            contributesShieldAbsorbed ? 1 : 0,
-            observation.ValueKind,
-            observation.EffectTag,
-            observation.DrainHealAmount);
-    }
-
     public void ApplyCombatTotals(
         long damageAmount,
         long healingAmount,
+        long periodicHealingAmount,
+        long drainDamageAmount,
+        long drainHealingAmount,
+        long regenerationHealingAmount,
         long shieldAmount,
         int shieldTimes,
         long shieldAbsorbedAmount,
@@ -128,6 +113,10 @@ internal struct SceneCombatantMetricsAccumulator
     {
         DamageAmount += damageAmount;
         HealingAmount += healingAmount;
+        PeriodicHealingAmount += periodicHealingAmount;
+        DrainDamageAmount += drainDamageAmount;
+        DrainHealingAmount += drainHealingAmount;
+        RegenerationHealingAmount += regenerationHealingAmount;
         ShieldAmount += shieldAmount;
         ShieldTimes += shieldTimes;
         ShieldAbsorbedAmount += shieldAbsorbedAmount;

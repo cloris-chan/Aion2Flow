@@ -84,6 +84,20 @@ public sealed class SceneBoundaryStore
         _revision++;
     }
 
-    public SceneBoundaryStore DeepClone()
-        => new(_sceneBoundary.DeepClone(), _revision);
+    public SceneBoundaryStoreStateSnapshot CreateStateSnapshot() =>
+        new(_revision, _sceneBoundary.CreateStateSnapshot());
+
+    public void RestoreState(SceneBoundaryStoreStateSnapshot snapshot)
+    {
+        _sceneBoundary.RestoreState(snapshot.Boundary);
+        _revision = snapshot.Revision;
+    }
+}
+
+public sealed class SceneBoundaryStoreStateSnapshot(long revision, SceneBoundaryServiceStateSnapshot boundary)
+{
+    public long Revision { get; } = revision;
+    public SceneBoundaryServiceStateSnapshot Boundary { get; } = boundary;
+
+    public SceneBoundaryStoreStateSnapshot DeepClone() => new(Revision, Boundary);
 }

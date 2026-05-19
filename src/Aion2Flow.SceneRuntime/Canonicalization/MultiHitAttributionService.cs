@@ -11,11 +11,23 @@ public sealed class MultiHitAttributionService
     private readonly record struct Candidate(int SourceId, int TargetId, int SkillCode, long FrameOrdinal);
     private readonly List<Candidate> _candidates = [];
 
-    public MultiHitAttributionService DeepClone()
+    internal StateSnapshot CreateStateSnapshot()
     {
-        var clone = new MultiHitAttributionService();
-        clone._candidates.AddRange(_candidates);
-        return clone;
+        var candidates = new CandidateStateSnapshot[_candidates.Count];
+        for (var i = 0; i < candidates.Length; i++)
+        {
+            var candidate = _candidates[i];
+            candidates[i] = new CandidateStateSnapshot(candidate.SourceId, candidate.TargetId, candidate.SkillCode, candidate.FrameOrdinal);
+        }
+        return new StateSnapshot(candidates);
+    }
+
+    internal void RestoreState(StateSnapshot snapshot)
+    {
+        _candidates.Clear();
+        _candidates.EnsureCapacity(snapshot.Candidates.Length);
+        foreach (ref readonly var candidate in snapshot.Candidates.AsSpan())
+            _candidates.Add(new Candidate(candidate.SourceId, candidate.TargetId, candidate.SkillCode, candidate.FrameOrdinal));
     }
 
     public void ObserveCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation)
@@ -109,4 +121,18 @@ public sealed class MultiHitAttributionService
         var variant = CombatResourceRegistry.ParseSkillVariant(skillCode);
         return CombatResourceRegistry.InferOriginalSkillCode(skillCode) ?? variant.NormalizedSkillCode;
     }
+
+    internal sealed class StateSnapshot(CandidateStateSnapshot[] candidates)
+    {
+        public CandidateStateSnapshot[] Candidates { get; } = candidates;
+
+        public StateSnapshot DeepClone()
+        {
+            var candidates = new CandidateStateSnapshot[Candidates.Length];
+            Array.Copy(Candidates, candidates, candidates.Length);
+            return new StateSnapshot(candidates);
+        }
+    }
+
+    internal readonly record struct CandidateStateSnapshot(int SourceId, int TargetId, int SkillCode, long FrameOrdinal);
 }

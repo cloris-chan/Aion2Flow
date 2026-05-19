@@ -11,9 +11,9 @@ public sealed class CompactOutcomeCanonicalizer
     private const int MaxPendingAvoidances = 32;
     private const int PendingCompactInitialCapacity = 1024;
     private const int StoredDamageInitialCapacity = 1024;
-    private readonly record struct PendingDirectBlockedDamage(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
-    private readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int OriginalSkillCode, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds);
-    private readonly record struct AvoidedSignature(int SourceId, int TargetId, int Marker);
+    internal readonly record struct PendingDirectBlockedDamage(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
+    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int OriginalSkillCode, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds);
+    internal readonly record struct AvoidedSignature(int SourceId, int TargetId, int Marker);
     private readonly List<PendingDirectBlockedDamage> _pendingDirect = new(MaxPendingAvoidances);
     private readonly List<PendingCompactAvoidance> _pendingCompact = new(MaxPendingAvoidances);
     private readonly List<PendingCompactAvoidance> _pendingCompactDamage = new(PendingCompactInitialCapacity);
@@ -24,21 +24,57 @@ public sealed class CompactOutcomeCanonicalizer
     private readonly HashSet<(int TargetId, int SkillCode)> _confirmedCompactDamage = [];
     private long _currentBatchOrdinal;
 
-    public CompactOutcomeCanonicalizer DeepClone()
+    internal StateSnapshot CreateStateSnapshot()
     {
-        var clone = new CompactOutcomeCanonicalizer
+        var pendingDirect = _pendingDirect.ToArray();
+        var pendingCompact = _pendingCompact.ToArray();
+        var pendingCompactDamage = _pendingCompactDamage.ToArray();
+        var pendingCompactControls0638 = _pendingCompactControls0638.ToArray();
+        var storedDamage = _storedDamage.ToArray();
+
+        var currentBatchDodgeTargets = new int[_currentBatchDodgeTargets.Count];
+        var index = 0;
+        foreach (var target in _currentBatchDodgeTargets)
+            currentBatchDodgeTargets[index++] = target;
+        Array.Sort(currentBatchDodgeTargets);
+
+        var resolvedAvoidanceSignatures = new AvoidedSignature[_resolvedAvoidanceSignatures.Count];
+        index = 0;
+        foreach (var signature in _resolvedAvoidanceSignatures)
+            resolvedAvoidanceSignatures[index++] = signature;
+        Array.Sort(resolvedAvoidanceSignatures, static (left, right) =>
         {
-            _currentBatchOrdinal = _currentBatchOrdinal
-        };
-        clone._pendingDirect.AddRange(_pendingDirect);
-        clone._pendingCompact.AddRange(_pendingCompact);
-        clone._pendingCompactDamage.AddRange(_pendingCompactDamage);
-        clone._pendingCompactControls0638.AddRange(_pendingCompactControls0638);
-        clone._storedDamage.AddRange(_storedDamage);
-        clone._currentBatchDodgeTargets.UnionWith(_currentBatchDodgeTargets);
-        clone._resolvedAvoidanceSignatures.UnionWith(_resolvedAvoidanceSignatures);
-        clone._confirmedCompactDamage.UnionWith(_confirmedCompactDamage);
-        return clone;
+            var cmp = left.SourceId.CompareTo(right.SourceId);
+            if (cmp != 0) return cmp;
+            cmp = left.TargetId.CompareTo(right.TargetId);
+            return cmp != 0 ? cmp : left.Marker.CompareTo(right.Marker);
+        });
+
+        var confirmedCompactDamage = new ConfirmedCompactDamageState[_confirmedCompactDamage.Count];
+        index = 0;
+        foreach (var (targetId, skillCode) in _confirmedCompactDamage)
+            confirmedCompactDamage[index++] = new ConfirmedCompactDamageState(targetId, skillCode);
+        Array.Sort(confirmedCompactDamage, static (left, right) =>
+        {
+            var cmp = left.TargetId.CompareTo(right.TargetId);
+            return cmp != 0 ? cmp : left.SkillCode.CompareTo(right.SkillCode);
+        });
+
+        return new StateSnapshot(
+            _currentBatchOrdinal,
+            pendingDirect,
+            pendingCompact,
+            pendingCompactDamage,
+            pendingCompactControls0638,
+            storedDamage,
+            currentBatchDodgeTargets,
+            resolvedAvoidanceSignatures,
+            confirmedCompactDamage);
+    }
+
+    internal void RestoreState(StateSnapshot snapshot)
+    {
+        snapshot.RestoreTo(this);
     }
 
     public StampedCombatCanonicalizationBatch NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
@@ -494,6 +530,95 @@ public sealed class CompactOutcomeCanonicalizer
 
     private static int OriginalSkillCode(in CombatObservation observation) =>
         observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
+
+    internal sealed class StateSnapshot
+    {
+        private readonly long _currentBatchOrdinal;
+        private readonly PendingDirectBlockedDamage[] _pendingDirect;
+        private readonly PendingCompactAvoidance[] _pendingCompact;
+        private readonly PendingCompactAvoidance[] _pendingCompactDamage;
+        private readonly PendingCompactAvoidance[] _pendingCompactControls0638;
+        private readonly StampedCombatCanonicalizationResult[] _storedDamage;
+        private readonly int[] _currentBatchDodgeTargets;
+        private readonly AvoidedSignature[] _resolvedAvoidanceSignatures;
+        private readonly ConfirmedCompactDamageState[] _confirmedCompactDamage;
+
+        internal StateSnapshot(
+            long currentBatchOrdinal,
+            PendingDirectBlockedDamage[] pendingDirect,
+            PendingCompactAvoidance[] pendingCompact,
+            PendingCompactAvoidance[] pendingCompactDamage,
+            PendingCompactAvoidance[] pendingCompactControls0638,
+            StampedCombatCanonicalizationResult[] storedDamage,
+            int[] currentBatchDodgeTargets,
+            AvoidedSignature[] resolvedAvoidanceSignatures,
+            ConfirmedCompactDamageState[] confirmedCompactDamage)
+        {
+            _currentBatchOrdinal = currentBatchOrdinal;
+            _pendingDirect = pendingDirect;
+            _pendingCompact = pendingCompact;
+            _pendingCompactDamage = pendingCompactDamage;
+            _pendingCompactControls0638 = pendingCompactControls0638;
+            _storedDamage = storedDamage;
+            _currentBatchDodgeTargets = currentBatchDodgeTargets;
+            _resolvedAvoidanceSignatures = resolvedAvoidanceSignatures;
+            _confirmedCompactDamage = confirmedCompactDamage;
+        }
+
+        internal StateSnapshot DeepClone()
+        {
+            var pendingDirect = new PendingDirectBlockedDamage[_pendingDirect.Length];
+            Array.Copy(_pendingDirect, pendingDirect, pendingDirect.Length);
+            var pendingCompact = new PendingCompactAvoidance[_pendingCompact.Length];
+            Array.Copy(_pendingCompact, pendingCompact, pendingCompact.Length);
+            var pendingCompactDamage = new PendingCompactAvoidance[_pendingCompactDamage.Length];
+            Array.Copy(_pendingCompactDamage, pendingCompactDamage, pendingCompactDamage.Length);
+            var pendingCompactControls0638 = new PendingCompactAvoidance[_pendingCompactControls0638.Length];
+            Array.Copy(_pendingCompactControls0638, pendingCompactControls0638, pendingCompactControls0638.Length);
+            var storedDamage = new StampedCombatCanonicalizationResult[_storedDamage.Length];
+            Array.Copy(_storedDamage, storedDamage, storedDamage.Length);
+            var currentBatchDodgeTargets = new int[_currentBatchDodgeTargets.Length];
+            Array.Copy(_currentBatchDodgeTargets, currentBatchDodgeTargets, currentBatchDodgeTargets.Length);
+            var resolvedAvoidanceSignatures = new AvoidedSignature[_resolvedAvoidanceSignatures.Length];
+            Array.Copy(_resolvedAvoidanceSignatures, resolvedAvoidanceSignatures, resolvedAvoidanceSignatures.Length);
+            var confirmedCompactDamage = new ConfirmedCompactDamageState[_confirmedCompactDamage.Length];
+            Array.Copy(_confirmedCompactDamage, confirmedCompactDamage, confirmedCompactDamage.Length);
+            return new StateSnapshot(
+                _currentBatchOrdinal,
+                pendingDirect,
+                pendingCompact,
+                pendingCompactDamage,
+                pendingCompactControls0638,
+                storedDamage,
+                currentBatchDodgeTargets,
+                resolvedAvoidanceSignatures,
+                confirmedCompactDamage);
+        }
+
+        internal void RestoreTo(CompactOutcomeCanonicalizer target)
+        {
+            target._currentBatchOrdinal = _currentBatchOrdinal;
+            target._pendingDirect.Clear();
+            target._pendingDirect.AddRange(_pendingDirect);
+            target._pendingCompact.Clear();
+            target._pendingCompact.AddRange(_pendingCompact);
+            target._pendingCompactDamage.Clear();
+            target._pendingCompactDamage.AddRange(_pendingCompactDamage);
+            target._pendingCompactControls0638.Clear();
+            target._pendingCompactControls0638.AddRange(_pendingCompactControls0638);
+            target._storedDamage.Clear();
+            target._storedDamage.AddRange(_storedDamage);
+            target._currentBatchDodgeTargets.Clear();
+            target._currentBatchDodgeTargets.UnionWith(_currentBatchDodgeTargets);
+            target._resolvedAvoidanceSignatures.Clear();
+            target._resolvedAvoidanceSignatures.UnionWith(_resolvedAvoidanceSignatures);
+            target._confirmedCompactDamage.Clear();
+            foreach (ref readonly var damage in _confirmedCompactDamage.AsSpan())
+                target._confirmedCompactDamage.Add((damage.TargetId, damage.SkillCode));
+        }
+    }
+
+    internal readonly record struct ConfirmedCompactDamageState(int TargetId, int SkillCode);
 }
 
 public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);

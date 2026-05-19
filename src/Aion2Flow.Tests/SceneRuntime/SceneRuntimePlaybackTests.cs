@@ -19,7 +19,7 @@ public sealed class SceneRuntimePlaybackTests
         var journal = CreateJournal();
         var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
         var baseline = owner.CreateSnapshot();
-        var checkpoint = Assert.Single(owner.RuntimeCheckpoints, static c => c.Cursor.NextObservationOrdinal == 0);
+        var checkpoint = Assert.Single(owner.RuntimeCheckpoints, static c => c.Anchor.LastObservationOrdinal == -1);
 
         var restored = SceneReadModelOwner.RestoreFromCheckpoint(journal, checkpoint);
         var replayed = restored.CreateSnapshotAt(7_000);
@@ -35,14 +35,80 @@ public sealed class SceneRuntimePlaybackTests
         var baseline = owner.CreateSnapshot();
         var checkpoint = owner.RuntimeCheckpoints[^1];
 
-        Assert.True(checkpoint.Cursor.NextObservationOrdinal > 0);
-        Assert.NotEmpty(checkpoint.CombatState.Pairs);
-        Assert.NotEmpty(checkpoint.CombatState.Combatants);
+        Assert.True(checkpoint.Anchor.LastObservationOrdinal >= 0);
+        Assert.NotEmpty(checkpoint.State.Combat.Pairs);
+        Assert.NotEmpty(checkpoint.State.Combat.Combatants);
 
         var restored = SceneReadModelOwner.RestoreFromCheckpoint(journal, checkpoint);
         var replayed = restored.CreateSnapshotAt(7_000);
 
         AssertSnapshotTotalsEqual(baseline, replayed, playerId: 100);
+    }
+
+    [Fact]
+    public void RuntimeCheckpoint_Restore_Reads_Tail_Journal_Only()
+    {
+        var journal = CreateJournal();
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
+        var baseline = owner.CreateSnapshot();
+        var checkpoint = owner.RuntimeCheckpoints[^1];
+        var tail = journal.ToArray().Where(e => e.Stamp.ObservationOrdinal > checkpoint.Anchor.LastObservationOrdinal).ToArray();
+        var tailJournal = ObservedEventJournal.FromEntries(tail);
+
+        var restored = SceneReadModelOwner.RestoreFromCheckpoint(tailJournal, checkpoint);
+        var replayed = restored.CreateSnapshotAt(7_000);
+
+        AssertSnapshotTotalsEqual(baseline, replayed, playerId: 100);
+    }
+
+    [Fact]
+    public void RuntimeCheckpoint_Restore_Preserves_Metadata_Entity_And_BossFocus_State()
+    {
+        var journal = CreateJournal();
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
+        _ = owner.CreateSnapshot();
+        var checkpoint = owner.RuntimeCheckpoints[^1];
+        var restored = SceneReadModelOwner.RestoreFromCheckpoint(ObservedEventJournal.FromEntries([]), checkpoint);
+
+        restored.ReadLocked((entities, _, metadata, combat) =>
+        {
+            Assert.True(entities.TryGet(100, out var player));
+            Assert.Equal("Tester", player.Nickname);
+            Assert.True(metadata.TryGetPcMetadata(100, out var pc));
+            Assert.Equal("Tester", pc.Nickname);
+            Assert.True(metadata.TryGetNpcCode(200, out var npcCode));
+            Assert.Equal(2_999_997, npcCode);
+            Assert.True(combat.Combatants.ContainsKey(100));
+            return 0;
+        });
+
+        var bosses = restored.BossFocus.GetObservedBosses(7_000, long.MaxValue);
+        Assert.Contains(bosses, boss => boss.InstanceId == 200 && boss.HasHp);
+    }
+
+    [Fact]
+    public void RuntimeCheckpoint_Restore_Preserves_Canonicalizer_Pending_State()
+    {
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        const int playerId = 4086;
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendPeriodicRecovery(journal, sceneId, playerId, damage: 7634, mode: 1, ordinal: 0, observedAt: 1_000, batchOrdinal: 10);
+        AppendState(journal, sceneId, playerId, 0, StateCodes.PlayerIdentity, 0, 0, "Tester", 1, 6_000);
+        AppendPeriodicRecovery(journal, sceneId, playerId, damage: 7634, mode: 2, ordinal: 2, observedAt: 7_000, batchOrdinal: 11);
+        journal.CompleteBatch(11);
+
+        var full = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
+        _ = full.CreateSnapshot();
+        var checkpoint = Assert.Single(full.RuntimeCheckpoints, static c => c.Anchor.LastObservationOrdinal == 1);
+        var tailJournal = ObservedEventJournal.FromEntries(journal.ToArray().Where(e => e.Stamp.ObservationOrdinal > checkpoint.Anchor.LastObservationOrdinal).ToArray());
+        var restored = SceneReadModelOwner.RestoreFromCheckpoint(tailJournal, checkpoint);
+        _ = restored.CreateSnapshotAt(7_000);
+
+        var expectedHealing = full.ReadLocked((_, _, _, combat) => combat.Combatants[playerId].OutgoingHealing);
+        var actualHealing = restored.ReadLocked((_, _, _, combat) => combat.Combatants[playerId].OutgoingHealing);
+        Assert.Equal(7634, expectedHealing);
+        Assert.Equal(expectedHealing, actualHealing);
     }
 
     [Fact]
@@ -62,6 +128,9 @@ public sealed class SceneRuntimePlaybackTests
         var flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         Assert.DoesNotContain(typeof(SceneRuntimeCheckpoint).GetFields(flags), static field => IsForbiddenCheckpointStorageType(field.FieldType));
         Assert.DoesNotContain(typeof(SceneRuntimeCheckpoint).GetProperties(flags), static property => IsForbiddenCheckpointStorageType(property.PropertyType));
+        Assert.Null(typeof(SceneRuntimeCheckpoint).GetProperty("Cursor"));
+        Assert.Null(typeof(SceneRuntimeCheckpoint).GetProperty("NextCursor"));
+        Assert.Null(typeof(SceneRuntimeCheckpoint).GetProperty("Snapshot"));
 
         static bool IsForbiddenCheckpointStorageType(Type type) =>
             IsForbiddenDirectType(type) || type.IsArray && type.GetElementType() is { } elementType && IsForbiddenDirectType(elementType);
@@ -75,9 +144,9 @@ public sealed class SceneRuntimePlaybackTests
             type == typeof(RuntimeMetadataRegistry) ||
             type == typeof(CombatStore) ||
             type == typeof(DomainEventApplier) ||
+            type == typeof(SceneCombatSnapshot) ||
             type == typeof(CombatEventRecord) ||
-            type == typeof(CombatSnapshotChange) ||
-            type.Name is "StampedCombatCanonicalizationResult" or "PendingCompactAvoidance";
+            type == typeof(CombatSnapshotChange);
     }
 
     [Fact]
@@ -112,7 +181,7 @@ public sealed class SceneRuntimePlaybackTests
         _ = owner.CreateSnapshot();
 
         Assert.Equal(21, owner.RuntimeCheckpoints.Count);
-        Assert.Contains(owner.RuntimeCheckpoints, static checkpoint => checkpoint.Cursor.NextObservationOrdinal == 0);
+        Assert.Contains(owner.RuntimeCheckpoints, static checkpoint => checkpoint.Anchor.LastObservationOrdinal == -1);
 
         var payload = owner.CreateArchivePayload();
         Assert.Equal(22, payload.Checkpoints.Count);
@@ -223,6 +292,31 @@ public sealed class SceneRuntimePlaybackTests
                 Damage = damage,
                 HitCount = 1,
                 AttemptCount = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            }
+        });
+    }
+
+    private static void AppendPeriodicRecovery(ObservedEventJournal journal, Guid sceneId, int playerId, int damage, int mode, long ordinal, long observedAt, long batchOrdinal)
+    {
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FrameOrdinal = batchOrdinal, BatchOrdinal = batchOrdinal },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = playerId,
+            TargetEntityId = playerId,
+            Raw = new RawPacketReference(0x0438, 0, ordinal + 1, observedAt),
+            Combat = new CombatObservation
+            {
+                SkillCode = 190000131,
+                OriginalSkillCode = 190000131,
+                Damage = damage,
+                HitCount = 1,
+                AttemptCount = 1,
+                PeriodicRelation = PeriodicEffectRelation.Self,
+                PeriodicMode = mode,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
             }

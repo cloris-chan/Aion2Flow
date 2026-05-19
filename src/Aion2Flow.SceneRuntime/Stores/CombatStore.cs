@@ -14,14 +14,12 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
     private readonly List<CombatSnapshotChange> _changeLog = eventCapacity > 0 ? new(ResolveChangeCapacity(eventCapacity)) : [];
     private readonly Dictionary<int, long> _detailRevisionByCombatant = combatantCapacity > 0 ? new(combatantCapacity) : [];
     private long _revision;
-    private bool _hasRestoredStateBaseline;
 
     public IReadOnlyDictionary<(int Source, int Target), CombatPairRecord> Pairs => _pairs;
     public IReadOnlyDictionary<int, CombatantRecord> Combatants => _combatants;
     public IReadOnlyList<CombatEventRecord> Events => _events;
     public ReadOnlySpan<CombatEventRecord> EventSpan => CollectionsMarshal.AsSpan(_events);
     public long Revision => _revision;
-    internal bool HasRestoredStateBaseline => _hasRestoredStateBaseline;
 
     public void EnsureCapacity(int eventCapacity, int combatantCapacity = 0, int pairCapacity = 0)
     {
@@ -81,6 +79,12 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             MultiHitCount = contribution.MultiHitCount
         };
         _events.Add(eventRecord);
+        var extraDrainHealing = observation.ValueKind == CombatValueKind.DrainDamage && observation.DrainHealAmount > 0 ? observation.DrainHealAmount : 0;
+        var totalHealing = contribution.HealingAmount + extraDrainHealing;
+        var periodicHealing = observation.ValueKind == CombatValueKind.PeriodicHealing ? contribution.HealingAmount : 0;
+        var drainDamage = observation.ValueKind == CombatValueKind.DrainDamage ? contribution.DamageAmount : 0;
+        var drainHealing = observation.ValueKind == CombatValueKind.DrainHealing ? contribution.HealingAmount : extraDrainHealing;
+        var regenerationHealing = observation.EffectTag == PacketEffectTag.RegenerationHealing ? contribution.HealingAmount : 0;
 
         var pairKey = (sourceId, targetId);
         ref var pair = ref CollectionsMarshal.GetValueRefOrAddDefault(_pairs, pairKey, out var pairExists);
@@ -99,7 +103,11 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             throw new InvalidOperationException("Combat pair dictionary returned a null record.");
         }
         pairRecord.TotalDamage += contribution.DamageAmount;
-        pairRecord.TotalHealing += contribution.HealingAmount;
+        pairRecord.TotalHealing += totalHealing;
+        pairRecord.TotalPeriodicHealing += periodicHealing;
+        pairRecord.TotalDrainDamage += drainDamage;
+        pairRecord.TotalDrainHealing += drainHealing;
+        pairRecord.TotalRegenerationHealing += regenerationHealing;
         pairRecord.TotalShield += contribution.ShieldGrantAmount;
         pairRecord.TotalShieldAbsorbed += contribution.ShieldAbsorbedAmount;
         pairRecord.ShieldCount += contribution.ShieldGrantCount;
@@ -119,7 +127,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
 
         var source = GetOrAddCombatant(sourceId);
         source.OutgoingDamage += contribution.DamageAmount;
-        source.OutgoingHealing += contribution.HealingAmount;
+        source.OutgoingHealing += totalHealing;
         source.OutgoingShield += contribution.ShieldGrantAmount;
         source.OutgoingShieldAbsorbed += contribution.ShieldAbsorbedAmount;
         source.OutgoingShieldCount += contribution.ShieldGrantCount;
@@ -277,7 +285,6 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         _changeLog.Clear();
         _detailRevisionByCombatant.Clear();
         _revision = 0;
-        _hasRestoredStateBaseline = false;
     }
 
     public CombatStoreStateSnapshot CreateStateSnapshot()
@@ -337,27 +344,6 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             _detailRevisionByCombatant[detailRevision.CombatantId] = detailRevision.Revision;
 
         _revision = snapshot.Revision;
-        _hasRestoredStateBaseline = true;
-    }
-
-    public CombatStore DeepClone()
-    {
-        var clone = new CombatStore(_events.Count, _combatants.Count, _pairs.Count);
-        foreach (var pair in _pairs)
-            clone._pairs.Add(pair.Key, pair.Value.DeepClone());
-        foreach (var pair in _combatants)
-            clone._combatants.Add(pair.Key, pair.Value.DeepClone());
-        foreach (var pair in _outgoingBySource)
-            clone._outgoingBySource.Add(pair.Key, [.. pair.Value]);
-        foreach (var pair in _incomingByTarget)
-            clone._incomingByTarget.Add(pair.Key, [.. pair.Value]);
-        clone._events.AddRange(_events);
-        clone._changeLog.AddRange(_changeLog);
-        foreach (var pair in _detailRevisionByCombatant)
-            clone._detailRevisionByCombatant.Add(pair.Key, pair.Value);
-        clone._revision = _revision;
-        clone._hasRestoredStateBaseline = _hasRestoredStateBaseline;
-        return clone;
     }
 
     public SnapshotChangeCursor CreateCursor(long afterRevision) =>
@@ -484,6 +470,10 @@ public readonly record struct CombatPairStateSnapshot(
     int TargetId,
     long TotalDamage,
     long TotalHealing,
+    long TotalPeriodicHealing,
+    long TotalDrainDamage,
+    long TotalDrainHealing,
+    long TotalRegenerationHealing,
     long TotalShield,
     long TotalShieldAbsorbed,
     int ShieldCount,
@@ -504,6 +494,10 @@ public readonly record struct CombatPairStateSnapshot(
         record.TargetId,
         record.TotalDamage,
         record.TotalHealing,
+        record.TotalPeriodicHealing,
+        record.TotalDrainDamage,
+        record.TotalDrainHealing,
+        record.TotalRegenerationHealing,
         record.TotalShield,
         record.TotalShieldAbsorbed,
         record.ShieldCount,
@@ -525,6 +519,10 @@ public readonly record struct CombatPairStateSnapshot(
         TargetId = TargetId,
         TotalDamage = TotalDamage,
         TotalHealing = TotalHealing,
+        TotalPeriodicHealing = TotalPeriodicHealing,
+        TotalDrainDamage = TotalDrainDamage,
+        TotalDrainHealing = TotalDrainHealing,
+        TotalRegenerationHealing = TotalRegenerationHealing,
         TotalShield = TotalShield,
         TotalShieldAbsorbed = TotalShieldAbsorbed,
         ShieldCount = ShieldCount,
@@ -635,6 +633,10 @@ public sealed class CombatPairRecord
     public int TargetId { get; init; }
     public long TotalDamage { get; set; }
     public long TotalHealing { get; set; }
+    public long TotalPeriodicHealing { get; set; }
+    public long TotalDrainDamage { get; set; }
+    public long TotalDrainHealing { get; set; }
+    public long TotalRegenerationHealing { get; set; }
     public long TotalShield { get; set; }
     public long TotalShieldAbsorbed { get; set; }
     public int ShieldCount { get; set; }
@@ -650,27 +652,6 @@ public sealed class CombatPairRecord
     public long FirstRevision { get; set; }
     public long Revision { get; set; }
 
-    public CombatPairRecord DeepClone() => new()
-    {
-        SourceId = SourceId,
-        TargetId = TargetId,
-        TotalDamage = TotalDamage,
-        TotalHealing = TotalHealing,
-        TotalShield = TotalShield,
-        TotalShieldAbsorbed = TotalShieldAbsorbed,
-        ShieldCount = ShieldCount,
-        ShieldAbsorbedCount = ShieldAbsorbedCount,
-        HitCount = HitCount,
-        AttemptCount = AttemptCount,
-        EvadeCount = EvadeCount,
-        InvincibleCount = InvincibleCount,
-        MultiHitCount = MultiHitCount,
-        LastSkillCode = LastSkillCode,
-        FirstObserved = FirstObserved,
-        LastObserved = LastObserved,
-        FirstRevision = FirstRevision,
-        Revision = Revision
-    };
 }
 
 public readonly record struct CombatEventRecord
@@ -720,33 +701,4 @@ public sealed class CombatantRecord
     public long LastObserved { get; set; }
     public long Revision { get; set; }
 
-    public CombatantRecord DeepClone() => new()
-    {
-        CombatantId = CombatantId,
-        OutgoingDamage = OutgoingDamage,
-        OutgoingHits = OutgoingHits,
-        OutgoingAttempts = OutgoingAttempts,
-        OutgoingEvades = OutgoingEvades,
-        OutgoingInvincibles = OutgoingInvincibles,
-        OutgoingMultiHits = OutgoingMultiHits,
-        IncomingDamage = IncomingDamage,
-        IncomingHits = IncomingHits,
-        IncomingAttempts = IncomingAttempts,
-        IncomingEvades = IncomingEvades,
-        IncomingInvincibles = IncomingInvincibles,
-        IncomingMultiHits = IncomingMultiHits,
-        OutgoingHealing = OutgoingHealing,
-        IncomingHealing = IncomingHealing,
-        OutgoingShield = OutgoingShield,
-        IncomingShield = IncomingShield,
-        OutgoingShieldAbsorbed = OutgoingShieldAbsorbed,
-        IncomingShieldAbsorbed = IncomingShieldAbsorbed,
-        OutgoingShieldCount = OutgoingShieldCount,
-        IncomingShieldCount = IncomingShieldCount,
-        OutgoingShieldAbsorbedCount = OutgoingShieldAbsorbedCount,
-        IncomingShieldAbsorbedCount = IncomingShieldAbsorbedCount,
-        FirstObserved = FirstObserved,
-        LastObserved = LastObserved,
-        Revision = Revision
-    };
 }

@@ -78,16 +78,16 @@ public sealed class SceneBoundaryService
 
     public SceneTransitionKind MarkSceneTransportBoundary() => SceneTransitionKind.None;
 
-    public SceneBoundaryService DeepClone()
+    public SceneBoundaryServiceStateSnapshot CreateStateSnapshot() =>
+        new(CurrentMapId, CurrentMapInstanceId, SceneTransitionRevision, _pendingMapId, _pendingAllowSameMapReload);
+
+    public void RestoreState(SceneBoundaryServiceStateSnapshot snapshot)
     {
-        return new SceneBoundaryService
-        {
-            _pendingMapId = _pendingMapId,
-            _pendingAllowSameMapReload = _pendingAllowSameMapReload,
-            CurrentMapId = CurrentMapId,
-            CurrentMapInstanceId = CurrentMapInstanceId,
-            SceneTransitionRevision = SceneTransitionRevision
-        };
+        CurrentMapId = snapshot.CurrentMapId;
+        CurrentMapInstanceId = snapshot.CurrentMapInstanceId;
+        SceneTransitionRevision = snapshot.SceneTransitionRevision;
+        _pendingMapId = snapshot.PendingMapId;
+        _pendingAllowSameMapReload = snapshot.PendingAllowSameMapReload;
     }
 
     private bool CommitConfirmedMap(uint mapId, bool allowSameMapReload)
@@ -128,3 +128,10 @@ public sealed class SceneBoundaryService
 }
 
 public enum SceneTransitionKind : byte { None, MapChanged, InstanceChanged, SceneReload, TransportBoundary }
+
+public readonly record struct SceneBoundaryServiceStateSnapshot(
+    uint CurrentMapId,
+    uint CurrentMapInstanceId,
+    long SceneTransitionRevision,
+    uint PendingMapId,
+    bool PendingAllowSameMapReload);

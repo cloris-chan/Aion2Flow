@@ -12,14 +12,25 @@ public sealed class PeriodicLinkCanonicalizer
     private readonly HashSet<Signature> _resolved = [];
     private readonly Queue<Signature> _order = [];
 
-    public PeriodicLinkCanonicalizer DeepClone()
+    internal StateSnapshot CreateStateSnapshot()
     {
-        var clone = new PeriodicLinkCanonicalizer();
-        foreach (var signature in _resolved)
-            clone._resolved.Add(signature);
+        var order = new SignatureStateSnapshot[_order.Count];
+        var index = 0;
         foreach (var signature in _order)
-            clone._order.Enqueue(signature);
-        return clone;
+            order[index++] = new SignatureStateSnapshot(signature.TargetId, signature.LinkId, signature.SequenceId, signature.TailRaw, signature.BatchOrdinal);
+        return new StateSnapshot(order);
+    }
+
+    internal void RestoreState(StateSnapshot snapshot)
+    {
+        _resolved.Clear();
+        _order.Clear();
+        foreach (ref readonly var item in snapshot.Order.AsSpan())
+        {
+            var signature = new Signature(item.TargetId, item.LinkId, item.SequenceId, item.TailRaw, item.BatchOrdinal);
+            _resolved.Add(signature);
+            _order.Enqueue(signature);
+        }
     }
 
     public static bool IsLinkObservation(in CombatObservation observation) => observation.Type == 48 && observation.Damage == 0 && observation.HitCount == 0 && observation.AttemptCount == 0;
@@ -71,4 +82,18 @@ public sealed class PeriodicLinkCanonicalizer
             _resolved.Remove(signature);
         }
     }
+
+    internal sealed class StateSnapshot(SignatureStateSnapshot[] order)
+    {
+        public SignatureStateSnapshot[] Order { get; } = order;
+
+        public StateSnapshot DeepClone()
+        {
+            var order = new SignatureStateSnapshot[Order.Length];
+            Array.Copy(Order, order, order.Length);
+            return new StateSnapshot(order);
+        }
+    }
+
+    internal readonly record struct SignatureStateSnapshot(int TargetId, int LinkId, int SequenceId, int TailRaw, long BatchOrdinal);
 }

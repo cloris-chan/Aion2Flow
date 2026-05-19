@@ -183,14 +183,25 @@ public sealed class EntityStore
         _revision++;
     }
 
-    public EntityStore DeepClone()
+    public EntityStoreStateSnapshot CreateStateSnapshot()
     {
-        var clone = new EntityStore();
-        foreach (var pair in _entities)
-            clone._entities.Add(pair.Key, pair.Value.DeepClone());
-        clone._revision = _revision;
-        return clone;
+        var entities = new EntityStateSnapshot[_entities.Count];
+        var index = 0;
+        foreach (var entity in _entities.Values)
+            entities[index++] = EntityStateSnapshot.From(entity);
+        Array.Sort(entities, static (left, right) => left.EntityId.CompareTo(right.EntityId));
+        return new EntityStoreStateSnapshot(_revision, entities);
     }
+
+    public void RestoreState(EntityStoreStateSnapshot snapshot)
+    {
+        _entities.Clear();
+        _entities.EnsureCapacity(snapshot.Entities.Length);
+        foreach (ref readonly var entity in snapshot.Entities.AsSpan())
+            _entities.Add(entity.EntityId, entity.ToRecord());
+        _revision = snapshot.Revision;
+    }
+
 }
 
 public sealed class EntityRecord
@@ -214,7 +225,62 @@ public sealed class EntityRecord
     public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
     public long LastObservedOrdinal { get; set; }
 
-    public EntityRecord DeepClone() => new()
+}
+
+public sealed class EntityStoreStateSnapshot(long revision, EntityStateSnapshot[] entities)
+{
+    public long Revision { get; } = revision;
+    public EntityStateSnapshot[] Entities { get; } = entities;
+
+    public EntityStoreStateSnapshot DeepClone()
+    {
+        var entities = new EntityStateSnapshot[Entities.Length];
+        Array.Copy(Entities, entities, entities.Length);
+        return new EntityStoreStateSnapshot(Revision, entities);
+    }
+}
+
+public readonly record struct EntityStateSnapshot(
+    int EntityId,
+    int? NpcCode,
+    NpcKind Kind,
+    string? Nickname,
+    bool IsPlayer,
+    CharacterClass? CharacterClass,
+    CombatantClassEvidence ClassEvidence,
+    int? OwnerEntityId,
+    int? CurrentHp,
+    int? MaxHp,
+    bool NpcCombatActive,
+    uint? Value2136,
+    uint? Sequence2136,
+    uint? Value0140,
+    uint? Value0240,
+    (byte State0, byte State1)? State4636,
+    (int SequenceId, int ResultCode)? Latest2C38,
+    long LastObservedOrdinal)
+{
+    internal static EntityStateSnapshot From(EntityRecord record) => new(
+        record.EntityId,
+        record.NpcCode,
+        record.Kind,
+        record.Nickname,
+        record.IsPlayer,
+        record.CharacterClass,
+        record.ClassEvidence,
+        record.OwnerEntityId,
+        record.CurrentHp,
+        record.MaxHp,
+        record.NpcCombatActive,
+        record.Value2136,
+        record.Sequence2136,
+        record.Value0140,
+        record.Value0240,
+        record.State4636,
+        record.Latest2C38,
+        record.LastObservedOrdinal);
+
+    internal EntityRecord ToRecord() => new()
     {
         EntityId = EntityId,
         NpcCode = NpcCode,

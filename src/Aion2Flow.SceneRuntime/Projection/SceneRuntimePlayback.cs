@@ -26,7 +26,11 @@ public sealed class SceneRuntimePlayback
             _checkpoints[i] = checkpoints[i].DeepClone();
 
         Array.Sort(_timeline, static (a, b) => a.Stamp.ObservationOrdinal.CompareTo(b.Stamp.ObservationOrdinal));
-        Array.Sort(_checkpoints, static (a, b) => a.CapturedAtMilliseconds.CompareTo(b.CapturedAtMilliseconds));
+        Array.Sort(_checkpoints, static (a, b) =>
+        {
+            var cmp = a.CapturedAtMilliseconds.CompareTo(b.CapturedAtMilliseconds);
+            return cmp != 0 ? cmp : a.Anchor.LastObservationOrdinal.CompareTo(b.Anchor.LastObservationOrdinal);
+        });
         _journal = ObservedEventJournal.FromEntries(_timeline);
     }
 
