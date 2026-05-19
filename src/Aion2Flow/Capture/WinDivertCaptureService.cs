@@ -193,8 +193,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         continue;
                     }
 
-                    var capturedPacket = CapturedPacket.Create(connection, bufferOwner, payloadOffset, payloadLength, tcp.HostSequenceNumber);
-                    bufferOwner = null;
+                    var capturedPacket = CapturedPacket.CreateCopy(connection, packetSpan.Slice(payloadOffset, payloadLength), tcp.HostSequenceNumber);
                     if (!PacketCaptureChannel.TryWrite(capturedPacket))
                     {
                         capturedPacket.Return();

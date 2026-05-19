@@ -52,7 +52,9 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
     public CharacterClass? ResolvePcClass(int entityId)
         => Snapshot.Combatants.TryGetValue(entityId, out var combatant)
             ? combatant.CharacterClass
-            : null;
+            : TryGetPcMetadata(entityId, out var pc)
+                ? pc.CharacterClass
+                : null;
 
     public Faction ResolveFaction(int entityId)
         => TryGetPcMetadata(entityId, out var pc)

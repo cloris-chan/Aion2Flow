@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Identity;
 
@@ -9,7 +10,7 @@ public enum Faction : byte
     Dark = 2
 }
 
-public readonly record struct PcMetadata(int EntityId, string Nickname, int? OriginServerId, Faction Faction = Faction.Unknown)
+public readonly record struct PcMetadata(int EntityId, string Nickname, int? OriginServerId, Faction Faction = Faction.Unknown, CharacterClass? CharacterClass = null)
 {
     public bool HasNickname => !string.IsNullOrWhiteSpace(Nickname);
     public bool HasFaction => Faction != Faction.Unknown;
@@ -46,7 +47,27 @@ public sealed class RuntimeMetadataRegistry
             : exists
                 ? current.Faction
                 : Faction.Unknown;
-        var next = new PcMetadata(entityId, nickname, resolvedOriginServerId, resolvedFaction);
+        var next = new PcMetadata(entityId, nickname, resolvedOriginServerId, resolvedFaction, exists ? current.CharacterClass : null);
+        if (exists && current.Equals(next))
+            return false;
+
+        current = next;
+        _revision++;
+        return true;
+    }
+
+    public bool UpsertPcClass(int entityId, CharacterClass? characterClass)
+    {
+        if (entityId <= 0)
+            return false;
+
+        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_pcMetadataByEntityId, entityId, out var exists);
+        if (!exists && characterClass is null)
+            return false;
+
+        var next = exists
+            ? current with { CharacterClass = characterClass }
+            : new PcMetadata(entityId, string.Empty, null, Faction.Unknown, characterClass);
         if (exists && current.Equals(next))
             return false;
 
@@ -247,7 +268,7 @@ public sealed class SceneIdentityScopeBuilder
 
     public void AddPcMetadata(PcMetadata metadata)
     {
-        if (metadata.EntityId <= 0 || !metadata.HasNickname)
+        if (metadata.EntityId <= 0 || !metadata.HasNickname && metadata.CharacterClass is null)
             return;
 
         _pcMetadata[metadata.EntityId] = metadata;

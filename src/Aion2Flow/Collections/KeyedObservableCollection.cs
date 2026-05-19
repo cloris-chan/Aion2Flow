@@ -100,7 +100,7 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
         {
             if (_snapshot is null)
             {
-                _snapshot = new List<TItem>(Items);
+                _snapshot = [.. Items];
             }
             else
             {
@@ -134,7 +134,7 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
                 }
             }
 
-            _snapshot = null;
+            _snapshot?.Clear();
             _isModifiedDuringSuspension = false;
         }
     }
@@ -287,8 +287,8 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
 
     public readonly struct NotificationDeferral(KeyedObservableCollection<TKey, TItem> collection, BatchUpdateMode mode) : IDisposable
     {
-        public  IReadOnlyList<TItem> Snapshot => collection._snapshot ?? [];
-        public  void Dispose() => collection.ResumeNotifications(mode);
+        public IReadOnlyList<TItem> Snapshot => collection._snapshot ?? [];
+        public void Dispose() => collection.ResumeNotifications(mode);
     }
 
     private readonly struct DiffOperation(NotifyCollectionChangedAction action, TItem? oldItem, TItem? newItem, int index, int oldIndex = -1)

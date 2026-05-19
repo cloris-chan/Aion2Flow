@@ -184,7 +184,9 @@ public class MultiHitAttributionServiceTests
             ValueKind = CombatValueKind.Damage
         };
 
-        var result = Assert.Single(canonicalizer.Normalize(8171, 42995, in observation));
+        var results = canonicalizer.Normalize(8171, 42995, in observation);
+        Assert.Equal(1, results.Count);
+        var result = results[0];
 
         Assert.Equal(2, result.Observation.MultiHitCount);
         Assert.Equal(DamageModifiers.MultiHit, result.Observation.Modifiers & DamageModifiers.MultiHit);

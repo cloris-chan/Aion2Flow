@@ -20,11 +20,13 @@ public static class CombatResourceRegistry
             SkillDisplayMap = _skillMap;
             SkillCodes = [.. _skillMap.Select(static x => x.Id).OrderBy(static x => x)];
             _resolvedSkillCodeCache.Clear();
+            SkillMapRevision++;
         }
     }
 
     public static SkillCollection SkillDisplayMap { get; private set; } = [];
     public static int[] SkillCodes { get; private set; } = [];
+    public static long SkillMapRevision { get; private set; }
     public static IReadOnlyDictionary<int, NpcCatalogEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcCatalogEntry>();
 
     public static void EnsureCombatResources()

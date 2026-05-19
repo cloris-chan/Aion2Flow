@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -13,11 +12,7 @@ public sealed class SceneRuntimeCheckpoint
         JournalCursor cursor,
         long appliedObservationOrdinal,
         long appliedBatchOrdinal,
-        EntityStore entities,
-        SceneBoundaryStore boundary,
-        RuntimeMetadataRegistry metadataRegistry,
-        CombatStore combat,
-        DomainEventApplier applier)
+        CombatStoreStateSnapshot combatState)
     {
         EncounterId = encounterId;
         SceneStarted = sceneStarted;
@@ -25,11 +20,7 @@ public sealed class SceneRuntimeCheckpoint
         Cursor = cursor;
         AppliedObservationOrdinal = appliedObservationOrdinal;
         AppliedBatchOrdinal = appliedBatchOrdinal;
-        Entities = entities;
-        Boundary = boundary;
-        MetadataRegistry = metadataRegistry;
-        Combat = combat;
-        Applier = applier;
+        CombatState = combatState;
     }
 
     public Guid EncounterId { get; }
@@ -38,32 +29,15 @@ public sealed class SceneRuntimeCheckpoint
     public JournalCursor Cursor { get; }
     public long AppliedObservationOrdinal { get; }
     public long AppliedBatchOrdinal { get; }
+    internal CombatStoreStateSnapshot CombatState { get; }
 
-    internal EntityStore Entities { get; }
-    internal SceneBoundaryStore Boundary { get; }
-    internal RuntimeMetadataRegistry MetadataRegistry { get; }
-    internal CombatStore Combat { get; }
-    internal DomainEventApplier Applier { get; }
-
-    public SceneRuntimeCheckpoint DeepClone()
-    {
-        var entities = Entities.DeepClone();
-        var boundary = Boundary.DeepClone();
-        var metadataRegistry = MetadataRegistry.DeepClone();
-        var combat = Combat.DeepClone();
-        var applier = Applier.DeepClone(entities, boundary, metadataRegistry, combat);
-        return new SceneRuntimeCheckpoint(
+    public SceneRuntimeCheckpoint DeepClone() =>
+        new(
             EncounterId,
             SceneStarted,
             CapturedAtMilliseconds,
             Cursor,
             AppliedObservationOrdinal,
             AppliedBatchOrdinal,
-            entities,
-            boundary,
-            metadataRegistry,
-            combat,
-            applier);
-    }
-
+            CombatState.DeepClone());
 }

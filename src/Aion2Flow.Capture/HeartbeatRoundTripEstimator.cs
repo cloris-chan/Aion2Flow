@@ -9,7 +9,7 @@ internal sealed class HeartbeatRoundTripEstimator
     internal const int HeartbeatReplyPayloadLength = 3;
     internal const double SmoothingFactor = 0.1;
 
-    private static readonly byte[] HeartbeatReplyPayload = [0x06, 0x00, 0x36];
+    private static ReadOnlySpan<byte> HeartbeatReplyPayload => [0x06, 0x00, 0x36];
     private const double DampenedFactor = SmoothingFactor * 0.2;
     private const double OutlierThreshold = 0.3;
     private const int WarmUpCount = 5;

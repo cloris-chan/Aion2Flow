@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Controls;
@@ -7,8 +9,6 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
-using System.Collections;
-using System.Collections.Specialized;
 
 namespace Cloris.Aion2Flow.Controls;
 
@@ -25,8 +25,10 @@ public sealed class AnimatedItemsView : Panel
     public static readonly DirectProperty<AnimatedItemsView, double> AddRemoveOffsetProperty = AvaloniaProperty.RegisterDirect<AnimatedItemsView, double>(nameof(AddRemoveOffset), view => view.AddRemoveOffset, (v, value) => v.AddRemoveOffset = value);
 
     private readonly List<object> _items = [];
+    private readonly List<object> _syncItems = [];
     private readonly Dictionary<object, AnimatedItemsViewItem> _containers = [];
     private readonly Dictionary<AnimatedItemsViewItem, double> _targetTops = [];
+    private readonly HashSet<object> _syncItemSet = new(ReferenceEqualityComparer.Instance);
 
     private INotifyCollectionChanged? _trackedCollection;
     private Control? _emptyStateControl;
@@ -142,8 +144,11 @@ public sealed class AnimatedItemsView : Panel
             }
         }
 
-        foreach (var container in Children.OfType<AnimatedItemsViewItem>().Where(c => c.IsRemoving))
+        foreach (var child in Children)
         {
+            if (child is not AnimatedItemsViewItem { IsRemoving: true } container)
+                continue;
+
             container.Measure(measureSize);
             maxWidth = Math.Max(maxWidth, container.DesiredSize.Width);
 
@@ -227,9 +232,12 @@ public sealed class AnimatedItemsView : Panel
             currentY += container.DesiredSize.Height + ItemSpacing;
         }
 
-        foreach (var container in Children.OfType<AnimatedItemsViewItem>().Where(c => c.IsRemoving))
+        foreach (var child in Children)
         {
-            if (_targetTops.TryGetValue(container, out double removeY))
+            if (child is not AnimatedItemsViewItem { IsRemoving: true } container)
+                continue;
+
+            if (_targetTops.TryGetValue(container, out _))
             {
                 container.Arrange(new Rect(0, 0, finalSize.Width, container.DesiredSize.Height));
             }
@@ -361,53 +369,72 @@ public sealed class AnimatedItemsView : Panel
 
     private void FullSync(bool animate)
     {
-        var nextItems = ItemsSource?.Cast<object>().ToList() ?? [];
-        var nextSet = nextItems.ToHashSet(ReferenceEqualityComparer.Instance);
-
-        for (int i = _items.Count - 1; i >= 0; i--)
+        _syncItems.Clear();
+        _syncItemSet.Clear();
+        try
         {
-            var item = _items[i];
-            if (!nextSet.Contains(item))
+            if (ItemsSource is not null)
             {
-                var container = _containers[item];
-                _items.RemoveAt(i);
-                _containers.Remove(item);
-
-                if (animate && _hasArrangedOnce) BeginRemoveAnimation(container);
-                else
+                foreach (var item in ItemsSource)
                 {
-                    Children.Remove(container);
-                    _targetTops.Remove(container);
+                    if (item is null)
+                        continue;
+
+                    _syncItems.Add(item);
+                    _syncItemSet.Add(item);
                 }
             }
-        }
 
-        for (int i = 0; i < nextItems.Count; i++)
-        {
-            var item = nextItems[i];
-            if (_containers.TryGetValue(item, out var container))
+            for (int i = _items.Count - 1; i >= 0; i--)
             {
-                int currentIndex = _items.IndexOf(item);
-                if (currentIndex != i)
+                var item = _items[i];
+                if (!_syncItemSet.Contains(item))
                 {
-                    _items.RemoveAt(currentIndex);
+                    var container = _containers[item];
+                    _items.RemoveAt(i);
+                    _containers.Remove(item);
+
+                    if (animate && _hasArrangedOnce) BeginRemoveAnimation(container);
+                    else
+                    {
+                        Children.Remove(container);
+                        _targetTops.Remove(container);
+                    }
+                }
+            }
+
+            for (int i = 0; i < _syncItems.Count; i++)
+            {
+                var item = _syncItems[i];
+                if (_containers.TryGetValue(item, out var container))
+                {
+                    int currentIndex = _items.IndexOf(item);
+                    if (currentIndex != i)
+                    {
+                        _items.RemoveAt(currentIndex);
+                        _items.Insert(i, item);
+                        Children.Remove(container);
+                        Children.Insert(i, container);
+                    }
+                }
+                else
+                {
                     _items.Insert(i, item);
-                    Children.Remove(container);
+                    container = CreateContainer(item, startAsAdding: animate && _hasArrangedOnce);
+                    _containers[item] = container;
                     Children.Insert(i, container);
                 }
             }
-            else
-            {
-                _items.Insert(i, item);
-                container = CreateContainer(item, startAsAdding: animate && _hasArrangedOnce);
-                _containers[item] = container;
-                Children.Insert(i, container);
-            }
-        }
 
-        RefreshSelectionState();
-        UpdateEmptyStateControl();
-        InvalidateMeasure();
+            RefreshSelectionState();
+            UpdateEmptyStateControl();
+            InvalidateMeasure();
+        }
+        finally
+        {
+            _syncItems.Clear();
+            _syncItemSet.Clear();
+        }
     }
 
     private AnimatedItemsViewItem CreateContainer(object item, bool startAsAdding = false)
@@ -552,10 +579,19 @@ public sealed class AnimatedItemsView : Panel
         RemoveEmptyStateControl();
     }
 
-    private bool ShouldShowEmptyState() =>
-        EmptyTemplate is not null &&
-        _items.Count == 0 &&
-        !Children.OfType<AnimatedItemsViewItem>().Any(static c => c.IsRemoving);
+    private bool ShouldShowEmptyState()
+    {
+        if (EmptyTemplate is null || _items.Count != 0)
+            return false;
+
+        foreach (var child in Children)
+        {
+            if (child is AnimatedItemsViewItem { IsRemoving: true })
+                return false;
+        }
+
+        return true;
+    }
 
     private Control? CreateEmptyStateControl()
     {

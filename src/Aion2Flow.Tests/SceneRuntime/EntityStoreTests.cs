@@ -563,6 +563,23 @@ public class CombatStoreTests
     }
 
     [Fact]
+    public void CombatStore_RestoredState_ContinuesRevisionIndexedEventLookup()
+    {
+        var source = new CombatStore();
+        source.ApplyCombat(100, 200, 500, 1, 1, 1000);
+        source.ApplyCombat(100, 200, 300, 1, 1, 1000);
+
+        var restored = new CombatStore();
+        restored.RestoreState(source.CreateStateSnapshot());
+        restored.ApplyCombat(100, 200, 700, 1, 1, 1000);
+
+        Assert.Equal(3, restored.Revision);
+        Assert.True(restored.TryGetEventByRevision(3, out var record));
+        Assert.Equal(700, record.Observation.Damage);
+        Assert.False(restored.TryGetEventByRevision(2, out _));
+    }
+
+    [Fact]
     public void DomainEventApplier_CombatObservation_PopulatesCombatStore()
     {
         var journal = new ObservedEventJournal();

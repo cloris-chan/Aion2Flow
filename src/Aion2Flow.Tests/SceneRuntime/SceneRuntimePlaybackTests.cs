@@ -1,9 +1,13 @@
+using System.Reflection;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
@@ -24,6 +28,24 @@ public sealed class SceneRuntimePlaybackTests
     }
 
     [Fact]
+    public void RuntimeCheckpoint_Restore_From_Later_CombatState_Replays_To_Same_Snapshot()
+    {
+        var journal = CreateJournal();
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
+        var baseline = owner.CreateSnapshot();
+        var checkpoint = owner.RuntimeCheckpoints[^1];
+
+        Assert.True(checkpoint.Cursor.NextObservationOrdinal > 0);
+        Assert.NotEmpty(checkpoint.CombatState.Pairs);
+        Assert.NotEmpty(checkpoint.CombatState.Combatants);
+
+        var restored = SceneReadModelOwner.RestoreFromCheckpoint(journal, checkpoint);
+        var replayed = restored.CreateSnapshotAt(7_000);
+
+        AssertSnapshotTotalsEqual(baseline, replayed, playerId: 100);
+    }
+
+    [Fact]
     public void ArchivePayload_Stores_Timeline_And_Checkpoints_Not_Ui_Snapshot()
     {
         var owner = new SceneReadModelOwner(CreateJournal(), Guid.NewGuid(), DateTimeOffset.Now);
@@ -32,6 +54,30 @@ public sealed class SceneRuntimePlaybackTests
         Assert.Null(typeof(SceneArchivePayload).GetProperty("Snapshot"));
         Assert.NotEmpty(payload.Timeline);
         Assert.NotEmpty(payload.Checkpoints);
+    }
+
+    [Fact]
+    public void RuntimeCheckpoint_DoesNotStore_JournalStoresOrEventLogs()
+    {
+        var flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        Assert.DoesNotContain(typeof(SceneRuntimeCheckpoint).GetFields(flags), static field => IsForbiddenCheckpointStorageType(field.FieldType));
+        Assert.DoesNotContain(typeof(SceneRuntimeCheckpoint).GetProperties(flags), static property => IsForbiddenCheckpointStorageType(property.PropertyType));
+
+        static bool IsForbiddenCheckpointStorageType(Type type) =>
+            IsForbiddenDirectType(type) || type.IsArray && type.GetElementType() is { } elementType && IsForbiddenDirectType(elementType);
+
+        static bool IsForbiddenDirectType(Type type) =>
+            type == typeof(ObservedEventJournal) ||
+            type == typeof(ObservedEventEnvelope) ||
+            type == typeof(IReadOnlyList<ObservedEventEnvelope>) ||
+            type == typeof(EntityStore) ||
+            type == typeof(SceneBoundaryStore) ||
+            type == typeof(RuntimeMetadataRegistry) ||
+            type == typeof(CombatStore) ||
+            type == typeof(DomainEventApplier) ||
+            type == typeof(CombatEventRecord) ||
+            type == typeof(CombatSnapshotChange) ||
+            type.Name is "StampedCombatCanonicalizationResult" or "PendingCompactAvoidance";
     }
 
     [Fact]
@@ -48,6 +94,28 @@ public sealed class SceneRuntimePlaybackTests
         Assert.True(final.Combatants.TryGetValue(100, out var finalMetrics));
         Assert.Equal(1_000, partialMetrics.DamageAmount);
         Assert.Equal(1_250, finalMetrics.DamageAmount);
+    }
+
+    [Fact]
+    public void RuntimeCheckpoints_Retain_Full_FiveSecond_Cadence()
+    {
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
+
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendState(journal, sceneId, 100, 0, StateCodes.PlayerIdentity, 0, 0, "Tester", 0, 1_000);
+        for (var i = 1; i <= 20; i++)
+            AppendCombat(journal, sceneId, 100, 200, 100, i, 1_000 + i * 31_000L);
+        journal.CompleteBatch(1);
+
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
+        _ = owner.CreateSnapshot();
+
+        Assert.Equal(21, owner.RuntimeCheckpoints.Count);
+        Assert.Contains(owner.RuntimeCheckpoints, static checkpoint => checkpoint.Cursor.NextObservationOrdinal == 0);
+
+        var payload = owner.CreateArchivePayload();
+        Assert.Equal(22, payload.Checkpoints.Count);
     }
 
     [Fact]
@@ -77,10 +145,14 @@ public sealed class SceneRuntimePlaybackTests
 
     private static ObservedEventJournal CreateJournal()
     {
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
-        {
-            [2_999_997] = new(2_999_997, "Playback Boss", NpcCatalogKind.Boss)
-        });
+        CombatResourceRegistry.SetGameResources(
+            [
+                new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
+            ],
+            new Dictionary<int, NpcCatalogEntry>
+            {
+                [2_999_997] = new(2_999_997, "Playback Boss", NpcCatalogKind.Boss)
+            });
 
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
@@ -101,6 +173,7 @@ public sealed class SceneRuntimePlaybackTests
         Assert.True(expected.Combatants.TryGetValue(playerId, out var expectedMetrics));
         Assert.True(actual.Combatants.TryGetValue(playerId, out var actualMetrics));
         Assert.Equal(expectedMetrics.DamageAmount, actualMetrics.DamageAmount);
+        Assert.Equal(expectedMetrics.CharacterClass, actualMetrics.CharacterClass);
         Assert.Equal(expected.EncounterStartTime, actual.EncounterStartTime);
         Assert.Equal(expected.EncounterEndTime, actual.EncounterEndTime);
     }

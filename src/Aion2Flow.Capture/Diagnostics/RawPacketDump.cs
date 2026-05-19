@@ -7,11 +7,7 @@ namespace Cloris.Aion2Flow.Capture.Diagnostics;
 
 internal static class RawPacketDump
 {
-#if DEBUG
-    private static bool IsEnabled => true;
-#else
-    private static bool IsEnabled => false;
-#endif
+    private static readonly bool IsEnabled = Environment.GetEnvironmentVariable("AION2FLOW_RAW_PACKET_DUMP") == "1";
     private static readonly Lock SyncRoot = new();
     private static string _logRootDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
     private static string _rawLogPath = string.Empty;

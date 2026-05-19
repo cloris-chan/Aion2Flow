@@ -4,7 +4,7 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 
 internal static class PacketTransportCodec
 {
-    public static readonly byte[] Pattern = [0x06, 0x00, 0x36];
+    public static ReadOnlySpan<byte> Pattern => [0x06, 0x00, 0x36];
 
     public static bool TryWriteVarInt(int value, Span<byte> destination, out int written)
     {

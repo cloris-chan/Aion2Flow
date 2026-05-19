@@ -87,9 +87,11 @@ public sealed class DomainEventApplier
 
     public void ApplyJournal(ObservedEventJournal journal)
     {
-        if (journal.Count == 0)
+        var count = journal.Count;
+        if (count == 0)
             return;
 
+        _combat.EnsureCapacity(count);
         var cursor = journal.CreateCursor(0);
         while (true)
         {
@@ -184,6 +186,12 @@ public sealed class DomainEventApplier
     private void ApplyCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
     {
         var observation = result.Observation;
+        if (_entities.ApplyCharacterClassEvidence(result.SourceId, in observation) &&
+            _entities.TryGet(result.SourceId, out var sourceEntity))
+        {
+            _metadataRegistry.UpsertPcClass(result.SourceId, sourceEntity.CharacterClass);
+        }
+
         _combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
         _multiHitAttribution.ObserveCombat(result.SourceId, result.TargetId, in stamp, in observation);
     }

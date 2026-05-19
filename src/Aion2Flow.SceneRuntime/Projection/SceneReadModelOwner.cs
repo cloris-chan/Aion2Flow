@@ -20,6 +20,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private readonly List<SceneRuntimeCheckpoint> _runtimeCheckpoints = [];
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
+    private SceneCombatSnapshotAdapter? _adapter;
     private long _appliedBatchOrdinal = -1;
     private long _lastAppliedTimestampMilliseconds;
     private long _nextRuntimeCheckpointAtMilliseconds;
@@ -139,24 +140,9 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
     public static SceneReadModelOwner RestoreFromCheckpoint(ObservedEventJournal journal, SceneRuntimeCheckpoint checkpoint)
     {
-        var entities = checkpoint.Entities.DeepClone();
-        var boundary = checkpoint.Boundary.DeepClone();
-        var metadataRegistry = checkpoint.MetadataRegistry.DeepClone();
-        var combat = checkpoint.Combat.DeepClone();
-        var applier = checkpoint.Applier.DeepClone(entities, boundary, metadataRegistry, combat);
-        return new SceneReadModelOwner(
-            journal,
-            checkpoint.EncounterId,
-            checkpoint.SceneStarted,
-            entities,
-            boundary,
-            metadataRegistry,
-            combat,
-            applier,
-            checkpoint.Cursor,
-            checkpoint.AppliedObservationOrdinal,
-            checkpoint.AppliedBatchOrdinal,
-            [checkpoint]);
+        var owner = new SceneReadModelOwner(journal, checkpoint.EncounterId, checkpoint.SceneStarted);
+        owner.RestoreCheckpointState(checkpoint);
+        return owner;
     }
 
     public SceneReadModelFrame CreateFrame(int detailCombatantId = 0, bool forceDetailRefresh = false)
@@ -344,6 +330,54 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _nextRuntimeCheckpointAtMilliseconds += RuntimeCheckpointIntervalMilliseconds;
     }
 
+    private void RestoreCheckpointState(SceneRuntimeCheckpoint checkpoint)
+    {
+        while (true)
+        {
+            var result = journal.CopyEntries(_cursor, _entryBuffer);
+            if (result.Count == 0)
+                break;
+
+            var entries = _entryBuffer.AsSpan(0, result.Count);
+            var cursor = _cursor;
+            for (var i = 0; i < entries.Length; i++)
+            {
+                ref readonly var entry = ref entries[i];
+                if (entry.Stamp.ObservationOrdinal >= checkpoint.Cursor.NextObservationOrdinal)
+                    break;
+
+                _applier.ApplyEntry(in entry);
+                cursor = new JournalCursor(entry.Stamp.ObservationOrdinal + 1);
+                if (entry.Raw.TimestampMilliseconds > 0)
+                    _lastAppliedTimestampMilliseconds = Math.Max(_lastAppliedTimestampMilliseconds, entry.Raw.TimestampMilliseconds);
+            }
+
+            _cursor = cursor;
+            if (_cursor.NextObservationOrdinal >= checkpoint.Cursor.NextObservationOrdinal || _cursor.NextObservationOrdinal < result.Cursor.NextObservationOrdinal)
+                break;
+        }
+
+        if (checkpoint.AppliedBatchOrdinal > _appliedBatchOrdinal)
+        {
+            _applier.CompleteBatch(checkpoint.AppliedBatchOrdinal);
+            _appliedBatchOrdinal = checkpoint.AppliedBatchOrdinal;
+        }
+
+        combat.RestoreState(checkpoint.CombatState);
+        _cursor = checkpoint.Cursor;
+        AppliedObservationOrdinal = checkpoint.AppliedObservationOrdinal;
+        _lastAppliedTimestampMilliseconds = checkpoint.CapturedAtMilliseconds;
+        _hasRuntimeCheckpointSchedule = true;
+        _nextRuntimeCheckpointAtMilliseconds = checkpoint.CapturedAtMilliseconds + RuntimeCheckpointIntervalMilliseconds;
+        _runtimeCheckpoints.Clear();
+        _runtimeCheckpoints.Add(checkpoint.DeepClone());
+        _snapshotCache = null;
+        _snapshotCacheKey = default;
+        _adapter = null;
+        _detailSubscriptions.Clear();
+        _lastDetailDeltas.Clear();
+    }
+
     private SceneReadModelFrame CreateFrameWithMarkers(int detailCombatantId, bool forceDetailRefresh, ICombatDetailEventWriter? detailWriter)
         => CreateFrameCore(detailCombatantId, forceDetailRefresh, detailWriter);
 
@@ -405,15 +439,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     }
 
     private SceneCombatSnapshotAdapter CreateAdapter()
-        => new(entities, combat, boundary, _applier.BossFocus, EncounterId);
+        => _adapter ??= new(entities, combat, boundary, _applier.BossFocus, EncounterId);
 
     private SceneRuntimeCheckpoint CreateRuntimeCheckpointCore(long capturedAtMilliseconds, JournalCursor cursor)
     {
-        var entitiesClone = entities.DeepClone();
-        var boundaryClone = boundary.DeepClone();
-        var metadataRegistryClone = metadataRegistry.DeepClone();
-        var combatClone = combat.DeepClone();
-        var applierClone = _applier.DeepClone(entitiesClone, boundaryClone, metadataRegistryClone, combatClone);
         return new SceneRuntimeCheckpoint(
             EncounterId,
             SceneStarted,
@@ -421,11 +450,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             cursor,
             AppliedObservationOrdinal,
             _appliedBatchOrdinal,
-            entitiesClone,
-            boundaryClone,
-            metadataRegistryClone,
-            combatClone,
-            applierClone);
+            combat.CreateStateSnapshot());
     }
 
     internal SceneRuntimeCheckpoint[] CreateArchiveCheckpoints()
@@ -433,12 +458,20 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         if (_runtimeCheckpoints.Count == 0)
             return [CreateRuntimeCheckpointCore(_lastAppliedTimestampMilliseconds, _cursor)];
 
-        var result = new SceneRuntimeCheckpoint[_runtimeCheckpoints.Count + 1];
+        var includeFinal = !IsCurrentProjectionCheckpoint(_runtimeCheckpoints[^1]);
+        var result = new SceneRuntimeCheckpoint[_runtimeCheckpoints.Count + (includeFinal ? 1 : 0)];
         for (var i = 0; i < _runtimeCheckpoints.Count; i++)
             result[i] = _runtimeCheckpoints[i].DeepClone();
-        result[^1] = CreateRuntimeCheckpointCore(_lastAppliedTimestampMilliseconds, _cursor);
+        if (includeFinal)
+            result[^1] = CreateRuntimeCheckpointCore(_lastAppliedTimestampMilliseconds, _cursor);
         return result;
     }
+
+    private bool IsCurrentProjectionCheckpoint(SceneRuntimeCheckpoint checkpoint) =>
+        checkpoint.Cursor == _cursor &&
+        checkpoint.AppliedObservationOrdinal == AppliedObservationOrdinal &&
+        checkpoint.AppliedBatchOrdinal == _appliedBatchOrdinal &&
+        checkpoint.CapturedAtMilliseconds == _lastAppliedTimestampMilliseconds;
 
     private static bool IsSnapshotCacheStable(SceneCombatSnapshot snapshot) =>
         snapshot.EncounterEndTime > 0 || snapshot.BossFocuses.Count == 0 && snapshot.Encounter.TrackingTargetId == 0;
@@ -510,6 +543,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             SceneStarted = sceneStarted;
             combat.Clear();
             _applier = new DomainEventApplier(entities, boundary, metadataRegistry, combat);
+            _adapter = null;
             _detailSubscriptions.Clear();
             _lastDetailDeltas.Clear();
             _cursor = journal.CreateCursor(startOrdinal);

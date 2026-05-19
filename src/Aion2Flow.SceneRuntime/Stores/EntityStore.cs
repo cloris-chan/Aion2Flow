@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -58,6 +60,28 @@ public sealed class EntityStore
         entity.IsPlayer = true;
         entity.LastObservedOrdinal++;
         _revision++;
+    }
+
+    public bool ApplyCharacterClassEvidence(int entityId, in CombatObservation observation)
+    {
+        if (entityId <= 0 || !CombatantClassEvidence.TryCreate(in observation, out var characterClass, out var score))
+            return false;
+
+        var entity = GetOrAdd(entityId);
+        if (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon)
+            return false;
+
+        var evidence = entity.ClassEvidence;
+        var previousClass = entity.CharacterClass;
+        evidence.Add(characterClass, score);
+        var nextClass = evidence.Resolve();
+        entity.ClassEvidence = evidence;
+        if (previousClass == nextClass)
+            return false;
+
+        entity.CharacterClass = nextClass;
+        _revision++;
+        return true;
     }
 
     public void ApplySummon(int ownerId, int summonInstanceId)
@@ -176,6 +200,8 @@ public sealed class EntityRecord
     public NpcKind Kind { get; set; }
     public string? Nickname { get; set; }
     public bool IsPlayer { get; set; }
+    public CharacterClass? CharacterClass { get; set; }
+    public CombatantClassEvidence ClassEvidence { get; set; }
     public int? OwnerEntityId { get; set; }
     public int? CurrentHp { get; set; }
     public int? MaxHp { get; set; }
@@ -195,6 +221,8 @@ public sealed class EntityRecord
         Kind = Kind,
         Nickname = Nickname,
         IsPlayer = IsPlayer,
+        CharacterClass = CharacterClass,
+        ClassEvidence = ClassEvidence,
         OwnerEntityId = OwnerEntityId,
         CurrentHp = CurrentHp,
         MaxHp = MaxHp,

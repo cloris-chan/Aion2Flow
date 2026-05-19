@@ -5,8 +5,10 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 
 public sealed class PacketTailBuffer(int capacity) : IDisposable
 {
+    private const int InitialBufferSize = 8 * 1024;
     private readonly int _capacity = ThrowIfNegativeOrZero(capacity);
-    private readonly IMemoryOwner<byte> _bufferOwner = MemoryPool<byte>.Shared.Rent(ThrowIfNegativeOrZero(capacity));
+    private IMemoryOwner<byte>? _bufferOwner;
+    private int _bufferCapacity;
 
     public int Capacity => _capacity;
 
@@ -14,11 +16,14 @@ public sealed class PacketTailBuffer(int capacity) : IDisposable
 
     public int Length { get; private set; }
 
-    public ReadOnlySpan<byte> Data => Length == 0 ? ReadOnlySpan<byte>.Empty : _bufferOwner.Memory.Span.Slice(Offset, Length);
+    public ReadOnlySpan<byte> Data => Length == 0 || _bufferOwner is null ? ReadOnlySpan<byte>.Empty : _bufferOwner.Memory.Span.Slice(Offset, Length);
 
     public void Dispose()
     {
-        _bufferOwner.Dispose();
+        _bufferOwner?.Dispose();
+        _bufferOwner = null;
+        _bufferCapacity = 0;
+        Clear();
     }
 
     public void Clear()
@@ -34,23 +39,26 @@ public sealed class PacketTailBuffer(int capacity) : IDisposable
 
         if (data.Length >= Capacity)
         {
-            data[^Capacity..].CopyTo(_bufferOwner.Memory.Span);
+            EnsureBuffer(Capacity);
+            data[^Capacity..].CopyTo(Buffer);
             Offset = 0;
             Length = Capacity;
             return;
         }
 
-        int freeSize = Capacity - (Offset + Length);
-        var buffer = _bufferOwner.Memory.Span[..Capacity];
-        if (data.Length > freeSize)
+        var requiredLength = Length + data.Length;
+        if (requiredLength > Capacity)
         {
-            var overflow = Length + data.Length - Capacity;
-            if (overflow > 0)
-            {
-                Offset += overflow;
-                Length -= overflow;
-            }
+            var overflow = requiredLength - Capacity;
+            Offset += overflow;
+            Length -= overflow;
+            requiredLength = Capacity;
+        }
 
+        EnsureBuffer(requiredLength);
+        var buffer = Buffer;
+        if (Offset + Length + data.Length > _bufferCapacity)
+        {
             Data.CopyTo(buffer);
             Offset = 0;
         }
@@ -74,6 +82,26 @@ public sealed class PacketTailBuffer(int capacity) : IDisposable
         {
             Offset = 0;
         }
+    }
+
+    private Span<byte> Buffer => _bufferOwner!.Memory.Span[.._bufferCapacity];
+
+    private void EnsureBuffer(int requiredLength)
+    {
+        if (_bufferOwner is not null && _bufferCapacity >= requiredLength)
+            return;
+
+        var newCapacity = _bufferCapacity == 0 ? Math.Min(Capacity, Math.Max(InitialBufferSize, requiredLength)) : _bufferCapacity;
+        while (newCapacity < requiredLength)
+            newCapacity = Math.Min(Capacity, checked(newCapacity * 2));
+
+        var previous = Data;
+        var nextOwner = MemoryPool<byte>.Shared.Rent(newCapacity);
+        previous.CopyTo(nextOwner.Memory.Span);
+        _bufferOwner?.Dispose();
+        _bufferOwner = nextOwner;
+        _bufferCapacity = newCapacity;
+        Offset = 0;
     }
 
     private static int ThrowIfNegativeOrZero(int value, [CallerArgumentExpression(nameof(value))] string name = default!)

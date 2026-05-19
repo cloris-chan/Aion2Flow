@@ -3,10 +3,10 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Journal;
 
-public sealed class ObservedEventJournal
+public sealed class ObservedEventJournal(int capacity = 0)
 {
     private readonly Lock _gate = new();
-    private readonly List<ObservedEventEnvelope> _entries = [];
+    private readonly List<ObservedEventEnvelope> _entries = capacity > 0 ? new(capacity) : [];
     private long _firstObservationOrdinal = 0;
     private long _nextObservationOrdinal;
     private long _lastCompletedBatchOrdinal = -1;
@@ -35,7 +35,7 @@ public sealed class ObservedEventJournal
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(entries.Count);
         if (entries.Count == 0)
             return journal;
 
@@ -70,6 +70,15 @@ public sealed class ObservedEventJournal
         }
     }
 
+    public void EnsureCapacity(int capacity)
+    {
+        if (capacity <= 0)
+            return;
+
+        lock (_gate)
+            _entries.EnsureCapacity(capacity);
+    }
+
     public void CompleteBatch(long batchOrdinal)
     {
         lock (_gate)
@@ -82,8 +91,7 @@ public sealed class ObservedEventJournal
         }
     }
 
-    public JournalCursor CreateCursor(long startOrdinal)
-        => new(startOrdinal);
+    public JournalCursor CreateCursor(long startOrdinal) => new(startOrdinal);
 
     public ObservedEventEnvelope Read(long observationOrdinal)
     {

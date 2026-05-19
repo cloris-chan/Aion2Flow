@@ -3,6 +3,7 @@ using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime;
 
@@ -24,12 +25,16 @@ public static class SceneSinkFactory
 
 public sealed class SceneLiveReadModel
 {
+    private const int LiveJournalInitialCapacity = 4_096;
+    private const int LiveCombatEventInitialCapacity = 4_096;
+    private const int LiveCombatantInitialCapacity = 128;
+    private const int LivePairInitialCapacity = 512;
     private readonly Lock _gate = new();
     private long _nextBatchOrdinal;
 
     public Guid SessionId { get; private set; }
     public DateTimeOffset SessionStarted { get; private set; }
-    public ObservedEventJournal Journal { get; } = new();
+    public ObservedEventJournal Journal { get; }
     public SceneRuntimeClock Clock { get; } = new(DateTimeOffset.UtcNow.Ticks);
     public RuntimeMetadataRegistry MetadataRegistry { get; } = new();
     public SceneReadModelOwner Owner { get; }
@@ -42,7 +47,15 @@ public sealed class SceneLiveReadModel
     {
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
-        Owner = new SceneReadModelOwner(Journal, SessionId, sessionStarted, MetadataRegistry);
+        Journal = new ObservedEventJournal(LiveJournalInitialCapacity);
+        Owner = new SceneReadModelOwner(
+            Journal,
+            SessionId,
+            sessionStarted,
+            new EntityStore(),
+            new SceneBoundaryStore(),
+            MetadataRegistry,
+            new CombatStore(LiveCombatEventInitialCapacity, LiveCombatantInitialCapacity, LivePairInitialCapacity));
     }
 
     public void Reset()

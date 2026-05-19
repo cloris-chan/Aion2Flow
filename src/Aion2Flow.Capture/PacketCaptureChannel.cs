@@ -4,7 +4,13 @@ namespace Cloris.Aion2Flow.Capture;
 
 internal static class PacketCaptureChannel
 {
-    private static readonly Channel<CapturedPacket> _channel = Channel.CreateUnbounded<CapturedPacket>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+    private const int Capacity = 256;
+    private static readonly Channel<CapturedPacket> _channel = Channel.CreateBounded<CapturedPacket>(new BoundedChannelOptions(Capacity)
+    {
+        SingleReader = true,
+        SingleWriter = true,
+        FullMode = BoundedChannelFullMode.Wait
+    });
 
     public static bool TryWrite(CapturedPacket packet) => _channel.Writer.TryWrite(packet);
 

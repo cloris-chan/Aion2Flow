@@ -2,29 +2,23 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-public sealed class PacketStreamProcessor : IDisposable
+public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDisposable
 {
     private readonly PacketTailBuffer _tail = new(CaptureBufferLimits.StreamTailBufferSize);
-    private readonly IRuntimeObservationSink _sink;
-    private readonly PacketFrameParser _parser;
+    private readonly PacketFrameParser _parser = new(sink);
     private long? _timestampOverrideMilliseconds;
 
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
 
-    public PacketStreamProcessor(IRuntimeObservationSink sink)
-    {
-        _sink = sink;
-        _parser = new PacketFrameParser(sink);
-    }
-
     public void Dispose()
     {
+        _parser.Dispose();
         _tail.Dispose();
     }
 
     public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection)
     {
-        if (_sink is IRuntimeObservationSynchronization synchronization)
+        if (sink is IRuntimeObservationSynchronization synchronization)
         {
             lock (synchronization.Gate)
                 return AppendAndProcessCore(payload, in connection);
@@ -72,7 +66,7 @@ public sealed class PacketStreamProcessor : IDisposable
             }
             else
             {
-                _sink.CompleteBatch(_parser.CurrentAppendBatchOrdinal);
+                sink.CompleteBatch(_parser.CurrentAppendBatchOrdinal);
             }
 
             return hasParsed;

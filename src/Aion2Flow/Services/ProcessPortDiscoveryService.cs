@@ -1,8 +1,6 @@
-using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Cloris.Aion2Flow.Services.Logging;
 using Cloris.Aion2Flow.WinDivert;
@@ -22,8 +20,9 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
     private readonly record struct QueueEventItem(long ExpiredAt, PortEventType Type, uint ProcessId, PortPair PortPair);
 
     private const string ProcessName = "Aion2";
-    private const int PollInterval = 1000;
-    private const int QueueExpiration = 2500;
+    private const int SearchPollInterval = 1000;
+    private const int KnownProcessPollInterval = 5000;
+    private const int QueueExpiration = 10_000;
 
     private readonly ConcurrentDictionary<uint, HashSet<PortPair>> _processPorts = new();
 
@@ -55,6 +54,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
     private Task? _pollTask;
     private Task? _divertTask;
     private WinDivertSession? _divert;
+    private byte[] _tcpTableBuffer = [];
 
     public bool IsMonitoring { get; private set; }
 
@@ -81,10 +81,12 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
 
         try
         {
-            var tasks = new List<Task>();
-            if (_pollTask is not null) tasks.Add(_pollTask);
-            if (_divertTask is not null) tasks.Add(_divertTask);
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            if (_pollTask is not null && _divertTask is not null)
+                await Task.WhenAll(_pollTask, _divertTask).ConfigureAwait(false);
+            else if (_pollTask is not null)
+                await _pollTask.ConfigureAwait(false);
+            else if (_divertTask is not null)
+                await _divertTask.ConfigureAwait(false);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { AppLog.Write(AppLogLevel.Warning, $"Stop error: {ex.Message}"); }
@@ -144,75 +146,79 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
         return Task.Factory.StartNew(async () =>
         {
             var knownPids = new HashSet<uint>();
+            var currentPids = new HashSet<uint>();
+            var vanishedPids = new List<uint>();
+            var currentConnections = new HashSet<PortPair>();
             var sw = Stopwatch.StartNew();
 
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    if (!TryGetPidsByProcessName(ProcessName, out var currentPids))
-                        continue;
-
-                    long now = sw.ElapsedMilliseconds;
-
-                    foreach (var pid in currentPids)
+                    currentPids.Clear();
+                    if (TryGetPidsByProcessName(ProcessName, currentPids))
                     {
-                        if (!knownPids.Add(pid)) continue;
+                        long now = sw.ElapsedMilliseconds;
 
-                        _processPorts.TryAdd(pid, []);
-
-                        if (!TryGetTcpPortsForPid(pid, out var currentConnections))
-                            continue;
-
-                        foreach (var portPair in currentConnections)
+                        foreach (var pid in currentPids)
                         {
-                            UpdatePortState(pid, portPair, PortEventType.Add);
-                        }
+                            if (!knownPids.Add(pid)) continue;
 
-                        foreach (var item in _eventQueue)
-                        {
-                            if (item.ProcessId == pid)
-                                UpdatePortState(pid, item.PortPair, item.Type);
-                        }
-                    }
+                            _processPorts.TryAdd(pid, []);
 
-                    List<uint>? vanishedPids = null;
-                    foreach (var pid in knownPids)
-                    {
-                        if (!currentPids.Contains(pid))
-                        {
-                            vanishedPids ??= [];
-                            vanishedPids.Add(pid);
-                        }
-                    }
+                            currentConnections.Clear();
+                            if (!TryGetTcpPortsForPid(pid, currentConnections))
+                                continue;
 
-                    if (vanishedPids is not null)
-                    {
-                        foreach (var pid in vanishedPids)
-                        {
-                            knownPids.Remove(pid);
-                            if (_processPorts.TryRemove(pid, out var portSet))
+                            foreach (var portPair in currentConnections)
                             {
-                                lock (portSet)
-                                {
-                                    var uniqueLocals = new HashSet<ushort>();
-                                    foreach (var (LocalPort, _) in portSet) uniqueLocals.Add(LocalPort);
-                                    foreach (var lp in uniqueLocals) Removed?.Invoke(pid, lp);
-                                }
-                                _snapshotDirty = true;
+                                UpdatePortState(pid, portPair, PortEventType.Add);
+                            }
+
+                            foreach (var item in _eventQueue)
+                            {
+                                if (item.ProcessId == pid)
+                                    UpdatePortState(pid, item.PortPair, item.Type);
                             }
                         }
-                    }
-                    while (_eventQueue.TryPeek(out var item) && item.ExpiredAt < now)
-                    {
-                        _eventQueue.TryDequeue(out _);
+
+                        vanishedPids.Clear();
+                        foreach (var pid in knownPids)
+                        {
+                            if (!currentPids.Contains(pid))
+                                vanishedPids.Add(pid);
+                        }
+
+                        if (vanishedPids.Count != 0)
+                        {
+                            foreach (var pid in vanishedPids)
+                            {
+                                knownPids.Remove(pid);
+                                if (_processPorts.TryRemove(pid, out var portSet))
+                                {
+                                    lock (portSet)
+                                    {
+                                        var uniqueLocals = new HashSet<ushort>();
+                                        foreach (var (LocalPort, _) in portSet) uniqueLocals.Add(LocalPort);
+                                        foreach (var lp in uniqueLocals) Removed?.Invoke(pid, lp);
+                                    }
+                                    _snapshotDirty = true;
+                                }
+                            }
+                        }
+
+                        while (_eventQueue.TryPeek(out var item) && item.ExpiredAt < now)
+                        {
+                            _eventQueue.TryDequeue(out _);
+                        }
                     }
                 }
                 catch
                 {
                 }
 
-                await Task.Delay(PollInterval, token).ConfigureAwait(false);
+                var delay = knownPids.Count == 0 ? SearchPollInterval : KnownProcessPollInterval;
+                await Task.Delay(delay, token).ConfigureAwait(false);
             }
         }, TaskCreationOptions.LongRunning).Unwrap();
     }
@@ -228,7 +234,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
         {
             if (type == PortEventType.Add)
             {
-                bool alreadyHasLocal = portSet.Any(x => x.LocalPort == portPair.LocalPort);
+                bool alreadyHasLocal = HasLocalPort(portSet, portPair.LocalPort);
                 if (portSet.Add(portPair))
                 {
                     changed = true;
@@ -240,7 +246,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
                 if (portSet.Remove(portPair))
                 {
                     changed = true;
-                    if (portSet.All(x => x.LocalPort != portPair.LocalPort)) isLastLocal = true;
+                    if (!HasLocalPort(portSet, portPair.LocalPort)) isLastLocal = true;
                 }
             }
         }
@@ -251,6 +257,17 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
             if (isFirstLocal) Discovered?.Invoke(pid, portPair.LocalPort);
             if (isLastLocal) Removed?.Invoke(pid, portPair.LocalPort);
         }
+    }
+
+    private static bool HasLocalPort(HashSet<PortPair> portSet, ushort localPort)
+    {
+        foreach (var pair in portSet)
+        {
+            if (pair.LocalPort == localPort)
+                return true;
+        }
+
+        return false;
     }
 
     private void RebuildProcessIdsAllPortsSnapshot()
@@ -273,29 +290,35 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
         _snapshotDirty = false;
     }
 
-    private static unsafe bool TryGetTcpPortsForPid(uint targetPid, [NotNullWhen(true)] out HashSet<PortPair>? ports)
+    private unsafe bool TryGetTcpPortsForPid(uint targetPid, HashSet<PortPair> ports)
     {
+        ports.Clear();
         uint size = 0;
 
         PInvoke.GetExtendedTcpTable(default, ref size, true, (uint)ADDRESS_FAMILY.AF_INET, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL, 0);
         if (size == 0)
         {
-            ports = null;
             return false;
         }
 
-        using var buffer = MemoryPool<byte>.Shared.Rent((int)size);
+        if (_tcpTableBuffer.Length < size)
+            _tcpTableBuffer = GC.AllocateUninitializedArray<byte>((int)size);
 
-        var res = PInvoke.GetExtendedTcpTable(buffer.Memory.Span, ref size, true, (uint)ADDRESS_FAMILY.AF_INET, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL, 0);
+        var buffer = _tcpTableBuffer.AsSpan(0, (int)size);
+        var res = PInvoke.GetExtendedTcpTable(buffer, ref size, true, (uint)ADDRESS_FAMILY.AF_INET, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL, 0);
+        if (res != (uint)WIN32_ERROR.NO_ERROR && size > _tcpTableBuffer.Length)
+        {
+            _tcpTableBuffer = GC.AllocateUninitializedArray<byte>((int)size);
+            buffer = _tcpTableBuffer.AsSpan(0, (int)size);
+            res = PInvoke.GetExtendedTcpTable(buffer, ref size, true, (uint)ADDRESS_FAMILY.AF_INET, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL, 0);
+        }
+
         if (res != (uint)WIN32_ERROR.NO_ERROR)
         {
-            ports = null;
             return false;
         }
 
-        ports = [];
-
-        fixed (byte* pBuffer = buffer.Memory.Span)
+        fixed (byte* pBuffer = buffer)
         {
             uint rowCount = *(uint*)pBuffer;
             var pRow = (MIB_TCPROW_OWNER_PID*)(pBuffer + sizeof(uint));
@@ -315,19 +338,17 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
         return true;
     }
 
-    private static unsafe bool TryGetPidsByProcessName(string targetName, [NotNullWhen(true)] out HashSet<uint>? pids)
+    private static unsafe bool TryGetPidsByProcessName(string targetName, HashSet<uint> pids)
     {
         var snapshot = PInvoke.CreateToolhelp32Snapshot_SafeHandle(CREATE_TOOLHELP_SNAPSHOT_FLAGS.TH32CS_SNAPPROCESS, 0);
 
         if (snapshot.IsInvalid)
         {
-            pids = null;
             return false;
         }
 
         try
         {
-            pids = [];
             PROCESSENTRY32W entry = default;
             entry.dwSize = (uint)sizeof(PROCESSENTRY32W);
 

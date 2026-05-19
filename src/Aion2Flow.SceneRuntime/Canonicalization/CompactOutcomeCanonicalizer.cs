@@ -9,14 +9,16 @@ namespace Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 public sealed class CompactOutcomeCanonicalizer
 {
     private const int MaxPendingAvoidances = 32;
+    private const int PendingCompactInitialCapacity = 1024;
+    private const int StoredDamageInitialCapacity = 1024;
     private readonly record struct PendingDirectBlockedDamage(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
     private readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int OriginalSkillCode, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds);
     private readonly record struct AvoidedSignature(int SourceId, int TargetId, int Marker);
-    private readonly List<PendingDirectBlockedDamage> _pendingDirect = [];
-    private readonly List<PendingCompactAvoidance> _pendingCompact = [];
-    private readonly List<PendingCompactAvoidance> _pendingCompactDamage = [];
-    private readonly List<PendingCompactAvoidance> _pendingCompactControls0638 = [];
-    private readonly List<StampedCombatCanonicalizationResult> _storedDamage = [];
+    private readonly List<PendingDirectBlockedDamage> _pendingDirect = new(MaxPendingAvoidances);
+    private readonly List<PendingCompactAvoidance> _pendingCompact = new(MaxPendingAvoidances);
+    private readonly List<PendingCompactAvoidance> _pendingCompactDamage = new(PendingCompactInitialCapacity);
+    private readonly List<PendingCompactAvoidance> _pendingCompactControls0638 = new(PendingCompactInitialCapacity);
+    private readonly List<StampedCombatCanonicalizationResult> _storedDamage = new(StoredDamageInitialCapacity);
     private readonly HashSet<int> _currentBatchDodgeTargets = [];
     private readonly HashSet<AvoidedSignature> _resolvedAvoidanceSignatures = [];
     private readonly HashSet<(int TargetId, int SkillCode)> _confirmedCompactDamage = [];
@@ -39,7 +41,7 @@ public sealed class CompactOutcomeCanonicalizer
         return clone;
     }
 
-    public IReadOnlyList<StampedCombatCanonicalizationResult> NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
+    public StampedCombatCanonicalizationBatch NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
     {
         var prefix = EnsureBatch(stamp.BatchOrdinal);
 
@@ -51,7 +53,7 @@ public sealed class CompactOutcomeCanonicalizer
         return Append(prefix, result);
     }
 
-    public IReadOnlyList<StampedCombatCanonicalizationResult> ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
+    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
     {
         var isCompactSignal = IsCompactSignalShape(in observation) && observation.EventKind == CombatEventKind.Unknown && observation.ValueKind == CombatValueKind.Unknown;
         if (!isCompactSignal)
@@ -79,14 +81,14 @@ public sealed class CompactOutcomeCanonicalizer
         return prefix;
     }
 
-    public IReadOnlyList<StampedCombatCanonicalizationResult> ObserveCompactControl0238(int sourceId, in TimelineStamp stamp, in CombatObservation observation)
+    public StampedCombatCanonicalizationBatch ObserveCompactControl0238(int sourceId, in TimelineStamp stamp, in CombatObservation observation)
     {
         var prefix = EnsureBatch(stamp.BatchOrdinal);
         ObserveDodgeSignal(sourceId, in observation);
         return prefix;
     }
 
-    public IReadOnlyList<StampedCombatCanonicalizationResult> ObserveCompactControl0638(int sourceId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
+    public StampedCombatCanonicalizationBatch ObserveCompactControl0638(int sourceId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
     {
         var prefix = EnsureBatch(stamp.BatchOrdinal);
         if (sourceId > 0 && observation.Marker > 0 && observation.SkillCode > 0)
@@ -96,13 +98,13 @@ public sealed class CompactOutcomeCanonicalizer
         return prefix;
     }
 
-    public IReadOnlyList<StampedCombatCanonicalizationResult> CompleteBatch(long batchOrdinal)
+    public StampedCombatCanonicalizationBatch CompleteBatch(long batchOrdinal)
     {
         if (_currentBatchOrdinal == 0)
-            return batchOrdinal == long.MaxValue ? FlushOrphanCompactHits() : [];
+            return batchOrdinal == long.MaxValue ? FlushOrphanCompactHits() : StampedCombatCanonicalizationBatch.Empty;
 
         if (batchOrdinal > 0 && _currentBatchOrdinal > 0 && batchOrdinal < _currentBatchOrdinal)
-            return [];
+            return StampedCombatCanonicalizationBatch.Empty;
 
         if (batchOrdinal == long.MaxValue)
             return FinalizeAll();
@@ -144,9 +146,9 @@ public sealed class CompactOutcomeCanonicalizer
         return true;
     }
 
-    private List<StampedCombatCanonicalizationResult> FinalizeBatch()
+    private StampedCombatCanonicalizationBatch FinalizeBatch()
     {
-        var results = new List<StampedCombatCanonicalizationResult>(_pendingDirect.Count + _pendingCompact.Count);
+        var results = new StampedCombatCanonicalizationBatchBuilder(_pendingDirect.Count + _pendingCompact.Count);
 
         foreach (var pending in _pendingDirect)
         {
@@ -188,20 +190,20 @@ public sealed class CompactOutcomeCanonicalizer
         _currentBatchDodgeTargets.Clear();
         _resolvedAvoidanceSignatures.Clear();
         _currentBatchOrdinal = 0;
-        return results;
+        return results.ToBatch();
     }
 
-    private List<StampedCombatCanonicalizationResult> FinalizeAll()
+    private StampedCombatCanonicalizationBatch FinalizeAll()
     {
-        var results = new List<StampedCombatCanonicalizationResult>();
+        var results = new StampedCombatCanonicalizationBatchBuilder();
         var finalized = FinalizeBatch();
         TrackStored(finalized);
         results.AddRange(finalized);
         results.AddRange(FlushOrphanCompactHits());
-        return results;
+        return results.ToBatch();
     }
 
-    private List<StampedCombatCanonicalizationResult> FlushOrphanCompactHits()
+    private StampedCombatCanonicalizationBatch FlushOrphanCompactHits()
     {
         var storedKeys = new HashSet<(long Batch, int Source, int Target, int Marker)>();
         var damageMarkersBySource = new HashSet<(int Source, int Marker)>();
@@ -233,7 +235,7 @@ public sealed class CompactOutcomeCanonicalizer
             storedKeys.Add((pending.Stamp.BatchOrdinal + 1, pending.SourceId, pending.TargetId, pending.Observation.Marker));
         }
 
-        var results = new List<StampedCombatCanonicalizationResult>();
+        var results = new StampedCombatCanonicalizationBatchBuilder();
         foreach (var pending in _pendingCompactDamage)
         {
             if (pending.Marker <= 0)
@@ -313,20 +315,20 @@ public sealed class CompactOutcomeCanonicalizer
         _pendingCompactDamage.Clear();
         _pendingCompactControls0638.Clear();
         _storedDamage.Clear();
-        return results;
+        return results.ToBatch();
     }
 
-    private List<StampedCombatCanonicalizationResult> EnsureBatch(long batchOrdinal)
+    private StampedCombatCanonicalizationBatch EnsureBatch(long batchOrdinal)
     {
         var resolvedBatchOrdinal = batchOrdinal > 0 ? batchOrdinal : 0;
         if (_currentBatchOrdinal == 0)
         {
             _currentBatchOrdinal = resolvedBatchOrdinal;
-            return [];
+            return StampedCombatCanonicalizationBatch.Empty;
         }
 
         if (resolvedBatchOrdinal == 0 || resolvedBatchOrdinal == _currentBatchOrdinal)
-            return [];
+            return StampedCombatCanonicalizationBatch.Empty;
 
         var results = FinalizeBatch();
         TrackStored(results);
@@ -334,7 +336,7 @@ public sealed class CompactOutcomeCanonicalizer
         return results;
     }
 
-    private void TrackStored(IReadOnlyList<StampedCombatCanonicalizationResult> results)
+    private void TrackStored(StampedCombatCanonicalizationBatch results)
     {
         foreach (var result in results)
             TrackStored(in result);
@@ -346,15 +348,15 @@ public sealed class CompactOutcomeCanonicalizer
             _storedDamage.Add(result);
     }
 
-    private static List<StampedCombatCanonicalizationResult> Append(List<StampedCombatCanonicalizationResult> prefix, in StampedCombatCanonicalizationResult result)
+    private static StampedCombatCanonicalizationBatch Append(StampedCombatCanonicalizationBatch prefix, in StampedCombatCanonicalizationResult result)
     {
         if (prefix.Count == 0)
-            return [result];
+            return StampedCombatCanonicalizationBatch.One(result);
 
-        var results = new List<StampedCombatCanonicalizationResult>(prefix.Count + 1);
+        var results = new StampedCombatCanonicalizationBatchBuilder(prefix.Count + 1);
         results.AddRange(prefix);
         results.Add(result);
-        return results;
+        return results.ToBatch();
     }
 
     private void ObserveDodgeSignal(int sourceId, in CombatObservation observation)
@@ -495,3 +497,136 @@ public sealed class CompactOutcomeCanonicalizer
 }
 
 public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
+
+public readonly struct StampedCombatCanonicalizationBatch
+{
+    private readonly StampedCombatCanonicalizationResult _first;
+    private readonly StampedCombatCanonicalizationResult _second;
+    private readonly StampedCombatCanonicalizationResult[]? _overflow;
+
+    internal StampedCombatCanonicalizationBatch(int count, in StampedCombatCanonicalizationResult first, in StampedCombatCanonicalizationResult second, StampedCombatCanonicalizationResult[]? overflow)
+    {
+        Count = count;
+        _first = first;
+        _second = second;
+        _overflow = overflow;
+    }
+
+    public static StampedCombatCanonicalizationBatch Empty => default;
+
+    public int Count { get; }
+
+    public static StampedCombatCanonicalizationBatch One(in StampedCombatCanonicalizationResult result) =>
+        new(1, in result, default, null);
+
+    public static StampedCombatCanonicalizationBatch Two(in StampedCombatCanonicalizationResult first, in StampedCombatCanonicalizationResult second) =>
+        new(2, in first, in second, null);
+
+    public StampedCombatCanonicalizationResult this[int index]
+    {
+        get
+        {
+            if ((uint)index >= (uint)Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
+            if (_overflow is not null)
+                return _overflow[index];
+
+            return index == 0 ? _first : _second;
+        }
+    }
+
+    public Enumerator GetEnumerator() => new(this);
+
+    public struct Enumerator
+    {
+        private readonly StampedCombatCanonicalizationBatch _batch;
+        private int _index;
+
+        internal Enumerator(StampedCombatCanonicalizationBatch batch)
+        {
+            _batch = batch;
+            _index = -1;
+            Current = default;
+        }
+
+        public StampedCombatCanonicalizationResult Current { get; private set; }
+
+        public bool MoveNext()
+        {
+            var next = _index + 1;
+            if ((uint)next >= (uint)_batch.Count)
+                return false;
+
+            _index = next;
+            Current = _batch[next];
+            return true;
+        }
+    }
+}
+
+internal struct StampedCombatCanonicalizationBatchBuilder(int capacity = 0)
+{
+    private StampedCombatCanonicalizationResult _first = default;
+    private StampedCombatCanonicalizationResult _second = default;
+    private StampedCombatCanonicalizationResult[]? _overflow = null;
+    private readonly int _initialCapacity = capacity;
+    private int _count = 0;
+
+    public void Add(in StampedCombatCanonicalizationResult result)
+    {
+        if (_count == 0)
+        {
+            _first = result;
+            _count = 1;
+            return;
+        }
+
+        if (_count == 1)
+        {
+            _second = result;
+            _count = 2;
+            return;
+        }
+
+        var overflow = EnsureOverflow();
+        overflow[_count++] = result;
+    }
+
+    public void AddRange(StampedCombatCanonicalizationBatch batch)
+    {
+        foreach (var result in batch)
+            Add(in result);
+    }
+
+    public readonly StampedCombatCanonicalizationBatch ToBatch()
+    {
+        if (_count == 0)
+            return StampedCombatCanonicalizationBatch.Empty;
+
+        if (_overflow is { } overflow)
+            return new StampedCombatCanonicalizationBatch(_count, default, default, overflow);
+
+        return _count == 1
+            ? StampedCombatCanonicalizationBatch.One(_first)
+            : StampedCombatCanonicalizationBatch.Two(_first, _second);
+    }
+
+    private StampedCombatCanonicalizationResult[] EnsureOverflow()
+    {
+        if (_overflow is null)
+        {
+            var capacity = Math.Max(Math.Max(_initialCapacity, 4), _count + 1);
+            _overflow = new StampedCombatCanonicalizationResult[capacity];
+            _overflow[0] = _first;
+            _overflow[1] = _second;
+            return _overflow;
+        }
+
+        if (_count < _overflow.Length)
+            return _overflow;
+
+        Array.Resize(ref _overflow, checked(_overflow.Length * 2));
+        return _overflow;
+    }
+}

@@ -10,11 +10,11 @@ internal static class Packet4036CreateParser
 {
     private const int SpawnHpPairOffsetFromNpcCodeEnd = 21;
 
-    private static readonly byte[] EightByteMarker = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+    private static ReadOnlySpan<byte> EightByteMarker => [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
 
-    private static readonly byte[] OwnerOpcodeMarker = [0x07, 0x02, 0x06];
+    private static ReadOnlySpan<byte> OwnerOpcodeMarker => [0x07, 0x02, 0x06];
 
-    private static readonly byte[] OwnerOpcodeMarkerAlt = [0x07, 0x02, 0x01];
+    private static ReadOnlySpan<byte> OwnerOpcodeMarkerAlt => [0x07, 0x02, 0x01];
 
     public static bool TryParse(ReadOnlySpan<byte> packet, out Packet4036Create result)
     {

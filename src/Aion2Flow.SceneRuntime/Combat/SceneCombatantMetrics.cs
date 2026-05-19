@@ -96,11 +96,42 @@ internal struct SceneCombatantMetricsAccumulator
     public void ProcessCombatObservation(in CombatObservation observation)
     {
         var contribution = CombatContributionClassifier.Evaluate(in observation);
-        ApplyContribution(
-            contribution,
+        ApplyContribution(contribution, observation.ValueKind, observation.EffectTag, observation.DrainHealAmount);
+    }
+
+    public void ProcessStoredCombatObservation(
+        in CombatObservation observation,
+        bool contributesDamage,
+        bool contributesHealing,
+        bool contributesShieldGrant,
+        bool contributesShieldAbsorbed)
+    {
+        ApplyValues(
+            contributesDamage ? observation.Damage : 0,
+            contributesHealing ? observation.Damage : 0,
+            contributesShieldGrant ? observation.Damage : 0,
+            contributesShieldGrant ? 1 : 0,
+            contributesShieldAbsorbed ? observation.Damage : 0,
+            contributesShieldAbsorbed ? 1 : 0,
             observation.ValueKind,
             observation.EffectTag,
             observation.DrainHealAmount);
+    }
+
+    public void ApplyCombatTotals(
+        long damageAmount,
+        long healingAmount,
+        long shieldAmount,
+        int shieldTimes,
+        long shieldAbsorbedAmount,
+        int shieldAbsorbedTimes)
+    {
+        DamageAmount += damageAmount;
+        HealingAmount += healingAmount;
+        ShieldAmount += shieldAmount;
+        ShieldTimes += shieldTimes;
+        ShieldAbsorbedAmount += shieldAbsorbedAmount;
+        ShieldAbsorbedTimes += shieldAbsorbedTimes;
     }
 
     private void ApplyContribution(
@@ -108,25 +139,46 @@ internal struct SceneCombatantMetricsAccumulator
         CombatValueKind valueKind,
         PacketEffectTag effectTag,
         int drainHealAmount)
+        => ApplyValues(
+            contribution.DamageAmount,
+            contribution.HealingAmount,
+            contribution.ShieldGrantAmount,
+            contribution.ShieldGrantCount,
+            contribution.ShieldAbsorbedAmount,
+            contribution.ShieldAbsorbedCount,
+            valueKind,
+            effectTag,
+            drainHealAmount);
+
+    private void ApplyValues(
+        long damageAmount,
+        long healingAmount,
+        long shieldGrantAmount,
+        int shieldGrantCount,
+        long shieldAbsorbedAmount,
+        int shieldAbsorbedCount,
+        CombatValueKind valueKind,
+        PacketEffectTag effectTag,
+        int drainHealAmount)
     {
-        DamageAmount += contribution.DamageAmount;
-        HealingAmount += contribution.HealingAmount;
-        ShieldAmount += contribution.ShieldGrantAmount;
-        ShieldTimes += contribution.ShieldGrantCount;
-        ShieldAbsorbedAmount += contribution.ShieldAbsorbedAmount;
-        ShieldAbsorbedTimes += contribution.ShieldAbsorbedCount;
+        DamageAmount += damageAmount;
+        HealingAmount += healingAmount;
+        ShieldAmount += shieldGrantAmount;
+        ShieldTimes += shieldGrantCount;
+        ShieldAbsorbedAmount += shieldAbsorbedAmount;
+        ShieldAbsorbedTimes += shieldAbsorbedCount;
 
         if (valueKind == CombatValueKind.PeriodicHealing)
         {
-            PeriodicHealingAmount += contribution.HealingAmount;
+            PeriodicHealingAmount += healingAmount;
         }
         else if (valueKind == CombatValueKind.DrainHealing)
         {
-            DrainHealingAmount += contribution.HealingAmount;
+            DrainHealingAmount += healingAmount;
         }
         else if (valueKind == CombatValueKind.DrainDamage)
         {
-            DrainDamageAmount += contribution.DamageAmount;
+            DrainDamageAmount += damageAmount;
             if (drainHealAmount > 0)
             {
                 DrainHealingAmount += drainHealAmount;
@@ -135,7 +187,7 @@ internal struct SceneCombatantMetricsAccumulator
         }
         else if (effectTag == PacketEffectTag.RegenerationHealing)
         {
-            RegenerationHealingAmount += contribution.HealingAmount;
+            RegenerationHealingAmount += healingAmount;
         }
     }
 

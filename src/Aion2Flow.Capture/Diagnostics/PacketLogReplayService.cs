@@ -76,7 +76,7 @@ public sealed class PacketLogReplayService
 
     private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName)
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(lines is ICollection<string> collection ? ResolveJournalCapacity(collection.Count) : 16_384);
         var sceneId = Guid.NewGuid();
         var clock = new SceneRuntimeClock(DateTimeOffset.UtcNow.Ticks);
         var metadataRegistry = new RuntimeMetadataRegistry();
@@ -182,6 +182,9 @@ public sealed class PacketLogReplayService
 
     private static BaselineStart CaptureBaselineStart()
         => new(Stopwatch.GetTimestamp(), GC.GetAllocatedBytesForCurrentThread());
+
+    private static int ResolveJournalCapacity(int lineCount) =>
+        lineCount <= 0 ? 0 : lineCount <= int.MaxValue / 2 ? lineCount * 2 : int.MaxValue;
 
     private static PacketLogReplayBaselineCounter CaptureBaselineCounter(BaselineStart start)
     {

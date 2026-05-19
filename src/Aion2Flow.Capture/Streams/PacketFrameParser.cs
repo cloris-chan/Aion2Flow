@@ -4,11 +4,13 @@ using K4os.Compression.LZ4;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
+internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposable
 {
     private const int MaxDecompressedSize = 4 * 1024 * 1024;
+    private const int MaxRetainedDecompressionBufferSize = 512 * 1024;
     private readonly SceneObservationWriter _writer = new(sink);
     private readonly PacketOrdinalState _ordinals = new();
+    private byte[]? _decompressionBuffer;
 
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
 
@@ -17,6 +19,15 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
     public long BeginAppendBatch() => _ordinals.BeginAppendBatch();
 
     public void EndAppendBatch(long previous) => _ordinals.EndAppendBatch(previous);
+
+    public void Dispose()
+    {
+        if (_decompressionBuffer is not null)
+        {
+            ArrayPool<byte>.Shared.Return(_decompressionBuffer);
+            _decompressionBuffer = null;
+        }
+    }
 
     public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, long timestampMilliseconds)
     {
@@ -96,7 +107,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
             return false;
         }
 
-        var rented = ArrayPool<byte>.Shared.Rent(uncompressedLength);
+        var rented = RentDecompressionBuffer(uncompressedLength, out var returnAfterUse);
         try
         {
             var decoded = LZ4Codec.Decode(packet[offset..], rented.AsSpan(0, uncompressedLength));
@@ -114,8 +125,29 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink)
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(rented);
+            if (returnAfterUse)
+                ArrayPool<byte>.Shared.Return(rented);
         }
+    }
+
+    private byte[] RentDecompressionBuffer(int length, out bool returnAfterUse)
+    {
+        if (length > MaxRetainedDecompressionBufferSize)
+        {
+            returnAfterUse = true;
+            return ArrayPool<byte>.Shared.Rent(length);
+        }
+
+        if (_decompressionBuffer is null || _decompressionBuffer.Length < length)
+        {
+            if (_decompressionBuffer is not null)
+                ArrayPool<byte>.Shared.Return(_decompressionBuffer);
+
+            _decompressionBuffer = ArrayPool<byte>.Shared.Rent(length);
+        }
+
+        returnAfterUse = false;
+        return _decompressionBuffer;
     }
 
     private bool TryParseFrameBatch(ReadOnlySpan<byte> packet, ref PacketParseContext context)
