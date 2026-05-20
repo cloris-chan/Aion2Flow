@@ -392,7 +392,7 @@ public static class CombatObservationTraits
             PacketEffectTag.ActiveDodgeEvade => "active-dodge-evade",
             PacketEffectTag.CompactEvade => "compact-evade",
             PacketEffectTag.PeriodicLinkInvincible => "periodic-link-invincible",
-            PacketEffectTag.Aux2C38Invincible => "aux-2c38-invincible",
+            PacketEffectTag.ActiveSkillInvincible => "active-skill-invincible",
             _ => string.Empty
         };
 }

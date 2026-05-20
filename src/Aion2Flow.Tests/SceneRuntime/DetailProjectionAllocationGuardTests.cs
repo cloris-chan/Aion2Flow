@@ -30,7 +30,6 @@ public sealed class DetailProjectionAllocationGuardTests
         var root = FindRepositoryRoot();
         var files = new[]
         {
-            Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "PeriodicLinkCanonicalizer.cs"),
             Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "PeriodicChainCanonicalizer.cs"),
             Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "CompactOutcomeCanonicalizer.cs"),
             Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Observation", "JournalingRuntimeObservationSink.cs"),

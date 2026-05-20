@@ -128,16 +128,48 @@ internal static class PacketCombatHandler
 
         if (parsed.IsLinkRecord)
         {
-            context.Sink.RegisterPeriodicLink0538(
-                parsed.TargetId,
-                parsed.SourceId,
-                parsed.LinkId,
-                parsed.Unknown,
-                parsed.TailRaw,
-                context.TimestampMilliseconds,
-                frameOrdinal,
-                batchOrdinal);
+            if (parsed.LinkId > 0 && parsed.TargetId > 0 && parsed.LinkId != parsed.TargetId)
+            {
+                context.Sink.RememberNpcObservationSource(parsed.TargetId);
+                var invincibleObservation = new CombatObservation
+                {
+                    OriginalSkillCode = parsed.TailRaw,
+                    SkillCode = parsed.TailRaw,
+                    Damage = 0,
+                    HitCount = 0,
+                    AttemptCount = 1,
+                    DetailRaw = parsed.LinkId,
+                    Marker = parsed.Unknown,
+                    Type = 48,
+                    Modifiers = DamageModifiers.Invincible,
+                    EventKind = CombatEventKind.Damage,
+                    ValueKind = CombatValueKind.Damage,
+                    EffectTag = PacketEffectTag.PeriodicLinkInvincible
+                };
+                context.Sink.AppendCombatObservation(parsed.LinkId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length);
+            }
 
+            return context.MarkParsed();
+        }
+
+        if (IsActiveSkillInvincible(parsed.Mode, parsed.TargetId, parsed.SourceId, parsed.NormalizedSkillCode, parsed.Damage))
+        {
+            var invincibleObservation = new CombatObservation
+            {
+                OriginalSkillCode = parsed.SkillCodeRaw,
+                SkillCode = parsed.NormalizedSkillCode,
+                Damage = 0,
+                HitCount = 0,
+                AttemptCount = 1,
+                DetailRaw = parsed.Damage,
+                Marker = parsed.Unknown,
+                Type = parsed.Mode,
+                Modifiers = DamageModifiers.Invincible,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage,
+                EffectTag = PacketEffectTag.ActiveSkillInvincible
+            };
+            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length);
             return context.MarkParsed();
         }
 
@@ -288,10 +320,6 @@ internal static class PacketCombatHandler
         if (!reader.TryAdvance(1)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (sourceId == 0 || targetId == 0) return false;
-        if (sourceId == targetId)
-        {
-            return false;
-        }
         if (!reader.TryReadVarInt(out var unknownInfo)) return false;
         if (!reader.TryReadUInt32Le(out var skillRaw)) return false;
 
@@ -301,9 +329,36 @@ internal static class PacketCombatHandler
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (damage <= 0) return false;
 
+        if (sourceId == targetId && !IsActiveSkillInvincible(mode, targetId, sourceId, resolvedSkillCode.Value, damage))
+        {
+            return false;
+        }
+
         if (!context.Sink.IsKnownEntity(sourceId) && !context.Sink.IsKnownEntity(targetId))
         {
             return false;
+        }
+
+        if (IsActiveSkillInvincible(mode, targetId, sourceId, resolvedSkillCode.Value, damage))
+        {
+            var invincibleObservation = new CombatObservation
+            {
+                OriginalSkillCode = skillRaw,
+                SkillCode = resolvedSkillCode.Value,
+                ChainId = unknownInfo,
+                Damage = 0,
+                HitCount = 0,
+                AttemptCount = 1,
+                DetailRaw = damage,
+                Type = mode,
+                Modifiers = DamageModifiers.Invincible,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage,
+                EffectTag = PacketEffectTag.ActiveSkillInvincible
+            };
+            consumed = reader.Offset;
+            context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, consumed);
+            return context.MarkParsed();
         }
 
         var observation = new CombatObservation
@@ -318,9 +373,8 @@ internal static class PacketCombatHandler
             PeriodicMode = mode
         };
 
-        context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, consumed);
-
         consumed = reader.Offset;
+        context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, consumed);
         return context.MarkParsed();
     }
 
@@ -358,4 +412,17 @@ internal static class PacketCombatHandler
 
         return true;
     }
+
+    private static bool IsActiveSkillInvincible(int mode, int targetId, int sourceId, int skillCode, int packetValue)
+    {
+        if (mode != 56 || targetId <= 0 || targetId != sourceId || packetValue <= 0)
+        {
+            return false;
+        }
+
+        return NormalizeSkillBase(skillCode) is 11380000 or 15410000 or 17270000;
+    }
+
+    private static int NormalizeSkillBase(int skillCode)
+        => skillCode <= 0 ? 0 : skillCode - skillCode % 10000;
 }

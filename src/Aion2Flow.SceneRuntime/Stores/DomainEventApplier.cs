@@ -16,9 +16,7 @@ public sealed class DomainEventApplier
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery;
     private readonly PeriodicChainCanonicalizer _periodicChain;
     private readonly OwnerTargetSummonRestoreCanonicalizer _ownerTargetSummonRestore;
-    private readonly MultiHitAttributionService _multiHitAttribution;
     private readonly CompactOutcomeCanonicalizer _compactOutcome;
-    private readonly PeriodicLinkCanonicalizer _periodicLink;
     private readonly BossFocusStore _bossFocus;
 
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
@@ -29,9 +27,7 @@ public sealed class DomainEventApplier
             combat,
             new SystemPeriodicRecoveryCanonicalizer(),
             new PeriodicChainCanonicalizer(),
-            new MultiHitAttributionService(),
             new CompactOutcomeCanonicalizer(),
-            new PeriodicLinkCanonicalizer(),
             new BossFocusStore(entities))
     {
     }
@@ -48,9 +44,7 @@ public sealed class DomainEventApplier
         CombatStore combat,
         SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery,
         PeriodicChainCanonicalizer periodicChain,
-        MultiHitAttributionService multiHitAttribution,
         CompactOutcomeCanonicalizer compactOutcome,
-        PeriodicLinkCanonicalizer periodicLink,
         BossFocusStore bossFocus)
     {
         _entities = entities;
@@ -60,9 +54,7 @@ public sealed class DomainEventApplier
         _systemPeriodicRecovery = systemPeriodicRecovery;
         _periodicChain = periodicChain;
         _ownerTargetSummonRestore = new OwnerTargetSummonRestoreCanonicalizer(entities);
-        _multiHitAttribution = multiHitAttribution;
         _compactOutcome = compactOutcome;
-        _periodicLink = periodicLink;
         _bossFocus = bossFocus;
     }
 
@@ -76,18 +68,14 @@ public sealed class DomainEventApplier
         new(
             _systemPeriodicRecovery.CreateStateSnapshot(),
             _periodicChain.CreateStateSnapshot(),
-            _multiHitAttribution.CreateStateSnapshot(),
             _compactOutcome.CreateStateSnapshot(),
-            _periodicLink.CreateStateSnapshot(),
             _bossFocus.CreateStateSnapshot());
 
     internal void RestoreState(DomainProjectionStateSnapshot snapshot)
     {
         _systemPeriodicRecovery.RestoreState(snapshot.SystemPeriodicRecovery);
         _periodicChain.RestoreState(snapshot.PeriodicChain);
-        _multiHitAttribution.RestoreState(snapshot.MultiHitAttribution);
         _compactOutcome.RestoreState(snapshot.CompactOutcome);
-        _periodicLink.RestoreState(snapshot.PeriodicLink);
         _bossFocus.RestoreState(snapshot.BossFocus);
     }
 
@@ -133,7 +121,7 @@ public sealed class DomainEventApplier
                 ApplyScene(in scene);
                 break;
             case ObservedEventDomain.Aura when entry.Aura is { } aura:
-                ApplyAura(in entry, in aura);
+                ApplyAura(in aura);
                 break;
         }
     }
@@ -154,13 +142,6 @@ public sealed class DomainEventApplier
     private void ApplyCombat(in ObservedEventEnvelope entry, in CombatObservation combatObservation)
     {
         var stamp = entry.Stamp;
-        if (entry.Raw.Opcode == 0x0538 && PeriodicLinkCanonicalizer.IsLinkObservation(in combatObservation))
-        {
-            if (_periodicLink.Normalize(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation) is { } periodicLinkResult)
-                ApplyCanonicalizedCombatResult(in stamp, in periodicLinkResult, entry.Raw.TimestampMilliseconds);
-            return;
-        }
-
         var rawResults = entry.Raw.Opcode switch
         {
             0x0438 => _compactOutcome.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds),
@@ -186,10 +167,10 @@ public sealed class DomainEventApplier
         var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonRestoreResult.SourceId, ownerTargetSummonRestoreResult.TargetId, in stamp, in observation);
         var systemRecoveryObservation = systemRecoveryResult.Observation;
         foreach (var normalized in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
-            ApplyCombatResult(in stamp, in normalized, observedAtMilliseconds);
+            ApplyCombatResult(in normalized, observedAtMilliseconds);
     }
 
-    private void ApplyCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
+    private void ApplyCombatResult(in CombatCanonicalizationResult result, long observedAtMilliseconds)
     {
         var observation = result.Observation;
         if (_entities.ApplyCharacterClassEvidence(result.SourceId, in observation) &&
@@ -199,19 +180,13 @@ public sealed class DomainEventApplier
         }
 
         _combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
-        _multiHitAttribution.ObserveCombat(result.SourceId, result.TargetId, in stamp, in observation);
     }
 
-    private void ApplyAura(in ObservedEventEnvelope entry, in AuraObservation aura)
+    private void ApplyAura(in AuraObservation aura)
     {
         if (aura.TargetEntityId > 0 && aura.SequenceId > 0)
             _entities.ApplyNpc2C38State(aura.TargetEntityId, aura.SequenceId, aura.ResultCode);
 
-        if (_multiHitAttribution.TrySynthesize2C38Invincible(in entry, in aura) is { } result)
-        {
-            var stamp = entry.Stamp;
-            ApplyCombatResult(in stamp, in result, entry.Raw.TimestampMilliseconds);
-        }
     }
 
     private void ApplyScene(in SceneObservation scene)
@@ -353,24 +328,18 @@ public sealed class DomainEventApplier
 internal sealed class DomainProjectionStateSnapshot(
     SystemPeriodicRecoveryCanonicalizer.StateSnapshot systemPeriodicRecovery,
     PeriodicChainCanonicalizer.StateSnapshot periodicChain,
-    MultiHitAttributionService.StateSnapshot multiHitAttribution,
     CompactOutcomeCanonicalizer.StateSnapshot compactOutcome,
-    PeriodicLinkCanonicalizer.StateSnapshot periodicLink,
     BossFocusStoreStateSnapshot bossFocus)
 {
     public SystemPeriodicRecoveryCanonicalizer.StateSnapshot SystemPeriodicRecovery { get; } = systemPeriodicRecovery;
     public PeriodicChainCanonicalizer.StateSnapshot PeriodicChain { get; } = periodicChain;
-    public MultiHitAttributionService.StateSnapshot MultiHitAttribution { get; } = multiHitAttribution;
     public CompactOutcomeCanonicalizer.StateSnapshot CompactOutcome { get; } = compactOutcome;
-    public PeriodicLinkCanonicalizer.StateSnapshot PeriodicLink { get; } = periodicLink;
     public BossFocusStoreStateSnapshot BossFocus { get; } = bossFocus;
 
     public DomainProjectionStateSnapshot DeepClone() =>
         new(
             SystemPeriodicRecovery.DeepClone(),
             PeriodicChain.DeepClone(),
-            MultiHitAttribution.DeepClone(),
             CompactOutcome.DeepClone(),
-            PeriodicLink.DeepClone(),
             BossFocus.DeepClone());
 }

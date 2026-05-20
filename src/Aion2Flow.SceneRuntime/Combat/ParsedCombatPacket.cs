@@ -12,14 +12,14 @@ public enum PeriodicEffectRelation : byte
 
 public enum PacketEffectTag : byte
 {
-    None,
-    ActiveDodgeEvade,
-    CompactEvade,
-    PeriodicLinkInvincible,
-    Aux2C38Invincible,
-    RegenerationHealing,
-    ShieldGrant,
-    ShieldAbsorbed
+    None = 0,
+    ActiveDodgeEvade = 1,
+    CompactEvade = 2,
+    PeriodicLinkInvincible = 3,
+    ActiveSkillInvincible = 4,
+    RegenerationHealing = 5,
+    ShieldGrant = 6,
+    ShieldAbsorbed = 7
 }
 
 public struct ParsedCombatPacket
@@ -194,7 +194,7 @@ public struct ParsedCombatPacket
             PacketEffectTag.ActiveDodgeEvade => "active-dodge-evade",
             PacketEffectTag.CompactEvade => "compact-evade",
             PacketEffectTag.PeriodicLinkInvincible => "periodic-link-invincible",
-            PacketEffectTag.Aux2C38Invincible => "aux-2c38-invincible",
+            PacketEffectTag.ActiveSkillInvincible => "active-skill-invincible",
             _ => string.Empty
         };
     }

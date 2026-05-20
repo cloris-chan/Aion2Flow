@@ -84,16 +84,6 @@ public interface IRuntimeObservationSink
         long frameOrdinal,
         long batchOrdinal);
 
-    void RegisterPeriodicLink0538(
-        int targetId,
-        int sourceId,
-        int linkId,
-        int sequenceId,
-        int tailRaw,
-        long timestamp,
-        long frameOrdinal,
-        long batchOrdinal);
-
     void RegisterObservation2A38(
         int sourceId,
         int mode,

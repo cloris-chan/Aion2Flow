@@ -347,44 +347,6 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterPeriodicLink0538(int targetId, int sourceId, int linkId, int sequenceId, int tailRaw, long timestamp, long frameOrdinal, long batchOrdinal)
-    {
-        targetId = ResolveLifecycleId(targetId);
-        sourceId = ResolveLifecycleId(sourceId);
-        linkId = ResolveLifecycleId(linkId);
-        AddKnownEntity(targetId);
-        AddKnownEntity(sourceId);
-        AddKnownEntity(linkId);
-        RememberNpcObservationSource(targetId);
-        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x0538,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = timestamp
-            },
-            Combat = new CombatObservation
-            {
-                SkillCode = tailRaw,
-                OriginalSkillCode = tailRaw,
-                Damage = 0,
-                HitCount = 0,
-                AttemptCount = 0,
-                DetailRaw = linkId,
-                Marker = sequenceId,
-                Type = 48
-            }
-        });
-    }
-
     public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         sourceId = ResolveLifecycleId(sourceId);
