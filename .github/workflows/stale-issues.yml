@@ -1,0 +1,29 @@
+name: Close inactive issues
+
+on:
+  schedule:
+    - cron: '17 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Close inactive issues
+        uses: actions/stale@v10
+        with:
+          days-before-issue-stale: 30
+          days-before-issue-close: 0
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-label: stale
+          close-issue-reason: not_planned
+          stale-issue-message: ''
+          close-issue-message: 'Closed automatically because this issue has had no updates for more than 30 days.'
+          exempt-issue-labels: keep-open,no-stale
+          operations-per-run: 100
