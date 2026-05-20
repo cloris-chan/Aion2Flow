@@ -104,14 +104,6 @@ public sealed class ObservedEventJournal(int capacity = 0)
         }
     }
 
-    public ObservedEventEnvelope[] ToArray()
-    {
-        lock (_gate)
-        {
-            return [.. _entries];
-        }
-    }
-
     public JournalReadResult CopyEntries(JournalCursor cursor, Span<ObservedEventEnvelope> destination)
     {
         lock (_gate)

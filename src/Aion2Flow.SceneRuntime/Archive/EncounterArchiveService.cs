@@ -6,6 +6,8 @@ namespace Cloris.Aion2Flow.SceneRuntime.Archive;
 
 public sealed class EncounterArchiveService
 {
+    public const int MaxHistoryCount = 10;
+
     private readonly Lock _lock = new();
     private readonly List<ArchivedEncounterRecord> _history = [];
     private readonly Dictionary<Guid, ArchivedEncounterRecord> _historyByEncounterId = [];
@@ -15,11 +17,9 @@ public sealed class EncounterArchiveService
 
     public IReadOnlyList<ArchivedEncounterRecord> History => _historySnapshot;
 
-    public ArchivedEncounterRecord? Archive(SceneArchivePayload payload, string trigger, bool isAutomatic)
+    public ArchivedEncounterRecord? Archive(SceneCombatSnapshot snapshot, SceneArchivePayload payload, string trigger, bool isAutomatic)
     {
-        var archivedPayload = payload.DeepClone();
-        var archivedSnapshot = archivedPayload.CreateSnapshot();
-        return AddArchiveRecord(archivedSnapshot, archivedPayload, trigger, isAutomatic);
+        return AddArchiveRecord(snapshot, payload, trigger, isAutomatic);
     }
 
     private ArchivedEncounterRecord? AddArchiveRecord(SceneCombatSnapshot archivedSnapshot, SceneArchivePayload scenePayload, string trigger, bool isAutomatic)
@@ -50,14 +50,14 @@ public sealed class EncounterArchiveService
 
             _history.Insert(0, record);
             _historyByEncounterId[record.EncounterId] = record;
-            if (_history.Count > 100)
+            if (_history.Count > MaxHistoryCount)
             {
-                for (var i = 100; i < _history.Count; i++)
+                for (var i = MaxHistoryCount; i < _history.Count; i++)
                 {
                     _historyByEncounterId.Remove(_history[i].EncounterId);
                 }
 
-                _history.RemoveRange(100, _history.Count - 100);
+                _history.RemoveRange(MaxHistoryCount, _history.Count - MaxHistoryCount);
             }
 
             _historySnapshot = [.. _history];

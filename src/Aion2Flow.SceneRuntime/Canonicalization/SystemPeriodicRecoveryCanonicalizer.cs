@@ -11,30 +11,6 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
     private readonly record struct State(long Damage, long FrameOrdinal, long BatchOrdinal);
     private readonly Dictionary<Key, State> _seeds = [];
 
-    internal StateSnapshot CreateStateSnapshot()
-    {
-        var seeds = new SeedStateSnapshot[_seeds.Count];
-        var index = 0;
-        foreach (var pair in _seeds)
-            seeds[index++] = new SeedStateSnapshot(pair.Key.SourceId, pair.Key.TargetId, pair.Key.OriginalSkillCode, pair.Value.Damage, pair.Value.FrameOrdinal, pair.Value.BatchOrdinal);
-        Array.Sort(seeds, static (left, right) =>
-        {
-            var cmp = left.SourceId.CompareTo(right.SourceId);
-            if (cmp != 0) return cmp;
-            cmp = left.TargetId.CompareTo(right.TargetId);
-            return cmp != 0 ? cmp : left.OriginalSkillCode.CompareTo(right.OriginalSkillCode);
-        });
-        return new StateSnapshot(seeds);
-    }
-
-    internal void RestoreState(StateSnapshot snapshot)
-    {
-        _seeds.Clear();
-        _seeds.EnsureCapacity(snapshot.Seeds.Length);
-        foreach (ref readonly var seed in snapshot.Seeds.AsSpan())
-            _seeds.Add(new Key(seed.SourceId, seed.TargetId, seed.OriginalSkillCode), new State(seed.Damage, seed.FrameOrdinal, seed.BatchOrdinal));
-    }
-
     public CombatCanonicalizationResult Normalize(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation)
     {
         if (!TryGetKey(sourceId, targetId, in observation, out var key, out var isSeed))
@@ -99,17 +75,4 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
     private static int ResolveOriginalSkillCode(in CombatObservation observation) =>
         observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
 
-    internal sealed class StateSnapshot(SeedStateSnapshot[] seeds)
-    {
-        public SeedStateSnapshot[] Seeds { get; } = seeds;
-
-        public StateSnapshot DeepClone()
-        {
-            var seeds = new SeedStateSnapshot[Seeds.Length];
-            Array.Copy(Seeds, seeds, seeds.Length);
-            return new StateSnapshot(seeds);
-        }
-    }
-
-    internal readonly record struct SeedStateSnapshot(int SourceId, int TargetId, int OriginalSkillCode, long Damage, long FrameOrdinal, long BatchOrdinal);
 }

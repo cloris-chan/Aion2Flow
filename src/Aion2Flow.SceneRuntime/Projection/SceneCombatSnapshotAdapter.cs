@@ -25,6 +25,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private long _ownerInferenceSkillMapRevision = -1;
     private long _ownerInferenceVersion;
     private int _ownerInferenceScannedEventCount;
+    private long _classEvidenceCombatRevision = -1;
+    private long _classEvidenceEntityRevision = -1;
+    private long _classEvidenceOwnerVersion = -1;
+    private int _classEvidenceScannedEventCount;
     private long _resolveCacheEntityRevision = -1;
     private long _resolveCacheOwnerVersion = -1;
     private bool _ownerInferenceReady;
@@ -44,8 +48,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     internal void BuildSnapshot(SceneCombatSnapshotBuilder builder)
     {
-        _classEvidence.Clear();
         PrepareProjectionCaches();
+        EnsureClassEvidence();
         builder.SetMap(boundary.CurrentMapId, boundary.CurrentMapInstanceId, boundary.SceneTransitionRevision);
 
         var targetDecision = BuildTargetDecisionFromCombatState();
@@ -63,8 +67,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         if (encounterTime > 0)
             ApplyCombatState(builder);
-        BuildClassEvidenceFromEvents();
-
         var totalDamage = 0L;
         foreach (var id in builder.CombatantIds)
         {
@@ -241,12 +243,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private void BuildClassEvidenceFromEvents()
+    private void ProcessClassEvidenceEvents(ReadOnlySpan<CombatEventRecord> events)
     {
-        if (combat.EventSpan.Length == 0)
-            return;
-
-        var events = combat.EventSpan;
         foreach (ref readonly var record in events)
         {
             var sourceId = ResolveCombatantIdCached(record.SourceId);
@@ -574,6 +572,34 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     {
         EnsureOwnerInference();
         EnsureResolveCaches();
+    }
+
+    private void EnsureClassEvidence()
+    {
+        var combatRevision = combat.Revision;
+        var entityRevision = entities.Revision;
+        var ownerVersion = _ownerInferenceVersion;
+        var events = combat.EventSpan;
+        var rebuildFromStart = _classEvidenceEntityRevision != entityRevision ||
+                               _classEvidenceOwnerVersion != ownerVersion ||
+                               combatRevision < _classEvidenceCombatRevision ||
+                               _classEvidenceScannedEventCount > events.Length;
+
+        if (rebuildFromStart)
+        {
+            _classEvidence.Clear();
+            _classEvidenceScannedEventCount = 0;
+        }
+
+        if (_classEvidenceScannedEventCount < events.Length)
+        {
+            ProcessClassEvidenceEvents(events[_classEvidenceScannedEventCount..]);
+            _classEvidenceScannedEventCount = events.Length;
+        }
+
+        _classEvidenceCombatRevision = combatRevision;
+        _classEvidenceEntityRevision = entityRevision;
+        _classEvidenceOwnerVersion = ownerVersion;
     }
 
     private void EnsureOwnerInference()

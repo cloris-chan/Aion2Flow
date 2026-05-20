@@ -11,18 +11,19 @@ namespace Cloris.Aion2Flow.Tests.App;
 public sealed class EncounterArchiveServiceTests
 {
     [Fact]
-    public void Archive_Stores_DeepCloned_ScenePayload_And_Lookup()
+    public void Archive_Stores_Frozen_ScenePayload_And_Lookup()
     {
         var service = new EncounterArchiveService();
         const int playerId = 100;
         const int bossId = 200;
         var owner = CreateSceneOwner(playerId, bossId);
-        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
-        var record = service.Archive(payload, "manual", isAutomatic: false);
+        var snapshot = owner.CreateSnapshot();
+        var payload = owner.CreateArchivePayload(snapshot);
+        var record = service.Archive(snapshot, payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
         Assert.Single(service.History);
-        Assert.NotSame(payload, record!.ScenePayload);
+        Assert.Same(payload, record!.ScenePayload);
         Assert.Equal(bossId, record.Snapshot.TargetObservation?.InstanceId);
         Assert.True(record.ScenePayload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
         Assert.Equal("Tester", archivedPc.Nickname);
@@ -44,10 +45,11 @@ public sealed class EncounterArchiveServiceTests
         const int playerId = 100;
         const int bossId = 200;
         var owner = CreateSceneOwner(playerId, bossId);
-        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
+        var snapshot = owner.CreateSnapshot();
+        var payload = owner.CreateArchivePayload(snapshot);
 
-        var first = service.Archive(payload, "manual", isAutomatic: false);
-        var second = service.Archive(payload, "manual", isAutomatic: false);
+        var first = service.Archive(snapshot, payload, "manual", isAutomatic: false);
+        var second = service.Archive(snapshot, payload, "manual", isAutomatic: false);
 
         Assert.NotNull(first);
         Assert.Null(second);
@@ -60,9 +62,10 @@ public sealed class EncounterArchiveServiceTests
         var service = new EncounterArchiveService();
         var sceneStarted = new DateTimeOffset(2026, 5, 9, 13, 14, 15, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 9)));
         var owner = CreateSceneOwner(100, 200, sceneStarted);
-        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
+        var snapshot = owner.CreateSnapshot();
+        var payload = owner.CreateArchivePayload(snapshot);
 
-        var record = service.Archive(payload, "manual", isAutomatic: false);
+        var record = service.Archive(snapshot, payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
         Assert.Equal(sceneStarted.ToLocalTime(), record!.ArchivedAt);
@@ -75,11 +78,12 @@ public sealed class EncounterArchiveServiceTests
         var service = new EncounterArchiveService();
         Guid firstEncounterId = default;
 
-        for (var i = 0; i < 101; i++)
+        for (var i = 0; i < EncounterArchiveService.MaxHistoryCount + 1; i++)
         {
             var owner = CreateSceneOwner(i + 1, 10_000 + i, DateTimeOffset.FromUnixTimeMilliseconds(1_000 + i).ToLocalTime());
-            var payload = owner.CreateArchivePayload();
-            var record = service.Archive(payload, "manual", isAutomatic: false);
+            var snapshot = owner.CreateSnapshot();
+            var payload = owner.CreateArchivePayload(snapshot);
+            var record = service.Archive(snapshot, payload, "manual", isAutomatic: false);
             Assert.NotNull(record);
 
             if (i == 0)
@@ -88,7 +92,7 @@ public sealed class EncounterArchiveServiceTests
             }
         }
 
-        Assert.Equal(100, service.History.Count);
+        Assert.Equal(EncounterArchiveService.MaxHistoryCount, service.History.Count);
         Assert.False(service.TryGetEncounter(firstEncounterId, out _));
     }
 
@@ -103,7 +107,6 @@ public sealed class EncounterArchiveServiceTests
         var payload = owner.CreateArchivePayload(snapshot);
         var delta = payload.CreateDetailDelta(playerId);
 
-        Assert.Equal(snapshot.EncounterId, payload.CreateSnapshot().EncounterId);
         Assert.Equal(2, payload.Events.Count);
         Assert.Equal(playerId, delta.CombatantId);
         Assert.Equal(2, delta.Events.Count);
@@ -202,7 +205,7 @@ public sealed class EncounterArchiveServiceTests
 
         var delta = payload.CreateDetailDelta(playerId);
 
-        Assert.Equal(bossId, payload.CreateSnapshot().TargetObservation?.InstanceId);
+        Assert.Equal(bossId, snapshot.TargetObservation?.InstanceId);
         Assert.True(payload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
         Assert.Equal("Tester", archivedPc.Nickname);
         Assert.Equal(2, payload.Events.Count);
@@ -259,14 +262,15 @@ public sealed class EncounterArchiveServiceTests
         const int bossId = 200;
         var service = new EncounterArchiveService();
         var owner = CreateSceneOwner(playerId, bossId);
-        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
+        var snapshot = owner.CreateSnapshot();
+        var payload = owner.CreateArchivePayload(snapshot);
 
-        var record = service.Archive(payload, "manual", isAutomatic: false);
+        var record = service.Archive(snapshot, payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.NotSame(payload, record!.ScenePayload);
+        Assert.Same(payload, record!.ScenePayload);
         Assert.Equal(payload.Events.Count, record.ScenePayload.Events.Count);
-        Assert.Equal(payload.CreateSnapshot().EncounterId, record.EncounterId);
+        Assert.Equal(snapshot.EncounterId, record.EncounterId);
     }
 
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId)

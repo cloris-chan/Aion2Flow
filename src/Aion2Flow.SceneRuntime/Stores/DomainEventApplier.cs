@@ -64,21 +64,6 @@ public sealed class DomainEventApplier
     public CombatStore Combat => _combat;
     public BossFocusStore BossFocus => _bossFocus;
 
-    internal DomainProjectionStateSnapshot CreateStateSnapshot() =>
-        new(
-            _systemPeriodicRecovery.CreateStateSnapshot(),
-            _periodicChain.CreateStateSnapshot(),
-            _compactOutcome.CreateStateSnapshot(),
-            _bossFocus.CreateStateSnapshot());
-
-    internal void RestoreState(DomainProjectionStateSnapshot snapshot)
-    {
-        _systemPeriodicRecovery.RestoreState(snapshot.SystemPeriodicRecovery);
-        _periodicChain.RestoreState(snapshot.PeriodicChain);
-        _compactOutcome.RestoreState(snapshot.CompactOutcome);
-        _bossFocus.RestoreState(snapshot.BossFocus);
-    }
-
     public void ApplyJournal(ObservedEventJournal journal)
     {
         var count = journal.Count;
@@ -323,23 +308,4 @@ public sealed class DomainEventApplier
 
     private bool CanNpcBattleActivate(int instanceId) =>
         !_entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
-}
-
-internal sealed class DomainProjectionStateSnapshot(
-    SystemPeriodicRecoveryCanonicalizer.StateSnapshot systemPeriodicRecovery,
-    PeriodicChainCanonicalizer.StateSnapshot periodicChain,
-    CompactOutcomeCanonicalizer.StateSnapshot compactOutcome,
-    BossFocusStoreStateSnapshot bossFocus)
-{
-    public SystemPeriodicRecoveryCanonicalizer.StateSnapshot SystemPeriodicRecovery { get; } = systemPeriodicRecovery;
-    public PeriodicChainCanonicalizer.StateSnapshot PeriodicChain { get; } = periodicChain;
-    public CompactOutcomeCanonicalizer.StateSnapshot CompactOutcome { get; } = compactOutcome;
-    public BossFocusStoreStateSnapshot BossFocus { get; } = bossFocus;
-
-    public DomainProjectionStateSnapshot DeepClone() =>
-        new(
-            SystemPeriodicRecovery.DeepClone(),
-            PeriodicChain.DeepClone(),
-            CompactOutcome.DeepClone(),
-            BossFocus.DeepClone());
 }

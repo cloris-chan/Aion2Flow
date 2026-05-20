@@ -581,7 +581,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         => new(scope, metadataRegistry, snapshot, _gameResourceService, Localization["Scene_Unknown"]);
 
     private ArchivedEncounterRecord? ArchiveEncounter(string trigger, bool isAutomatic)
-        => _encounterArchiveService.Archive(_captureService.Scene.Owner.CreateArchivePayload(), trigger, isAutomatic);
+    {
+        var archive = _captureService.Scene.Owner.CreateArchiveCapture();
+        return _encounterArchiveService.Archive(archive.Snapshot, archive.Payload, trigger, isAutomatic);
+    }
 
     private bool TryAutoResetEncounter(SceneCombatSnapshot previousLiveSnapshot, SceneCombatSnapshot latestLiveSnapshot)
     {

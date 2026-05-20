@@ -339,8 +339,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
-        var payload = scene.Owner.CreateArchivePayload(scene.Owner.CreateSnapshot());
-        var record = archive.Archive(payload, "manual", isAutomatic: false);
+        var snapshot = scene.Owner.CreateSnapshot();
+        var payload = scene.Owner.CreateArchivePayload(snapshot);
+        var record = archive.Archive(snapshot, payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
@@ -374,11 +375,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
-        var payload = scene.Owner.CreateArchivePayload(scene.Owner.CreateSnapshot());
-        var record = archive.Archive(payload, "manual", isAutomatic: false);
+        var snapshot = scene.Owner.CreateSnapshot();
+        var payload = scene.Owner.CreateArchivePayload(snapshot);
+        var record = archive.Archive(snapshot, payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.Equal(payload.CreateSnapshot().EncounterId, record!.EncounterId);
+        Assert.Equal(snapshot.EncounterId, record!.EncounterId);
 
         scene.Reset();
         SelectArchivedSceneCombatant(viewModel, record, playerId);
@@ -444,8 +446,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
-        var payload = scene.Owner.CreateArchivePayload(scene.Owner.CreateSnapshot());
-        var record = archive.Archive(payload, "manual", isAutomatic: false);
+        var snapshot = scene.Owner.CreateSnapshot();
+        var payload = scene.Owner.CreateArchivePayload(snapshot);
+        var record = archive.Archive(snapshot, payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
@@ -1558,8 +1561,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     private static ArchivedEncounterRecord? CreateSceneArchiveRecord(PacketLogReplayResult replay)
     {
         var service = new EncounterArchiveService();
-        var payload = replay.SceneOwner.CreateArchivePayload(replay.SceneOwner.CreateSnapshot());
-        return service.Archive(payload, "replay", isAutomatic: false);
+        var snapshot = replay.SceneOwner.CreateSnapshot();
+        var payload = replay.SceneOwner.CreateArchivePayload(snapshot);
+        return service.Archive(snapshot, payload, "replay", isAutomatic: false);
     }
 
     private static PacketLogReplayResult ReplayWithScene(string path)
@@ -1627,8 +1631,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
-        var payload = scene.Owner.CreateArchivePayload(scene.Owner.CreateSnapshot());
-        var record = archive.Archive(payload, "manual", isAutomatic: false);
+        var archivedSnapshot = scene.Owner.CreateSnapshot();
+        var payload = scene.Owner.CreateArchivePayload(archivedSnapshot);
+        var record = archive.Archive(archivedSnapshot, payload, "manual", isAutomatic: false);
         Assert.NotNull(record);
 
         scene.Reset();

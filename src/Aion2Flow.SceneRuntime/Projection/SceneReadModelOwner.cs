@@ -2,9 +2,7 @@ using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
-using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
-using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -12,21 +10,15 @@ namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
 {
     private const long BossFocusVisibilityTimeoutMilliseconds = 2_000;
-    private const long RuntimeCheckpointIntervalMilliseconds = 5_000;
     private readonly Lock _gate = new();
     private DomainEventApplier _applier = new(entities, boundary, metadataRegistry, combat);
     private readonly SceneCombatSnapshotBuilder _snapshotBuilder = new();
     private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
     private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
-    private readonly List<SceneRuntimeCheckpoint> _runtimeCheckpoints = [];
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
     private SceneCombatSnapshotAdapter? _adapter;
     private long _appliedBatchOrdinal = -1;
-    private long _lastAppliedTimestampMilliseconds;
-    private long _nextRuntimeCheckpointAtMilliseconds;
-    private TimelineStamp _lastAppliedStamp;
-    private bool _hasRuntimeCheckpointSchedule;
     private SnapshotCacheKey _snapshotCacheKey;
     private SceneCombatSnapshot? _snapshotCache;
     private ProjectionCacheStats _projectionCacheStats;
@@ -70,40 +62,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public long AppliedObservationOrdinal { get; private set; }
     public long AppliedBatchOrdinal => _appliedBatchOrdinal;
     public ProjectionCacheStats ProjectionCacheStats => _projectionCacheStats;
-    public IReadOnlyList<SceneRuntimeCheckpoint> RuntimeCheckpoints => _runtimeCheckpoints;
-
-    internal SceneReadModelOwner(
-        ObservedEventJournal journal,
-        Guid encounterId,
-        DateTimeOffset sceneStarted,
-        EntityStore entities,
-        SceneBoundaryStore boundary,
-        RuntimeMetadataRegistry metadataRegistry,
-        CombatStore combat,
-        DomainEventApplier applier,
-        JournalCursor cursor,
-        long appliedObservationOrdinal,
-        long appliedBatchOrdinal,
-        IEnumerable<SceneRuntimeCheckpoint>? checkpoints = null)
-        : this(journal, encounterId, sceneStarted, entities, boundary, metadataRegistry, combat)
-    {
-        _applier = applier;
-        _cursor = cursor;
-        AppliedObservationOrdinal = appliedObservationOrdinal;
-        _appliedBatchOrdinal = appliedBatchOrdinal;
-        if (checkpoints is not null)
-        {
-            foreach (var checkpoint in checkpoints)
-                _runtimeCheckpoints.Add(checkpoint.DeepClone());
-            if (_runtimeCheckpoints.Count > 0)
-            {
-                _hasRuntimeCheckpointSchedule = true;
-                _nextRuntimeCheckpointAtMilliseconds = _runtimeCheckpoints[^1].CapturedAtMilliseconds + RuntimeCheckpointIntervalMilliseconds;
-                _lastAppliedTimestampMilliseconds = _runtimeCheckpoints[^1].CapturedAtMilliseconds;
-                _lastAppliedStamp = _runtimeCheckpoints[^1].Anchor.LastStamp;
-            }
-        }
-    }
 
     public SceneCombatSnapshot CreateSnapshot()
     {
@@ -112,40 +70,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             RefreshCore();
             return CreateSnapshotCore();
         }
-    }
-
-    public SceneCombatSnapshot CreateSnapshotAt(long observedAtMilliseconds)
-    {
-        lock (_gate)
-        {
-            RefreshCoreUntil(observedAtMilliseconds);
-            return CreateSnapshotCore();
-        }
-    }
-
-    public SceneReadModelFrame CreateFrameAt(long observedAtMilliseconds, int detailCombatantId = 0, bool forceDetailRefresh = false)
-    {
-        lock (_gate)
-        {
-            RefreshCoreUntil(observedAtMilliseconds);
-            return CreateFrameWithMarkers(detailCombatantId, forceDetailRefresh, null);
-        }
-    }
-
-    public SceneRuntimeCheckpoint CreateRuntimeCheckpoint()
-    {
-        lock (_gate)
-        {
-            RefreshCore();
-            return CreateRuntimeCheckpointCore(CreateCurrentAnchor(_lastAppliedTimestampMilliseconds));
-        }
-    }
-
-    public static SceneReadModelOwner RestoreFromCheckpoint(ObservedEventJournal journal, SceneRuntimeCheckpoint checkpoint)
-    {
-        var owner = new SceneReadModelOwner(journal, checkpoint.EncounterId, checkpoint.SceneStarted);
-        owner.RestoreCheckpointState(checkpoint);
-        return owner;
     }
 
     public SceneReadModelFrame CreateFrame(int detailCombatantId = 0, bool forceDetailRefresh = false)
@@ -178,9 +102,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 boundary,
                 metadataRegistry,
                 _applier.BossFocus,
-                CreateAdapter(),
-                journal.ToArray(),
-                CreateArchiveCheckpoints());
+                CreateAdapter());
         }
     }
 
@@ -197,9 +119,25 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 boundary,
                 metadataRegistry,
                 _applier.BossFocus,
-                CreateAdapter(),
-                journal.ToArray(),
-                CreateArchiveCheckpoints());
+                CreateAdapter());
+        }
+    }
+
+    public SceneArchiveCapture CreateArchiveCapture()
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            var snapshot = CreateSnapshotCore();
+            var payload = SceneArchivePayload.CreateLocked(
+                snapshot,
+                SceneStarted,
+                entities,
+                boundary,
+                metadataRegistry,
+                _applier.BossFocus,
+                CreateAdapter());
+            return new SceneArchiveCapture(snapshot, payload);
         }
     }
 
@@ -250,13 +188,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             var entries = _entryBuffer.AsSpan(0, result.Count);
             foreach (ref readonly var entry in entries)
             {
-                EnsureRuntimeCheckpointSchedule(in entry);
                 _applier.ApplyEntry(in entry);
                 AppliedObservationOrdinal++;
-                _lastAppliedStamp = entry.Stamp;
-                if (entry.Raw.TimestampMilliseconds > 0)
-                    _lastAppliedTimestampMilliseconds = Math.Max(_lastAppliedTimestampMilliseconds, entry.Raw.TimestampMilliseconds);
-                MaybeCaptureRuntimeCheckpointAfterEntry(in entry);
             }
 
             _cursor = result.Cursor;
@@ -268,95 +201,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _applier.CompleteBatch(completedBatch);
             _appliedBatchOrdinal = completedBatch;
         }
-    }
-
-    private void RefreshCoreUntil(long observedAtMilliseconds)
-    {
-        var maxAppliedBatchOrdinal = _appliedBatchOrdinal;
-        while (true)
-        {
-            var result = journal.CopyEntries(_cursor, _entryBuffer);
-            if (result.Count == 0)
-                break;
-
-            var entries = _entryBuffer.AsSpan(0, result.Count);
-            var appliedAny = false;
-            JournalCursor cursor = _cursor;
-            foreach (ref readonly var entry in entries)
-            {
-                var timestamp = entry.Raw.TimestampMilliseconds;
-                if (timestamp > 0 && timestamp > observedAtMilliseconds)
-                    break;
-
-                _applier.ApplyEntry(in entry);
-                AppliedObservationOrdinal++;
-                _lastAppliedStamp = entry.Stamp;
-                cursor = new JournalCursor(entry.Stamp.ObservationOrdinal + 1);
-                maxAppliedBatchOrdinal = Math.Max(maxAppliedBatchOrdinal, entry.Stamp.BatchOrdinal);
-                if (timestamp > 0)
-                    _lastAppliedTimestampMilliseconds = Math.Max(_lastAppliedTimestampMilliseconds, timestamp);
-                appliedAny = true;
-            }
-
-            _cursor = cursor;
-            if (!appliedAny || _cursor.NextObservationOrdinal < result.Cursor.NextObservationOrdinal)
-                break;
-        }
-
-        if (maxAppliedBatchOrdinal > _appliedBatchOrdinal)
-        {
-            _applier.CompleteBatch(maxAppliedBatchOrdinal);
-            _appliedBatchOrdinal = maxAppliedBatchOrdinal;
-        }
-    }
-
-    private void EnsureRuntimeCheckpointSchedule(in ObservedEventEnvelope entry)
-    {
-        var timestamp = entry.Raw.TimestampMilliseconds;
-        if (timestamp <= 0 || _hasRuntimeCheckpointSchedule)
-            return;
-
-        _hasRuntimeCheckpointSchedule = true;
-        _nextRuntimeCheckpointAtMilliseconds = timestamp + RuntimeCheckpointIntervalMilliseconds;
-        _runtimeCheckpoints.Add(CreateRuntimeCheckpointCore(CreateAnchorBeforeEntry(in entry)));
-    }
-
-    private void MaybeCaptureRuntimeCheckpointAfterEntry(in ObservedEventEnvelope entry)
-    {
-        var timestamp = entry.Raw.TimestampMilliseconds;
-        if (timestamp <= 0 || !_hasRuntimeCheckpointSchedule)
-            return;
-
-        if (timestamp < _nextRuntimeCheckpointAtMilliseconds)
-            return;
-
-        _runtimeCheckpoints.Add(CreateRuntimeCheckpointCore(CreateAnchorAfterEntry(in entry)));
-        while (_nextRuntimeCheckpointAtMilliseconds <= timestamp)
-            _nextRuntimeCheckpointAtMilliseconds += RuntimeCheckpointIntervalMilliseconds;
-    }
-
-    private void RestoreCheckpointState(SceneRuntimeCheckpoint checkpoint)
-    {
-        var state = checkpoint.State;
-        entities.RestoreState(state.Entities);
-        boundary.RestoreState(state.Boundary);
-        metadataRegistry.RestoreState(state.Metadata);
-        combat.RestoreState(state.Combat);
-        _applier.RestoreState(state.Projection);
-        _cursor = checkpoint.Anchor.CreateReplayCursor(journal);
-        AppliedObservationOrdinal = Math.Max(0, checkpoint.Anchor.LastObservationOrdinal + 1);
-        _appliedBatchOrdinal = checkpoint.Anchor.LastBatchOrdinal;
-        _lastAppliedTimestampMilliseconds = checkpoint.Anchor.CapturedAtMilliseconds;
-        _lastAppliedStamp = checkpoint.Anchor.LastStamp;
-        _hasRuntimeCheckpointSchedule = true;
-        _nextRuntimeCheckpointAtMilliseconds = checkpoint.CapturedAtMilliseconds + RuntimeCheckpointIntervalMilliseconds;
-        _runtimeCheckpoints.Clear();
-        _runtimeCheckpoints.Add(checkpoint.DeepClone());
-        _snapshotCache = null;
-        _snapshotCacheKey = default;
-        _adapter = null;
-        _detailSubscriptions.Clear();
-        _lastDetailDeltas.Clear();
     }
 
     private SceneReadModelFrame CreateFrameWithMarkers(int detailCombatantId, bool forceDetailRefresh, ICombatDetailEventWriter? detailWriter)
@@ -421,52 +265,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
     private SceneCombatSnapshotAdapter CreateAdapter()
         => _adapter ??= new(entities, combat, boundary, _applier.BossFocus, EncounterId);
-
-    private SceneRuntimeCheckpoint CreateRuntimeCheckpointCore(TimelineAnchor anchor) =>
-        new(EncounterId, SceneStarted, anchor, CreateRuntimeStateSnapshot());
-
-    private SceneRuntimeStateSnapshot CreateRuntimeStateSnapshot() =>
-        new(
-            entities.CreateStateSnapshot(),
-            boundary.CreateStateSnapshot(),
-            metadataRegistry.CreateStateSnapshot(),
-            combat.CreateStateSnapshot(),
-            _applier.CreateStateSnapshot());
-
-    private TimelineAnchor CreateAnchorBeforeEntry(in ObservedEventEnvelope entry)
-    {
-        var lastObservationOrdinal = entry.Stamp.ObservationOrdinal - 1;
-        return new TimelineAnchor(
-            lastObservationOrdinal,
-            _appliedBatchOrdinal,
-            entry.Raw.TimestampMilliseconds,
-            new TimelineStamp(entry.Stamp.OffsetTicks, lastObservationOrdinal, Math.Max(0, entry.Stamp.FrameOrdinal - 1), _appliedBatchOrdinal));
-    }
-
-    private TimelineAnchor CreateAnchorAfterEntry(in ObservedEventEnvelope entry) =>
-        new(entry.Stamp.ObservationOrdinal, _appliedBatchOrdinal, entry.Raw.TimestampMilliseconds, entry.Stamp);
-
-    private TimelineAnchor CreateCurrentAnchor(long capturedAtMilliseconds) =>
-        new(_cursor.NextObservationOrdinal - 1, _appliedBatchOrdinal, capturedAtMilliseconds, _lastAppliedStamp);
-
-    internal SceneRuntimeCheckpoint[] CreateArchiveCheckpoints()
-    {
-        if (_runtimeCheckpoints.Count == 0)
-            return [CreateRuntimeCheckpointCore(CreateCurrentAnchor(_lastAppliedTimestampMilliseconds))];
-
-        var includeFinal = !IsCurrentProjectionCheckpoint(_runtimeCheckpoints[^1]);
-        var result = new SceneRuntimeCheckpoint[_runtimeCheckpoints.Count + (includeFinal ? 1 : 0)];
-        for (var i = 0; i < _runtimeCheckpoints.Count; i++)
-            result[i] = _runtimeCheckpoints[i].DeepClone();
-        if (includeFinal)
-            result[^1] = CreateRuntimeCheckpointCore(CreateCurrentAnchor(_lastAppliedTimestampMilliseconds));
-        return result;
-    }
-
-    private bool IsCurrentProjectionCheckpoint(SceneRuntimeCheckpoint checkpoint) =>
-        checkpoint.Anchor.LastObservationOrdinal == _cursor.NextObservationOrdinal - 1 &&
-        checkpoint.Anchor.LastBatchOrdinal == _appliedBatchOrdinal &&
-        checkpoint.CapturedAtMilliseconds == _lastAppliedTimestampMilliseconds;
 
     private static bool IsSnapshotCacheStable(SceneCombatSnapshot snapshot) =>
         snapshot.EncounterEndTime > 0 || snapshot.BossFocuses.Count == 0 && snapshot.Encounter.TrackingTargetId == 0;
@@ -544,16 +342,13 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _cursor = journal.CreateCursor(startOrdinal);
             AppliedObservationOrdinal = 0;
             _appliedBatchOrdinal = journal.LastCompletedBatchOrdinal;
-            _lastAppliedTimestampMilliseconds = 0;
-            _lastAppliedStamp = default;
-            _hasRuntimeCheckpointSchedule = false;
-            _nextRuntimeCheckpointAtMilliseconds = 0;
-            _runtimeCheckpoints.Clear();
             _snapshotCache = null;
             _snapshotCacheKey = default;
         }
     }
 }
+
+public readonly record struct SceneArchiveCapture(SceneCombatSnapshot Snapshot, SceneArchivePayload Payload);
 
 internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long EntityRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision)
 {

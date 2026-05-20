@@ -176,36 +176,6 @@ public sealed class BossFocusStore(EntityStore entities)
     private bool IsObservedDead(int instanceId) =>
         entities.TryGet(instanceId, out var entity) && entity.CurrentHp == 0;
 
-    internal BossFocusStoreStateSnapshot CreateStateSnapshot()
-    {
-        var observed = new BossFocusObservedStateSnapshot[_observed.Count];
-        var index = 0;
-        foreach (var pair in _observed)
-            observed[index++] = new BossFocusObservedStateSnapshot(pair.Key, pair.Value);
-        Array.Sort(observed, static (left, right) => left.InstanceId.CompareTo(right.InstanceId));
-
-        var focused = new int[_focused.Count];
-        index = 0;
-        foreach (var id in _focused)
-            focused[index++] = id;
-        Array.Sort(focused);
-
-        return new BossFocusStoreStateSnapshot(_revision, observed, focused);
-    }
-
-    internal void RestoreState(BossFocusStoreStateSnapshot snapshot)
-    {
-        _observed.Clear();
-        _focused.Clear();
-        _observed.EnsureCapacity(snapshot.Observed.Length);
-        foreach (ref readonly var observed in snapshot.Observed.AsSpan())
-            _observed.Add(observed.InstanceId, observed.Snapshot);
-        _focused.EnsureCapacity(snapshot.Focused.Length);
-        foreach (var id in snapshot.Focused)
-            _focused.Add(id);
-        _revision = snapshot.Revision;
-    }
-
     public readonly record struct Snapshot
     {
         public int InstanceId { get; init; }
@@ -215,21 +185,3 @@ public sealed class BossFocusStore(EntityStore entities)
         public bool HasHp { get; init; }
     }
 }
-
-internal sealed class BossFocusStoreStateSnapshot(long revision, BossFocusObservedStateSnapshot[] observed, int[] focused)
-{
-    public long Revision { get; } = revision;
-    public BossFocusObservedStateSnapshot[] Observed { get; } = observed;
-    public int[] Focused { get; } = focused;
-
-    public BossFocusStoreStateSnapshot DeepClone()
-    {
-        var observed = new BossFocusObservedStateSnapshot[Observed.Length];
-        Array.Copy(Observed, observed, observed.Length);
-        var focused = new int[Focused.Length];
-        Array.Copy(Focused, focused, focused.Length);
-        return new BossFocusStoreStateSnapshot(Revision, observed, focused);
-    }
-}
-
-internal readonly record struct BossFocusObservedStateSnapshot(int InstanceId, BossFocusStore.Snapshot Snapshot);
