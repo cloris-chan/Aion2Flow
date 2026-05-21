@@ -2,19 +2,11 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0438CompactOutcome(
-    int TargetId,
-    int LayoutTag,
-    int Flag,
-    int SourceId,
-    int SkillCodeRaw,
-    int Marker,
-    int Type,
-    int TailLength);
+internal readonly record struct Packet0438CompactSignal(int TargetId, int LayoutTag, int Flag, int SourceId, int SkillCodeRaw, int Marker, int Type, int TailLength);
 
-internal static class Packet0438CompactOutcomeParser
+internal static class Packet0438CompactSignalParser
 {
-    public static bool TryParse(ReadOnlySpan<byte> packet, out Packet0438CompactOutcome result)
+    public static bool TryParse(ReadOnlySpan<byte> packet, out Packet0438CompactSignal result)
     {
         result = default;
 
@@ -37,15 +29,7 @@ internal static class Packet0438CompactOutcomeParser
         if (!reader.TryReadVarInt(out var type)) return false;
         if (reader.Remaining == 0) return false;
 
-        result = new Packet0438CompactOutcome(
-            targetId,
-            layoutTag,
-            flag,
-            sourceId,
-            skillCodeRaw,
-            marker,
-            type,
-            reader.Remaining);
+        result = new Packet0438CompactSignal(targetId, layoutTag, flag, sourceId, skillCodeRaw, marker, type, reader.Remaining);
         return true;
     }
 }

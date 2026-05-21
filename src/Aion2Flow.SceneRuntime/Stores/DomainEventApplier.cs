@@ -14,21 +14,13 @@ public sealed class DomainEventApplier
     private readonly RuntimeMetadataRegistry _metadataRegistry;
     private readonly CombatStore _combat;
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery;
-    private readonly PeriodicChainCanonicalizer _periodicChain;
+    private readonly PeriodicPoolCanonicalizer _periodicPool;
     private readonly OwnerTargetSummonRestoreCanonicalizer _ownerTargetSummonRestore;
-    private readonly CompactOutcomeCanonicalizer _compactOutcome;
+    private readonly CompactAvoidanceCanonicalizer _compactAvoidance;
     private readonly BossFocusStore _bossFocus;
 
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
-        : this(
-            entities,
-            boundary,
-            metadataRegistry,
-            combat,
-            new SystemPeriodicRecoveryCanonicalizer(),
-            new PeriodicChainCanonicalizer(),
-            new CompactOutcomeCanonicalizer(),
-            new BossFocusStore(entities))
+        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactAvoidanceCanonicalizer(), new BossFocusStore(entities))
     {
     }
 
@@ -37,24 +29,16 @@ public sealed class DomainEventApplier
     {
     }
 
-    private DomainEventApplier(
-        EntityStore entities,
-        SceneBoundaryStore boundary,
-        RuntimeMetadataRegistry metadataRegistry,
-        CombatStore combat,
-        SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery,
-        PeriodicChainCanonicalizer periodicChain,
-        CompactOutcomeCanonicalizer compactOutcome,
-        BossFocusStore bossFocus)
+    private DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactAvoidanceCanonicalizer compactAvoidance, BossFocusStore bossFocus)
     {
         _entities = entities;
         _boundary = boundary;
         _metadataRegistry = metadataRegistry;
         _combat = combat;
         _systemPeriodicRecovery = systemPeriodicRecovery;
-        _periodicChain = periodicChain;
+        _periodicPool = periodicPool;
         _ownerTargetSummonRestore = new OwnerTargetSummonRestoreCanonicalizer(entities);
-        _compactOutcome = compactOutcome;
+        _compactAvoidance = compactAvoidance;
         _bossFocus = bossFocus;
     }
 
@@ -113,7 +97,7 @@ public sealed class DomainEventApplier
 
     public void CompleteBatch(long batchOrdinal)
     {
-        foreach (var result in _compactOutcome.CompleteBatch(batchOrdinal))
+        foreach (var result in _compactAvoidance.CompleteBatch(batchOrdinal))
         {
             var stamp = result.Stamp;
             var observation = result.Observation;
@@ -129,10 +113,10 @@ public sealed class DomainEventApplier
         var stamp = entry.Stamp;
         var rawResults = entry.Raw.Opcode switch
         {
-            0x0438 => _compactOutcome.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds),
-            0x0238 => _compactOutcome.ObserveCompactControl0238(entry.SourceEntityId, in stamp, in combatObservation),
-            0x0638 => _compactOutcome.ObserveCompactControl0638(entry.SourceEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds),
-            _ => _compactOutcome.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds)
+            0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds),
+            0x0238 => _compactAvoidance.AdvanceBatch(in stamp),
+            0x0638 => _compactAvoidance.AdvanceBatch(in stamp),
+            _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds)
         };
 
         foreach (var rawResult in rawResults)
@@ -151,7 +135,7 @@ public sealed class DomainEventApplier
         var observation = ownerTargetSummonRestoreResult.Observation;
         var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonRestoreResult.SourceId, ownerTargetSummonRestoreResult.TargetId, in stamp, in observation);
         var systemRecoveryObservation = systemRecoveryResult.Observation;
-        foreach (var normalized in _periodicChain.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
+        foreach (var normalized in _periodicPool.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
             ApplyCombatResult(in normalized, observedAtMilliseconds);
     }
 
@@ -306,6 +290,5 @@ public sealed class DomainEventApplier
         _ = _entities.GetOrAdd(state.EntityId);
     }
 
-    private bool CanNpcBattleActivate(int instanceId) =>
-        !_entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
+    private bool CanNpcBattleActivate(int instanceId) => !_entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
 }

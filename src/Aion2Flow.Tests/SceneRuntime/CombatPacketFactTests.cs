@@ -45,7 +45,7 @@ public class CombatPacketFactTests
     [Fact]
     public void PeriodicNormalizer_PreservesParserAuthoritativeMultiHitCount()
     {
-        var canonicalizer = new PeriodicChainCanonicalizer();
+        var canonicalizer = new PeriodicPoolCanonicalizer();
         var observation = new CombatObservation
         {
             SkillCode = 17010230,

@@ -8,7 +8,7 @@ using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
-public class CompactOutcomeCanonicalizerTests
+public class CompactAvoidanceCanonicalizerTests
 {
     [Fact]
     public void ScenePath_FlushesCompactType1AvoidAsEvade()
@@ -45,7 +45,7 @@ public class CompactOutcomeCanonicalizerTests
     }
 
     [Fact]
-    public void ScenePath_ConvertsDirectBlockedDamageToEvadeWhenDodgeControlArrives()
+    public void ScenePath_KeepsDirectBlockedDamageWhenDodgeControlArrives()
     {
         CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
         var journal = new ObservedEventJournal();
@@ -90,10 +90,10 @@ public class CompactOutcomeCanonicalizerTests
         var combat = Apply(journal);
 
         Assert.True(combat.TryGetPair(26029, 933, out var pair));
-        Assert.Equal(0, pair!.TotalDamage);
-        Assert.Equal(0, pair.HitCount);
+        Assert.Equal(1, pair!.TotalDamage);
+        Assert.Equal(1, pair.HitCount);
         Assert.Equal(1, pair.AttemptCount);
-        Assert.Equal(1, pair.EvadeCount);
+        Assert.Equal(0, pair.EvadeCount);
     }
 
     [Fact]

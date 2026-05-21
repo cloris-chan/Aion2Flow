@@ -8,7 +8,7 @@ using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
-public class PeriodicChainCanonicalizerTests
+public class PeriodicPoolCanonicalizerTests
 {
     [Fact]
     public void ScenePath_NormalizesSelfPeriodicHealingRemainingTotal()

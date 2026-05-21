@@ -1352,7 +1352,7 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
-    public void Owner_Refresh_DoesNotFlushPendingCompactOutcomeBeforeCompletedBatch()
+    public void Owner_Refresh_DoesNotFlushPendingCompactAvoidanceBeforeCompletedBatch()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
@@ -1365,16 +1365,16 @@ public class SceneReadModelOwnerTests
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = 100,
             TargetEntityId = 200,
-            Raw = new RawPacketReference { TimestampMilliseconds = 1_000 },
+            Raw = new RawPacketReference { Opcode = 0x0438, TimestampMilliseconds = 1_000 },
             Combat = new CombatObservation
             {
                 SkillCode = 11000010,
-                Damage = 1,
-                HitCount = 1,
-                AttemptCount = 1,
+                Damage = 0,
+                HitCount = 0,
+                AttemptCount = 0,
                 Marker = 77,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = CombatValueKind.Damage
+                Type = 1,
+                LayoutTag = 0
             }
         });
 
@@ -1387,7 +1387,8 @@ public class SceneReadModelOwnerTests
 
         Assert.True(owner.Combat.TryGetPair(100, 200, out var pair));
         Assert.NotNull(pair);
-        Assert.Equal(1, pair.TotalDamage);
+        Assert.Equal(0, pair.TotalDamage);
+        Assert.Equal(1, pair.EvadeCount);
     }
 
     [Fact]

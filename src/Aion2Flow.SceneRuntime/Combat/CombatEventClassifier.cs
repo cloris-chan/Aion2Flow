@@ -389,7 +389,6 @@ public static class CombatObservationTraits
     private static string FormatEffectTagLabel(PacketEffectTag effectTag) =>
         effectTag switch
         {
-            PacketEffectTag.ActiveDodgeEvade => "active-dodge-evade",
             PacketEffectTag.CompactEvade => "compact-evade",
             PacketEffectTag.PeriodicLinkInvincible => "periodic-link-invincible",
             PacketEffectTag.ActiveSkillInvincible => "active-skill-invincible",

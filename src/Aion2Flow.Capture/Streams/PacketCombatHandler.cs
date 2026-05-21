@@ -98,18 +98,18 @@ internal static class PacketCombatHandler
             return context.MarkParsed();
         }
 
-        if (!Packet0438CompactOutcomeParser.TryParse(packet, out var compactOutcome))
+        if (!Packet0438CompactSignalParser.TryParse(packet, out var compactSignal))
         {
             return false;
         }
 
         context.Sink.RegisterCompactValue0438(
-            compactOutcome.TargetId,
-            compactOutcome.SourceId,
-            compactOutcome.SkillCodeRaw,
-            compactOutcome.Marker,
-            compactOutcome.LayoutTag,
-            compactOutcome.Type,
+            compactSignal.TargetId,
+            compactSignal.SourceId,
+            compactSignal.SkillCodeRaw,
+            compactSignal.Marker,
+            compactSignal.LayoutTag,
+            compactSignal.Type,
             context.TimestampMilliseconds,
             frameOrdinal,
             batchOrdinal);

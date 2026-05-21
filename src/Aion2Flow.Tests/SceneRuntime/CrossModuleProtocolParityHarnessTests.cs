@@ -316,7 +316,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
         public int Scene;
         public int Summon;
         public int ExtendedNpcState;
-        public int PeriodicChain;
+        public int PeriodicPool;
         public int SystemRecovery;
         public int MultiHit;
         public int Compact0438;
@@ -368,7 +368,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
             AddMissing(missing, "scene journal", Scene);
             AddMissing(missing, "summon owner context", Summon);
             AddMissing(missing, "extended npc state", ExtendedNpcState);
-            AddMissing(missing, "periodic chain 0538 mode 9/10/11", PeriodicChain);
+            AddMissing(missing, "periodic pool 0538 mode 9/10/11", PeriodicPool);
             AddMissing(missing, "system periodic recovery seed/tick", SystemRecovery);
             AddMissing(missing, "multi-hit evidence", MultiHit);
             AddMissing(missing, "compact 0438 sidecar", Compact0438);
@@ -382,7 +382,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
         }
 
         public string Format() =>
-            $"evidence combat={Combat} state={State} aura={Aura} resource={Resource} scene={Scene} summon={Summon} extendedNpcState={ExtendedNpcState} periodicChain={PeriodicChain} systemRecovery={SystemRecovery} multiHit={MultiHit} compact0438={Compact0438} compact0238={Compact0238} compact0638={Compact0638} periodicLink={PeriodicLink} bossFocus={BossFocus} mapStaging={MapStaging} mapArrivalConfirm={MapArrivalConfirm}";
+            $"evidence combat={Combat} state={State} aura={Aura} resource={Resource} scene={Scene} summon={Summon} extendedNpcState={ExtendedNpcState} periodicPool={PeriodicPool} systemRecovery={SystemRecovery} multiHit={MultiHit} compact0438={Compact0438} compact0238={Compact0238} compact0638={Compact0638} periodicLink={PeriodicLink} bossFocus={BossFocus} mapStaging={MapStaging} mapArrivalConfirm={MapArrivalConfirm}";
 
         public string FormatMissing(List<string> missing) =>
             $"{Format()}{Environment.NewLine}missing={string.Join(", ", missing)}";
@@ -390,7 +390,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
         private void ObserveCombat(in ObservedEventEnvelope entry, in CombatObservation combat)
         {
             if (combat.PeriodicMode is 9 or 10 or 11)
-                PeriodicChain++;
+                PeriodicPool++;
             if ((combat.OriginalSkillCode != 0 ? combat.OriginalSkillCode : combat.SkillCode) / 1000000 == 190)
                 SystemRecovery++;
             if ((combat.Modifiers & DamageModifiers.MultiHit) != 0 || combat.MultiHitCount > 0)

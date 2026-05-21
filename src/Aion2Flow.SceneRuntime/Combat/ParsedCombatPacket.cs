@@ -13,7 +13,6 @@ public enum PeriodicEffectRelation : byte
 public enum PacketEffectTag : byte
 {
     None = 0,
-    ActiveDodgeEvade = 1,
     CompactEvade = 2,
     PeriodicLinkInvincible = 3,
     ActiveSkillInvincible = 4,
@@ -191,7 +190,6 @@ public struct ParsedCombatPacket
     {
         return effectTag switch
         {
-            PacketEffectTag.ActiveDodgeEvade => "active-dodge-evade",
             PacketEffectTag.CompactEvade => "compact-evade",
             PacketEffectTag.PeriodicLinkInvincible => "periodic-link-invincible",
             PacketEffectTag.ActiveSkillInvincible => "active-skill-invincible",
