@@ -404,7 +404,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         {
             var id = entry.Id;
             var data = entry.Metrics;
-            if (Combatants.Contains(id))
+            if (Combatants.ContainsKey(id))
                 continue;
 
             if (!ShouldDisplayCombatant(data))
