@@ -152,7 +152,7 @@ internal static class PacketCombatHandler
             return context.MarkParsed();
         }
 
-        if (IsActiveSkillInvincible(parsed.Mode, parsed.TargetId, parsed.SourceId, parsed.NormalizedSkillCode, parsed.Damage))
+        if (IsActiveSkillInvincible(parsed.Mode, parsed.TargetId, parsed.SourceId, parsed.Damage))
         {
             var invincibleObservation = new CombatObservation
             {
@@ -329,7 +329,7 @@ internal static class PacketCombatHandler
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (damage <= 0) return false;
 
-        if (sourceId == targetId && !IsActiveSkillInvincible(mode, targetId, sourceId, resolvedSkillCode.Value, damage))
+        if (sourceId == targetId && !IsActiveSkillInvincible(mode, targetId, sourceId, damage))
         {
             return false;
         }
@@ -339,7 +339,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        if (IsActiveSkillInvincible(mode, targetId, sourceId, resolvedSkillCode.Value, damage))
+        if (IsActiveSkillInvincible(mode, targetId, sourceId, damage))
         {
             var invincibleObservation = new CombatObservation
             {
@@ -413,16 +413,6 @@ internal static class PacketCombatHandler
         return true;
     }
 
-    private static bool IsActiveSkillInvincible(int mode, int targetId, int sourceId, int skillCode, int packetValue)
-    {
-        if (mode != 56 || targetId <= 0 || targetId != sourceId || packetValue <= 0)
-        {
-            return false;
-        }
-
-        return NormalizeSkillBase(skillCode) is 11380000 or 15410000 or 17270000;
-    }
-
-    private static int NormalizeSkillBase(int skillCode)
-        => skillCode <= 0 ? 0 : skillCode - skillCode % 10000;
+    private static bool IsActiveSkillInvincible(int mode, int targetId, int sourceId, int packetValue)
+        => mode == 56 && targetId > 0 && targetId == sourceId && packetValue > 0;
 }

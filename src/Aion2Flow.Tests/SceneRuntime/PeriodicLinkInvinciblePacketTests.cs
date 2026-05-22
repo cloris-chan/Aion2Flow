@@ -91,6 +91,31 @@ public class PeriodicLinkInvinciblePacketTests
         Assert.Equal(PacketEffectTag.ActiveSkillInvincible, observation.EffectTag);
     }
 
+    [Theory]
+    [InlineData(1337004013u, 13370040)]
+    [InlineData(1739004311u, 17390043)]
+    public void StreamMode56MultiEffectSkills_CreatePacketAuthoritativeInvincible(uint rawSkillCode, int expectedSkillCode)
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        using var processor = new PacketStreamProcessor(sink);
+
+        var packet = HexHelper.FromFixture("combat/0538-mode56-rescue-invincible.hex");
+        ReplaceUInt32(packet, 1727002011u, rawSkillCode);
+
+        Assert.True(processor.AppendAndProcess(packet, TestConnection));
+        var observation = journal.Read(0).Combat!.Value;
+
+        Assert.Equal((int)rawSkillCode, observation.OriginalSkillCode);
+        Assert.Equal(expectedSkillCode, observation.SkillCode);
+        Assert.Equal(56, observation.Type);
+        Assert.Equal(0, observation.Damage);
+        Assert.Equal(1, observation.AttemptCount);
+        Assert.Equal(DamageModifiers.Invincible, observation.Modifiers & DamageModifiers.Invincible);
+        Assert.Equal(PacketEffectTag.ActiveSkillInvincible, observation.EffectTag);
+    }
+
     [Fact]
     public void ScenePath_StreamMode56ActiveSkill_ProjectsInvincibleTotals()
     {
@@ -137,10 +162,23 @@ public class PeriodicLinkInvinciblePacketTests
         return combat;
     }
 
+    private static void ReplaceUInt32(byte[] packet, uint oldValue, uint newValue)
+    {
+        Span<byte> oldBytes = stackalloc byte[4];
+        Span<byte> newBytes = stackalloc byte[4];
+        BitConverter.TryWriteBytes(oldBytes, oldValue);
+        BitConverter.TryWriteBytes(newBytes, newValue);
+        var index = packet.AsSpan().IndexOf(oldBytes);
+        Assert.True(index >= 0);
+        newBytes.CopyTo(packet.AsSpan(index, 4));
+    }
+
     private static SkillCollection BuildSkillMap() =>
     [
         new Skill(1230000, "Fangs", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
         new Skill(11800008, "Buff Tick", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
-        new Skill(17270020, "Rescue", SkillCategory.Cleric, SkillSourceType.PcSkill, "skill", null)
+        new Skill(17270020, "Rescue", SkillCategory.Cleric, SkillSourceType.PcSkill, "skill", null),
+        new Skill(13370040, "Evasion Contract", SkillCategory.Assassin, SkillSourceType.PcSkill, "skill", null),
+        new Skill(17390043, "Summon Resurrection", SkillCategory.Cleric, SkillSourceType.PcSkill, "skill", null)
     ];
 }
