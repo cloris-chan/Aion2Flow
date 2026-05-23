@@ -32,8 +32,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void SetLifecycleId(int rawInstanceId, int mappedInstanceId) => _lifecycle.Set(rawInstanceId, mappedInstanceId);
 
-    public bool IsKnownEntity(int id) =>
-        id > 0 && (_knownEntities.Contains(id) || _npcStates.ContainsKey(id) || _summonOwnerByInstance.ContainsKey(id));
+    public bool IsKnownEntity(int id) => id > 0 && (_knownEntities.Contains(id) || _npcStates.ContainsKey(id) || _summonOwnerByInstance.ContainsKey(id));
 
     public bool HasSummonOwner(int instanceId) => instanceId > 0 && _summonOwnerByInstance.ContainsKey(ResolveLifecycleId(instanceId));
 
@@ -58,17 +57,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         AddKnownEntity(instanceId);
     }
 
-    public void StageDestinationMap(uint mapId)
-        => StageDestinationMap(mapId, allowSameMapReload: false);
+    public void StageDestinationMap(uint mapId) => StageDestinationMap(mapId, allowSameMapReload: false);
 
-    public void StageDestinationMap(uint mapId, bool allowSameMapReload)
-        => AppendSceneMapObservation(mapId, allowSameMapReload, "stage-destination-map");
+    public void StageDestinationMap(uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(mapId, allowSameMapReload, "stage-destination-map");
 
-    public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload)
-        => AppendSceneMapObservation(mapId, allowSameMapReload, "pending-destination-map");
+    public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(mapId, allowSameMapReload, "pending-destination-map");
 
-    public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload)
-        => AppendSceneMapObservation(mapId, allowSameMapReload, "confirm-destination-map");
+    public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(mapId, allowSameMapReload, "confirm-destination-map");
 
     public void ConfirmPendingDestinationMapArrival()
     {
@@ -180,16 +175,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendCombatObservation(
-        int sourceId,
-        int targetId,
-        long timestamp,
-        long frameOrdinal,
-        long batchOrdinal,
-        in CombatObservation observation,
-        ushort opcode = 0,
-        int payloadLength = 0,
-        long captureSequence = 0)
+    public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructureReference structure = default)
     {
         var normalized = CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
         sourceId = ResolveLifecycleId(sourceId);
@@ -209,7 +195,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Opcode = opcode,
                 PayloadLength = payloadLength,
                 CaptureSequence = captureSequence,
-                TimestampMilliseconds = timestamp
+                TimestampMilliseconds = timestamp,
+                Structure = structure
             },
             Combat = normalized
         });
@@ -217,7 +204,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void CompleteBatch(long batchOrdinal) => journal.CompleteBatch(MapBatchOrdinal(batchOrdinal));
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal)
+    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
@@ -234,7 +221,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Opcode = 0x0438,
                 PayloadLength = 0,
                 CaptureSequence = 0,
-                TimestampMilliseconds = timestamp
+                TimestampMilliseconds = timestamp,
+                Structure = structure
             },
             Combat = new CombatObservation
             {
@@ -250,7 +238,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal)
+    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
@@ -267,7 +255,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Opcode = 0x0438,
                 PayloadLength = 0,
                 CaptureSequence = 0,
-                TimestampMilliseconds = timestamp
+                TimestampMilliseconds = timestamp,
+                Structure = structure
             },
             Combat = new CombatObservation
             {
@@ -283,7 +272,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal)
+    public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructureReference structure = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStampFromOffset(0, 0, MapBatchOrdinal(batchOrdinal));
@@ -299,7 +288,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Opcode = 0x0238,
                 PayloadLength = 0,
                 CaptureSequence = 0,
-                TimestampMilliseconds = 0
+                TimestampMilliseconds = 0,
+                Structure = structure
             },
             Combat = new CombatObservation
             {
@@ -315,7 +305,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal)
+    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
@@ -331,7 +321,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Opcode = 0x0638,
                 PayloadLength = 0,
                 CaptureSequence = 0,
-                TimestampMilliseconds = timestamp
+                TimestampMilliseconds = timestamp,
+                Structure = structure
             },
             Combat = new CombatObservation
             {
@@ -347,7 +338,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal)
+    public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         AddKnownEntity(sourceId);
@@ -364,7 +355,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Opcode = 0x2A38,
                 PayloadLength = 0,
                 CaptureSequence = 0,
-                TimestampMilliseconds = timestamp
+                TimestampMilliseconds = timestamp,
+                Structure = structure
             },
             Aura = new AuraObservation
             {
@@ -380,7 +372,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal)
+    public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
     {
         instanceId = ResolveLifecycleId(instanceId);
         tailSourceId = ResolveLifecycleId(tailSourceId);
@@ -402,7 +394,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 Opcode = 0x2C38,
                 PayloadLength = 0,
                 CaptureSequence = 0,
-                TimestampMilliseconds = timestamp
+                TimestampMilliseconds = timestamp,
+                Structure = structure
             },
             Aura = new AuraObservation
             {
@@ -829,18 +822,6 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         public (byte State0, byte State1)? State4636 { get; set; }
         public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
 
-        public RuntimeNpcStateSnapshot ToSnapshot() => new(
-            NpcCode,
-            Hp,
-            MaxHp,
-            HpObservedAtMilliseconds,
-            BattleToggledOn,
-            Kind,
-            Value2136,
-            Sequence2136,
-            Value0140,
-            Value0240,
-            State4636,
-            Latest2C38);
+        public RuntimeNpcStateSnapshot ToSnapshot() => new(NpcCode, Hp, MaxHp, HpObservedAtMilliseconds, BattleToggledOn, Kind, Value2136, Sequence2136, Value0140, Value0240, State4636, Latest2C38);
     }
 }

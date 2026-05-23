@@ -46,7 +46,7 @@ internal static class PacketCombatHandler
                 };
             }
 
-            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, packet.Length);
+            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, packet.Length, 0, context.CurrentStructure);
 
             if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId, context.Sink))
             {
@@ -61,7 +61,7 @@ internal static class PacketCombatHandler
                     ValueKind = CombatValueKind.Healing,
                     EffectTag = PacketEffectTag.RegenerationHealing
                 };
-                context.Sink.AppendCombatObservation(parsed.TargetId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, packet.Length);
+                context.Sink.AppendCombatObservation(parsed.TargetId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, packet.Length, 0, context.CurrentStructure);
             }
 
             if (ShouldStoreDrainHealing(parsed))
@@ -75,7 +75,7 @@ internal static class PacketCombatHandler
                     AttemptCount = 1,
                     DrainHealAmount = parsed.DrainHealAmount
                 };
-                context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, packet.Length);
+                context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, packet.Length, 0, context.CurrentStructure);
             }
 
             return context.MarkParsed();
@@ -93,7 +93,8 @@ internal static class PacketCombatHandler
                 compact.Value,
                 context.TimestampMilliseconds,
                 frameOrdinal,
-                batchOrdinal);
+                batchOrdinal,
+                context.CurrentStructure);
             RawPacketDump.ObserveParsedPacket("compact-value", context.Connection);
             return context.MarkParsed();
         }
@@ -112,7 +113,8 @@ internal static class PacketCombatHandler
             compactSignal.Type,
             context.TimestampMilliseconds,
             frameOrdinal,
-            batchOrdinal);
+            batchOrdinal,
+            context.CurrentStructure);
         return context.MarkParsed();
     }
 
@@ -146,7 +148,7 @@ internal static class PacketCombatHandler
                     ValueKind = CombatValueKind.Damage,
                     EffectTag = PacketEffectTag.PeriodicLinkInvincible
                 };
-                context.Sink.AppendCombatObservation(parsed.LinkId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length);
+                context.Sink.AppendCombatObservation(parsed.LinkId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length, 0, context.CurrentStructure);
             }
 
             return context.MarkParsed();
@@ -169,7 +171,7 @@ internal static class PacketCombatHandler
                 ValueKind = CombatValueKind.Damage,
                 EffectTag = PacketEffectTag.ActiveSkillInvincible
             };
-            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length);
+            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length, 0, context.CurrentStructure);
             return context.MarkParsed();
         }
 
@@ -185,7 +187,7 @@ internal static class PacketCombatHandler
             PeriodicMode = parsed.Mode
         };
 
-        context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, packet.Length);
+        context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, packet.Length, 0, context.CurrentStructure);
         return context.MarkParsed();
     }
 
@@ -196,7 +198,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.BatchOrdinal);
+        context.Sink.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.BatchOrdinal, context.CurrentStructure);
         RawPacketDump.ObserveParsedPacket("compact-0238", context.Connection);
         return context.MarkParsed();
     }
@@ -208,7 +210,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.TimestampMilliseconds, context.FrameOrdinal, context.BatchOrdinal);
+        context.Sink.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.TimestampMilliseconds, context.FrameOrdinal, context.BatchOrdinal, context.CurrentStructure);
         RawPacketDump.ObserveParsedPacket("compact-0638", context.Connection);
         return context.MarkParsed();
     }
@@ -265,7 +267,7 @@ internal static class PacketCombatHandler
             ResourceKind = parsed.ResourceKind
         };
 
-        context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, consumed);
+        context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, consumed, 0, context.CurrentStructure);
 
         if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId, context.Sink))
         {
@@ -280,7 +282,7 @@ internal static class PacketCombatHandler
                 ValueKind = CombatValueKind.Healing,
                 EffectTag = PacketEffectTag.RegenerationHealing
             };
-            context.Sink.AppendCombatObservation(parsed.TargetId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, consumed);
+            context.Sink.AppendCombatObservation(parsed.TargetId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, consumed, 0, context.CurrentStructure);
         }
 
         if (ShouldStoreDrainHealing(parsed))
@@ -294,7 +296,7 @@ internal static class PacketCombatHandler
                 AttemptCount = 1,
                 DrainHealAmount = parsed.DrainHealAmount
             };
-            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, consumed);
+            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, consumed, 0, context.CurrentStructure);
         }
 
         return context.MarkParsed();
@@ -357,7 +359,7 @@ internal static class PacketCombatHandler
                 EffectTag = PacketEffectTag.ActiveSkillInvincible
             };
             consumed = reader.Offset;
-            context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, consumed);
+            context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, consumed, 0, context.CurrentStructure);
             return context.MarkParsed();
         }
 
@@ -374,7 +376,7 @@ internal static class PacketCombatHandler
         };
 
         consumed = reader.Offset;
-        context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, consumed);
+        context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, consumed, 0, context.CurrentStructure);
         return context.MarkParsed();
     }
 

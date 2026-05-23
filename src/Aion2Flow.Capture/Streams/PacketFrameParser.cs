@@ -32,11 +32,19 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
     public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, long timestampMilliseconds)
     {
         var context = new PacketParseContext(sink, _writer, _ordinals, connection, timestampMilliseconds);
-        ParsePacketEntry(packet, ref context);
+        var previous = context.EnterStructure(PacketStructureKind.TransportPacket, 0, packet.Length, 0, packet.Length, 0);
+        try
+        {
+            ParsePacketEntryCore(packet, ref context);
+        }
+        finally
+        {
+            context.RestoreStructure(previous);
+        }
         return context.Parsed;
     }
 
-    private void ParsePacketEntry(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    private void ParsePacketEntryCore(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (packet.IsEmpty)
         {
@@ -118,12 +126,20 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
             }
 
             var restored = rented.AsSpan(0, decoded);
-            if (TryParseFrameBatch(restored, ref context) || TryParsePacketContainer(restored, ref context))
+            var previous = context.EnterStructure(PacketStructureKind.CompressedPayload, offset, packet.Length - offset, 0, decoded, 0);
+            try
             {
-                return true;
-            }
+                if (TryParseFrameBatch(restored, ref context) || TryParsePacketContainer(restored, ref context))
+                {
+                    return true;
+                }
 
-            return HasLeadingNonWholeTransportFrame(restored) || ParseFramePayload(restored, ref context);
+                return HasLeadingNonWholeTransportFrame(restored) || ParseFramePayload(restored, ref context);
+            }
+            finally
+            {
+                context.RestoreStructure(previous);
+            }
         }
         catch
         {
@@ -165,6 +181,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
 
         var previousBatchOrdinal = _ordinals.BeginFrameBatch();
         var offset = 0;
+        var siblingIndex = 0;
 
         try
         {
@@ -197,9 +214,18 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
                     continue;
                 }
 
-                if (!ParseFramePayload(framePayload, ref context))
+                var (bodyOffset, bodyLength) = ResolveFrameBodyRange(framePayload);
+                var previous = context.EnterStructure(PacketStructureKind.FrameBatchEntry, offset, frameLength, bodyOffset, bodyLength, siblingIndex++);
+                try
                 {
-                    ParseUnknownFramePayload(framePayload, ref context);
+                    if (!ParseFramePayload(framePayload, ref context))
+                    {
+                        ParseUnknownFramePayload(framePayload, ref context);
+                    }
+                }
+                finally
+                {
+                    context.RestoreStructure(previous);
                 }
 
                 offset += frameLength;
@@ -255,6 +281,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
     private static bool TryParsePacketContainer(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         var parsed = false;
+        var siblingIndex = 0;
 
         for (var offset = 0; offset <= packet.Length - 3; offset++)
         {
@@ -281,7 +308,16 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
                 continue;
             }
 
-            parsed |= ParsePerfectPacket(candidate[..bodyLength], ref context);
+            var (bodyOffset, opcodeBodyLength) = ResolveFrameBodyRange(candidate[..bodyLength]);
+            var previous = context.EnterStructure(PacketStructureKind.PacketContainerEntry, offset, declaredLength, bodyOffset, opcodeBodyLength, siblingIndex++);
+            try
+            {
+                parsed |= ParsePerfectPacket(candidate[..bodyLength], ref context);
+            }
+            finally
+            {
+                context.RestoreStructure(previous);
+            }
         }
 
         return parsed;
@@ -295,46 +331,63 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
 
     private void ParseUnknownFramePayload(ReadOnlySpan<byte> framePayload, ref PacketParseContext context)
     {
-        if (TrySliceFrameBody(framePayload, out var body) && !body.IsEmpty)
+        if (TrySliceFrameBody(framePayload, out var bodyOffset, out var body) && !body.IsEmpty)
         {
-            if (TryParsePacketContainer(body, ref context) || TryParseFrameBatch(body, ref context))
+            var previous = context.EnterStructure(PacketStructureKind.UnknownFramePayload, bodyOffset, body.Length, 0, body.Length, 0);
+            try
             {
-                return;
-            }
+                if (TryParsePacketContainer(body, ref context) || TryParseFrameBatch(body, ref context))
+                {
+                    return;
+                }
 
-            if (!HasLeadingNonWholeTransportFrame(body) && ParseFramePayload(body, ref context))
-            {
-                return;
-            }
+                if (!HasLeadingNonWholeTransportFrame(body) && ParseFramePayload(body, ref context))
+                {
+                    return;
+                }
 
-            if (ParseRecoveryPacket(body, ref context))
-            {
-                return;
-            }
+                if (ParseRecoveryPacket(body, ref context))
+                {
+                    return;
+                }
 
-            if (PacketUnknownFramePayloadScanner.Scan(body, ref context))
+                if (PacketUnknownFramePayloadScanner.Scan(body, ref context))
+                {
+                    return;
+                }
+            }
+            finally
             {
-                return;
+                context.RestoreStructure(previous);
             }
         }
 
-        if (PacketUnknownFramePayloadScanner.Scan(framePayload, ref context))
+        var payloadPrevious = context.EnterStructure(PacketStructureKind.UnknownFramePayload, 0, framePayload.Length, 0, framePayload.Length, 1);
+        try
         {
-            return;
-        }
+            if (PacketUnknownFramePayloadScanner.Scan(framePayload, ref context))
+            {
+                return;
+            }
 
-        PacketEmbeddedIdentityScanner.Scan(framePayload, ref context);
+            PacketEmbeddedIdentityScanner.Scan(framePayload, ref context);
+        }
+        finally
+        {
+            context.RestoreStructure(payloadPrevious);
+        }
     }
 
-    private static bool TrySliceFrameBody(ReadOnlySpan<byte> framePayload, out ReadOnlySpan<byte> body)
+    private static bool TrySliceFrameBody(ReadOnlySpan<byte> framePayload, out int bodyOffset, out ReadOnlySpan<byte> body)
     {
+        bodyOffset = 0;
         body = default;
         if (!PacketTransportCodec.TryReadVarInt(framePayload, 0, out var lengthInfo))
         {
             return false;
         }
 
-        var bodyOffset = lengthInfo.ByteCount + 2;
+        bodyOffset = lengthInfo.ByteCount + 2;
         if (bodyOffset > framePayload.Length)
         {
             return false;
@@ -342,6 +395,22 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
 
         body = framePayload[bodyOffset..];
         return true;
+    }
+
+    private static (int BodyOffset, int BodyLength) ResolveFrameBodyRange(ReadOnlySpan<byte> framePayload)
+    {
+        if (!PacketTransportCodec.TryReadVarInt(framePayload, 0, out var lengthInfo))
+        {
+            return (0, framePayload.Length);
+        }
+
+        var bodyOffset = lengthInfo.ByteCount + 2;
+        if (bodyOffset > framePayload.Length)
+        {
+            return (0, framePayload.Length);
+        }
+
+        return (bodyOffset, framePayload.Length - bodyOffset);
     }
 
     private static bool HasLeadingNonWholeTransportFrame(ReadOnlySpan<byte> payload)
@@ -367,12 +436,28 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
 
     private bool ParseRecoveryPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        var parsed = PacketRecoveryParser.ParseRecoveryPacket(packet, ref context, out var nestedOffset);
-        if (nestedOffset >= 0 && nestedOffset < packet.Length)
+        var previousRecovery = context.EnterStructure(PacketStructureKind.RecoveryPayload, 0, packet.Length, 0, packet.Length, 0);
+        try
         {
-            ParsePacketEntry(packet[nestedOffset..], ref context);
-        }
+            var parsed = PacketRecoveryParser.ParseRecoveryPacket(packet, ref context, out var nestedOffset);
+            if (nestedOffset >= 0 && nestedOffset < packet.Length)
+            {
+                var previous = context.EnterStructure(PacketStructureKind.NestedTransportPacket, nestedOffset, packet.Length - nestedOffset, 0, packet.Length - nestedOffset, 0);
+                try
+                {
+                    ParsePacketEntryCore(packet[nestedOffset..], ref context);
+                }
+                finally
+                {
+                    context.RestoreStructure(previous);
+                }
+            }
 
-        return parsed;
+            return parsed;
+        }
+        finally
+        {
+            context.RestoreStructure(previousRecovery);
+        }
     }
 }

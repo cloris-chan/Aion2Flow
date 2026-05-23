@@ -4,8 +4,41 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Observation;
 
+public enum PacketStructureKind : byte
+{
+    None,
+    TransportPacket,
+    NestedTransportPacket,
+    CompressedPayload,
+    FrameBatchEntry,
+    PacketContainerEntry,
+    UnknownFramePayload,
+    RecoveryPayload
+}
+public readonly record struct PacketStructureReference(PacketStructureKind Kind, int ScopeId, int ParentScopeId, int Depth, int SiblingIndex, int Offset, int Length, int BodyOffset, int BodyLength);
 
-public readonly record struct RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds);
+public readonly record struct RawPacketReference
+{
+    public ushort Opcode { get; init; }
+    public int PayloadLength { get; init; }
+    public long CaptureSequence { get; init; }
+    public long TimestampMilliseconds { get; init; }
+    public PacketStructureReference Structure { get; init; }
+
+    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds)
+        : this(Opcode, PayloadLength, CaptureSequence, TimestampMilliseconds, default)
+    {
+    }
+
+    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds, PacketStructureReference Structure)
+    {
+        this.Opcode = Opcode;
+        this.PayloadLength = PayloadLength;
+        this.CaptureSequence = CaptureSequence;
+        this.TimestampMilliseconds = TimestampMilliseconds;
+        this.Structure = Structure;
+    }
+}
 
 public readonly record struct CombatObservation
 {
@@ -34,15 +67,7 @@ public readonly record struct CombatObservation
     public int ChainId { get; init; }
 }
 
-public readonly record struct StateObservation(
-    int EntityId,
-    int StateCode,
-    int Value0,
-    int Value1,
-    long DetailRaw,
-    string? Text,
-    int? OriginServerId = null,
-    Faction Faction = Faction.Unknown);
+public readonly record struct StateObservation(int EntityId, int StateCode, int Value0, int Value1, long DetailRaw, string? Text, int? OriginServerId = null, Faction Faction = Faction.Unknown);
 
 public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, int Value0, int Value1, string? DiagnosticKey);
 

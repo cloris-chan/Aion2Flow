@@ -52,6 +52,28 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
+    public void FrameBatch_Combat_RawReference_IncludesTransportStructure()
+    {
+        var scene = new SceneLiveReadModel();
+        using var parser = new PacketFrameParser(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
+        var frame = HexHelper.FromFixture("combat/0538-dot.hex");
+
+        var parsed = parser.ParsePacketEntry(frame, TestConnection, 1);
+
+        Assert.True(parsed);
+        Assert.Equal(1, scene.Journal.Count);
+        var raw = scene.Journal.Read(0).Raw;
+        Assert.Equal(0x0538, raw.Opcode);
+        Assert.Equal(PacketStructureKind.FrameBatchEntry, raw.Structure.Kind);
+        Assert.True(raw.Structure.ScopeId > 0);
+        Assert.Equal(1, raw.Structure.ParentScopeId);
+        Assert.Equal(0, raw.Structure.Offset);
+        Assert.Equal(frame.Length, raw.Structure.Length);
+        Assert.True(raw.Structure.BodyOffset > 0);
+        Assert.True(raw.Structure.BodyLength > 0);
+    }
+
+    [Fact]
     public void Uses_Recent_4536_Source_As_Fallback_For_SourceLess_Runtime_State_Frames()
     {
         var journal = new ObservedEventJournal();
@@ -528,14 +550,14 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public void StageDestinationMapInstance(uint instanceId) { }
         public void ConfirmDestinationMapInstance(uint instanceId) { }
         public void MarkSceneTransportBoundary() { }
-        public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0) { }
+        public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructureReference structure = default) { }
         public void CompleteBatch(long batchOrdinal) { }
-        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal) { }
-        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal) { }
-        public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal) { }
-        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal) { }
-        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal) { }
-        public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal) { }
+        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
+        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
+        public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructureReference structure = default) { }
+        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
+        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
+        public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
         public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
         {
             NicknameEntered.SetResult();

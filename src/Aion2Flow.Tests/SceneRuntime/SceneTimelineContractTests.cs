@@ -144,6 +144,27 @@ public class SceneTimelineContractTests
         Assert.Equal(64, raw.PayloadLength);
         Assert.Equal(42, raw.CaptureSequence);
         Assert.Equal(1234567890, raw.TimestampMilliseconds);
+        Assert.Equal(default, raw.Structure);
+    }
+
+    [Fact]
+    public void RawPacketReference_PreservesPacketStructure()
+    {
+        var structure = new PacketStructureReference(
+            PacketStructureKind.FrameBatchEntry,
+            ScopeId: 2,
+            ParentScopeId: 1,
+            Depth: 2,
+            SiblingIndex: 3,
+            Offset: 16,
+            Length: 64,
+            BodyOffset: 4,
+            BodyLength: 60);
+        var raw = new RawPacketReference(0x0538, 64, 7, 1000, structure);
+
+        Assert.Equal(structure, raw.Structure);
+        Assert.Equal(PacketStructureKind.FrameBatchEntry, raw.Structure.Kind);
+        Assert.Equal(3, raw.Structure.SiblingIndex);
     }
 
     [Fact]

@@ -28,50 +28,35 @@ internal sealed class SceneTestHarness : IDisposable
         return Owner.CreateSnapshot();
     }
 
-    public CombatDetailDelta CreateDetailDelta(SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false) =>
-        Owner.CreateDetailDelta(snapshot, combatantId, forceRefresh);
+    public CombatDetailDelta CreateDetailDelta(SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false) => Owner.CreateDetailDelta(snapshot, combatantId, forceRefresh);
 
-    public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId) =>
-        Owner.CreateSkillBreakdown(snapshot, combatantId);
+    public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId) => Owner.CreateSkillBreakdown(snapshot, combatantId);
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown) =>
-        Sink.AppendNickname(uid, nickname, originServerId, faction);
+    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown) => Sink.AppendNickname(uid, nickname, originServerId, faction);
 
-    public void AppendNpcCode(int instanceId, int npcCode) =>
-        Sink.AppendNpcCode(instanceId, npcCode);
+    public void AppendNpcCode(int instanceId, int npcCode) => Sink.AppendNpcCode(instanceId, npcCode);
 
-    public void AppendNpcName(int npcCode, string name) =>
-        Sink.AppendNpcName(npcCode, name);
+    public void AppendNpcName(int npcCode, string name) => Sink.AppendNpcName(npcCode, name);
 
-    public void AppendNpcKind(int instanceId, NpcKind kind) =>
-        Sink.AppendNpcKind(instanceId, kind);
+    public void AppendNpcKind(int instanceId, NpcKind kind) => Sink.AppendNpcKind(instanceId, kind);
 
-    public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds) =>
-        Sink.AppendNpcHp(instanceId, hp, observedAtMilliseconds);
+    public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds) => Sink.AppendNpcHp(instanceId, hp, observedAtMilliseconds);
 
-    public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds) =>
-        Sink.AppendNpcHp(instanceId, hp, maxHp, observedAtMilliseconds);
+    public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds) => Sink.AppendNpcHp(instanceId, hp, maxHp, observedAtMilliseconds);
 
-    public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds) =>
-        Sink.SetNpcBattle(instanceId, isActive, observedAtMilliseconds);
+    public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds) => Sink.SetNpcBattle(instanceId, isActive, observedAtMilliseconds);
 
-    public void ToggleNpcBattle(int instanceId) =>
-        Sink.ToggleNpcBattle(instanceId);
+    public void ToggleNpcBattle(int instanceId) => Sink.ToggleNpcBattle(instanceId);
 
-    public void AppendNpc2136State(int instanceId, uint sequence, uint value0) =>
-        Sink.AppendNpc2136State(instanceId, sequence, value0);
+    public void AppendNpc2136State(int instanceId, uint sequence, uint value0) => Sink.AppendNpc2136State(instanceId, sequence, value0);
 
-    public void AppendNpc0140Value(int instanceId, uint value0) =>
-        Sink.AppendNpc0140Value(instanceId, value0);
+    public void AppendNpc0140Value(int instanceId, uint value0) => Sink.AppendNpc0140Value(instanceId, value0);
 
-    public void AppendNpc0240Value(int instanceId, uint value0) =>
-        Sink.AppendNpc0240Value(instanceId, value0);
+    public void AppendNpc0240Value(int instanceId, uint value0) => Sink.AppendNpc0240Value(instanceId, value0);
 
-    public void AppendNpc4636State(int instanceId, byte state0, byte state1) =>
-        Sink.AppendNpc4636State(instanceId, state0, state1);
+    public void AppendNpc4636State(int instanceId, byte state0, byte state1) => Sink.AppendNpc4636State(instanceId, state0, state1);
 
-    public void AppendSummon(int ownerId, int summonInstanceId) =>
-        Sink.AppendSummon(ownerId, summonInstanceId);
+    public void AppendSummon(int ownerId, int summonInstanceId) => Sink.AppendSummon(ownerId, summonInstanceId);
 
     public void AppendCombatPacket(ParsedCombatPacket packet)
     {
@@ -84,19 +69,7 @@ internal sealed class SceneTestHarness : IDisposable
         Owner.Refresh();
         if (Owner.Entities.TryGet(instanceId, out var entity))
         {
-            state = new RuntimeNpcStateSnapshot(
-                entity.NpcCode,
-                entity.CurrentHp,
-                entity.MaxHp,
-                null,
-                entity.NpcCombatActive,
-                entity.Kind,
-                entity.Value2136,
-                entity.Sequence2136,
-                entity.Value0140,
-                entity.Value0240,
-                entity.State4636,
-                entity.Latest2C38);
+            state = new RuntimeNpcStateSnapshot(entity.NpcCode, entity.CurrentHp, entity.MaxHp, null, entity.NpcCombatActive, entity.Kind, entity.Value2136, entity.Sequence2136, entity.Value0140, entity.Value0240, entity.State4636, entity.Latest2C38);
             return true;
         }
 
@@ -208,29 +181,20 @@ internal sealed class SceneTestHarness : IDisposable
         public void StageDestinationMapInstance(uint instanceId) => inner.StageDestinationMapInstance(instanceId);
         public void ConfirmDestinationMapInstance(uint instanceId) => inner.ConfirmDestinationMapInstance(instanceId);
         public void MarkSceneTransportBoundary() => inner.MarkSceneTransportBoundary();
-        public void AppendCombatObservation(
-            int sourceId,
-            int targetId,
-            long timestamp,
-            long frameOrdinal,
-            long batchOrdinal,
-            in CombatObservation observation,
-            ushort opcode = 0,
-            int payloadLength = 0,
-            long captureSequence = 0)
+        public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructureReference structure = default)
         {
             var packet = ParsedCombatPacket.FromObservation(sourceId, targetId, in observation, timestamp, frameOrdinal, batchOrdinal);
             packet = owner.PreparePacket(packet);
             var prepared = packet.ToObservation();
-            inner.AppendCombatObservation(packet.SourceId, packet.TargetId, packet.Timestamp, packet.FrameOrdinal, packet.BatchOrdinal, in prepared, opcode, payloadLength, captureSequence);
+            inner.AppendCombatObservation(packet.SourceId, packet.TargetId, packet.Timestamp, packet.FrameOrdinal, packet.BatchOrdinal, in prepared, opcode, payloadLength, captureSequence, structure);
         }
         public void CompleteBatch(long batchOrdinal) => owner.CompleteBatch(batchOrdinal);
-        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal);
-        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, value, timestamp, frameOrdinal, batchOrdinal);
-        public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal) => inner.RegisterCompactControl0238(sourceId, skillCodeRaw, marker, batchOrdinal);
-        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal) => inner.RegisterCompactControl0638(sourceId, skillCodeRaw, marker, timestamp, frameOrdinal, batchOrdinal);
-        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal) => inner.RegisterObservation2A38(sourceId, mode, groupCode, sequenceId, headValue, buffCodeRaw, timestamp, frameOrdinal, batchOrdinal);
-        public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal) => inner.RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal);
+        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal, structure);
+        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, value, timestamp, frameOrdinal, batchOrdinal, structure);
+        public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructureReference structure = default) => inner.RegisterCompactControl0238(sourceId, skillCodeRaw, marker, batchOrdinal, structure);
+        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) => inner.RegisterCompactControl0638(sourceId, skillCodeRaw, marker, timestamp, frameOrdinal, batchOrdinal, structure);
+        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) => inner.RegisterObservation2A38(sourceId, mode, groupCode, sequenceId, headValue, buffCodeRaw, timestamp, frameOrdinal, batchOrdinal, structure);
+        public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) => inner.RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal, structure);
         public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown) => inner.AppendNickname(uid, nickname, originServerId, faction);
         public void AppendNpcCode(int instanceId, int npcCode) => inner.AppendNpcCode(instanceId, npcCode);
         public void AppendNpcName(int npcCode, string name) => inner.AppendNpcName(npcCode, name);
