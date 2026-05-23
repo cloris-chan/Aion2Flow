@@ -35,6 +35,23 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
+    public void FrameBatch_With_Trailing_Bytes_Does_Not_Partially_Apply_Frame()
+    {
+        var scene = new SceneLiveReadModel();
+        using var parser = new PacketFrameParser(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
+        var frame = HexHelper.FromFixture("state/0140-boss-tail-430d03.hex");
+        var packet = new byte[frame.Length + 1];
+        frame.CopyTo(packet, 0);
+        packet[^1] = 0x7f;
+
+        var parsed = parser.ParsePacketEntry(packet, TestConnection, 1);
+
+        Assert.False(parsed);
+        scene.Owner.Refresh();
+        Assert.Equal(0u, scene.Owner.Boundary.CurrentMapId);
+    }
+
+    [Fact]
     public void Uses_Recent_4536_Source_As_Fallback_For_SourceLess_Runtime_State_Frames()
     {
         var journal = new ObservedEventJournal();

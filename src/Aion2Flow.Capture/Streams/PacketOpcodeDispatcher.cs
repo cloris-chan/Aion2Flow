@@ -5,7 +5,7 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 internal static class PacketOpcodeDispatcher
 {
     public static bool ParseFramePayload(ReadOnlySpan<byte> payload, ref PacketParseContext context)
-        => TryParseExactFrame(payload, ref context) || PacketEmbeddedPacketScanner.ScanForKnownPackets(payload, ref context);
+        => TryParseExactFrame(payload, ref context);
 
     public static bool TryParseExactFrame(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
