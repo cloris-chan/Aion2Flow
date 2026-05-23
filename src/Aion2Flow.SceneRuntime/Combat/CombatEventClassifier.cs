@@ -171,6 +171,10 @@ public static class CombatObservationTraits
     private const ulong HpAbsorptionDirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
     private const ulong DirectHpRestoreDetailPrefix = 0x0000000163F40000UL;
     private const ulong DirectHpRestoreDetailMask = 0xFFFFFFFFFFFF0000UL;
+    private const ulong DirectHealingDetailPrefix = 0x000000016A180000UL;
+    private const ulong DirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
+    private const ulong AegisShieldHealingDetailPrefix = 0x000000014BD10000UL;
+    private const ulong AegisShieldHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
     private const int WardingStrikeBaseSkillCode = 12350000;
 
     public static bool IsRestoreHp(in CombatObservation observation) =>
@@ -178,11 +182,12 @@ public static class CombatObservationTraits
 
     public static bool IsKnownDirectHealing(in CombatObservation observation) =>
         IsLightOfProtectionDirectHealing(in observation) ||
+        IsDirectHealingDetailShape(in observation) ||
+        IsAegisShieldHealingShape(in observation) ||
         MatchesExact(
             in observation,
             16120000,
-            17720000,
-            17800000) ||
+            17720000) ||
         MatchesBase(in observation, 13710000, 13790000, 17090000, 17100000, 17120000, 18120000);
 
     public static bool IsKnownDirectPeriodicHealing(int sourceId, int targetId, in CombatObservation observation) =>
@@ -202,6 +207,7 @@ public static class CombatObservationTraits
 
     public static bool IsKnownShield(in CombatObservation observation) =>
         MatchesExact(in observation, 2212001, 22120011, 15160000, 18730000) ||
+        MatchesExact(in observation, 12070000, 12130040) ||
         MatchesBase(in observation, 1742000000);
 
     public static bool IsDirectHpRestoreShape(int sourceId, int targetId, in CombatObservation observation) =>
@@ -209,16 +215,16 @@ public static class CombatObservationTraits
         observation.Loop == 1 &&
         HasDetailPrefix(observation.DetailRaw, DirectHpRestoreDetailPrefix, DirectHpRestoreDetailMask);
 
-    public static bool IsTargetPeriodicSupportSeed(in CombatObservation observation) =>
-        IsPeriodicTargetMode(in observation, 9) ||
-        IsPeriodicTargetMode(in observation, 11);
-
     public static bool IsKnownPeriodicHealingPool(in CombatObservation observation) =>
         (IsPeriodicSelfMode(in observation, 9) ||
          IsPeriodicSelfMode(in observation, 11) ||
          IsPeriodicTargetMode(in observation, 9) ||
          IsPeriodicTargetMode(in observation, 11)) &&
         IsEnhanceSpiritBenediction(in observation);
+
+    public static bool IsTargetPeriodicSupportSeed(in CombatObservation observation) =>
+        IsPeriodicTargetMode(in observation, 9) ||
+        IsPeriodicTargetMode(in observation, 11);
 
     public static bool IsPeriodicSelfMode(in CombatObservation observation, int mode) =>
         observation.PeriodicRelation == PeriodicEffectRelation.Self && observation.PeriodicMode == mode;
@@ -246,6 +252,24 @@ public static class CombatObservationTraits
         observation.Type == 2 &&
         observation.Loop == 2 &&
         observation.DetailRaw == LightOfProtectionDirectHealingDetailRaw;
+
+    private static bool IsDirectHealingDetailShape(in CombatObservation observation) =>
+        observation.Damage > 0 &&
+        observation.PeriodicRelation == PeriodicEffectRelation.None &&
+        observation.LayoutTag == 4 &&
+        observation.Flag == 0 &&
+        observation.Type == 2 &&
+        observation.Loop == 1 &&
+        HasDetailPrefix(observation.DetailRaw, DirectHealingDetailPrefix, DirectHealingDetailMask);
+
+    private static bool IsAegisShieldHealingShape(in CombatObservation observation) =>
+        observation.Damage > 0 &&
+        observation.PeriodicRelation == PeriodicEffectRelation.None &&
+        observation.LayoutTag == 4 &&
+        observation.Flag == 0 &&
+        observation.Type == 2 &&
+        observation.Loop == 1 &&
+        HasDetailPrefix(observation.DetailRaw, AegisShieldHealingDetailPrefix, AegisShieldHealingDetailMask);
 
     private static bool IsDirectSelfHpRecoveryEffect(int sourceId, int targetId, in CombatObservation observation) =>
         IsHpAbsorptionDirectSelfRestore(sourceId, targetId, in observation) ||

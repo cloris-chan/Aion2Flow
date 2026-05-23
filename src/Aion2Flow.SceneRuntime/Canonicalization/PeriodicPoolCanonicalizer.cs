@@ -36,7 +36,7 @@ public sealed class PeriodicPoolCanonicalizer
         }
 
         if (state.Kind == CombatValueKind.Shield)
-            return ApplyShieldContinuation(targetId, key, state, mode, in normalized);
+            return ApplyShieldContinuation(sourceId, targetId, key, state, mode, in normalized);
 
         if (state.Kind == CombatValueKind.PeriodicHealing && mode == 11)
             return ApplyPeriodicHealingContinuation(sourceId, targetId, key, state, in normalized);
@@ -46,6 +46,18 @@ public sealed class PeriodicPoolCanonicalizer
 
     private CombatCanonicalizationBatch OpenPool(int sourceId, int targetId, Key key, in CombatObservation observation)
     {
+        if (IsShieldPoolPacket(sourceId, targetId, in observation))
+        {
+            var grant = observation with
+            {
+                EventKind = CombatEventKind.Support,
+                ValueKind = CombatValueKind.Shield,
+                EffectTag = PacketEffectTag.ShieldGrant
+            };
+            _pools[key] = new PoolState(CombatValueKind.Shield, observation.Damage, sourceId, sourceId, targetId, grant, true);
+            return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, grant));
+        }
+
         if (observation.ValueKind == CombatValueKind.PeriodicHealing && IsPeriodicHealingPoolPacket(sourceId, targetId, in observation))
         {
             var opened = observation with { Damage = 0 };
@@ -84,10 +96,12 @@ public sealed class PeriodicPoolCanonicalizer
         return new PoolState(CombatValueKind.PeriodicHealing, state.Remaining, state.CasterId, state.GrantSourceId, state.GrantTargetId, healingGrant, state.GrantEmitted);
     }
 
-    private CombatCanonicalizationBatch ApplyShieldContinuation(int targetId, Key key, PoolState state, int mode, in CombatObservation observation)
+    private CombatCanonicalizationBatch ApplyShieldContinuation(int sourceId, int targetId, Key key, PoolState state, int mode, in CombatObservation observation)
     {
-        var newRemaining = Math.Max(0, observation.Damage);
-        var absorbed = Math.Max(0, state.Remaining - newRemaining);
+        var newRemaining = mode == 10 && sourceId != targetId ? 0 : Math.Max(0, observation.Damage);
+        var absorbed = mode == 10 && sourceId != targetId
+            ? Math.Min(state.Remaining, Math.Max(0, observation.Damage))
+            : Math.Max(0, state.Remaining - newRemaining);
         var absorbedObservation = observation with
         {
             Damage = absorbed,
@@ -154,41 +168,23 @@ public sealed class PeriodicPoolCanonicalizer
         if (sourceId <= 0 || targetId <= 0)
             return false;
 
-        var isSelfPool = sourceId == targetId && observation.PeriodicRelation == PeriodicEffectRelation.Self && observation.PeriodicMode is 9 or 11;
-        var isTargetPool = observation.PeriodicRelation == PeriodicEffectRelation.Target && observation.PeriodicMode is 9 or 11 && IsEnhanceSpiritBenediction(in observation);
-        return isSelfPool || isTargetPool;
+        return observation.Damage > 0 &&
+               observation.PeriodicMode is 9 or 11 &&
+               observation.PeriodicRelation is PeriodicEffectRelation.Self or PeriodicEffectRelation.Target &&
+               CombatObservationTraits.IsKnownPeriodicHealing(sourceId, targetId, in observation) &&
+               !CombatObservationTraits.IsKnownShield(in observation);
     }
 
-    private static bool IsEnhanceSpiritBenediction(in CombatObservation observation)
+    private static bool IsShieldPoolPacket(int sourceId, int targetId, in CombatObservation observation)
     {
-        const int skillCode = 16190000;
-        return MatchesBase(in observation, skillCode) ||
-               MatchesExact(in observation, skillCode, 16190010, 16190020, 16190030) ||
-               MatchesByHundred(observation.SkillCode, skillCode) ||
-               MatchesByHundred(observation.OriginalSkillCode, skillCode);
+        if (sourceId <= 0 || targetId <= 0)
+            return false;
+
+        return observation.Damage > 0 &&
+               observation.PeriodicMode is 9 or 11 &&
+               observation.PeriodicRelation is PeriodicEffectRelation.Self or PeriodicEffectRelation.Target &&
+               CombatObservationTraits.IsKnownShield(in observation);
     }
-
-    private static bool MatchesExact(in CombatObservation observation, int a, int b, int c, int d) =>
-        MatchesSkillCode(in observation, a) ||
-        MatchesSkillCode(in observation, b) ||
-        MatchesSkillCode(in observation, c) ||
-        MatchesSkillCode(in observation, d);
-
-    private static bool MatchesSkillCode(in CombatObservation observation, int skillCode) =>
-        skillCode > 0 &&
-        (observation.SkillCode == skillCode ||
-         observation.OriginalSkillCode == skillCode ||
-         CombatResourceRegistry.InferOriginalSkillCode(observation.OriginalSkillCode) == skillCode ||
-         CombatResourceRegistry.InferOriginalSkillCode(observation.SkillCode) == skillCode);
-
-    private static bool MatchesBase(in CombatObservation observation, int baseSkillCode) =>
-        baseSkillCode > 0 &&
-        (observation.BaseSkillCode == baseSkillCode ||
-         CombatResourceRegistry.ParseSkillVariant(observation.OriginalSkillCode).BaseSkillCode == baseSkillCode ||
-         CombatResourceRegistry.ParseSkillVariant(observation.SkillCode).BaseSkillCode == baseSkillCode);
-
-    private static bool MatchesByHundred(int candidateSkillCode, int skillCode) =>
-        candidateSkillCode > 0 && skillCode > 0 && candidateSkillCode / 100 == skillCode;
 
     private static int ResolveOriginalSkillCode(in CombatObservation observation) =>
         observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;

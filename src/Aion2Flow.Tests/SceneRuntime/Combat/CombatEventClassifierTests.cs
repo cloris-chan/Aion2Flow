@@ -197,6 +197,19 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
+    public void Classifies_AegisShield0438_DetailFamily_As_Healing()
+    {
+        var packet = DirectPacket(8470, 8470, 12720000, 406);
+        packet.LayoutTag = 4;
+        packet.Type = 2;
+        packet.Loop = 1;
+        packet.DetailRaw = 0x000000014BD12E6FL;
+
+        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
+    }
+
+    [Fact]
     public void Keeps_DirectSummonHpRestore0438_Shape_As_Support_Without_SummonContext()
     {
         var packet = DirectPacket(76550, 76550, 16990004, 100_000);
@@ -327,6 +340,8 @@ public sealed class CombatEventClassifierTests
     [InlineData(22120011)]
     [InlineData(15160000)]
     [InlineData(18730000)]
+    [InlineData(12070000)]
+    [InlineData(12130040)]
     public void Classifies_Known_Shield_As_Support_Shield(int skillCode)
     {
         var packet = DirectPacket(12115, 12115, skillCode, 1025);
