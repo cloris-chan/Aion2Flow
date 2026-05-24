@@ -46,7 +46,7 @@ internal static class PacketCombatHandler
                 };
             }
 
-            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, packet.Length, 0, context.CurrentStructure);
+            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, packet.Length, 0, context.CurrentStructurePath);
 
             if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId, context.Sink))
             {
@@ -61,7 +61,7 @@ internal static class PacketCombatHandler
                     ValueKind = CombatValueKind.Healing,
                     EffectTag = PacketEffectTag.RegenerationHealing
                 };
-                context.Sink.AppendCombatObservation(parsed.TargetId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, packet.Length, 0, context.CurrentStructure);
+                context.Sink.AppendCombatObservation(parsed.TargetId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, packet.Length, 0, context.CurrentStructurePath);
             }
 
             if (ShouldStoreDrainHealing(parsed))
@@ -75,7 +75,7 @@ internal static class PacketCombatHandler
                     AttemptCount = 1,
                     DrainHealAmount = parsed.DrainHealAmount
                 };
-                context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, packet.Length, 0, context.CurrentStructure);
+                context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, packet.Length, 0, context.CurrentStructurePath);
             }
 
             return context.MarkParsed();
@@ -94,7 +94,7 @@ internal static class PacketCombatHandler
                 context.TimestampMilliseconds,
                 frameOrdinal,
                 batchOrdinal,
-                context.CurrentStructure);
+                context.CurrentStructurePath);
             RawPacketDump.ObserveParsedPacket("compact-value", context.Connection);
             return context.MarkParsed();
         }
@@ -114,7 +114,7 @@ internal static class PacketCombatHandler
             context.TimestampMilliseconds,
             frameOrdinal,
             batchOrdinal,
-            context.CurrentStructure);
+            context.CurrentStructurePath);
         return context.MarkParsed();
     }
 
@@ -148,7 +148,7 @@ internal static class PacketCombatHandler
                     ValueKind = CombatValueKind.Damage,
                     EffectTag = PacketEffectTag.PeriodicLinkInvincible
                 };
-                context.Sink.AppendCombatObservation(parsed.LinkId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length, 0, context.CurrentStructure);
+                context.Sink.AppendCombatObservation(parsed.LinkId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length, 0, context.CurrentStructurePath);
             }
 
             return context.MarkParsed();
@@ -171,7 +171,7 @@ internal static class PacketCombatHandler
                 ValueKind = CombatValueKind.Damage,
                 EffectTag = PacketEffectTag.ActiveSkillInvincible
             };
-            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length, 0, context.CurrentStructure);
+            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, packet.Length, 0, context.CurrentStructurePath);
             return context.MarkParsed();
         }
 
@@ -187,7 +187,7 @@ internal static class PacketCombatHandler
             PeriodicMode = parsed.Mode
         };
 
-        context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, packet.Length, 0, context.CurrentStructure);
+        context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, packet.Length, 0, context.CurrentStructurePath);
         return context.MarkParsed();
     }
 
@@ -198,7 +198,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.BatchOrdinal, context.CurrentStructure);
+        context.Sink.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.BatchOrdinal, context.CurrentStructurePath);
         RawPacketDump.ObserveParsedPacket("compact-0238", context.Connection);
         return context.MarkParsed();
     }
@@ -210,7 +210,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.TimestampMilliseconds, context.FrameOrdinal, context.BatchOrdinal, context.CurrentStructure);
+        context.Sink.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.TimestampMilliseconds, context.FrameOrdinal, context.BatchOrdinal, context.CurrentStructurePath);
         RawPacketDump.ObserveParsedPacket("compact-0638", context.Connection);
         return context.MarkParsed();
     }
@@ -244,62 +244,70 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        var observation = new CombatObservation
+        var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, opcodeOffset, consumed, 2, Math.Max(0, consumed - 2), 0);
+        try
         {
-            LayoutTag = parsed.LayoutTag,
-            Flag = parsed.Flag,
-            OriginalSkillCode = parsed.SkillCodeRaw,
-            SkillCode = resolvedSkillCode,
-            Marker = parsed.Marker,
-            Type = parsed.Type,
-            Modifiers = parsed.TailMultiHitCount > 0
-                ? parsed.Modifiers | DamageModifiers.MultiHit
-                : parsed.Modifiers,
-            ChainId = parsed.Unknown,
-            Damage = parsed.Damage,
-            HitCount = 1,
-            AttemptCount = 1,
-            Loop = parsed.Loop,
-            MultiHitCount = parsed.TailMultiHitCount,
-            DrainHealAmount = parsed.DrainHealAmount,
-            RegenerationAmount = parsed.RegenerationAmount,
-            DetailRaw = parsed.DetailRaw,
-            ResourceKind = parsed.ResourceKind
-        };
-
-        context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, consumed, 0, context.CurrentStructure);
-
-        if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId, context.Sink))
-        {
-            var regenObservation = new CombatObservation
+            var observation = new CombatObservation
             {
+                LayoutTag = parsed.LayoutTag,
+                Flag = parsed.Flag,
                 OriginalSkillCode = parsed.SkillCodeRaw,
                 SkillCode = resolvedSkillCode,
-                Damage = parsed.RegenerationAmount,
+                Marker = parsed.Marker,
+                Type = parsed.Type,
+                Modifiers = parsed.TailMultiHitCount > 0
+                    ? parsed.Modifiers | DamageModifiers.MultiHit
+                    : parsed.Modifiers,
+                ChainId = parsed.Unknown,
+                Damage = parsed.Damage,
                 HitCount = 1,
                 AttemptCount = 1,
-                EventKind = CombatEventKind.Healing,
-                ValueKind = CombatValueKind.Healing,
-                EffectTag = PacketEffectTag.RegenerationHealing
+                Loop = parsed.Loop,
+                MultiHitCount = parsed.TailMultiHitCount,
+                DrainHealAmount = parsed.DrainHealAmount,
+                RegenerationAmount = parsed.RegenerationAmount,
+                DetailRaw = parsed.DetailRaw,
+                ResourceKind = parsed.ResourceKind
             };
-            context.Sink.AppendCombatObservation(parsed.TargetId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, consumed, 0, context.CurrentStructure);
-        }
 
-        if (ShouldStoreDrainHealing(parsed))
-        {
-            var drainObservation = new CombatObservation
+            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, consumed, 0, context.CurrentStructurePath);
+
+            if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId, context.Sink))
             {
-                OriginalSkillCode = parsed.SkillCodeRaw,
-                SkillCode = resolvedSkillCode,
-                Damage = parsed.DrainHealAmount,
-                HitCount = 1,
-                AttemptCount = 1,
-                DrainHealAmount = parsed.DrainHealAmount
-            };
-            context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, consumed, 0, context.CurrentStructure);
-        }
+                var regenObservation = new CombatObservation
+                {
+                    OriginalSkillCode = parsed.SkillCodeRaw,
+                    SkillCode = resolvedSkillCode,
+                    Damage = parsed.RegenerationAmount,
+                    HitCount = 1,
+                    AttemptCount = 1,
+                    EventKind = CombatEventKind.Healing,
+                    ValueKind = CombatValueKind.Healing,
+                    EffectTag = PacketEffectTag.RegenerationHealing
+                };
+                context.Sink.AppendCombatObservation(parsed.TargetId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in regenObservation, 0x0438, consumed, 0, context.CurrentStructurePath);
+            }
 
-        return context.MarkParsed();
+            if (ShouldStoreDrainHealing(parsed))
+            {
+                var drainObservation = new CombatObservation
+                {
+                    OriginalSkillCode = parsed.SkillCodeRaw,
+                    SkillCode = resolvedSkillCode,
+                    Damage = parsed.DrainHealAmount,
+                    HitCount = 1,
+                    AttemptCount = 1,
+                    DrainHealAmount = parsed.DrainHealAmount
+                };
+                context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, consumed, 0, context.CurrentStructurePath);
+            }
+
+            return context.MarkParsed();
+        }
+        finally
+        {
+            context.RestoreStructure(previous);
+        }
     }
 
     public static bool TryParsePeriodicValuePacketAt(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
@@ -341,43 +349,50 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        if (IsActiveSkillInvincible(mode, targetId, sourceId, damage))
+        consumed = reader.Offset;
+        var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, opcodeOffset, consumed, 2, Math.Max(0, consumed - 2), 0);
+        try
         {
-            var invincibleObservation = new CombatObservation
+            if (IsActiveSkillInvincible(mode, targetId, sourceId, damage))
+            {
+                var invincibleObservation = new CombatObservation
+                {
+                    OriginalSkillCode = skillRaw,
+                    SkillCode = resolvedSkillCode.Value,
+                    ChainId = unknownInfo,
+                    Damage = 0,
+                    HitCount = 0,
+                    AttemptCount = 1,
+                    DetailRaw = damage,
+                    Type = mode,
+                    Modifiers = DamageModifiers.Invincible,
+                    EventKind = CombatEventKind.Damage,
+                    ValueKind = CombatValueKind.Damage,
+                    EffectTag = PacketEffectTag.ActiveSkillInvincible
+                };
+                context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, consumed, 0, context.CurrentStructurePath);
+                return context.MarkParsed();
+            }
+
+            var observation = new CombatObservation
             {
                 OriginalSkillCode = skillRaw,
                 SkillCode = resolvedSkillCode.Value,
                 ChainId = unknownInfo,
-                Damage = 0,
-                HitCount = 0,
+                Damage = damage,
+                HitCount = 1,
                 AttemptCount = 1,
-                DetailRaw = damage,
-                Type = mode,
-                Modifiers = DamageModifiers.Invincible,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = CombatValueKind.Damage,
-                EffectTag = PacketEffectTag.ActiveSkillInvincible
+                PeriodicRelation = PeriodicEffectRelation.Target,
+                PeriodicMode = mode
             };
-            consumed = reader.Offset;
-            context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in invincibleObservation, 0x0538, consumed, 0, context.CurrentStructure);
+
+            context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, consumed, 0, context.CurrentStructurePath);
             return context.MarkParsed();
         }
-
-        var observation = new CombatObservation
+        finally
         {
-            OriginalSkillCode = skillRaw,
-            SkillCode = resolvedSkillCode.Value,
-            ChainId = unknownInfo,
-            Damage = damage,
-            HitCount = 1,
-            AttemptCount = 1,
-            PeriodicRelation = PeriodicEffectRelation.Target,
-            PeriodicMode = mode
-        };
-
-        consumed = reader.Offset;
-        context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, consumed, 0, context.CurrentStructure);
-        return context.MarkParsed();
+            context.RestoreStructure(previous);
+        }
     }
 
     private static int? ResolveSkillCode(int skillCode)
@@ -415,6 +430,5 @@ internal static class PacketCombatHandler
         return true;
     }
 
-    private static bool IsActiveSkillInvincible(int mode, int targetId, int sourceId, int packetValue)
-        => mode == 56 && targetId > 0 && targetId == sourceId && packetValue > 0;
+    private static bool IsActiveSkillInvincible(int mode, int targetId, int sourceId, int packetValue) => mode == 56 && targetId > 0 && targetId == sourceId && packetValue > 0;
 }

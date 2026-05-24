@@ -63,7 +63,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.RegisterObservation2A38(parsed.SourceId, parsed.Mode, parsed.GroupCode, parsed.SequenceId, parsed.HeadValue, parsed.BuffCodeRaw, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructure);
+        context.Sink.RegisterObservation2A38(parsed.SourceId, parsed.Mode, parsed.GroupCode, parsed.SequenceId, parsed.HeadValue, parsed.BuffCodeRaw, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
 
         RawPacketDump.ObserveParsedPacket("aux-2a38", context.Connection);
         return context.MarkParsed();
@@ -79,7 +79,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.RegisterObservation2C38(parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, parsed.TailSourceId, parsed.TailSkillCodeRaw, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructure);
+        context.Sink.RegisterObservation2C38(parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, parsed.TailSourceId, parsed.TailSkillCodeRaw, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
 
         RawPacketDump.ObserveParsedPacket("aux-2c38", context.Connection);
         return context.MarkParsed();

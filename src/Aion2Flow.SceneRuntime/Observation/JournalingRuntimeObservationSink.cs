@@ -175,7 +175,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructureReference structure = default)
+    public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructurePath structurePath = default)
     {
         var normalized = CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
         sourceId = ResolveLifecycleId(sourceId);
@@ -196,7 +196,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 PayloadLength = payloadLength,
                 CaptureSequence = captureSequence,
                 TimestampMilliseconds = timestamp,
-                Structure = structure
+                StructurePath = structurePath
             },
             Combat = normalized
         });
@@ -204,7 +204,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void CompleteBatch(long batchOrdinal) => journal.CompleteBatch(MapBatchOrdinal(batchOrdinal));
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
+    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
@@ -222,7 +222,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 PayloadLength = 0,
                 CaptureSequence = 0,
                 TimestampMilliseconds = timestamp,
-                Structure = structure
+                StructurePath = structurePath
             },
             Combat = new CombatObservation
             {
@@ -238,7 +238,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
+    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
@@ -256,7 +256,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 PayloadLength = 0,
                 CaptureSequence = 0,
                 TimestampMilliseconds = timestamp,
-                Structure = structure
+                StructurePath = structurePath
             },
             Combat = new CombatObservation
             {
@@ -272,7 +272,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructureReference structure = default)
+    public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStampFromOffset(0, 0, MapBatchOrdinal(batchOrdinal));
@@ -289,7 +289,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 PayloadLength = 0,
                 CaptureSequence = 0,
                 TimestampMilliseconds = 0,
-                Structure = structure
+                StructurePath = structurePath
             },
             Combat = new CombatObservation
             {
@@ -305,7 +305,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
+    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
@@ -322,7 +322,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 PayloadLength = 0,
                 CaptureSequence = 0,
                 TimestampMilliseconds = timestamp,
-                Structure = structure
+                StructurePath = structurePath
             },
             Combat = new CombatObservation
             {
@@ -338,7 +338,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
+    public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         AddKnownEntity(sourceId);
@@ -356,7 +356,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 PayloadLength = 0,
                 CaptureSequence = 0,
                 TimestampMilliseconds = timestamp,
-                Structure = structure
+                StructurePath = structurePath
             },
             Aura = new AuraObservation
             {
@@ -372,7 +372,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default)
+    public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         instanceId = ResolveLifecycleId(instanceId);
         tailSourceId = ResolveLifecycleId(tailSourceId);
@@ -395,7 +395,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 PayloadLength = 0,
                 CaptureSequence = 0,
                 TimestampMilliseconds = timestamp,
-                Structure = structure
+                StructurePath = structurePath
             },
             Aura = new AuraObservation
             {

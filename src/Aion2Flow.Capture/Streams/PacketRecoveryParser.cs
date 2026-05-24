@@ -1,3 +1,5 @@
+using Cloris.Aion2Flow.SceneRuntime.Observation;
+
 namespace Cloris.Aion2Flow.Capture.Streams;
 
 internal static class PacketRecoveryParser
@@ -70,9 +72,18 @@ internal static class PacketRecoveryParser
                 if (startIdx >= 0 && startIdx < endIdx && endIdx <= packet.Length)
                 {
                     var extractedPacket = packet[startIdx..endIdx];
-                    processed = handlerKind == 1
-                        ? PacketCombatHandler.Parse0438ValuePacket(extractedPacket, ref context)
-                        : PacketCombatHandler.ParsePeriodicValuePacket(extractedPacket, ref context);
+                    var bodyOffset = packetLengthInfo.ByteCount + 2;
+                    var previous = context.EnterStructure(PacketStructureKind.RecoveredFrame, startIdx, extractedPacket.Length, bodyOffset, Math.Max(0, extractedPacket.Length - bodyOffset), 0);
+                    try
+                    {
+                        processed = handlerKind == 1
+                            ? PacketCombatHandler.Parse0438ValuePacket(extractedPacket, ref context)
+                            : PacketCombatHandler.ParsePeriodicValuePacket(extractedPacket, ref context);
+                    }
+                    finally
+                    {
+                        context.RestoreStructure(previous);
+                    }
 
                     if (processed && endIdx < packet.Length)
                     {

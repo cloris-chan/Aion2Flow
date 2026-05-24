@@ -13,9 +13,44 @@ public enum PacketStructureKind : byte
     FrameBatchEntry,
     PacketContainerEntry,
     UnknownFramePayload,
-    RecoveryPayload
+    RecoveryPayload,
+    EmbeddedFrame,
+    RecoveredFrame
 }
+
 public readonly record struct PacketStructureReference(PacketStructureKind Kind, int ScopeId, int ParentScopeId, int Depth, int SiblingIndex, int Offset, int Length, int BodyOffset, int BodyLength);
+
+public readonly record struct PacketStructurePath(PacketStructureReference Root, PacketStructureReference Level1, PacketStructureReference Level2, PacketStructureReference Level3, PacketStructureReference Leaf, int Depth)
+{
+    public bool IsEmpty => Depth == 0 || Leaf.Kind == PacketStructureKind.None;
+
+    public PacketStructureReference Parent => Depth switch
+    {
+        <= 1 => default,
+        2 => Root,
+        3 => Level1,
+        4 => Level2,
+        _ => Level3.Kind == PacketStructureKind.None ? Level2 : Level3
+    };
+
+    public static PacketStructurePath FromLeaf(PacketStructureReference leaf)
+        => leaf.Kind == PacketStructureKind.None ? default : new PacketStructurePath(default, default, default, default, leaf, Math.Max(1, leaf.Depth));
+
+    public PacketStructurePath Push(PacketStructureReference next)
+    {
+        if (next.Kind == PacketStructureKind.None)
+            return this;
+
+        return Depth switch
+        {
+            0 => new PacketStructurePath(next, default, default, default, next, next.Depth),
+            1 => this with { Level1 = next, Leaf = next, Depth = next.Depth },
+            2 => this with { Level2 = next, Leaf = next, Depth = next.Depth },
+            3 => this with { Level3 = next, Leaf = next, Depth = next.Depth },
+            _ => this with { Leaf = next, Depth = next.Depth }
+        };
+    }
+}
 
 public readonly record struct RawPacketReference
 {
@@ -23,20 +58,26 @@ public readonly record struct RawPacketReference
     public int PayloadLength { get; init; }
     public long CaptureSequence { get; init; }
     public long TimestampMilliseconds { get; init; }
-    public PacketStructureReference Structure { get; init; }
+    public PacketStructurePath StructurePath { get; init; }
+    public PacketStructureReference Structure => StructurePath.Leaf;
 
     public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds)
-        : this(Opcode, PayloadLength, CaptureSequence, TimestampMilliseconds, default)
+        : this(Opcode, PayloadLength, CaptureSequence, TimestampMilliseconds, default(PacketStructurePath))
     {
     }
 
     public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds, PacketStructureReference Structure)
+        : this(Opcode, PayloadLength, CaptureSequence, TimestampMilliseconds, PacketStructurePath.FromLeaf(Structure))
+    {
+    }
+
+    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds, PacketStructurePath StructurePath)
     {
         this.Opcode = Opcode;
         this.PayloadLength = PayloadLength;
         this.CaptureSequence = CaptureSequence;
         this.TimestampMilliseconds = TimestampMilliseconds;
-        this.Structure = Structure;
+        this.StructurePath = StructurePath;
     }
 }
 

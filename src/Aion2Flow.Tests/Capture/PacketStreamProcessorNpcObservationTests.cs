@@ -16,6 +16,25 @@ public sealed class PacketStreamProcessorNpcObservationTests
 {
     private static readonly TcpConnection TestConnection = new(0x0100007f, 0x0100007f, 49820, 57080);
 
+    private static byte[] BuildSingleByteLengthFrame(ReadOnlySpan<byte> payload)
+    {
+        var frame = new byte[payload.Length + 1];
+        frame[0] = checked((byte)(payload.Length + 4));
+        payload.CopyTo(frame.AsSpan(1));
+        return frame;
+    }
+
+    private static byte[] BuildUnknownPayloadWithEmbeddedFrame(ReadOnlySpan<byte> embeddedFrame)
+    {
+        var payload = new byte[4 + embeddedFrame.Length];
+        payload[0] = 0x99;
+        payload[1] = 0x99;
+        payload[2] = 0x00;
+        payload[3] = 0x7f;
+        embeddedFrame.CopyTo(payload.AsSpan(4));
+        return payload;
+    }
+
     [Fact]
     public void Runtime_Sink_Constructor_Keeps_2136_Map_Pending_Until_Confirmed()
     {
@@ -65,12 +84,58 @@ public sealed class PacketStreamProcessorNpcObservationTests
         var raw = scene.Journal.Read(0).Raw;
         Assert.Equal(0x0538, raw.Opcode);
         Assert.Equal(PacketStructureKind.FrameBatchEntry, raw.Structure.Kind);
+        Assert.Equal(PacketStructureKind.TransportPacket, raw.StructurePath.Root.Kind);
+        Assert.Equal(raw.Structure, raw.StructurePath.Leaf);
+        Assert.Equal(2, raw.StructurePath.Depth);
         Assert.True(raw.Structure.ScopeId > 0);
         Assert.Equal(1, raw.Structure.ParentScopeId);
         Assert.Equal(0, raw.Structure.Offset);
         Assert.Equal(frame.Length, raw.Structure.Length);
         Assert.True(raw.Structure.BodyOffset > 0);
         Assert.True(raw.Structure.BodyLength > 0);
+    }
+
+    [Fact]
+    public void UnknownPayload_EmbeddedCombat_RawReference_IncludesEmbeddedFramePath()
+    {
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        using var parser = new PacketFrameParser(scene.Synchronize(sink));
+        var direct = HexHelper.FromFixture("combat/0438-damage.hex");
+        Assert.True(parser.ParsePacketEntry(direct, TestConnection, 1));
+        var embedded = BuildSingleByteLengthFrame(BuildUnknownPayloadWithEmbeddedFrame(direct.AsSpan(1)));
+
+        Assert.True(parser.ParsePacketEntry(embedded, TestConnection, 2));
+
+        var raw = scene.Journal.Read(scene.Journal.Count - 1).Raw;
+        Assert.Equal(0x0438, raw.Opcode);
+        Assert.Equal(PacketStructureKind.EmbeddedFrame, raw.Structure.Kind);
+        Assert.Equal(PacketStructureKind.TransportPacket, raw.StructurePath.Root.Kind);
+        Assert.Equal(PacketStructureKind.FrameBatchEntry, raw.StructurePath.Level1.Kind);
+        Assert.Equal(PacketStructureKind.UnknownFramePayload, raw.StructurePath.Parent.Kind);
+    }
+
+    [Fact]
+    public void RecoveryPayload_Combat_RawReference_IncludesRecoveredFramePath()
+    {
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        using var parser = new PacketFrameParser(scene.Synchronize(sink));
+        var direct = HexHelper.FromFixture("combat/0438-damage.hex");
+        Assert.True(parser.ParsePacketEntry(direct, TestConnection, 1));
+        sink.CurrentTarget = scene.Journal.Read(0).TargetEntityId;
+        var recovery = new byte[direct.Length + 2];
+        recovery[0] = 0x00;
+        direct.CopyTo(recovery.AsSpan(1));
+        recovery[^1] = 0x7f;
+
+        Assert.True(parser.ParsePacketEntry(recovery, TestConnection, 2));
+
+        var raw = scene.Journal.Read(scene.Journal.Count - 1).Raw;
+        Assert.Equal(0x0438, raw.Opcode);
+        Assert.Equal(PacketStructureKind.RecoveredFrame, raw.Structure.Kind);
+        Assert.Equal(PacketStructureKind.TransportPacket, raw.StructurePath.Root.Kind);
+        Assert.Equal(PacketStructureKind.RecoveryPayload, raw.StructurePath.Parent.Kind);
     }
 
     [Fact]
@@ -550,14 +615,14 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public void StageDestinationMapInstance(uint instanceId) { }
         public void ConfirmDestinationMapInstance(uint instanceId) { }
         public void MarkSceneTransportBoundary() { }
-        public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructureReference structure = default) { }
+        public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructurePath structurePath = default) { }
         public void CompleteBatch(long batchOrdinal) { }
-        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
-        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
-        public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructureReference structure = default) { }
-        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
-        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
-        public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructureReference structure = default) { }
+        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
+        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
+        public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructurePath structurePath = default) { }
+        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
+        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
+        public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
         public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
         {
             NicknameEntered.SetResult();

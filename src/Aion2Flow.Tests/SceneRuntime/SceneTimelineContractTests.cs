@@ -145,6 +145,7 @@ public class SceneTimelineContractTests
         Assert.Equal(42, raw.CaptureSequence);
         Assert.Equal(1234567890, raw.TimestampMilliseconds);
         Assert.Equal(default, raw.Structure);
+        Assert.Equal(default, raw.StructurePath);
     }
 
     [Fact]
@@ -163,8 +164,23 @@ public class SceneTimelineContractTests
         var raw = new RawPacketReference(0x0538, 64, 7, 1000, structure);
 
         Assert.Equal(structure, raw.Structure);
+        Assert.Equal(structure, raw.StructurePath.Leaf);
         Assert.Equal(PacketStructureKind.FrameBatchEntry, raw.Structure.Kind);
         Assert.Equal(3, raw.Structure.SiblingIndex);
+    }
+
+    [Fact]
+    public void RawPacketReference_PreservesPacketStructurePath()
+    {
+        var root = new PacketStructureReference(PacketStructureKind.TransportPacket, 1, 0, 1, 0, 0, 100, 0, 100);
+        var frame = new PacketStructureReference(PacketStructureKind.FrameBatchEntry, 2, 1, 2, 0, 0, 30, 3, 27);
+        var path = default(PacketStructurePath).Push(root).Push(frame);
+        var raw = new RawPacketReference(0x0438, 30, 0, 1000, path);
+
+        Assert.Equal(frame, raw.Structure);
+        Assert.Equal(root, raw.StructurePath.Root);
+        Assert.Equal(frame, raw.StructurePath.Leaf);
+        Assert.Equal(2, raw.StructurePath.Depth);
     }
 
     [Fact]

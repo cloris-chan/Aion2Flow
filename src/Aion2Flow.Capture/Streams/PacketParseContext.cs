@@ -10,20 +10,23 @@ internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObserv
     public readonly long TimestampMilliseconds = timestampMilliseconds;
     private int _nextStructureScopeId;
     public bool Parsed;
-    public PacketStructureReference CurrentStructure { get; private set; }
+    public PacketStructurePath CurrentStructurePath { get; private set; }
+    public readonly PacketStructureReference CurrentStructure => CurrentStructurePath.Leaf;
 
     public readonly long FrameOrdinal => ordinals.CurrentFrameOrdinal;
 
     public readonly long BatchOrdinal => ordinals.CurrentBatchOrdinal;
 
-    public PacketStructureReference EnterStructure(PacketStructureKind kind, int offset, int length, int bodyOffset, int bodyLength, int siblingIndex)
+    public PacketStructurePath EnterStructure(PacketStructureKind kind, int offset, int length, int bodyOffset, int bodyLength, int siblingIndex)
     {
-        var previous = CurrentStructure;
-        CurrentStructure = new PacketStructureReference(kind, ++_nextStructureScopeId, previous.ScopeId, previous.ScopeId == 0 ? 1 : previous.Depth + 1, siblingIndex, offset, length, bodyOffset, bodyLength);
+        var previous = CurrentStructurePath;
+        var previousLeaf = previous.Leaf;
+        var next = new PacketStructureReference(kind, ++_nextStructureScopeId, previousLeaf.ScopeId, previousLeaf.ScopeId == 0 ? 1 : previousLeaf.Depth + 1, siblingIndex, offset, length, bodyOffset, bodyLength);
+        CurrentStructurePath = previous.Push(next);
         return previous;
     }
 
-    public void RestoreStructure(PacketStructureReference previous) => CurrentStructure = previous;
+    public void RestoreStructure(PacketStructurePath previous) => CurrentStructurePath = previous;
 
     public bool MarkParsed()
     {
