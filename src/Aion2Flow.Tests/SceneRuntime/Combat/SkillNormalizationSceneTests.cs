@@ -410,9 +410,8 @@ public sealed class SkillNormalizationSceneTests
         scene.CreateSnapshot();
         var normalizedDamages = scene.Owner.Combat.Events.Select(static e => e.Observation.Damage).ToArray();
 
-        Assert.Equal(10, normalizedDamages.Length);
-        Assert.Equal(0, normalizedDamages[0]);
-        Assert.All(normalizedDamages.Skip(1), static damage => Assert.Equal(467, damage));
+        Assert.Equal(9, normalizedDamages.Length);
+        Assert.All(normalizedDamages, static damage => Assert.Equal(467, damage));
     }
 
     [Fact]

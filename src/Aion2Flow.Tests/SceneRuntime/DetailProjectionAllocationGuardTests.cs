@@ -46,6 +46,18 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
+    public void PeriodicPoolCanonicalizer_DoesNotUseSkillWhitelistClassifiers()
+    {
+        var root = FindRepositoryRoot();
+        var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "PeriodicPoolCanonicalizer.cs"));
+
+        Assert.DoesNotContain("IsKnownShield", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsKnownPeriodicHealing", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("MatchesExact", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("MatchesBase", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SceneMetadataAndArchivePayload_DoNotExposeOldDisplayNameStores()
     {
         var root = FindRepositoryRoot();

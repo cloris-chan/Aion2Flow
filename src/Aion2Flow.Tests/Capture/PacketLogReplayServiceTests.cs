@@ -582,7 +582,7 @@ public sealed class PacketLogReplayServiceTests
             healingPackets.Select(static packet =>
                 $"target={packet.TargetId} damage={packet.Damage} mode={packet.PeriodicRelation}:{packet.PeriodicMode} value={packet.ValueKind}"));
 
-        Assert.Equal(20, healingPackets.Length);
+        Assert.Equal(18, healingPackets.Length);
         Assert.True(healingPackets.Sum(static packet => packet.Damage) == 3438, packetDump);
         Assert.True(healingPackets.Where(static packet => packet.TargetId == playerId).Sum(static packet => packet.Damage) == 1737, packetDump);
         Assert.True(healingPackets.Where(static packet => packet.TargetId == summonId).Sum(static packet => packet.Damage) == 1701, packetDump);
