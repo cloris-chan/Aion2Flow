@@ -167,6 +167,8 @@ public static class CombatResourceRegistry
         packet.ResourceKind = normalized.ResourceKind;
         packet.EventKind = normalized.EventKind;
         packet.ValueKind = normalized.ValueKind;
+        packet.PeriodicTailSkillCodeRaw = normalized.PeriodicTailSkillCodeRaw;
+        packet.PeriodicTailPrefixValue = normalized.PeriodicTailPrefixValue;
         packet.SetPeriodicEffect(normalized.PeriodicRelation, normalized.PeriodicMode);
         packet.SetEffectTag(normalized.EffectTag);
         packet.IsNormalized = true;

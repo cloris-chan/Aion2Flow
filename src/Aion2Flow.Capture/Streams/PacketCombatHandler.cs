@@ -143,6 +143,8 @@ internal static class PacketCombatHandler
                     DetailRaw = parsed.LinkId,
                     Marker = parsed.Unknown,
                     Type = 48,
+                    PeriodicTailSkillCodeRaw = parsed.TailSkillCodeRaw,
+                    PeriodicTailPrefixValue = parsed.TailPrefixValue,
                     Modifiers = DamageModifiers.Invincible,
                     EventKind = CombatEventKind.Damage,
                     ValueKind = CombatValueKind.Damage,
@@ -166,6 +168,8 @@ internal static class PacketCombatHandler
                 DetailRaw = parsed.Damage,
                 Marker = parsed.Unknown,
                 Type = parsed.Mode,
+                PeriodicTailSkillCodeRaw = parsed.TailSkillCodeRaw,
+                PeriodicTailPrefixValue = parsed.TailPrefixValue,
                 Modifiers = DamageModifiers.Invincible,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage,
@@ -184,7 +188,9 @@ internal static class PacketCombatHandler
             HitCount = 1,
             AttemptCount = 1,
             PeriodicRelation = parsed.TargetId == parsed.SourceId ? PeriodicEffectRelation.Self : PeriodicEffectRelation.Target,
-            PeriodicMode = parsed.Mode
+            PeriodicMode = parsed.Mode,
+            PeriodicTailSkillCodeRaw = parsed.TailSkillCodeRaw,
+            PeriodicTailPrefixValue = parsed.TailPrefixValue
         };
 
         context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, packet.Length, 0, context.CurrentStructurePath);

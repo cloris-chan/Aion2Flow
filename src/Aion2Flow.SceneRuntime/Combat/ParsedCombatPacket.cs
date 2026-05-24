@@ -54,6 +54,8 @@ public struct ParsedCombatPacket
     public CombatValueKind ValueKind { get; set; } = CombatValueKind.Unknown;
     public PeriodicEffectRelation PeriodicRelation { get; private set; }
     public int PeriodicMode { get; private set; }
+    public int PeriodicTailSkillCodeRaw { get; set; }
+    public int PeriodicTailPrefixValue { get; set; }
     public PacketEffectTag EffectTag { get; private set; }
     public readonly bool IsCritical => (Modifiers & DamageModifiers.Critical) != 0;
     public readonly bool IsPeriodicEffect => PeriodicRelation != PeriodicEffectRelation.None;
@@ -113,6 +115,8 @@ public struct ParsedCombatPacket
         EffectTag = EffectTag,
         PeriodicRelation = PeriodicRelation,
         PeriodicMode = PeriodicMode,
+        PeriodicTailSkillCodeRaw = PeriodicTailSkillCodeRaw,
+        PeriodicTailPrefixValue = PeriodicTailPrefixValue,
         ChainId = Unknown
     };
 
@@ -143,6 +147,8 @@ public struct ParsedCombatPacket
         PeriodicMode = observation.PeriodicMode,
         EffectTag = observation.EffectTag,
         Unknown = observation.ChainId,
+        PeriodicTailSkillCodeRaw = observation.PeriodicTailSkillCodeRaw,
+        PeriodicTailPrefixValue = observation.PeriodicTailPrefixValue,
         Timestamp = timestamp,
         FrameOrdinal = frameOrdinal,
         BatchOrdinal = batchOrdinal

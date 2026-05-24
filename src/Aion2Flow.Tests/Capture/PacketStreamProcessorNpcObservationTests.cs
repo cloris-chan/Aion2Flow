@@ -349,6 +349,24 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
+    public void Keeps_0538_Periodic_Tail_Fields_In_Combat_Observation()
+    {
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
+
+        var scene = new SceneLiveReadModel();
+        using var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
+
+        var parsed = processor.AppendAndProcess(HexHelper.Parse("140538010B012A785634120709EFCDAB00"), TestConnection);
+
+        Assert.True(parsed);
+        scene.Owner.Refresh();
+        var entry = Assert.Single(scene.Owner.Combat.Events);
+        Assert.Equal(11, entry.Observation.PeriodicMode);
+        Assert.Equal(0x00ABCDEF, entry.Observation.PeriodicTailSkillCodeRaw);
+        Assert.Equal(9, entry.Observation.PeriodicTailPrefixValue);
+    }
+
+    [Fact]
     public void Scans_Embedded_3336_OwnNickname_Record_From_Larger_Packet()
     {
         var scene = new SceneLiveReadModel();

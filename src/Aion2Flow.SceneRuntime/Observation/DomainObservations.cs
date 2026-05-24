@@ -33,8 +33,7 @@ public readonly record struct PacketStructurePath(PacketStructureReference Root,
         _ => Level3.Kind == PacketStructureKind.None ? Level2 : Level3
     };
 
-    public static PacketStructurePath FromLeaf(PacketStructureReference leaf)
-        => leaf.Kind == PacketStructureKind.None ? default : new PacketStructurePath(default, default, default, default, leaf, Math.Max(1, leaf.Depth));
+    public static PacketStructurePath FromLeaf(PacketStructureReference leaf) => leaf.Kind == PacketStructureKind.None ? default : new PacketStructurePath(default, default, default, default, leaf, Math.Max(1, leaf.Depth));
 
     public PacketStructurePath Push(PacketStructureReference next)
     {
@@ -105,6 +104,8 @@ public readonly record struct CombatObservation
     public PacketEffectTag EffectTag { get; init; }
     public PeriodicEffectRelation PeriodicRelation { get; init; }
     public int PeriodicMode { get; init; }
+    public int PeriodicTailSkillCodeRaw { get; init; }
+    public int PeriodicTailPrefixValue { get; init; }
     public int ChainId { get; init; }
 }
 

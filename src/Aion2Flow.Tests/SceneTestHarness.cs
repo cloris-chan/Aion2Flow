@@ -146,6 +146,8 @@ internal sealed class SceneTestHarness : IDisposable
             Modifiers = packet.Modifiers,
             EventKind = packet.EventKind,
             ValueKind = packet.ValueKind,
+            PeriodicTailSkillCodeRaw = packet.PeriodicTailSkillCodeRaw,
+            PeriodicTailPrefixValue = packet.PeriodicTailPrefixValue,
             IsNormalized = packet.IsNormalized
         };
 
