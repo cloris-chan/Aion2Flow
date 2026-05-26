@@ -111,9 +111,10 @@ public sealed class DomainEventApplier
     private void ApplyCombat(in ObservedEventEnvelope entry, in CombatObservation combatObservation)
     {
         var stamp = entry.Stamp;
+        var structurePath = entry.Raw.StructurePath;
         var rawResults = entry.Raw.Opcode switch
         {
-            0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds),
+            0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, entry.Raw.TimestampMilliseconds),
             0x0238 => _compactAvoidance.AdvanceBatch(in stamp),
             0x0638 => _compactAvoidance.AdvanceBatch(in stamp),
             _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds)

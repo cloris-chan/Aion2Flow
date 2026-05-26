@@ -58,6 +58,17 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
+    public void CompactAvoidanceCanonicalizer_DoesNotUseSkillResourceClassifiers()
+    {
+        var root = FindRepositoryRoot();
+        var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "CompactAvoidanceCanonicalizer.cs"));
+
+        Assert.DoesNotContain("ParseSkillVariant", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("InferOriginalSkillCode", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("SkillSourceType", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SceneMetadataAndArchivePayload_DoNotExposeOldDisplayNameStores()
     {
         var root = FindRepositoryRoot();

@@ -9,7 +9,7 @@ public sealed class CompactAvoidanceCanonicalizer
 {
     private const int MaxPendingAvoidances = 32;
 
-    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int OriginalSkillCode, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds);
+    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int OriginalSkillCode, int Marker, long BatchOrdinal, int ScopeId, TimelineStamp Stamp, long ObservedAtMilliseconds);
 
     private readonly List<PendingCompactAvoidance> _pendingCompact = new(MaxPendingAvoidances);
     private long _currentBatchOrdinal;
@@ -21,7 +21,7 @@ public sealed class CompactAvoidanceCanonicalizer
         return Append(prefix, result);
     }
 
-    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
+    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, in PacketStructurePath structurePath, long observedAtMilliseconds = 0)
     {
         var isCompactSignal = IsCompactSignalShape(in observation) &&
                               observation.EventKind == CombatEventKind.Unknown &&
@@ -31,12 +31,12 @@ public sealed class CompactAvoidanceCanonicalizer
 
         if (IsCompactType2Sidecar(in observation))
         {
-            CancelPendingCompactEvade(targetId, observation.SkillCode);
+            CancelPendingCompactEvade(sourceId, targetId, observation.SkillCode, observation.Marker, ResolveAssociationScope(in structurePath));
             return EnsureBatch(stamp.BatchOrdinal);
         }
 
         var prefix = EnsureBatch(stamp.BatchOrdinal);
-        if (TryObserveCompactAvoidance(sourceId, targetId, in stamp, in observation, observedAtMilliseconds))
+        if (TryObserveCompactAvoidance(sourceId, targetId, in stamp, in observation, in structurePath, observedAtMilliseconds))
             return prefix;
 
         return prefix;
@@ -55,16 +55,15 @@ public sealed class CompactAvoidanceCanonicalizer
         return FinalizeBatch();
     }
 
-    private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds)
+    private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, in PacketStructurePath structurePath, long observedAtMilliseconds)
     {
         if (!IsCompactEvadeSignal(sourceId, targetId, in observation) || observation.Marker <= 0)
             return false;
 
-        var trackedSkillCode = ResolveTrackedSkillCode(observation.SkillCode);
-        if (trackedSkillCode <= 0)
+        if (observation.SkillCode <= 0)
             return false;
 
-        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.SkillCode, observation.Marker, stamp, observedAtMilliseconds));
+        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.SkillCode, observation.Marker, _currentBatchOrdinal, ResolveAssociationScope(in structurePath), stamp, observedAtMilliseconds));
         TrimPending();
         return true;
     }
@@ -108,14 +107,29 @@ public sealed class CompactAvoidanceCanonicalizer
         return results.ToBatch();
     }
 
-    private void CancelPendingCompactEvade(int targetId, int skillCode)
+    private void CancelPendingCompactEvade(int sourceId, int targetId, int skillCode, int marker, int scopeId)
     {
+        var fallbackBatchOrdinal = _currentBatchOrdinal;
         for (var i = _pendingCompact.Count - 1; i >= 0; i--)
         {
             var pending = _pendingCompact[i];
-            if (pending.TargetId == targetId && pending.OriginalSkillCode == skillCode)
+            if (pending.SourceId == sourceId &&
+                pending.TargetId == targetId &&
+                pending.OriginalSkillCode == skillCode &&
+                pending.Marker == marker &&
+                MatchesScopeOrFallbackBatch(in pending, scopeId, fallbackBatchOrdinal))
+            {
                 _pendingCompact.RemoveAt(i);
+            }
         }
+    }
+
+    private static bool MatchesScopeOrFallbackBatch(in PendingCompactAvoidance pending, int scopeId, long fallbackBatchOrdinal)
+    {
+        if (pending.ScopeId > 0 && scopeId > 0)
+            return pending.ScopeId == scopeId;
+
+        return fallbackBatchOrdinal > 0 && pending.BatchOrdinal == fallbackBatchOrdinal;
     }
 
     private void TrimPending()
@@ -136,6 +150,21 @@ public sealed class CompactAvoidanceCanonicalizer
 
     private static bool IsCompactType2Sidecar(in CombatObservation observation) => IsCompactSignalShape(in observation) && observation.Type == 2;
 
+    private static int ResolveAssociationScope(in PacketStructurePath structurePath)
+    {
+        if (structurePath.IsEmpty)
+            return 0;
+
+        var parent = structurePath.Parent;
+        if (parent.ScopeId > 0)
+            return parent.ScopeId;
+
+        if (structurePath.Leaf.ParentScopeId > 0)
+            return structurePath.Leaf.ParentScopeId;
+
+        return structurePath.Leaf.ScopeId;
+    }
+
     private static CombatObservation CreateCompactEvade(in PendingCompactAvoidance pending)
     {
         var observation = new CombatObservation
@@ -154,14 +183,6 @@ public sealed class CompactAvoidanceCanonicalizer
         return CombatResourceRegistry.NormalizeObservationForStorage(pending.SourceId, pending.TargetId, in observation);
     }
 
-    private static int ResolveTrackedSkillCode(int skillCode)
-    {
-        if (skillCode <= 0)
-            return 0;
-
-        var variant = CombatResourceRegistry.ParseSkillVariant(skillCode);
-        return CombatResourceRegistry.InferOriginalSkillCode(skillCode) ?? variant.NormalizedSkillCode;
-    }
 }
 
 public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);

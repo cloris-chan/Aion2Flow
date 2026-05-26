@@ -263,6 +263,40 @@ public class CompactAvoidanceCanonicalizerTests
         Assert.Equal(0, combat.Revision);
     }
 
+    [Fact]
+    public void ScenePath_CompactType2SidecarCancelsPendingCompactEvadeInSameParentScope()
+    {
+        CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        var structurePath = CreateStructurePath(parentScopeId: 10, leafScopeId: 11);
+        AppendCompact0438(journal, sceneId, ordinal: 0, frame: 1, batch: 100, sourceId: 26029, targetId: 933, skillCode: 1216310, marker: 6, type: 1, structurePath);
+        AppendCompact0438(journal, sceneId, ordinal: 1, frame: 2, batch: 101, sourceId: 26029, targetId: 933, skillCode: 1216310, marker: 6, type: 2, structurePath);
+
+        var combat = Apply(journal);
+
+        Assert.False(combat.TryGetPair(26029, 933, out _));
+        Assert.Equal(0, combat.Revision);
+    }
+
+    [Fact]
+    public void ScenePath_CompactType2SidecarDoesNotCancelPendingCompactEvadeInDifferentParentScope()
+    {
+        CombatResourceRegistry.SetGameResources(BuildCompactEvadeSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendCompact0438(journal, sceneId, ordinal: 0, frame: 1, batch: 100, sourceId: 26029, targetId: 933, skillCode: 1216310, marker: 6, type: 1, CreateStructurePath(parentScopeId: 10, leafScopeId: 11));
+        AppendCompact0438(journal, sceneId, ordinal: 1, frame: 2, batch: 100, sourceId: 26029, targetId: 933, skillCode: 1216310, marker: 6, type: 2, CreateStructurePath(parentScopeId: 20, leafScopeId: 21));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(26029, 933, out var pair));
+        Assert.Equal(0, pair!.TotalDamage);
+        Assert.Equal(0, pair.HitCount);
+        Assert.Equal(1, pair.AttemptCount);
+        Assert.Equal(1, pair.EvadeCount);
+    }
+
     [Theory]
     [InlineData("aion2flow.stream.20260411174533.log")]
     [InlineData("aion2flow.stream.20260411215842.log")]
@@ -288,6 +322,36 @@ public class CompactAvoidanceCanonicalizerTests
         var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat);
         applier.ApplyJournal(journal);
         return combat;
+    }
+
+    private static void AppendCompact0438(ObservedEventJournal journal, Guid sceneId, long ordinal, long frame, long batch, int sourceId, int targetId, int skillCode, int marker, int type, PacketStructurePath structurePath)
+    {
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FrameOrdinal = frame, BatchOrdinal = batch },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = sourceId,
+            TargetEntityId = targetId,
+            Raw = new RawPacketReference(0x0438, 0, 0, 1_000 + ordinal, structurePath),
+            Combat = new CombatObservation
+            {
+                SkillCode = skillCode,
+                Damage = type == 2 ? 108 : 0,
+                HitCount = 0,
+                AttemptCount = 0,
+                Marker = marker,
+                Type = type,
+                LayoutTag = 0
+            }
+        });
+    }
+
+    private static PacketStructurePath CreateStructurePath(int parentScopeId, int leafScopeId)
+    {
+        var root = new PacketStructureReference(PacketStructureKind.TransportPacket, parentScopeId, 0, 1, 0, 0, 64, 0, 64);
+        var leaf = new PacketStructureReference(PacketStructureKind.FrameBatchEntry, leafScopeId, parentScopeId, 2, 0, 0, 32, 2, 30);
+        return new PacketStructurePath(root, leaf, default, default, leaf, 2);
     }
 
     private static SkillCollection BuildCompactEvadeSkillMap() =>
