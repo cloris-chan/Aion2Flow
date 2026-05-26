@@ -401,7 +401,8 @@ public sealed class SkillNormalizationSceneTests
                 OriginalSkillCode = 1709125011,
                 Damage = remainingTotals[index],
                 Unknown = chainId,
-                Timestamp = 3_000 + (index * 2_000L)
+                Timestamp = 3_000 + (index * 2_000L),
+                PeriodicTailPrefixValue = 467
             };
             tickPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);
             scene.AppendCombatPacket(tickPacket);

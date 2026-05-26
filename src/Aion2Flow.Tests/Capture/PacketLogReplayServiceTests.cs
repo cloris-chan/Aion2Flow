@@ -162,7 +162,7 @@ public sealed class PacketLogReplayServiceTests
         var summaryDump = BuildSummaryDump(replay.Combatants);
         var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles}\n{summaryDump}";
 
-        Assert.True(player.OutgoingDamage == 20211224, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingDamage == 19969423, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
         Assert.True(player.OutgoingInvincibles == 8, $"OutgoingInvincibles={player.OutgoingInvincibles}\n{diagDump}");
         Assert.True(player.OutgoingHits == 1304, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
         Assert.True(player.OutgoingAttempts == 1312, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
@@ -184,7 +184,7 @@ public sealed class PacketLogReplayServiceTests
         var summaryDump = BuildSummaryDump(replay.Combatants);
         var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles}\n{summaryDump}";
 
-        Assert.True(player.OutgoingDamage == 7920567, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingDamage == 7866922, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
         Assert.True(player.OutgoingHits == 1166, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
         Assert.True(player.OutgoingAttempts == 1166, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
 
@@ -208,7 +208,7 @@ public sealed class PacketLogReplayServiceTests
         var summaryDump = BuildSummaryDump(replay.Combatants);
         var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles} dmg={player.OutgoingDamage}\n{summaryDump}";
 
-        Assert.True(player.OutgoingDamage == 3961239, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingDamage == 3954053, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
         Assert.True(player.OutgoingHits == 524, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
         Assert.True(player.OutgoingAttempts == 524, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
 
@@ -234,7 +234,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.False(snapshot.Combatants.ContainsKey(39022), $"Ground AoE entity 39022 should not appear separately.\n{combatantDump}");
 
         Assert.True(snapshot.Combatants.TryGetValue(664, out var cleric), $"Cleric 664 not found.\n{combatantDump}");
-        Assert.True(cleric.DamageAmount == 3421060, $"Cleric damage={cleric.DamageAmount} expected=3421060\n{combatantDump}");
+        Assert.True(cleric.DamageAmount == 3323254, $"Cleric damage={cleric.DamageAmount} expected=3323254\n{combatantDump}");
     }
 
     [Fact]

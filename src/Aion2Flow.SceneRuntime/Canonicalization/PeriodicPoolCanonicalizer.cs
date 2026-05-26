@@ -6,8 +6,8 @@ namespace Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 public sealed class PeriodicPoolCanonicalizer
 {
     private readonly record struct Key(int TargetId, int ChainId, int PoolSkillCode);
-    private readonly record struct PoolState(PeriodicPoolKind Kind, long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatObservation Grant, bool GrantEmitted);
-    private readonly Dictionary<Key, PoolState> _pools = [];
+    private readonly record struct RemainingValueState(long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatObservation Grant, bool ShieldGrantEmitted);
+    private readonly Dictionary<Key, RemainingValueState> _states = [];
 
     public CombatCanonicalizationBatch Normalize(int sourceId, int targetId, in CombatObservation observation)
     {
@@ -16,163 +16,86 @@ public sealed class PeriodicPoolCanonicalizer
             return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized));
 
         var key = new Key(targetId, normalized.ChainId, ResolvePoolSkillCode(in normalized));
-        var mode = normalized.PeriodicMode;
-        if (mode == 9)
-            return OpenPool(sourceId, targetId, key, in normalized);
-
-        if (mode is not (10 or 11) || !_pools.TryGetValue(key, out var state))
-            return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized));
-
-        if (state.Kind == PeriodicPoolKind.Unresolved)
+        return normalized.PeriodicMode switch
         {
-            var kind = DetermineContinuationKind(sourceId, mode, in state);
-            if (kind == PeriodicPoolKind.Unresolved)
-            {
-                if (mode == 10)
-                    _pools.Remove(key);
-
-                return CombatCanonicalizationBatch.Empty;
-            }
-
-            state = PromotePool(state, kind);
-            _pools[key] = state;
-        }
-
-        if (state.Kind == PeriodicPoolKind.Shield)
-            return ApplyShieldContinuation(targetId, key, state, mode, in normalized);
-
-        if (state.Kind == PeriodicPoolKind.PeriodicHealing && mode == 11)
-            return ApplyPeriodicHealingContinuation(sourceId, targetId, key, state, in normalized);
-
-        if (mode == 10)
-            _pools.Remove(key);
-
-        return CombatCanonicalizationBatch.Empty;
+            9 => OpenState(sourceId, targetId, key, in normalized),
+            10 => CloseState(key),
+            11 => ApplyContinuation(sourceId, targetId, key, in normalized),
+            _ => CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized))
+        };
     }
 
-    private CombatCanonicalizationBatch OpenPool(int sourceId, int targetId, Key key, in CombatObservation observation)
+    private CombatCanonicalizationBatch OpenState(int sourceId, int targetId, Key key, in CombatObservation observation)
     {
         if (observation.Damage > 0 && sourceId > 0 && targetId > 0)
-        {
-            _pools[key] = new PoolState(PeriodicPoolKind.Unresolved, observation.Damage, sourceId, sourceId, targetId, observation, false);
-            return CombatCanonicalizationBatch.Empty;
-        }
+            _states[key] = new RemainingValueState(Math.Max(0, observation.Damage), sourceId, sourceId, targetId, observation, false);
 
         return CombatCanonicalizationBatch.Empty;
     }
 
-    private static PeriodicPoolKind DetermineContinuationKind(int sourceId, int mode, in PoolState state)
+    private CombatCanonicalizationBatch CloseState(Key key)
     {
+        _states.Remove(key);
+        return CombatCanonicalizationBatch.Empty;
+    }
+
+    private CombatCanonicalizationBatch ApplyContinuation(int sourceId, int targetId, Key key, in CombatObservation observation)
+    {
+        var emittedValue = Math.Max(0, observation.PeriodicTailPrefixValue);
         if (sourceId <= 0)
-            return PeriodicPoolKind.Unresolved;
+            return CombatCanonicalizationBatch.Empty;
+
+        if (!_states.TryGetValue(key, out var state))
+            return EmitStandaloneContinuation(sourceId, targetId, in observation, emittedValue);
+
+        _states[key] = state with { Remaining = Math.Max(0, observation.Damage) };
+        if (emittedValue <= 0)
+            return CombatCanonicalizationBatch.Empty;
 
         if (sourceId == state.CasterId)
-            return mode == 11 ? PeriodicPoolKind.PeriodicHealing : PeriodicPoolKind.Unresolved;
-
-        return PeriodicPoolKind.Shield;
-    }
-
-    private static PoolState PromotePool(PoolState state, PeriodicPoolKind kind)
-    {
-        if (kind == PeriodicPoolKind.Shield)
-        {
-            var grant = state.Grant with
+            return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, observation with
             {
-                EventKind = CombatEventKind.Support,
-                ValueKind = CombatValueKind.Shield,
-                EffectTag = PacketEffectTag.ShieldGrant
-            };
-            return new PoolState(PeriodicPoolKind.Shield, state.Remaining, state.CasterId, state.GrantSourceId, state.GrantTargetId, grant, state.GrantEmitted);
-        }
+                Damage = emittedValue,
+                EventKind = CombatEventKind.Healing,
+                ValueKind = CombatValueKind.PeriodicHealing
+            }));
 
-        var healingGrant = state.Grant with
-        {
-            Damage = 0,
-            EventKind = CombatEventKind.Healing,
-            ValueKind = CombatValueKind.PeriodicHealing
-        };
-        return new PoolState(PeriodicPoolKind.PeriodicHealing, state.Remaining, state.CasterId, state.GrantSourceId, state.GrantTargetId, healingGrant, true);
+        return ApplyShieldAbsorb(targetId, key, state, observation with { Damage = emittedValue });
     }
 
-    private CombatCanonicalizationBatch ApplyShieldContinuation(int targetId, Key key, PoolState state, int mode, in CombatObservation observation)
+    private static CombatCanonicalizationBatch EmitStandaloneContinuation(int sourceId, int targetId, in CombatObservation observation, long emittedValue)
     {
-        var newRemaining = mode == 10 ? 0 : Math.Max(0, observation.Damage);
-        var tailValue = Math.Max(0, observation.PeriodicTailPrefixValue);
-        var remainingDelta = Math.Max(0, state.Remaining - newRemaining);
-        var absorbed = mode == 10
-            ? Math.Min(state.Remaining, Math.Max(0, observation.Damage))
-            : tailValue > 0 ? tailValue : remainingDelta;
-
-        if (absorbed <= 0)
-        {
-            if (mode == 10)
-                _pools.Remove(key);
-            else
-                _pools[key] = state with { Remaining = newRemaining };
-
+        if (emittedValue <= 0)
             return CombatCanonicalizationBatch.Empty;
-        }
 
-        var absorbedObservation = observation with
+        return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, observation with { Damage = emittedValue }));
+    }
+
+    private CombatCanonicalizationBatch ApplyShieldAbsorb(int targetId, Key key, RemainingValueState state, in CombatObservation observation)
+    {
+        var absorbedResult = new CombatCanonicalizationResult(state.CasterId, targetId, observation with
         {
-            Damage = absorbed,
             EventKind = CombatEventKind.Support,
             ValueKind = CombatValueKind.Shield,
             EffectTag = PacketEffectTag.ShieldAbsorbed
-        };
-
-        var absorbedResult = new CombatCanonicalizationResult(state.CasterId, targetId, absorbedObservation);
-        var results = state.GrantEmitted
-            ? CombatCanonicalizationBatch.One(absorbedResult)
-            : CombatCanonicalizationBatch.Two(new CombatCanonicalizationResult(state.GrantSourceId, state.GrantTargetId, state.Grant), absorbedResult);
-        if (mode == 10)
-            _pools.Remove(key);
-        else
-            _pools[key] = state with { Remaining = newRemaining, GrantEmitted = true };
-
-        return results;
-    }
-
-    private CombatCanonicalizationBatch ApplyPeriodicHealingContinuation(int sourceId, int targetId, Key key, PoolState state, in CombatObservation observation)
-    {
-        var currentRemaining = Math.Max(0, observation.Damage);
-        var tailValue = Math.Max(0, observation.PeriodicTailPrefixValue);
-        var remainingDelta = Math.Max(0, state.Remaining - currentRemaining);
-        var healingAmount = tailValue > 0 ? tailValue : remainingDelta;
-        if (healingAmount <= 0)
-        {
-            if (currentRemaining == 0)
-                _pools.Remove(key);
-            else
-                _pools[key] = state with { Remaining = currentRemaining };
-
-            return CombatCanonicalizationBatch.Empty;
-        }
-
-        if (currentRemaining == 0)
-            _pools.Remove(key);
-        else
-            _pools[key] = state with { Remaining = currentRemaining };
-
-        var tick = new CombatCanonicalizationResult(sourceId, targetId, observation with
-        {
-            Damage = healingAmount,
-            EventKind = CombatEventKind.Healing,
-            ValueKind = CombatValueKind.PeriodicHealing
         });
-        return CombatCanonicalizationBatch.One(tick);
+
+        if (state.ShieldGrantEmitted)
+            return CombatCanonicalizationBatch.One(absorbedResult);
+
+        _states[key] = state with { ShieldGrantEmitted = true };
+        var grant = state.Grant with
+        {
+            EventKind = CombatEventKind.Support,
+            ValueKind = CombatValueKind.Shield,
+            EffectTag = PacketEffectTag.ShieldGrant
+        };
+        return CombatCanonicalizationBatch.Two(new CombatCanonicalizationResult(state.GrantSourceId, state.GrantTargetId, grant), absorbedResult);
     }
 
     private static CombatObservation NormalizeBaseObservation(int sourceId, int targetId, in CombatObservation observation) => CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
 
     private static int ResolvePoolSkillCode(in CombatObservation observation) => observation.SkillCode != 0 ? observation.SkillCode : observation.OriginalSkillCode;
-}
-
-internal enum PeriodicPoolKind : byte
-{
-    Unresolved,
-    Shield,
-    PeriodicHealing
 }
 
 public readonly record struct CombatCanonicalizationResult(int SourceId, int TargetId, CombatObservation Observation);

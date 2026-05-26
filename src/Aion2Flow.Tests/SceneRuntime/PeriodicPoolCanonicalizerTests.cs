@@ -44,7 +44,8 @@ public class PeriodicPoolCanonicalizerTests
                 OriginalSkillCode = 1709125011,
                 Damage = remainingTotals[i],
                 Unknown = chainId,
-                Timestamp = 3_000 + (i * 2_000L)
+                Timestamp = 3_000 + (i * 2_000L),
+                PeriodicTailPrefixValue = 467
             };
             tick.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);
             sink.AppendCombatPacket(tick);
@@ -59,7 +60,7 @@ public class PeriodicPoolCanonicalizerTests
     }
 
     [Fact]
-    public void ScenePath_SelfPeriodicHealingTerminalTickConsumesRemainingTotal()
+    public void ScenePath_SelfPeriodicHealingTerminalTickUsesTailValue()
     {
         CombatResourceRegistry.LoadSkillMap("zh-TW");
         const int playerId = 2508;
@@ -89,7 +90,8 @@ public class PeriodicPoolCanonicalizerTests
             OriginalSkillCode = 1709125011,
             Damage = 0,
             Unknown = chainId,
-            Timestamp = 3_000
+            Timestamp = 3_000,
+            PeriodicTailPrefixValue = 4676
         };
         terminal.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);
         sink.AppendCombatPacket(terminal);
@@ -133,7 +135,8 @@ public class PeriodicPoolCanonicalizerTests
             OriginalSkillCode = 18730000,
             Damage = 700,
             Unknown = chainId,
-            Timestamp = 2_000
+            Timestamp = 2_000,
+            PeriodicTailPrefixValue = 300
         };
         continuation.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
         sink.AppendCombatPacket(continuation);
@@ -201,6 +204,74 @@ public class PeriodicPoolCanonicalizerTests
         Assert.Equal(600, target!.IncomingHealing);
         Assert.Equal(0, caster.OutgoingShield);
         Assert.Equal(0, target.IncomingShield);
+    }
+
+    [Fact]
+    public void ScenePath_MixedContinuationsClassifyEachMode11PacketIndependently()
+    {
+        const int casterId = 100;
+        const int targetId = 200;
+        const int attackerId = 300;
+        const int chainId = 9003;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+
+        var seed = new ParsedCombatPacket
+        {
+            SourceId = casterId,
+            TargetId = targetId,
+            SkillCode = 16190000,
+            OriginalSkillCode = 1619000011,
+            Damage = 3000,
+            Unknown = chainId,
+            Timestamp = 1_000
+        };
+        seed.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
+        sink.AppendCombatPacket(seed);
+
+        var healTick = new ParsedCombatPacket
+        {
+            SourceId = casterId,
+            TargetId = targetId,
+            SkillCode = 16190000,
+            OriginalSkillCode = 1619000011,
+            Damage = 2800,
+            Unknown = chainId,
+            Timestamp = 2_000,
+            PeriodicTailPrefixValue = 200
+        };
+        healTick.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
+        sink.AppendCombatPacket(healTick);
+
+        var shieldTick = new ParsedCombatPacket
+        {
+            SourceId = attackerId,
+            TargetId = targetId,
+            SkillCode = 16190000,
+            OriginalSkillCode = 1619000011,
+            Damage = 2500,
+            Unknown = chainId,
+            Timestamp = 3_000,
+            PeriodicTailPrefixValue = 300
+        };
+        shieldTick.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
+        sink.AppendCombatPacket(shieldTick);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetCombatant(casterId, out var caster));
+        Assert.True(combat.TryGetCombatant(targetId, out var target));
+        Assert.True(combat.TryGetPair(casterId, targetId, out var pair));
+        Assert.Equal(200, caster!.OutgoingHealing);
+        Assert.Equal(3000, caster.OutgoingShield);
+        Assert.Equal(300, caster.OutgoingShieldAbsorbed);
+        Assert.Equal(200, target!.IncomingHealing);
+        Assert.Equal(3000, target.IncomingShield);
+        Assert.Equal(300, target.IncomingShieldAbsorbed);
+        Assert.Equal(3000, pair!.TotalShield);
+        Assert.Equal(300, pair.TotalShieldAbsorbed);
+        Assert.False(combat.TryGetPair(attackerId, targetId, out _));
     }
 
     [Fact]
@@ -325,7 +396,7 @@ public class PeriodicPoolCanonicalizerTests
     }
 
     [Fact]
-    public void ScenePath_KnownShieldMode10FromAttackerConsumesRemainingShield()
+    public void ScenePath_Mode10ClosesShieldStateWithoutSynthesizingAbsorb()
     {
         const int playerId = 8470;
         const int attackerId = 136787;
@@ -362,15 +433,11 @@ public class PeriodicPoolCanonicalizerTests
 
         var combat = Apply(journal);
 
-        Assert.True(combat.TryGetCombatant(playerId, out var player));
-        Assert.True(combat.TryGetPair(playerId, playerId, out var grantPair));
+        Assert.False(combat.TryGetCombatant(playerId, out var player));
+        Assert.Null(player);
+        Assert.False(combat.TryGetPair(playerId, playerId, out var grantPair));
+        Assert.Null(grantPair);
         Assert.False(combat.TryGetPair(attackerId, playerId, out _));
-        Assert.Equal(3539, player!.OutgoingShield);
-        Assert.Equal(3539, player.IncomingShield);
-        Assert.Equal(3539, player.OutgoingShieldAbsorbed);
-        Assert.Equal(3539, player.IncomingShieldAbsorbed);
-        Assert.Equal(3539, grantPair!.TotalShield);
-        Assert.Equal(3539, grantPair.TotalShieldAbsorbed);
     }
 
     [Fact]
