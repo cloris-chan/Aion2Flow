@@ -3,24 +3,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0438Damage(
-    int TargetId,
-    int LayoutTag,
-    int Flag,
-    int SourceId,
-    int SkillCodeRaw,
-    int Marker,
-    int Type,
-    DamageModifiers Modifiers,
-    int Unknown,
-    int Damage,
-    int Loop,
-    int TailLength,
-    int TailMultiHitCount,
-    int DrainHealAmount = 0,
-    int RegenerationAmount = 0,
-    long DetailRaw = 0,
-    CombatResourceKind ResourceKind = CombatResourceKind.Unknown);
+internal readonly record struct Packet0438Damage(int TargetId, int LayoutTag, int Flag, int SourceId, int SkillCodeRaw, int Marker, int Type, DamageModifiers Modifiers, int Unknown, int Damage, int Loop, int TailLength, int MultiHitCount, int DrainHealAmount = 0, int RegenerationAmount = 0, long DetailRaw = 0, CombatResourceKind ResourceKind = CombatResourceKind.Unknown);
 
 internal static class Packet0438DamageParser
 {
@@ -92,25 +75,11 @@ internal static class Packet0438DamageParser
             multiHitCount = Math.Max(1, multiHitAmounts);
         }
 
+        if (multiHitCount > 0)
+            modifiers |= DamageModifiers.MultiHit;
+
         consumed = reader.Offset;
-        result = new Packet0438Damage(
-            targetId,
-            layoutTag,
-            flag,
-            sourceId,
-            skillCodeRaw,
-            marker,
-            type,
-            modifiers,
-            unknown,
-            damage,
-            loop,
-            payload.Length - consumed,
-            multiHitCount,
-            drainHealAmount,
-            regenAmount,
-            detailRaw,
-            resourceKind);
+        result = new Packet0438Damage(targetId, layoutTag, flag, sourceId, skillCodeRaw, marker, type, modifiers, unknown, damage, loop, payload.Length - consumed, multiHitCount, drainHealAmount, regenAmount, detailRaw, resourceKind);
         return true;
     }
 
@@ -142,14 +111,7 @@ internal static class Packet0438DamageParser
         return bestDrain;
     }
 
-    private static void TryMultiHitInterpretation(
-        ReadOnlySpan<byte> tail,
-        bool hasLeadingByte,
-        int leadingCount,
-        ref int bestRank,
-        ref int bestDrain,
-        ref int bestAmounts,
-        ref int bestConsumed)
+    private static void TryMultiHitInterpretation(ReadOnlySpan<byte> tail, bool hasLeadingByte, int leadingCount, ref int bestRank, ref int bestDrain, ref int bestAmounts, ref int bestConsumed)
     {
         if (tail.IsEmpty)
         {

@@ -69,6 +69,26 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
+    public void MultiHitCapturePath_DoesNotUseSidecarAttribution()
+    {
+        var root = FindRepositoryRoot();
+        var files = new[]
+        {
+            Path.Combine(root, "src", "Aion2Flow.Capture", "Streams", "PacketCombatHandler.cs"),
+            Path.Combine(root, "src", "Aion2Flow.Capture", "Streams", "PacketStateHandler.cs"),
+            Path.Combine(root, "src", "Aion2Flow.Protocol", "Packets", "Packet3538SidecarParser.cs"),
+            Path.Combine(root, "src", "Aion2Flow.Protocol", "Packets", "Packet8456EnvelopeParser.cs")
+        };
+
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            Assert.DoesNotContain("DamageModifiers.MultiHit", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("TailMultiHitCount", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void SceneMetadataAndArchivePayload_DoNotExposeOldDisplayNameStores()
     {
         var root = FindRepositoryRoot();

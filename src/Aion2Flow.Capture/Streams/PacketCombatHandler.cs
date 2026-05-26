@@ -30,21 +30,13 @@ internal static class PacketCombatHandler
                 HitCount = 1,
                 AttemptCount = 1,
                 Loop = parsed.Loop,
+                MultiHitCount = parsed.MultiHitCount,
                 DrainHealAmount = parsed.DrainHealAmount,
                 RegenerationAmount = parsed.RegenerationAmount,
                 DetailRaw = parsed.DetailRaw,
                 ResourceKind = parsed.ResourceKind,
                 ChainId = parsed.Unknown
             };
-
-            if (parsed.TailMultiHitCount > 0)
-            {
-                observation = observation with
-                {
-                    MultiHitCount = parsed.TailMultiHitCount,
-                    Modifiers = observation.Modifiers | DamageModifiers.MultiHit
-                };
-            }
 
             context.Sink.AppendCombatObservation(parsed.SourceId, parsed.TargetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0438, packet.Length, 0, context.CurrentStructurePath);
 
@@ -261,15 +253,13 @@ internal static class PacketCombatHandler
                 SkillCode = resolvedSkillCode,
                 Marker = parsed.Marker,
                 Type = parsed.Type,
-                Modifiers = parsed.TailMultiHitCount > 0
-                    ? parsed.Modifiers | DamageModifiers.MultiHit
-                    : parsed.Modifiers,
+                Modifiers = parsed.Modifiers,
                 ChainId = parsed.Unknown,
                 Damage = parsed.Damage,
                 HitCount = 1,
                 AttemptCount = 1,
                 Loop = parsed.Loop,
-                MultiHitCount = parsed.TailMultiHitCount,
+                MultiHitCount = parsed.MultiHitCount,
                 DrainHealAmount = parsed.DrainHealAmount,
                 RegenerationAmount = parsed.RegenerationAmount,
                 DetailRaw = parsed.DetailRaw,

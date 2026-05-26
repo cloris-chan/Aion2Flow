@@ -69,7 +69,8 @@ public sealed class PacketCombatParsersTests
         Assert.True(ok);
         Assert.Equal(4, parsed.Marker);
         Assert.Equal(3, parsed.Type);
-        Assert.Equal(DamageModifiers.Critical | DamageModifiers.Back | DamageModifiers.Smite, parsed.Modifiers);
+        Assert.Equal(1, parsed.MultiHitCount);
+        Assert.Equal(DamageModifiers.Critical | DamageModifiers.Back | DamageModifiers.Smite | DamageModifiers.MultiHit, parsed.Modifiers);
     }
 
     [Fact]
