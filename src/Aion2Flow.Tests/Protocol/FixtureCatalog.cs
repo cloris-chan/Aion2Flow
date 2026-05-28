@@ -137,6 +137,7 @@ public static class FixtureCatalog
         yield return [new Create4036Sample("protocol/4036-create-198.hex", Packet4036Kind.Create198, 1182, 27203, null)];
         yield return [new Create4036Sample("protocol/4036-create-198-summon-skill.hex", Packet4036Kind.Create198, 12115, 18345, null)];
         yield return [new Create4036Sample("protocol/4036-create-198-summon-skill-20623.hex", Packet4036Kind.Create198, 2855, 20623, null)];
+        yield return [new Create4036Sample("protocol/4036-create-205-summon-owner-varint.hex", Packet4036Kind.Create198, 10389, 26765, 2920115)];
     }
 
     public static IEnumerable<object[]> NpcSpawn4036Samples()
@@ -147,6 +148,7 @@ public static class FixtureCatalog
         yield return [new NpcSpawn4036Sample("state/4036-state-152-852100.hex", Packet4036Kind.State152, 191528, 2311317)];
         yield return [new NpcSpawn4036Sample("protocol/4036-create-198.hex", Packet4036Kind.Create198, 27203, null)];
         yield return [new NpcSpawn4036Sample("protocol/4036-create-198-summon-skill.hex", Packet4036Kind.Create198, 18345, null)];
+        yield return [new NpcSpawn4036Sample("protocol/4036-create-205-summon-owner-varint.hex", Packet4036Kind.Create198, 26765, 2920115)];
         yield return [new NpcSpawn4036Sample("state/4036-create-198-boss-2702396.hex", Packet4036Kind.Create198, 21544, 2702396)];
     }
 

@@ -95,6 +95,137 @@ public sealed class SummonAttributionSceneTests
     }
 
     [Fact]
+    public void Infers_Preexisting_Elementalist_Summon_From_OwnerSupport_When_Class_Candidates_Are_Ambiguous()
+    {
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        const int ownerId = 10389;
+        const int otherElementalistId = 9915;
+        const int summonId = 26765;
+        const int targetId = 163760;
+
+        scene.AppendNickname(ownerId, "Owner");
+        scene.AppendNickname(otherElementalistId, "Other");
+        scene.AppendNpcHp(summonId, 19_649, 19_649, 1_005);
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 405,
+            Timestamp = 1_000
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = otherElementalistId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 777,
+            Timestamp = 1_010
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = summonId,
+            OriginalSkillCode = 16770001,
+            SkillCode = 16770001,
+            Damage = 587,
+            EventKind = CombatEventKind.Healing,
+            ValueKind = CombatValueKind.Healing,
+            Timestamp = 1_020
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = targetId,
+            OriginalSkillCode = 16100004,
+            SkillCode = 16100004,
+            Damage = 1205,
+            Timestamp = 1_030
+        });
+
+        var snapshot = scene.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        Assert.True(snapshot.Combatants.TryGetValue(otherElementalistId, out var other));
+        Assert.False(snapshot.Combatants.ContainsKey(summonId));
+        Assert.Equal(1610, owner.DamageAmount);
+        Assert.Equal(777, other.DamageAmount);
+        Assert.Equal(587, owner.HealingAmount);
+    }
+
+    [Fact]
+    public void Does_Not_Infer_Preexisting_Summon_Owner_When_DirectSupport_Has_Multiple_SameClass_Candidates()
+    {
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        const int firstElementalistId = 10389;
+        const int secondElementalistId = 9915;
+        const int summonId = 26765;
+        const int targetId = 163760;
+
+        scene.AppendNickname(firstElementalistId, "First");
+        scene.AppendNickname(secondElementalistId, "Second");
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = firstElementalistId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 405,
+            Timestamp = 1_000
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = secondElementalistId,
+            TargetId = targetId,
+            OriginalSkillCode = 16010000,
+            SkillCode = 16010000,
+            Damage = 777,
+            Timestamp = 1_010
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = firstElementalistId,
+            TargetId = summonId,
+            OriginalSkillCode = 16770001,
+            SkillCode = 16770001,
+            Damage = 587,
+            EventKind = CombatEventKind.Healing,
+            ValueKind = CombatValueKind.Healing,
+            Timestamp = 1_020
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = secondElementalistId,
+            TargetId = summonId,
+            OriginalSkillCode = 16770001,
+            SkillCode = 16770001,
+            Damage = 586,
+            EventKind = CombatEventKind.Healing,
+            ValueKind = CombatValueKind.Healing,
+            Timestamp = 1_025
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = targetId,
+            OriginalSkillCode = 16100004,
+            SkillCode = 16100004,
+            Damage = 1205,
+            Timestamp = 1_030
+        });
+
+        var snapshot = scene.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.ContainsKey(summonId));
+    }
+
+    [Fact]
     public void Treats_Spirit_Descent_Summon_Restore_As_Support()
     {
         CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
@@ -288,6 +419,8 @@ public sealed class SummonAttributionSceneTests
         [
             new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
             new Skill(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
+            new Skill(16100004, "Fire Spirit: Strike", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
+            new Skill(16770001, "Spirit Recovery", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
             new Skill(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
         ];
     }

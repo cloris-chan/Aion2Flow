@@ -17,6 +17,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private readonly Dictionary<int, int> _nextInferredOwnerBySummon = [];
     private readonly Dictionary<int, SummonOwnerInferenceAccumulator> _ownerInferenceBySource = [];
     private readonly Dictionary<SkillCategory, OwnerCandidateAccumulator> _ownerCandidatesByCategory = [];
+    private readonly Dictionary<SummonOwnerInferenceKey, OwnerCandidateAccumulator> _directOwnerCandidatesBySummonCategory = [];
     private readonly Dictionary<int, int> _resolvedCombatantIds = [];
     private readonly Dictionary<int, bool> _knownSummons = [];
     private readonly Dictionary<int, TargetInfo> _targetInfos = [];
@@ -496,6 +497,15 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             if (!TryResolveSkill(in observation, out var skill))
                 continue;
 
+            if (IsSummonOwnerCandidateSkill(skill) && IsDirectSummonOwnerSupportEvidence(in e) && IsPotentialImplicitSummonTarget(sourceId, e.TargetId))
+            {
+                var key = new SummonOwnerInferenceKey(e.TargetId, skill.Category);
+                ref var directOwners = ref CollectionsMarshal.GetValueRefOrAddDefault(_directOwnerCandidatesBySummonCategory, key, out var directOwnersExist);
+                if (!directOwnersExist)
+                    directOwners = default;
+                directOwners.Add(sourceId);
+            }
+
             ref var source = ref CollectionsMarshal.GetValueRefOrAddDefault(_ownerInferenceBySource, sourceId, out var sourceExists);
             if (!sourceExists)
                 source = new SummonOwnerInferenceAccumulator(sourceId);
@@ -527,10 +537,14 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
                 if (source.HasOwnerSkillEvidence || !source.TryGetSingleSummonSkillCategory(out var category))
                     continue;
 
-                if (category == SkillCategory.Unknown || !_ownerCandidatesByCategory.TryGetValue(category, out var owners))
+                if (category == SkillCategory.Unknown)
                     continue;
 
-                var ownerId = owners.ResolveUniqueOwner(source.SourceId);
+                var ownerId = _directOwnerCandidatesBySummonCategory.TryGetValue(new SummonOwnerInferenceKey(source.SourceId, category), out var directOwners)
+                    ? directOwners.ResolveUniqueOwner(source.SourceId)
+                    : 0;
+                if (ownerId <= 0 && _ownerCandidatesByCategory.TryGetValue(category, out var owners))
+                    ownerId = owners.ResolveUniqueOwner(source.SourceId);
                 if (ownerId > 0)
                     _nextInferredOwnerBySummon[source.SourceId] = ownerId;
             }
@@ -565,6 +579,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     {
         _ownerInferenceBySource.Clear();
         _ownerCandidatesByCategory.Clear();
+        _directOwnerCandidatesBySummonCategory.Clear();
         _ownerInferenceScannedEventCount = 0;
     }
 
@@ -807,6 +822,23 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private static bool IsPreexistingSummonSignatureSkill(Skill skill) =>
         skill.Category == SkillCategory.Elementalist && skill.Name.Contains("Spirit:", StringComparison.OrdinalIgnoreCase);
 
+    private bool IsPotentialImplicitSummonTarget(int sourceId, int targetId)
+    {
+        if (targetId <= 0 || targetId == sourceId)
+            return false;
+
+        if (!entities.TryGet(targetId, out var target))
+            return true;
+
+        if (target.IsPlayer || !string.IsNullOrWhiteSpace(target.Nickname) || target.NpcCode.HasValue)
+            return false;
+
+        return target.Kind is NpcKind.Unknown or NpcKind.Summon;
+    }
+
+    private static bool IsDirectSummonOwnerSupportEvidence(in CombatEventRecord e) =>
+        e.TargetId > 0 && e.Observation.Damage > 0 && IsRecoveryEvent(in e);
+
     private NpcRuntimeObservationSnapshot? BuildTargetObservation(int targetId)
     {
         if (targetId <= 0)
@@ -909,6 +941,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     }
 
     private readonly record struct TargetDecision(long EncounterStartTime, long EncounterEndTime, int TrackingTargetId, long LatestObservedAt);
+
+    private readonly record struct SummonOwnerInferenceKey(int SummonId, SkillCategory Category);
 
     private struct TargetInfo(long firstDamageAt, long lastDamageAt)
     {

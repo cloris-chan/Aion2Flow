@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.Protocol.Readers;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
@@ -65,23 +66,33 @@ internal static class PacketUnknownFramePayloadScanner
             context.Sink.AppendNpcKind(summonId, NpcKind.Summon);
         }
 
-        ReadOnlySpan<byte> keyPattern = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
-        var keyIdx = payload.IndexOf(keyPattern);
-        if (keyIdx == -1) return false;
-        var afterPacket = payload[(keyIdx + 8)..];
+        if (!Packet4036CreateParser.TryExtractOwnerId(payload, out var realSourceId, out var ownerTailOffset))
+            return false;
 
-        ReadOnlySpan<byte> opcodePattern = [0x07, 0x02, 0x06];
-        var opcodeIdx = afterPacket.IndexOf(opcodePattern);
-        if (opcodeIdx == -1) return false;
-
-        var offset = keyIdx + opcodeIdx + 11;
-        if (offset + 2 > payload.Length) return false;
-
-        var realSourceId = (payload[offset] & 0xff) | ((payload[offset + 1] & 0xff) << 8);
         if (realSourceId == 0) return false;
 
         context.Sink.AppendSummon(realSourceId, summonId);
-        consumed = Math.Max(offset + 2, reader.Offset);
+        consumed = ResolveEmbedded4036Length(packet, opcodeOffset, Math.Max(reader.Offset, ownerTailOffset));
         return context.MarkParsed();
+    }
+
+    private static int ResolveEmbedded4036Length(ReadOnlySpan<byte> packet, int opcodeOffset, int minimumLength)
+    {
+        for (var prefixLength = 1; prefixLength <= 5 && prefixLength <= opcodeOffset; prefixLength++)
+        {
+            var prefixOffset = opcodeOffset - prefixLength;
+            if (!PacketTransportCodec.TryReadVarInt(packet, prefixOffset, out var lengthInfo) ||
+                lengthInfo.ByteCount != prefixLength ||
+                !PacketTransportCodec.TryReadTransportLength(packet, prefixOffset, out var frameLength) ||
+                frameLength <= prefixLength ||
+                frameLength > packet.Length - prefixOffset)
+            {
+                continue;
+            }
+
+            return Math.Max(frameLength - prefixLength, minimumLength);
+        }
+
+        return minimumLength;
     }
 }

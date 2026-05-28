@@ -10,7 +10,9 @@ internal static class Packet4036CreateParser
 {
     private const int SpawnHpPairOffsetFromNpcCodeEnd = 21;
 
-    private static ReadOnlySpan<byte> EightByteMarker => [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+    private static ReadOnlySpan<byte> OwnerSectionSentinel => [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+
+    private static ReadOnlySpan<byte> OwnerHeaderMarker => [0x80, 0x75, 0xd5, 0x2a, 0xbb, 0x03, 0x00, 0x00];
 
     private static ReadOnlySpan<byte> OwnerOpcodeMarker => [0x07, 0x02, 0x06];
 
@@ -82,65 +84,79 @@ internal static class Packet4036CreateParser
         return true;
     }
 
-    private static bool TryExtractOwnerId(ReadOnlySpan<byte> packet, out int ownerId)
+    internal static bool TryExtractOwnerId(ReadOnlySpan<byte> packet, out int ownerId)
+        => TryExtractOwnerId(packet, out ownerId, out _);
+
+    internal static bool TryExtractOwnerId(ReadOnlySpan<byte> packet, out int ownerId, out int tailOffset)
     {
         ownerId = 0;
+        tailOffset = 0;
 
-        var keyIndex = FindArrayIndex(packet, EightByteMarker);
+        var keyIndex = packet.IndexOf(OwnerSectionSentinel);
         if (keyIndex < 0) return false;
 
-        var afterMarker = packet[(keyIndex + EightByteMarker.Length)..];
-        var ownerOpcodeIndex = FindLastArrayIndex(afterMarker, OwnerOpcodeMarker);
+        var afterMarker = packet[(keyIndex + OwnerSectionSentinel.Length)..];
+        if (TryExtractOwnerIdFromHeader(afterMarker, out ownerId, out var headerTailOffset))
+        {
+            tailOffset = keyIndex + OwnerSectionSentinel.Length + headerTailOffset;
+            return true;
+        }
+
+        var ownerOpcodeIndex = afterMarker.LastIndexOf(OwnerOpcodeMarker);
         if (ownerOpcodeIndex < 0)
-            ownerOpcodeIndex = FindLastArrayIndex(afterMarker, OwnerOpcodeMarkerAlt);
+            ownerOpcodeIndex = afterMarker.LastIndexOf(OwnerOpcodeMarkerAlt);
         if (ownerOpcodeIndex < 0) return false;
 
         var ownerOffset = keyIndex + ownerOpcodeIndex + 11;
         if (ownerOffset + 2 > packet.Length) return false;
 
         ownerId = packet[ownerOffset] | (packet[ownerOffset + 1] << 8);
+        tailOffset = ownerOffset + 2;
         return ownerId != 0;
     }
 
-    private static int FindArrayIndex(ReadOnlySpan<byte> data, ReadOnlySpan<byte> needle)
+    private static bool TryExtractOwnerIdFromHeader(ReadOnlySpan<byte> afterMarker, out int ownerId, out int tailOffset)
     {
-        if (needle.Length == 0) return 0;
-        if (data.Length < needle.Length) return -1;
+        ownerId = 0;
+        tailOffset = 0;
 
-        var index = data.IndexOf(needle[0]);
-        while (index >= 0 && index <= data.Length - needle.Length)
-        {
-            if (data.Slice(index, needle.Length).SequenceEqual(needle))
-            {
-                return index;
-            }
+        if (!afterMarker.StartsWith(OwnerHeaderMarker))
+            return false;
 
-            var next = data[(index + 1)..].IndexOf(needle[0]);
-            if (next < 0)
-            {
-                return -1;
-            }
+        if (!TryReadVarInt(afterMarker, OwnerHeaderMarker.Length, out var candidate, out var consumed))
+            return false;
 
-            index += next + 1;
-        }
+        var offset = OwnerHeaderMarker.Length + consumed;
+        if (candidate <= 0 || afterMarker.Length - offset < 14)
+            return false;
 
-        return -1;
+        return afterMarker[offset] == 0x10 &&
+               afterMarker[offset + 1] == 0x02 &&
+               afterMarker[offset + 11] == 0x60 &&
+               afterMarker[offset + 12] == 0xfc &&
+               afterMarker[offset + 13] == 0x44 &&
+               TryConfirmOwnerLe32(afterMarker, offset + 14, candidate, out ownerId, out tailOffset);
     }
 
-    private static int FindLastArrayIndex(ReadOnlySpan<byte> data, ReadOnlySpan<byte> needle)
+    private static bool TryConfirmOwnerLe32(ReadOnlySpan<byte> buffer, int offset, int candidate, out int ownerId, out int tailOffset)
     {
-        if (needle.Length == 0) return data.Length;
-        if (data.Length < needle.Length) return -1;
-
-        for (var index = data.Length - needle.Length; index >= 0; index--)
+        ownerId = 0;
+        tailOffset = 0;
+        var end = Math.Min(buffer.Length - 4, offset + 8);
+        for (var i = offset; i <= end; i++)
         {
-            if (data.Slice(index, needle.Length).SequenceEqual(needle))
+            if (buffer[i] == (byte)candidate &&
+                buffer[i + 1] == (byte)(candidate >> 8) &&
+                buffer[i + 2] == (byte)(candidate >> 16) &&
+                buffer[i + 3] == (byte)(candidate >> 24))
             {
-                return index;
+                ownerId = candidate;
+                tailOffset = i + 4;
+                return true;
             }
         }
 
-        return -1;
+        return false;
     }
 
     public static bool TryParseNpcSpawn(ReadOnlySpan<byte> packet, out Packet4036NpcSpawn result)
@@ -162,7 +178,7 @@ internal static class Packet4036CreateParser
         var spawnTag1 = packet[reader.Offset + 1];
         var spawnTag2 = packet[reader.Offset + 2];
         var spawnTagLikelyCarriesNpcCode =
-            ((spawnTag1 == 0x20 || spawnTag1 == 0x21 || spawnTag1 == 0x22 || spawnTag1 == 0x30 || spawnTag1 == 0x32) && spawnTag2 == 0x00)
+            ((spawnTag1 == 0x10 || spawnTag1 == 0x20 || spawnTag1 == 0x21 || spawnTag1 == 0x22 || spawnTag1 == 0x30 || spawnTag1 == 0x32) && spawnTag2 == 0x00)
             || (spawnTag0 == 0x1C && spawnTag1 == 0x00 && spawnTag2 == 0x00);
         if (!reader.TryAdvance(3)) return false;
 

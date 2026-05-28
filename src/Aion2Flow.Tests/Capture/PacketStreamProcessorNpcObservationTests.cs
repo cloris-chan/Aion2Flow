@@ -116,6 +116,23 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
+    public void UnknownPayload_Embedded4036_OwnerVarint_RecordsSummonOwner()
+    {
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        using var parser = new PacketFrameParser(scene.Synchronize(sink));
+
+        var parsed = parser.ParsePacketEntry(HexHelper.FromFixture("state/unknown-payload-embedded-4036-summon-owner-varint.hex"), TestConnection, 1);
+
+        Assert.True(parsed);
+        scene.Owner.Refresh();
+        Assert.True(scene.Owner.Entities.TryGet(26765, out var summon));
+        Assert.Equal(10389, summon.OwnerEntityId);
+        Assert.Equal(NpcKind.Summon, summon.Kind);
+        Assert.Equal(2_920_115, summon.NpcCode);
+    }
+
+    [Fact]
     public void RecoveryPayload_Combat_RawReference_IncludesRecoveredFramePath()
     {
         var scene = new SceneLiveReadModel();
