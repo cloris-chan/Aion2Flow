@@ -23,24 +23,13 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private const string IndicatorWarnColor = "#F3C969";
     private const string IndicatorErrorColor = "#F07C82";
     private const string IndicatorInfoColor = "#8DD6FF";
-    private static readonly string[] CombatantBarPalette =
-    [
-        "#7048D37A",
-        "#705BA7FF",
-        "#70C084FC",
-        "#70F1B44C",
-        "#70F577AD",
-        "#704FD1C5",
-        "#70B6D957",
-        "#70FF8E5C"
-    ];
-    private static readonly string[] BossHpBarPalette =
-    [
-        "#7059D8E8",
-        "#7087E0A7",
-        "#70D9C05C",
-        "#70C88DF5"
-    ];
+    private const double BarColorAlpha = 0x70 / 255d;
+    private const double BarColorMinSaturation = 0.52d;
+    private const double BarColorSaturationRange = 0.16d;
+    private const double BarColorMinLightness = 0.52d;
+    private const double BarColorLightnessRange = 0.12d;
+    private const int BarHueGap = 40;
+    private const int BarHueRingSize = 360 / BarHueGap;
 
     private readonly WinDivertCaptureService _captureService;
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService;
@@ -62,6 +51,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private int _displayContextBuiltVersion = -1;
     private bool _displayContextIsArchived;
     private Guid _barBrushEncounterId;
+    private uint _barBrushSeed;
+    private int _barBrushBaseHue;
+    private int _nextBarHueIndex;
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
 
@@ -640,6 +632,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             return;
 
         _barBrushEncounterId = encounterId;
+        _barBrushSeed = CreateColorSeed(encounterId);
+        _barBrushBaseHue = (int)(_barBrushSeed % 360);
+        _nextBarHueIndex = 0;
         _combatantBarBrushes.Clear();
         _bossHpBarBrushes.Clear();
     }
@@ -650,10 +645,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         if (_combatantBarBrushes.TryGetValue(combatantId, out var brush))
             return brush;
 
-        var index = _combatantBarBrushes.Count;
-        brush = index < CombatantBarPalette.Length
-            ? new SolidColorBrush(Color.Parse(CombatantBarPalette[index]))
-            : CreateGeneratedBrush(encounterId, combatantId, salt: 17);
+        brush = CreateGeneratedBrush(_nextBarHueIndex++);
         _combatantBarBrushes.Add(combatantId, brush);
         return brush;
     }
@@ -664,40 +656,69 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         if (_bossHpBarBrushes.TryGetValue(bossId, out var brush))
             return brush;
 
-        var index = _bossHpBarBrushes.Count;
-        brush = index < BossHpBarPalette.Length
-            ? new SolidColorBrush(Color.Parse(BossHpBarPalette[index]))
-            : CreateGeneratedBrush(encounterId, bossId, salt: 113);
+        brush = CreateGeneratedBrush(_nextBarHueIndex++);
         _bossHpBarBrushes.Add(bossId, brush);
         return brush;
     }
 
-    private static SolidColorBrush CreateGeneratedBrush(Guid encounterId, int entityId, int salt)
+    private SolidColorBrush CreateGeneratedBrush(int index)
     {
-        var hash = HashCode.Combine(encounterId, entityId, salt) & 0x7fffffff;
-        var hue = hash % 360;
-        return new SolidColorBrush(FromHsv(0x70, hue, 0.58d, 0.86d));
+        var hue = AllocateBarHue(index);
+        var variant = MixHash(_barBrushSeed, unchecked((uint)index));
+        var saturation = BarColorMinSaturation + BarColorSaturationRange * ((variant & 0xffff) / 65_535d);
+        var lightness = BarColorMinLightness + BarColorLightnessRange * (((variant >> 16) & 0xffff) / 65_535d);
+        return new SolidColorBrush(HslColor.ToRgb(hue, saturation, lightness, BarColorAlpha));
     }
 
-    private static Color FromHsv(byte alpha, int hue, double saturation, double value)
+    private int AllocateBarHue(int index)
     {
-        var c = value * saturation;
-        var x = c * (1 - Math.Abs(hue / 60d % 2 - 1));
-        var m = value - c;
-        var (r, g, b) = hue switch
+        var ring = index / BarHueRingSize;
+        var slot = index % BarHueRingSize;
+        var offset = GetHueRingOffset(ring);
+        return NormalizeHue(_barBrushBaseHue + offset + slot * BarHueGap);
+    }
+
+    private static int GetHueRingOffset(int ring)
+    {
+        if (ring == 0)
+            return 0;
+
+        var level = 0;
+        var value = ring;
+        while (value > 1)
         {
-            < 60 => (c, x, 0d),
-            < 120 => (x, c, 0d),
-            < 180 => (0d, c, x),
-            < 240 => (0d, x, c),
-            < 300 => (x, 0d, c),
-            _ => (c, 0d, x)
-        };
+            value >>= 1;
+            level++;
+        }
 
-        return Color.FromArgb(alpha, ToByte(r + m), ToByte(g + m), ToByte(b + m));
+        var denominator = 1 << (level + 1);
+        var odd = ((ring - (1 << level)) << 1) + 1;
+        return BarHueGap * odd / denominator;
     }
 
-    private static byte ToByte(double value) => (byte)Math.Clamp((int)Math.Round(value * 255), 0, 255);
+    private static int NormalizeHue(int hue)
+    {
+        hue %= 360;
+        return hue < 0 ? hue + 360 : hue;
+    }
+
+    private static uint CreateColorSeed(Guid encounterId)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        encounterId.TryWriteBytes(bytes);
+        var hash = 2_166_136_261u;
+        for (var i = 0; i < bytes.Length; i++)
+            hash = (hash ^ bytes[i]) * 16_777_619u;
+        return hash;
+    }
+
+    private static uint MixHash(uint hash, uint value)
+    {
+        hash = (hash ^ (byte)value) * 16_777_619u;
+        hash = (hash ^ (byte)(value >> 8)) * 16_777_619u;
+        hash = (hash ^ (byte)(value >> 16)) * 16_777_619u;
+        return (hash ^ (byte)(value >> 24)) * 16_777_619u;
+    }
 
     private static bool ShouldDisplayCombatant(SceneCombatantMetrics data)
     {

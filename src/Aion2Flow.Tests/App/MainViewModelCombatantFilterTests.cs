@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime;
@@ -252,6 +253,32 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal(0.5d, fixture.ViewModel.Combatants[1].BarSegments[0].Ratio, 6);
         Assert.Same(firstColor, fixture.ViewModel.Combatants[0].BarSegments[0].Brush);
         Assert.Same(secondColor, fixture.ViewModel.Combatants[1].BarSegments[0].Brush);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_GeneratesBarHuesFromEncounterBase()
+    {
+        var fixture = MainViewModelFixture.Create();
+        for (var i = 0; i < 10; i++)
+        {
+            var playerId = 300 + i;
+            fixture.AppendSceneNickname(playerId, $"Player {i}");
+            fixture.AppendSceneDamage(playerId, 900_002, 11000010, 1_000 - i * 50, 3_000 + i, i + 1);
+        }
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var colors = fixture.ViewModel.Combatants.Select(static row => Assert.IsType<SolidColorBrush>(row.BarSegments[0].Brush).Color).ToArray();
+        Assert.All(colors, static color => Assert.Equal(0x70, color.A));
+        Assert.All(colors, static color =>
+        {
+            var (_, saturation, lightness) = GetHsl(color);
+            Assert.InRange(saturation, 0.51d, 0.69d);
+            Assert.InRange(lightness, 0.51d, 0.65d);
+        });
+        for (var i = 1; i < 9; i++)
+            Assert.InRange(GetHueDistance(colors[i - 1], colors[i]), 39d, 41d);
+        Assert.InRange(GetHueDistance(colors[0], colors[9]), 19d, 21d);
     }
 
     [Fact]
@@ -783,6 +810,36 @@ public sealed class MainViewModelCombatantFilterTests
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
         sink.StageDestinationMap(mapId);
         sink.StageDestinationMapInstance(instanceId);
+    }
+
+    private static double GetHueDistance(Color left, Color right)
+    {
+        var delta = Math.Abs(GetHue(left) - GetHue(right));
+        return Math.Min(delta, 360d - delta);
+    }
+
+    private static double GetHue(Color color)
+        => GetHsl(color).Hue;
+
+    private static (double Hue, double Saturation, double Lightness) GetHsl(Color color)
+    {
+        var r = color.R / 255d;
+        var g = color.G / 255d;
+        var b = color.B / 255d;
+        var max = Math.Max(r, Math.Max(g, b));
+        var min = Math.Min(r, Math.Min(g, b));
+        var delta = max - min;
+        var lightness = (max + min) / 2d;
+        if (delta == 0)
+            return (0, 0, lightness);
+
+        var hue = max == r
+            ? 60d * (((g - b) / delta) % 6d)
+            : max == g
+                ? 60d * ((b - r) / delta + 2d)
+                : 60d * ((r - g) / delta + 4d);
+        var saturation = delta / (1d - Math.Abs(2d * lightness - 1d));
+        return (hue < 0 ? hue + 360d : hue, saturation, lightness);
     }
 
     private static SkillCollection BuildSkillMap()
