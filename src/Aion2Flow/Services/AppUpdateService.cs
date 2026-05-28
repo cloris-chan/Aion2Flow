@@ -23,7 +23,7 @@ public sealed partial class AppUpdateService : ObservableObject
 {
     private const string RepositoryUrl = "https://github.com/cloris-chan/Aion2Flow";
 
-    private readonly UpdateManager _updateManager;
+    private readonly UpdateManager? _updateManager;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Lock _syncRoot = new();
 
@@ -45,13 +45,22 @@ public sealed partial class AppUpdateService : ObservableObject
 
     public AppUpdateService()
     {
-        _updateManager = new UpdateManager(new GithubSource(RepositoryUrl, string.Empty, IsPrereleaseBuild()));
-        CurrentVersion = VelopackLocator.Current.CurrentlyInstalledVersion?.ToString();
+        try
+        {
+            _updateManager = new UpdateManager(new GithubSource(RepositoryUrl, string.Empty, IsPrereleaseBuild()));
+            CurrentVersion = VelopackLocator.Current.CurrentlyInstalledVersion?.ToString();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(AppLogLevel.Debug, $"Velopack update service disabled: {ex.Message}");
+            _updateManager = null;
+            CurrentVersion = null;
+        }
     }
 
     public string? CurrentVersion { get; }
 
-    public bool IsManagedByVelopack => _updateManager.IsInstalled || _updateManager.IsPortable;
+    public bool IsManagedByVelopack => _updateManager is { } updateManager && (updateManager.IsInstalled || updateManager.IsPortable);
 
     public void Start() => StartWorkflow();
 
@@ -59,7 +68,10 @@ public sealed partial class AppUpdateService : ObservableObject
 
     public Task RestartAsync()
     {
-        var pending = _pendingUpdate ?? _updateManager.UpdatePendingRestart;
+        if (_updateManager is not { } updateManager)
+            return Task.CompletedTask;
+
+        var pending = _pendingUpdate ?? updateManager.UpdatePendingRestart;
         if (pending is null)
         {
             return Task.CompletedTask;
@@ -69,7 +81,7 @@ public sealed partial class AppUpdateService : ObservableObject
         {
             try
             {
-                _updateManager.WaitExitThenApplyUpdates(pending, true, true, []);
+                updateManager.WaitExitThenApplyUpdates(pending, true, true, []);
                 _restartUpdateRequested = true;
                 Dispatcher.UIThread.Post(RequestShutdown);
             }
@@ -94,7 +106,12 @@ public sealed partial class AppUpdateService : ObservableObject
             return;
         }
 
-        var updateToApply = _pendingUpdate ?? _updateManager.UpdatePendingRestart;
+        if (_updateManager is not { } updateManager)
+        {
+            return;
+        }
+
+        var updateToApply = _pendingUpdate ?? updateManager.UpdatePendingRestart;
         if (updateToApply is null)
         {
             return;
@@ -102,7 +119,7 @@ public sealed partial class AppUpdateService : ObservableObject
 
         try
         {
-            _updateManager.WaitExitThenApplyUpdates(updateToApply, true, false, []);
+            updateManager.WaitExitThenApplyUpdates(updateToApply, true, false, []);
         }
         catch (Exception ex)
         {
@@ -130,11 +147,15 @@ public sealed partial class AppUpdateService : ObservableObject
 
     private async Task RunUpdateWorkflowAsync(CancellationToken cancellationToken)
     {
+        var updateManager = _updateManager;
+        if (updateManager is null)
+            return;
+
         try
         {
             UpdateState(AppUpdateState.Checking, progress: 0, message: null);
 
-            var update = await _updateManager.CheckForUpdatesAsync().ConfigureAwait(false);
+            var update = await updateManager.CheckForUpdatesAsync().ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested)
             {
                 return;
@@ -149,7 +170,7 @@ public sealed partial class AppUpdateService : ObservableObject
             var version = update.TargetFullRelease.Version.ToString();
             UpdateState(AppUpdateState.Downloading, progress: 0, message: null, version: version);
 
-            await _updateManager.DownloadUpdatesAsync(
+            await updateManager.DownloadUpdatesAsync(
                 update,
                 pct => Dispatcher.UIThread.Post(() => DownloadProgress = pct),
                 cancellationToken).ConfigureAwait(false);

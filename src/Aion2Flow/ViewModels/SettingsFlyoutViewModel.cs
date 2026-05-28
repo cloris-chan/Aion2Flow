@@ -18,13 +18,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly bool _isApplyingPersistedSettings;
 
-    public SettingsFlyoutViewModel(
-        LocalizationService localization,
-        LanguageService languageService,
-        SettingsService settingsService,
-        AppUpdateService updateService,
-        ProcessForegroundWatcher processForegroundWatcher,
-        GlobalHotkeyService globalHotkeyService)
+    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
     {
         Localization = localization;
         _languageService = languageService;
@@ -44,6 +38,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         {
             TopmostMode = persisted.TopmostMode;
             MaxVisibleCombatantRows = persisted.MaxVisibleCombatantRows;
+            CombatantSortMetric = persisted.CombatantSortMetric;
             if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
             {
                 BattleResetHotkey = new HotkeyDefinition((HotkeyModifiers)mods, vk);
@@ -69,10 +64,11 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public ObservableCollection<LanguageOption> Languages { get; } = [];
 
-    public IReadOnlyList<TopmostMode> TopmostModeOptions { get; } =
-        [TopmostMode.GameForeground, TopmostMode.Always, TopmostMode.Never];
+    public IReadOnlyList<TopmostMode> TopmostModeOptions { get; } = [TopmostMode.GameForeground, TopmostMode.Always, TopmostMode.Never];
 
     public IReadOnlyList<int> RowCountOptions { get; } = [3, 4, 5, 6];
+
+    public IReadOnlyList<CombatantSortMetric> CombatantSortMetricOptions { get; } = [CombatantSortMetric.DamagePerSecond, CombatantSortMetric.TotalDamage];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAlwaysOnTop))]
@@ -86,6 +82,10 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MaxVisibleCombatantRowsDisplay))]
     public partial int MaxVisibleCombatantRows { get; set; } = 4;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CombatantSortMetricDisplay))]
+    public partial CombatantSortMetric CombatantSortMetric { get; set; } = CombatantSortMetric.DamagePerSecond;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
@@ -124,6 +124,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public string TopmostModeDisplay => Localization[$"Settings_Topmost_{TopmostMode}"];
 
     public string MaxVisibleCombatantRowsDisplay => MaxVisibleCombatantRows.ToString();
+
+    public string CombatantSortMetricDisplay => Localization[$"Settings_CombatantSortMetric_{CombatantSortMetric}"];
 
     public string LanguageDisplay => SelectedLanguage?.DisplayName ?? string.Empty;
 
@@ -178,6 +180,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     partial void OnMaxVisibleCombatantRowsChanged(int value) => PersistSettings();
 
+    partial void OnCombatantSortMetricChanged(CombatantSortMetric value) => PersistSettings();
+
     partial void OnSelectedLanguageChanged(LanguageOption? value)
     {
         if (value is not null)
@@ -223,6 +227,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         {
             s.TopmostMode = TopmostMode;
             s.MaxVisibleCombatantRows = MaxVisibleCombatantRows;
+            s.CombatantSortMetric = CombatantSortMetric;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
             s.BattleResetHotkeyVirtualKey = BattleResetHotkey?.VirtualKey;
@@ -242,6 +247,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     private void OnLocalizationLanguageChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(TopmostModeDisplay));
+        OnPropertyChanged(nameof(CombatantSortMetricDisplay));
         OnPropertyChanged(nameof(LanguageDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(CurrentVersionText));

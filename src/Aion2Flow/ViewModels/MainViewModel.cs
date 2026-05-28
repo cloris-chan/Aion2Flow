@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Collections;
+using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -20,6 +23,24 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private const string IndicatorWarnColor = "#F3C969";
     private const string IndicatorErrorColor = "#F07C82";
     private const string IndicatorInfoColor = "#8DD6FF";
+    private static readonly string[] CombatantBarPalette =
+    [
+        "#7048D37A",
+        "#705BA7FF",
+        "#70C084FC",
+        "#70F1B44C",
+        "#70F577AD",
+        "#704FD1C5",
+        "#70B6D957",
+        "#70FF8E5C"
+    ];
+    private static readonly string[] BossHpBarPalette =
+    [
+        "#7059D8E8",
+        "#7087E0A7",
+        "#70D9C05C",
+        "#70C88DF5"
+    ];
 
     private readonly WinDivertCaptureService _captureService;
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService;
@@ -34,9 +55,13 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private SceneReadModelFrame _latestLiveFrame = new();
     private SceneCombatSnapshot? _displayContextSnapshot;
     private ArchivedEncounterRecord? _displayContextArchivedRecord;
+    private readonly Dictionary<int, IBrush> _combatantBarBrushes = [];
+    private readonly Dictionary<int, IBrush> _bossHpBarBrushes = [];
+    private readonly List<ProgressSegment> _bossSegmentScratch = [];
     private int _displayContextVersion;
     private int _displayContextBuiltVersion = -1;
     private bool _displayContextIsArchived;
+    private Guid _barBrushEncounterId;
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
 
@@ -172,6 +197,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _languageService.LanguageChanged += OnLanguageChanged;
         _gameResourceService.ResourcesChanged += OnResourcesChanged;
         _encounterArchiveService.HistoryChanged += OnEncounterHistoryChanged;
+        SettingsFlyout.PropertyChanged += OnSettingsFlyoutPropertyChanged;
 
         RebuildEncounterHistory();
         ApplyLocalizedUiText();
@@ -219,6 +245,12 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private void OnEncounterHistoryChanged(object? sender, EventArgs e)
     {
         Dispatcher.UIThread.Post(RebuildEncounterHistory);
+    }
+
+    private void OnSettingsFlyoutPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantSortMetric))
+            Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
     }
 
     [RelayCommand]
@@ -377,8 +409,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         var encounterSeconds = snapshot.EncounterTime / 1000.0;
         EncounterTimeSeconds = encounterSeconds;
         LiveSceneMapId = snapshot.MapId;
-        var liveFrame = IsViewingArchivedEncounter ? (SceneReadModelFrame?)null : _latestLiveFrame;
-        RefreshBossFocus(liveFrame, snapshot);
+        EnsureBarBrushScope(snapshot.EncounterId);
 
         using var deferral = Combatants.SuspendNotifications();
         foreach (var row in deferral.Snapshot)
@@ -391,7 +422,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                 row.HealingPerSecond = data.HealingPerSecond;
                 row.Damage = data.DamageAmount;
                 row.Healing = data.HealingAmount;
-                row.DamageContribution = data.DamageContribution;
             }
             else
             {
@@ -417,11 +447,14 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                 data.DamagePerSecond,
                 data.HealingPerSecond,
                 data.DamageAmount,
-                data.HealingAmount,
-                data.DamageContribution));
+                data.HealingAmount));
         }
 
-        Combatants.Sort((a, b) => b.Damage.CompareTo(a.Damage));
+        RefreshCombatantBars(snapshot.EncounterId);
+        Combatants.Sort(CompareCombatantRows);
+
+        var liveFrame = IsViewingArchivedEncounter ? (SceneReadModelFrame?)null : _latestLiveFrame;
+        RefreshBossFocus(liveFrame, snapshot);
 
         RefreshCombatantDetails(forceDetailRefresh);
     }
@@ -448,10 +481,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         }
 
         var snapshots = liveFrame?.BossFocuses ?? snapshot.BossFocuses;
-        SyncBossFocuses(snapshots);
+        SyncBossFocuses(snapshot.EncounterId, snapshots, liveFrame?.BossDamageContributions ?? []);
     }
 
-    private void SyncBossFocuses(SnapshotList<SceneBossFocusSnapshot> snapshots)
+    private void SyncBossFocuses(Guid encounterId, SnapshotList<SceneBossFocusSnapshot> snapshots, IReadOnlyList<BossDamageContribution> damageContributions)
     {
         for (var i = BossFocuses.Count - 1; i >= 0; i--)
         {
@@ -489,11 +522,182 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             {
                 row = new BossFocusViewModel(_frameBatchService, instanceId, snapshot.Hp, snapshot.MaxHp, snapshot.HasHp);
                 BossFocuses.Add(row);
-                continue;
             }
-            row.Update(snapshot.Hp, snapshot.MaxHp, snapshot.HasHp);
+            else
+            {
+                row.Update(snapshot.Hp, snapshot.MaxHp, snapshot.HasHp);
+            }
+
+            var hpBrush = ResolveBossHpBrush(encounterId, instanceId);
+            row.UpdateSegments(CreateBossSegments(snapshot, damageContributions, hpBrush, encounterId));
         }
     }
+
+    private List<ProgressSegment> CreateBossSegments(SceneBossFocusSnapshot boss, IReadOnlyList<BossDamageContribution> damageContributions, IBrush hpBrush, Guid encounterId)
+    {
+        _bossSegmentScratch.Clear();
+        if (!boss.HasHp)
+            return _bossSegmentScratch;
+
+        var maxHp = Math.Max(1, boss.MaxHp);
+        var hpRatio = Math.Clamp(Math.Max(0, boss.Hp) / (double)maxHp, 0d, 1d);
+        if (hpRatio > 0)
+            _bossSegmentScratch.Add(new ProgressSegment(hpRatio, hpBrush));
+
+        var lostRatio = 1d - hpRatio;
+        if (lostRatio <= 0)
+            return _bossSegmentScratch;
+
+        var start = FindBossContributionStart(damageContributions, boss.InstanceId);
+        if (start < 0)
+            return _bossSegmentScratch;
+
+        var end = start;
+        while (end < damageContributions.Count && damageContributions[end].BossId == boss.InstanceId)
+            end++;
+
+        var totalDamage = 0L;
+        for (var i = start; i < end; i++)
+        {
+            var contribution = damageContributions[i];
+            if (contribution.DamageAmount > 0 && Combatants.ContainsKey(contribution.SourceCombatantId))
+                totalDamage += contribution.DamageAmount;
+        }
+
+        if (totalDamage <= 0)
+            return _bossSegmentScratch;
+
+        for (var i = start; i < end; i++)
+        {
+            var contribution = damageContributions[i];
+            if (contribution.DamageAmount <= 0 || !Combatants.ContainsKey(contribution.SourceCombatantId))
+                continue;
+
+            var ratio = lostRatio * contribution.DamageAmount / totalDamage;
+            if (ratio > 0)
+                _bossSegmentScratch.Add(new ProgressSegment(ratio, ResolveCombatantBarBrush(encounterId, contribution.SourceCombatantId)));
+        }
+
+        return _bossSegmentScratch;
+    }
+
+    private static int FindBossContributionStart(IReadOnlyList<BossDamageContribution> damageContributions, int bossId)
+    {
+        var left = 0;
+        var right = damageContributions.Count - 1;
+        while (left <= right)
+        {
+            var mid = left + ((right - left) >> 1);
+            var contributionBossId = damageContributions[mid].BossId;
+            if (contributionBossId == bossId)
+            {
+                while (mid > 0 && damageContributions[mid - 1].BossId == bossId)
+                    mid--;
+                return mid;
+            }
+
+            if (contributionBossId < bossId)
+                left = mid + 1;
+            else
+                right = mid - 1;
+        }
+
+        return -1;
+    }
+
+    private void RefreshCombatantBars(Guid encounterId)
+    {
+        var maxMetric = 0d;
+        for (var i = 0; i < Combatants.Count; i++)
+            maxMetric = Math.Max(maxMetric, ResolveCombatantSortMetric(Combatants[i]));
+
+        for (var i = 0; i < Combatants.Count; i++)
+        {
+            var row = Combatants[i];
+            var ratio = maxMetric > 0 ? ResolveCombatantSortMetric(row) / maxMetric : 0d;
+            row.UpdateBar(ratio, ResolveCombatantBarBrush(encounterId, row.Id));
+        }
+    }
+
+    private int CompareCombatantRows(CombatantRowViewModel left, CombatantRowViewModel right)
+    {
+        var cmp = ResolveCombatantSortMetric(right).CompareTo(ResolveCombatantSortMetric(left));
+        if (cmp != 0)
+            return cmp;
+
+        cmp = right.Damage.CompareTo(left.Damage);
+        return cmp != 0 ? cmp : left.Id.CompareTo(right.Id);
+    }
+
+    private double ResolveCombatantSortMetric(CombatantRowViewModel row) =>
+        SettingsFlyout.CombatantSortMetric == CombatantSortMetric.TotalDamage
+            ? row.Damage
+            : row.DamagePerSecond;
+
+    private void EnsureBarBrushScope(Guid encounterId)
+    {
+        if (_barBrushEncounterId == encounterId)
+            return;
+
+        _barBrushEncounterId = encounterId;
+        _combatantBarBrushes.Clear();
+        _bossHpBarBrushes.Clear();
+    }
+
+    private IBrush ResolveCombatantBarBrush(Guid encounterId, int combatantId)
+    {
+        EnsureBarBrushScope(encounterId);
+        if (_combatantBarBrushes.TryGetValue(combatantId, out var brush))
+            return brush;
+
+        var index = _combatantBarBrushes.Count;
+        brush = index < CombatantBarPalette.Length
+            ? new SolidColorBrush(Color.Parse(CombatantBarPalette[index]))
+            : CreateGeneratedBrush(encounterId, combatantId, salt: 17);
+        _combatantBarBrushes.Add(combatantId, brush);
+        return brush;
+    }
+
+    private IBrush ResolveBossHpBrush(Guid encounterId, int bossId)
+    {
+        EnsureBarBrushScope(encounterId);
+        if (_bossHpBarBrushes.TryGetValue(bossId, out var brush))
+            return brush;
+
+        var index = _bossHpBarBrushes.Count;
+        brush = index < BossHpBarPalette.Length
+            ? new SolidColorBrush(Color.Parse(BossHpBarPalette[index]))
+            : CreateGeneratedBrush(encounterId, bossId, salt: 113);
+        _bossHpBarBrushes.Add(bossId, brush);
+        return brush;
+    }
+
+    private static SolidColorBrush CreateGeneratedBrush(Guid encounterId, int entityId, int salt)
+    {
+        var hash = HashCode.Combine(encounterId, entityId, salt) & 0x7fffffff;
+        var hue = hash % 360;
+        return new SolidColorBrush(FromHsv(0x70, hue, 0.58d, 0.86d));
+    }
+
+    private static Color FromHsv(byte alpha, int hue, double saturation, double value)
+    {
+        var c = value * saturation;
+        var x = c * (1 - Math.Abs(hue / 60d % 2 - 1));
+        var m = value - c;
+        var (r, g, b) = hue switch
+        {
+            < 60 => (c, x, 0d),
+            < 120 => (x, c, 0d),
+            < 180 => (0d, c, x),
+            < 240 => (0d, x, c),
+            < 300 => (x, 0d, c),
+            _ => (c, 0d, x)
+        };
+
+        return Color.FromArgb(alpha, ToByte(r + m), ToByte(g + m), ToByte(b + m));
+    }
+
+    private static byte ToByte(double value) => (byte)Math.Clamp((int)Math.Round(value * 255), 0, 255);
 
     private static bool ShouldDisplayCombatant(SceneCombatantMetrics data)
     {
@@ -518,6 +722,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _languageService.LanguageChanged -= OnLanguageChanged;
         _gameResourceService.ResourcesChanged -= OnResourcesChanged;
         _encounterArchiveService.HistoryChanged -= OnEncounterHistoryChanged;
+        SettingsFlyout.PropertyChanged -= OnSettingsFlyoutPropertyChanged;
         await StopCaptureAsync().ConfigureAwait(false);
         await _processPortDiscoveryService.DisposeAsync().ConfigureAwait(false);
     }

@@ -6,6 +6,7 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.Tests.SceneRuntime;
 using Cloris.Aion2Flow.ViewModels;
@@ -205,6 +206,113 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal("NPC-2100351", fixture.ViewModel.DisplayContext!.ResolveNpcName(focus.InstanceId));
         Assert.Equal(25_000, focus.Hp);
         Assert.Equal(50_000, focus.MaxHp);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_CalculatesRelativeDpsBars()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneNickname(301, "Second");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 500, 3_000, 1);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 500, 5_000, 2);
+        fixture.AppendSceneDamage(301, 900_002, 11000010, 250, 3_000, 3);
+        fixture.AppendSceneDamage(301, 900_002, 11000010, 250, 5_000, 4);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal([300, 301], fixture.ViewModel.Combatants.Select(static row => row.Id));
+        Assert.Single(fixture.ViewModel.Combatants[0].BarSegments);
+        Assert.Single(fixture.ViewModel.Combatants[1].BarSegments);
+        Assert.Equal(1d, fixture.ViewModel.Combatants[0].BarSegments[0].Ratio, 6);
+        Assert.Equal(0.5d, fixture.ViewModel.Combatants[1].BarSegments[0].Ratio, 6);
+        Assert.NotNull(fixture.ViewModel.Combatants[0].BarSegments[0].Brush);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_TotalDamageBarMode_UsesStableColors()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantSortMetric = CombatantSortMetric.TotalDamage;
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneNickname(301, "Second");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 500, 3_000, 1);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 500, 5_000, 2);
+        fixture.AppendSceneDamage(301, 900_002, 11000010, 250, 3_000, 3);
+        fixture.AppendSceneDamage(301, 900_002, 11000010, 250, 5_000, 4);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        var firstColor = fixture.ViewModel.Combatants[0].BarSegments[0].Brush;
+        var secondColor = fixture.ViewModel.Combatants[1].BarSegments[0].Brush;
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal([300, 301], fixture.ViewModel.Combatants.Select(static row => row.Id));
+        Assert.Equal(1d, fixture.ViewModel.Combatants[0].BarSegments[0].Ratio, 6);
+        Assert.Equal(0.5d, fixture.ViewModel.Combatants[1].BarSegments[0].Ratio, 6);
+        Assert.Same(firstColor, fixture.ViewModel.Combatants[0].BarSegments[0].Brush);
+        Assert.Same(secondColor, fixture.ViewModel.Combatants[1].BarSegments[0].Brush);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_BossSegments_DistributeLostHpByPlayerDamage()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneNickname(301, "Second");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 500, 3_000, 1);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 500, 5_000, 2);
+        fixture.AppendSceneDamage(301, 900_002, 11000010, 250, 3_000, 3);
+        fixture.AppendSceneDamage(301, 900_002, 11000010, 250, 5_000, 4);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 700, 1_000, 5_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var focus = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.Equal(3, focus.BarSegments.Count);
+        Assert.Equal(0.7d, focus.BarSegments[0].Ratio, 6);
+        Assert.Equal(0.2d, focus.BarSegments[1].Ratio, 6);
+        Assert.Equal(0.1d, focus.BarSegments[2].Ratio, 6);
+        Assert.Same(fixture.ViewModel.Combatants[0].BarSegments[0].Brush, focus.BarSegments[1].Brush);
+        Assert.Same(fixture.ViewModel.Combatants[1].BarSegments[0].Brush, focus.BarSegments[2].Brush);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_BossSegments_ArePerBoss()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneNickname(301, "Second");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 900, 3_000, 1);
+        fixture.AppendSceneDamage(301, 900_002, 11000010, 100, 5_000, 2);
+        fixture.AppendSceneDamage(300, 900_003, 11000010, 100, 6_000, 3);
+        fixture.AppendSceneDamage(301, 900_003, 11000010, 900, 7_000, 4);
+        fixture.AppendSceneBossFocus(900_002, "Boss A", 500, 1_000, 7_500);
+        fixture.AppendSceneBossFocus(900_003, "Boss B", 500, 1_000, 7_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal(2, fixture.ViewModel.BossFocuses.Count);
+        var firstBoss = fixture.ViewModel.BossFocuses.Single(static boss => boss.InstanceId == 900_002);
+        var secondBoss = fixture.ViewModel.BossFocuses.Single(static boss => boss.InstanceId == 900_003);
+        Assert.Equal([0.5d, 0.45d, 0.05d], firstBoss.BarSegments.Select(static segment => Math.Round(segment.Ratio, 6)));
+        Assert.Equal([0.5d, 0.45d, 0.05d], secondBoss.BarSegments.Select(static segment => Math.Round(segment.Ratio, 6)));
+        Assert.NotSame(firstBoss.BarSegments[1].Brush, secondBoss.BarSegments[1].Brush);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_BossSegments_HideDamageWhenHpUnknown()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 1_000, 3_000, 1);
+        fixture.AppendSceneBossFocusUnknownHp(900_002, "Scene Boss", 3_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var focus = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.False(focus.HasHp);
+        Assert.Empty(focus.BarSegments);
     }
 
     [Fact]
@@ -510,6 +618,7 @@ public sealed class MainViewModelCombatantFilterTests
         }
 
         public MainViewModel ViewModel { get; }
+        public SettingsFlyoutViewModel Settings => ViewModel.SettingsFlyout;
         public EncounterArchiveService Archive { get; }
         public RuntimeMetadataRegistry MetadataRegistry => _captureService.Scene.Owner.MetadataRegistry;
 
@@ -526,11 +635,14 @@ public sealed class MainViewModelCombatantFilterTests
             var capture = new WinDivertCaptureService(ports);
             var frameBatch = new UiFrameBatchService();
             var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
-            var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, null!, frameBatch);
+            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, new AppUpdateService(), new ProcessForegroundWatcher(ports), new GlobalHotkeyService());
+            var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, settingsViewModel, frameBatch);
             return new MainViewModelFixture(viewModel, capture, archive, frameBatch);
         }
 
         public void AppendSceneEncounter(int playerId, string name, int damage, long start, long end) => MainViewModelCombatantFilterTests.AppendSceneEncounter(_captureService.Scene, playerId, name, damage, start, end);
+
+        public void AppendSceneNickname(int playerId, string name) => MainViewModelCombatantFilterTests.AppendSceneNickname(_captureService.Scene, playerId, name);
 
         public IRuntimeObservationSink CreateLiveSink() => SceneSinkFactory.CreateForLive(_captureService.Scene)();
 
@@ -541,6 +653,8 @@ public sealed class MainViewModelCombatantFilterTests
         public void AppendSceneNpc(int instanceId, int npcCode, NpcKind kind) => MainViewModelCombatantFilterTests.AppendSceneNpc(_captureService.Scene, instanceId, npcCode, kind);
 
         public void AppendSceneBossFocus(int instanceId, string name, int hp, int maxHp, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocus(_captureService.Scene, instanceId, name, hp, maxHp, timestamp);
+
+        public void AppendSceneBossFocusUnknownHp(int instanceId, string name, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocusUnknownHp(_captureService.Scene, instanceId, name, timestamp);
 
         public void AppendSceneMap(uint mapId, uint instanceId) => MainViewModelCombatantFilterTests.AppendSceneMap(_captureService.Scene, mapId, instanceId);
 
@@ -577,6 +691,12 @@ public sealed class MainViewModelCombatantFilterTests
         });
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
+    }
+
+    private static void AppendSceneNickname(SceneLiveReadModel scene, int playerId, string name)
+    {
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        sink.AppendNickname(playerId, name);
     }
 
     private static void AppendLiveBattle(IRuntimeObservationSink sink, int playerId, string name, int damage, long start, long end, long firstBatchOrdinal)
@@ -629,6 +749,15 @@ public sealed class MainViewModelCombatantFilterTests
         sink.AppendNpcKind(instanceId, NpcKind.Boss);
         sink.SetNpcBattle(instanceId, true, timestamp - 100);
         sink.AppendNpcHp(instanceId, hp, maxHp, timestamp);
+    }
+
+    private static void AppendSceneBossFocusUnknownHp(SceneLiveReadModel scene, int instanceId, string name, long timestamp)
+    {
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        sink.AppendNpcName(2_100_351, name);
+        sink.AppendNpcCode(instanceId, 2_100_351);
+        sink.AppendNpcKind(instanceId, NpcKind.Boss);
+        sink.SetNpcBattle(instanceId, true, timestamp);
     }
 
     private static void AppendSceneDamage(SceneLiveReadModel scene, int sourceId, int targetId, int skillCode, int damage, long timestamp, long batchOrdinal)

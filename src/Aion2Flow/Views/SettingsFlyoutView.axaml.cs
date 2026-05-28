@@ -14,6 +14,7 @@ public partial class SettingsFlyoutView : UserControl
 {
     private MenuItem? _topmostMenuItem;
     private MenuItem? _visibleRowsMenuItem;
+    private MenuItem? _combatantSortMetricMenuItem;
     private MenuItem? _languageMenuItem;
     private SettingsFlyoutViewModel? _viewModel;
     private Services.LocalizationService? _localization;
@@ -47,6 +48,7 @@ public partial class SettingsFlyoutView : UserControl
 
         RebuildTopmostMenuItems();
         RebuildVisibleRowsMenuItems();
+        RebuildCombatantSortMetricMenuItems();
         RebuildLanguageMenuItems();
     }
 
@@ -54,6 +56,7 @@ public partial class SettingsFlyoutView : UserControl
     {
         RebuildTopmostMenuItems();
         RebuildVisibleRowsMenuItems();
+        RebuildCombatantSortMetricMenuItems();
         RebuildLanguageMenuItems();
     }
 
@@ -71,6 +74,11 @@ public partial class SettingsFlyoutView : UserControl
                 RefreshVisibleRowsHeader();
                 RefreshVisibleRowsCheckmarks();
                 break;
+            case nameof(SettingsFlyoutViewModel.CombatantSortMetric):
+            case nameof(SettingsFlyoutViewModel.CombatantSortMetricDisplay):
+                RefreshCombatantSortMetricHeader();
+                RefreshCombatantSortMetricCheckmarks();
+                break;
             case nameof(SettingsFlyoutViewModel.SelectedLanguage):
             case nameof(SettingsFlyoutViewModel.LanguageDisplay):
                 RefreshLanguageHeader();
@@ -83,6 +91,7 @@ public partial class SettingsFlyoutView : UserControl
     {
         RebuildLanguageMenuItems();
         RebuildTopmostMenuItems();
+        RebuildCombatantSortMetricMenuItems();
     }
 
     private void TopmostMenuItemLoaded(object? sender, RoutedEventArgs e)
@@ -109,6 +118,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _languageMenuItem = mi;
             RebuildLanguageMenuItems();
+        }
+    }
+
+    private void CombatantSortMetricMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _combatantSortMetricMenuItem != mi)
+        {
+            _combatantSortMetricMenuItem = mi;
+            RebuildCombatantSortMetricMenuItems();
         }
     }
 
@@ -194,6 +212,47 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
+    private void RebuildCombatantSortMetricMenuItems()
+    {
+        RefreshCombatantSortMetricHeader();
+        var vm = ViewModel;
+        if (_combatantSortMetricMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        _combatantSortMetricMenuItem.Items.Clear();
+        foreach (var metric in vm.CombatantSortMetricOptions)
+        {
+            var item = new MenuItem
+            {
+                Header = vm.Localization[$"Settings_CombatantSortMetric_{metric}"],
+                Tag = metric
+            };
+            item.Classes.Add("FlyoutMenuItem");
+            item.Icon = CreateCheckmark(metric == vm.CombatantSortMetric);
+            item.Click += CombatantSortMetricItemClicked;
+            _combatantSortMetricMenuItem.Items.Add(item);
+        }
+    }
+
+    private void RefreshCombatantSortMetricCheckmarks()
+    {
+        var vm = ViewModel;
+        if (_combatantSortMetricMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        foreach (var child in _combatantSortMetricMenuItem.Items)
+        {
+            if (child is MenuItem { Tag: CombatantSortMetric metric } mi)
+            {
+                mi.Icon = CreateCheckmark(metric == vm.CombatantSortMetric);
+            }
+        }
+    }
+
     private void RebuildLanguageMenuItems()
     {
         RefreshLanguageHeader();
@@ -251,6 +310,14 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
+    private void CombatantSortMetricItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && sender is MenuItem { Tag: CombatantSortMetric metric })
+        {
+            vm.CombatantSortMetric = metric;
+        }
+    }
+
     private void LanguageItemClicked(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm && sender is MenuItem { Tag: string code })
@@ -275,6 +342,13 @@ public partial class SettingsFlyoutView : UserControl
         var vm = ViewModel;
         if (_visibleRowsMenuItem is null || vm is null) return;
         _visibleRowsMenuItem.Header = CreateRowHeader(vm.Localization["Settings_VisibleRows"], vm.MaxVisibleCombatantRowsDisplay);
+    }
+
+    private void RefreshCombatantSortMetricHeader()
+    {
+        var vm = ViewModel;
+        if (_combatantSortMetricMenuItem is null || vm is null) return;
+        _combatantSortMetricMenuItem.Header = CreateRowHeader(vm.Localization["Settings_CombatantSortMetric"], vm.CombatantSortMetricDisplay);
     }
 
     private void RefreshLanguageHeader()

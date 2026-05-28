@@ -13,8 +13,7 @@ public sealed class SettingsService
 
     public string FilePath { get; }
 
-    public SettingsService()
-        : this(Path.Combine(WorkingDirectoryResolver.GetWorkingDirectory(), SettingsFileName))
+    public SettingsService() : this(Path.Combine(WorkingDirectoryResolver.GetWorkingDirectory(), SettingsFileName))
     {
     }
 
@@ -84,6 +83,7 @@ public sealed class SettingsService
     {
         TopmostMode = source.TopmostMode,
         MaxVisibleCombatantRows = source.MaxVisibleCombatantRows,
+        CombatantSortMetric = source.CombatantSortMetric,
         Language = source.Language,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,
         BattleResetHotkeyVirtualKey = source.BattleResetHotkeyVirtualKey,

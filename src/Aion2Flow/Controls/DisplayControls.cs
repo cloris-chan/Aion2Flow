@@ -30,23 +30,17 @@ public abstract class IconTextDisplay : UserControl
     private static readonly SolidColorBrush LightNameForeground = new(Color.Parse("#72e1ff"));
     private static readonly SolidColorBrush DarkNameForeground = new(Color.Parse("#d275ff"));
 
-    public static readonly DirectProperty<IconTextDisplay, int> EntityIdProperty =
-        AvaloniaProperty.RegisterDirect<IconTextDisplay, int>(nameof(EntityId), x => x.EntityId, (x, value) => x.EntityId = value);
+    public static readonly DirectProperty<IconTextDisplay, int> EntityIdProperty = AvaloniaProperty.RegisterDirect<IconTextDisplay, int>(nameof(EntityId), x => x.EntityId, (x, value) => x.EntityId = value);
 
-    public static readonly DirectProperty<IconTextDisplay, bool> ShowIconProperty =
-        AvaloniaProperty.RegisterDirect<IconTextDisplay, bool>(nameof(ShowIcon), x => x.ShowIcon, (x, value) => x.ShowIcon = value);
+    public static readonly DirectProperty<IconTextDisplay, bool> ShowIconProperty = AvaloniaProperty.RegisterDirect<IconTextDisplay, bool>(nameof(ShowIcon), x => x.ShowIcon, (x, value) => x.ShowIcon = value);
 
-    public static readonly StyledProperty<bool> IsIconAlternateProperty =
-        AvaloniaProperty.Register<IconTextDisplay, bool>(nameof(IsIconAlternate));
+    public static readonly StyledProperty<bool> IsIconAlternateProperty = AvaloniaProperty.Register<IconTextDisplay, bool>(nameof(IsIconAlternate));
 
-    public static readonly StyledProperty<double> IconOverlayOpacityProperty =
-        AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconOverlayOpacity));
+    public static readonly StyledProperty<double> IconOverlayOpacityProperty = AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconOverlayOpacity));
 
-    public static readonly StyledProperty<double> IconSizeProperty =
-        AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconSize), 30);
+    public static readonly StyledProperty<double> IconSizeProperty = AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconSize), 30);
 
-    public static readonly StyledProperty<double> IconSpacingProperty =
-        AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconSpacing), 4);
+    public static readonly StyledProperty<double> IconSpacingProperty = AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconSpacing), 4);
 
     private readonly Grid _layout;
     private readonly TextBlock _textBlock;
@@ -64,6 +58,13 @@ public abstract class IconTextDisplay : UserControl
     protected IconTextDisplay()
     {
         Classes.Add("IconTextDisplay");
+        Effect = new DropShadowDirectionEffect
+        {
+            BlurRadius = 4,
+            ShadowDepth = 0,
+            Opacity = 0.95,
+            Color = Color.Parse("#D0000000")
+        };
 
         _textBlock = new TextBlock
         {
@@ -155,10 +156,7 @@ public abstract class IconTextDisplay : UserControl
         UpdateDisplay();
     }
 
-    protected virtual bool ShouldUpdateDisplay(AvaloniaProperty property)
-        => property == EntityIdProperty ||
-           property == ShowIconProperty ||
-           property == DisplayContextProvider.DisplayContextProperty;
+    protected virtual bool ShouldUpdateDisplay(AvaloniaProperty property) => property == EntityIdProperty || property == ShowIconProperty || property == DisplayContextProvider.DisplayContextProperty;
 
     protected virtual void UpdateStateCore(SceneDisplayContext? context, int entityId)
     {
@@ -195,8 +193,7 @@ public abstract class IconTextDisplay : UserControl
 
     protected abstract DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId);
 
-    protected static string FormatEntityId(int entityId)
-        => entityId > 0 ? entityId.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
+    protected static string FormatEntityId(int entityId) => entityId > 0 ? entityId.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
 
     private void UpdateDisplay()
     {
@@ -387,23 +384,17 @@ public abstract class IconTextDisplay : UserControl
 
 public sealed class CombatantDisplay : UserControl
 {
-    public static readonly DirectProperty<CombatantDisplay, int> EntityIdProperty =
-        AvaloniaProperty.RegisterDirect<CombatantDisplay, int>(nameof(EntityId), x => x.EntityId, (x, value) => x.EntityId = value);
+    public static readonly DirectProperty<CombatantDisplay, int> EntityIdProperty = AvaloniaProperty.RegisterDirect<CombatantDisplay, int>(nameof(EntityId), x => x.EntityId, (x, value) => x.EntityId = value);
 
-    public static readonly DirectProperty<CombatantDisplay, bool> ShowIconProperty =
-        AvaloniaProperty.RegisterDirect<CombatantDisplay, bool>(nameof(ShowIcon), x => x.ShowIcon, (x, value) => x.ShowIcon = value);
+    public static readonly DirectProperty<CombatantDisplay, bool> ShowIconProperty = AvaloniaProperty.RegisterDirect<CombatantDisplay, bool>(nameof(ShowIcon), x => x.ShowIcon, (x, value) => x.ShowIcon = value);
 
-    public static readonly StyledProperty<bool> IsIconAlternateProperty =
-        AvaloniaProperty.Register<CombatantDisplay, bool>(nameof(IsIconAlternate));
+    public static readonly StyledProperty<bool> IsIconAlternateProperty = AvaloniaProperty.Register<CombatantDisplay, bool>(nameof(IsIconAlternate));
 
-    public static readonly StyledProperty<double> IconOverlayOpacityProperty =
-        AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconOverlayOpacity));
+    public static readonly StyledProperty<double> IconOverlayOpacityProperty = AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconOverlayOpacity));
 
-    public static readonly StyledProperty<double> IconSizeProperty =
-        AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconSize), 30);
+    public static readonly StyledProperty<double> IconSizeProperty = AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconSize), 30);
 
-    public static readonly StyledProperty<double> IconSpacingProperty =
-        AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconSpacing), 4);
+    public static readonly StyledProperty<double> IconSpacingProperty = AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconSpacing), 4);
 
     private PcDisplay? _pcDisplay;
     private NpcDisplay? _npcDisplay;
@@ -569,8 +560,7 @@ public sealed class PcDisplay : IconTextDisplay
         SetTextForeground(ResolveFactionNameForeground(faction));
     }
 
-    protected override string ResolveTextCore(SceneDisplayContext? context, int entityId)
-        => context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
+    protected override string ResolveTextCore(SceneDisplayContext? context, int entityId) => context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
 
     protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId)
     {
@@ -581,8 +571,7 @@ public sealed class PcDisplay : IconTextDisplay
 
 public sealed class NpcDisplay : IconTextDisplay
 {
-    public static readonly DirectProperty<NpcDisplay, int> NpcCodeProperty =
-        AvaloniaProperty.RegisterDirect<NpcDisplay, int>(nameof(NpcCode), x => x.NpcCode, (x, value) => x.NpcCode = value);
+    public static readonly DirectProperty<NpcDisplay, int> NpcCodeProperty = AvaloniaProperty.RegisterDirect<NpcDisplay, int>(nameof(NpcCode), x => x.NpcCode, (x, value) => x.NpcCode = value);
 
     public int NpcCode
     {
@@ -623,8 +612,7 @@ public sealed class NpcDisplay : IconTextDisplay
 
 public sealed class SkillDisplay : IconTextDisplay
 {
-    public static readonly DirectProperty<SkillDisplay, int> SkillCodeProperty =
-        AvaloniaProperty.RegisterDirect<SkillDisplay, int>(nameof(SkillCode), x => x.SkillCode, (x, value) => x.SkillCode = value);
+    public static readonly DirectProperty<SkillDisplay, int> SkillCodeProperty = AvaloniaProperty.RegisterDirect<SkillDisplay, int>(nameof(SkillCode), x => x.SkillCode, (x, value) => x.SkillCode = value);
 
     public int SkillCode
     {
@@ -644,11 +632,9 @@ public sealed class SkillDisplay : IconTextDisplay
 
 public sealed class MapDisplay : IconTextDisplay
 {
-    public static readonly DirectProperty<MapDisplay, uint> MapIdProperty =
-        AvaloniaProperty.RegisterDirect<MapDisplay, uint>(nameof(MapId), x => x.MapId, (x, value) => x.MapId = value);
+    public static readonly DirectProperty<MapDisplay, uint> MapIdProperty = AvaloniaProperty.RegisterDirect<MapDisplay, uint>(nameof(MapId), x => x.MapId, (x, value) => x.MapId = value);
 
-    public static readonly DirectProperty<MapDisplay, bool> UseBracketsProperty =
-        AvaloniaProperty.RegisterDirect<MapDisplay, bool>(nameof(UseBrackets), x => x.UseBrackets, (x, value) => x.UseBrackets = value);
+    public static readonly DirectProperty<MapDisplay, bool> UseBracketsProperty = AvaloniaProperty.RegisterDirect<MapDisplay, bool>(nameof(UseBrackets), x => x.UseBrackets, (x, value) => x.UseBrackets = value);
 
     public uint MapId
     {
@@ -676,8 +662,7 @@ public sealed class MapDisplay : IconTextDisplay
         return UseBrackets ? $"[{text}]" : text;
     }
 
-    protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId)
-        => null;
+    protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId) => null;
 }
 
 internal static class DisplayIconCache
@@ -736,6 +721,5 @@ internal static class DisplayIconCache
             _ => "UT_Marker_Default.png"
         };
 
-    private static Bitmap Load(string fileName)
-        => new(AssetLoader.Open(new Uri($"avares://Aion2Flow/Assets/Images/{fileName}")));
+    private static Bitmap Load(string fileName) => new(AssetLoader.Open(new Uri($"avares://Aion2Flow/Assets/Images/{fileName}")));
 }

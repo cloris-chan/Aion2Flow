@@ -89,11 +89,9 @@
                 <DataTemplate x:DataType="vm:BossFocusViewModel">
                     <Border Classes="BossFocusPanel">
                         <Grid>
-                            <ProgressBar Classes="BossFocusHpBar"
-                                     Minimum="0"
-                                     Maximum="1"
-                                     Value="{Binding HpRatio}"
-                                     IsHitTestVisible="False" />
+                            <controls:SegmentedProgressBar Classes="BossFocusHpBar"
+                                                           Segments="{Binding BarSegments}"
+                                                           IsHitTestVisible="False" />
 
                             <Grid ColumnDefinitions="*,Auto"
                                 ColumnSpacing="8"
@@ -155,49 +153,46 @@
                     <Border Name="RowRoot"
                             Classes="OverlayRowCard"
                             Tapped="CombatantRowTapped">
-                        <Grid ColumnDefinitions="2,34,*,46,48,36"
-                              ColumnSpacing="4">
-                            <Border Grid.Column="0"
-                                    Name="RowAccent"
-                                    Classes="MainRowAccent" />
+                        <Grid>
+                            <controls:SegmentedProgressBar Classes="CombatantRowBar"
+                                                           Segments="{Binding BarSegments}"
+                                                           IsHitTestVisible="False" />
 
-                            <controls:PcDisplay Grid.Column="1"
-                                                Grid.ColumnSpan="2"
-                                                Classes="OverlayRowName"
-                                                EntityId="{Binding Id}"
-                                                VerticalAlignment="Center" />
+                            <Grid ColumnDefinitions="2,34,*,46,48"
+                                  ColumnSpacing="4"
+                                  Margin="5,3">
+                                <Border Grid.Column="0"
+                                        Name="RowAccent"
+                                        Classes="MainRowAccent" />
 
-                            <controls:NumericBlock Grid.Column="3"
-                                                    Classes="OverlayRowMetricStrong"
-                                                    Value="{Binding DamagePerSecond}"
-                                                    VerticalAlignment="Center"
-                                                    HorizontalAlignment="Stretch"
-                                                    TextAlignment="Right"
-                                                    StableWidthScopeKey="{Binding Id}"
-                                                    UseCompactNotation="True"
-                                                    CompactThreshold="1000"
-                                                    CompactSignificantDigits="3" />
+                                <controls:PcDisplay Grid.Column="1"
+                                                    Grid.ColumnSpan="2"
+                                                    Classes="OverlayRowName"
+                                                    EntityId="{Binding Id}"
+                                                    VerticalAlignment="Center" />
 
-                            <controls:NumericBlock Grid.Column="4"
-                                                     Classes="OverlayRowMetric"
-                                                     Value="{Binding Damage}"
-                                                     VerticalAlignment="Center"
-                                                     HorizontalAlignment="Stretch"
-                                                     TextAlignment="Right"
-                                                     StableWidthScopeKey="{Binding Id}"
-                                                     UseCompactNotation="True"
-                                                     CompactThreshold="1000"
-                                                     CompactSignificantDigits="3" />
+                                <controls:NumericBlock Grid.Column="3"
+                                                        Classes="OverlayRowMetricStrong"
+                                                        Value="{Binding DamagePerSecond}"
+                                                        VerticalAlignment="Center"
+                                                        HorizontalAlignment="Stretch"
+                                                        TextAlignment="Right"
+                                                        StableWidthScopeKey="{Binding Id}"
+                                                        UseCompactNotation="True"
+                                                        CompactThreshold="1000"
+                                                        CompactSignificantDigits="3" />
 
-                            <controls:NumericBlock Grid.Column="5"
-                                                   Classes="OverlayRowMetricShare"
-                                                   Value="{Binding DamageContribution}"
-                                                   FractionDigits="1"
-                                                   UsePercentageNotation="True"
-                                                   TextAlignment="Right"
-                                                   StableWidthScopeKey="{Binding Id}"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Stretch" />
+                                <controls:NumericBlock Grid.Column="4"
+                                                         Classes="OverlayRowMetric"
+                                                         Value="{Binding Damage}"
+                                                         VerticalAlignment="Center"
+                                                         HorizontalAlignment="Stretch"
+                                                         TextAlignment="Right"
+                                                         StableWidthScopeKey="{Binding Id}"
+                                                         UseCompactNotation="True"
+                                                         CompactThreshold="1000"
+                                                         CompactSignificantDigits="3" />
+                            </Grid>
                         </Grid>
                     </Border>
                 </DataTemplate>

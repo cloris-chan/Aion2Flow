@@ -16,8 +16,6 @@
         <SolidColorBrush x:Key="OverlayBrush.TextSubtle">#8595A2</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.EmptyStateText">#D7E4EF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowMetricText">#C4D1DC</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.RowShareText">#9FB0BE</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.Share">#2C85A8C4</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.ShellBorder">#22596570</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowCard">#07000000</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowCardStrong">#10000000</SolidColorBrush>
@@ -159,10 +157,8 @@
         <Setter Property="Opacity" Value="0.72" />
     </Style>
 
-    <Style Selector="ProgressBar.BossFocusHpBar">
-        <Setter Property="Foreground" Value="#A90109" />
+    <Style Selector="controls|SegmentedProgressBar.BossFocusHpBar">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.SurfaceStrong}" />
-        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
     </Style>
@@ -562,11 +558,18 @@
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem Border.OverlayRowCard">
-        <Setter Property="Padding" Value="5,3" />
+        <Setter Property="Padding" Value="0" />
         <Setter Property="Background" Value="{StaticResource OverlayBrush.RowCard}" />
         <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.RowCardBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+
+    <Style Selector="controls|SegmentedProgressBar.CombatantRowBar">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem:pointerover Border.OverlayRowCard">
@@ -615,31 +618,6 @@
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />
-    </Style>
-
-    <Style Selector="controls|NumericBlock.OverlayRowMetricShare">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.RowShareText}" />
-        <Setter Property="FontSize" Value="10" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="TextAlignment" Value="Right" />
-    </Style>
-
-    <Style Selector="Border.OverlayShareBadge">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.Share}" />
-        <Setter Property="BorderBrush" Value="#5096B4CE" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="999" />
-        <Setter Property="Padding" Value="5,2" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="controls|NumericBlock.OverlayShareMetric">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="9" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
     <Style Selector="Border.DetailFlyoutCard">

@@ -1,7 +1,11 @@
+using Cloris.Aion2Flow.Presentation;
+
 namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed class BossFocusViewModel : FrameBatchedObservableObject
 {
+    private static readonly ProgressSegment[] EmptySegments = [];
+
     public BossFocusViewModel(UiFrameBatchService frameBatchService, int instanceId, int hp, int maxHp, bool hasHp)
         : base(frameBatchService)
     {
@@ -43,11 +47,15 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
 
     public bool IsHpUnknown => !HasHp;
 
-    public void Update(int hp, int maxHp)
-        => Update(hp, maxHp, hasHp: true);
+    public IReadOnlyList<ProgressSegment> BarSegments
+    {
+        get;
+        private set => SetFrameProperty(ref field, value);
+    } = EmptySegments;
 
-    public void Update(int hp, int maxHp, bool hasHp)
-        => Apply(hp, maxHp, hasHp);
+    public void Update(int hp, int maxHp) => Update(hp, maxHp, hasHp: true);
+
+    public void Update(int hp, int maxHp, bool hasHp) => Apply(hp, maxHp, hasHp);
 
     public void Clear()
     {
@@ -55,6 +63,13 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         MaxHp = 1;
         HpRatio = 0;
         HasHp = false;
+        BarSegments = EmptySegments;
+    }
+
+    public void UpdateSegments(IReadOnlyList<ProgressSegment> segments)
+    {
+        if (!AreSameSegments(BarSegments, segments))
+            BarSegments = segments.Count == 0 ? EmptySegments : [.. segments];
     }
 
     private void Apply(int hp, int maxHp, bool hasHp)
@@ -78,5 +93,19 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         MaxHp = maxHp;
         HasHp = hasHp;
         HpRatio = hpRatio;
+    }
+
+    private static bool AreSameSegments(IReadOnlyList<ProgressSegment> left, IReadOnlyList<ProgressSegment> right)
+    {
+        if (left.Count != right.Count)
+            return false;
+
+        for (var i = 0; i < left.Count; i++)
+        {
+            if (Math.Abs(left[i].Ratio - right[i].Ratio) > 0.000_001 || !ReferenceEquals(left[i].Brush, right[i].Brush))
+                return false;
+        }
+
+        return true;
     }
 }

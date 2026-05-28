@@ -430,6 +430,33 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Sort By.
+        /// </summary>
+        internal static string Settings_CombatantSortMetric {
+            get {
+                return ResourceManager.GetString("Settings_CombatantSortMetric", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to DPS.
+        /// </summary>
+        internal static string Settings_CombatantSortMetric_DamagePerSecond {
+            get {
+                return ResourceManager.GetString("Settings_CombatantSortMetric_DamagePerSecond", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Total Damage.
+        /// </summary>
+        internal static string Settings_CombatantSortMetric_TotalDamage {
+            get {
+                return ResourceManager.GetString("Settings_CombatantSortMetric_TotalDamage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Battle reset hotkey.
         /// </summary>
         internal static string Settings_Hotkey_BattleReset {

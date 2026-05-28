@@ -112,6 +112,9 @@
   <data name="Column_Skill" xml:space="preserve"><value>스킬</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>직격</value></data>
   <data name="Column_Share" xml:space="preserve"><value>비율</value></data>
+  <data name="Settings_CombatantSortMetric" xml:space="preserve"><value>정렬 기준</value></data>
+  <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
+  <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>총 피해</value></data>
 
   <data name="Scene_Activation" xml:space="preserve"><value>장면 활성화</value></data>
   <data name="Scene_Combat" xml:space="preserve"><value>전투 장면</value></data>

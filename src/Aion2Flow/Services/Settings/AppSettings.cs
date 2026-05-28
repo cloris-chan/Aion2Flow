@@ -9,6 +9,8 @@ public sealed class AppSettings
 
     public int MaxVisibleCombatantRows { get; set; } = 4;
 
+    public CombatantSortMetric CombatantSortMetric { get; set; } = CombatantSortMetric.DamagePerSecond;
+
     public string? Language { get; set; }
 
     public uint? BattleResetHotkeyModifiers { get; set; }

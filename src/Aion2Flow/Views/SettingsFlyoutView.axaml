@@ -22,6 +22,9 @@
                 <MenuItem x:Name="VisibleRowsMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="VisibleRowsMenuItemLoaded" />
+                <MenuItem x:Name="CombatantSortMetricMenuItem"
+                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Loaded="CombatantSortMetricMenuItemLoaded" />
                 <MenuItem x:Name="LanguageMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="LanguageMenuItemLoaded" />

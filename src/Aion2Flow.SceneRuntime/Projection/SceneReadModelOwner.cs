@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -15,6 +16,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private readonly SceneCombatSnapshotBuilder _snapshotBuilder = new();
     private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
     private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
+    private readonly Dictionary<BossDamageContributionKey, long> _bossDamageContributionScratch = [];
+    private readonly List<BossDamageContribution> _bossDamageContributionBuffer = [];
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
     private SceneCombatSnapshotAdapter? _adapter;
@@ -209,11 +212,13 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private SceneReadModelFrame CreateFrameCore(int detailCombatantId, bool forceDetailRefresh, ICombatDetailEventWriter? detailWriter)
     {
         var snapshot = CreateSnapshotCore();
+        SceneCombatSnapshotAdapter? adapter = null;
+        var bossDamageContributions = snapshot.BossFocuses.Count == 0 ? [] : CreateBossDamageContributions(adapter = CreateAdapter(), snapshot);
         CombatDetailDelta? detail = null;
         CombatDetailUpdateResult detailUpdate = default;
         if (detailCombatantId > 0)
         {
-            var adapter = CreateAdapter();
+            adapter ??= CreateAdapter();
             if (detailWriter is not null)
             {
                 detailUpdate = CreateDetailUpdateCore(adapter, snapshot, detailCombatantId, forceDetailRefresh, detailWriter);
@@ -231,7 +236,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             DetailCombatantId = detailCombatantId,
             Detail = detail,
             DetailUpdate = detailUpdate,
-            BossFocuses = snapshot.BossFocuses
+            BossFocuses = snapshot.BossFocuses,
+            BossDamageContributions = bossDamageContributions
         };
     }
 
@@ -265,6 +271,52 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
     private SceneCombatSnapshotAdapter CreateAdapter()
         => _adapter ??= new(entities, combat, boundary, _applier.BossFocus, EncounterId);
+
+    private BossDamageContribution[] CreateBossDamageContributions(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
+    {
+        if (snapshot.BossFocuses.Count == 0 || snapshot.Combatants.Count == 0)
+            return [];
+
+        _bossDamageContributionScratch.Clear();
+        _bossDamageContributionBuffer.Clear();
+        foreach (var pair in combat.Pairs.Values)
+        {
+            if (pair.TotalDamage <= 0 || !IsBossFocus(snapshot, pair.TargetId))
+                continue;
+
+            var sourceId = adapter.ResolveDetailCombatantId(pair.SourceId);
+            if (sourceId <= 0 || !snapshot.Combatants.TryGetValue(sourceId, out var sourceMetrics) || !sourceMetrics.IsVisiblePlayerCombatant || sourceMetrics.CharacterClass is null)
+                continue;
+
+            var key = new BossDamageContributionKey(pair.TargetId, sourceId);
+            ref var damage = ref CollectionsMarshal.GetValueRefOrAddDefault(_bossDamageContributionScratch, key, out _);
+            damage += pair.TotalDamage;
+        }
+
+        if (_bossDamageContributionScratch.Count == 0)
+            return [];
+
+        foreach (var (key, damage) in _bossDamageContributionScratch)
+            _bossDamageContributionBuffer.Add(new BossDamageContribution(key.BossId, key.SourceCombatantId, damage));
+        _bossDamageContributionBuffer.Sort(static (left, right) =>
+        {
+            var cmp = left.BossId.CompareTo(right.BossId);
+            return cmp != 0 ? cmp : right.DamageAmount.CompareTo(left.DamageAmount);
+        });
+        return [.. _bossDamageContributionBuffer];
+    }
+
+    private static bool IsBossFocus(SceneCombatSnapshot snapshot, int instanceId)
+    {
+        var bosses = snapshot.BossFocuses;
+        for (var i = 0; i < bosses.Count; i++)
+        {
+            if (bosses[i].InstanceId == instanceId)
+                return true;
+        }
+
+        return false;
+    }
 
     private static bool IsSnapshotCacheStable(SceneCombatSnapshot snapshot) =>
         snapshot.EncounterEndTime > 0 || snapshot.BossFocuses.Count == 0 && snapshot.Encounter.TrackingTargetId == 0;
@@ -350,6 +402,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
 public readonly record struct SceneArchiveCapture(SceneCombatSnapshot Snapshot, SceneArchivePayload Payload);
 
+public readonly record struct BossDamageContribution(int BossId, int SourceCombatantId, long DamageAmount);
+
+internal readonly record struct BossDamageContributionKey(int BossId, int SourceCombatantId);
+
 internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long EntityRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision)
 {
     public static SnapshotCacheKey From(Guid encounterId, EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, BossFocusStore bossFocus) =>
@@ -372,6 +428,7 @@ public readonly record struct SceneReadModelFrame
         Detail = null;
         DetailUpdate = default;
         BossFocuses = default;
+        BossDamageContributions = [];
     }
 
     public SceneCombatSnapshot Snapshot { get; init; }
@@ -380,4 +437,5 @@ public readonly record struct SceneReadModelFrame
     public CombatDetailDelta? Detail { get; init; }
     public CombatDetailUpdateResult DetailUpdate { get; init; }
     public SnapshotList<SceneBossFocusSnapshot> BossFocuses { get; init; }
+    public IReadOnlyList<BossDamageContribution> BossDamageContributions { get; init; }
 }
