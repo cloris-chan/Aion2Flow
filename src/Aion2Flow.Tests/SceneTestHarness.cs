@@ -32,7 +32,7 @@ internal sealed class SceneTestHarness : IDisposable
 
     public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId) => Owner.CreateSkillBreakdown(snapshot, combatantId);
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown) => Sink.AppendNickname(uid, nickname, originServerId, faction);
+    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null) => Sink.AppendNickname(uid, nickname, originServerId, faction, characterClass);
 
     public void AppendNpcCode(int instanceId, int npcCode) => Sink.AppendNpcCode(instanceId, npcCode);
 
@@ -197,7 +197,7 @@ internal sealed class SceneTestHarness : IDisposable
         public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactControl0638(sourceId, skillCodeRaw, marker, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterObservation2A38(sourceId, mode, groupCode, sequenceId, headValue, buffCodeRaw, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal, structurePath);
-        public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown) => inner.AppendNickname(uid, nickname, originServerId, faction);
+        public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null) => inner.AppendNickname(uid, nickname, originServerId, faction, characterClass);
         public void AppendNpcCode(int instanceId, int npcCode) => inner.AppendNpcCode(instanceId, npcCode);
         public void AppendNpcName(int npcCode, string name) => inner.AppendNpcName(npcCode, name);
         public void AppendNpcKind(int instanceId, NpcKind kind) => inner.AppendNpcKind(instanceId, kind);

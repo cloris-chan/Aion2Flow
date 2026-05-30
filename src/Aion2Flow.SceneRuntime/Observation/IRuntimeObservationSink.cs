@@ -54,7 +54,7 @@ public interface IRuntimeObservationSink
 
     void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default);
 
-    void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown);
+    void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null);
 
     void AppendNpcCode(int instanceId, int npcCode);
 

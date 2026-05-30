@@ -139,9 +139,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal, structurePath);
     }
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
+    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
     {
-        lock (gate) inner.AppendNickname(uid, nickname, originServerId, faction);
+        lock (gate) inner.AppendNickname(uid, nickname, originServerId, faction, characterClass);
     }
 
     public void AppendNpcCode(int instanceId, int npcCode)

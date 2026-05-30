@@ -411,7 +411,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
+    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
     {
         uid = ResolveLifecycleId(uid);
         AddKnownEntity(uid);
@@ -433,7 +433,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 DetailRaw = 0,
                 Text = nickname,
                 OriginServerId = originServerId,
-                Faction = faction
+                Faction = faction,
+                CharacterClass = characterClass
             }
         });
     }

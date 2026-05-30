@@ -28,6 +28,7 @@ public sealed class Packet4436NicknameParserTests
         Assert.Equal(3120, parsed.PlayerId);
         Assert.Equal("浅尝", parsed.Nickname);
         Assert.Equal(420, parsed.OriginServerId);
+        Assert.Equal(18, parsed.ClassCode);
         Assert.Equal(1, parsed.FactionCode);
     }
 
@@ -42,6 +43,7 @@ public sealed class Packet4436NicknameParserTests
         Assert.Equal(1630, parsed.PlayerId);
         Assert.Equal("以月之名", parsed.Nickname);
         Assert.Equal(160, parsed.OriginServerId);
+        Assert.Equal(32, parsed.ClassCode);
         Assert.Equal(2, parsed.FactionCode);
     }
 
@@ -54,6 +56,7 @@ public sealed class Packet4436NicknameParserTests
 
         Assert.True(ok);
         Assert.Equal("红豆冰糕", parsed.Nickname);
+        Assert.Equal(30, parsed.ClassCode);
         Assert.Equal(1, parsed.FactionCode);
     }
 
@@ -66,6 +69,7 @@ public sealed class Packet4436NicknameParserTests
 
         Assert.True(ok);
         Assert.Equal("金色誓约", parsed.Nickname);
+        Assert.Equal(16, parsed.ClassCode);
         Assert.Equal(2, parsed.FactionCode);
     }
 }

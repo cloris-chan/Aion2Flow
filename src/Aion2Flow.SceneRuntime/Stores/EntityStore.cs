@@ -71,15 +71,37 @@ public sealed class EntityStore
         if (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon)
             return false;
 
+        if (entity.CharacterClass is not null and not CharacterClass.None)
+            return false;
+
         var evidence = entity.ClassEvidence;
         var previousClass = entity.CharacterClass;
         evidence.Add(characterClass, score);
         var nextClass = evidence.Resolve();
         entity.ClassEvidence = evidence;
+        if (nextClass is null or CharacterClass.None)
+            return false;
+
         if (previousClass == nextClass)
             return false;
 
         entity.CharacterClass = nextClass;
+        _revision++;
+        return true;
+    }
+
+    public bool ApplyMetadataCharacterClass(int entityId, CharacterClass characterClass)
+    {
+        if (entityId <= 0 || characterClass == CharacterClass.None)
+            return false;
+
+        var entity = GetOrAdd(entityId);
+        if (entity.CharacterClass == characterClass && entity.IsPlayer)
+            return false;
+
+        entity.CharacterClass = characterClass;
+        entity.IsPlayer = true;
+        entity.LastObservedOrdinal++;
         _revision++;
         return true;
     }

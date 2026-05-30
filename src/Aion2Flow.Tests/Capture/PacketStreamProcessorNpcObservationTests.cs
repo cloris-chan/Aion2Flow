@@ -658,7 +658,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
         public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
         public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
-        public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
+        public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
         {
             NicknameEntered.SetResult();
             AllowNickname.Task.GetAwaiter().GetResult();

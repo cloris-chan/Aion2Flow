@@ -34,40 +34,22 @@ public sealed class RuntimeMetadataRegistry
     public IReadOnlyDictionary<uint, uint> MapCodesByInstanceId => _mapCodesByInstanceId;
     public long Revision => _revision;
 
-    public bool UpsertPcMetadata(int entityId, string nickname, int? originServerId = null, Faction faction = Faction.Unknown)
+    public bool UpsertPcMetadata(int entityId, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
     {
         if (entityId <= 0)
             return false;
 
         nickname ??= string.Empty;
         ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_pcMetadataByEntityId, entityId, out var exists);
+        var incomingClass = characterClass is CharacterClass.None ? null : characterClass;
         var resolvedOriginServerId = originServerId ?? (exists ? current.OriginServerId : null);
         var resolvedFaction = faction != Faction.Unknown
             ? faction
             : exists
                 ? current.Faction
                 : Faction.Unknown;
-        var next = new PcMetadata(entityId, nickname, resolvedOriginServerId, resolvedFaction, exists ? current.CharacterClass : null);
-        if (exists && current.Equals(next))
-            return false;
-
-        current = next;
-        _revision++;
-        return true;
-    }
-
-    public bool UpsertPcClass(int entityId, CharacterClass? characterClass)
-    {
-        if (entityId <= 0)
-            return false;
-
-        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_pcMetadataByEntityId, entityId, out var exists);
-        if (!exists && characterClass is null)
-            return false;
-
-        var next = exists
-            ? current with { CharacterClass = characterClass }
-            : new PcMetadata(entityId, string.Empty, null, Faction.Unknown, characterClass);
+        var resolvedClass = incomingClass ?? (exists ? current.CharacterClass : null);
+        var next = new PcMetadata(entityId, nickname, resolvedOriginServerId, resolvedFaction, resolvedClass);
         if (exists && current.Equals(next))
             return false;
 

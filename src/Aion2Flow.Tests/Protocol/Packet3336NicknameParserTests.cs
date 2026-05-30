@@ -40,6 +40,7 @@ public sealed class Packet3336NicknameParserTests
         Assert.Equal(2007, parsed.PlayerId);
         Assert.Equal("Perigee", parsed.Nickname);
         Assert.Equal(495, parsed.OriginServerId);
+        Assert.Equal(6, parsed.ClassCode);
         Assert.Equal(1, parsed.FactionCode);
     }
 
@@ -54,6 +55,7 @@ public sealed class Packet3336NicknameParserTests
         Assert.Equal(9816, parsed.PlayerId);
         Assert.Equal("雅昂", parsed.Nickname);
         Assert.Equal(495, parsed.OriginServerId);
+        Assert.Equal(18, parsed.ClassCode);
         Assert.Equal(1, parsed.FactionCode);
     }
 }

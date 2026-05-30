@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
@@ -7,13 +8,7 @@ internal static class NicknameParserUtil
     public const int MaxNicknameLength = 72;
     private const int MaxOriginServerId = 10000;
 
-    public static bool TryReadLengthPrefixedNickname(
-        ReadOnlySpan<byte> packet,
-        int lengthOffset,
-        bool strict,
-        out string nickname,
-        out int nicknameLength,
-        out int tailOffset)
+    public static bool TryReadLengthPrefixedNickname(ReadOnlySpan<byte> packet, int lengthOffset, bool strict, out string nickname, out int nicknameLength, out int tailOffset)
     {
         nickname = string.Empty;
         nicknameLength = 0;
@@ -37,9 +32,7 @@ internal static class NicknameParserUtil
         }
 
         var decoded = Encoding.UTF8.GetString(packet.Slice(nicknameOffset, nicknameLength));
-        var sanitized = strict
-            ? NicknameSanitizer.SanitizeStrict(decoded)
-            : NicknameSanitizer.Sanitize(decoded);
+        var sanitized = strict ? NicknameSanitizer.SanitizeStrict(decoded) : NicknameSanitizer.Sanitize(decoded);
         if (sanitized is null)
         {
             return false;
@@ -64,23 +57,12 @@ internal static class NicknameParserUtil
             return null;
         }
 
-        return TryReadVarInt(packet, startOffset, out var value, out var byteCount) &&
-               startOffset + byteCount == endOffset &&
-               IsPossibleOriginServerId(value)
-            ? value
-            : null;
+        return TryReadVarInt(packet, startOffset, out var value, out var byteCount) && startOffset + byteCount == endOffset && IsPossibleOriginServerId(value) ? value : null;
     }
 
-    public static int? TryReadPossibleOriginServerAt(ReadOnlySpan<byte> packet, int offset)
-        => TryReadPossibleOriginServerAt(packet, offset, out var originServerId, out _)
-            ? originServerId
-            : null;
+    public static int? TryReadPossibleOriginServerAt(ReadOnlySpan<byte> packet, int offset) => TryReadPossibleOriginServerAt(packet, offset, out var originServerId, out _) ? originServerId : null;
 
-    public static bool TryReadPossibleOriginServerAt(
-        ReadOnlySpan<byte> packet,
-        int offset,
-        out int originServerId,
-        out int byteCount)
+    public static bool TryReadPossibleOriginServerAt(ReadOnlySpan<byte> packet, int offset, out int originServerId, out int byteCount)
     {
         originServerId = 0;
         byteCount = 0;
@@ -96,9 +78,7 @@ internal static class NicknameParserUtil
             return false;
         }
 
-        if (TryReadVarInt(packet, offset, out var value, out byteCount) &&
-            byteCount == 2 &&
-            IsPossibleOriginServerId(value))
+        if (TryReadVarInt(packet, offset, out var value, out byteCount) && byteCount == 2 && IsPossibleOriginServerId(value))
         {
             originServerId = value;
             return true;
@@ -116,6 +96,14 @@ internal static class NicknameParserUtil
         }
 
         return packet[offset] is 1 or 2 ? packet[offset] : (byte)0;
+    }
+
+    public static int? TryReadClassCode(ReadOnlySpan<byte> packet, int offset)
+    {
+        if (offset < 0 || offset + sizeof(int) > packet.Length)
+            return null;
+
+        return BinaryPrimitives.TryReadInt32LittleEndian(packet.Slice(offset, sizeof(int)), out var value) && value is >= 5 and <= 36 ? value : null;
     }
 
     private static bool TryReadVarInt(ReadOnlySpan<byte> bytes, int offset, out int value, out int byteCount)
@@ -152,6 +140,5 @@ internal static class NicknameParserUtil
         }
     }
 
-    private static bool IsPossibleOriginServerId(int value)
-        => value is > 0 and <= MaxOriginServerId;
+    private static bool IsPossibleOriginServerId(int value) => value is > 0 and <= MaxOriginServerId;
 }

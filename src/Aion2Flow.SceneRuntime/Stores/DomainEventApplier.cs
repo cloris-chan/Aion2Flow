@@ -143,11 +143,7 @@ public sealed class DomainEventApplier
     private void ApplyCombatResult(in CombatCanonicalizationResult result, long observedAtMilliseconds)
     {
         var observation = result.Observation;
-        if (_entities.ApplyCharacterClassEvidence(result.SourceId, in observation) &&
-            _entities.TryGet(result.SourceId, out var sourceEntity))
-        {
-            _metadataRegistry.UpsertPcClass(result.SourceId, sourceEntity.CharacterClass);
-        }
+        _entities.ApplyCharacterClassEvidence(result.SourceId, in observation);
 
         _combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
     }
@@ -221,9 +217,13 @@ public sealed class DomainEventApplier
             if (entry.SourceEntityId > 0)
             {
                 var nickname = state.Text ?? string.Empty;
+                var metadataClass = state.CharacterClass is CharacterClass.None ? null : state.CharacterClass;
                 _entities.ApplyNickname(entry.SourceEntityId, nickname);
-                if (!string.IsNullOrWhiteSpace(nickname))
-                    _metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.OriginServerId, state.Faction);
+                if (metadataClass is { } characterClass)
+                    _entities.ApplyMetadataCharacterClass(entry.SourceEntityId, characterClass);
+
+                if (!string.IsNullOrWhiteSpace(nickname) || metadataClass is not null)
+                    _metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.OriginServerId, state.Faction, metadataClass);
             }
             return;
         }

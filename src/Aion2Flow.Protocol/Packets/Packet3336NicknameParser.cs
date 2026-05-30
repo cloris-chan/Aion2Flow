@@ -2,13 +2,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet3336Nickname(
-    int PlayerId,
-    string Nickname,
-    int NicknameLength,
-    int TailOffset,
-    int? OriginServerId,
-    byte FactionCode);
+internal readonly record struct Packet3336Nickname(int PlayerId, string Nickname, int NicknameLength, int TailOffset, int? OriginServerId, int? ClassCode, byte FactionCode);
 
 internal static class Packet3336NicknameParser
 {
@@ -39,13 +33,7 @@ internal static class Packet3336NicknameParser
                 continue;
             }
 
-            if (!NicknameParserUtil.TryReadLengthPrefixedNickname(
-                    payload,
-                    markerOffset + 1,
-                    strict: true,
-                    out var sanitizedName,
-                    out var nicknameLength,
-                    out var tailOffset))
+            if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, markerOffset + 1, strict: true, out var sanitizedName, out var nicknameLength, out var tailOffset))
             {
                 continue;
             }
@@ -53,14 +41,9 @@ internal static class Packet3336NicknameParser
             var originServerLength = NicknameParserUtil.TryReadPossibleOriginServerAt(payload, tailOffset, out var originServerId, out var originLength)
                 ? originLength
                 : 0;
+            var classCode = NicknameParserUtil.TryReadClassCode(payload, tailOffset + originServerLength);
             var factionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset + originServerLength + 4);
-            result = new Packet3336Nickname(
-                playerId,
-                sanitizedName,
-                nicknameLength,
-                tailOffset,
-                originServerLength == 0 ? null : originServerId,
-                factionCode);
+            result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, tailOffset, originServerLength == 0 ? null : originServerId, classCode, factionCode);
             return true;
         }
 

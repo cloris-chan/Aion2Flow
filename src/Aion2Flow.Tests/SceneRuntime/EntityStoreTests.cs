@@ -133,6 +133,17 @@ public class EntityStoreTests
     }
 
     [Fact]
+    public void RuntimeMetadataRegistry_UpsertPcMetadata_PreservesCharacterClass_WhenNicknameRefreshes()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(2007, "Perigee", 495, Faction.Light, CharacterClass.Sorcerer);
+        registry.UpsertPcMetadata(2007, "Perigee", null);
+
+        Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
+        Assert.Equal(CharacterClass.Sorcerer, metadata.CharacterClass);
+    }
+
+    [Fact]
     public void SceneBoundaryStore_MapState_CommitsImmediately()
     {
         var store = new SceneBoundaryStore();
@@ -1080,6 +1091,94 @@ public class SceneReadModelOwnerTests
         Assert.Equal(800, third.Combatants[100].DamageAmount);
         Assert.Equal(2, scene.Owner.ProjectionCacheStats.SnapshotBuilds);
         Assert.Equal(1, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
+    }
+
+    [Fact]
+    public void Owner_CreateSnapshot_Uses_Metadata_Class_Over_Skill_Evidence()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        scene.AppendNickname(100, "Player", characterClass: CharacterClass.Cleric);
+        scene.AppendNpcCode(200, 2_999_999);
+        scene.AppendNpcName(2_999_999, "Target");
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 200,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = 500,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 1_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 200,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = 300,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 2_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+
+        var snapshot = scene.CreateSnapshot();
+
+        Assert.Equal(CharacterClass.Cleric, snapshot.Combatants[100].CharacterClass);
+        Assert.True(scene.Owner.MetadataRegistry.TryGetPcMetadata(100, out var metadata));
+        Assert.Equal(CharacterClass.Cleric, metadata.CharacterClass);
+    }
+
+    [Fact]
+    public void Owner_CreateSnapshot_Metadata_Class_Overrides_Previous_Skill_Evidence()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+
+        using var scene = new SceneTestHarness();
+        scene.AppendNickname(100, "Player");
+        scene.AppendNpcCode(200, 2_999_999);
+        scene.AppendNpcName(2_999_999, "Target");
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 200,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = 500,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 1_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 200,
+            SkillCode = 11000010,
+            OriginalSkillCode = 11000010,
+            Damage = 300,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            Timestamp = 2_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+
+        var inferred = scene.CreateSnapshot();
+        Assert.Equal(CharacterClass.Gladiator, inferred.Combatants[100].CharacterClass);
+
+        scene.AppendNickname(100, "Player", characterClass: CharacterClass.Cleric);
+        var corrected = scene.CreateSnapshot();
+
+        Assert.Equal(CharacterClass.Cleric, corrected.Combatants[100].CharacterClass);
     }
 
     [Fact]

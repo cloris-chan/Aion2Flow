@@ -70,7 +70,7 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.TailOffset;
-        context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
+        context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode));
         return context.MarkParsed();
     }
 
@@ -85,7 +85,7 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.Delta + parsed.NicknameLength + 2;
-        context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
+        context.Sink.AppendNickname(parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode));
         return context.MarkParsed();
     }
 }

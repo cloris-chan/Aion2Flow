@@ -8,6 +8,7 @@ internal readonly record struct Packet4436Nickname(
     int NicknameLength,
     int Delta,
     int? OriginServerId,
+    int? ClassCode,
     byte FactionCode);
 
 internal static class Packet4436NicknameParser
@@ -73,6 +74,7 @@ internal static class Packet4436NicknameParser
             }
 
             var originServerId = NicknameParserUtil.TryReadPossibleOriginServerBefore(packet, markerOffset);
+            var classCode = NicknameParserUtil.TryReadClassCode(packet, tailOffset);
             var factionCode = NicknameParserUtil.TryReadFactionCode(packet, tailOffset + 4);
             result = new Packet4436Nickname(
                 playerId,
@@ -80,6 +82,7 @@ internal static class Packet4436NicknameParser
                 nicknameLength,
                 markerOffset - searchStart,
                 originServerId,
+                classCode,
                 factionCode);
             return true;
         }
