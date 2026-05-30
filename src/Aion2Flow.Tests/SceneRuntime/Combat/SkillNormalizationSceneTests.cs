@@ -360,6 +360,19 @@ public sealed class SkillNormalizationSceneTests
         Assert.Equal(240, combatant.HealingAmount);
         Assert.Equal(240, combatant.DrainHealingAmount);
 
+        scene.Owner.ReadLocked((_, _, _, combat) =>
+        {
+            Assert.True(combat.TryGetPair(playerId, npcId, out var damagePair));
+            Assert.Equal(2000, damagePair!.TotalDamage);
+            Assert.Equal(0, damagePair.TotalHealing);
+            Assert.Equal(0, damagePair.TotalDrainHealing);
+
+            Assert.True(combat.TryGetPair(playerId, playerId, out var drainPair));
+            Assert.Equal(240, drainPair!.TotalHealing);
+            Assert.Equal(240, drainPair.TotalDrainHealing);
+            return 0;
+        });
+
         var skills = scene.CreateSkillBreakdown(snapshot, playerId).Skills;
         Assert.True(skills.TryGetValue(13060250, out var skill));
         Assert.Equal(2000, skill.DamageAmount);

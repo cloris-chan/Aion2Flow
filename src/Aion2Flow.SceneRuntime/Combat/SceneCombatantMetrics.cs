@@ -5,22 +5,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
 public readonly record struct SceneCombatantMetrics
 {
-    internal SceneCombatantMetrics(
-        CharacterClass? characterClass,
-        bool isVisiblePlayerCombatant,
-        double damagePerSecond,
-        double healingPerSecond,
-        long damageAmount,
-        long healingAmount,
-        long periodicHealingAmount,
-        long drainDamageAmount,
-        long drainHealingAmount,
-        long regenerationHealingAmount,
-        long shieldAmount,
-        int shieldTimes,
-        long shieldAbsorbedAmount,
-        int shieldAbsorbedTimes,
-        double damageContribution)
+    internal SceneCombatantMetrics(CharacterClass? characterClass, bool isVisiblePlayerCombatant, double damagePerSecond, double healingPerSecond, long damageAmount, long healingAmount, long periodicHealingAmount, long drainDamageAmount, long drainHealingAmount, long regenerationHealingAmount, long shieldAmount, int shieldTimes, long shieldAbsorbedAmount, int shieldAbsorbedTimes, double damageContribution)
     {
         CharacterClass = characterClass;
         IsVisiblePlayerCombatant = isVisiblePlayerCombatant;
@@ -96,20 +81,10 @@ internal struct SceneCombatantMetricsAccumulator
     public void ProcessCombatObservation(in CombatObservation observation)
     {
         var contribution = CombatContributionClassifier.Evaluate(in observation);
-        ApplyContribution(contribution, observation.ValueKind, observation.EffectTag, observation.DrainHealAmount);
+        ApplyContribution(contribution, observation.ValueKind, observation.EffectTag);
     }
 
-    public void ApplyCombatTotals(
-        long damageAmount,
-        long healingAmount,
-        long periodicHealingAmount,
-        long drainDamageAmount,
-        long drainHealingAmount,
-        long regenerationHealingAmount,
-        long shieldAmount,
-        int shieldTimes,
-        long shieldAbsorbedAmount,
-        int shieldAbsorbedTimes)
+    public void ApplyCombatTotals(long damageAmount, long healingAmount, long periodicHealingAmount, long drainDamageAmount, long drainHealingAmount, long regenerationHealingAmount, long shieldAmount, int shieldTimes, long shieldAbsorbedAmount, int shieldAbsorbedTimes)
     {
         DamageAmount += damageAmount;
         HealingAmount += healingAmount;
@@ -126,29 +101,10 @@ internal struct SceneCombatantMetricsAccumulator
     private void ApplyContribution(
         in CombatContribution contribution,
         CombatValueKind valueKind,
-        PacketEffectTag effectTag,
-        int drainHealAmount)
-        => ApplyValues(
-            contribution.DamageAmount,
-            contribution.HealingAmount,
-            contribution.ShieldGrantAmount,
-            contribution.ShieldGrantCount,
-            contribution.ShieldAbsorbedAmount,
-            contribution.ShieldAbsorbedCount,
-            valueKind,
-            effectTag,
-            drainHealAmount);
+        PacketEffectTag effectTag)
+        => ApplyValues(contribution.DamageAmount, contribution.HealingAmount, contribution.ShieldGrantAmount, contribution.ShieldGrantCount, contribution.ShieldAbsorbedAmount, contribution.ShieldAbsorbedCount, valueKind, effectTag);
 
-    private void ApplyValues(
-        long damageAmount,
-        long healingAmount,
-        long shieldGrantAmount,
-        int shieldGrantCount,
-        long shieldAbsorbedAmount,
-        int shieldAbsorbedCount,
-        CombatValueKind valueKind,
-        PacketEffectTag effectTag,
-        int drainHealAmount)
+    private void ApplyValues(long damageAmount, long healingAmount, long shieldGrantAmount, int shieldGrantCount, long shieldAbsorbedAmount, int shieldAbsorbedCount, CombatValueKind valueKind, PacketEffectTag effectTag)
     {
         DamageAmount += damageAmount;
         HealingAmount += healingAmount;
@@ -168,11 +124,6 @@ internal struct SceneCombatantMetricsAccumulator
         else if (valueKind == CombatValueKind.DrainDamage)
         {
             DrainDamageAmount += damageAmount;
-            if (drainHealAmount > 0)
-            {
-                DrainHealingAmount += drainHealAmount;
-                HealingAmount += drainHealAmount;
-            }
         }
         else if (effectTag == PacketEffectTag.RegenerationHealing)
         {
@@ -182,21 +133,6 @@ internal struct SceneCombatantMetricsAccumulator
 
     public readonly SceneCombatantMetrics ToSnapshot()
     {
-        return new SceneCombatantMetrics(
-            CharacterClass,
-            IsVisiblePlayerCombatant,
-            DamagePerSecond,
-            HealingPerSecond,
-            DamageAmount,
-            HealingAmount,
-            PeriodicHealingAmount,
-            DrainDamageAmount,
-            DrainHealingAmount,
-            RegenerationHealingAmount,
-            ShieldAmount,
-            ShieldTimes,
-            ShieldAbsorbedAmount,
-            ShieldAbsorbedTimes,
-            DamageContribution);
+        return new SceneCombatantMetrics(CharacterClass, IsVisiblePlayerCombatant, DamagePerSecond, HealingPerSecond, DamageAmount, HealingAmount, PeriodicHealingAmount, DrainDamageAmount, DrainHealingAmount, RegenerationHealingAmount, ShieldAmount, ShieldTimes, ShieldAbsorbedAmount, ShieldAbsorbedTimes, DamageContribution);
     }
 }

@@ -54,8 +54,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             ValueKind = CombatValueKind.Damage
         });
 
-    public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation)
-        => ApplyCombat(sourceId, targetId, in observation, 0);
+    public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation) => ApplyCombat(sourceId, targetId, in observation, 0);
 
     public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation, long observedAtMilliseconds)
     {
@@ -79,11 +78,10 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             MultiHitCount = contribution.MultiHitCount
         };
         _events.Add(eventRecord);
-        var extraDrainHealing = observation.ValueKind == CombatValueKind.DrainDamage && observation.DrainHealAmount > 0 ? observation.DrainHealAmount : 0;
-        var totalHealing = contribution.HealingAmount + extraDrainHealing;
+        var totalHealing = contribution.HealingAmount;
         var periodicHealing = observation.ValueKind == CombatValueKind.PeriodicHealing ? contribution.HealingAmount : 0;
         var drainDamage = observation.ValueKind == CombatValueKind.DrainDamage ? contribution.DamageAmount : 0;
-        var drainHealing = observation.ValueKind == CombatValueKind.DrainHealing ? contribution.HealingAmount : extraDrainHealing;
+        var drainHealing = observation.ValueKind == CombatValueKind.DrainHealing ? contribution.HealingAmount : 0;
         var regenerationHealing = observation.EffectTag == PacketEffectTag.RegenerationHealing ? contribution.HealingAmount : 0;
 
         var pairKey = (sourceId, targetId);
@@ -216,17 +214,13 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         record.LastObserved = Math.Max(record.LastObserved, observedAtMilliseconds);
     }
 
-    public bool TryGetPair(int sourceId, int targetId, out CombatPairRecord? pair) =>
-        _pairs.TryGetValue((sourceId, targetId), out pair);
+    public bool TryGetPair(int sourceId, int targetId, out CombatPairRecord? pair) => _pairs.TryGetValue((sourceId, targetId), out pair);
 
-    public bool TryGetCombatant(int combatantId, out CombatantRecord? combatant) =>
-        _combatants.TryGetValue(combatantId, out combatant);
+    public bool TryGetCombatant(int combatantId, out CombatantRecord? combatant) => _combatants.TryGetValue(combatantId, out combatant);
 
-    public IReadOnlyCollection<(int, int)> GetOutgoingPairs(int sourceId) =>
-        _outgoingBySource.TryGetValue(sourceId, out var pairs) ? pairs : [];
+    public IReadOnlyCollection<(int, int)> GetOutgoingPairs(int sourceId) => _outgoingBySource.TryGetValue(sourceId, out var pairs) ? pairs : [];
 
-    public IReadOnlyCollection<(int, int)> GetIncomingPairs(int targetId) =>
-        _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
+    public IReadOnlyCollection<(int, int)> GetIncomingPairs(int targetId) => _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
 
     public ref readonly CombatEventRecord GetEvent(int index) => ref CollectionsMarshal.AsSpan(_events)[index];
 
@@ -251,8 +245,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         return false;
     }
 
-    public long GetCombatantDetailRevision(int combatantId) =>
-        combatantId > 0 && _detailRevisionByCombatant.TryGetValue(combatantId, out var revision) ? revision : 0;
+    public long GetCombatantDetailRevision(int combatantId) => combatantId > 0 && _detailRevisionByCombatant.TryGetValue(combatantId, out var revision) ? revision : 0;
 
     private CombatantRecord GetOrAddCombatant(int combatantId)
     {
@@ -287,8 +280,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         _revision = 0;
     }
 
-    public SnapshotChangeCursor CreateCursor(long afterRevision) =>
-        new(afterRevision, 0);
+    public SnapshotChangeCursor CreateCursor(long afterRevision) => new(afterRevision, 0);
 
     public SnapshotChangeBatch<CombatSnapshotChange> ReadChanges(SnapshotChangeCursor cursor, int maxChanges)
     {
@@ -298,11 +290,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             return new SnapshotChangeBatch<CombatSnapshotChange>(cursor.Revision, _revision, [], false);
 
         var changes = _changeLog.GetRange(Start, Count);
-        return new SnapshotChangeBatch<CombatSnapshotChange>(
-            cursor.Revision,
-            changes[^1].Revision,
-            changes,
-            Start + Count < _changeLog.Count);
+        return new SnapshotChangeBatch<CombatSnapshotChange>(cursor.Revision, changes[^1].Revision, changes, Start + Count < _changeLog.Count);
     }
 
     public SnapshotChangeCopyResult CopyChanges(SnapshotChangeCursor cursor, Span<CombatSnapshotChange> destination)
@@ -315,12 +303,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             destination[i] = _changeLog[Start + i];
 
         var toRevision = _changeLog[Start + Count - 1].Revision;
-        return new SnapshotChangeCopyResult(
-            new SnapshotChangeCursor(toRevision, 0),
-            cursor.Revision,
-            toRevision,
-            Count,
-            Start + Count < _changeLog.Count);
+        return new SnapshotChangeCopyResult(new SnapshotChangeCursor(toRevision, 0), cursor.Revision, toRevision, Count, Start + Count < _changeLog.Count);
     }
 
     private (int Start, int Count) ResolveChangeReadBounds(SnapshotChangeCursor cursor, int maxChanges)
@@ -361,8 +344,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         return (start, count);
     }
 
-    private static int ResolveChangeCapacity(int eventCapacity) =>
-        eventCapacity <= 0 ? 0 : eventCapacity <= int.MaxValue / 3 ? eventCapacity * 3 : int.MaxValue;
+    private static int ResolveChangeCapacity(int eventCapacity) => eventCapacity <= 0 ? 0 : eventCapacity <= int.MaxValue / 3 ? eventCapacity * 3 : int.MaxValue;
 
 }
 
@@ -439,5 +421,4 @@ public sealed class CombatantRecord
     public long FirstObserved { get; set; }
     public long LastObserved { get; set; }
     public long Revision { get; set; }
-
 }

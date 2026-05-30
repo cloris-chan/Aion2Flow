@@ -65,7 +65,9 @@ internal static class PacketCombatHandler
                     Damage = parsed.DrainHealAmount,
                     HitCount = 1,
                     AttemptCount = 1,
-                    DrainHealAmount = parsed.DrainHealAmount
+                    DrainHealAmount = parsed.DrainHealAmount,
+                    EventKind = CombatEventKind.Healing,
+                    ValueKind = CombatValueKind.DrainHealing
                 };
                 context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, packet.Length, 0, context.CurrentStructurePath);
             }
@@ -75,18 +77,7 @@ internal static class PacketCombatHandler
 
         if (Packet0438CompactValueParser.TryParse(packet, out var compact))
         {
-            context.Sink.RegisterCompactValue0438(
-                compact.TargetId,
-                compact.SourceId,
-                compact.SkillCodeRaw,
-                compact.Marker,
-                compact.LayoutTag,
-                compact.Type,
-                compact.Value,
-                context.TimestampMilliseconds,
-                frameOrdinal,
-                batchOrdinal,
-                context.CurrentStructurePath);
+            context.Sink.RegisterCompactValue0438(compact.TargetId, compact.SourceId, compact.SkillCodeRaw, compact.Marker, compact.LayoutTag, compact.Type, compact.Value, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
             RawPacketDump.ObserveParsedPacket("compact-value", context.Connection);
             return context.MarkParsed();
         }
@@ -96,17 +87,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactValue0438(
-            compactSignal.TargetId,
-            compactSignal.SourceId,
-            compactSignal.SkillCodeRaw,
-            compactSignal.Marker,
-            compactSignal.LayoutTag,
-            compactSignal.Type,
-            context.TimestampMilliseconds,
-            frameOrdinal,
-            batchOrdinal,
-            context.CurrentStructurePath);
+        context.Sink.RegisterCompactValue0438(compactSignal.TargetId, compactSignal.SourceId, compactSignal.SkillCodeRaw, compactSignal.Marker, compactSignal.LayoutTag, compactSignal.Type, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
         return context.MarkParsed();
     }
 
@@ -293,7 +274,9 @@ internal static class PacketCombatHandler
                     Damage = parsed.DrainHealAmount,
                     HitCount = 1,
                     AttemptCount = 1,
-                    DrainHealAmount = parsed.DrainHealAmount
+                    DrainHealAmount = parsed.DrainHealAmount,
+                    EventKind = CombatEventKind.Healing,
+                    ValueKind = CombatValueKind.DrainHealing
                 };
                 context.Sink.AppendCombatObservation(parsed.SourceId, parsed.SourceId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in drainObservation, 0x0438, consumed, 0, context.CurrentStructurePath);
             }

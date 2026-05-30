@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
@@ -104,6 +105,64 @@ public sealed class CombatMetricsAggregationTests
         Assert.Equal(567, metrics.HealingAmount);
         Assert.Equal(567, metrics.DrainHealingAmount);
         Assert.Equal(0, metrics.DamageAmount);
+    }
+
+    [Fact]
+    public void CombatantMetrics_Does_Not_Fold_DrainDamage_Tail_Heal_Into_Healing()
+    {
+        var observation = new CombatObservation
+        {
+            SkillCode = 16046601,
+            Damage = 1234,
+            DrainHealAmount = 567,
+            HitCount = 1,
+            AttemptCount = 1,
+            ValueKind = CombatValueKind.DrainDamage,
+            EventKind = CombatEventKind.Damage
+        };
+
+        var accumulator = new SceneCombatantMetricsAccumulator();
+        accumulator.ProcessCombatObservation(in observation);
+        var metrics = accumulator.ToSnapshot();
+
+        Assert.Equal(1234, metrics.DamageAmount);
+        Assert.Equal(1234, metrics.DrainDamageAmount);
+        Assert.Equal(0, metrics.HealingAmount);
+        Assert.Equal(0, metrics.DrainHealingAmount);
+    }
+
+    [Fact]
+    public void CombatStore_Does_Not_Attribute_DrainDamage_Tail_Heal_To_Damage_Pair()
+    {
+        var store = new CombatStore();
+        const int attackerId = 1001;
+        const int targetId = 9001;
+        var observation = new CombatObservation
+        {
+            SkillCode = 16046601,
+            Damage = 1234,
+            DrainHealAmount = 567,
+            HitCount = 1,
+            AttemptCount = 1,
+            ValueKind = CombatValueKind.DrainDamage,
+            EventKind = CombatEventKind.Damage
+        };
+
+        store.ApplyCombat(attackerId, targetId, in observation, 1_000);
+
+        Assert.True(store.TryGetPair(attackerId, targetId, out var pair));
+        Assert.Equal(1234, pair!.TotalDamage);
+        Assert.Equal(1234, pair.TotalDrainDamage);
+        Assert.Equal(0, pair.TotalHealing);
+        Assert.Equal(0, pair.TotalDrainHealing);
+
+        Assert.True(store.TryGetCombatant(attackerId, out var attacker));
+        Assert.Equal(1234, attacker!.OutgoingDamage);
+        Assert.Equal(0, attacker.OutgoingHealing);
+
+        Assert.True(store.TryGetCombatant(targetId, out var target));
+        Assert.Equal(1234, target!.IncomingDamage);
+        Assert.Equal(0, target.IncomingHealing);
     }
 
     [Fact]
