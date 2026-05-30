@@ -1781,6 +1781,57 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
+    public void LiveReadModel_Reset_AppliesPendingNpcIdentityBeforeBarrier()
+    {
+        const int npcId = 29194;
+        const int npcCode = 2_980_122;
+        var scene = new SceneLiveReadModel();
+        try
+        {
+            var sink = SceneSinkFactory.CreateForLive(scene)();
+            sink.AppendNpcCode(npcId, npcCode);
+            sink.AppendNpcKind(npcId, NpcKind.Boss);
+            sink.AppendCombatPacket(new ParsedCombatPacket
+            {
+                SourceId = 100,
+                TargetId = npcId,
+                SkillCode = 11000010,
+                OriginalSkillCode = 11000010,
+                Damage = 500,
+                Timestamp = 1_000,
+                BatchOrdinal = 1,
+                HitContribution = 1,
+                AttemptContribution = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            });
+            sink.CompleteBatch(1);
+
+            scene.Reset(new DateTimeOffset(2026, 5, 30, 19, 35, 44, TimeSpan.Zero));
+
+            Assert.True(scene.Owner.MetadataRegistry.TryGetNpcCode(npcId, out var retainedNpcCode));
+            Assert.Equal(npcCode, retainedNpcCode);
+            Assert.True(scene.Owner.Entities.TryGet(npcId, out var retainedEntity));
+            Assert.Equal(NpcKind.Boss, retainedEntity.Kind);
+
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            sink.SetNpcBattle(npcId, true, now);
+            sink.AppendNpcHp(npcId, 70, 100, now);
+
+            var snapshot = scene.Owner.CreateSnapshot();
+
+            Assert.Empty(snapshot.Combatants);
+            var boss = Assert.Single(snapshot.BossFocuses);
+            Assert.Equal(npcId, boss.InstanceId);
+            Assert.Equal(70, boss.Hp);
+            Assert.Equal(100, boss.MaxHp);
+        }
+        finally
+        {
+        }
+    }
+
+    [Fact]
     public void LiveReadModel_FactoryCreatesSceneSink()
     {
         var scene = new SceneLiveReadModel();

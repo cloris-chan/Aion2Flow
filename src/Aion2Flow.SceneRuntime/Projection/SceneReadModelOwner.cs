@@ -180,23 +180,39 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
-    private void RefreshCore()
+    private void RefreshCore() => RefreshCore(long.MaxValue, completeBatches: true);
+
+    private void RefreshCore(long stopBeforeObservationOrdinal, bool completeBatches)
     {
         while (true)
         {
+            if (_cursor.NextObservationOrdinal >= stopBeforeObservationOrdinal)
+                break;
+
             var result = journal.CopyEntries(_cursor, _entryBuffer);
             if (result.Count == 0)
                 break;
 
             var entries = _entryBuffer.AsSpan(0, result.Count);
+            var applied = 0;
             foreach (ref readonly var entry in entries)
             {
+                if (entry.Stamp.ObservationOrdinal >= stopBeforeObservationOrdinal)
+                    break;
+
                 _applier.ApplyEntry(in entry);
                 AppliedObservationOrdinal++;
+                applied++;
             }
 
-            _cursor = result.Cursor;
+            if (applied == 0)
+                break;
+
+            _cursor = applied == result.Count ? result.Cursor : journal.CreateCursor(entries[applied - 1].Stamp.ObservationOrdinal + 1);
         }
+
+        if (!completeBatches)
+            return;
 
         var completedBatch = journal.LastCompletedBatchOrdinal;
         if (completedBatch > _appliedBatchOrdinal)
@@ -206,8 +222,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
-    private SceneReadModelFrame CreateFrameWithMarkers(int detailCombatantId, bool forceDetailRefresh, ICombatDetailEventWriter? detailWriter)
-        => CreateFrameCore(detailCombatantId, forceDetailRefresh, detailWriter);
+    private SceneReadModelFrame CreateFrameWithMarkers(int detailCombatantId, bool forceDetailRefresh, ICombatDetailEventWriter? detailWriter) => CreateFrameCore(detailCombatantId, forceDetailRefresh, detailWriter);
 
     private SceneReadModelFrame CreateFrameCore(int detailCombatantId, bool forceDetailRefresh, ICombatDetailEventWriter? detailWriter)
     {
@@ -269,8 +284,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         return snapshot;
     }
 
-    private SceneCombatSnapshotAdapter CreateAdapter()
-        => _adapter ??= new(entities, combat, boundary, _applier.BossFocus, EncounterId);
+    private SceneCombatSnapshotAdapter CreateAdapter() => _adapter ??= new(entities, combat, boundary, _applier.BossFocus, EncounterId);
 
     private BossDamageContribution[] CreateBossDamageContributions(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
     {
@@ -318,8 +332,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         return false;
     }
 
-    private static bool IsSnapshotCacheStable(SceneCombatSnapshot snapshot) =>
-        snapshot.EncounterEndTime > 0 || snapshot.BossFocuses.Count == 0 && snapshot.Encounter.TrackingTargetId == 0;
+    private static bool IsSnapshotCacheStable(SceneCombatSnapshot snapshot) => snapshot.EncounterEndTime > 0 || snapshot.BossFocuses.Count == 0 && snapshot.Encounter.TrackingTargetId == 0;
 
     private CombatDetailDelta CreateDetailDeltaCore(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh)
     {
@@ -377,13 +390,13 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         return subscription;
     }
 
-    public void ResetCombat(Guid encounterId, long startOrdinal)
-        => ResetCombat(encounterId, startOrdinal, DateTimeOffset.Now);
+    public void ResetCombat(Guid encounterId, long startOrdinal) => ResetCombat(encounterId, startOrdinal, DateTimeOffset.Now);
 
     public void ResetCombat(Guid encounterId, long startOrdinal, DateTimeOffset sceneStarted)
     {
         lock (_gate)
         {
+            RefreshCore(startOrdinal, completeBatches: false);
             EncounterId = encounterId;
             SceneStarted = sceneStarted;
             combat.Clear();
