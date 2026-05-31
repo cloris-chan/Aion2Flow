@@ -155,6 +155,7 @@ public static class CombatResourceRegistry
         packet.HitContribution = normalized.HitCount;
         packet.AttemptContribution = normalized.AttemptCount;
         packet.DetailRaw = normalized.DetailRaw;
+        packet.EffectRef = normalized.EffectRef;
         packet.Marker = normalized.Marker;
         packet.Type = normalized.Type;
         packet.Flag = normalized.Flag;

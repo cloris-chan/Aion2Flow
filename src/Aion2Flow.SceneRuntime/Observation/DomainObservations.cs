@@ -90,6 +90,7 @@ public readonly record struct CombatObservation
     public int HitCount { get; init; }
     public int AttemptCount { get; init; }
     public long DetailRaw { get; init; }
+    public CombatEffectRef EffectRef { get; init; }
     public int Marker { get; init; }
     public int Type { get; init; }
     public int Flag { get; init; }

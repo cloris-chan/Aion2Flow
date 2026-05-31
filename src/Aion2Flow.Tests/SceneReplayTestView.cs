@@ -20,6 +20,7 @@ internal static class SceneReplayTestView
                 HitContribution = observation.HitCount,
                 AttemptContribution = observation.AttemptCount,
                 DetailRaw = observation.DetailRaw,
+                EffectRef = observation.EffectRef,
                 Marker = observation.Marker,
                 Unknown = observation.ChainId,
                 Type = observation.Type,
@@ -114,6 +115,7 @@ internal readonly record struct SceneReplayPacket
     public int HitContribution { get; init; }
     public int AttemptContribution { get; init; }
     public long DetailRaw { get; init; }
+    public CombatEffectRef EffectRef { get; init; }
     public int Marker { get; init; }
     public int Unknown { get; init; }
     public int Type { get; init; }

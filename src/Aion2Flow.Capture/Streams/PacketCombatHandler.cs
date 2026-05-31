@@ -34,6 +34,7 @@ internal static class PacketCombatHandler
                 DrainHealAmount = parsed.DrainHealAmount,
                 RegenerationAmount = parsed.RegenerationAmount,
                 DetailRaw = parsed.DetailRaw,
+                EffectRef = parsed.EffectRef,
                 ResourceKind = parsed.ResourceKind,
                 ChainId = parsed.Unknown
             };
@@ -49,6 +50,7 @@ internal static class PacketCombatHandler
                     Damage = parsed.RegenerationAmount,
                     HitCount = 1,
                     AttemptCount = 1,
+                    EffectRef = parsed.EffectRef,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.Healing,
                     EffectTag = PacketEffectTag.RegenerationHealing
@@ -66,6 +68,7 @@ internal static class PacketCombatHandler
                     HitCount = 1,
                     AttemptCount = 1,
                     DrainHealAmount = parsed.DrainHealAmount,
+                    EffectRef = parsed.EffectRef,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.DrainHealing
                 };
@@ -244,6 +247,7 @@ internal static class PacketCombatHandler
                 DrainHealAmount = parsed.DrainHealAmount,
                 RegenerationAmount = parsed.RegenerationAmount,
                 DetailRaw = parsed.DetailRaw,
+                EffectRef = parsed.EffectRef,
                 ResourceKind = parsed.ResourceKind
             };
 
@@ -258,6 +262,7 @@ internal static class PacketCombatHandler
                     Damage = parsed.RegenerationAmount,
                     HitCount = 1,
                     AttemptCount = 1,
+                    EffectRef = parsed.EffectRef,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.Healing,
                     EffectTag = PacketEffectTag.RegenerationHealing
@@ -275,6 +280,7 @@ internal static class PacketCombatHandler
                     HitCount = 1,
                     AttemptCount = 1,
                     DrainHealAmount = parsed.DrainHealAmount,
+                    EffectRef = parsed.EffectRef,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.DrainHealing
                 };

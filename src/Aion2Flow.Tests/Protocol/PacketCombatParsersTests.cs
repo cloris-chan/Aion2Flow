@@ -71,6 +71,21 @@ public sealed class PacketCombatParsersTests
         Assert.Equal(3, parsed.Type);
         Assert.Equal(1, parsed.MultiHitCount);
         Assert.Equal(DamageModifiers.Critical | DamageModifiers.Back | DamageModifiers.Smite | DamageModifiers.MultiHit, parsed.Modifiers);
+        Assert.Equal(unchecked((uint)parsed.DetailRaw), parsed.EffectRef.RawId);
+        Assert.Equal((int)(parsed.EffectRef.RawId / 100), parsed.EffectRef.ResourceSkillCode);
+        Assert.Equal((int)(parsed.EffectRef.RawId % 100), parsed.EffectRef.EffectIndex);
+    }
+
+    [Fact]
+    public void Decodes_0438_Detail_Effect_Ref()
+    {
+        ReadOnlySpan<byte> detail = [0xAF, 0xFD, 0xF4, 0x63, 0x01, 0x00, 0x00, 0x00];
+
+        var effectRef = CombatEffectRef.FromDetail(detail);
+
+        Assert.Equal(1_677_000_111U, effectRef.RawId);
+        Assert.Equal(16_770_001, effectRef.ResourceSkillCode);
+        Assert.Equal(11, effectRef.EffectIndex);
     }
 
     [Fact]

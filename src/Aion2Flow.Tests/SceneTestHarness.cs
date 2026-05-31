@@ -138,6 +138,7 @@ internal sealed class SceneTestHarness : IDisposable
             DrainHealAmount = packet.DrainHealAmount,
             RegenerationAmount = packet.RegenerationAmount,
             DetailRaw = packet.DetailRaw,
+            EffectRef = packet.EffectRef,
             ResourceKind = packet.ResourceKind,
             FrameOrdinal = packet.FrameOrdinal,
             BatchOrdinal = packet.BatchOrdinal,

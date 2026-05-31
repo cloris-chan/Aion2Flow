@@ -44,6 +44,7 @@ public struct ParsedCombatPacket
     public int DrainHealAmount { get; set; }
     public int RegenerationAmount { get; set; }
     public long DetailRaw { get; set; }
+    public CombatEffectRef EffectRef { get; set; }
     public CombatResourceKind ResourceKind { get; set; } = CombatResourceKind.Unknown;
     public long FrameOrdinal { get; set; }
     public long BatchOrdinal { get; set; }
@@ -100,6 +101,7 @@ public struct ParsedCombatPacket
         HitCount = HitContribution,
         AttemptCount = AttemptContribution,
         DetailRaw = DetailRaw,
+        EffectRef = EffectRef,
         Marker = Marker,
         Type = Type,
         Flag = Flag,
@@ -131,6 +133,7 @@ public struct ParsedCombatPacket
         HitContribution = observation.HitCount,
         AttemptContribution = observation.AttemptCount,
         DetailRaw = observation.DetailRaw,
+        EffectRef = observation.EffectRef,
         Marker = observation.Marker,
         Type = observation.Type,
         Flag = observation.Flag,
