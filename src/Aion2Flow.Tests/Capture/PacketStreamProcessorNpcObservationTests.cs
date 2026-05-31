@@ -116,6 +116,31 @@ public sealed class PacketStreamProcessorNpcObservationTests
     }
 
     [Fact]
+    public void UnknownPayload_LengthPrefixedEmbeddedCombat_RawReference_UsesNestedFrameBoundary()
+    {
+        var scene = new SceneLiveReadModel();
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        using var parser = new PacketFrameParser(scene.Synchronize(sink));
+        var direct = HexHelper.FromFixture("combat/0438-damage.hex");
+        Assert.True(PacketTransportCodec.TryReadVarInt(direct, 0, out var directLength));
+        Assert.True(parser.ParsePacketEntry(direct, TestConnection, 1));
+        var embedded = BuildSingleByteLengthFrame(BuildUnknownPayloadWithEmbeddedFrame(direct));
+
+        Assert.True(parser.ParsePacketEntry(embedded, TestConnection, 2));
+
+        var raw = scene.Journal.Read(scene.Journal.Count - 1).Raw;
+        var expectedBodyOffset = directLength.ByteCount + 2;
+        Assert.Equal(0x0438, raw.Opcode);
+        Assert.Equal(direct.Length, raw.PayloadLength);
+        Assert.Equal(PacketStructureKind.EmbeddedFrame, raw.Structure.Kind);
+        Assert.Equal(PacketStructureKind.UnknownFramePayload, raw.StructurePath.Parent.Kind);
+        Assert.Equal(2, raw.Structure.Offset);
+        Assert.Equal(direct.Length, raw.Structure.Length);
+        Assert.Equal(expectedBodyOffset, raw.Structure.BodyOffset);
+        Assert.Equal(direct.Length - expectedBodyOffset, raw.Structure.BodyLength);
+    }
+
+    [Fact]
     public void UnknownPayload_Embedded4036_OwnerVarint_RecordsSummonOwner()
     {
         var scene = new SceneLiveReadModel();

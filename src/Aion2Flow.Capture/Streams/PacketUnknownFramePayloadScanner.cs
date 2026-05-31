@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.Protocol.Readers;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
@@ -9,10 +10,18 @@ internal static class PacketUnknownFramePayloadScanner
     public static bool Scan(ReadOnlySpan<byte> payload, ref PacketParseContext context)
     {
         var parsed = false;
+        var embeddedSiblingIndex = 0;
 
         for (var offset = 0; offset + 1 < payload.Length; offset++)
         {
-            int consumed;
+            if (TryParseEmbeddedLengthFrame(payload, offset, embeddedSiblingIndex, ref context, out int consumed))
+            {
+                parsed = true;
+                embeddedSiblingIndex++;
+                offset += Math.Max(consumed - 1, 1);
+                continue;
+            }
+
             if (payload[offset] == 0x04 && payload[offset + 1] == 0x38)
             {
                 if (PacketCombatHandler.TryParseDamageAt(payload, offset, ref context, out consumed))
@@ -44,6 +53,44 @@ internal static class PacketUnknownFramePayloadScanner
 
         return parsed;
     }
+
+    private static bool TryParseEmbeddedLengthFrame(ReadOnlySpan<byte> payload, int offset, int siblingIndex, ref PacketParseContext context, out int frameLength)
+    {
+        frameLength = 0;
+        if (!PacketTransportCodec.TryReadVarInt(payload, offset, out var lengthInfo))
+        {
+            return false;
+        }
+
+        frameLength = lengthInfo.Value + lengthInfo.ByteCount - 4;
+        var bodyOffset = lengthInfo.ByteCount + 2;
+        if (frameLength <= bodyOffset || frameLength > payload.Length - offset)
+        {
+            frameLength = 0;
+            return false;
+        }
+
+        var opcodeOffset = offset + lengthInfo.ByteCount;
+        if (!IsEmbeddedCombatFrame(payload[opcodeOffset], payload[opcodeOffset + 1]))
+        {
+            frameLength = 0;
+            return false;
+        }
+
+        var frame = payload.Slice(offset, frameLength);
+        var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, offset, frameLength, bodyOffset, frameLength - bodyOffset, siblingIndex);
+        try
+        {
+            return PacketOpcodeDispatcher.TryParseExactFrame(frame, ref context);
+        }
+        finally
+        {
+            context.RestoreStructure(previous);
+        }
+    }
+
+    private static bool IsEmbeddedCombatFrame(byte opcode0, byte opcode1)
+        => (opcode0, opcode1) is (0x04, 0x38) or (0x05, 0x38);
 
     private static bool TryParseSummonPacketAt(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
     {
