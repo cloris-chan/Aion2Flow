@@ -93,7 +93,7 @@ public sealed class CombatEventClassifierTests
     [InlineData(10000007, 0x000000013B9ACCC7L)]
     [InlineData(10000011, 0x000000013B9ACA6FL)]
     [InlineData(10000013, 0x000000013B9ACB37L)]
-    public void Classifies_HpAbsorption_DirectSelf0438_DetailFamily_As_PeriodicHealing(
+    public void Keeps_HpAbsorption_DirectSelf0438_DetailFamily_As_Support(
         int skillCode,
         long detailRaw)
     {
@@ -103,8 +103,8 @@ public sealed class CombatEventClassifierTests
         packet.Type = 2;
         packet.DetailRaw = detailRaw;
 
-        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
-        Assert.Equal(CombatValueKind.PeriodicHealing, CombatEventClassifier.ClassifyValueKind(packet));
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
-    public void Classifies_LightOfProtection_Direct_Healing_Packet_Shape_As_Healing()
+    public void Keeps_LightOfProtection_Direct_DetailFamily_As_Support()
     {
         var packet = DirectPacket(12115, 12115, 17410040, 1234);
         packet.BaseSkillCode = 17410000;
@@ -168,8 +168,8 @@ public sealed class CombatEventClassifierTests
         packet.Loop = 2;
         packet.DetailRaw = 0x0000000267C58D55L;
 
-        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
-        Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
-    public void Classifies_DirectHpRestore0438_DetailFamily_As_Healing()
+    public void Keeps_DirectHpRestore0438_DetailFamily_As_Damage()
     {
         var packet = DirectPacket(4156, 34135, 16770001, 198);
         packet.LayoutTag = 4;
@@ -192,12 +192,12 @@ public sealed class CombatEventClassifierTests
         packet.Loop = 1;
         packet.DetailRaw = 0x0000000163F4FDAFL;
 
-        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
-        Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
+        Assert.Equal(CombatEventKind.Damage, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Damage, CombatEventClassifier.ClassifyValueKind(packet));
     }
 
     [Fact]
-    public void Classifies_AegisShield0438_DetailFamily_As_Healing()
+    public void Keeps_AegisShield0438_DetailFamily_As_Support()
     {
         var packet = DirectPacket(8470, 8470, 12720000, 406);
         packet.LayoutTag = 4;
@@ -205,8 +205,8 @@ public sealed class CombatEventClassifierTests
         packet.Loop = 1;
         packet.DetailRaw = 0x000000014BD12E6FL;
 
-        Assert.Equal(CombatEventKind.Healing, CombatEventClassifier.Classify(packet));
-        Assert.Equal(CombatValueKind.Healing, CombatEventClassifier.ClassifyValueKind(packet));
+        Assert.Equal(CombatEventKind.Support, CombatEventClassifier.Classify(packet));
+        Assert.Equal(CombatValueKind.Support, CombatEventClassifier.ClassifyValueKind(packet));
     }
 
     [Fact]

@@ -49,9 +49,6 @@ public static class CombatEventClassifier
         if (CombatObservationTraits.IsRestoreHp(in observation))
             return (CombatEventKind.Healing, CombatValueKind.PeriodicHealing);
 
-        if (CombatObservationTraits.IsDirectHpRestoreShape(sourceId, targetId, in observation))
-            return (CombatEventKind.Healing, CombatValueKind.Healing);
-
         if (CombatObservationTraits.IsDirectSupportValueShape(sourceId, targetId, in observation))
             return (CombatEventKind.Support, CombatValueKind.Support);
 
@@ -166,24 +163,12 @@ public static class CombatObservationTraits
     private const int RestoreHpSkillCode = 1010000;
     private const int RestSkillCode = 10001;
     private const int EnhanceSpiritBenedictionBaseSkillCode = 16190000;
-    private const long LightOfProtectionDirectHealingDetailRaw = 0x0000000267C58D55L;
-    private const ulong HpAbsorptionDirectHealingDetailPrefix = 0x000000013B9A0000UL;
-    private const ulong HpAbsorptionDirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
-    private const ulong DirectHpRestoreDetailPrefix = 0x0000000163F40000UL;
-    private const ulong DirectHpRestoreDetailMask = 0xFFFFFFFFFFFF0000UL;
-    private const ulong DirectHealingDetailPrefix = 0x000000016A180000UL;
-    private const ulong DirectHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
-    private const ulong AegisShieldHealingDetailPrefix = 0x000000014BD10000UL;
-    private const ulong AegisShieldHealingDetailMask = 0xFFFFFFFFFFFF0000UL;
     private const int WardingStrikeBaseSkillCode = 12350000;
 
     public static bool IsRestoreHp(in CombatObservation observation) =>
         MatchesExact(in observation, RestoreHpSkillCode, RestSkillCode);
 
     public static bool IsKnownDirectHealing(in CombatObservation observation) =>
-        IsLightOfProtectionDirectHealing(in observation) ||
-        IsDirectHealingDetailShape(in observation) ||
-        IsAegisShieldHealingShape(in observation) ||
         MatchesExact(
             in observation,
             16120000,
@@ -191,7 +176,7 @@ public static class CombatObservationTraits
         MatchesBase(in observation, 13710000, 13790000, 17090000, 17100000, 17120000, 18120000);
 
     public static bool IsKnownDirectPeriodicHealing(int sourceId, int targetId, in CombatObservation observation) =>
-        IsDirectSelfHpRecoveryEffect(sourceId, targetId, in observation) ||
+        IsWardingStrikeDirectSelfRestore(sourceId, targetId, in observation) ||
         MatchesExact(in observation, 16120350, 2011101) ||
         MatchesBase(in observation, 18160000);
 
@@ -209,11 +194,6 @@ public static class CombatObservationTraits
         MatchesExact(in observation, 2212001, 22120011, 15160000, 18730000) ||
         MatchesExact(in observation, 12070000, 12130040) ||
         MatchesBase(in observation, 1742000000);
-
-    public static bool IsDirectHpRestoreShape(int sourceId, int targetId, in CombatObservation observation) =>
-        IsPositiveDirect0438Value(sourceId, targetId, in observation) &&
-        observation.Loop == 1 &&
-        HasDetailPrefix(observation.DetailRaw, DirectHpRestoreDetailPrefix, DirectHpRestoreDetailMask);
 
     public static bool IsKnownPeriodicHealingPool(in CombatObservation observation) =>
         (IsPeriodicSelfMode(in observation, 9) ||
@@ -245,43 +225,6 @@ public static class CombatObservationTraits
             : FormatEffectTagLabel(observation.EffectTag);
     }
 
-    private static bool IsLightOfProtectionDirectHealing(in CombatObservation observation) =>
-        observation.Damage > 0 &&
-        observation.LayoutTag == 4 &&
-        observation.Flag == 0 &&
-        observation.Type == 2 &&
-        observation.Loop == 2 &&
-        observation.DetailRaw == LightOfProtectionDirectHealingDetailRaw;
-
-    private static bool IsDirectHealingDetailShape(in CombatObservation observation) =>
-        observation.Damage > 0 &&
-        observation.PeriodicRelation == PeriodicEffectRelation.None &&
-        observation.LayoutTag == 4 &&
-        observation.Flag == 0 &&
-        observation.Type == 2 &&
-        observation.Loop == 1 &&
-        HasDetailPrefix(observation.DetailRaw, DirectHealingDetailPrefix, DirectHealingDetailMask);
-
-    private static bool IsAegisShieldHealingShape(in CombatObservation observation) =>
-        observation.Damage > 0 &&
-        observation.PeriodicRelation == PeriodicEffectRelation.None &&
-        observation.LayoutTag == 4 &&
-        observation.Flag == 0 &&
-        observation.Type == 2 &&
-        observation.Loop == 1 &&
-        HasDetailPrefix(observation.DetailRaw, AegisShieldHealingDetailPrefix, AegisShieldHealingDetailMask);
-
-    private static bool IsDirectSelfHpRecoveryEffect(int sourceId, int targetId, in CombatObservation observation) =>
-        IsHpAbsorptionDirectSelfRestore(sourceId, targetId, in observation) ||
-        IsWardingStrikeDirectSelfRestore(sourceId, targetId, in observation);
-
-    private static bool IsHpAbsorptionDirectSelfRestore(int sourceId, int targetId, in CombatObservation observation) =>
-        IsPositiveSelfDirect0438Value(sourceId, targetId, in observation) &&
-        HasDetailPrefix(
-            observation.DetailRaw,
-            HpAbsorptionDirectHealingDetailPrefix,
-            HpAbsorptionDirectHealingDetailMask);
-
     private static bool IsWardingStrikeDirectSelfRestore(int sourceId, int targetId, in CombatObservation observation) =>
         IsPositiveSelfDirect0438Value(sourceId, targetId, in observation) &&
         MatchesBase(in observation, WardingStrikeBaseSkillCode);
@@ -302,10 +245,6 @@ public static class CombatObservationTraits
         observation.LayoutTag == 4 &&
         observation.Flag == 0 &&
         observation.Type == 2;
-
-    private static bool HasDetailPrefix(long detailRaw, ulong prefix, ulong mask) =>
-        detailRaw > 0 &&
-        (((ulong)detailRaw) & mask) == prefix;
 
     private static bool IsEnhanceSpiritBenediction(in CombatObservation observation) =>
         MatchesBase(in observation, EnhanceSpiritBenedictionBaseSkillCode) ||

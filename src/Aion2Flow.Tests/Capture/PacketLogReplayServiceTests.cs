@@ -234,7 +234,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.False(snapshot.Combatants.ContainsKey(39022), $"Ground AoE entity 39022 should not appear separately.\n{combatantDump}");
 
         Assert.True(snapshot.Combatants.TryGetValue(664, out var cleric), $"Cleric 664 not found.\n{combatantDump}");
-        Assert.True(cleric.DamageAmount == 3323254, $"Cleric damage={cleric.DamageAmount} expected=3323254\n{combatantDump}");
+        Assert.True(cleric.DamageAmount == 3367264, $"Cleric damage={cleric.DamageAmount} expected=3367264\n{combatantDump}");
     }
 
     [Fact]
@@ -264,8 +264,8 @@ public sealed class PacketLogReplayServiceTests
                 $"Divine Aura drain={divineAura.DrainHealingAmount} should be 0\n{combatantDump}");
         }
 
-        const int gameReportedHealing023559 = 70963;
-        Assert.Equal(gameReportedHealing023559, metrics.HealingAmount);
+        const int expectedKnownHealing023559 = 16863;
+        Assert.Equal(expectedKnownHealing023559, metrics.HealingAmount);
     }
 
     [Fact]
@@ -316,7 +316,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(player.IncomingDamage == 946, $"IncomingDamage={player.IncomingDamage} expected=946\n{diagDump}");
         Assert.True(player.IncomingHits == 2, $"IncomingHits={player.IncomingHits} expected=2\n{diagDump}");
 
-        Assert.True(player.IncomingHealing == 48630, $"IncomingHealing={player.IncomingHealing} expected=48630 (HP instance-clear restore + Radiant Benediction, excludes MP restore)\n{diagDump}");
+        Assert.True(player.IncomingHealing == 42616, $"IncomingHealing={player.IncomingHealing} expected=42616 (known HP restore only; ambiguous direct detail families excluded)\n{diagDump}");
     }
 
     [Fact]
@@ -344,7 +344,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260426110459_Templar_DirectSelfHpRecovery_Packets_Are_Healing()
+    public void Replay_20260426110459_Templar_KnownSelfRecovery_Packets_Are_Healing()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -380,12 +380,12 @@ public sealed class PacketLogReplayServiceTests
                 packet.OriginalSkillCode == punishingStrikeSkillCode &&
                 packet.ValueKind == CombatValueKind.DrainHealing)
             .Sum(static packet => packet.Damage);
-        Assert.True(hpAbsorptionRecovery == 5372, packetDump);
+        Assert.True(hpAbsorptionRecovery == 0, packetDump);
         Assert.True(wardingStrikeRecovery == 2492, packetDump);
         Assert.True(punishingStrikeRecovery == 1563, packetDump);
 
         var recognizedSelfRecovery = hpAbsorptionRecovery + wardingStrikeRecovery + punishingStrikeRecovery;
-        Assert.Equal(9427, recognizedSelfRecovery);
+        Assert.Equal(4055, recognizedSelfRecovery);
 
         var combatantDump = string.Join(
             Environment.NewLine,
@@ -398,7 +398,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260426121726_Templar_Healing_Matches_Game_Ground_Truth()
+    public void Replay_20260426121726_Templar_Healing_Matches_KnownPacketOnly_Output()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -439,8 +439,8 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(SkillDrainHealing(12030250) == 897, skillDump);
         Assert.True(SkillDrainHealing(12440250) == 2395, skillDump);
         Assert.True(SkillDrainHealing(12060240) == 784, skillDump);
-        Assert.True(playerMetrics.HealingAmount == 31531,
-            $"HealingAmount={playerMetrics.HealingAmount} expected=31531\n{skillDump}\n{packetDump}\n{combatantDump}");
+        Assert.True(playerMetrics.HealingAmount == 5845,
+            $"HealingAmount={playerMetrics.HealingAmount} expected=5845\n{skillDump}\n{packetDump}\n{combatantDump}");
     }
 
     [Fact]
