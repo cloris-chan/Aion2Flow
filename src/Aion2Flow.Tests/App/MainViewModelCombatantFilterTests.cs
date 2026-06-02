@@ -343,6 +343,98 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_SceneMode_NoBoss_ShowsDpsAndTotalColumns()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Same(fixture.ViewModel.CombatantColumns, row.Columns);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        Assert.Empty(row.BossShares);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_BossColumn_DpsSortShowsDpsAndBossShare()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 250, 3_000, 1);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 250, 3_100, 2);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 700, 1_000, 3_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Same(fixture.ViewModel.CombatantColumns, row.Columns);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        var share = Assert.Single(row.BossShares);
+        Assert.Equal(900_002, share.BossId);
+        Assert.Equal(0.5d, share.Ratio, 6);
+        Assert.NotNull(share.Brush);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_BossColumn_TotalDamageSortShowsTotalAndBossShare()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantSortMetric = CombatantSortMetric.TotalDamage;
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 125, 3_000, 1);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 125, 3_100, 2);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 500, 1_000, 3_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Same(fixture.ViewModel.CombatantColumns, row.Columns);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        Assert.Equal(0.25d, Assert.Single(row.BossShares).Ratio, 6);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_BossColumn_UsesEffectiveHpAfterHealing()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 1_000, 1_000, 1_000);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 500, 1_000, 2_000);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 800, 1_000, 3_000);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 325, 3_500, 1);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 325, 3_600, 2);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(0.5d, Assert.Single(row.BossShares).Ratio, 6);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_BossColumn_ShowsMultipleBossSharesInBossOrder()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneDamage(300, 900_003, 11000010, 50, 3_000, 1);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 100, 3_100, 2);
+        fixture.AppendSceneBossFocus(900_003, "Boss B", 250, 500, 3_500);
+        fixture.AppendSceneBossFocus(900_002, "Boss A", 700, 1_000, 3_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal([900_002, 900_003], row.BossShares.Select(static share => share.BossId));
+        Assert.Equal([0.1d, 0.1d], row.BossShares.Select(static share => Math.Round(share.Ratio, 6)));
+    }
+
+    [Fact]
     public void RefreshCombatStats_SceneMode_RefreshesLiveDetailFromSceneProjection()
     {
         var fixture = MainViewModelFixture.Create();

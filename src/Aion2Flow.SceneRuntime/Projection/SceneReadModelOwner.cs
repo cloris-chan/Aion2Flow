@@ -373,6 +373,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 InstanceId = boss.InstanceId,
                 Hp = boss.Hp,
                 MaxHp = boss.MaxHp,
+                CumulativeLostHp = boss.CumulativeLostHp,
                 LastObservedAtMilliseconds = boss.LastObservedAtMilliseconds,
                 HasHp = boss.HasHp
             });

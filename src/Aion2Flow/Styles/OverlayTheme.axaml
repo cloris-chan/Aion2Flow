@@ -620,6 +620,28 @@
         <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
+    <Style Selector="StackPanel.CombatantBossShareToken">
+        <Setter Property="MinHeight" Value="15" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Border.CombatantBossShareMarker">
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Height" Value="8" />
+        <Setter Property="BorderBrush" Value="#C8FFFFFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|NumericBlock.CombatantBossShareValue">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextAlignment" Value="Right" />
+    </Style>
+
     <Style Selector="Border.DetailFlyoutCard">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailBackdrop}" />
         <Setter Property="BorderBrush" Value="#22FFFFFF" />

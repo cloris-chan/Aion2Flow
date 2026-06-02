@@ -467,6 +467,17 @@ public readonly record struct SceneBossFocusSnapshot
 
     public int MaxHp { get; init; }
 
+    public long CumulativeLostHp { get; init; }
+
+    public long EffectiveHp
+    {
+        get
+        {
+            var maxHp = Math.Max(1L, MaxHp);
+            return HasHp ? Math.Max(maxHp, Math.Max(0, Hp) + CumulativeLostHp) : maxHp;
+        }
+    }
+
     public long LastObservedAtMilliseconds { get; init; }
 
     public bool HasHp { get; init; }

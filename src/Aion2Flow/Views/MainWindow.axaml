@@ -158,7 +158,7 @@
                                                            Segments="{Binding BarSegments}"
                                                            IsHitTestVisible="False" />
 
-                            <Grid ColumnDefinitions="2,34,*,46,48"
+                            <Grid ColumnDefinitions="2,34,*,Auto"
                                   ColumnSpacing="4"
                                   Margin="5,3">
                                 <Border Grid.Column="0"
@@ -171,27 +171,68 @@
                                                     EntityId="{Binding Id}"
                                                     VerticalAlignment="Center" />
 
-                                <controls:NumericBlock Grid.Column="3"
-                                                        Classes="OverlayRowMetricStrong"
-                                                        Value="{Binding DamagePerSecond}"
-                                                        VerticalAlignment="Center"
-                                                        HorizontalAlignment="Stretch"
-                                                        TextAlignment="Right"
-                                                        StableWidthScopeKey="{Binding Id}"
-                                                        UseCompactNotation="True"
-                                                        CompactThreshold="1000"
-                                                        CompactSignificantDigits="3" />
+                                <StackPanel Grid.Column="3"
+                                            Orientation="Horizontal"
+                                            Spacing="8"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="4"
+                                                VerticalAlignment="Center">
+                                        <controls:NumericBlock Classes="OverlayRowMetricStrong"
+                                                               Width="46"
+                                                               Value="{Binding DamagePerSecond}"
+                                                               IsVisible="{Binding Columns.ShowDamagePerSecondColumn}"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Stretch"
+                                                               TextAlignment="Right"
+                                                               StableWidthScopeKey="{Binding Id}"
+                                                               UseCompactNotation="True"
+                                                               CompactThreshold="1000"
+                                                               CompactSignificantDigits="3" />
 
-                                <controls:NumericBlock Grid.Column="4"
-                                                         Classes="OverlayRowMetric"
-                                                         Value="{Binding Damage}"
-                                                         VerticalAlignment="Center"
-                                                         HorizontalAlignment="Stretch"
-                                                         TextAlignment="Right"
-                                                         StableWidthScopeKey="{Binding Id}"
-                                                         UseCompactNotation="True"
-                                                         CompactThreshold="1000"
-                                                         CompactSignificantDigits="3" />
+                                        <controls:NumericBlock Classes="OverlayRowMetric"
+                                                               Width="48"
+                                                               Value="{Binding Damage}"
+                                                               IsVisible="{Binding Columns.ShowDamageColumn}"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Stretch"
+                                                               TextAlignment="Right"
+                                                               StableWidthScopeKey="{Binding Id}"
+                                                               UseCompactNotation="True"
+                                                               CompactThreshold="1000"
+                                                               CompactSignificantDigits="3" />
+                                    </StackPanel>
+
+                                    <ItemsControl ItemsSource="{Binding BossShares}"
+                                                  IsVisible="{Binding Columns.ShowBossColumn}"
+                                                  HorizontalAlignment="Right"
+                                                  VerticalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="3" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:CombatantBossShareViewModel">
+                                                <StackPanel Classes="CombatantBossShareToken"
+                                                            Orientation="Horizontal"
+                                                            Spacing="3"
+                                                            VerticalAlignment="Center">
+                                                    <Border Classes="CombatantBossShareMarker"
+                                                            Background="{Binding Brush}" />
+                                                    <controls:NumericBlock Classes="CombatantBossShareValue"
+                                                                           Value="{Binding Ratio}"
+                                                                           UsePercentageNotation="True"
+                                                                           FractionDigits="1"
+                                                                           TrimTrailingZeros="False"
+                                                                           TextAlignment="Right"
+                                                                           VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                             </Grid>
                         </Grid>
                     </Border>

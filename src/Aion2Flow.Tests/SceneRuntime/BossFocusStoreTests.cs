@@ -84,6 +84,24 @@ public sealed class BossFocusStoreTests
     }
 
     [Fact]
+    public void ScenePath_TracksCumulativeLostHpAcrossHealing()
+    {
+        var h = new Harness();
+
+        h.Kind(3518, NpcKind.Boss);
+        h.Battle(3518, true, 900);
+        h.Hp(3518, 1_000, 1_000, 1_000);
+        h.Hp(3518, 700, 1_100, 1_000);
+        h.Hp(3518, 850, 1_200, 1_000);
+        h.Hp(3518, 400, 1_300, 1_000);
+
+        Assert.True(h.Focus.TryGetObservedBoss(1_400, 2_000, out var boss));
+        Assert.Equal(400, boss.Hp);
+        Assert.Equal(1_000, boss.MaxHp);
+        Assert.Equal(750, boss.CumulativeLostHp);
+    }
+
+    [Fact]
     public void ScenePath_PromotesExistingHpWhenBossLaterBecomesActive()
     {
         var h = new Harness();

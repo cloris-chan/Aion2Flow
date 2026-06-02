@@ -144,11 +144,22 @@ public sealed class BossFocusStore(EntityStore entities)
 
     private void Remember(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
     {
+        var resolvedHp = Math.Max(0, hp);
+        var resolvedMaxHp = Math.Max(1, maxHp);
+        var cumulativeLostHp = 0L;
+        if (_observed.TryGetValue(instanceId, out var previous) && previous.HasHp)
+        {
+            cumulativeLostHp = previous.CumulativeLostHp;
+            if (resolvedHp < previous.Hp)
+                cumulativeLostHp += previous.Hp - resolvedHp;
+        }
+
         var snapshot = new Snapshot
         {
             InstanceId = instanceId,
-            Hp = hp,
-            MaxHp = Math.Max(1, maxHp),
+            Hp = resolvedHp,
+            MaxHp = resolvedMaxHp,
+            CumulativeLostHp = cumulativeLostHp,
             LastObservedAtMilliseconds = Math.Max(0, observedAtMilliseconds),
             HasHp = true
         };
@@ -181,6 +192,7 @@ public sealed class BossFocusStore(EntityStore entities)
         public int InstanceId { get; init; }
         public int Hp { get; init; }
         public int MaxHp { get; init; }
+        public long CumulativeLostHp { get; init; }
         public long LastObservedAtMilliseconds { get; init; }
         public bool HasHp { get; init; }
     }

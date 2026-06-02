@@ -18,6 +18,8 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsyncDisposable
 {
+    private static readonly BossDamageContribution[] EmptyBossDamageContributions = [];
+
     private const string IndicatorIdleColor = "#6F7A8A";
     private const string IndicatorOkColor = "#6FD38A";
     private const string IndicatorWarnColor = "#F3C969";
@@ -47,6 +49,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private readonly Dictionary<int, IBrush> _combatantBarBrushes = [];
     private readonly Dictionary<int, IBrush> _bossHpBarBrushes = [];
     private readonly List<ProgressSegment> _bossSegmentScratch = [];
+    private readonly List<SceneBossFocusSnapshot> _bossShareSnapshotScratch = [];
+    private readonly List<CombatantBossShareViewModel> _combatantBossShareScratch = [];
     private int _displayContextVersion;
     private int _displayContextBuiltVersion = -1;
     private bool _displayContextIsArchived;
@@ -60,6 +64,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     public LocalizationService Localization { get; }
     public CombatantDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
     public SettingsFlyoutViewModel SettingsFlyout { get; }
+    public CombatantColumnLayoutViewModel CombatantColumns { get; }
     public ObservableCollection<BossFocusViewModel> BossFocuses { get; } = [];
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
     public ObservableCollection<EncounterHistoryItemViewModel> EncounterHistory { get; } = [];
@@ -181,6 +186,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _frameBatchService = frameBatchService;
         Localization = localization;
         SettingsFlyout = settingsFlyout;
+        CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService);
         DisplayContext = CreateLiveDisplayContext(_displayedSnapshot);
         _combatantDetails.DisplayContext = DisplayContext;
 
@@ -297,6 +303,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             Combatants.Clear();
             CombatantDetails.Clear();
             BossFocuses.Clear();
+            CombatantColumns.Update(hasBossColumn: false, SettingsFlyout.CombatantSortMetric);
             SelectedCombatant = null;
             SelectedEncounterHistory = null;
             IsViewingArchivedEncounter = false;
@@ -434,6 +441,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
             Combatants.Add(new CombatantRowViewModel(
                 _frameBatchService,
+                CombatantColumns,
                 id,
                 data.CharacterClass,
                 data.DamagePerSecond,
@@ -469,11 +477,14 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         if (IsViewingArchivedEncounter)
         {
             BossFocuses.Clear();
+            RefreshCombatantBossShares(snapshot.EncounterId, default, EmptyBossDamageContributions);
             return;
         }
 
         var snapshots = liveFrame?.BossFocuses ?? snapshot.BossFocuses;
-        SyncBossFocuses(snapshot.EncounterId, snapshots, liveFrame?.BossDamageContributions ?? []);
+        var damageContributions = liveFrame?.BossDamageContributions ?? EmptyBossDamageContributions;
+        SyncBossFocuses(snapshot.EncounterId, snapshots, damageContributions);
+        RefreshCombatantBossShares(snapshot.EncounterId, snapshots, damageContributions);
     }
 
     private void SyncBossFocuses(Guid encounterId, SnapshotList<SceneBossFocusSnapshot> snapshots, IReadOnlyList<BossDamageContribution> damageContributions)
@@ -595,6 +606,60 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         }
 
         return -1;
+    }
+
+    private void RefreshCombatantBossShares(Guid encounterId, SnapshotList<SceneBossFocusSnapshot> snapshots, IReadOnlyList<BossDamageContribution> damageContributions)
+    {
+        _bossShareSnapshotScratch.Clear();
+        for (var i = 0; i < snapshots.Count; i++)
+        {
+            var boss = snapshots[i];
+            if (boss.HasHp && boss.EffectiveHp > 0)
+                _bossShareSnapshotScratch.Add(boss);
+        }
+
+        var hasBossColumn = _bossShareSnapshotScratch.Count > 0;
+        CombatantColumns.Update(hasBossColumn, SettingsFlyout.CombatantSortMetric);
+        if (!hasBossColumn)
+        {
+            for (var i = 0; i < Combatants.Count; i++)
+                Combatants[i].UpdateBossShares([]);
+            return;
+        }
+
+        for (var i = 0; i < Combatants.Count; i++)
+        {
+            var row = Combatants[i];
+            _combatantBossShareScratch.Clear();
+            for (var j = 0; j < _bossShareSnapshotScratch.Count; j++)
+            {
+                var boss = _bossShareSnapshotScratch[j];
+                var damage = FindBossContributionAmount(damageContributions, boss.InstanceId, row.Id);
+                var ratio = damage > 0 ? damage / (double)boss.EffectiveHp : 0d;
+                _combatantBossShareScratch.Add(new CombatantBossShareViewModel(
+                    boss.InstanceId,
+                    ResolveBossHpBrush(encounterId, boss.InstanceId),
+                    ratio));
+            }
+
+            row.UpdateBossShares(_combatantBossShareScratch);
+        }
+    }
+
+    private static long FindBossContributionAmount(IReadOnlyList<BossDamageContribution> damageContributions, int bossId, int sourceCombatantId)
+    {
+        var start = FindBossContributionStart(damageContributions, bossId);
+        if (start < 0)
+            return 0;
+
+        for (var i = start; i < damageContributions.Count && damageContributions[i].BossId == bossId; i++)
+        {
+            var contribution = damageContributions[i];
+            if (contribution.SourceCombatantId == sourceCombatantId)
+                return Math.Max(0L, contribution.DamageAmount);
+        }
+
+        return 0;
     }
 
     private void RefreshCombatantBars(Guid encounterId)

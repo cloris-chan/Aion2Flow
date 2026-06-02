@@ -352,6 +352,7 @@ public sealed class SceneArchivePayload
                 InstanceId = boss.InstanceId,
                 Hp = boss.Hp,
                 MaxHp = boss.MaxHp,
+                CumulativeLostHp = boss.CumulativeLostHp,
                 LastObservedAtMilliseconds = boss.LastObservedAtMilliseconds,
                 HasHp = boss.HasHp
             };
@@ -834,6 +835,7 @@ public sealed class SceneArchiveBossFocus
     public int InstanceId { get; init; }
     public int Hp { get; init; }
     public int MaxHp { get; init; }
+    public long CumulativeLostHp { get; init; }
     public long LastObservedAtMilliseconds { get; init; }
     public bool HasHp { get; init; }
 
@@ -842,6 +844,7 @@ public sealed class SceneArchiveBossFocus
         InstanceId = InstanceId,
         Hp = Hp,
         MaxHp = MaxHp,
+        CumulativeLostHp = CumulativeLostHp,
         LastObservedAtMilliseconds = LastObservedAtMilliseconds,
         HasHp = HasHp
     };
