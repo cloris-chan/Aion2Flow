@@ -19,6 +19,7 @@ public sealed class PeriodicPoolCanonicalizer
         return normalized.PeriodicMode switch
         {
             9 => OpenState(sourceId, targetId, key, in normalized),
+            10 when IsMode10DamageTick(in normalized) => CloseStateWithDamageTick(sourceId, targetId, key, in normalized),
             10 => CloseState(key),
             11 => ApplyContinuation(sourceId, targetId, key, in normalized),
             _ => CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized))
@@ -37,6 +38,13 @@ public sealed class PeriodicPoolCanonicalizer
     {
         _states.Remove(key);
         return CombatCanonicalizationBatch.Empty;
+    }
+
+    private CombatCanonicalizationBatch CloseStateWithDamageTick(int sourceId, int targetId, Key key, in CombatObservation observation)
+    {
+        _states.Remove(key);
+        return CombatCanonicalizationBatch.One(
+            new CombatCanonicalizationResult(sourceId, targetId, NormalizeMode10DamageTick(sourceId, targetId, in observation)));
     }
 
     private CombatCanonicalizationBatch ApplyContinuation(int sourceId, int targetId, Key key, in CombatObservation observation)
@@ -96,6 +104,39 @@ public sealed class PeriodicPoolCanonicalizer
     private static CombatObservation NormalizeBaseObservation(int sourceId, int targetId, in CombatObservation observation) => CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
 
     private static int ResolvePoolSkillCode(in CombatObservation observation) => observation.SkillCode != 0 ? observation.SkillCode : observation.OriginalSkillCode;
+
+    private static bool IsMode10DamageTick(in CombatObservation observation) =>
+        observation.PeriodicRelation == PeriodicEffectRelation.Target &&
+        observation.PeriodicTailSkillCodeRaw > 0 &&
+        observation.ValueKind == CombatValueKind.PeriodicDamage &&
+        observation.Damage > 0 &&
+        ResolveMode10TickSkillFamily(in observation) is var skillFamily &&
+        skillFamily > 0 &&
+        IsMode10TickTailSkill(skillFamily, observation.PeriodicTailSkillCodeRaw) &&
+        observation.OriginalSkillCode == (long)skillFamily * 100 + 11;
+
+    private static bool IsMode10TickTailSkill(int skillFamily, int tailSkillCode)
+    {
+        var suffix = tailSkillCode - skillFamily;
+        return suffix is 3 or 30;
+    }
+
+    private static int ResolveMode10TickSkillFamily(in CombatObservation observation)
+    {
+        return observation.OriginalSkillCode > 0 ? observation.OriginalSkillCode / 100 : 0;
+    }
+
+    private static CombatObservation NormalizeMode10DamageTick(int sourceId, int targetId, in CombatObservation observation)
+    {
+        var tailSkillCode = observation.PeriodicTailSkillCodeRaw;
+        var reassigned = observation with
+        {
+            SkillCode = tailSkillCode,
+            OriginalSkillCode = tailSkillCode,
+            BaseSkillCode = 0
+        };
+        return NormalizeBaseObservation(sourceId, targetId, in reassigned);
+    }
 }
 
 public readonly record struct CombatCanonicalizationResult(int SourceId, int TargetId, CombatObservation Observation);
