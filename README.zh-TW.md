@@ -72,3 +72,17 @@ dotnet publish src/Aion2Flow -c Release -r win-x64 -p:PublishAot=true
 ```text
 src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
 ```
+
+## 贊助
+
+如果 Aion2Flow 對你有幫助，可以透過 Ko-fi 或微信讚賞支持開發。
+
+<p>
+  <a href="https://ko-fi.com/cloris">
+    <img alt="Support me on Ko-fi" src="https://ko-fi.com/img/githubbutton_sm.svg">
+  </a>
+</p>
+
+<p>
+  <img alt="微信讚賞碼" src="https://raw.githubusercontent.com/cloris-chan/.github/main/assets/sponsors/wechat-reward.png" width="180">
+</p>

@@ -72,3 +72,17 @@ Output:
 ```text
 src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
 ```
+
+## Sponsor
+
+If Aion2Flow helps you, you can support development through Ko-fi or WeChat.
+
+<p>
+  <a href="https://ko-fi.com/cloris">
+    <img alt="Support me on Ko-fi" src="https://ko-fi.com/img/githubbutton_sm.svg">
+  </a>
+</p>
+
+<p>
+  <img alt="WeChat reward QR code" src="https://raw.githubusercontent.com/cloris-chan/.github/main/assets/sponsors/wechat-reward.png" width="180">
+</p>
