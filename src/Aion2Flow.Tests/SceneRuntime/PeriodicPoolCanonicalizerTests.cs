@@ -319,6 +319,34 @@ public class PeriodicPoolCanonicalizerTests
     }
 
     [Fact]
+    public void ScenePath_PeriodicPoolKeyUsesTailEffectToAvoidSameChainCollision()
+    {
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
+
+        const int casterA = 100;
+        const int casterB = 101;
+        const int targetId = 200;
+        const int attackerId = 300;
+        const int chainId = 77;
+        const int tailA = 500011;
+        const int tailB = 500022;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+
+        AppendPeriodicPoolPacket(sink, casterA, targetId, 500001, tailA, 1000, chainId, 9, 1_000, 1, 1);
+        AppendPeriodicPoolPacket(sink, casterB, targetId, 500002, tailB, 2000, chainId, 9, 1_100, 1, 1);
+        AppendPeriodicPoolPacket(sink, attackerId, targetId, 500001, tailA, 700, chainId, 11, 2_000, 2, 2, tailPrefixValue: 300);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetCombatant(casterA, out var sourceA));
+        Assert.Equal(1000, sourceA!.OutgoingShield);
+        Assert.Equal(300, sourceA.OutgoingShieldAbsorbed);
+        Assert.False(combat.TryGetCombatant(casterB, out var sourceB) && sourceB!.OutgoingShield > 0);
+    }
+
+    [Fact]
     public void ScenePath_Mode9GrantOnlyDoesNotEmitSingletonShield()
     {
         const int playerId = 8470;
@@ -443,45 +471,29 @@ public class PeriodicPoolCanonicalizerTests
     [Theory]
     [InlineData(16140000, 1614000011, 16140030)]
     [InlineData(16001109, 1600110911, 16001112)]
-    public void ScenePath_StandaloneMode10TargetDamageUsesTailSkillWhenPacketShapeMatches(int skillCode, int originalSkillCode, int tailSkillCode)
+    [InlineData(16140000, 123456789, 16140030)]
+    public void ScenePath_StandaloneMode10TargetDamageUsesTailSkillWhenCompactControlMatches(int skillCode, int originalSkillCode, int tailSkillCode)
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         const int sourceId = 100;
         const int targetId = 200;
+        const long frameOrdinal = 1;
+        const long batchOrdinal = 1;
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = skillCode,
-            OriginalSkillCode = originalSkillCode,
-            Damage = 1395,
-            Unknown = 6,
-            Timestamp = 1_000,
-            ValueKind = CombatValueKind.PeriodicDamage,
-            PeriodicTailSkillCodeRaw = tailSkillCode
-        };
-        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
-        sink.AppendCombatPacket(packet);
+        sink.RegisterCompactControl0638(sourceId, tailSkillCode, 1, 12, 900, frameOrdinal, batchOrdinal);
+        AppendMode10DamageTick(sink, sourceId, targetId, skillCode, originalSkillCode, tailSkillCode, 1395, 6, 1_000, frameOrdinal, batchOrdinal);
 
         var combat = Apply(journal);
 
-        Assert.True(combat.TryGetCombatant(sourceId, out var source));
-        Assert.True(combat.TryGetPair(sourceId, targetId, out var pair));
-        Assert.Equal(1395, source!.OutgoingDamage);
-        Assert.Equal(1395, pair!.TotalDamage);
-        Assert.Single(combat.Events);
-        Assert.Equal(tailSkillCode, combat.Events[0].Observation.SkillCode);
-        Assert.Equal(tailSkillCode, combat.Events[0].Observation.OriginalSkillCode);
-        Assert.Equal(CombatValueKind.PeriodicDamage, combat.Events[0].Observation.ValueKind);
+        AssertMode10DamageTick(combat, sourceId, targetId, tailSkillCode, 1395);
     }
 
     [Fact]
-    public void ScenePath_StatefulMode10TargetDamageUsesTailSkillWhenPacketShapeMatches()
+    public void ScenePath_StatefulMode10TargetDamageUsesTailSkillWhenCompactControlMatches()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -491,6 +503,7 @@ public class PeriodicPoolCanonicalizerTests
         const int originalSkillCode = 1614000011;
         const int tailSkillCode = 16140030;
         const int chainId = 6;
+        const long batchOrdinal = 1;
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
@@ -504,72 +517,194 @@ public class PeriodicPoolCanonicalizerTests
             Damage = 5000,
             Unknown = chainId,
             Timestamp = 1_000,
-            ValueKind = CombatValueKind.PeriodicDamage
+            FrameOrdinal = 1,
+            BatchOrdinal = batchOrdinal,
+            ValueKind = CombatValueKind.PeriodicDamage,
+            PeriodicBodySkillCode = skillCode,
+            PeriodicTailSkillCodeRaw = tailSkillCode,
+            PeriodicTailLength = 4
         };
         seed.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
         sink.AppendCombatPacket(seed);
 
-        var terminal = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = skillCode,
-            OriginalSkillCode = originalSkillCode,
-            Damage = 1395,
-            Unknown = chainId,
-            Timestamp = 2_000,
-            ValueKind = CombatValueKind.PeriodicDamage,
-            PeriodicTailSkillCodeRaw = tailSkillCode
-        };
-        terminal.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
-        sink.AppendCombatPacket(terminal);
+        sink.RegisterCompactControl0638(sourceId, tailSkillCode, 1, 12, 1_900, 2, batchOrdinal);
+        AppendMode10DamageTick(sink, sourceId, targetId, skillCode, originalSkillCode, tailSkillCode, 1395, chainId, 2_000, 2, batchOrdinal);
 
         var combat = Apply(journal);
 
-        Assert.True(combat.TryGetCombatant(sourceId, out var source));
-        Assert.True(combat.TryGetPair(sourceId, targetId, out var pair));
-        Assert.Equal(1395, source!.OutgoingDamage);
-        Assert.Equal(1395, pair!.TotalDamage);
-        Assert.Single(combat.Events);
-        Assert.Equal(tailSkillCode, combat.Events[0].Observation.SkillCode);
-        Assert.Equal(tailSkillCode, combat.Events[0].Observation.OriginalSkillCode);
-        Assert.Equal(CombatValueKind.PeriodicDamage, combat.Events[0].Observation.ValueKind);
+        AssertMode10DamageTick(combat, sourceId, targetId, tailSkillCode, 1395);
     }
 
-    [Theory]
-    [InlineData(1614000051, 16140130)]
-    [InlineData(1614000012, 16140030)]
-    public void ScenePath_StandaloneMode10TargetDamageDropsUnmatchedPacketShapes(int originalSkillCode, int tailSkillCode)
+    [Fact]
+    public void ScenePath_StandaloneMode10TargetDamageDropsWithoutAssociatedCompactControl()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
         const int sourceId = 100;
         const int targetId = 200;
         const int skillCode = 16140000;
+        const int originalSkillCode = 1614000011;
+        const int tailSkillCode = 16140030;
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = skillCode,
-            OriginalSkillCode = originalSkillCode,
-            Damage = 1395,
-            Unknown = 6,
-            Timestamp = 1_000,
-            ValueKind = CombatValueKind.PeriodicDamage,
-            PeriodicTailSkillCodeRaw = tailSkillCode
-        };
-        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
-        sink.AppendCombatPacket(packet);
+        AppendMode10DamageTick(sink, sourceId, targetId, skillCode, originalSkillCode, tailSkillCode, 1395, 6, 1_000, 1, 1);
 
         var combat = Apply(journal);
 
         Assert.Empty(combat.Events);
         Assert.False(combat.TryGetCombatant(sourceId, out _));
         Assert.False(combat.TryGetPair(sourceId, targetId, out _));
+    }
+
+    [Fact]
+    public void ScenePath_StandaloneMode10TargetDamageDropsTailAliasPacket()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        const int sourceId = 100;
+        const int targetId = 200;
+        const int skillCode = 17070240;
+        const int originalSkillCode = 123456789;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+
+        sink.RegisterCompactControl0638(sourceId, skillCode, 1, 12, 900, 1, 1);
+        AppendMode10DamageTick(sink, sourceId, targetId, skillCode, originalSkillCode, skillCode, 1694, 19, 1_000, 1, 1);
+
+        var combat = Apply(journal);
+
+        Assert.Empty(combat.Events);
+        Assert.False(combat.TryGetCombatant(sourceId, out _));
+        Assert.False(combat.TryGetPair(sourceId, targetId, out _));
+    }
+
+    [Fact]
+    public void ScenePath_StandaloneMode10TargetDamageDropsNonSummonFlagZeroCompactControl()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        const int sourceId = 100;
+        const int targetId = 200;
+        const int skillCode = 16140000;
+        const int originalSkillCode = 1614000011;
+        const int tailSkillCode = 16140030;
+        const long frameOrdinal = 1;
+        const long batchOrdinal = 1;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+
+        sink.RegisterCompactControl0638(sourceId, tailSkillCode, 1, 0, 900, frameOrdinal, batchOrdinal);
+        AppendMode10DamageTick(sink, sourceId, targetId, skillCode, originalSkillCode, tailSkillCode, 1395, 6, 1_000, frameOrdinal, batchOrdinal);
+
+        var combat = Apply(journal);
+
+        Assert.Empty(combat.Events);
+        Assert.False(combat.TryGetCombatant(sourceId, out _));
+        Assert.False(combat.TryGetPair(sourceId, targetId, out _));
+    }
+
+    [Fact]
+    public void ScenePath_StandaloneMode10TargetDamageUsesRecentFlagZeroCompactControlAfterTriggeredTailGate()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        const int sourceId = 100;
+        const int targetId = 200;
+        const int skillCode = 16140000;
+        const int originalSkillCode = 1614000011;
+        const int tailSkillCode = 16140030;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+
+        sink.RegisterCompactControl0638(sourceId, tailSkillCode, 1, 12, 900, 1, 1);
+        sink.RegisterCompactControl0638(sourceId, tailSkillCode, 2, 0, 1_900, 2, 2);
+        AppendMode10DamageTick(sink, sourceId, targetId, skillCode, originalSkillCode, tailSkillCode, 1395, 13, 2_000, 2, 2);
+
+        var combat = Apply(journal);
+
+        AssertMode10DamageTick(combat, sourceId, targetId, tailSkillCode, 1395);
+    }
+
+    [Fact]
+    public void ScenePath_StandaloneMode10TargetDamageDropsWhenTriggeredTailGateHasNoRecentCompactControl()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        const int sourceId = 100;
+        const int targetId = 200;
+        const int skillCode = 16140000;
+        const int originalSkillCode = 1614000011;
+        const int tailSkillCode = 16140030;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+
+        sink.RegisterCompactControl0638(sourceId, tailSkillCode, 1, 12, 900, 1, 1);
+        for (var i = 0; i < 65; i++)
+            sink.RegisterCompactControl0638(1_000 + i, tailSkillCode + i + 1, i, 12, 1_000 + i, 2 + i, 2 + i);
+
+        AppendMode10DamageTick(sink, sourceId, targetId, skillCode, originalSkillCode, tailSkillCode, 1395, 13, 2_000, 100, 100);
+
+        var combat = Apply(journal);
+
+        Assert.Empty(combat.Events);
+        Assert.False(combat.TryGetCombatant(sourceId, out _));
+        Assert.False(combat.TryGetPair(sourceId, targetId, out _));
+    }
+
+    [Fact]
+    public void ScenePath_StandaloneMode10TargetDamageEmitsImmediatelyWithoutFinalFlush()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        const int sourceId = 100;
+        const int targetId = 200;
+        const int skillCode = 16140000;
+        const int originalSkillCode = 123456789;
+        const int tailSkillCode = 16140030;
+        const long frameOrdinal = 1;
+        const long batchOrdinal = 1;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+
+        sink.RegisterCompactControl0638(sourceId, tailSkillCode, 1, 12, 900, frameOrdinal, batchOrdinal);
+        AppendMode10DamageTick(sink, sourceId, targetId, skillCode, originalSkillCode, tailSkillCode, 1395, 13, 1_000, frameOrdinal, batchOrdinal);
+
+        var combat = ApplyRealtimeWithoutFinalFlush(journal);
+
+        AssertMode10DamageTick(combat, sourceId, targetId, tailSkillCode, 1395);
+    }
+
+    [Fact]
+    public void ScenePath_SummonMode10TargetDamageUsesFlagZeroCompactControl()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+
+        const int ownerId = 100;
+        const int summonId = 101;
+        const int targetId = 200;
+        const int skillCode = 16001109;
+        const int originalSkillCode = 1600110911;
+        const int tailSkillCode = 16001112;
+        const long frameOrdinal = 1;
+        const long batchOrdinal = 1;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+
+        sink.AppendSummon(ownerId, summonId);
+        sink.RegisterCompactControl0638(summonId, tailSkillCode, 1, 0, 900, frameOrdinal, batchOrdinal);
+        AppendMode10DamageTick(sink, summonId, targetId, skillCode, originalSkillCode, tailSkillCode, 517, 21, 1_000, frameOrdinal, batchOrdinal);
+
+        var combat = Apply(journal);
+
+        AssertMode10DamageTick(combat, summonId, targetId, tailSkillCode, 517);
     }
 
     [Fact]
@@ -621,5 +756,96 @@ public class PeriodicPoolCanonicalizerTests
         var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat);
         applier.ApplyJournal(journal);
         return combat;
+    }
+
+    private static CombatStore ApplyRealtimeWithoutFinalFlush(ObservedEventJournal journal)
+    {
+        var combat = new CombatStore();
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat);
+        for (var ordinal = 0L; ordinal < journal.Count; ordinal++)
+        {
+            var entry = journal.Read(ordinal);
+            applier.ApplyEntry(in entry);
+        }
+
+        return combat;
+    }
+
+    private static void AppendMode10DamageTick(
+        IRuntimeObservationSink sink,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int originalSkillCode,
+        int tailSkillCode,
+        int damage,
+        int chainId,
+        long timestamp,
+        long frameOrdinal,
+        long batchOrdinal)
+    {
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = skillCode,
+            OriginalSkillCode = originalSkillCode,
+            Damage = damage,
+            Unknown = chainId,
+            Timestamp = timestamp,
+            FrameOrdinal = frameOrdinal,
+            BatchOrdinal = batchOrdinal,
+            PeriodicBodySkillCode = skillCode,
+            PeriodicTailSkillCodeRaw = tailSkillCode,
+            PeriodicTailLength = 4
+        };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
+        sink.AppendCombatPacket(packet);
+    }
+
+    private static void AppendPeriodicPoolPacket(
+        IRuntimeObservationSink sink,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int tailSkillCode,
+        int damage,
+        int chainId,
+        int mode,
+        long timestamp,
+        long frameOrdinal,
+        long batchOrdinal,
+        int tailPrefixValue = 0)
+    {
+        var packet = new ParsedCombatPacket
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            SkillCode = skillCode,
+            OriginalSkillCode = skillCode,
+            Damage = damage,
+            Unknown = chainId,
+            Timestamp = timestamp,
+            FrameOrdinal = frameOrdinal,
+            BatchOrdinal = batchOrdinal,
+            PeriodicBodySkillCode = skillCode,
+            PeriodicTailSkillCodeRaw = tailSkillCode,
+            PeriodicTailPrefixValue = tailPrefixValue,
+            PeriodicTailLength = tailPrefixValue > 0 ? 5 : 4
+        };
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, mode);
+        sink.AppendCombatPacket(packet);
+    }
+
+    private static void AssertMode10DamageTick(CombatStore combat, int sourceId, int targetId, int tailSkillCode, int damage)
+    {
+        Assert.True(combat.TryGetCombatant(sourceId, out var source));
+        Assert.True(combat.TryGetPair(sourceId, targetId, out var pair));
+        Assert.Equal(damage, source!.OutgoingDamage);
+        Assert.Equal(damage, pair!.TotalDamage);
+        Assert.Single(combat.Events);
+        Assert.Equal(tailSkillCode, combat.Events[0].Observation.SkillCode);
+        Assert.Equal(tailSkillCode, combat.Events[0].Observation.OriginalSkillCode);
+        Assert.Equal(CombatValueKind.PeriodicDamage, combat.Events[0].Observation.ValueKind);
     }
 }

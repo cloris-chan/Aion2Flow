@@ -406,6 +406,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         Assert.Equal(11, entry.Observation.PeriodicMode);
         Assert.Equal(0x00ABCDEF, entry.Observation.PeriodicTailSkillCodeRaw);
         Assert.Equal(9, entry.Observation.PeriodicTailPrefixValue);
+        Assert.Equal(5, entry.Observation.PeriodicTailLength);
     }
 
     [Fact]
@@ -680,7 +681,7 @@ public sealed class PacketStreamProcessorNpcObservationTests
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
         public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructurePath structurePath = default) { }
-        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
+        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
         public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
         public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) { }
         public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)

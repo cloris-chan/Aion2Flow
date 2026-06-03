@@ -36,8 +36,10 @@ internal static class SceneReplayTestView
                 EffectTag = observation.EffectTag,
                 PeriodicRelation = observation.PeriodicRelation,
                 PeriodicMode = observation.PeriodicMode,
+                PeriodicBodySkillCode = observation.PeriodicBodySkillCode,
                 PeriodicTailSkillCodeRaw = observation.PeriodicTailSkillCodeRaw,
                 PeriodicTailPrefixValue = observation.PeriodicTailPrefixValue,
+                PeriodicTailLength = observation.PeriodicTailLength,
                 Timestamp = e.ObservedAtMilliseconds,
                 ContributesDamage = e.ContributesDamage,
                 ContributesHealing = e.ContributesHealing,
@@ -131,8 +133,10 @@ internal readonly record struct SceneReplayPacket
     public PacketEffectTag EffectTag { get; init; }
     public PeriodicEffectRelation PeriodicRelation { get; init; }
     public int PeriodicMode { get; init; }
+    public int PeriodicBodySkillCode { get; init; }
     public int PeriodicTailSkillCodeRaw { get; init; }
     public int PeriodicTailPrefixValue { get; init; }
+    public int PeriodicTailLength { get; init; }
     public long Timestamp { get; init; }
     public bool ContributesDamage { get; init; }
     public bool ContributesHealing { get; init; }

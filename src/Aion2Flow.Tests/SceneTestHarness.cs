@@ -147,8 +147,10 @@ internal sealed class SceneTestHarness : IDisposable
             Modifiers = packet.Modifiers,
             EventKind = packet.EventKind,
             ValueKind = packet.ValueKind,
+            PeriodicBodySkillCode = packet.PeriodicBodySkillCode,
             PeriodicTailSkillCodeRaw = packet.PeriodicTailSkillCodeRaw,
             PeriodicTailPrefixValue = packet.PeriodicTailPrefixValue,
+            PeriodicTailLength = packet.PeriodicTailLength,
             IsNormalized = packet.IsNormalized
         };
 
@@ -195,7 +197,7 @@ internal sealed class SceneTestHarness : IDisposable
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, value, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactControl0238(sourceId, skillCodeRaw, marker, batchOrdinal, structurePath);
-        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactControl0638(sourceId, skillCodeRaw, marker, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactControl0638(sourceId, skillCodeRaw, marker, flag, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterObservation2A38(sourceId, mode, groupCode, sequenceId, headValue, buffCodeRaw, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null) => inner.AppendNickname(uid, nickname, originServerId, faction, characterClass);

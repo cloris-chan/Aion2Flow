@@ -305,7 +305,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
@@ -332,6 +332,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 AttemptCount = 0,
                 DetailRaw = marker,
                 Marker = marker,
+                Flag = flag,
                 Type = 0,
                 LayoutTag = 0
             }

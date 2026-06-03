@@ -106,8 +106,10 @@ public readonly record struct CombatObservation
     public PacketEffectTag EffectTag { get; init; }
     public PeriodicEffectRelation PeriodicRelation { get; init; }
     public int PeriodicMode { get; init; }
+    public int PeriodicBodySkillCode { get; init; }
     public int PeriodicTailSkillCodeRaw { get; init; }
     public int PeriodicTailPrefixValue { get; init; }
+    public int PeriodicTailLength { get; init; }
     public int ChainId { get; init; }
 }
 

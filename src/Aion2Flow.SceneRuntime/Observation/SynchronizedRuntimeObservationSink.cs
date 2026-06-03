@@ -124,9 +124,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterCompactControl0238(sourceId, skillCodeRaw, marker, batchOrdinal, structurePath);
     }
 
-    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
-        lock (gate) inner.RegisterCompactControl0638(sourceId, skillCodeRaw, marker, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        lock (gate) inner.RegisterCompactControl0638(sourceId, skillCodeRaw, marker, flag, timestamp, frameOrdinal, batchOrdinal, structurePath);
     }
 
     public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)

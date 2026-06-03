@@ -20,7 +20,7 @@ public sealed class DomainEventApplier
     private readonly BossFocusStore _bossFocus;
 
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
-        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactAvoidanceCanonicalizer(), new BossFocusStore(entities))
+        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(entities), new CompactAvoidanceCanonicalizer(), new BossFocusStore(entities))
     {
     }
 
@@ -116,7 +116,7 @@ public sealed class DomainEventApplier
         {
             0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, entry.Raw.TimestampMilliseconds),
             0x0238 => _compactAvoidance.AdvanceBatch(in stamp),
-            0x0638 => _compactAvoidance.AdvanceBatch(in stamp),
+            0x0638 => ObserveCompactControl0638(entry.SourceEntityId, in stamp, in combatObservation),
             _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds)
         };
 
@@ -136,8 +136,14 @@ public sealed class DomainEventApplier
         var observation = ownerTargetSummonRestoreResult.Observation;
         var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonRestoreResult.SourceId, ownerTargetSummonRestoreResult.TargetId, in stamp, in observation);
         var systemRecoveryObservation = systemRecoveryResult.Observation;
-        foreach (var normalized in _periodicPool.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
+        foreach (var normalized in _periodicPool.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation, in stamp))
             ApplyCombatResult(in normalized, observedAtMilliseconds);
+    }
+
+    private StampedCombatCanonicalizationBatch ObserveCompactControl0638(int sourceId, in TimelineStamp stamp, in CombatObservation observation)
+    {
+        _periodicPool.ObserveCompactControl0638(sourceId, observation.SkillCode, observation.Flag, in stamp);
+        return _compactAvoidance.AdvanceBatch(in stamp);
     }
 
     private void ApplyCombatResult(in CombatCanonicalizationResult result, long observedAtMilliseconds)
