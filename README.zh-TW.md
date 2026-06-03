@@ -8,10 +8,10 @@
 
 <p align="center">
   <a href="https://github.com/cloris-chan/Aion2Flow/releases">
-    <img alt="Release" src="https://img.shields.io/github/v/release/cloris-chan/Aion2Flow?display_name=release&style=flat-square">
+    <img alt="Release" src="https://img.shields.io/github/v/release/cloris-chan/Aion2Flow?display_name=release">
   </a>
   <a href="./LICENSE.txt">
-    <img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square">
+    <img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPLv3-blue.svg">
   </a>
 </p>
 
@@ -19,29 +19,32 @@
 
 ## 特色
 
-- 即時戰鬥列表，顯示戰鬥時間、DPS、總傷害與貢獻占比
-- 角色細節面板，可查看造成與承受的傷害、治療與屏障
-- 技能明細統計，包含暴擊、命中率、多段打擊、背後、格擋、迴避、無敵等資訊
-- 自動歸檔最近戰鬥，可快速在歷史與即時視圖間切換
-- 介面支援繁體中文、English、한국어
+- 即時戰鬥列表，使用穩定寬度數字欄與動畫貢獻條。
+- Boss 焦點血條；在能辨識 Boss 血量與貢獻者時，會顯示傷害占比區段。
+- 角色細節面板，包含方向範圍、對象篩選與技能列。
+- 技能明細支援傷害、治療、屏障、吸收屏障等範圍。
+- 設定可調整語言、置頂模式、顯示列數、角色排序依據，以及全域戰鬥重置熱鍵。
+- Velopack 管理的版本可在設定中檢查更新。
 
 ## 安全性
 
-- 不修改遊戲檔案
-- 不注入遊戲進程
-- 不讀取遊戲記憶體
-- 不需額外安裝 Npcap / WinPcap
-- 僅分析本機流量
+Aion2Flow 的定位是本機封包分析器。
 
-## 下載
-
-預編譯版本：[GitHub Releases](https://github.com/cloris-chan/Aion2Flow/releases)
+- 不修改遊戲檔案。
+- 不注入遊戲進程。
+- 不讀取遊戲記憶體。
+- 不需要額外安裝 Npcap 或 WinPcap。
+- 啟動時需要系統管理員權限，讓 WinDivert 開啟擷取 driver。
 
 ## 需求
 
-- Windows x64
-- 啟動需要系統管理員權限
-- 若從原始碼建置，需要 .NET 10 SDK
+- Windows x64。
+- 啟動程式時需要系統管理員權限。
+- 若要從原始碼編譯或測試，需要 .NET 10 SDK。
+
+## 下載
+
+預編譯版本可在 [GitHub Releases](https://github.com/cloris-chan/Aion2Flow/releases) 下載。
 
 ## 編譯
 
@@ -55,16 +58,22 @@ dotnet build -c Release
 dotnet run --project src/Aion2Flow
 ```
 
+如果擷取啟動失敗，請用系統管理員權限執行。
+
 ## 測試
 
 ```bash
 dotnet test
 ```
 
-## AOT 發佈
+測試包含 protocol parser、場景統計聚合、UI view model，以及以 stream log fixture 驅動的 replay 測試。
+
+## 發佈
+
+桌面 app 已啟用 Native AOT 發佈：
 
 ```bash
-dotnet publish src/Aion2Flow -c Release -r win-x64 -p:PublishAot=true
+dotnet publish src/Aion2Flow -c Release
 ```
 
 輸出目錄：
@@ -72,6 +81,34 @@ dotnet publish src/Aion2Flow -c Release -r win-x64 -p:PublishAot=true
 ```text
 src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
 ```
+
+## 專案結構
+
+```text
+src/Aion2Flow              Avalonia 桌面 app、ViewModel、設定與更新流程
+src/Aion2Flow.Capture      WinDivert 擷取流程、TCP stream 處理、replay log
+src/Aion2Flow.Protocol     封包解析器與 protocol-level 結構
+src/Aion2Flow.SceneRuntime 場景模型、戰鬥聚合、身分推斷、歸檔快照
+src/Aion2Flow.Resources    內嵌資源資料庫，提供技能、NPC、地圖資料
+src/Aion2Flow.WinDivert    WinDivert P/Invoke 包裝與 native 檔案
+src/Aion2Flow.Tests        Parser、replay、場景 runtime 與 UI 測試
+```
+
+## 在地化
+
+介面支援：
+
+- 繁體中文
+- English
+- 한국어
+
+遊戲資源顯示資料來自內嵌資源資料庫，會在資料可用時跟隨介面語言。
+
+## 注意事項
+
+- Parser 目前針對 AION 2 台服客戶端 protocol 調整；遊戲更新封包格式時可能需要同步更新。
+- 封包中的 resource reference 只視為顯示或除錯資訊，不作為穩定解析邏輯。
+- 本專案與 NCSOFT 或任何 AION 2 發行商沒有從屬、背書或贊助關係。
 
 ## 贊助
 
