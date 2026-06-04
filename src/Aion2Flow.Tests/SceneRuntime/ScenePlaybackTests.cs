@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
@@ -97,6 +98,27 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void TrackReader_ReadsPagedMarkersWithoutSkippingSpanRemainder()
+    {
+        var record = CreateArchiveRecord();
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var frame = session.Seek(0);
+        var segment = record.ScenePayload.TimelineSegment;
+
+        var first = ScenePlaybackTrackReader.Read(segment, frame.TimeRange, 400, 1_000, 2);
+        var second = ScenePlaybackTrackReader.Read(segment, frame.TimeRange, 400, 1_000, 10, first.NextCursor);
+
+        Assert.True(first.HasMore);
+        Assert.Equal([ScenePlaybackTrack.Combat, ScenePlaybackTrack.Combat], first.Markers.Select(static marker => marker.Track));
+        Assert.Equal([1L, 2L], first.Markers.Select(static marker => marker.ObservationOrdinal));
+        Assert.False(second.HasMore);
+        var marker = Assert.Single(second.Markers);
+        Assert.Equal(ScenePlaybackTrack.Resource, marker.Track);
+        Assert.Equal(3, marker.ObservationOrdinal);
+        Assert.Equal(30_000, marker.CurrentValue);
+    }
+
+    [Fact]
     public void Seek_Backwards_RebuildsAuraState()
     {
         var journal = new ObservedEventJournal();
@@ -153,6 +175,15 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void Controller_OptionsRejectInvalidCheckpointInterval()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ScenePlaybackController(
+            new ArchivedScenePlaybackSource(CreateArchiveRecord()),
+            new ManualTickSourceFactory(),
+            new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 0, RebuildCheckpointsOnCreate: false)));
+    }
+
+    [Fact]
     public void Controller_Stop_SeeksToStartAndPauses()
     {
         using var controller = CreateController(CreateArchiveRecord());
@@ -171,19 +202,20 @@ public sealed class ScenePlaybackTests
     {
         var tickFactory = new ManualTickSourceFactory();
         using var controller = CreateController(CreateArchiveRecord(), tickFactory);
-        var frames = new List<ScenePlaybackFrame>();
-        controller.FrameChanged += (_, e) => frames.Add(e.Frame);
+        var frames = new ConcurrentQueue<ScenePlaybackFrame>();
+        controller.FrameChanged += (_, e) => frames.Enqueue(e.Frame);
 
         controller.Play();
         tickFactory.Source.Tick(TimeSpan.FromMilliseconds(500));
         await WaitUntil(() => controller.PositionMilliseconds == 500);
         tickFactory.Source.Tick(TimeSpan.FromMilliseconds(5_000));
         await WaitUntil(() => !controller.IsPlaying && controller.PositionMilliseconds == controller.DurationMilliseconds);
+        await WaitUntil(() => frames.Count >= 2 && frames.Last().PositionMilliseconds == 2_000);
 
         Assert.Equal(2_000, controller.PositionMilliseconds);
         Assert.Equal(2_000, controller.DurationMilliseconds);
         Assert.True(frames.Count >= 2);
-        Assert.Equal(2_000, frames[^1].PositionMilliseconds);
+        Assert.Equal(2_000, frames.Last().PositionMilliseconds);
     }
 
     [Fact]
@@ -213,6 +245,52 @@ public sealed class ScenePlaybackTests
         Assert.Equal(ScenePlaybackSourceKind.Live, controller.State.SourceKind);
         Assert.Equal(3_000, controller.DurationMilliseconds);
         Assert.Equal(3_000, frame.TimeRange.DurationMilliseconds);
+    }
+
+    [Fact]
+    public async Task Controller_DefaultOptionsDoNotPrebuildLiveCheckpoints()
+    {
+        var scene = new SceneLiveReadModel();
+        AppendCombat(scene.Journal, scene.SessionId, 100, 200, 100, 1, 1_000);
+        AppendCombat(scene.Journal, scene.SessionId, 100, 200, 200, 2, 2_000);
+        using var controller = new ScenePlaybackController(new LiveScenePlaybackSource(scene));
+
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+
+        Assert.False(controller.IsCheckpointing);
+        Assert.Equal(1, controller.CheckpointCount);
+    }
+
+    [Fact]
+    public async Task Controller_RebuildCheckpoints_BuildsRuntimeCache()
+    {
+        using var controller = new ScenePlaybackController(
+            new ArchivedScenePlaybackSource(CreateArchiveRecord()),
+            new ManualTickSourceFactory(),
+            new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
+
+        await controller.RebuildCheckpointsAsync(TestContext.Current.CancellationToken);
+
+        var checkpoints = controller.GetCheckpoints();
+        Assert.False(controller.IsCheckpointing);
+        Assert.Equal(3, checkpoints.Length);
+        Assert.Equal([0L, 1_000L, 2_000L], checkpoints.Select(static checkpoint => checkpoint.PositionMilliseconds));
+        Assert.Equal(3, controller.State.CheckpointCount);
+        Assert.All(checkpoints, static checkpoint => Assert.True(checkpoint.ObservationOrdinal >= 0));
+    }
+
+    [Fact]
+    public async Task Controller_StartCheckpointRebuild_RunsInBackground()
+    {
+        using var controller = new ScenePlaybackController(
+            new ArchivedScenePlaybackSource(CreateArchiveRecord()),
+            new ManualTickSourceFactory(),
+            new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
+
+        controller.StartCheckpointRebuild();
+        await WaitUntil(() => !controller.IsCheckpointing && controller.CheckpointCount == 3);
+
+        Assert.Equal([0L, 1_000L, 2_000L], controller.GetCheckpoints().Select(static checkpoint => checkpoint.PositionMilliseconds));
     }
 
     [Fact]

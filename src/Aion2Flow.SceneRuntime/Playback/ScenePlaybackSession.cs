@@ -346,17 +346,26 @@ public sealed class ScenePlaybackSession
 
     private readonly record struct AuraKey(int TargetEntityId, int SequenceId, int SkillCode, int ChainId);
 
-    private struct TrackAccumulator(long firstOrdinal)
+    private struct TrackAccumulator
     {
-        private int _count = 0;
+        private long _firstOrdinal;
+        private long _lastOrdinal;
+        private int _count;
+
+        public TrackAccumulator(long firstOrdinal)
+        {
+            _firstOrdinal = firstOrdinal;
+            _lastOrdinal = firstOrdinal;
+            _count = 0;
+        }
 
         public void Apply(long ordinal)
         {
-            firstOrdinal = Math.Min(firstOrdinal, ordinal);
-            firstOrdinal = Math.Max(firstOrdinal, ordinal);
+            _firstOrdinal = Math.Min(_firstOrdinal, ordinal);
+            _lastOrdinal = Math.Max(_lastOrdinal, ordinal);
             _count++;
         }
 
-        public readonly ScenePlaybackTrackWindow ToWindow(ScenePlaybackTrack track) => new(track, firstOrdinal, firstOrdinal + 1, _count);
+        public readonly ScenePlaybackTrackWindow ToWindow(ScenePlaybackTrack track) => new(track, _firstOrdinal, _lastOrdinal + 1, _count);
     }
 }
