@@ -120,6 +120,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
     }
 
     public JournalReadResult ReadEntries(JournalCursor cursor, int maxCount, JournalEntriesReader reader)
+        => ReadEntries(cursor, long.MaxValue, maxCount, reader);
+
+    public JournalReadResult ReadEntries(JournalCursor cursor, long endObservationOrdinalExclusive, int maxCount, JournalEntriesReader reader)
     {
         lock (_gate)
         {
@@ -127,7 +130,13 @@ public sealed class ObservedEventJournal(int capacity = 0)
             if (start >= _entries.Count || maxCount <= 0)
                 return new JournalReadResult(0, cursor);
 
-            var count = Math.Min(maxCount, _entries.Count - start);
+            var end = endObservationOrdinalExclusive >= _nextObservationOrdinal
+                ? _entries.Count
+                : FindPosition(endObservationOrdinalExclusive);
+            if (end <= start)
+                return new JournalReadResult(0, cursor);
+
+            var count = Math.Min(maxCount, end - start);
             var entries = CollectionsMarshal.AsSpan(_entries).Slice(start, count);
             reader(entries);
             return new JournalReadResult(count, new JournalCursor(entries[^1].Stamp.ObservationOrdinal + 1));

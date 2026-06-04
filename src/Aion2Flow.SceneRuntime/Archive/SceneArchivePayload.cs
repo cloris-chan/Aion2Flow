@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -13,6 +14,7 @@ public sealed class SceneArchivePayload
     private ArchivePayloadIndex? _detailIndex;
 
     public DateTimeOffset SceneStarted { get; init; }
+    public SceneJournalSegment TimelineSegment { get; init; }
     public IReadOnlyList<SceneArchiveCombatEvent> Events { get; init; } = [];
     public SceneIdentityScope IdentityScope { get; init; } = SceneIdentityScope.Empty;
     public IReadOnlyList<DirectedPairSnapshot> Pairs { get; init; } = [];
@@ -31,16 +33,9 @@ public sealed class SceneArchivePayload
         init => _detailIndex = value;
     }
 
-    internal static SceneArchivePayload CreateLocked(
-        SceneCombatSnapshot snapshot,
-        DateTimeOffset sceneStarted,
-        EntityStore entities,
-        SceneBoundaryStore boundary,
-        RuntimeMetadataRegistry metadataRegistry,
-        BossFocusStore bossFocus,
-        SceneCombatSnapshotAdapter adapter)
+    internal static SceneArchivePayload CreateLocked(SceneCombatSnapshot snapshot, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, BossFocusStore bossFocus, SceneCombatSnapshotAdapter adapter, SceneJournalSegment timelineSegment)
     {
-        var archivedSnapshot = snapshot.DeepClone();
+        var archivedSnapshot = snapshot;
         var eventsByKey = new Dictionary<EventKey, SceneArchiveCombatEvent>();
         var entityIds = new HashSet<int>();
 
@@ -70,6 +65,7 @@ public sealed class SceneArchivePayload
         return new SceneArchivePayload
         {
             SceneStarted = sceneStarted,
+            TimelineSegment = timelineSegment,
             Events = eventsSnapshot,
             IdentityScope = identityScope,
             Pairs = pairs,
@@ -105,6 +101,7 @@ public sealed class SceneArchivePayload
         return new SceneArchivePayload
         {
             SceneStarted = SceneStarted,
+            TimelineSegment = TimelineSegment,
             Events = events,
             IdentityScope = IdentityScope.DeepClone(),
             Pairs = pairs,

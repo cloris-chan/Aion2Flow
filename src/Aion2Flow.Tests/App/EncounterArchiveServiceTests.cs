@@ -106,8 +106,12 @@ public sealed class EncounterArchiveServiceTests
 
         var payload = owner.CreateArchivePayload(snapshot);
         var delta = payload.CreateDetailDelta(playerId);
+        var timelineCount = 0;
+        var timelineRead = payload.TimelineSegment.ReadEntries(payload.TimelineSegment.CreateCursor(), 64, entries => timelineCount = entries.Length);
 
         Assert.Equal(2, payload.Events.Count);
+        Assert.Equal(8, timelineCount);
+        Assert.Equal(8, timelineRead.Cursor.NextObservationOrdinal);
         Assert.Equal(playerId, delta.CombatantId);
         Assert.Equal(2, delta.Events.Count);
         Assert.Equal(playerId, delta.Events[0].SourceId);
@@ -180,6 +184,48 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal([1L, 2L], cloneDelta.Events.Select(static e => e.Revision));
         Assert.Equal([1, 2], clone.EventIndicesByCombatant[playerId]);
         Assert.Equal(payload.Events[1], clone.Events[1]);
+    }
+
+    [Fact]
+    public void SceneArchivePayload_TimelineSegment_IsFixed_AfterJournalAppend()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        const int playerId = 100;
+        const int bossId = 200;
+        AppendCombat(journal, sceneId, playerId, bossId, 100, 1, 1_000);
+        AppendCombat(journal, sceneId, playerId, bossId, 200, 2, 2_000);
+        journal.CompleteBatch(1);
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
+        var snapshot = owner.CreateSnapshot();
+        var payload = owner.CreateArchivePayload(snapshot);
+        var end = payload.TimelineSegment.CurrentEndObservationOrdinalExclusive;
+
+        AppendCombat(journal, sceneId, playerId, bossId, 300, 3, 3_000);
+
+        var count = 0;
+        payload.TimelineSegment.ReadEntries(payload.TimelineSegment.CreateCursor(), 64, entries => count = entries.Length);
+
+        Assert.False(payload.TimelineSegment.IsLiveGrowing);
+        Assert.Equal(2, end);
+        Assert.Equal(end, payload.TimelineSegment.CurrentEndObservationOrdinalExclusive);
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public void SceneArchivePayload_DeepClone_ReusesTimelineSegment()
+    {
+        const int playerId = 100;
+        const int bossId = 200;
+        var owner = CreateSceneOwner(playerId, bossId);
+        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
+
+        var clone = payload.DeepClone();
+
+        Assert.Same(payload.TimelineSegment.Journal, clone.TimelineSegment.Journal);
+        Assert.Equal(payload.TimelineSegment.StartObservationOrdinal, clone.TimelineSegment.StartObservationOrdinal);
+        Assert.Equal(payload.TimelineSegment.EndObservationOrdinalExclusive, clone.TimelineSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(payload.TimelineSegment.IsLiveGrowing, clone.TimelineSegment.IsLiveGrowing);
     }
 
     [Fact]

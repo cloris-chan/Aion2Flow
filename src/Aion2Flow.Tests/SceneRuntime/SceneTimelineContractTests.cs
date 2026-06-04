@@ -384,6 +384,68 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
+    public void Journal_ReadEntries_StopsAtEndExclusive()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+
+        for (var i = 0; i < 10; i++)
+            journal.Append(new ObservedEventEnvelope(sceneId,
+                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+
+        long[] ordinals = [];
+        var result = journal.ReadEntries(journal.CreateCursor(3), 7, 10, entries => ordinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
+
+        Assert.Equal(4, result.Count);
+        Assert.Equal(7, result.Cursor.NextObservationOrdinal);
+        Assert.Equal([3L, 4L, 5L, 6L], ordinals);
+    }
+
+    [Fact]
+    public void Journal_ReadEntries_ReacquiresSliceAfterAppendResize()
+    {
+        var journal = new ObservedEventJournal(1);
+        var sceneId = Guid.NewGuid();
+
+        for (var i = 0; i < 3; i++)
+            journal.Append(new ObservedEventEnvelope(sceneId,
+                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+
+        var first = journal.ReadEntries(journal.CreateCursor(0), 2, 10, _ => { });
+        for (var i = 3; i < 20; i++)
+            journal.Append(new ObservedEventEnvelope(sceneId,
+                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+
+        long[] ordinals = [];
+        var second = journal.ReadEntries(first.Cursor, journal.NextObservationOrdinal, 64, entries => ordinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
+
+        Assert.Equal(2, first.Cursor.NextObservationOrdinal);
+        Assert.Equal(18, second.Count);
+        Assert.Equal(20, second.Cursor.NextObservationOrdinal);
+        Assert.Equal(2, ordinals[0]);
+        Assert.Equal(19, ordinals[^1]);
+    }
+
+    [Fact]
+    public void SceneJournalSegment_ReadEntries_ClampsToSegmentStart()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+
+        for (var i = 0; i < 6; i++)
+            journal.Append(new ObservedEventEnvelope(sceneId,
+                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+
+        var segment = new SceneJournalSegment(journal, 2, 5, IsLiveGrowing: false);
+        long[] ordinals = [];
+        var result = segment.ReadEntries(journal.CreateCursor(0), 10, entries => ordinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(5, result.Cursor.NextObservationOrdinal);
+        Assert.Equal([2L, 3L, 4L], ordinals);
+    }
+
+    [Fact]
     public void Clock_CreateStamp_AssignsSequentialOrdinals()
     {
         var clock = new SceneRuntimeClock(startMonotonicTicks: 0);

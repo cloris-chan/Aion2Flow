@@ -62,7 +62,9 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public BossFocusStore BossFocus => _applier.BossFocus;
     public Guid EncounterId { get; private set; } = encounterId;
     public DateTimeOffset SceneStarted { get; private set; } = sceneStarted;
+    public long SceneStartObservationOrdinal { get; private set; } = journal.FirstObservationOrdinal;
     public long AppliedObservationOrdinal { get; private set; }
+    public long AppliedNextObservationOrdinal => _cursor.NextObservationOrdinal;
     public long AppliedBatchOrdinal => _appliedBatchOrdinal;
     public ProjectionCacheStats ProjectionCacheStats => _projectionCacheStats;
 
@@ -105,7 +107,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 boundary,
                 metadataRegistry,
                 _applier.BossFocus,
-                CreateAdapter());
+                CreateAdapter(),
+                CreateTimelineSegment(isLiveGrowing: false));
         }
     }
 
@@ -122,7 +125,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 boundary,
                 metadataRegistry,
                 _applier.BossFocus,
-                CreateAdapter());
+                CreateAdapter(),
+                CreateTimelineSegment(isLiveGrowing: false));
         }
     }
 
@@ -132,15 +136,17 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         {
             RefreshCore();
             var snapshot = CreateSnapshotCore();
-            var payload = SceneArchivePayload.CreateLocked(
-                snapshot,
-                SceneStarted,
-                entities,
-                boundary,
-                metadataRegistry,
-                _applier.BossFocus,
-                CreateAdapter());
+            var payload = SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, boundary, metadataRegistry, _applier.BossFocus, CreateAdapter(), CreateTimelineSegment(isLiveGrowing: false));
             return new SceneArchiveCapture(snapshot, payload);
+        }
+    }
+
+    public SceneJournalSegment CreateLiveTimelineSegment()
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            return CreateTimelineSegment(isLiveGrowing: true);
         }
     }
 
@@ -286,6 +292,9 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
     private SceneCombatSnapshotAdapter CreateAdapter() => _adapter ??= new(entities, combat, boundary, _applier.BossFocus, EncounterId);
 
+    private SceneJournalSegment CreateTimelineSegment(bool isLiveGrowing) =>
+        new(journal, SceneStartObservationOrdinal, AppliedNextObservationOrdinal, isLiveGrowing);
+
     private BossDamageContribution[] CreateBossDamageContributions(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
     {
         if (snapshot.BossFocuses.Count == 0 || snapshot.Combatants.Count == 0)
@@ -400,6 +409,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             RefreshCore(startOrdinal, completeBatches: false);
             EncounterId = encounterId;
             SceneStarted = sceneStarted;
+            SceneStartObservationOrdinal = startOrdinal;
             combat.Clear();
             _applier = new DomainEventApplier(entities, boundary, metadataRegistry, combat);
             _adapter = null;
