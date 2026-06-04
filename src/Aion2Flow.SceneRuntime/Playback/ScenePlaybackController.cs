@@ -1,6 +1,6 @@
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
-public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
+public sealed class ScenePlaybackController : IAsyncDisposable
 {
     public static readonly TimeSpan DefaultTickInterval = TimeSpan.FromMilliseconds(33);
     public const long DefaultCheckpointIntervalMilliseconds = 5_000;
@@ -135,10 +135,10 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
         CancelAndDisposeAfterCompletion(cancellation, playbackTask);
     }
 
-    public ScenePlaybackFrame Stop()
+    public async ValueTask<ScenePlaybackFrame> StopAsync(CancellationToken cancellationToken = default)
     {
         Pause();
-        return Seek(0);
+        return await SeekAsync(0, cancellationToken).ConfigureAwait(false);
     }
 
     public ScenePlaybackCheckpoint[] GetCheckpoints() => _checkpoints.Snapshot();
@@ -171,14 +171,8 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
         return RebuildCheckpointsCoreAsync(cancellationToken, generation);
     }
 
-    public ScenePlaybackFrame Seek(long positionMilliseconds) =>
-        SeekAsync(positionMilliseconds).AsTask().GetAwaiter().GetResult();
-
     public ValueTask<ScenePlaybackFrame> SeekAsync(long positionMilliseconds, CancellationToken cancellationToken = default) =>
         SeekCoreAsync(positionMilliseconds, cancelPrevious: true, cancellationToken);
-
-    public ScenePlaybackFrame Refresh() =>
-        RefreshAsync().AsTask().GetAwaiter().GetResult();
 
     public ValueTask<ScenePlaybackFrame> RefreshAsync(CancellationToken cancellationToken = default)
     {
@@ -197,9 +191,6 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
 
         Session.SetSpeed(speed);
     }
-
-    public void Dispose() =>
-        DisposeAsync().AsTask().GetAwaiter().GetResult();
 
     public async ValueTask DisposeAsync()
     {
@@ -281,7 +272,7 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
 
             try
             {
-                await SeekCoreAsync(tickTarget.Value.PositionMilliseconds, cancelPrevious: false, cancellationToken, tickTarget.Value.SeekGeneration).ConfigureAwait(false);
+                await AdvanceCoreAsync(tickTarget.Value.PositionMilliseconds, cancellationToken, tickTarget.Value.SeekGeneration).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -334,20 +325,11 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
             try
             {
                 var token = linkedCancellation.Token;
-                ScenePlaybackFrame frame;
-                if (Source.SourceKind == ScenePlaybackSourceKind.Archived && _checkpoints.TryGet(Math.Max(0, positionMilliseconds), out var checkpoint))
+                var frame = await Task.Run(() =>
                 {
-                    frame = checkpoint.Frame;
-                }
-                else
-                {
-                    frame = await Task.Run(() =>
-                    {
-                        token.ThrowIfCancellationRequested();
-                        return Session.Seek(positionMilliseconds);
-                    }, token).ConfigureAwait(false);
-                    _checkpoints.Upsert(CreateCheckpoint(frame));
-                }
+                    token.ThrowIfCancellationRequested();
+                    return Session.Seek(positionMilliseconds);
+                }, token).ConfigureAwait(false);
 
                 token.ThrowIfCancellationRequested();
                 if (!TryApplyFrame(frame, generation, out var playbackCancellation, out var playbackTask))
@@ -384,15 +366,48 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
         }
     }
 
+    private async ValueTask<ScenePlaybackFrame> AdvanceCoreAsync(long positionMilliseconds, CancellationToken cancellationToken, long expectedGeneration)
+    {
+        ThrowIfDisposed();
+        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_stateGate)
+            {
+                if (_disposed || expectedGeneration != _seekGeneration)
+                    return _currentFrame;
+            }
+
+            var frame = Session.AdvanceTo(positionMilliseconds);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryApplyFrame(frame, expectedGeneration, out var playbackCancellation, out var playbackTask))
+                return frame;
+
+            CancelAndDisposeAfterCompletion(playbackCancellation, playbackTask);
+            PublishFrameChanged(frame);
+            return frame;
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
     private async Task RebuildCheckpointsCoreAsync(CancellationToken cancellationToken, long generation)
     {
+        var publishStarted = false;
         lock (_stateGate)
         {
             if (_disposed || generation != _checkpointGeneration)
                 return;
 
             _isCheckpointing = true;
+            publishStarted = true;
         }
+
+        if (publishStarted)
+            PublishCurrentFrameChanged();
 
         try
         {
@@ -407,12 +422,12 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
                 for (var position = interval; position < duration; position += interval)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var frame = await Task.Run(() => session.Seek(position), cancellationToken).ConfigureAwait(false);
+                    var frame = await Task.Run(() => session.AdvanceTo(position), cancellationToken).ConfigureAwait(false);
                     checkpoints.Add(CreateCheckpoint(frame));
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                var last = await Task.Run(() => session.Seek(duration), cancellationToken).ConfigureAwait(false);
+                var last = await Task.Run(() => session.AdvanceTo(duration), cancellationToken).ConfigureAwait(false);
                 checkpoints.Add(CreateCheckpoint(last));
             }
 
@@ -424,11 +439,18 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
         }
         finally
         {
+            var publishFinished = false;
             lock (_stateGate)
             {
                 if (generation == _checkpointGeneration)
+                {
                     _isCheckpointing = false;
+                    publishFinished = !_disposed;
+                }
             }
+
+            if (publishFinished)
+                PublishCurrentFrameChanged();
         }
     }
 
@@ -465,15 +487,16 @@ public sealed class ScenePlaybackController : IDisposable, IAsyncDisposable
         FrameChanged?.Invoke(this, new ScenePlaybackFrameChangedEventArgs(state, frame));
     }
 
-    private ScenePlaybackControllerState CreateStateLocked() => new(
-        Source.SourceKind,
-        _positionMilliseconds,
-        _durationMilliseconds,
-        _speed,
-        _isPlaying,
-        _isLoading,
-        _isCheckpointing,
-        _checkpoints.Count);
+    private void PublishCurrentFrameChanged()
+    {
+        ScenePlaybackFrame frame;
+        lock (_stateGate)
+            frame = _currentFrame;
+
+        PublishFrameChanged(frame);
+    }
+
+    private ScenePlaybackControllerState CreateStateLocked() => new(Source.SourceKind, _positionMilliseconds, _durationMilliseconds, _speed, _isPlaying, _isLoading, _isCheckpointing, _checkpoints.Count);
 
     private void ThrowIfDisposed()
     {

@@ -116,6 +116,39 @@
   <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
   <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>總傷害</value></data>
 
+  <data name="Playback_WindowTitleFormat" xml:space="preserve"><value>回放（實驗性） - {0}</value></data>
+  <data name="Playback_Open" xml:space="preserve"><value>回放</value></data>
+  <data name="Playback_Status_Loading" xml:space="preserve"><value>正在載入幀</value></data>
+  <data name="Playback_Status_Playing" xml:space="preserve"><value>播放中</value></data>
+  <data name="Playback_Status_Paused" xml:space="preserve"><value>已暫停</value></data>
+  <data name="Playback_CheckpointsBuildingFormat" xml:space="preserve"><value>正在建立 checkpoints... {0}</value></data>
+  <data name="Playback_CheckpointsReadyFormat" xml:space="preserve"><value>Checkpoints {0}</value></data>
+  <data name="Playback_CheckpointsButton" xml:space="preserve"><value>Checkpoints</value></data>
+  <data name="Playback_TimelineMarkerLimitFormat" xml:space="preserve"><value>僅顯示前 {0} 個 timeline 標記</value></data>
+  <data name="Playback_Label_Speed" xml:space="preserve"><value>速率</value></data>
+  <data name="Playback_TimelineTracks" xml:space="preserve"><value>時間軸軌道</value></data>
+  <data name="Playback_Combatants" xml:space="preserve"><value>戰鬥對象</value></data>
+  <data name="Playback_EventWindow" xml:space="preserve"><value>事件窗口</value></data>
+  <data name="Playback_ActiveAuras" xml:space="preserve"><value>作用中 Buff / Debuff</value></data>
+  <data name="Playback_Column_Combatant" xml:space="preserve"><value>對象</value></data>
+  <data name="Playback_Column_Damage" xml:space="preserve"><value>傷害</value></data>
+  <data name="Playback_Column_Healing" xml:space="preserve"><value>治療</value></data>
+  <data name="Playback_Column_RemainingHp" xml:space="preserve"><value>剩餘 HP</value></data>
+  <data name="Playback_Column_Time" xml:space="preserve"><value>時間</value></data>
+  <data name="Playback_Column_Track" xml:space="preserve"><value>軌道</value></data>
+  <data name="Playback_Column_Source" xml:space="preserve"><value>來源</value></data>
+  <data name="Playback_Column_Target" xml:space="preserve"><value>目標</value></data>
+  <data name="Playback_Column_Skill" xml:space="preserve"><value>技能</value></data>
+  <data name="Playback_Column_Amount" xml:space="preserve"><value>數值</value></data>
+  <data name="Playback_Track_Combat" xml:space="preserve"><value>戰鬥</value></data>
+  <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>剩餘 HP</value></data>
+  <data name="Playback_Track_Aura" xml:space="preserve"><value>Buff / Debuff</value></data>
+  <data name="Playback_Track_State" xml:space="preserve"><value>狀態</value></data>
+  <data name="Playback_Track_Scene" xml:space="preserve"><value>場景</value></data>
+  <data name="Playback_Track_Action" xml:space="preserve"><value>動作</value></data>
+  <data name="Playback_Track_Diagnostic" xml:space="preserve"><value>診斷</value></data>
+  <data name="Playback_Track_Other" xml:space="preserve"><value>其他</value></data>
+
   <data name="Scene_Activation" xml:space="preserve"><value>場景啟動</value></data>
   <data name="Scene_Combat" xml:space="preserve"><value>戰鬥場景</value></data>
   <data name="Scene_Teardown" xml:space="preserve"><value>場景結束</value></data>

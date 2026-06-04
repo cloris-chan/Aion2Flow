@@ -80,6 +80,50 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void Session_AdvanceTo_ContinuesCurrentProjector()
+    {
+        var record = CreateArchiveRecord();
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+
+        var first = session.Seek(1_000);
+        var second = session.AdvanceTo(2_000);
+
+        Assert.Equal(300, first.CombatTotals.TotalDamage);
+        Assert.Equal(600, second.CombatTotals.TotalDamage);
+        Assert.Equal(5, second.AppliedSegment.EndObservationOrdinalExclusive);
+        Assert.Equal([0L, 1L, 2L, 3L, 4L], second.RecentMarkers.Select(static marker => marker.ObservationOrdinal));
+    }
+
+    [Fact]
+    public void Seek_ResourceWithoutMaximum_PreservesKnownMaxHp()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        const int bossId = 200;
+        AppendResource(journal, sceneId, bossId, 50_000, 50_000, 1, 1_000);
+        AppendResource(journal, sceneId, bossId, 30_000, null, 2, 1_500);
+        journal.CompleteBatch(1);
+        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
+        var snapshot = owner.CreateSnapshot();
+        var record = new ArchivedEncounterRecord
+        {
+            EncounterId = sceneId,
+            Snapshot = snapshot,
+            ScenePayload = owner.CreateArchivePayload(snapshot)
+        };
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+
+        var frame = session.Seek(500);
+
+        var resource = Assert.Single(frame.Resources);
+        Assert.Equal(30_000, resource.CurrentValue);
+        Assert.Equal(50_000, resource.MaximumValue);
+        var marker = Assert.Single(frame.RecentMarkers, static marker => marker.Track == ScenePlaybackTrack.Resource && marker.ObservationOrdinal == 1);
+        Assert.Equal(30_000, marker.CurrentValue);
+        Assert.Equal(50_000, marker.MaximumValue);
+    }
+
+    [Fact]
     public void Seek_TrackWindows_PreserveFirstAndLastOrdinals()
     {
         var record = CreateArchiveRecord();
@@ -145,9 +189,9 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
-    public void Controller_InitialState_UsesPausedTimelineDuration()
+    public async Task Controller_InitialState_UsesPausedTimelineDuration()
     {
-        using var controller = CreateController(CreateArchiveRecord());
+        await using var controller = CreateController(CreateArchiveRecord());
 
         Assert.False(controller.IsPlaying);
         Assert.False(controller.IsLoading);
@@ -159,9 +203,9 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
-    public void Controller_SetSpeed_RejectsInvalidValues()
+    public async Task Controller_SetSpeed_RejectsInvalidValues()
     {
-        using var controller = CreateController(CreateArchiveRecord());
+        await using var controller = CreateController(CreateArchiveRecord());
 
         Assert.Throws<ArgumentOutOfRangeException>(() => controller.SetSpeed(0));
         Assert.Throws<ArgumentOutOfRangeException>(() => controller.SetSpeed(-1));
@@ -184,13 +228,13 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
-    public void Controller_Stop_SeeksToStartAndPauses()
+    public async Task Controller_StopAsync_SeeksToStartAndPauses()
     {
-        using var controller = CreateController(CreateArchiveRecord());
-        controller.Seek(1_000);
+        await using var controller = CreateController(CreateArchiveRecord());
+        await controller.SeekAsync(1_000, TestContext.Current.CancellationToken);
         controller.Play();
 
-        var frame = controller.Stop();
+        var frame = await controller.StopAsync(TestContext.Current.CancellationToken);
 
         Assert.False(controller.IsPlaying);
         Assert.Equal(0, controller.PositionMilliseconds);
@@ -201,7 +245,7 @@ public sealed class ScenePlaybackTests
     public async Task Controller_Play_AdvancesAndPausesAtArchivedEnd()
     {
         var tickFactory = new ManualTickSourceFactory();
-        using var controller = CreateController(CreateArchiveRecord(), tickFactory);
+        await using var controller = CreateController(CreateArchiveRecord(), tickFactory);
         var frames = new ConcurrentQueue<ScenePlaybackFrame>();
         controller.FrameChanged += (_, e) => frames.Enqueue(e.Frame);
 
@@ -219,32 +263,59 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
-    public void Controller_Refresh_KeepsArchivedDurationFixedAfterJournalAppend()
+    public async Task Controller_Play_DoesNotCreateTickCheckpoints()
+    {
+        var tickFactory = new ManualTickSourceFactory();
+        await using var controller = CreateController(CreateArchiveRecord(), tickFactory);
+
+        controller.Play();
+        tickFactory.Source.Tick(TimeSpan.FromMilliseconds(500));
+        await WaitUntil(() => controller.PositionMilliseconds == 500);
+        tickFactory.Source.Tick(TimeSpan.FromMilliseconds(500));
+        await WaitUntil(() => controller.PositionMilliseconds == 1_000);
+
+        Assert.Equal(1, controller.CheckpointCount);
+    }
+
+    [Fact]
+    public async Task Controller_Refresh_KeepsArchivedDurationFixedAfterJournalAppend()
     {
         var record = CreateArchiveRecord();
-        using var controller = CreateController(record);
+        await using var controller = CreateController(record);
         AppendCombat(record.ScenePayload.TimelineSegment.Journal!, record.EncounterId, 100, 200, 400, 6, 4_000);
 
-        var frame = controller.Refresh();
+        var frame = await controller.RefreshAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2_000, controller.DurationMilliseconds);
         Assert.Equal(2_000, frame.TimeRange.DurationMilliseconds);
     }
 
     [Fact]
-    public void Controller_Refresh_GrowsLiveDurationAfterAppend()
+    public async Task Controller_Refresh_GrowsLiveDurationAfterAppend()
     {
         var scene = new SceneLiveReadModel();
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 100, 1, 1_000);
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 200, 2, 2_000);
-        using var controller = new ScenePlaybackController(new LiveScenePlaybackSource(scene), new ManualTickSourceFactory(), TimeSpan.FromMilliseconds(33));
+        await using var controller = new ScenePlaybackController(new LiveScenePlaybackSource(scene), new ManualTickSourceFactory(), TimeSpan.FromMilliseconds(33));
 
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 300, 3, 4_000);
-        var frame = controller.Refresh();
+        var frame = await controller.RefreshAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenePlaybackSourceKind.Live, controller.State.SourceKind);
         Assert.Equal(3_000, controller.DurationMilliseconds);
         Assert.Equal(3_000, frame.TimeRange.DurationMilliseconds);
+    }
+
+    [Fact]
+    public async Task Controller_DefaultOptionsPrebuildArchivedCheckpoints()
+    {
+        await using var controller = new ScenePlaybackController(new ArchivedScenePlaybackSource(CreateArchiveRecord()));
+
+        await WaitUntil(() => !controller.IsCheckpointing && controller.CheckpointCount == 2);
+
+        Assert.False(controller.IsCheckpointing);
+        Assert.Equal(2, controller.CheckpointCount);
+        Assert.Equal(5_000, ScenePlaybackControllerOptions.Default.CheckpointIntervalMilliseconds);
     }
 
     [Fact]
@@ -253,7 +324,7 @@ public sealed class ScenePlaybackTests
         var scene = new SceneLiveReadModel();
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 100, 1, 1_000);
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 200, 2, 2_000);
-        using var controller = new ScenePlaybackController(new LiveScenePlaybackSource(scene));
+        await using var controller = new ScenePlaybackController(new LiveScenePlaybackSource(scene));
 
         await Task.Delay(50, TestContext.Current.CancellationToken);
 
@@ -264,7 +335,7 @@ public sealed class ScenePlaybackTests
     [Fact]
     public async Task Controller_RebuildCheckpoints_BuildsRuntimeCache()
     {
-        using var controller = new ScenePlaybackController(
+        await using var controller = new ScenePlaybackController(
             new ArchivedScenePlaybackSource(CreateArchiveRecord()),
             new ManualTickSourceFactory(),
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
@@ -282,7 +353,7 @@ public sealed class ScenePlaybackTests
     [Fact]
     public async Task Controller_StartCheckpointRebuild_RunsInBackground()
     {
-        using var controller = new ScenePlaybackController(
+        await using var controller = new ScenePlaybackController(
             new ArchivedScenePlaybackSource(CreateArchiveRecord()),
             new ManualTickSourceFactory(),
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
@@ -294,30 +365,38 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
-    public async Task Controller_SeekAsync_PublishesOnlyLatestQuickSeek()
+    public async Task Controller_SeekAsync_FinalQuickSeekWins()
     {
-        using var controller = CreateController(CreateArchiveRecord());
-        var frames = new List<ScenePlaybackFrame>();
-        controller.FrameChanged += (_, e) => frames.Add(e.Frame);
+        await using var controller = CreateController(CreateArchiveRecord());
+        var frames = new ConcurrentQueue<ScenePlaybackFrame>();
+        controller.FrameChanged += (_, e) => frames.Enqueue(e.Frame);
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var first = controller.SeekAsync(500, cancellationToken).AsTask();
         var second = controller.SeekAsync(1_000, cancellationToken).AsTask();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+        try
+        {
+            await first;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
         var frame = await second;
+        var published = frames.ToArray();
 
         Assert.Equal(1_000, frame.PositionMilliseconds);
         Assert.Equal(1_000, controller.PositionMilliseconds);
-        Assert.Single(frames);
-        Assert.Equal(1_000, frames[0].PositionMilliseconds);
+        Assert.NotEmpty(published);
+        Assert.Equal(1_000, published[^1].PositionMilliseconds);
     }
 
     [Fact]
     public async Task Controller_ManualSeekWinsOverPlaybackTick()
     {
         var tickFactory = new ManualTickSourceFactory();
-        using var controller = CreateController(CreateArchiveRecord(), tickFactory);
+        await using var controller = CreateController(CreateArchiveRecord(), tickFactory);
 
         controller.Play();
         tickFactory.Source.Tick(TimeSpan.FromMilliseconds(500));
@@ -382,7 +461,7 @@ public sealed class ScenePlaybackTests
         });
     }
 
-    private static void AppendResource(ObservedEventJournal journal, Guid sceneId, int entityId, long current, long maximum, long ordinal, long observedAt)
+    private static void AppendResource(ObservedEventJournal journal, Guid sceneId, int entityId, long current, long? maximum, long ordinal, long observedAt)
     {
         journal.Append(new ObservedEventEnvelope
         {

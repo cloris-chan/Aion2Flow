@@ -15,6 +15,7 @@ public sealed class ScenePlaybackFrame
     public IReadOnlyList<ScenePlaybackResourceState> Resources { get; init; } = [];
     public IReadOnlyList<ScenePlaybackAuraState> ActiveAuras { get; init; } = [];
     public IReadOnlyList<ScenePlaybackTrackWindow> Tracks { get; init; } = [];
+    public IReadOnlyList<ScenePlaybackTrackMarker> RecentMarkers { get; init; } = [];
 }
 
 public readonly record struct ScenePlaybackTimeRange(long StartTimestampMilliseconds, long EndTimestampMilliseconds, long DurationMilliseconds, bool HasTimestamps);

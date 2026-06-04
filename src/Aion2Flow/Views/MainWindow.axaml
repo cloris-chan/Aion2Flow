@@ -324,6 +324,17 @@
                 <Border Classes="BottomBarDivider"
                         IsHitTestVisible="False" />
 
+                <Button Classes="BottomBarButton"
+                        MinWidth="26"
+                        IsEnabled="{Binding IsViewingArchivedEncounter}"
+                        Click="OpenSelectedPlayback"
+                        ToolTip.Tip="{markups:Translate Playback_Open}">
+                    <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
+                </Button>
+
+                <Border Classes="BottomBarDivider"
+                        IsHitTestVisible="False" />
+
                 <Button x:Name="EncounterHistoryButton"
                         Classes="BottomBarButton"
                         CornerRadius="0,999,999,0"

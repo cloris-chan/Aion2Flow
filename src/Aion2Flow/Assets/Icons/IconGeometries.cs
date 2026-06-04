@@ -3,11 +3,10 @@ using Avalonia.Media;
 
 namespace Cloris.Aion2Flow.Assets.Icons;
 
-// Lucide outline icons (https://lucide.dev, ISC license).
-// All paths normalized to a 24x24 bounding box via the leading "M0 0M24 24" prefix
 internal sealed class IconGeometries : ResourceDictionary
 {
     private const string Bbox = "M0 0M24 24";
+    internal static StreamGeometry Play { get; } = Geometry("M6 3l14 9-14 9V3z");
 
     public IconGeometries()
     {
@@ -20,6 +19,11 @@ internal sealed class IconGeometries : ResourceDictionary
         Add("globe", Geometry("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"));
         Add("settings", Geometry("M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"));
         Add("check", Geometry("M20 6 9 17l-5-5"));
+        Add("play", Play);
+        Add("pause", Geometry("M6 4h4v16H6zM14 4h4v16h-4z"));
+        Add("square", Geometry("M5 5h14v14H5z"));
+        Add("skip-back", Geometry("M19 20 9 12l10-8v16zM5 19V5"));
+        Add("skip-forward", Geometry("M5 4l10 8-10 8V4zM19 5v14"));
     }
 
     private static StreamGeometry Geometry(string data) => StreamGeometry.Parse(Bbox + data);

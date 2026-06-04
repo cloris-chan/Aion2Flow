@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Cloris.Aion2Flow.Assets.Icons;
 using Cloris.Aion2Flow.Controls;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
@@ -205,18 +206,40 @@ public partial class MainWindow : Window
             var header = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Spacing = 6
+                Spacing = 6,
+                VerticalAlignment = VerticalAlignment.Center
             };
             DisplayContextProvider.SetDisplayContext(header, item.DisplayContext);
             header.Children.Add(new MapDisplay
             {
                 MapId = item.MapId,
-                UseBrackets = true
+                UseBrackets = true,
+                VerticalAlignment = VerticalAlignment.Center
             });
             header.Children.Add(new TextBlock
             {
-                Text = item.ArchivedAtText
+                Text = item.ArchivedAtText,
+                VerticalAlignment = VerticalAlignment.Center
             });
+            var playbackButton = new Button
+            {
+                Tag = item,
+                VerticalAlignment = VerticalAlignment.Center,
+                Content = new Avalonia.Controls.Shapes.Path
+                {
+                    Data = IconGeometries.Play
+                }
+            };
+            ToolTip.SetTip(playbackButton, DataContext.Localization["Playback_Open"]);
+            playbackButton.Classes.Add("HistoryPlaybackButton");
+            if (playbackButton.Content is Avalonia.Controls.Shapes.Path playbackIcon)
+            {
+                playbackIcon.Classes.Add("Glyph");
+                playbackIcon.Classes.Add("GlyphSm");
+            }
+
+            playbackButton.Click += EncounterHistoryPlaybackButtonClicked;
+            header.Children.Add(playbackButton);
 
             var menuItem = new MenuItem
             {
@@ -235,6 +258,30 @@ public partial class MainWindow : Window
         {
             DataContext.SelectedEncounterHistory = item;
         }
+    }
+
+    private void EncounterHistoryPlaybackButtonClicked(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is Button { Tag: EncounterHistoryItemViewModel item })
+        {
+            OpenPlayback(item);
+        }
+    }
+
+    private void OpenSelectedPlayback(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext.SelectedEncounterHistory is { } item)
+        {
+            OpenPlayback(item);
+        }
+    }
+
+    private void OpenPlayback(EncounterHistoryItemViewModel item)
+    {
+        var viewModel = new ScenePlaybackViewModel(item.Record, item.DisplayContext, DataContext.Localization);
+        var window = new ScenePlaybackWindow(viewModel);
+        window.Show(this);
     }
 
     private void ConfigureCombatantDetailsFlyout(Flyout flyout, CombatantDetailsFlyoutView flyoutView)

@@ -116,6 +116,39 @@
   <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
   <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>Total Damage</value></data>
 
+  <data name="Playback_WindowTitleFormat" xml:space="preserve"><value>Playback (Experimental) - {0}</value></data>
+  <data name="Playback_Open" xml:space="preserve"><value>Playback</value></data>
+  <data name="Playback_Status_Loading" xml:space="preserve"><value>Loading frame</value></data>
+  <data name="Playback_Status_Playing" xml:space="preserve"><value>Playing</value></data>
+  <data name="Playback_Status_Paused" xml:space="preserve"><value>Paused</value></data>
+  <data name="Playback_CheckpointsBuildingFormat" xml:space="preserve"><value>Building checkpoints... {0}</value></data>
+  <data name="Playback_CheckpointsReadyFormat" xml:space="preserve"><value>Checkpoints {0}</value></data>
+  <data name="Playback_CheckpointsButton" xml:space="preserve"><value>Checkpoints</value></data>
+  <data name="Playback_TimelineMarkerLimitFormat" xml:space="preserve"><value>Showing first {0} timeline markers</value></data>
+  <data name="Playback_Label_Speed" xml:space="preserve"><value>Speed</value></data>
+  <data name="Playback_TimelineTracks" xml:space="preserve"><value>Timeline Tracks</value></data>
+  <data name="Playback_Combatants" xml:space="preserve"><value>Combatants</value></data>
+  <data name="Playback_EventWindow" xml:space="preserve"><value>Event Window</value></data>
+  <data name="Playback_ActiveAuras" xml:space="preserve"><value>Active Buff / Debuff</value></data>
+  <data name="Playback_Column_Combatant" xml:space="preserve"><value>Combatant</value></data>
+  <data name="Playback_Column_Damage" xml:space="preserve"><value>Damage</value></data>
+  <data name="Playback_Column_Healing" xml:space="preserve"><value>Healing</value></data>
+  <data name="Playback_Column_RemainingHp" xml:space="preserve"><value>Remaining HP</value></data>
+  <data name="Playback_Column_Time" xml:space="preserve"><value>Time</value></data>
+  <data name="Playback_Column_Track" xml:space="preserve"><value>Track</value></data>
+  <data name="Playback_Column_Source" xml:space="preserve"><value>Source</value></data>
+  <data name="Playback_Column_Target" xml:space="preserve"><value>Target</value></data>
+  <data name="Playback_Column_Skill" xml:space="preserve"><value>Skill</value></data>
+  <data name="Playback_Column_Amount" xml:space="preserve"><value>Amount</value></data>
+  <data name="Playback_Track_Combat" xml:space="preserve"><value>Combat</value></data>
+  <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>Remaining HP</value></data>
+  <data name="Playback_Track_Aura" xml:space="preserve"><value>Buff / Debuff</value></data>
+  <data name="Playback_Track_State" xml:space="preserve"><value>State</value></data>
+  <data name="Playback_Track_Scene" xml:space="preserve"><value>Scene</value></data>
+  <data name="Playback_Track_Action" xml:space="preserve"><value>Action</value></data>
+  <data name="Playback_Track_Diagnostic" xml:space="preserve"><value>Diagnostic</value></data>
+  <data name="Playback_Track_Other" xml:space="preserve"><value>Other</value></data>
+
   <!-- Battle scene labels (used in archived battle history) -->
   <data name="Scene_Activation" xml:space="preserve"><value>Scene Activation</value></data>
   <data name="Scene_Combat" xml:space="preserve"><value>Combat Scene</value></data>

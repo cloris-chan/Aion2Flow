@@ -11,7 +11,9 @@ namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 public sealed class ScenePlaybackSession
 {
     private const int DefaultReadBatchSize = 512;
+    private const int DefaultRecentMarkerCapacity = 512;
     private readonly IScenePlaybackSource _source;
+    private FrameProjector? _projector;
     private long _nextLoadedObservationOrdinal;
     private long _positionMilliseconds;
     private double _speed = 1d;
@@ -50,6 +52,8 @@ public sealed class ScenePlaybackSession
     {
         var segment = _source.CreateTimelineSegment();
         _nextLoadedObservationOrdinal = segment.StartObservationOrdinal;
+        _projector = null;
+        _positionMilliseconds = 0;
     }
 
     public JournalReadResult ReadNextTimelineBatch(int maxCount, JournalEntriesReader reader)
@@ -63,18 +67,35 @@ public sealed class ScenePlaybackSession
 
     public ScenePlaybackFrame Seek(long positionMilliseconds)
     {
+        var projector = CreateProjector();
+        _projector = projector;
+        return ApplyFrame(projector.AdvanceTo(positionMilliseconds, projector.Segment, projector.TimeRange));
+    }
+
+    public ScenePlaybackFrame AdvanceTo(long positionMilliseconds)
+    {
+        var projector = _projector ??= CreateProjector();
+        if (positionMilliseconds < _positionMilliseconds)
+            return Seek(positionMilliseconds);
+
+        var segment = _source.CreateTimelineSegment();
+        var timeRange = segment.IsLiveGrowing ? ResolveTimeRange(segment, _source.CreateSnapshot()) : projector.TimeRange;
+        return ApplyFrame(projector.AdvanceTo(positionMilliseconds, segment, timeRange));
+    }
+
+    private ScenePlaybackFrame ApplyFrame(ScenePlaybackFrame frame)
+    {
+        _positionMilliseconds = frame.PositionMilliseconds;
+        _nextLoadedObservationOrdinal = frame.AppliedSegment.EndObservationOrdinalExclusive;
+        return frame;
+    }
+
+    private FrameProjector CreateProjector()
+    {
         var segment = _source.CreateTimelineSegment();
         var baseSnapshot = _source.CreateSnapshot();
         var timeRange = ResolveTimeRange(segment, baseSnapshot);
-        var clamped = ClampPosition(positionMilliseconds, timeRange.DurationMilliseconds);
-        var targetTimestamp = timeRange.HasTimestamps
-            ? timeRange.StartTimestampMilliseconds + clamped
-            : clamped;
-        var projector = new FrameProjector(_source.EncounterId, segment, timeRange, targetTimestamp);
-        var frame = projector.BuildFrame(clamped);
-        _positionMilliseconds = clamped;
-        _nextLoadedObservationOrdinal = frame.AppliedSegment.EndObservationOrdinalExclusive;
-        return frame;
+        return new FrameProjector(_source.EncounterId, segment, timeRange);
     }
 
     private static long ClampPosition(long positionMilliseconds, long durationMilliseconds)
@@ -134,88 +155,137 @@ public sealed class ScenePlaybackSession
     private sealed class FrameProjector
     {
         private readonly Guid _encounterId;
-        private readonly SceneJournalSegment _segment;
-        private readonly ScenePlaybackTimeRange _timeRange;
-        private readonly long _targetTimestamp;
         private readonly EntityStore _entities = new();
         private readonly SceneBoundaryStore _boundary = new();
         private readonly RuntimeMetadataRegistry _metadata = new();
         private readonly CombatStore _combat = new();
         private readonly DomainEventApplier _applier;
+        private readonly SceneCombatSnapshotAdapter _adapter;
         private readonly Dictionary<int, ScenePlaybackResourceState> _resources = [];
         private readonly Dictionary<AuraKey, ScenePlaybackAuraState> _activeAuras = [];
         private readonly Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks = [];
+        private readonly Queue<ScenePlaybackTrackMarker> _recentMarkers = new(DefaultRecentMarkerCapacity);
+        private SceneJournalSegment _segment;
+        private ScenePlaybackTimeRange _timeRange;
+        private JournalCursor _cursor;
+        private long _targetTimestamp;
+        private long _positionMilliseconds;
         private long _appliedEndOrdinal;
+        private long _currentBatchOrdinal = -1;
+        private long _completedBatchOrdinal = -1;
 
-        public FrameProjector(Guid encounterId, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange, long targetTimestamp)
+        public FrameProjector(Guid encounterId, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
         {
             _encounterId = encounterId;
             _segment = segment;
             _timeRange = timeRange;
-            _targetTimestamp = targetTimestamp;
+            _cursor = segment.CreateCursor();
             _appliedEndOrdinal = segment.StartObservationOrdinal;
             _applier = new DomainEventApplier(_entities, _boundary, _metadata, _combat);
+            _adapter = new SceneCombatSnapshotAdapter(_entities, _combat, _boundary, _applier.BossFocus, _encounterId);
         }
 
-        public ScenePlaybackFrame BuildFrame(long positionMilliseconds)
+        public SceneJournalSegment Segment => _segment;
+
+        public ScenePlaybackTimeRange TimeRange => _timeRange;
+
+        public ScenePlaybackFrame AdvanceTo(long positionMilliseconds, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
         {
+            _segment = segment;
+            _timeRange = timeRange;
+            _positionMilliseconds = ClampPosition(positionMilliseconds, _timeRange.DurationMilliseconds);
+            _targetTimestamp = _timeRange.HasTimestamps
+                ? _timeRange.StartTimestampMilliseconds + _positionMilliseconds
+                : _positionMilliseconds;
+            if (_cursor.NextObservationOrdinal < _segment.StartObservationOrdinal)
+                _cursor = _segment.CreateCursor();
             ApplyEntries();
-            var adapter = new SceneCombatSnapshotAdapter(_entities, _combat, _boundary, _applier.BossFocus, _encounterId);
-            var snapshot = adapter.CreateSnapshot();
+            return BuildFrame();
+        }
+
+        private ScenePlaybackFrame BuildFrame()
+        {
+            var snapshot = _adapter.CreateSnapshot();
             var totals = CreateTotals(snapshot);
             return new ScenePlaybackFrame
             {
                 EncounterId = _encounterId,
-                PositionMilliseconds = positionMilliseconds,
-                PositionTimestampMilliseconds = _timeRange.HasTimestamps ? _targetTimestamp : positionMilliseconds,
+                PositionMilliseconds = _positionMilliseconds,
+                PositionTimestampMilliseconds = _timeRange.HasTimestamps ? _targetTimestamp : _positionMilliseconds,
                 TimeRange = _timeRange,
                 AppliedSegment = new SceneJournalSegment(_segment.Journal, _segment.StartObservationOrdinal, _appliedEndOrdinal, IsLiveGrowing: false),
                 Snapshot = snapshot,
                 CombatTotals = totals,
                 Resources = CreateResourceSnapshot(),
                 ActiveAuras = CreateAuraSnapshot(),
-                Tracks = CreateTrackSnapshot()
+                Tracks = CreateTrackSnapshot(),
+                RecentMarkers = CreateRecentMarkerSnapshot()
             };
         }
 
         private void ApplyEntries()
         {
-            var cursor = _segment.CreateCursor();
-            long currentBatchOrdinal = -1;
-            long completeBatchOrdinal = -1;
             while (true)
             {
-                var shouldContinue = true;
-                var result = _segment.ReadEntries(cursor, DefaultReadBatchSize, entries =>
+                if (_cursor.NextObservationOrdinal >= _segment.CurrentEndObservationOrdinalExclusive)
+                    break;
+
+                var stoppedAtTarget = false;
+                var appliedAny = false;
+                var result = _segment.ReadEntries(_cursor, DefaultReadBatchSize, entries =>
                 {
                     foreach (ref readonly var entry in entries)
                     {
                         var timestamp = ResolveTimestampMilliseconds(in entry);
                         if (_timeRange.HasTimestamps && timestamp > _targetTimestamp)
                         {
-                            shouldContinue = false;
+                            stoppedAtTarget = true;
                             return;
                         }
 
-                        if (currentBatchOrdinal >= 0 && entry.Stamp.BatchOrdinal != currentBatchOrdinal)
-                            completeBatchOrdinal = currentBatchOrdinal;
-                        currentBatchOrdinal = entry.Stamp.BatchOrdinal;
-                        _applier.ApplyEntry(in entry);
-                        ApplyFrameTracks(in entry, timestamp);
-                        _appliedEndOrdinal = entry.Stamp.ObservationOrdinal + 1;
+                        ApplyEntry(in entry, timestamp);
+                        appliedAny = true;
                     }
                 });
 
-                if (result.Count == 0 || !shouldContinue)
+                if (result.Count == 0 || stoppedAtTarget || !appliedAny)
                     break;
-
-                cursor = result.Cursor;
             }
 
-            if (_appliedEndOrdinal >= _segment.CurrentEndObservationOrdinalExclusive)
-                completeBatchOrdinal = currentBatchOrdinal;
-            if (completeBatchOrdinal >= 0)
-                _applier.CompleteBatch(completeBatchOrdinal);
+            TryCompleteCurrentBatchAtSegmentEnd();
+        }
+
+        private void ApplyEntry(in ObservedEventEnvelope entry, long timestamp)
+        {
+            var batchOrdinal = entry.Stamp.BatchOrdinal;
+            if (_currentBatchOrdinal >= 0 && batchOrdinal != _currentBatchOrdinal)
+                CompleteBatch(_currentBatchOrdinal);
+
+            _currentBatchOrdinal = batchOrdinal;
+            _applier.ApplyEntry(in entry);
+            ApplyFrameTracks(in entry, timestamp);
+            _appliedEndOrdinal = entry.Stamp.ObservationOrdinal + 1;
+            _cursor = new JournalCursor(_appliedEndOrdinal);
+        }
+
+        private void CompleteBatch(long batchOrdinal)
+        {
+            if (batchOrdinal <= 0 || batchOrdinal <= _completedBatchOrdinal)
+                return;
+
+            _applier.CompleteBatch(batchOrdinal);
+            _completedBatchOrdinal = batchOrdinal;
+        }
+
+        private void TryCompleteCurrentBatchAtSegmentEnd()
+        {
+            if (_currentBatchOrdinal <= 0 || _cursor.NextObservationOrdinal < _segment.CurrentEndObservationOrdinalExclusive)
+                return;
+
+            if (_segment.IsLiveGrowing && (_segment.Journal?.LastCompletedBatchOrdinal ?? -1) < _currentBatchOrdinal)
+                return;
+
+            CompleteBatch(_currentBatchOrdinal);
         }
 
         private void ApplyFrameTracks(in ObservedEventEnvelope entry, long timestamp)
@@ -225,13 +295,15 @@ public sealed class ScenePlaybackSession
             if (!exists)
                 accumulator = new TrackAccumulator(entry.Stamp.ObservationOrdinal);
             accumulator.Apply(entry.Stamp.ObservationOrdinal);
+            AddRecentMarker(CreateMarker(in entry, track, timestamp));
 
             if (entry.Domain == ObservedEventDomain.Resource && entry.Resource is { } resource)
             {
+                var maximumValue = ResolveResourceMaximum(in resource);
                 _resources[resource.EntityId] = new ScenePlaybackResourceState(
                     resource.EntityId,
                     resource.CurrentValue,
-                    resource.MaximumValue,
+                    maximumValue,
                     resource.Delta,
                     resource.ResourceKind,
                     timestamp,
@@ -248,18 +320,64 @@ public sealed class ScenePlaybackSession
                     return;
                 }
 
-                _activeAuras[key] = new ScenePlaybackAuraState(
-                    aura.SourceEntityId,
-                    aura.TargetEntityId,
-                    aura.SkillCode,
-                    aura.StackCount,
-                    aura.SequenceId,
-                    aura.ChainId,
-                    aura.ResultCode,
-                    aura.Mode,
-                    timestamp,
-                    entry.Stamp.ObservationOrdinal);
+                _activeAuras[key] = new ScenePlaybackAuraState(aura.SourceEntityId, aura.TargetEntityId, aura.SkillCode, aura.StackCount, aura.SequenceId, aura.ChainId, aura.ResultCode, aura.Mode, timestamp, entry.Stamp.ObservationOrdinal);
             }
+        }
+
+        private long? ResolveResourceMaximum(in ResourceObservation resource)
+        {
+            var maximumValue = resource.MaximumValue;
+            if (_entities.TryGet(resource.EntityId, out var entity) && entity.MaxHp is int entityMaxHp)
+                maximumValue = maximumValue.HasValue ? Math.Max(maximumValue.Value, entityMaxHp) : entityMaxHp;
+
+            if (maximumValue.HasValue && resource.CurrentValue.HasValue)
+                return Math.Max(maximumValue.Value, resource.CurrentValue.Value);
+
+            return maximumValue;
+        }
+
+        private void AddRecentMarker(ScenePlaybackTrackMarker marker)
+        {
+            _recentMarkers.Enqueue(marker);
+            while (_recentMarkers.Count > DefaultRecentMarkerCapacity)
+                _recentMarkers.Dequeue();
+        }
+
+        private ScenePlaybackTrackMarker CreateMarker(in ObservedEventEnvelope entry, ScenePlaybackTrack track, long timestamp)
+        {
+            var skillCode = 0;
+            var amount = 0L;
+            long? currentValue = null;
+            long? maximumValue = null;
+            var resourceKind = 0;
+            var resultCode = 0;
+            if (entry.Combat is { } combat)
+            {
+                skillCode = combat.SkillCode;
+                amount = combat.Damage;
+            }
+            else if (entry.Resource is { } resource)
+            {
+                currentValue = resource.CurrentValue;
+                maximumValue = ResolveResourceMaximum(in resource);
+                resourceKind = resource.ResourceKind;
+                amount = resource.Delta ?? 0;
+            }
+            else if (entry.Aura is { } aura)
+            {
+                skillCode = aura.SkillCode;
+                resultCode = aura.ResultCode;
+            }
+
+            return new ScenePlaybackTrackMarker(track, ResolvePositionMilliseconds(timestamp), timestamp, entry.Stamp.ObservationOrdinal, entry.SourceEntityId, entry.TargetEntityId, skillCode, amount, currentValue, maximumValue, resourceKind, resultCode);
+        }
+
+        private long ResolvePositionMilliseconds(long timestamp)
+        {
+            if (!_timeRange.HasTimestamps || timestamp <= 0)
+                return Math.Max(0, timestamp);
+
+            return Math.Max(0, timestamp - _timeRange.StartTimestampMilliseconds);
         }
 
         private static ScenePlaybackTrack ResolveTrack(ObservedEventDomain domain) => domain switch
@@ -341,6 +459,14 @@ public sealed class ScenePlaybackSession
                 result[index++] = accumulator.ToWindow(track);
             Array.Sort(result, static (left, right) => left.Track.CompareTo(right.Track));
             return result;
+        }
+
+        private ScenePlaybackTrackMarker[] CreateRecentMarkerSnapshot()
+        {
+            if (_recentMarkers.Count == 0)
+                return [];
+
+            return _recentMarkers.ToArray();
         }
     }
 
