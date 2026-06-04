@@ -8,6 +8,7 @@ public interface IScenePlaybackSource
 {
     Guid EncounterId { get; }
     DateTimeOffset SceneStarted { get; }
+    ScenePlaybackSourceKind SourceKind { get; }
     SceneJournalSegment CreateTimelineSegment();
     SceneCombatSnapshot CreateSnapshot();
 }
@@ -17,6 +18,8 @@ public sealed class ArchivedScenePlaybackSource(ArchivedEncounterRecord record) 
     public Guid EncounterId => record.EncounterId;
 
     public DateTimeOffset SceneStarted => record.ScenePayload.SceneStarted;
+
+    public ScenePlaybackSourceKind SourceKind => ScenePlaybackSourceKind.Archived;
 
     public SceneJournalSegment CreateTimelineSegment() => record.ScenePayload.TimelineSegment;
 
@@ -29,7 +32,15 @@ public sealed class LiveScenePlaybackSource(SceneLiveReadModel scene) : IScenePl
 
     public DateTimeOffset SceneStarted => scene.SessionStarted;
 
+    public ScenePlaybackSourceKind SourceKind => ScenePlaybackSourceKind.Live;
+
     public SceneJournalSegment CreateTimelineSegment() => scene.Owner.CreateLiveTimelineSegment();
 
     public SceneCombatSnapshot CreateSnapshot() => scene.Owner.CreateSnapshot();
+}
+
+public enum ScenePlaybackSourceKind
+{
+    Archived,
+    Live
 }
