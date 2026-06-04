@@ -577,6 +577,25 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_SceneMode_AutoArchiveKeepsPreviousEncounterMapOnMapTransition()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneMap(600002, 396972);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        fixture.AppendSceneMap(1010, 0);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var record = Assert.Single(fixture.Archive.History);
+        Assert.Equal("map-transition", record.Trigger);
+        Assert.True(record.IsAutomatic);
+        Assert.Equal(600002u, record.Snapshot.MapId);
+        Assert.Equal(396972u, record.Snapshot.MapInstanceId);
+        Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
+    }
+
+    [Fact]
     public void RefreshCombatStats_SceneMode_AutoArchivesWhenPreviousMapIsUnknown()
     {
         var fixture = MainViewModelFixture.Create();

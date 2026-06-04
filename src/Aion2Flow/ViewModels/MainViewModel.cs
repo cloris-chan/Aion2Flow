@@ -871,17 +871,24 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private SceneDisplayContext CreateDisplayContext(SceneCombatSnapshot snapshot, SceneIdentityScope scope, RuntimeMetadataRegistry? metadataRegistry)
         => new(scope, metadataRegistry, snapshot, _gameResourceService, Localization["Scene_Unknown"]);
 
-    private ArchivedEncounterRecord? ArchiveEncounter(string trigger, bool isAutomatic)
+    private ArchivedEncounterRecord? ArchiveEncounter(string trigger, bool isAutomatic, SceneCombatSnapshot? archivedSnapshot = null)
     {
-        var archive = _captureService.Scene.Owner.CreateArchiveCapture();
-        return _encounterArchiveService.Archive(archive.Snapshot, archive.Payload, trigger, isAutomatic);
+        var owner = _captureService.Scene.Owner;
+        if (archivedSnapshot is null)
+        {
+            var archive = owner.CreateArchiveCapture();
+            return _encounterArchiveService.Archive(archive.Snapshot, archive.Payload, trigger, isAutomatic);
+        }
+
+        var payload = owner.CreateArchivePayload(archivedSnapshot);
+        return _encounterArchiveService.Archive(archivedSnapshot, payload, trigger, isAutomatic);
     }
 
     private bool TryAutoResetEncounter(SceneCombatSnapshot previousLiveSnapshot, SceneCombatSnapshot latestLiveSnapshot)
     {
         if (TryResolveMapTransitionResetReason(previousLiveSnapshot, latestLiveSnapshot, out var mapTransitionReason))
         {
-            ArchiveEncounter(mapTransitionReason, isAutomatic: true);
+            ArchiveEncounter(mapTransitionReason, isAutomatic: true, previousLiveSnapshot);
             ResetLiveModels(RawPacketDump.RotateLogs);
             return true;
         }
