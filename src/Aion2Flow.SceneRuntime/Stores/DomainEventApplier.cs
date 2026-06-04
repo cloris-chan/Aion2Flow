@@ -20,7 +20,7 @@ public sealed class DomainEventApplier
     private readonly BossFocusStore _bossFocus;
 
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
-        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(entities), new CompactAvoidanceCanonicalizer(), new BossFocusStore(entities))
+        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactAvoidanceCanonicalizer(), new BossFocusStore(entities))
     {
     }
 

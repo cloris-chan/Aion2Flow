@@ -582,7 +582,7 @@ public class PeriodicPoolCanonicalizerTests
     }
 
     [Fact]
-    public void ScenePath_StandaloneMode10TargetDamageDropsNonSummonFlagZeroCompactControl()
+    public void ScenePath_StandaloneMode10TargetDamageUsesFlagZeroCompactControl()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -602,13 +602,11 @@ public class PeriodicPoolCanonicalizerTests
 
         var combat = Apply(journal);
 
-        Assert.Empty(combat.Events);
-        Assert.False(combat.TryGetCombatant(sourceId, out _));
-        Assert.False(combat.TryGetPair(sourceId, targetId, out _));
+        AssertMode10DamageTick(combat, sourceId, targetId, tailSkillCode, 1395);
     }
 
     [Fact]
-    public void ScenePath_StandaloneMode10TargetDamageUsesRecentFlagZeroCompactControlAfterTriggeredTailGate()
+    public void ScenePath_StandaloneMode10TargetDamageUsesRecentFlagZeroCompactControl()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
@@ -631,7 +629,7 @@ public class PeriodicPoolCanonicalizerTests
     }
 
     [Fact]
-    public void ScenePath_StandaloneMode10TargetDamageDropsWhenTriggeredTailGateHasNoRecentCompactControl()
+    public void ScenePath_StandaloneMode10TargetDamageDropsWhenCompactControlIsNotRecent()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 

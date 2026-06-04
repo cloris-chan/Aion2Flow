@@ -1,42 +1,23 @@
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
-using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 
 public sealed class PeriodicPoolCanonicalizer
 {
-    private readonly record struct Key(int TargetId, int ChainId, int EffectCode);
+    private readonly record struct Key(int TargetId, int ChainId, int SkillIdentityCode);
     private readonly record struct RemainingValueState(long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatObservation Grant, bool ShieldGrantEmitted);
 
     private readonly Dictionary<Key, RemainingValueState> _states = [];
-    private readonly Mode10TailSidecarGate _mode10TailGate;
-
-    public PeriodicPoolCanonicalizer()
-        : this(static _ => false)
-    {
-    }
-
-    public PeriodicPoolCanonicalizer(EntityStore entities)
-        : this(instanceId => entities.TryGet(instanceId, out var entity) && entity.OwnerEntityId.HasValue)
-    {
-    }
-
-    private PeriodicPoolCanonicalizer(Func<int, bool> hasSummonOwner)
-    {
-        _mode10TailGate = new Mode10TailSidecarGate(hasSummonOwner);
-    }
+    private readonly Mode10TailSidecarGate _mode10TailGate = new();
 
     public void ObserveCompactControl0638(int sourceId, int skillCode, int flag, in TimelineStamp stamp)
     {
         _mode10TailGate.ObserveCompactControl0638(sourceId, skillCode, flag, in stamp);
     }
 
-    public CombatCanonicalizationBatch Normalize(int sourceId, int targetId, in CombatObservation observation)
-    {
-        return Normalize(sourceId, targetId, in observation, default);
-    }
+    public CombatCanonicalizationBatch Normalize(int sourceId, int targetId, in CombatObservation observation) => Normalize(sourceId, targetId, in observation, default);
 
     public CombatCanonicalizationBatch Normalize(int sourceId, int targetId, in CombatObservation observation, in TimelineStamp stamp)
     {
@@ -132,10 +113,9 @@ public sealed class PeriodicPoolCanonicalizer
 
     private static CombatObservation NormalizeBaseObservation(int sourceId, int targetId, in CombatObservation observation) => CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
 
-    private static Key ResolveStateKey(int targetId, int chainId, in CombatObservation observation) =>
-        new(targetId, chainId, ResolvePeriodicEffectCode(in observation));
+    private static Key ResolveStateKey(int targetId, int chainId, in CombatObservation observation) => new(targetId, chainId, ResolvePeriodicSkillIdentityCode(in observation));
 
-    private static int ResolvePeriodicEffectCode(in CombatObservation observation)
+    private static int ResolvePeriodicSkillIdentityCode(in CombatObservation observation)
     {
         if (observation.PeriodicTailSkillCodeRaw > 0)
             return observation.PeriodicTailSkillCodeRaw;
@@ -160,22 +140,19 @@ public sealed class PeriodicPoolCanonicalizer
         return NormalizeBaseObservation(sourceId, targetId, in reassigned);
     }
 
-    private sealed class Mode10TailSidecarGate(Func<int, bool> hasSummonOwner)
+    private sealed class Mode10TailSidecarGate
     {
         private const int MaxRecentTailControls = 128;
-        private const int MaxTriggeredTailGates = 256;
         private const int MaxAcceptedDamageChains = 256;
         private const long MaxTailControlObservationDistance = 64;
         private const long MaxTailControlBatchDistance = 16;
-        private const int CompactControlContinuationFlag = 0;
+        private const int CompactControlDefaultFlag = 0;
         private const int CompactControlTriggeredFlag = 12;
 
         private readonly record struct TailKey(int SourceId, int TailSkillCode);
         private readonly record struct TailControl(TailKey Key, int Flag, TimelineStamp Stamp);
         private readonly record struct DamageChainKey(int SourceId, int TargetId, int ChainId, int TailSkillCode);
 
-        private readonly HashSet<TailKey> _triggeredTailGates = [];
-        private readonly Queue<TailKey> _triggeredTailGateOrder = [];
         private readonly List<TailControl> _recentTailControls = new(MaxRecentTailControls);
         private readonly HashSet<DamageChainKey> _acceptedDamageChains = [];
         private readonly Queue<DamageChainKey> _acceptedDamageChainOrder = [];
@@ -186,9 +163,6 @@ public sealed class PeriodicPoolCanonicalizer
                 return;
 
             var key = new TailKey(sourceId, tailSkillCode);
-            if (flag == CompactControlTriggeredFlag || hasSummonOwner(sourceId))
-                RememberTriggeredTailGate(key);
-
             _recentTailControls.Add(new TailControl(key, flag, stamp));
             TrimRecentTailControls();
         }
@@ -217,8 +191,7 @@ public sealed class PeriodicPoolCanonicalizer
             observation.PeriodicTailPrefixValue == 0 &&
             observation.Damage > 0;
 
-        private static int ResolveBodySkillCode(in CombatObservation observation) =>
-            observation.PeriodicBodySkillCode > 0 ? observation.PeriodicBodySkillCode : observation.SkillCode;
+        private static int ResolveBodySkillCode(in CombatObservation observation) => observation.PeriodicBodySkillCode > 0 ? observation.PeriodicBodySkillCode : observation.SkillCode;
 
         private bool HasAssociatedTailControl(int sourceId, int tailSkillCode, in TimelineStamp stamp)
         {
@@ -234,24 +207,11 @@ public sealed class PeriodicPoolCanonicalizer
                 if (!IsRecentTailControl(in controlStamp, in stamp))
                     continue;
 
-                if (control.Flag == CompactControlTriggeredFlag)
-                    return true;
-
-                if (control.Flag == CompactControlContinuationFlag && (_triggeredTailGates.Contains(key) || hasSummonOwner(sourceId)))
+                if (control.Flag is CompactControlDefaultFlag or CompactControlTriggeredFlag)
                     return true;
             }
 
             return false;
-        }
-
-        private void RememberTriggeredTailGate(TailKey key)
-        {
-            if (!_triggeredTailGates.Add(key))
-                return;
-
-            _triggeredTailGateOrder.Enqueue(key);
-            while (_triggeredTailGates.Count > MaxTriggeredTailGates)
-                _triggeredTailGates.Remove(_triggeredTailGateOrder.Dequeue());
         }
 
         private void RememberAcceptedDamageChain(DamageChainKey key)
@@ -292,11 +252,7 @@ public sealed class PeriodicPoolCanonicalizer
             return false;
         }
 
-        private static bool HasTimeline(in TimelineStamp stamp) =>
-            stamp.OffsetTicks != 0 ||
-            stamp.ObservationOrdinal != 0 ||
-            stamp.FrameOrdinal != 0 ||
-            stamp.BatchOrdinal != 0;
+        private static bool HasTimeline(in TimelineStamp stamp) => stamp.OffsetTicks != 0 || stamp.ObservationOrdinal != 0 || stamp.FrameOrdinal != 0 || stamp.BatchOrdinal != 0;
     }
 }
 
