@@ -428,8 +428,27 @@ public sealed class PacketLogReplayServiceTests
             playerSkills.TryGetValue(16990004, out var spiritDescentRestore) && spiritDescentRestore.HealingAmount > 0,
             diagnostics);
 
-        var playerSummary = Assert.Single(replay.Combatants, static summary => summary.CombatantId == playerId);
-        Assert.True(playerSummary.IncomingDamage == 13_347, diagnostics);
+        var summonOwnerByInstance = SceneReplayTestView.SummonOwnerByInstance(replay);
+        var ownerTargetResourceValues = SceneReplayTestView.Packets(replay)
+            .Where(packet =>
+                summonOwnerByInstance.TryGetValue(packet.SourceId, out var ownerId) &&
+                ownerId == packet.TargetId &&
+                packet.Damage > 0 &&
+                packet.PeriodicRelation == PeriodicEffectRelation.None &&
+                packet.LayoutTag == 4 &&
+                packet.Flag == 0 &&
+                packet.Type == 2 &&
+                packet.Loop == 1 &&
+                (packet.HitContribution > 0 || packet.AttemptContribution > 0))
+            .ToArray();
+        Assert.NotEmpty(ownerTargetResourceValues);
+        Assert.All(ownerTargetResourceValues, static packet =>
+        {
+            Assert.Equal(CombatEventKind.Support, packet.EventKind);
+            Assert.Equal(CombatValueKind.Support, packet.ValueKind);
+            Assert.False(packet.ContributesDamage);
+            Assert.False(packet.ContributesHealing);
+        });
 
         foreach (var summonId in playerOwnedIds.Where(static id => id != playerId))
         {

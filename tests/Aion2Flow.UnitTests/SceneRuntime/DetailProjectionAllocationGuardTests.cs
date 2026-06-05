@@ -63,6 +63,7 @@ public sealed class DetailProjectionAllocationGuardTests
         var root = FindRepositoryRoot();
         var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "PeriodicPoolCanonicalizer.cs"));
 
+        Assert.DoesNotContain("observation.SkillCode", text, StringComparison.Ordinal);
         Assert.DoesNotContain("OriginalSkillCode", text, StringComparison.Ordinal);
         Assert.DoesNotContain("PeriodicBodySkillCode", text, StringComparison.Ordinal);
         Assert.DoesNotContain("InferOriginalSkillCode", text, StringComparison.Ordinal);
@@ -72,6 +73,36 @@ public sealed class DetailProjectionAllocationGuardTests
         Assert.DoesNotContain("CurrentValue", text, StringComparison.Ordinal);
         Assert.DoesNotContain("MaximumValue", text, StringComparison.Ordinal);
         Assert.DoesNotContain("HpCorrelation", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResourceValueCanonicalizers_UseOnlyPacketStructureAndEntityRelations()
+    {
+        var root = FindRepositoryRoot();
+        var files = new[]
+        {
+            Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "SystemPeriodicRecoveryCanonicalizer.cs"),
+            Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "OwnerTargetSummonResourceCanonicalizer.cs")
+        };
+        var forbiddenTerms = new[]
+        {
+            "OriginalSkillCode",
+            "BaseSkillCode",
+            "SkillCode ==",
+            "ParseSkillVariant",
+            "InferOriginalSkillCode",
+            "EffectRef",
+            "CurrentValue",
+            "MaximumValue",
+            "HpCorrelation"
+        };
+
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            foreach (var term in forbiddenTerms)
+                Assert.DoesNotContain(term, text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

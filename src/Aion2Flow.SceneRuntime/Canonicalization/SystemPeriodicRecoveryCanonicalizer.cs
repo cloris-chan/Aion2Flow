@@ -6,8 +6,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 
 public sealed class SystemPeriodicRecoveryCanonicalizer
 {
-    private const int PeriodicSelfRecoveryBaseSkillCode = 190000000;
-    private readonly record struct Key(int SourceId, int TargetId, int OriginalSkillCode);
+    private readonly record struct Key(int SourceId, int TargetId, int ChainId, int TailSkillCodeRaw);
     private readonly record struct State(long Damage, long FrameOrdinal, long BatchOrdinal);
     private readonly Dictionary<Key, State> _seeds = [];
 
@@ -45,18 +44,16 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
         key = default;
         isSeed = false;
 
-        if (sourceId <= 0 || targetId <= 0 || sourceId != targetId || observation.Damage <= 0 || observation.PeriodicRelation != PeriodicEffectRelation.Self || observation.PeriodicMode is not (1 or 2))
+        if (sourceId <= 0 ||
+            targetId <= 0 ||
+            sourceId != targetId ||
+            observation.Damage <= 0 ||
+            observation.PeriodicRelation != PeriodicEffectRelation.Self ||
+            observation.PeriodicMode is not (1 or 2) ||
+            observation.ChainId == 0)
             return false;
 
-        var originalSkillCode = ResolveOriginalSkillCode(in observation);
-        if (originalSkillCode <= 0)
-            return false;
-
-        var baseSkillCode = observation.BaseSkillCode > 0 ? observation.BaseSkillCode : CombatResourceRegistry.ParseSkillVariant(originalSkillCode).BaseSkillCode;
-        if (baseSkillCode != PeriodicSelfRecoveryBaseSkillCode)
-            return false;
-
-        key = new Key(sourceId, targetId, originalSkillCode);
+        key = new Key(sourceId, targetId, observation.ChainId, observation.PeriodicTailSkillCodeRaw);
         isSeed = observation.PeriodicMode == 1;
         return true;
     }
@@ -71,8 +68,4 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
 
         return true;
     }
-
-    private static int ResolveOriginalSkillCode(in CombatObservation observation) =>
-        observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
-
 }

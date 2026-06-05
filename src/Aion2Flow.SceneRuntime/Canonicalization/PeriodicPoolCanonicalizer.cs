@@ -126,14 +126,7 @@ public sealed class PeriodicPoolCanonicalizer
 
     private static Key ResolveStateKey(int targetId, int chainId, in CombatObservation observation) => new(targetId, chainId, ResolvePeriodicSkillIdentityCode(in observation));
 
-    private static int ResolvePeriodicSkillIdentityCode(in CombatObservation observation)
-    {
-        return observation.PeriodicTailSkillCodeRaw > 0
-            ? observation.PeriodicTailSkillCodeRaw
-            : observation.SkillCode > 0
-                ? observation.SkillCode
-                : 0;
-    }
+    private static int ResolvePeriodicSkillIdentityCode(in CombatObservation observation) => Math.Max(0, observation.PeriodicTailSkillCodeRaw);
 }
 
 public readonly record struct CombatCanonicalizationResult(int SourceId, int TargetId, CombatObservation Observation);

@@ -292,11 +292,14 @@ public sealed class CrossModuleProtocolParityHarnessTests
 
     private static bool IsRawSystemPeriodicRecoveryEntry(ObservedEventEnvelope entry)
     {
-        if (entry.Domain != ObservedEventDomain.Combat || entry.SourceEntityId != entry.TargetEntityId || entry.Combat is not { } observation || observation.PeriodicRelation != PeriodicEffectRelation.Self || observation.PeriodicMode is not (1 or 2))
-            return false;
-
-        var originalSkillCode = observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
-        return CombatResourceRegistry.ParseSkillVariant(originalSkillCode).BaseSkillCode == 190000000;
+        return entry.Domain == ObservedEventDomain.Combat &&
+               entry.SourceEntityId > 0 &&
+               entry.SourceEntityId == entry.TargetEntityId &&
+               entry.Combat is { } observation &&
+               observation.Damage > 0 &&
+               observation.ChainId != 0 &&
+               observation.PeriodicRelation == PeriodicEffectRelation.Self &&
+               observation.PeriodicMode is 1 or 2;
     }
 
 
@@ -384,7 +387,12 @@ public sealed class CrossModuleProtocolParityHarnessTests
         {
             if (combat.PeriodicMode is 9 or 10 or 11)
                 PeriodicPool++;
-            if ((combat.OriginalSkillCode != 0 ? combat.OriginalSkillCode : combat.SkillCode) / 1000000 == 190)
+            if (entry.SourceEntityId > 0 &&
+                entry.SourceEntityId == entry.TargetEntityId &&
+                combat.Damage > 0 &&
+                combat.ChainId != 0 &&
+                combat.PeriodicRelation == PeriodicEffectRelation.Self &&
+                combat.PeriodicMode is 1 or 2)
                 SystemRecovery++;
             if ((combat.Modifiers & DamageModifiers.MultiHit) != 0 || combat.MultiHitCount > 0)
                 MultiHit++;

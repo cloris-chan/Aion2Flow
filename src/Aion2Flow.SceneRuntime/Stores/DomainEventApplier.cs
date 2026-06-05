@@ -15,7 +15,7 @@ public sealed class DomainEventApplier
     private readonly CombatStore _combat;
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery;
     private readonly PeriodicPoolCanonicalizer _periodicPool;
-    private readonly OwnerTargetSummonRestoreCanonicalizer _ownerTargetSummonRestore;
+    private readonly OwnerTargetSummonResourceCanonicalizer _ownerTargetSummonResource;
     private readonly CompactAvoidanceCanonicalizer _compactAvoidance;
     private readonly BossFocusStore _bossFocus;
 
@@ -37,7 +37,7 @@ public sealed class DomainEventApplier
         _combat = combat;
         _systemPeriodicRecovery = systemPeriodicRecovery;
         _periodicPool = periodicPool;
-        _ownerTargetSummonRestore = new OwnerTargetSummonRestoreCanonicalizer(entities);
+        _ownerTargetSummonResource = new OwnerTargetSummonResourceCanonicalizer(entities);
         _compactAvoidance = compactAvoidance;
         _bossFocus = bossFocus;
     }
@@ -132,9 +132,9 @@ public sealed class DomainEventApplier
     private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
     {
         var resultObservation = result.Observation;
-        var ownerTargetSummonRestoreResult = _ownerTargetSummonRestore.Normalize(result.SourceId, result.TargetId, in resultObservation);
-        var observation = ownerTargetSummonRestoreResult.Observation;
-        var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonRestoreResult.SourceId, ownerTargetSummonRestoreResult.TargetId, in stamp, in observation);
+        var ownerTargetSummonResourceResult = _ownerTargetSummonResource.Normalize(result.SourceId, result.TargetId, in resultObservation);
+        var observation = ownerTargetSummonResourceResult.Observation;
+        var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonResourceResult.SourceId, ownerTargetSummonResourceResult.TargetId, in stamp, in observation);
         var systemRecoveryObservation = systemRecoveryResult.Observation;
         foreach (var normalized in _periodicPool.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
             ApplyCombatResult(in normalized, observedAtMilliseconds);

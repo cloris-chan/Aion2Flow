@@ -348,41 +348,6 @@ public class PeriodicPoolCanonicalizerTests
     }
 
     [Fact]
-    public void ScenePath_PeriodicPoolKeyFallsBackToPacketSkillWhenTailEffectIsMissing()
-    {
-        const int casterA = 100;
-        const int casterB = 101;
-        const int targetId = 200;
-        const int attackerId = 300;
-        const int chainId = 77;
-        const int skillA = 500001;
-        const int skillB = 500002;
-        CombatResourceRegistry.SetGameResources(
-            [new Skill(500000, "Shared Normalized Skill", SkillCategory.Npc, SkillSourceType.Unknown, "test", null)],
-            new Dictionary<int, NpcCatalogEntry>());
-
-        var canonicalizer = new PeriodicPoolCanonicalizer();
-
-        Assert.Equal(0, canonicalizer.Normalize(casterA, targetId, CreatePeriodicPoolObservation(skillA, 1000, chainId, 9)).Count);
-        Assert.Equal(0, canonicalizer.Normalize(casterB, targetId, CreatePeriodicPoolObservation(skillB, 2000, chainId, 9)).Count);
-
-        var batch = canonicalizer.Normalize(
-            attackerId,
-            targetId,
-            CreatePeriodicPoolObservation(skillA, 700, chainId, 11, tailPrefixValue: 300));
-
-        Assert.Equal(2, batch.Count);
-        Assert.Equal(casterA, batch[0].SourceId);
-        Assert.Equal(targetId, batch[0].TargetId);
-        Assert.Equal(1000, batch[0].Observation.Damage);
-        Assert.Equal(PacketEffectTag.ShieldGrant, batch[0].Observation.EffectTag);
-        Assert.Equal(casterA, batch[1].SourceId);
-        Assert.Equal(targetId, batch[1].TargetId);
-        Assert.Equal(300, batch[1].Observation.Damage);
-        Assert.Equal(PacketEffectTag.ShieldAbsorbed, batch[1].Observation.EffectTag);
-    }
-
-    [Fact]
     public void ScenePath_Mode9GrantOnlyDoesNotEmitSingletonShield()
     {
         const int playerId = 8470;
