@@ -58,6 +58,23 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
+    public void PeriodicPoolCanonicalizer_Mode10Path_UsesOnlyPacketStructure()
+    {
+        var root = FindRepositoryRoot();
+        var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Canonicalization", "PeriodicPoolCanonicalizer.cs"));
+
+        Assert.DoesNotContain("OriginalSkillCode", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("PeriodicBodySkillCode", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("InferOriginalSkillCode", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("ParseSkillVariant", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("ObserveCompactControl0638", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("ObserveResource", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentValue", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("MaximumValue", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("HpCorrelation", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CompactAvoidanceCanonicalizer_DoesNotUseSkillResourceClassifiers()
     {
         var root = FindRepositoryRoot();

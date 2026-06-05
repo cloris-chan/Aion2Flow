@@ -163,7 +163,7 @@ public sealed class PacketLogReplayServiceTests
         var summaryDump = BuildSummaryDump(replay.Combatants);
         var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles}\n{summaryDump}";
 
-        Assert.True(player.OutgoingDamage == 19969423, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingDamage == 20211224, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
         Assert.True(player.OutgoingInvincibles == 8, $"OutgoingInvincibles={player.OutgoingInvincibles}\n{diagDump}");
         Assert.True(player.OutgoingHits == 1304, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
         Assert.True(player.OutgoingAttempts == 1312, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
@@ -185,7 +185,7 @@ public sealed class PacketLogReplayServiceTests
         var summaryDump = BuildSummaryDump(replay.Combatants);
         var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles}\n{summaryDump}";
 
-        Assert.True(player.OutgoingDamage == 7866922, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingDamage == 7920567, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
         Assert.True(player.OutgoingHits == 1166, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
         Assert.True(player.OutgoingAttempts == 1166, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
 
@@ -209,7 +209,7 @@ public sealed class PacketLogReplayServiceTests
         var summaryDump = BuildSummaryDump(replay.Combatants);
         var diagDump = $"Player: id={player.CombatantId} hits={player.OutgoingHits} att={player.OutgoingAttempts} inv={player.OutgoingInvincibles} dmg={player.OutgoingDamage}\n{summaryDump}";
 
-        Assert.True(player.OutgoingDamage == 3954053, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
+        Assert.True(player.OutgoingDamage == 3961239, $"OutgoingDamage={player.OutgoingDamage}\n{diagDump}");
         Assert.True(player.OutgoingHits == 524, $"OutgoingHits={player.OutgoingHits}\n{diagDump}");
         Assert.True(player.OutgoingAttempts == 524, $"OutgoingAttempts={player.OutgoingAttempts}\n{diagDump}");
 
@@ -235,7 +235,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.False(snapshot.Combatants.ContainsKey(39022), $"Ground AoE entity 39022 should not appear separately.\n{combatantDump}");
 
         Assert.True(snapshot.Combatants.TryGetValue(664, out var cleric), $"Cleric 664 not found.\n{combatantDump}");
-        Assert.True(cleric.DamageAmount == 3367264, $"Cleric damage={cleric.DamageAmount} expected=3367264\n{combatantDump}");
+        Assert.True(cleric.DamageAmount == 3465070, $"Cleric damage={cleric.DamageAmount} expected=3465070\n{combatantDump}");
     }
 
     [Fact]
@@ -345,7 +345,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260602221303_Elementalist_Curse_Periodic_Damage_Folds_Into_Triggering_Skill()
+    public void Replay_20260602221303_Counts_PacketOnly_Mode10_TargetDamage()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
@@ -354,44 +354,11 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(replay.ReplayedLines > 0);
 
         const int playerId = 5346;
-        const int targetId = 18532;
-        const int curseSkillCode = 16140030;
-        var packets = SceneReplayTestView.BySource(replay)[playerId];
-        var periodicCursePackets = packets
-            .Where(static packet =>
-                packet.TargetId == targetId &&
-                packet.PeriodicRelation == PeriodicEffectRelation.Target &&
-                packet.PeriodicMode == 10 &&
-                packet.PeriodicTailSkillCodeRaw == curseSkillCode)
-            .ToArray();
-        var packetDump = string.Join(
-            Environment.NewLine,
-            packets
-                .Where(static packet => packet.SkillCode == curseSkillCode || packet.PeriodicTailSkillCodeRaw == curseSkillCode)
-                .Select(static packet =>
-                    $"t={packet.Timestamp} skill={packet.SkillCode} raw={packet.OriginalSkillCode} tail={packet.PeriodicTailSkillCodeRaw} damage={packet.Damage} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode}"));
-
-        Assert.Equal(12, periodicCursePackets.Length);
-        Assert.Equal(16480, periodicCursePackets.Sum(static packet => packet.Damage));
-        Assert.All(periodicCursePackets, static packet => Assert.Equal(curseSkillCode, packet.SkillCode));
-        Assert.All(periodicCursePackets, static packet => Assert.Equal(CombatValueKind.PeriodicDamage, packet.ValueKind));
-
-        var skills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, playerId).Skills;
-        var skillDump = string.Join(
-            Environment.NewLine,
-            skills
-                .OrderByDescending(static pair => pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount)
-                .Select(static pair => $"skill={pair.Key} direct={pair.Value.DamageAmount} periodic={pair.Value.PeriodicDamageAmount} total={pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount}"));
-
-        Assert.True(skills.TryGetValue(curseSkillCode, out var curseSkill), $"{packetDump}\n{skillDump}");
-        Assert.Equal(30917, curseSkill.DamageAmount);
-        Assert.Equal(16480, curseSkill.PeriodicDamageAmount);
-        Assert.Equal(47397, curseSkill.DamageAmount + curseSkill.PeriodicDamageAmount);
-        Assert.Equal(732285, skills.Values.Sum(static skill => skill.DamageAmount + skill.PeriodicDamageAmount));
+        AssertMode10PacketOnlyDamage(replay, playerId, 18532, playerId, 16140030, 12, 16480, 732285);
     }
 
     [Fact]
-    public void Replay_20260603005149_Elementalist_WindSpiritWhirlwind_Periodic_Damage_Folds_Into_SummonSkill()
+    public void Replay_20260603005149_Counts_PacketOnly_Mode10_SummonTargetDamage()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
@@ -399,47 +366,11 @@ public sealed class PacketLogReplayServiceTests
 
         Assert.True(replay.ReplayedLines > 0);
 
-        const int playerId = 2359;
-        const int summonId = 30299;
-        const int targetId = 29736;
-        const int whirlwindSkillCode = 16001112;
-        var packets = SceneReplayTestView.Packets(replay);
-        var periodicWhirlwindPackets = packets
-            .Where(static packet =>
-                packet.SourceId == summonId &&
-                packet.TargetId == targetId &&
-                packet.PeriodicRelation == PeriodicEffectRelation.Target &&
-                packet.PeriodicMode == 10 &&
-                packet.PeriodicTailSkillCodeRaw == whirlwindSkillCode)
-            .ToArray();
-        var packetDump = string.Join(
-            Environment.NewLine,
-            packets
-                .Where(static packet => packet.SkillCode == whirlwindSkillCode || packet.PeriodicTailSkillCodeRaw == whirlwindSkillCode)
-                .Select(static packet =>
-                    $"source={packet.SourceId} target={packet.TargetId} t={packet.Timestamp} skill={packet.SkillCode} raw={packet.OriginalSkillCode} tail={packet.PeriodicTailSkillCodeRaw} damage={packet.Damage} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode}"));
-
-        Assert.Equal(6, periodicWhirlwindPackets.Length);
-        Assert.Equal(3102, periodicWhirlwindPackets.Sum(static packet => packet.Damage));
-        Assert.All(periodicWhirlwindPackets, static packet => Assert.Equal(whirlwindSkillCode, packet.SkillCode));
-        Assert.All(periodicWhirlwindPackets, static packet => Assert.Equal(CombatValueKind.PeriodicDamage, packet.ValueKind));
-
-        var skills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, playerId).Skills;
-        var skillDump = string.Join(
-            Environment.NewLine,
-            skills
-                .OrderByDescending(static pair => pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount)
-                .Select(static pair => $"skill={pair.Key} direct={pair.Value.DamageAmount} periodic={pair.Value.PeriodicDamageAmount} total={pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount}"));
-
-        Assert.True(skills.TryGetValue(whirlwindSkillCode, out var whirlwindSkill), $"{packetDump}\n{skillDump}");
-        Assert.Equal(2673, whirlwindSkill.DamageAmount);
-        Assert.Equal(3102, whirlwindSkill.PeriodicDamageAmount);
-        Assert.Equal(5775, whirlwindSkill.DamageAmount + whirlwindSkill.PeriodicDamageAmount);
-        Assert.Equal(482068, skills.Values.Sum(static skill => skill.DamageAmount + skill.PeriodicDamageAmount));
+        AssertMode10PacketOnlyDamage(replay, 30299, 29736, 2359, 16001112, 6, 3102, 482068);
     }
 
     [Fact]
-    public void Replay_20260604124721_Elementalist_Curse_FlagZeroMode10Damage_Folds_Into_TriggeringSkill()
+    public void Replay_20260604124721_Counts_PacketOnly_Mode10_TargetDamage()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
@@ -448,45 +379,11 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(replay.ReplayedLines > 0);
 
         const int playerId = 7386;
-        const int targetId = 20368;
-        const int curseSkillCode = 16140030;
-        var packets = SceneReplayTestView.Packets(replay);
-        var periodicCursePackets = packets
-            .Where(static packet =>
-                packet.SourceId == playerId &&
-                packet.TargetId == targetId &&
-                packet.PeriodicRelation == PeriodicEffectRelation.Target &&
-                packet.PeriodicMode == 10 &&
-                packet.PeriodicTailSkillCodeRaw == curseSkillCode)
-            .ToArray();
-        var packetDump = string.Join(
-            Environment.NewLine,
-            packets
-                .Where(static packet => packet.SkillCode == curseSkillCode || packet.PeriodicTailSkillCodeRaw == curseSkillCode)
-                .Select(static packet =>
-                    $"source={packet.SourceId} target={packet.TargetId} t={packet.Timestamp} skill={packet.SkillCode} raw={packet.OriginalSkillCode} tail={packet.PeriodicTailSkillCodeRaw} damage={packet.Damage} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode}"));
-
-        Assert.Equal(7, periodicCursePackets.Length);
-        Assert.Equal(11293, periodicCursePackets.Sum(static packet => packet.Damage));
-        Assert.All(periodicCursePackets, static packet => Assert.Equal(curseSkillCode, packet.SkillCode));
-        Assert.All(periodicCursePackets, static packet => Assert.Equal(CombatValueKind.PeriodicDamage, packet.ValueKind));
-
-        var skills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, playerId).Skills;
-        var skillDump = string.Join(
-            Environment.NewLine,
-            skills
-                .OrderByDescending(static pair => pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount)
-                .Select(static pair => $"skill={pair.Key} direct={pair.Value.DamageAmount} periodic={pair.Value.PeriodicDamageAmount} total={pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount}"));
-
-        Assert.True(skills.TryGetValue(curseSkillCode, out var curseSkill), $"{packetDump}\n{skillDump}");
-        Assert.Equal(21422, curseSkill.DamageAmount);
-        Assert.Equal(11293, curseSkill.PeriodicDamageAmount);
-        Assert.Equal(32715, curseSkill.DamageAmount + curseSkill.PeriodicDamageAmount);
-        Assert.Equal(507816, skills.Values.Sum(static skill => skill.DamageAmount + skill.PeriodicDamageAmount));
+        AssertMode10PacketOnlyDamage(replay, playerId, 20368, playerId, 16140030, 7, 11293, 507816);
     }
 
     [Fact]
-    public void Replay_20260604133258_Elementalist_WindWhirlwind_FlagZeroMode10Damage_KeepsHpBackedTicks()
+    public void Replay_20260604133258_Counts_PacketOnly_Mode10_SummonTargetDamage()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
@@ -494,66 +391,20 @@ public sealed class PacketLogReplayServiceTests
 
         Assert.True(replay.ReplayedLines > 0);
 
-        const int playerId = 7386;
-        const int summonId = 18117;
-        const int targetId = 25154;
-        const int whirlwindSkillCode = 16001112;
-        var packets = SceneReplayTestView.Packets(replay);
-        var periodicWhirlwindPackets = packets
-            .Where(static packet =>
-                packet.SourceId == summonId &&
-                packet.TargetId == targetId &&
-                packet.PeriodicRelation == PeriodicEffectRelation.Target &&
-                packet.PeriodicMode == 10 &&
-                packet.PeriodicTailSkillCodeRaw == whirlwindSkillCode)
-            .ToArray();
-        var packetDump = string.Join(
-            Environment.NewLine,
-            packets
-                .Where(static packet => packet.SkillCode == whirlwindSkillCode || packet.PeriodicTailSkillCodeRaw == whirlwindSkillCode)
-                .Select(static packet =>
-                    $"source={packet.SourceId} target={packet.TargetId} t={packet.Timestamp} skill={packet.SkillCode} raw={packet.OriginalSkillCode} tail={packet.PeriodicTailSkillCodeRaw} damage={packet.Damage} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode}"));
+        AssertMode10PacketOnlyDamage(replay, 18117, 25154, 7386, 16001112, 5, 2415, 540689);
+    }
 
-        Assert.Equal(5, periodicWhirlwindPackets.Length);
-        Assert.Equal(2415, periodicWhirlwindPackets.Sum(static packet => packet.Damage));
-        Assert.Contains(periodicWhirlwindPackets, static packet => packet.Timestamp == 1780551206068 && packet.Damage == 483);
-        Assert.Contains(periodicWhirlwindPackets, static packet => packet.Timestamp == 1780551207192 && packet.Damage == 483);
-        Assert.All(periodicWhirlwindPackets, static packet => Assert.Equal(whirlwindSkillCode, packet.SkillCode));
-        Assert.All(periodicWhirlwindPackets, static packet => Assert.Equal(CombatValueKind.PeriodicDamage, packet.ValueKind));
+    [Fact]
+    public void Replay_20260605000843_Counts_PacketOnly_Mode10_TargetDamage()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
-        var targetResources = Enumerable.Range(0, replay.SceneJournal.Count)
-            .Select(index => replay.SceneJournal.Read(index))
-            .Where(entry => entry.Domain == ObservedEventDomain.Resource && entry.Resource is { EntityId: targetId, CurrentValue: not null })
-            .OrderBy(static entry => entry.Stamp.ObservationOrdinal)
-            .Select(static entry => new
-            {
-                entry.Raw.TimestampMilliseconds,
-                Current = entry.Resource!.Value.CurrentValue!.Value
-            })
-            .ToArray();
-        var resourceDeltas = targetResources
-            .Zip(targetResources.Skip(1), static (previous, current) => new
-            {
-                current.TimestampMilliseconds,
-                Delta = current.Current - previous.Current
-            })
-            .ToArray();
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260605000843.log"));
 
-        Assert.Contains(resourceDeltas, static delta => delta.TimestampMilliseconds == 1780551206068 && delta.Delta == -483);
-        Assert.Contains(resourceDeltas, static delta => delta.TimestampMilliseconds == 1780551207192 && delta.Delta == -1859);
+        Assert.True(replay.ReplayedLines > 0);
 
-        var skills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, playerId).Skills;
-        var skillDump = string.Join(
-            Environment.NewLine,
-            skills
-                .OrderByDescending(static pair => pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount)
-                .Select(static pair => $"skill={pair.Key} direct={pair.Value.DamageAmount} periodic={pair.Value.PeriodicDamageAmount} total={pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount}"));
-
-        Assert.True(skills.TryGetValue(whirlwindSkillCode, out var whirlwindSkill), $"{packetDump}\n{skillDump}");
-        Assert.Equal(2687, whirlwindSkill.DamageAmount);
-        Assert.Equal(2415, whirlwindSkill.PeriodicDamageAmount);
-        Assert.Equal(5102, whirlwindSkill.DamageAmount + whirlwindSkill.PeriodicDamageAmount);
-        Assert.Equal(540689, skills.Values.Sum(static skill => skill.DamageAmount + skill.PeriodicDamageAmount));
+        const int playerId = 16332;
+        AssertMode10PacketOnlyDamage(replay, playerId, 26450, playerId, 13730007, 35, 60198, 9666083);
     }
 
     [Fact]
@@ -1103,6 +954,70 @@ public sealed class PacketLogReplayServiceTests
             })
             .Order(StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static void AssertMode10PacketOnlyDamage(
+        PacketLogReplayResult replay,
+        int sourceId,
+        int targetId,
+        int combatantId,
+        int tailSkillCode,
+        int expectedPacketCount,
+        long expectedDamage,
+        long expectedOutgoingDamage)
+    {
+        var packets = ReadRawMode10Packets(replay, sourceId, targetId, tailSkillCode);
+        var packetDump = string.Join(
+            Environment.NewLine,
+            packets.Select(static packet =>
+                $"skill={packet.SkillCode} tail={packet.PeriodicTailSkillCodeRaw} damage={packet.Damage} tailLen={packet.PeriodicTailLength} tailPrefix={packet.PeriodicTailPrefixValue} value={packet.ValueKind}"));
+
+        Assert.Equal(expectedPacketCount, packets.Length);
+        Assert.Equal(expectedDamage, packets.Sum(static packet => packet.Damage));
+        Assert.All(packets, static packet => Assert.Equal(4, packet.PeriodicTailLength));
+        Assert.All(packets, static packet => Assert.Equal(0, packet.PeriodicTailPrefixValue));
+        Assert.All(packets, static packet => Assert.True(packet.Damage > 0));
+
+        var combatantDump = BuildSummaryDump(replay.Combatants);
+        var combatant = Assert.Single(replay.Combatants, combatant => combatant.CombatantId == combatantId);
+        Assert.True(combatant.OutgoingDamage == expectedOutgoingDamage, $"OutgoingDamage={combatant.OutgoingDamage} expected={expectedOutgoingDamage}\n{combatantDump}");
+
+        var skills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, combatantId).Skills;
+        var skillDump = BuildSkillDump(skills);
+        Assert.True(skills.TryGetValue(tailSkillCode, out var skill), $"{packetDump}\n{skillDump}");
+        Assert.True(skill.PeriodicDamageAmount == expectedDamage, $"PeriodicDamageAmount={skill.PeriodicDamageAmount} expected={expectedDamage}\n{packetDump}\n{skillDump}");
+        Assert.True(skill.PeriodicDamageTimes == expectedPacketCount, $"PeriodicDamageTimes={skill.PeriodicDamageTimes} expected={expectedPacketCount}\n{packetDump}\n{skillDump}");
+    }
+
+    private static CombatObservation[] ReadRawMode10Packets(PacketLogReplayResult replay, int sourceId, int targetId, int tailSkillCode)
+    {
+        var packets = new List<CombatObservation>();
+        for (var ordinal = replay.SceneJournal.FirstObservationOrdinal; ordinal < replay.SceneJournal.NextObservationOrdinal; ordinal++)
+        {
+            var entry = replay.SceneJournal.Read(ordinal);
+            if (entry.SourceEntityId != sourceId ||
+                entry.TargetEntityId != targetId ||
+                entry.Combat is not { } observation ||
+                observation.PeriodicRelation != PeriodicEffectRelation.Target ||
+                observation.PeriodicMode != 10 ||
+                observation.PeriodicTailSkillCodeRaw != tailSkillCode)
+            {
+                continue;
+            }
+
+            packets.Add(observation);
+        }
+
+        return [.. packets];
+    }
+
+    private static string BuildSkillDump(SkillMetricsSnapshotMap skills)
+    {
+        return string.Join(
+            Environment.NewLine,
+            skills
+                .OrderByDescending(static pair => pair.Value.DamageAmount + pair.Value.PeriodicDamageAmount)
+                .Select(static pair => $"skill={pair.Key} direct={pair.Value.DamageAmount} periodic={pair.Value.PeriodicDamageAmount} times={pair.Value.PeriodicDamageTimes}"));
     }
 
     private static string BuildSummaryDump(IEnumerable<PacketLogCombatantSummary> summaries)

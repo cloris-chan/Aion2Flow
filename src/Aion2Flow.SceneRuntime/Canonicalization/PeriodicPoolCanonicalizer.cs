@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.SceneRuntime.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Canonicalization;
@@ -10,27 +9,22 @@ public sealed class PeriodicPoolCanonicalizer
     private readonly record struct RemainingValueState(long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatObservation Grant, bool ShieldGrantEmitted);
 
     private readonly Dictionary<Key, RemainingValueState> _states = [];
-    private readonly Mode10TailSidecarGate _mode10TailGate = new();
 
-    public void ObserveCompactControl0638(int sourceId, int skillCode, int flag, in TimelineStamp stamp)
+    public CombatCanonicalizationBatch Normalize(int sourceId, int targetId, in CombatObservation observation)
     {
-        _mode10TailGate.ObserveCompactControl0638(sourceId, skillCode, flag, in stamp);
-    }
+        if (observation.PeriodicRelation != PeriodicEffectRelation.None && targetId > 0 && observation.ChainId != 0 && observation.PeriodicMode == 10)
+        {
+            return CloseStateOrEmitStandaloneMode10Target(sourceId, targetId, ResolveStateKey(targetId, observation.ChainId, in observation), in observation);
+        }
 
-    public CombatCanonicalizationBatch Normalize(int sourceId, int targetId, in CombatObservation observation) => Normalize(sourceId, targetId, in observation, default);
-
-    public CombatCanonicalizationBatch Normalize(int sourceId, int targetId, in CombatObservation observation, in TimelineStamp stamp)
-    {
         var normalized = NormalizeBaseObservation(sourceId, targetId, in observation);
         if (normalized.PeriodicRelation == PeriodicEffectRelation.None || targetId <= 0 || normalized.ChainId == 0)
             return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized));
 
-        var key = ResolveStateKey(targetId, normalized.ChainId, in normalized);
+        var key = ResolveStateKey(targetId, observation.ChainId, in observation);
         return normalized.PeriodicMode switch
         {
             9 => OpenState(sourceId, targetId, key, in normalized),
-            10 when _mode10TailGate.TryAcceptDamageTick(sourceId, targetId, in observation, in stamp) => CloseStateWithDamageTick(sourceId, targetId, key, in normalized),
-            10 => CloseState(key),
             11 => ApplyContinuation(sourceId, targetId, key, in normalized),
             _ => CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized))
         };
@@ -44,18 +38,35 @@ public sealed class PeriodicPoolCanonicalizer
         return CombatCanonicalizationBatch.Empty;
     }
 
-    private CombatCanonicalizationBatch CloseState(Key key)
+    private CombatCanonicalizationBatch CloseStateOrEmitStandaloneMode10Target(int sourceId, int targetId, Key key, in CombatObservation observation)
     {
-        _states.Remove(key);
-        return CombatCanonicalizationBatch.Empty;
+        if (_states.Remove(key) || !IsStandaloneMode10DamagePacket(sourceId, targetId, in observation))
+        {
+            return CombatCanonicalizationBatch.Empty;
+        }
+
+        var normalized = observation with
+        {
+            SkillCode = observation.PeriodicTailSkillCodeRaw,
+            BaseSkillCode = 0,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.PeriodicDamage,
+            HitCount = 0,
+            AttemptCount = 0
+        };
+        return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized));
     }
 
-    private CombatCanonicalizationBatch CloseStateWithDamageTick(int sourceId, int targetId, Key key, in CombatObservation observation)
-    {
-        _states.Remove(key);
-        return CombatCanonicalizationBatch.One(
-            new CombatCanonicalizationResult(sourceId, targetId, NormalizeMode10DamageTick(sourceId, targetId, in observation)));
-    }
+    private static bool IsStandaloneMode10DamagePacket(int sourceId, int targetId, in CombatObservation observation) =>
+        sourceId > 0 &&
+        targetId > 0 &&
+        observation.PeriodicRelation == PeriodicEffectRelation.Target &&
+        observation.PeriodicMode == 10 &&
+        observation.ChainId != 0 &&
+        observation.Damage > 0 &&
+        observation.PeriodicTailLength == 4 &&
+        observation.PeriodicTailPrefixValue == 0 &&
+        observation.PeriodicTailSkillCodeRaw > 0;
 
     private CombatCanonicalizationBatch ApplyContinuation(int sourceId, int targetId, Key key, in CombatObservation observation)
     {
@@ -117,142 +128,11 @@ public sealed class PeriodicPoolCanonicalizer
 
     private static int ResolvePeriodicSkillIdentityCode(in CombatObservation observation)
     {
-        if (observation.PeriodicTailSkillCodeRaw > 0)
-            return observation.PeriodicTailSkillCodeRaw;
-
-        if (observation.SkillCode > 0)
-            return observation.SkillCode;
-
-        return 0;
-    }
-
-    private static CombatObservation NormalizeMode10DamageTick(int sourceId, int targetId, in CombatObservation observation)
-    {
-        var tailSkillCode = observation.PeriodicTailSkillCodeRaw;
-        var reassigned = observation with
-        {
-            SkillCode = tailSkillCode,
-            OriginalSkillCode = tailSkillCode,
-            BaseSkillCode = 0,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.PeriodicDamage
-        };
-        return NormalizeBaseObservation(sourceId, targetId, in reassigned);
-    }
-
-    private sealed class Mode10TailSidecarGate
-    {
-        private const int MaxRecentTailControls = 128;
-        private const int MaxAcceptedDamageChains = 256;
-        private const long MaxTailControlObservationDistance = 64;
-        private const long MaxTailControlBatchDistance = 16;
-        private const int CompactControlDefaultFlag = 0;
-        private const int CompactControlTriggeredFlag = 12;
-
-        private readonly record struct TailKey(int SourceId, int TailSkillCode);
-        private readonly record struct TailControl(TailKey Key, int Flag, TimelineStamp Stamp);
-        private readonly record struct DamageChainKey(int SourceId, int TargetId, int ChainId, int TailSkillCode);
-
-        private readonly List<TailControl> _recentTailControls = new(MaxRecentTailControls);
-        private readonly HashSet<DamageChainKey> _acceptedDamageChains = [];
-        private readonly Queue<DamageChainKey> _acceptedDamageChainOrder = [];
-
-        public void ObserveCompactControl0638(int sourceId, int tailSkillCode, int flag, in TimelineStamp stamp)
-        {
-            if (sourceId <= 0 || tailSkillCode <= 0)
-                return;
-
-            var key = new TailKey(sourceId, tailSkillCode);
-            _recentTailControls.Add(new TailControl(key, flag, stamp));
-            TrimRecentTailControls();
-        }
-
-        public bool TryAcceptDamageTick(int sourceId, int targetId, in CombatObservation observation, in TimelineStamp stamp)
-        {
-            if (!IsDamageTickShape(in observation))
-                return false;
-
-            var chainKey = new DamageChainKey(sourceId, targetId, observation.ChainId, observation.PeriodicTailSkillCodeRaw);
-            if (_acceptedDamageChains.Contains(chainKey))
-                return true;
-
-            if (!HasAssociatedTailControl(sourceId, observation.PeriodicTailSkillCodeRaw, in stamp))
-                return false;
-
-            RememberAcceptedDamageChain(chainKey);
-            return true;
-        }
-
-        private static bool IsDamageTickShape(in CombatObservation observation) =>
-            observation.PeriodicRelation == PeriodicEffectRelation.Target &&
-            observation.PeriodicTailLength == 4 &&
-            observation.PeriodicTailSkillCodeRaw > 0 &&
-            observation.PeriodicTailSkillCodeRaw != ResolveBodySkillCode(in observation) &&
-            observation.PeriodicTailPrefixValue == 0 &&
-            observation.Damage > 0;
-
-        private static int ResolveBodySkillCode(in CombatObservation observation) => observation.PeriodicBodySkillCode > 0 ? observation.PeriodicBodySkillCode : observation.SkillCode;
-
-        private bool HasAssociatedTailControl(int sourceId, int tailSkillCode, in TimelineStamp stamp)
-        {
-            var key = new TailKey(sourceId, tailSkillCode);
-            TrimRecentTailControls();
-            for (var i = _recentTailControls.Count - 1; i >= 0; i--)
-            {
-                var control = _recentTailControls[i];
-                if (control.Key != key)
-                    continue;
-
-                var controlStamp = control.Stamp;
-                if (!IsRecentTailControl(in controlStamp, in stamp))
-                    continue;
-
-                if (control.Flag is CompactControlDefaultFlag or CompactControlTriggeredFlag)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private void RememberAcceptedDamageChain(DamageChainKey key)
-        {
-            if (!_acceptedDamageChains.Add(key))
-                return;
-
-            _acceptedDamageChainOrder.Enqueue(key);
-            while (_acceptedDamageChains.Count > MaxAcceptedDamageChains)
-                _acceptedDamageChains.Remove(_acceptedDamageChainOrder.Dequeue());
-        }
-
-        private void TrimRecentTailControls()
-        {
-            while (_recentTailControls.Count > MaxRecentTailControls)
-                _recentTailControls.RemoveAt(0);
-        }
-
-        private static bool IsRecentTailControl(in TimelineStamp controlStamp, in TimelineStamp tickStamp)
-        {
-            if (!HasTimeline(in controlStamp) || !HasTimeline(in tickStamp))
-                return false;
-
-            if (controlStamp.ObservationOrdinal >= 0 && tickStamp.ObservationOrdinal >= controlStamp.ObservationOrdinal)
-            {
-                var observationDistance = tickStamp.ObservationOrdinal - controlStamp.ObservationOrdinal;
-                if (observationDistance <= MaxTailControlObservationDistance)
-                    return true;
-            }
-
-            if (controlStamp.BatchOrdinal > 0 && tickStamp.BatchOrdinal >= controlStamp.BatchOrdinal)
-            {
-                var batchDistance = tickStamp.BatchOrdinal - controlStamp.BatchOrdinal;
-                if (batchDistance <= MaxTailControlBatchDistance)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static bool HasTimeline(in TimelineStamp stamp) => stamp.OffsetTicks != 0 || stamp.ObservationOrdinal != 0 || stamp.FrameOrdinal != 0 || stamp.BatchOrdinal != 0;
+        return observation.PeriodicTailSkillCodeRaw > 0
+            ? observation.PeriodicTailSkillCodeRaw
+            : observation.SkillCode > 0
+                ? observation.SkillCode
+                : 0;
     }
 }
 
