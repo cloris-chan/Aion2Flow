@@ -91,8 +91,8 @@ StyleCopReport.xml
 *.tmp_proj
 *_wpftmp.csproj
 *.log
-!src/Aion2Flow.Tests/Fixtures/logs/
-!src/Aion2Flow.Tests/Fixtures/logs/*.log
+!tests/Aion2Flow.ReplayTests/Fixtures/logs/
+!tests/Aion2Flow.ReplayTests/Fixtures/logs/*.log
 *.vspscc
 *.vssscc
 .builds

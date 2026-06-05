@@ -368,7 +368,12 @@ public sealed class ScenePlaybackController : IAsyncDisposable
 
     private async ValueTask<ScenePlaybackFrame> AdvanceCoreAsync(long positionMilliseconds, CancellationToken cancellationToken, long expectedGeneration)
     {
-        ThrowIfDisposed();
+        lock (_stateGate)
+        {
+            if (_disposed)
+                return _currentFrame;
+        }
+
         await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {

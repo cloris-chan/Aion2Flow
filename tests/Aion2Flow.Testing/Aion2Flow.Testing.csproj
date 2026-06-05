@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Aion2Flow\Aion2Flow.csproj" />
+    <ProjectReference Include="..\..\src\Aion2Flow.Capture\Aion2Flow.Capture.csproj" />
+    <ProjectReference Include="..\..\src\Aion2Flow.Protocol\Aion2Flow.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\Aion2Flow.SceneRuntime\Aion2Flow.SceneRuntime.csproj" />
+  </ItemGroup>
+</Project>
