@@ -114,6 +114,9 @@ public sealed class DetailProjectionAllocationGuardTests
         Assert.DoesNotContain("ParseSkillVariant", text, StringComparison.Ordinal);
         Assert.DoesNotContain("InferOriginalSkillCode", text, StringComparison.Ordinal);
         Assert.DoesNotContain("SkillSourceType", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("observation.SkillCode <=", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("observation.SkillCode ==", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("pending.DisplaySkillCode ==", text, StringComparison.Ordinal);
     }
 
     [Fact]

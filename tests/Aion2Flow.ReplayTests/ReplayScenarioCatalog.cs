@@ -18,6 +18,7 @@ public static class ReplayScenarioCatalog
     public const string PeriodicLinkInvariant = "aion2flow.stream.20260412103519.log";
     public const string CompactPrimaryInvariantA = "aion2flow.stream.20260411174533.log";
     public const string CompactPrimaryInvariantB = "aion2flow.stream.20260411215842.log";
+    public const string CompactSidecarCancellation = "aion2flow.stream.20260512223507.log";
     public const string ShieldAbsorbedInvariant = "aion2flow.stream.20260411192501.log";
 
     public static IEnumerable<object[]> April11IncomingAvoidance =>

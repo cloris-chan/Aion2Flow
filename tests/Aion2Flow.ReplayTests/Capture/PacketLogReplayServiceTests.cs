@@ -458,6 +458,47 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260512223507_CompactType2SidecarsCancelPendingEvadesByPacketStructure()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CompactSidecarCancellation}"));
+        var expected = new[]
+        {
+            new { SourceId = 119157, TargetId = 2681, Marker = 4, Timestamp = 1778596536127L },
+            new { SourceId = 145776, TargetId = 2681, Marker = 1, Timestamp = 1778596672584L }
+        };
+
+        foreach (var key in expected)
+        {
+            var raw = Enumerable.Range(0, replay.SceneJournal.Count)
+                .Select(index => replay.SceneJournal.Read(index))
+                .Where(entry =>
+                    entry.Raw.Opcode == 0x0438 &&
+                    entry.SourceEntityId == key.SourceId &&
+                    entry.TargetEntityId == key.TargetId &&
+                    entry.Raw.TimestampMilliseconds == key.Timestamp &&
+                    entry.Combat is { } observation &&
+                    observation.Marker == key.Marker &&
+                    observation.HitCount == 0 &&
+                    observation.AttemptCount == 0 &&
+                    observation.Type is 1 or 2)
+                .Select(static entry => entry.Combat!.Value.Type)
+                .ToArray();
+
+            Assert.Contains(1, raw);
+            Assert.Contains(2, raw);
+            Assert.DoesNotContain(
+                replay.SceneOwner.Combat.Events,
+                combat =>
+                    combat.SourceId == key.SourceId &&
+                    combat.TargetId == key.TargetId &&
+                    combat.ObservedAtMilliseconds == key.Timestamp &&
+                    combat.Observation.Marker == key.Marker &&
+                    combat.Observation.EffectTag == PacketEffectTag.CompactEvade);
+        }
+    }
+
+    [Fact]
     public void Replay_20260426031332_EnhanceSpiritBenediction_Self_And_Summon_Healing_Match_Game_Ground_Truth()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());

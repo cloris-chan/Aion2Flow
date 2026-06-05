@@ -9,7 +9,7 @@ public sealed class CompactAvoidanceCanonicalizer
 {
     private const int MaxPendingAvoidances = 32;
 
-    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int OriginalSkillCode, int Marker, long BatchOrdinal, int ScopeId, TimelineStamp Stamp, long ObservedAtMilliseconds);
+    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int DisplaySkillCode, int Marker, long BatchOrdinal, int ScopeId, TimelineStamp Stamp, long ObservedAtMilliseconds);
 
     private readonly List<PendingCompactAvoidance> _pendingCompact = new(MaxPendingAvoidances);
     private long _currentBatchOrdinal;
@@ -31,7 +31,7 @@ public sealed class CompactAvoidanceCanonicalizer
 
         if (IsCompactType2Sidecar(in observation))
         {
-            CancelPendingCompactEvade(sourceId, targetId, observation.SkillCode, observation.Marker, ResolveAssociationScope(in structurePath));
+            CancelPendingCompactEvade(sourceId, targetId, observation.Marker, ResolveAssociationScope(in structurePath));
             return EnsureBatch(stamp.BatchOrdinal);
         }
 
@@ -58,9 +58,6 @@ public sealed class CompactAvoidanceCanonicalizer
     private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, in PacketStructurePath structurePath, long observedAtMilliseconds)
     {
         if (!IsCompactEvadeSignal(sourceId, targetId, in observation) || observation.Marker <= 0)
-            return false;
-
-        if (observation.SkillCode <= 0)
             return false;
 
         _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.SkillCode, observation.Marker, _currentBatchOrdinal, ResolveAssociationScope(in structurePath), stamp, observedAtMilliseconds));
@@ -107,7 +104,7 @@ public sealed class CompactAvoidanceCanonicalizer
         return results.ToBatch();
     }
 
-    private void CancelPendingCompactEvade(int sourceId, int targetId, int skillCode, int marker, int scopeId)
+    private void CancelPendingCompactEvade(int sourceId, int targetId, int marker, int scopeId)
     {
         var fallbackBatchOrdinal = _currentBatchOrdinal;
         for (var i = _pendingCompact.Count - 1; i >= 0; i--)
@@ -115,7 +112,6 @@ public sealed class CompactAvoidanceCanonicalizer
             var pending = _pendingCompact[i];
             if (pending.SourceId == sourceId &&
                 pending.TargetId == targetId &&
-                pending.OriginalSkillCode == skillCode &&
                 pending.Marker == marker &&
                 MatchesScopeOrFallbackBatch(in pending, scopeId, fallbackBatchOrdinal))
             {
@@ -169,8 +165,8 @@ public sealed class CompactAvoidanceCanonicalizer
     {
         var observation = new CombatObservation
         {
-            SkillCode = pending.OriginalSkillCode,
-            OriginalSkillCode = pending.OriginalSkillCode,
+            SkillCode = pending.DisplaySkillCode,
+            OriginalSkillCode = pending.DisplaySkillCode,
             Damage = 0,
             HitCount = 0,
             AttemptCount = 1,
