@@ -1606,11 +1606,12 @@ public class SceneReadModelOwnerTests
         var scene = new SceneLiveReadModel();
         var sink = SceneSinkFactory.CreateForLive(scene)();
         sink.AppendNickname(100, "Player");
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        using var writerStop = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var testCancellation = TestContext.Current.CancellationToken;
         var writer = Task.Run(() =>
         {
             var batch = 0L;
-            while (!cts.IsCancellationRequested)
+            while (!writerStop.IsCancellationRequested && !testCancellation.IsCancellationRequested)
             {
                 var currentBatch = Interlocked.Increment(ref batch);
                 var targetId = 200 + (int)(currentBatch % 4);
@@ -1632,7 +1633,7 @@ public class SceneReadModelOwnerTests
                 if (currentBatch % 37 == 0)
                     scene.Reset(new DateTimeOffset(2026, 5, 9, 14, 30, (int)(currentBatch % 60), TimeSpan.Zero));
             }
-        }, cts.Token);
+        }, testCancellation);
 
         for (var i = 0; i < 250; i++)
         {
@@ -1662,8 +1663,8 @@ public class SceneReadModelOwnerTests
             await Task.Yield();
         }
 
-        await cts.CancelAsync();
-        await writer;
+        await writerStop.CancelAsync();
+        await writer.WaitAsync(testCancellation);
     }
 
     [Fact]
