@@ -12,8 +12,7 @@ public sealed class SceneBoundaryService
 
     public bool StageDestinationMap(uint mapId) => StageDestinationMap(mapId, allowSameMapReload: false);
 
-    public bool StageDestinationMap(uint mapId, bool allowSameMapReload)
-        => CommitConfirmedMap(mapId, allowSameMapReload);
+    public bool StageDestinationMap(uint mapId, bool allowSameMapReload) => CommitConfirmedMap(mapId, allowSameMapReload);
 
     public bool StagePendingDestinationMap(uint mapId, bool allowSameMapReload)
     {
@@ -78,6 +77,17 @@ public sealed class SceneBoundaryService
 
     public SceneTransitionKind MarkSceneTransportBoundary() => SceneTransitionKind.None;
 
+    internal SceneBoundaryServiceSnapshot CreateSnapshot() => new(CurrentMapId, CurrentMapInstanceId, SceneTransitionRevision, _pendingMapId, _pendingAllowSameMapReload);
+
+    internal static SceneBoundaryService FromSnapshot(SceneBoundaryServiceSnapshot snapshot) => new()
+    {
+        CurrentMapId = snapshot.CurrentMapId,
+        CurrentMapInstanceId = snapshot.CurrentMapInstanceId,
+        SceneTransitionRevision = snapshot.SceneTransitionRevision,
+        _pendingMapId = snapshot.PendingMapId,
+        _pendingAllowSameMapReload = snapshot.PendingAllowSameMapReload
+    };
+
     private bool CommitConfirmedMap(uint mapId, bool allowSameMapReload)
     {
         if (mapId == 0)
@@ -116,3 +126,5 @@ public sealed class SceneBoundaryService
 }
 
 public enum SceneTransitionKind : byte { None, MapChanged, InstanceChanged, SceneReload, TransportBoundary }
+
+internal readonly record struct SceneBoundaryServiceSnapshot(uint CurrentMapId, uint CurrentMapInstanceId, long SceneTransitionRevision, uint PendingMapId, bool PendingAllowSameMapReload);

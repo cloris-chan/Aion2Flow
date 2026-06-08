@@ -196,6 +196,31 @@ public sealed class EntityStore
     public bool IsKnownEntity(int entityId) =>
         _entities.ContainsKey(entityId);
 
+    internal EntityStoreSnapshot CreateSnapshot()
+    {
+        if (_entities.Count == 0)
+            return new EntityStoreSnapshot([], _revision);
+
+        var records = new EntityRecordSnapshot[_entities.Count];
+        var index = 0;
+        foreach (var record in _entities.Values)
+            records[index++] = EntityRecordSnapshot.From(record);
+        return new EntityStoreSnapshot(records, _revision);
+    }
+
+    internal static EntityStore FromSnapshot(EntityStoreSnapshot snapshot)
+    {
+        var store = new EntityStore();
+        store._revision = snapshot.Revision;
+        for (var i = 0; i < snapshot.Records.Length; i++)
+        {
+            var record = snapshot.Records[i].ToRecord();
+            store._entities[record.EntityId] = record;
+        }
+
+        return store;
+    }
+
     public void Clear()
     {
         if (_entities.Count == 0)
@@ -205,6 +230,71 @@ public sealed class EntityStore
         _revision++;
     }
 
+}
+
+internal sealed record EntityStoreSnapshot(EntityRecordSnapshot[] Records, long Revision);
+
+internal readonly record struct EntityRecordSnapshot(
+    int EntityId,
+    int? NpcCode,
+    NpcKind Kind,
+    string? Nickname,
+    bool IsPlayer,
+    CharacterClass? CharacterClass,
+    CombatantClassEvidence ClassEvidence,
+    int? OwnerEntityId,
+    int? CurrentHp,
+    int? MaxHp,
+    bool NpcCombatActive,
+    uint? Value2136,
+    uint? Sequence2136,
+    uint? Value0140,
+    uint? Value0240,
+    (byte State0, byte State1)? State4636,
+    (int SequenceId, int ResultCode)? Latest2C38,
+    long LastObservedOrdinal)
+{
+    public static EntityRecordSnapshot From(EntityRecord record) => new(
+        record.EntityId,
+        record.NpcCode,
+        record.Kind,
+        record.Nickname,
+        record.IsPlayer,
+        record.CharacterClass,
+        record.ClassEvidence,
+        record.OwnerEntityId,
+        record.CurrentHp,
+        record.MaxHp,
+        record.NpcCombatActive,
+        record.Value2136,
+        record.Sequence2136,
+        record.Value0140,
+        record.Value0240,
+        record.State4636,
+        record.Latest2C38,
+        record.LastObservedOrdinal);
+
+    public EntityRecord ToRecord() => new()
+    {
+        EntityId = EntityId,
+        NpcCode = NpcCode,
+        Kind = Kind,
+        Nickname = Nickname,
+        IsPlayer = IsPlayer,
+        CharacterClass = CharacterClass,
+        ClassEvidence = ClassEvidence,
+        OwnerEntityId = OwnerEntityId,
+        CurrentHp = CurrentHp,
+        MaxHp = MaxHp,
+        NpcCombatActive = NpcCombatActive,
+        Value2136 = Value2136,
+        Sequence2136 = Sequence2136,
+        Value0140 = Value0140,
+        Value0240 = Value0240,
+        State4636 = State4636,
+        Latest2C38 = Latest2C38,
+        LastObservedOrdinal = LastObservedOrdinal
+    };
 }
 
 public sealed class EntityRecord

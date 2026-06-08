@@ -1,8 +1,23 @@
+using Cloris.Aion2Flow.SceneRuntime.Journal;
+
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
-public readonly record struct ScenePlaybackCheckpoint(long PositionMilliseconds, long ObservationOrdinal, ScenePlaybackFrame Frame);
+public sealed class ScenePlaybackCheckpoint
+{
+    internal ScenePlaybackCheckpoint(ScenePlaybackProjectionSnapshot projection, JournalCursor journalCursor)
+    {
+        Projection = projection;
+        JournalCursor = journalCursor;
+    }
 
-public sealed class ScenePlaybackCheckpointCache
+    public long PositionMilliseconds => Projection.PositionMilliseconds;
+
+    public JournalCursor JournalCursor { get; }
+
+    internal ScenePlaybackProjectionSnapshot Projection { get; }
+}
+
+internal sealed class ScenePlaybackCheckpointCache
 {
     private readonly Lock _gate = new();
     private readonly SortedDictionary<long, ScenePlaybackCheckpoint> _checkpoints = [];
@@ -12,16 +27,39 @@ public sealed class ScenePlaybackCheckpointCache
         get { lock (_gate) return _checkpoints.Count; }
     }
 
-    public void Clear()
+    public bool TryGetFloor(long positionMilliseconds, out ScenePlaybackCheckpoint? checkpoint)
     {
         lock (_gate)
-            _checkpoints.Clear();
+        {
+            checkpoint = null;
+            foreach (var candidate in _checkpoints.Values)
+            {
+                if (candidate.PositionMilliseconds > positionMilliseconds)
+                    break;
+
+                checkpoint = candidate;
+            }
+
+            return checkpoint is not null;
+        }
     }
 
-    public bool TryGet(long positionMilliseconds, out ScenePlaybackCheckpoint checkpoint)
+    public bool TryGetCeiling(long positionMilliseconds, out ScenePlaybackCheckpoint? checkpoint)
     {
         lock (_gate)
-            return _checkpoints.TryGetValue(positionMilliseconds, out checkpoint);
+        {
+            foreach (var candidate in _checkpoints.Values)
+            {
+                if (candidate.PositionMilliseconds >= positionMilliseconds)
+                {
+                    checkpoint = candidate;
+                    return true;
+                }
+            }
+
+            checkpoint = null;
+            return false;
+        }
     }
 
     public void Upsert(ScenePlaybackCheckpoint checkpoint)

@@ -33,10 +33,37 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private long _resolveCacheEntityRevision = -1;
     private long _resolveCacheOwnerVersion = -1;
     private bool _ownerInferenceReady;
+    private bool _hasProjectionBaseline;
 
     public SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary)
         : this(entities, combat, boundary, null, default)
     {
+    }
+
+    internal SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary, BossFocusStore? bossFocus, Guid encounterId, SceneCombatSnapshotAdapterSnapshot snapshot)
+        : this(entities, combat, boundary, bossFocus, encounterId)
+    {
+        RestoreSnapshot(snapshot);
+    }
+
+    internal SceneCombatSnapshotAdapterSnapshot CreateProjectionSnapshot()
+    {
+        PrepareProjectionCaches();
+        EnsureClassEvidence();
+        return new SceneCombatSnapshotAdapterSnapshot(
+            CreateClassEvidenceSnapshot(),
+            CreateInferredOwnerSnapshot(),
+            CreateOwnerInferenceSourceSnapshot(),
+            CreateOwnerCandidateSnapshot(),
+            CreateDirectOwnerCandidateSnapshot(),
+            _ownerInferenceCombatRevision,
+            _ownerInferenceEntityRevision,
+            _ownerInferenceSkillMapRevision,
+            _ownerInferenceVersion,
+            _ownerInferenceReady,
+            _classEvidenceCombatRevision,
+            _classEvidenceEntityRevision,
+            _classEvidenceOwnerVersion);
     }
 
     public SceneCombatSnapshot CreateSnapshot()
@@ -354,11 +381,22 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (exists)
             return resolved;
 
-        resolved = entities.TryGet(combatantId, out var entity) && entity.OwnerEntityId is int ownerId
-            ? ownerId
-            : _inferredOwnerBySummon.TryGetValue(combatantId, out var inferredOwnerId)
-                ? inferredOwnerId
-                : combatantId;
+        if (entities.TryGet(combatantId, out var entity))
+        {
+            if (entity.OwnerEntityId is int ownerId)
+            {
+                resolved = ownerId;
+                return resolved;
+            }
+
+            if (IsExplicitNonSummon(entity))
+            {
+                resolved = combatantId;
+                return resolved;
+            }
+        }
+
+        resolved = _inferredOwnerBySummon.TryGetValue(combatantId, out var inferredOwnerId) ? inferredOwnerId : combatantId;
         return resolved;
     }
 
@@ -391,11 +429,27 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return known;
     }
 
-    private bool IsKnownSummonCore(int entityId) =>
-        _inferredOwnerBySummon.ContainsKey(entityId) || entities.TryGet(entityId, out var entity) && (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon);
+    private bool IsKnownSummonCore(int entityId)
+    {
+        if (entities.TryGet(entityId, out var entity))
+        {
+            if (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon)
+                return true;
+
+            if (IsExplicitNonSummon(entity))
+                return false;
+        }
+
+        return _inferredOwnerBySummon.ContainsKey(entityId);
+    }
 
     private bool IsExplicitKnownSummonCore(int entityId) =>
         entities.TryGet(entityId, out var entity) && (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon);
+
+    private static bool IsExplicitNonSummon(EntityRecord entity) =>
+        entity.IsPlayer ||
+        entity.NpcCode.HasValue ||
+        entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly;
 
     private bool IsKnownNpcCombatant(int entityId) =>
         entities.TryGet(entityId, out var entity) && (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
@@ -575,6 +629,111 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return true;
     }
 
+    private SceneCombatSnapshotClassEvidenceEntry[] CreateClassEvidenceSnapshot()
+    {
+        if (_classEvidence.Count == 0)
+            return [];
+
+        var result = new SceneCombatSnapshotClassEvidenceEntry[_classEvidence.Count];
+        var index = 0;
+        foreach (var (entityId, evidence) in _classEvidence)
+            result[index++] = new SceneCombatSnapshotClassEvidenceEntry(entityId, evidence);
+        return result;
+    }
+
+    private SceneCombatSnapshotOwnerEntry[] CreateInferredOwnerSnapshot()
+    {
+        if (_inferredOwnerBySummon.Count == 0)
+            return [];
+
+        var result = new SceneCombatSnapshotOwnerEntry[_inferredOwnerBySummon.Count];
+        var index = 0;
+        foreach (var (summonId, ownerId) in _inferredOwnerBySummon)
+            result[index++] = new SceneCombatSnapshotOwnerEntry(summonId, ownerId);
+        return result;
+    }
+
+    private SceneCombatSnapshotOwnerInferenceSourceEntry[] CreateOwnerInferenceSourceSnapshot()
+    {
+        if (_ownerInferenceBySource.Count == 0)
+            return [];
+
+        var result = new SceneCombatSnapshotOwnerInferenceSourceEntry[_ownerInferenceBySource.Count];
+        var index = 0;
+        foreach (var (sourceId, source) in _ownerInferenceBySource)
+            result[index++] = new SceneCombatSnapshotOwnerInferenceSourceEntry(sourceId, source.HasOwnerSkillEvidence, source.SummonSkillCategoryMask);
+        return result;
+    }
+
+    private SceneCombatSnapshotOwnerCandidateEntry[] CreateOwnerCandidateSnapshot()
+    {
+        if (_ownerCandidatesByCategory.Count == 0)
+            return [];
+
+        var result = new SceneCombatSnapshotOwnerCandidateEntry[_ownerCandidatesByCategory.Count];
+        var index = 0;
+        foreach (var (category, owners) in _ownerCandidatesByCategory)
+            result[index++] = new SceneCombatSnapshotOwnerCandidateEntry(category, owners.ToArray());
+        return result;
+    }
+
+    private SceneCombatSnapshotDirectOwnerCandidateEntry[] CreateDirectOwnerCandidateSnapshot()
+    {
+        if (_directOwnerCandidatesBySummonCategory.Count == 0)
+            return [];
+
+        var result = new SceneCombatSnapshotDirectOwnerCandidateEntry[_directOwnerCandidatesBySummonCategory.Count];
+        var index = 0;
+        foreach (var (key, owners) in _directOwnerCandidatesBySummonCategory)
+            result[index++] = new SceneCombatSnapshotDirectOwnerCandidateEntry(key.SummonId, key.Category, owners.ToArray());
+        return result;
+    }
+
+    private void RestoreSnapshot(SceneCombatSnapshotAdapterSnapshot snapshot)
+    {
+        for (var i = 0; i < snapshot.ClassEvidence.Length; i++)
+        {
+            var entry = snapshot.ClassEvidence[i];
+            _classEvidence[entry.EntityId] = entry.Evidence;
+        }
+
+        for (var i = 0; i < snapshot.InferredOwners.Length; i++)
+        {
+            var entry = snapshot.InferredOwners[i];
+            _inferredOwnerBySummon[entry.SummonId] = entry.OwnerId;
+        }
+
+        for (var i = 0; i < snapshot.OwnerInferenceSources.Length; i++)
+        {
+            var entry = snapshot.OwnerInferenceSources[i];
+            _ownerInferenceBySource[entry.SourceId] = SummonOwnerInferenceAccumulator.FromSnapshot(entry.SourceId, entry.HasOwnerSkillEvidence, entry.SummonSkillCategoryMask);
+        }
+
+        for (var i = 0; i < snapshot.OwnerCandidates.Length; i++)
+        {
+            var entry = snapshot.OwnerCandidates[i];
+            _ownerCandidatesByCategory[entry.Category] = OwnerCandidateAccumulator.FromSnapshot(entry.OwnerIds);
+        }
+
+        for (var i = 0; i < snapshot.DirectOwnerCandidates.Length; i++)
+        {
+            var entry = snapshot.DirectOwnerCandidates[i];
+            _directOwnerCandidatesBySummonCategory[new SummonOwnerInferenceKey(entry.SummonId, entry.Category)] = OwnerCandidateAccumulator.FromSnapshot(entry.OwnerIds);
+        }
+
+        _ownerInferenceCombatRevision = snapshot.OwnerInferenceCombatRevision;
+        _ownerInferenceEntityRevision = snapshot.OwnerInferenceEntityRevision;
+        _ownerInferenceSkillMapRevision = snapshot.OwnerInferenceSkillMapRevision;
+        _ownerInferenceVersion = snapshot.OwnerInferenceVersion;
+        _ownerInferenceReady = snapshot.OwnerInferenceReady;
+        _ownerInferenceScannedEventCount = 0;
+        _classEvidenceCombatRevision = snapshot.ClassEvidenceCombatRevision;
+        _classEvidenceEntityRevision = snapshot.ClassEvidenceEntityRevision;
+        _classEvidenceOwnerVersion = snapshot.ClassEvidenceOwnerVersion;
+        _classEvidenceScannedEventCount = 0;
+        _hasProjectionBaseline = true;
+    }
+
     private void ResetOwnerInferenceScan()
     {
         _ownerInferenceBySource.Clear();
@@ -595,10 +754,11 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         var entityRevision = entities.Revision;
         var ownerVersion = _ownerInferenceVersion;
         var events = combat.EventSpan;
-        var rebuildFromStart = _classEvidenceEntityRevision != entityRevision ||
-                               _classEvidenceOwnerVersion != ownerVersion ||
-                               combatRevision < _classEvidenceCombatRevision ||
-                               _classEvidenceScannedEventCount > events.Length;
+        var rebuildFromStart = combatRevision < _classEvidenceCombatRevision ||
+                               (!_hasProjectionBaseline &&
+                                (_classEvidenceEntityRevision != entityRevision ||
+                                 _classEvidenceOwnerVersion != ownerVersion ||
+                                 _classEvidenceScannedEventCount > events.Length));
 
         if (rebuildFromStart)
         {
@@ -624,18 +784,19 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         var skillMapRevision = CombatResourceRegistry.SkillMapRevision;
         if (_ownerInferenceReady &&
             _ownerInferenceCombatRevision == combatRevision &&
-            _ownerInferenceEntityRevision == entityRevision &&
-            _ownerInferenceSkillMapRevision == skillMapRevision)
+            (_hasProjectionBaseline || _ownerInferenceEntityRevision == entityRevision) &&
+            (_hasProjectionBaseline || _ownerInferenceSkillMapRevision == skillMapRevision))
         {
             return;
         }
 
         var events = combat.EventSpan;
-        var rebuildFromStart = !_ownerInferenceReady ||
-                               _ownerInferenceEntityRevision != entityRevision ||
-                               _ownerInferenceSkillMapRevision != skillMapRevision ||
-                               combatRevision < _ownerInferenceCombatRevision ||
-                               _ownerInferenceScannedEventCount > events.Length;
+        var rebuildFromStart = combatRevision < _ownerInferenceCombatRevision ||
+                               (!_hasProjectionBaseline &&
+                                (!_ownerInferenceReady ||
+                                 _ownerInferenceEntityRevision != entityRevision ||
+                                 _ownerInferenceSkillMapRevision != skillMapRevision ||
+                                 _ownerInferenceScannedEventCount > events.Length));
 
         if (rebuildFromStart)
             ResetOwnerInferenceScan();
@@ -675,6 +836,16 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         public int SourceId { get; } = sourceId;
         public bool HasOwnerSkillEvidence { get; set; }
+        public readonly uint SummonSkillCategoryMask => _summonSkillCategoryMask;
+
+        public static SummonOwnerInferenceAccumulator FromSnapshot(int sourceId, bool hasOwnerSkillEvidence, uint summonSkillCategoryMask)
+        {
+            return new SummonOwnerInferenceAccumulator(sourceId)
+            {
+                HasOwnerSkillEvidence = hasOwnerSkillEvidence,
+                _summonSkillCategoryMask = summonSkillCategoryMask
+            };
+        }
 
         public void AddSummonSkillCategory(SkillCategory category)
         {
@@ -747,6 +918,33 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             }
 
             return ownerId;
+        }
+
+        public readonly int[] ToArray()
+        {
+            if (_overflow is { } overflow)
+            {
+                var result = overflow.ToArray();
+                Array.Sort(result);
+                return result;
+            }
+
+            if (_count == 0)
+                return [];
+
+            var inline = new int[_count];
+            for (var i = 0; i < _count; i++)
+                inline[i] = GetInline(i);
+            Array.Sort(inline);
+            return inline;
+        }
+
+        public static OwnerCandidateAccumulator FromSnapshot(IReadOnlyList<int> ownerIds)
+        {
+            var accumulator = new OwnerCandidateAccumulator();
+            for (var i = 0; i < ownerIds.Count; i++)
+                accumulator.Add(ownerIds[i]);
+            return accumulator;
         }
 
         private readonly bool ContainsInline(int ownerId)
@@ -1025,3 +1223,28 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         public void Add(in CombatDetailEvent detailEvent) => events.Add(detailEvent);
     }
 }
+
+internal sealed record SceneCombatSnapshotAdapterSnapshot(
+    SceneCombatSnapshotClassEvidenceEntry[] ClassEvidence,
+    SceneCombatSnapshotOwnerEntry[] InferredOwners,
+    SceneCombatSnapshotOwnerInferenceSourceEntry[] OwnerInferenceSources,
+    SceneCombatSnapshotOwnerCandidateEntry[] OwnerCandidates,
+    SceneCombatSnapshotDirectOwnerCandidateEntry[] DirectOwnerCandidates,
+    long OwnerInferenceCombatRevision,
+    long OwnerInferenceEntityRevision,
+    long OwnerInferenceSkillMapRevision,
+    long OwnerInferenceVersion,
+    bool OwnerInferenceReady,
+    long ClassEvidenceCombatRevision,
+    long ClassEvidenceEntityRevision,
+    long ClassEvidenceOwnerVersion);
+
+internal readonly record struct SceneCombatSnapshotClassEvidenceEntry(int EntityId, CombatantClassEvidence Evidence);
+
+internal readonly record struct SceneCombatSnapshotOwnerEntry(int SummonId, int OwnerId);
+
+internal readonly record struct SceneCombatSnapshotOwnerInferenceSourceEntry(int SourceId, bool HasOwnerSkillEvidence, uint SummonSkillCategoryMask);
+
+internal readonly record struct SceneCombatSnapshotOwnerCandidateEntry(SkillCategory Category, int[] OwnerIds);
+
+internal readonly record struct SceneCombatSnapshotDirectOwnerCandidateEntry(int SummonId, SkillCategory Category, int[] OwnerIds);

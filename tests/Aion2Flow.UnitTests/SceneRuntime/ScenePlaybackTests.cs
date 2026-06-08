@@ -215,7 +215,6 @@ public sealed class ScenePlaybackTests
         controller.SetSpeed(2.5);
 
         Assert.Equal(2.5, controller.Speed);
-        Assert.Equal(2.5, controller.Session.Speed);
     }
 
     [Fact]
@@ -275,6 +274,39 @@ public sealed class ScenePlaybackTests
         await WaitUntil(() => controller.PositionMilliseconds == 1_000);
 
         Assert.Equal(1, controller.CheckpointCount);
+    }
+
+    [Fact]
+    public async Task Controller_Play_MapsElapsedWallTimeThroughSpeed()
+    {
+        var tickFactory = new ManualTickSourceFactory();
+        await using var controller = CreateController(CreateArchiveRecord(), tickFactory);
+
+        controller.SetSpeed(2d);
+        controller.Play();
+        tickFactory.Source.Tick(TimeSpan.FromMilliseconds(250));
+        await WaitUntil(() => controller.PositionMilliseconds == 500);
+        tickFactory.Source.Tick(TimeSpan.FromMilliseconds(250));
+        await WaitUntil(() => controller.PositionMilliseconds == 1_000);
+
+        Assert.Equal(1_000, controller.PositionMilliseconds);
+    }
+
+    [Fact]
+    public async Task Controller_SetSpeed_ReanchorsPlaybackClockAtCurrentPosition()
+    {
+        var tickFactory = new ManualTickSourceFactory();
+        await using var controller = CreateController(CreateArchiveRecord(), tickFactory);
+
+        controller.Play();
+        tickFactory.Source.Tick(TimeSpan.FromMilliseconds(500));
+        await WaitUntil(() => controller.PositionMilliseconds == 500);
+
+        controller.SetSpeed(2d);
+        tickFactory.Source.Tick(TimeSpan.FromMilliseconds(250));
+        await WaitUntil(() => controller.PositionMilliseconds == 1_000);
+
+        Assert.Equal(1_000, controller.PositionMilliseconds);
     }
 
     [Fact]
@@ -347,7 +379,48 @@ public sealed class ScenePlaybackTests
         Assert.Equal(3, checkpoints.Length);
         Assert.Equal([0L, 1_000L, 2_000L], checkpoints.Select(static checkpoint => checkpoint.PositionMilliseconds));
         Assert.Equal(3, controller.State.CheckpointCount);
-        Assert.All(checkpoints, static checkpoint => Assert.True(checkpoint.ObservationOrdinal >= 0));
+        Assert.All(checkpoints, static checkpoint => Assert.True(checkpoint.JournalCursor.NextObservationOrdinal >= 0));
+    }
+
+    [Fact]
+    public async Task Controller_SeekFromCheckpoint_ContinuesFromLiveJournalCursor()
+    {
+        var scene = new SceneLiveReadModel();
+        AppendCombat(scene.Journal, scene.SessionId, 100, 200, 100, 1, 1_000);
+        AppendCombat(scene.Journal, scene.SessionId, 100, 200, 200, 2, 2_000);
+        await using var controller = new ScenePlaybackController(
+            new LiveScenePlaybackSource(scene),
+            new ManualTickSourceFactory(),
+            new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
+
+        await controller.RebuildCheckpointsAsync(TestContext.Current.CancellationToken);
+        var checkpoint = Assert.Single(controller.GetCheckpoints(), static checkpoint => checkpoint.PositionMilliseconds == 1_000);
+        Assert.Equal(2, checkpoint.JournalCursor.NextObservationOrdinal);
+
+        AppendCombat(scene.Journal, scene.SessionId, 100, 200, 300, 3, 3_000);
+
+        var frame = await controller.SeekAsync(2_000, TestContext.Current.CancellationToken);
+
+        Assert.Equal(600, frame.CombatTotals.TotalDamage);
+        Assert.Equal(3, frame.AppliedSegment.EndObservationOrdinalExclusive);
+    }
+
+    [Fact]
+    public async Task Controller_CreateTimelineSegment_DoesNotSkipMarkersAtCheckpointBoundary()
+    {
+        await using var controller = new ScenePlaybackController(
+            new ArchivedScenePlaybackSource(CreateArchiveRecord()),
+            new ManualTickSourceFactory(),
+            new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
+
+        await controller.RebuildCheckpointsAsync(TestContext.Current.CancellationToken);
+
+        var segment = controller.CreateTimelineSegment(1_000, 1_000);
+        var read = ScenePlaybackTrackReader.Read(segment, controller.CurrentFrame.TimeRange, 1_000, 1_000, 10);
+
+        var marker = Assert.Single(read.Markers);
+        Assert.Equal(ScenePlaybackTrack.Resource, marker.Track);
+        Assert.Equal(3, marker.ObservationOrdinal);
     }
 
     [Fact]

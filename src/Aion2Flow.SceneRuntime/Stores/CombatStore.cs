@@ -158,42 +158,35 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, targetId, default, _revision));
         }
 
-        ref var outgoing = ref CollectionsMarshal.GetValueRefOrAddDefault(_outgoingBySource, sourceId, out var outgoingExists);
-        HashSet<(int, int)> outgoingSet;
-        if (!outgoingExists)
-        {
-            outgoingSet = [];
-            outgoing = outgoingSet;
-        }
-        else if (outgoing is { } existingOutgoing)
-        {
-            outgoingSet = existingOutgoing;
-        }
-        else
-        {
-            throw new InvalidOperationException("Outgoing combat pair index returned a null set.");
-        }
-        outgoingSet.Add(pairKey);
+        AddPairIndex(pairKey);
+    }
 
-        if (targetId > 0)
-        {
-            ref var incoming = ref CollectionsMarshal.GetValueRefOrAddDefault(_incomingByTarget, targetId, out var incomingExists);
-            HashSet<(int, int)> incomingSet;
-            if (!incomingExists)
-            {
-                incomingSet = [];
-                incoming = incomingSet;
-            }
-            else if (incoming is { } existingIncoming)
-            {
-                incomingSet = existingIncoming;
-            }
-            else
-            {
-                throw new InvalidOperationException("Incoming combat pair index returned a null set.");
-            }
-            incomingSet.Add(pairKey);
-        }
+    private void AddPairIndex((int Source, int Target) pairKey)
+    {
+        AddOutgoingPairIndex(pairKey);
+        AddIncomingPairIndex(pairKey);
+    }
+
+    private void AddOutgoingPairIndex((int Source, int Target) pairKey)
+    {
+        if (pairKey.Source <= 0)
+            return;
+
+        ref var outgoing = ref CollectionsMarshal.GetValueRefOrAddDefault(_outgoingBySource, pairKey.Source, out var outgoingExists);
+        if (!outgoingExists)
+            outgoing = [];
+        outgoing!.Add(pairKey);
+    }
+
+    private void AddIncomingPairIndex((int Source, int Target) pairKey)
+    {
+        if (pairKey.Target <= 0)
+            return;
+
+        ref var incoming = ref CollectionsMarshal.GetValueRefOrAddDefault(_incomingByTarget, pairKey.Target, out var incomingExists);
+        if (!incomingExists)
+            incoming = [];
+        incoming!.Add(pairKey);
     }
 
     private static void ApplyObservedAt(CombatPairRecord record, long observedAtMilliseconds)
@@ -246,6 +239,54 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
     }
 
     public long GetCombatantDetailRevision(int combatantId) => combatantId > 0 && _detailRevisionByCombatant.TryGetValue(combatantId, out var revision) ? revision : 0;
+
+    internal CombatStoreSnapshot CreateSnapshot()
+    {
+        var pairs = new CombatPairRecordSnapshot[_pairs.Count];
+        var index = 0;
+        foreach (var pair in _pairs.Values)
+            pairs[index++] = CombatPairRecordSnapshot.From(pair);
+
+        var combatants = new CombatantRecordSnapshot[_combatants.Count];
+        index = 0;
+        foreach (var combatant in _combatants.Values)
+            combatants[index++] = CombatantRecordSnapshot.From(combatant);
+
+        var detailRevisions = new CombatantDetailRevisionSnapshot[_detailRevisionByCombatant.Count];
+        index = 0;
+        foreach (var (combatantId, revision) in _detailRevisionByCombatant)
+            detailRevisions[index++] = new CombatantDetailRevisionSnapshot(combatantId, revision);
+
+        return new CombatStoreSnapshot(pairs, combatants, detailRevisions, _revision);
+    }
+
+    internal static CombatStore FromSnapshot(CombatStoreSnapshot snapshot)
+    {
+        var store = new CombatStore(0, snapshot.Combatants.Length, snapshot.Pairs.Length);
+        store._revision = snapshot.Revision;
+
+        for (var i = 0; i < snapshot.Pairs.Length; i++)
+        {
+            var pair = snapshot.Pairs[i].ToRecord();
+            var key = (pair.SourceId, pair.TargetId);
+            store._pairs[key] = pair;
+            store.AddPairIndex(key);
+        }
+
+        for (var i = 0; i < snapshot.Combatants.Length; i++)
+        {
+            var combatant = snapshot.Combatants[i].ToRecord();
+            store._combatants[combatant.CombatantId] = combatant;
+        }
+
+        for (var i = 0; i < snapshot.DetailRevisions.Length; i++)
+        {
+            var detail = snapshot.DetailRevisions[i];
+            store._detailRevisionByCombatant[detail.CombatantId] = detail.Revision;
+        }
+
+        return store;
+    }
 
     private CombatantRecord GetOrAddCombatant(int combatantId)
     {
@@ -346,6 +387,176 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
 
     private static int ResolveChangeCapacity(int eventCapacity) => eventCapacity <= 0 ? 0 : eventCapacity <= int.MaxValue / 3 ? eventCapacity * 3 : int.MaxValue;
 
+}
+
+internal sealed record CombatStoreSnapshot(
+    CombatPairRecordSnapshot[] Pairs,
+    CombatantRecordSnapshot[] Combatants,
+    CombatantDetailRevisionSnapshot[] DetailRevisions,
+    long Revision);
+
+internal readonly record struct CombatantDetailRevisionSnapshot(int CombatantId, long Revision);
+
+internal readonly record struct CombatPairRecordSnapshot(
+    int SourceId,
+    int TargetId,
+    long TotalDamage,
+    long TotalHealing,
+    long TotalPeriodicHealing,
+    long TotalDrainDamage,
+    long TotalDrainHealing,
+    long TotalRegenerationHealing,
+    long TotalShield,
+    long TotalShieldAbsorbed,
+    int ShieldCount,
+    int ShieldAbsorbedCount,
+    int HitCount,
+    int AttemptCount,
+    int EvadeCount,
+    int InvincibleCount,
+    int MultiHitCount,
+    int LastSkillCode,
+    long FirstObserved,
+    long LastObserved,
+    long FirstRevision,
+    long Revision)
+{
+    public static CombatPairRecordSnapshot From(CombatPairRecord record) => new(
+        record.SourceId,
+        record.TargetId,
+        record.TotalDamage,
+        record.TotalHealing,
+        record.TotalPeriodicHealing,
+        record.TotalDrainDamage,
+        record.TotalDrainHealing,
+        record.TotalRegenerationHealing,
+        record.TotalShield,
+        record.TotalShieldAbsorbed,
+        record.ShieldCount,
+        record.ShieldAbsorbedCount,
+        record.HitCount,
+        record.AttemptCount,
+        record.EvadeCount,
+        record.InvincibleCount,
+        record.MultiHitCount,
+        record.LastSkillCode,
+        record.FirstObserved,
+        record.LastObserved,
+        record.FirstRevision,
+        record.Revision);
+
+    public CombatPairRecord ToRecord() => new()
+    {
+        SourceId = SourceId,
+        TargetId = TargetId,
+        TotalDamage = TotalDamage,
+        TotalHealing = TotalHealing,
+        TotalPeriodicHealing = TotalPeriodicHealing,
+        TotalDrainDamage = TotalDrainDamage,
+        TotalDrainHealing = TotalDrainHealing,
+        TotalRegenerationHealing = TotalRegenerationHealing,
+        TotalShield = TotalShield,
+        TotalShieldAbsorbed = TotalShieldAbsorbed,
+        ShieldCount = ShieldCount,
+        ShieldAbsorbedCount = ShieldAbsorbedCount,
+        HitCount = HitCount,
+        AttemptCount = AttemptCount,
+        EvadeCount = EvadeCount,
+        InvincibleCount = InvincibleCount,
+        MultiHitCount = MultiHitCount,
+        LastSkillCode = LastSkillCode,
+        FirstObserved = FirstObserved,
+        LastObserved = LastObserved,
+        FirstRevision = FirstRevision,
+        Revision = Revision
+    };
+}
+
+internal readonly record struct CombatantRecordSnapshot(
+    int CombatantId,
+    long OutgoingDamage,
+    int OutgoingHits,
+    int OutgoingAttempts,
+    int OutgoingEvades,
+    int OutgoingInvincibles,
+    int OutgoingMultiHits,
+    long IncomingDamage,
+    int IncomingHits,
+    int IncomingAttempts,
+    int IncomingEvades,
+    int IncomingInvincibles,
+    int IncomingMultiHits,
+    long OutgoingHealing,
+    long IncomingHealing,
+    long OutgoingShield,
+    long IncomingShield,
+    long OutgoingShieldAbsorbed,
+    long IncomingShieldAbsorbed,
+    int OutgoingShieldCount,
+    int IncomingShieldCount,
+    int OutgoingShieldAbsorbedCount,
+    int IncomingShieldAbsorbedCount,
+    long FirstObserved,
+    long LastObserved,
+    long Revision)
+{
+    public static CombatantRecordSnapshot From(CombatantRecord record) => new(
+        record.CombatantId,
+        record.OutgoingDamage,
+        record.OutgoingHits,
+        record.OutgoingAttempts,
+        record.OutgoingEvades,
+        record.OutgoingInvincibles,
+        record.OutgoingMultiHits,
+        record.IncomingDamage,
+        record.IncomingHits,
+        record.IncomingAttempts,
+        record.IncomingEvades,
+        record.IncomingInvincibles,
+        record.IncomingMultiHits,
+        record.OutgoingHealing,
+        record.IncomingHealing,
+        record.OutgoingShield,
+        record.IncomingShield,
+        record.OutgoingShieldAbsorbed,
+        record.IncomingShieldAbsorbed,
+        record.OutgoingShieldCount,
+        record.IncomingShieldCount,
+        record.OutgoingShieldAbsorbedCount,
+        record.IncomingShieldAbsorbedCount,
+        record.FirstObserved,
+        record.LastObserved,
+        record.Revision);
+
+    public CombatantRecord ToRecord() => new()
+    {
+        CombatantId = CombatantId,
+        OutgoingDamage = OutgoingDamage,
+        OutgoingHits = OutgoingHits,
+        OutgoingAttempts = OutgoingAttempts,
+        OutgoingEvades = OutgoingEvades,
+        OutgoingInvincibles = OutgoingInvincibles,
+        OutgoingMultiHits = OutgoingMultiHits,
+        IncomingDamage = IncomingDamage,
+        IncomingHits = IncomingHits,
+        IncomingAttempts = IncomingAttempts,
+        IncomingEvades = IncomingEvades,
+        IncomingInvincibles = IncomingInvincibles,
+        IncomingMultiHits = IncomingMultiHits,
+        OutgoingHealing = OutgoingHealing,
+        IncomingHealing = IncomingHealing,
+        OutgoingShield = OutgoingShield,
+        IncomingShield = IncomingShield,
+        OutgoingShieldAbsorbed = OutgoingShieldAbsorbed,
+        IncomingShieldAbsorbed = IncomingShieldAbsorbed,
+        OutgoingShieldCount = OutgoingShieldCount,
+        IncomingShieldCount = IncomingShieldCount,
+        OutgoingShieldAbsorbedCount = OutgoingShieldAbsorbedCount,
+        IncomingShieldAbsorbedCount = IncomingShieldAbsorbedCount,
+        FirstObserved = FirstObserved,
+        LastObserved = LastObserved,
+        Revision = Revision
+    };
 }
 
 public sealed class CombatPairRecord

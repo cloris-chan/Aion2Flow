@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Cloris.Aion2Flow.Assets.Icons;
 using Cloris.Aion2Flow.Controls;
+using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
@@ -19,10 +20,9 @@ public partial class MainWindow : Window
 {
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly SettingsService _settingsService;
-    private readonly UiFrameBatchService _frameBatchService;
-    private readonly Action<TimeSpan> _animationFrameCallback;
+    private readonly AvaloniaFrameClockService _frameClock;
     private bool _hotkeyAttached;
-    private bool _frameLoopRunning;
+    private bool _frameClockAttached;
 
     public new MainViewModel DataContext { get => (MainViewModel)base.DataContext!; set => base.DataContext = value; }
 
@@ -31,8 +31,7 @@ public partial class MainWindow : Window
         DataContext = Ioc.Default.GetRequiredService<MainViewModel>();
         _globalHotkeyService = Ioc.Default.GetRequiredService<GlobalHotkeyService>();
         _settingsService = Ioc.Default.GetRequiredService<SettingsService>();
-        _frameBatchService = Ioc.Default.GetRequiredService<UiFrameBatchService>();
-        _animationFrameCallback = OnAnimationFrame;
+        _frameClock = Ioc.Default.GetRequiredService<AvaloniaFrameClockService>();
         DataContext.InitializeAsync().ConfigureAwait(false);
         AvaloniaXamlLoader.Load(this);
         DataContext.EncounterHistory.CollectionChanged += OnEncounterHistoryCollectionChanged;
@@ -49,39 +48,24 @@ public partial class MainWindow : Window
         base.OnOpened(e);
         RebuildEncounterHistoryMenuItems();
         AttachGlobalHotkeyHook();
-        StartFrameLoop();
+        AttachFrameClock();
     }
 
-    private void StartFrameLoop()
+    private void AttachFrameClock()
     {
-        if (_frameLoopRunning)
+        if (_frameClockAttached)
         {
             return;
         }
 
-        _frameLoopRunning = true;
-        RequestAnimationFrame(_animationFrameCallback);
+        _frameClockAttached = true;
+        _frameClock.Frame += OnAnimationFrame;
+        _frameClock.Attach(this);
     }
 
-    private void OnAnimationFrame(TimeSpan timestamp)
+    private void OnAnimationFrame(object? sender, AvaloniaFrameEventArgs e)
     {
-        if (!_frameLoopRunning)
-        {
-            return;
-        }
-
-        try
-        {
-            DataContext.ProcessUiFrame();
-            _frameBatchService.FlushFrame();
-        }
-        finally
-        {
-            if (_frameLoopRunning)
-            {
-                RequestAnimationFrame(_animationFrameCallback);
-            }
-        }
+        DataContext.ProcessUiFrame();
     }
 
     private void AttachGlobalHotkeyHook()
@@ -134,7 +118,13 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        _frameLoopRunning = false;
+        if (_frameClockAttached)
+        {
+            _frameClock.Frame -= OnAnimationFrame;
+            _frameClock.Detach(this);
+            _frameClockAttached = false;
+        }
+
         base.OnClosed(e);
         DataContext.DisposeAsync().AsTask().ConfigureAwait(false);
     }

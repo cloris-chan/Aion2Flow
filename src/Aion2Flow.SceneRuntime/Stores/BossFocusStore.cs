@@ -107,6 +107,29 @@ public sealed class BossFocusStore(EntityStore entities)
 
     public bool ApplyBattleToggle(int instanceId, bool isActive, long observedAtMilliseconds) => ApplyBattle(instanceId, isActive, observedAtMilliseconds);
 
+    internal BossFocusStoreSnapshot CreateSnapshot()
+    {
+        var observed = new BossFocusObservedSnapshot[_observed.Count];
+        var index = 0;
+        foreach (var (instanceId, snapshot) in _observed)
+            observed[index++] = new BossFocusObservedSnapshot(instanceId, snapshot);
+        return new BossFocusStoreSnapshot(observed, _focused.ToArray(), _revision);
+    }
+
+    internal static BossFocusStore FromSnapshot(EntityStore entities, BossFocusStoreSnapshot snapshot)
+    {
+        var store = new BossFocusStore(entities) { _revision = snapshot.Revision };
+        for (var i = 0; i < snapshot.Observed.Length; i++)
+        {
+            var observed = snapshot.Observed[i];
+            store._observed[observed.InstanceId] = observed.Snapshot;
+        }
+
+        for (var i = 0; i < snapshot.Focused.Length; i++)
+            store._focused.Add(snapshot.Focused[i]);
+        return store;
+    }
+
     private void RememberActivity(int instanceId, long observedAtMilliseconds)
     {
         var observedAt = Math.Max(0, observedAtMilliseconds);
@@ -178,14 +201,11 @@ public sealed class BossFocusStore(EntityStore entities)
         return resolved;
     }
 
-    private bool IsBossInstance(int instanceId) =>
-        entities.TryGet(instanceId, out var entity) && entity.Kind == NpcKind.Boss;
+    private bool IsBossInstance(int instanceId) => entities.TryGet(instanceId, out var entity) && entity.Kind == NpcKind.Boss;
 
-    private bool IsNpcCombatActive(int instanceId) =>
-        entities.TryGet(instanceId, out var entity) && entity.NpcCombatActive && !IsObservedDead(instanceId);
+    private bool IsNpcCombatActive(int instanceId) => entities.TryGet(instanceId, out var entity) && entity.NpcCombatActive && !IsObservedDead(instanceId);
 
-    private bool IsObservedDead(int instanceId) =>
-        entities.TryGet(instanceId, out var entity) && entity.CurrentHp == 0;
+    private bool IsObservedDead(int instanceId) => entities.TryGet(instanceId, out var entity) && entity.CurrentHp == 0;
 
     public readonly record struct Snapshot
     {
@@ -197,3 +217,7 @@ public sealed class BossFocusStore(EntityStore entities)
         public bool HasHp { get; init; }
     }
 }
+
+internal sealed record BossFocusStoreSnapshot(BossFocusObservedSnapshot[] Observed, int[] Focused, long Revision);
+
+internal readonly record struct BossFocusObservedSnapshot(int InstanceId, BossFocusStore.Snapshot Snapshot);

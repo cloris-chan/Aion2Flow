@@ -10,14 +10,11 @@ namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
 public sealed class ScenePlaybackSession
 {
-    private const int DefaultReadBatchSize = 512;
     private const int DefaultRecentMarkerCapacity = 512;
     private readonly IScenePlaybackSource _source;
     private FrameProjector? _projector;
     private long _nextLoadedObservationOrdinal;
     private long _positionMilliseconds;
-    private double _speed = 1d;
-    private bool _isPlaying;
 
     public ScenePlaybackSession(IScenePlaybackSource source)
     {
@@ -31,22 +28,6 @@ public sealed class ScenePlaybackSession
     public long NextLoadedObservationOrdinal => _nextLoadedObservationOrdinal;
 
     public long PositionMilliseconds => _positionMilliseconds;
-
-    public double Speed => _speed;
-
-    public bool IsPlaying => _isPlaying;
-
-    public void Play() => _isPlaying = true;
-
-    public void Pause() => _isPlaying = false;
-
-    public void SetSpeed(double speed)
-    {
-        if (!double.IsFinite(speed) || speed <= 0)
-            throw new ArgumentOutOfRangeException(nameof(speed));
-
-        _speed = speed;
-    }
 
     public void ResetLoadedCursor()
     {
@@ -72,6 +53,17 @@ public sealed class ScenePlaybackSession
         return ApplyFrame(projector.AdvanceTo(positionMilliseconds, projector.Segment, projector.TimeRange));
     }
 
+    internal ScenePlaybackFrame Seek(long positionMilliseconds, ScenePlaybackCheckpoint? checkpoint)
+    {
+        var baseProjector = checkpoint is null
+            ? CreateProjector()
+            : CreateProjector(checkpoint);
+        _projector = baseProjector;
+        var segment = _source.CreateTimelineSegment();
+        var timeRange = segment.IsLiveGrowing ? ScenePlaybackTimeline.ResolveTimeRange(segment, _source.CreateSnapshot()) : baseProjector.TimeRange;
+        return ApplyFrame(baseProjector.AdvanceTo(positionMilliseconds, segment, timeRange));
+    }
+
     public ScenePlaybackFrame AdvanceTo(long positionMilliseconds)
     {
         var projector = _projector ??= CreateProjector();
@@ -79,7 +71,7 @@ public sealed class ScenePlaybackSession
             return Seek(positionMilliseconds);
 
         var segment = _source.CreateTimelineSegment();
-        var timeRange = segment.IsLiveGrowing ? ResolveTimeRange(segment, _source.CreateSnapshot()) : projector.TimeRange;
+        var timeRange = segment.IsLiveGrowing ? ScenePlaybackTimeline.ResolveTimeRange(segment, _source.CreateSnapshot()) : projector.TimeRange;
         return ApplyFrame(projector.AdvanceTo(positionMilliseconds, segment, timeRange));
     }
 
@@ -90,81 +82,46 @@ public sealed class ScenePlaybackSession
         return frame;
     }
 
+    internal ScenePlaybackCheckpoint CreateCheckpoint()
+    {
+        if (_projector is null)
+        {
+            var frame = Seek(_positionMilliseconds);
+            return new ScenePlaybackCheckpoint(_projector!.CreateSnapshot(), new JournalCursor(frame.AppliedSegment.EndObservationOrdinalExclusive));
+        }
+
+        return new ScenePlaybackCheckpoint(_projector.CreateSnapshot(), new JournalCursor(_nextLoadedObservationOrdinal));
+    }
+
     private FrameProjector CreateProjector()
     {
         var segment = _source.CreateTimelineSegment();
         var baseSnapshot = _source.CreateSnapshot();
-        var timeRange = ResolveTimeRange(segment, baseSnapshot);
+        var timeRange = ScenePlaybackTimeline.ResolveTimeRange(segment, baseSnapshot);
         return new FrameProjector(_source.EncounterId, segment, timeRange);
     }
 
-    private static long ClampPosition(long positionMilliseconds, long durationMilliseconds)
+    private FrameProjector CreateProjector(ScenePlaybackCheckpoint checkpoint)
     {
-        if (positionMilliseconds <= 0)
-            return 0;
-
-        return durationMilliseconds > 0 ? Math.Min(positionMilliseconds, durationMilliseconds) : positionMilliseconds;
-    }
-
-    private static ScenePlaybackTimeRange ResolveTimeRange(SceneJournalSegment segment, SceneCombatSnapshot snapshot)
-    {
-        var start = long.MaxValue;
-        var end = long.MinValue;
-        var cursor = segment.CreateCursor();
-        while (true)
-        {
-            var result = segment.ReadEntries(cursor, DefaultReadBatchSize, entries =>
-            {
-                foreach (ref readonly var entry in entries)
-                {
-                    var timestamp = ResolveTimestampMilliseconds(in entry);
-                    if (timestamp <= 0)
-                        continue;
-
-                    start = Math.Min(start, timestamp);
-                    end = Math.Max(end, timestamp);
-                }
-            });
-
-            if (result.Count == 0)
-                break;
-
-            cursor = result.Cursor;
-        }
-
-        if (start != long.MaxValue && end != long.MinValue)
-            return new ScenePlaybackTimeRange(start, end, Math.Max(0, end - start), true);
-
-        if (snapshot.EncounterStartTime > 0)
-        {
-            var fallbackEnd = snapshot.EncounterEndTime >= snapshot.EncounterStartTime ? snapshot.EncounterEndTime : snapshot.EncounterStartTime;
-            return new ScenePlaybackTimeRange(snapshot.EncounterStartTime, fallbackEnd, Math.Max(0, fallbackEnd - snapshot.EncounterStartTime), true);
-        }
-
-        return default;
-    }
-
-    private static long ResolveTimestampMilliseconds(in ObservedEventEnvelope entry)
-    {
-        if (entry.Raw.TimestampMilliseconds > 0)
-            return entry.Raw.TimestampMilliseconds;
-
-        return entry.Stamp.OffsetTicks > 0 ? entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond : 0;
+        var segment = _source.CreateTimelineSegment();
+        var snapshot = checkpoint.Projection;
+        var timeRange = segment.IsLiveGrowing ? ScenePlaybackTimeline.ResolveTimeRange(segment, _source.CreateSnapshot()) : snapshot.TimeRange;
+        return FrameProjector.FromSnapshot(_source.EncounterId, segment, timeRange, checkpoint.JournalCursor, snapshot);
     }
 
     private sealed class FrameProjector
     {
         private readonly Guid _encounterId;
-        private readonly EntityStore _entities = new();
-        private readonly SceneBoundaryStore _boundary = new();
-        private readonly RuntimeMetadataRegistry _metadata = new();
-        private readonly CombatStore _combat = new();
-        private readonly DomainEventApplier _applier;
-        private readonly SceneCombatSnapshotAdapter _adapter;
-        private readonly Dictionary<int, ScenePlaybackResourceState> _resources = [];
-        private readonly Dictionary<AuraKey, ScenePlaybackAuraState> _activeAuras = [];
-        private readonly Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks = [];
-        private readonly Queue<ScenePlaybackTrackMarker> _recentMarkers = new(DefaultRecentMarkerCapacity);
+        private EntityStore _entities;
+        private SceneBoundaryStore _boundary;
+        private RuntimeMetadataRegistry _metadata;
+        private CombatStore _combat;
+        private DomainEventApplier _applier;
+        private SceneCombatSnapshotAdapter _adapter;
+        private Dictionary<int, ScenePlaybackResourceState> _resources;
+        private Dictionary<AuraKey, ScenePlaybackAuraState> _activeAuras;
+        private Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks;
+        private Queue<ScenePlaybackTrackMarker> _recentMarkers;
         private SceneJournalSegment _segment;
         private ScenePlaybackTimeRange _timeRange;
         private JournalCursor _cursor;
@@ -175,25 +132,129 @@ public sealed class ScenePlaybackSession
         private long _completedBatchOrdinal = -1;
 
         public FrameProjector(Guid encounterId, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
+            : this(
+                encounterId,
+                segment,
+                timeRange,
+                new EntityStore(),
+                new SceneBoundaryStore(),
+                new RuntimeMetadataRegistry(),
+                new CombatStore(),
+                resources: [],
+                activeAuras: [],
+                tracks: [],
+                recentMarkers: new Queue<ScenePlaybackTrackMarker>(DefaultRecentMarkerCapacity),
+                segment.CreateCursor(),
+                timeRange.HasTimestamps ? timeRange.StartTimestampMilliseconds : 0,
+                0,
+                segment.StartObservationOrdinal,
+                -1,
+                -1,
+                applierSnapshot: null,
+                adapterSnapshot: null)
+        {
+        }
+
+        private FrameProjector(
+            Guid encounterId,
+            SceneJournalSegment segment,
+            ScenePlaybackTimeRange timeRange,
+            EntityStore entities,
+            SceneBoundaryStore boundary,
+            RuntimeMetadataRegistry metadata,
+            CombatStore combat,
+            Dictionary<int, ScenePlaybackResourceState> resources,
+            Dictionary<AuraKey, ScenePlaybackAuraState> activeAuras,
+            Dictionary<ScenePlaybackTrack, TrackAccumulator> tracks,
+            Queue<ScenePlaybackTrackMarker> recentMarkers,
+            JournalCursor cursor,
+            long targetTimestamp,
+            long positionMilliseconds,
+            long appliedEndOrdinal,
+            long currentBatchOrdinal,
+            long completedBatchOrdinal,
+            DomainEventApplierSnapshot? applierSnapshot,
+            SceneCombatSnapshotAdapterSnapshot? adapterSnapshot)
         {
             _encounterId = encounterId;
             _segment = segment;
             _timeRange = timeRange;
-            _cursor = segment.CreateCursor();
-            _appliedEndOrdinal = segment.StartObservationOrdinal;
-            _applier = new DomainEventApplier(_entities, _boundary, _metadata, _combat);
-            _adapter = new SceneCombatSnapshotAdapter(_entities, _combat, _boundary, _applier.BossFocus, _encounterId);
+            _entities = entities;
+            _boundary = boundary;
+            _metadata = metadata;
+            _combat = combat;
+            _resources = resources;
+            _activeAuras = activeAuras;
+            _tracks = tracks;
+            _recentMarkers = recentMarkers;
+            _cursor = cursor;
+            _targetTimestamp = targetTimestamp;
+            _positionMilliseconds = positionMilliseconds;
+            _appliedEndOrdinal = appliedEndOrdinal;
+            _currentBatchOrdinal = currentBatchOrdinal;
+            _completedBatchOrdinal = completedBatchOrdinal;
+            _applier = applierSnapshot is null
+                ? new DomainEventApplier(_entities, _boundary, _metadata, _combat)
+                : DomainEventApplier.FromSnapshot(_entities, _boundary, _metadata, _combat, applierSnapshot);
+            _adapter = adapterSnapshot is null
+                ? new SceneCombatSnapshotAdapter(_entities, _combat, _boundary, _applier.BossFocus, _encounterId)
+                : new SceneCombatSnapshotAdapter(_entities, _combat, _boundary, _applier.BossFocus, _encounterId, adapterSnapshot);
         }
 
         public SceneJournalSegment Segment => _segment;
 
         public ScenePlaybackTimeRange TimeRange => _timeRange;
 
+        public static FrameProjector FromSnapshot(Guid encounterId, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange, JournalCursor cursor, ScenePlaybackProjectionSnapshot snapshot)
+        {
+            var entities = EntityStore.FromSnapshot(snapshot.Entities);
+            var boundary = SceneBoundaryStore.FromSnapshot(snapshot.Boundary);
+            var metadata = RuntimeMetadataRegistry.FromSnapshot(snapshot.Metadata);
+            var combat = CombatStore.FromSnapshot(snapshot.Combat);
+            return new FrameProjector(
+                encounterId,
+                segment,
+                timeRange,
+                entities,
+                boundary,
+                metadata,
+                combat,
+                CreateResourceState(snapshot.Resources),
+                CreateAuraState(snapshot.ActiveAuras),
+                CreateTrackState(snapshot.Tracks),
+                CreateRecentMarkerState(snapshot.RecentMarkers),
+                cursor,
+                snapshot.TargetTimestampMilliseconds,
+                snapshot.PositionMilliseconds,
+                cursor.NextObservationOrdinal,
+                snapshot.CurrentBatchOrdinal,
+                snapshot.CompletedBatchOrdinal,
+                snapshot.Applier,
+                snapshot.Adapter);
+        }
+
+        public ScenePlaybackProjectionSnapshot CreateSnapshot() => new(
+            _positionMilliseconds,
+            _targetTimestamp,
+            _timeRange,
+            _currentBatchOrdinal,
+            _completedBatchOrdinal,
+            _entities.CreateSnapshot(),
+            _boundary.CreateSnapshot(),
+            _metadata.CreateSnapshot(),
+            _combat.CreateSnapshot(),
+            _applier.CreateSnapshot(),
+            _adapter.CreateProjectionSnapshot(),
+            CreateResourceSnapshot(),
+            CreateAuraSnapshot(),
+            CreateTrackSnapshot(),
+            CreateRecentMarkerSnapshot());
+
         public ScenePlaybackFrame AdvanceTo(long positionMilliseconds, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
         {
             _segment = segment;
             _timeRange = timeRange;
-            _positionMilliseconds = ClampPosition(positionMilliseconds, _timeRange.DurationMilliseconds);
+            _positionMilliseconds = ScenePlaybackTimeline.ClampPosition(positionMilliseconds, _timeRange.DurationMilliseconds);
             _targetTimestamp = _timeRange.HasTimestamps
                 ? _timeRange.StartTimestampMilliseconds + _positionMilliseconds
                 : _positionMilliseconds;
@@ -223,6 +284,41 @@ public sealed class ScenePlaybackSession
             };
         }
 
+        private static Dictionary<int, ScenePlaybackResourceState> CreateResourceState(IReadOnlyList<ScenePlaybackResourceState> resources)
+        {
+            var result = new Dictionary<int, ScenePlaybackResourceState>(resources.Count);
+            for (var i = 0; i < resources.Count; i++)
+                result[resources[i].EntityId] = resources[i];
+            return result;
+        }
+
+        private static Dictionary<AuraKey, ScenePlaybackAuraState> CreateAuraState(IReadOnlyList<ScenePlaybackAuraState> activeAuras)
+        {
+            var result = new Dictionary<AuraKey, ScenePlaybackAuraState>(activeAuras.Count);
+            for (var i = 0; i < activeAuras.Count; i++)
+            {
+                var aura = activeAuras[i];
+                result[new AuraKey(aura.TargetEntityId, aura.SequenceId, aura.SkillCode, aura.ChainId)] = aura;
+            }
+
+            return result;
+        }
+
+        private static Dictionary<ScenePlaybackTrack, TrackAccumulator> CreateTrackState(IReadOnlyList<ScenePlaybackTrackWindow> tracks)
+        {
+            var result = new Dictionary<ScenePlaybackTrack, TrackAccumulator>(tracks.Count);
+            for (var i = 0; i < tracks.Count; i++)
+            {
+                var track = tracks[i];
+                result[track.Track] = TrackAccumulator.FromWindow(track);
+            }
+
+            return result;
+        }
+
+        private static Queue<ScenePlaybackTrackMarker> CreateRecentMarkerState(IReadOnlyList<ScenePlaybackTrackMarker> markers)
+            => new(markers);
+
         private void ApplyEntries()
         {
             while (true)
@@ -232,11 +328,11 @@ public sealed class ScenePlaybackSession
 
                 var stoppedAtTarget = false;
                 var appliedAny = false;
-                var result = _segment.ReadEntries(_cursor, DefaultReadBatchSize, entries =>
+                var result = _segment.ReadEntries(_cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
                 {
                     foreach (ref readonly var entry in entries)
                     {
-                        var timestamp = ResolveTimestampMilliseconds(in entry);
+                        var timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entry);
                         if (_timeRange.HasTimestamps && timestamp > _targetTimestamp)
                         {
                             stoppedAtTarget = true;
@@ -374,10 +470,7 @@ public sealed class ScenePlaybackSession
 
         private long ResolvePositionMilliseconds(long timestamp)
         {
-            if (!_timeRange.HasTimestamps || timestamp <= 0)
-                return Math.Max(0, timestamp);
-
-            return Math.Max(0, timestamp - _timeRange.StartTimestampMilliseconds);
+            return ScenePlaybackTimeline.ResolvePositionMilliseconds(_timeRange, timestamp);
         }
 
         private static ScenePlaybackTrack ResolveTrack(ObservedEventDomain domain) => domain switch
@@ -493,5 +586,32 @@ public sealed class ScenePlaybackSession
         }
 
         public readonly ScenePlaybackTrackWindow ToWindow(ScenePlaybackTrack track) => new(track, _firstOrdinal, _lastOrdinal + 1, _count);
+
+        public static TrackAccumulator FromWindow(ScenePlaybackTrackWindow window)
+        {
+            return new TrackAccumulator
+            {
+                _firstOrdinal = window.StartObservationOrdinal,
+                _lastOrdinal = Math.Max(window.StartObservationOrdinal, window.EndObservationOrdinalExclusive - 1),
+                _count = window.Count
+            };
+        }
     }
 }
+
+internal sealed record ScenePlaybackProjectionSnapshot(
+    long PositionMilliseconds,
+    long TargetTimestampMilliseconds,
+    ScenePlaybackTimeRange TimeRange,
+    long CurrentBatchOrdinal,
+    long CompletedBatchOrdinal,
+    EntityStoreSnapshot Entities,
+    SceneBoundaryStoreSnapshot Boundary,
+    RuntimeMetadataRegistrySnapshot Metadata,
+    CombatStoreSnapshot Combat,
+    DomainEventApplierSnapshot Applier,
+    SceneCombatSnapshotAdapterSnapshot Adapter,
+    ScenePlaybackResourceState[] Resources,
+    ScenePlaybackAuraState[] ActiveAuras,
+    ScenePlaybackTrackWindow[] Tracks,
+    ScenePlaybackTrackMarker[] RecentMarkers);

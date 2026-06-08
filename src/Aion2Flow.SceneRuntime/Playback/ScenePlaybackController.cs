@@ -1,3 +1,5 @@
+using Cloris.Aion2Flow.SceneRuntime.Journal;
+
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
 public sealed class ScenePlaybackController : IAsyncDisposable
@@ -14,10 +16,13 @@ public sealed class ScenePlaybackController : IAsyncDisposable
     private CancellationTokenSource? _activeSeekCancellation;
     private CancellationTokenSource? _checkpointCancellation;
     private Task? _playbackTask;
+    private Task? _activeSeekTask;
     private Task? _checkpointTask;
     private ScenePlaybackFrame _currentFrame;
     private long _positionMilliseconds;
     private long _durationMilliseconds;
+    private long _playbackClockAnchorMilliseconds;
+    private double _playbackClockElapsedMilliseconds;
     private double _speed = 1d;
     private bool _isPlaying;
     private bool _isLoading;
@@ -48,7 +53,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         _options = options;
         _currentFrame = Session.Seek(0);
         _durationMilliseconds = _currentFrame.TimeRange.DurationMilliseconds;
-        _checkpoints.Upsert(CreateCheckpoint(_currentFrame));
+        _checkpoints.Upsert(Session.CreateCheckpoint());
         if (options.RebuildCheckpointsOnCreate && source.SourceKind == ScenePlaybackSourceKind.Archived)
             StartCheckpointRebuild();
     }
@@ -113,6 +118,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             if (_isPlaying)
                 return;
 
+            ResetPlaybackClockLocked(_positionMilliseconds);
             _isPlaying = true;
             _playbackCancellation = new CancellationTokenSource();
             _playbackTask = RunPlaybackLoopAsync(_playbackCancellation.Token);
@@ -126,6 +132,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         lock (_stateGate)
         {
             _isPlaying = false;
+            ResetPlaybackClockLocked(_positionMilliseconds);
             cancellation = _playbackCancellation;
             _playbackCancellation = null;
             playbackTask = _playbackTask;
@@ -142,6 +149,27 @@ public sealed class ScenePlaybackController : IAsyncDisposable
     }
 
     public ScenePlaybackCheckpoint[] GetCheckpoints() => _checkpoints.Snapshot();
+
+    public SceneJournalSegment CreateTimelineSegment() => Source.CreateTimelineSegment();
+
+    public SceneJournalSegment CreateTimelineSegment(long startPositionMilliseconds, long endPositionMilliseconds)
+    {
+        var segment = Source.CreateTimelineSegment();
+        if (segment.IsEmpty || _checkpoints.Count == 0)
+            return segment;
+
+        var startOrdinal = segment.StartObservationOrdinal;
+        var endOrdinal = segment.CurrentEndObservationOrdinalExclusive;
+        var startPosition = Math.Max(0, startPositionMilliseconds);
+        if (_checkpoints.TryGetFloor(startPosition, out var floor) && floor is not null && floor.PositionMilliseconds < startPosition)
+            startOrdinal = Math.Max(startOrdinal, floor.JournalCursor.NextObservationOrdinal);
+
+        if (_checkpoints.TryGetCeiling(Math.Max(startPositionMilliseconds, endPositionMilliseconds), out var ceiling) && ceiling is not null)
+            endOrdinal = Math.Min(endOrdinal, ceiling.JournalCursor.NextObservationOrdinal);
+
+        startOrdinal = Math.Min(startOrdinal, endOrdinal);
+        return new SceneJournalSegment(segment.Journal, startOrdinal, endOrdinal, IsLiveGrowing: false);
+    }
 
     public void StartCheckpointRebuild()
     {
@@ -187,9 +215,10 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(speed));
 
         lock (_stateGate)
+        {
+            ResetPlaybackClockLocked(_positionMilliseconds);
             _speed = speed;
-
-        Session.SetSpeed(speed);
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -197,6 +226,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         Task? playbackTask;
         CancellationTokenSource? playbackCancellation;
         CancellationTokenSource? seekCancellation;
+        Task? seekTask;
         Task? checkpointTask;
         CancellationTokenSource? checkpointCancellation;
         lock (_stateGate)
@@ -213,6 +243,8 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             _playbackCancellation = null;
             seekCancellation = _activeSeekCancellation;
             _activeSeekCancellation = null;
+            seekTask = _activeSeekTask;
+            _activeSeekTask = null;
             checkpointTask = _checkpointTask;
             _checkpointTask = null;
             checkpointCancellation = _checkpointCancellation;
@@ -244,7 +276,19 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             }
         }
 
+        if (seekTask is not null)
+        {
+            try
+            {
+                await seekTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
         playbackCancellation?.Dispose();
+        seekCancellation?.Dispose();
         checkpointCancellation?.Dispose();
     }
 
@@ -266,7 +310,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             if (tick.Elapsed <= TimeSpan.Zero || IsLoading)
                 continue;
 
-            var tickTarget = ResolveNextPosition(tick.Elapsed);
+            var tickTarget = ResolveTickTarget(tick.Elapsed);
             if (tickTarget is null)
                 continue;
 
@@ -281,19 +325,26 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    private PlaybackTickTarget? ResolveNextPosition(TimeSpan elapsed)
+    private PlaybackTickTarget? ResolveTickTarget(TimeSpan elapsed)
     {
         lock (_stateGate)
         {
-            if (_isLoading)
+            if (_isLoading || !_isPlaying)
                 return null;
 
-            var advance = elapsed.TotalMilliseconds * _speed;
-            if (advance <= 0)
-                return new PlaybackTickTarget(_positionMilliseconds, _seekGeneration);
+            var elapsedMilliseconds = elapsed.TotalMilliseconds;
+            if (!double.IsFinite(elapsedMilliseconds) || elapsedMilliseconds <= 0)
+                return null;
 
-            var next = _positionMilliseconds + (long)Math.Round(advance, MidpointRounding.AwayFromZero);
-            return new PlaybackTickTarget(next < _positionMilliseconds ? long.MaxValue : next, _seekGeneration);
+            _playbackClockElapsedMilliseconds += elapsedMilliseconds;
+            var target = _playbackClockAnchorMilliseconds + _playbackClockElapsedMilliseconds * _speed;
+            var next = target >= long.MaxValue
+                ? long.MaxValue
+                : (long)Math.Round(target, MidpointRounding.AwayFromZero);
+            if (next <= _positionMilliseconds)
+                return null;
+
+            return new PlaybackTickTarget(next, _seekGeneration);
         }
     }
 
@@ -317,32 +368,16 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
 
         previousCancellation?.Cancel();
+        var operationTask = SeekOperationAsync(positionMilliseconds, linkedCancellation.Token, generation).AsTask();
+        lock (_stateGate)
+        {
+            if (ReferenceEquals(_activeSeekCancellation, linkedCancellation))
+                _activeSeekTask = operationTask;
+        }
+
         try
         {
-            await Task.Yield();
-            linkedCancellation.Token.ThrowIfCancellationRequested();
-            await _operationGate.WaitAsync(linkedCancellation.Token).ConfigureAwait(false);
-            try
-            {
-                var token = linkedCancellation.Token;
-                var frame = await Task.Run(() =>
-                {
-                    token.ThrowIfCancellationRequested();
-                    return Session.Seek(positionMilliseconds);
-                }, token).ConfigureAwait(false);
-
-                token.ThrowIfCancellationRequested();
-                if (!TryApplyFrame(frame, generation, out var playbackCancellation, out var playbackTask))
-                    return frame;
-
-                CancelAndDisposeAfterCompletion(playbackCancellation, playbackTask);
-                PublishFrameChanged(frame);
-                return frame;
-            }
-            finally
-            {
-                _operationGate.Release();
-            }
+            return await operationTask.ConfigureAwait(false);
         }
         catch
         {
@@ -360,9 +395,39 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             {
                 if (ReferenceEquals(_activeSeekCancellation, linkedCancellation))
                     _activeSeekCancellation = null;
+                if (ReferenceEquals(_activeSeekTask, operationTask))
+                    _activeSeekTask = null;
             }
 
             linkedCancellation.Dispose();
+        }
+    }
+
+    private async ValueTask<ScenePlaybackFrame> SeekOperationAsync(long positionMilliseconds, CancellationToken cancellationToken, long generation)
+    {
+        await Task.Yield();
+        cancellationToken.ThrowIfCancellationRequested();
+        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var frame = await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var checkpoint = ResolveSeekCheckpoint(positionMilliseconds);
+                return Session.Seek(positionMilliseconds, checkpoint);
+            }, cancellationToken).ConfigureAwait(false);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryApplyFrame(frame, generation, resetPlaybackClock: true, out var playbackCancellation, out var playbackTask))
+                return frame;
+
+            CancelAndDisposeAfterCompletion(playbackCancellation, playbackTask);
+            PublishFrameChanged(frame);
+            return frame;
+        }
+        finally
+        {
+            _operationGate.Release();
         }
     }
 
@@ -386,7 +451,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
 
             var frame = Session.AdvanceTo(positionMilliseconds);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryApplyFrame(frame, expectedGeneration, out var playbackCancellation, out var playbackTask))
+            if (!TryApplyFrame(frame, expectedGeneration, resetPlaybackClock: false, out var playbackCancellation, out var playbackTask))
                 return frame;
 
             CancelAndDisposeAfterCompletion(playbackCancellation, playbackTask);
@@ -416,25 +481,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
 
         try
         {
-            var interval = _options.CheckpointIntervalMilliseconds;
-            var session = new ScenePlaybackSession(Source);
-            var checkpoints = new List<ScenePlaybackCheckpoint>();
-            var first = await Task.Run(() => session.Seek(0), cancellationToken).ConfigureAwait(false);
-            checkpoints.Add(CreateCheckpoint(first));
-            var duration = first.TimeRange.DurationMilliseconds;
-            if (duration > 0)
-            {
-                for (var position = interval; position < duration; position += interval)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var frame = await Task.Run(() => session.AdvanceTo(position), cancellationToken).ConfigureAwait(false);
-                    checkpoints.Add(CreateCheckpoint(frame));
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                var last = await Task.Run(() => session.AdvanceTo(duration), cancellationToken).ConfigureAwait(false);
-                checkpoints.Add(CreateCheckpoint(last));
-            }
+            var checkpoints = await Task.Run(() => BuildCheckpoints(cancellationToken), cancellationToken).ConfigureAwait(false);
 
             lock (_stateGate)
             {
@@ -459,9 +506,40 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    private static ScenePlaybackCheckpoint CreateCheckpoint(ScenePlaybackFrame frame) => new(frame.PositionMilliseconds, frame.AppliedSegment.EndObservationOrdinalExclusive, frame);
+    private ScenePlaybackCheckpoint? ResolveSeekCheckpoint(long positionMilliseconds)
+    {
+        if (!_checkpoints.TryGetFloor(positionMilliseconds, out var checkpoint) || checkpoint is null)
+            return null;
 
-    private bool TryApplyFrame(ScenePlaybackFrame frame, long generation, out CancellationTokenSource? playbackCancellation, out Task? playbackTask)
+        var currentEnd = Source.CreateTimelineSegment().CurrentEndObservationOrdinalExclusive;
+        return checkpoint.JournalCursor.NextObservationOrdinal <= currentEnd ? checkpoint : null;
+    }
+
+    private IReadOnlyList<ScenePlaybackCheckpoint> BuildCheckpoints(CancellationToken cancellationToken)
+    {
+        var interval = _options.CheckpointIntervalMilliseconds;
+        var session = new ScenePlaybackSession(Source);
+        var checkpoints = new List<ScenePlaybackCheckpoint>();
+        var first = session.Seek(0);
+        checkpoints.Add(session.CreateCheckpoint());
+        var duration = first.TimeRange.DurationMilliseconds;
+        if (duration <= 0)
+            return checkpoints;
+
+        for (var position = interval; position < duration; position += interval)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            session.AdvanceTo(position);
+            checkpoints.Add(session.CreateCheckpoint());
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        session.AdvanceTo(duration);
+        checkpoints.Add(session.CreateCheckpoint());
+        return checkpoints;
+    }
+
+    private bool TryApplyFrame(ScenePlaybackFrame frame, long generation, bool resetPlaybackClock, out CancellationTokenSource? playbackCancellation, out Task? playbackTask)
     {
         playbackCancellation = null;
         playbackTask = null;
@@ -474,6 +552,8 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             _positionMilliseconds = frame.PositionMilliseconds;
             _durationMilliseconds = frame.TimeRange.DurationMilliseconds;
             _isLoading = false;
+            if (resetPlaybackClock || !_isPlaying)
+                ResetPlaybackClockLocked(_positionMilliseconds);
             if (Source.SourceKind == ScenePlaybackSourceKind.Archived &&
                 _durationMilliseconds > 0 &&
                 _positionMilliseconds >= _durationMilliseconds)
@@ -514,10 +594,17 @@ public sealed class ScenePlaybackController : IAsyncDisposable
     private void StopPlaybackLocked(out CancellationTokenSource? cancellation, out Task? playbackTask)
     {
         _isPlaying = false;
+        ResetPlaybackClockLocked(_positionMilliseconds);
         cancellation = _playbackCancellation;
         _playbackCancellation = null;
         playbackTask = _playbackTask;
         _playbackTask = null;
+    }
+
+    private void ResetPlaybackClockLocked(long positionMilliseconds)
+    {
+        _playbackClockAnchorMilliseconds = Math.Max(0, positionMilliseconds);
+        _playbackClockElapsedMilliseconds = 0;
     }
 
     private static void CancelAndDisposeAfterCompletion(CancellationTokenSource? cancellation, Task? playbackTask)

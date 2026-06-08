@@ -30,7 +30,7 @@ public sealed class SegmentedProgressBar : Control
 
     public override void Render(DrawingContext context)
     {
-        var bounds = Bounds;
+        var bounds = new Rect(Bounds.Size);
         if (bounds.Width <= 0 || bounds.Height <= 0)
             return;
 

@@ -23,21 +23,20 @@ public sealed class PeriodicScenePlaybackTickSourceFactory : IScenePlaybackTickS
 
 public sealed class PeriodicScenePlaybackTickSource : IScenePlaybackTickSource
 {
-    private readonly PeriodicTimer _timer;
+    private readonly TimeSpan _interval;
     private long _lastTimestamp;
 
     public PeriodicScenePlaybackTickSource(TimeSpan interval)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(interval, TimeSpan.Zero);
 
-        _timer = new PeriodicTimer(interval);
+        _interval = interval;
         _lastTimestamp = Stopwatch.GetTimestamp();
     }
 
     public async ValueTask<ScenePlaybackTick> WaitForNextTickAsync(CancellationToken cancellationToken)
     {
-        if (!await _timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            throw new OperationCanceledException(cancellationToken);
+        await Task.Delay(_interval, cancellationToken).ConfigureAwait(false);
 
         var now = Stopwatch.GetTimestamp();
         var elapsed = Stopwatch.GetElapsedTime(_lastTimestamp, now);
@@ -47,7 +46,6 @@ public sealed class PeriodicScenePlaybackTickSource : IScenePlaybackTickSource
 
     public ValueTask DisposeAsync()
     {
-        _timer.Dispose();
         return ValueTask.CompletedTask;
     }
 }

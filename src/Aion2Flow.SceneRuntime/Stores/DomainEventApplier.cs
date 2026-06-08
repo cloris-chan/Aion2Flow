@@ -29,7 +29,7 @@ public sealed class DomainEventApplier
     {
     }
 
-    private DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactAvoidanceCanonicalizer compactAvoidance, BossFocusStore bossFocus)
+    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactAvoidanceCanonicalizer compactAvoidance, BossFocusStore bossFocus)
     {
         _entities = entities;
         _boundary = boundary;
@@ -47,6 +47,23 @@ public sealed class DomainEventApplier
     public RuntimeMetadataRegistry MetadataRegistry => _metadataRegistry;
     public CombatStore Combat => _combat;
     public BossFocusStore BossFocus => _bossFocus;
+
+    internal DomainEventApplierSnapshot CreateSnapshot() => new(
+        _systemPeriodicRecovery.CreateSnapshot(),
+        _periodicPool.CreateSnapshot(),
+        _compactAvoidance.CreateSnapshot(),
+        _bossFocus.CreateSnapshot());
+
+    internal static DomainEventApplier FromSnapshot(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, DomainEventApplierSnapshot snapshot)
+        => new(
+            entities,
+            boundary,
+            metadataRegistry,
+            combat,
+            SystemPeriodicRecoveryCanonicalizer.FromSnapshot(snapshot.SystemPeriodicRecovery),
+            PeriodicPoolCanonicalizer.FromSnapshot(snapshot.PeriodicPool),
+            CompactAvoidanceCanonicalizer.FromSnapshot(snapshot.CompactAvoidance),
+            BossFocusStore.FromSnapshot(entities, snapshot.BossFocus));
 
     public void ApplyJournal(ObservedEventJournal journal)
     {
@@ -293,3 +310,9 @@ public sealed class DomainEventApplier
 
     private bool CanNpcBattleActivate(int instanceId) => !_entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
 }
+
+internal sealed record DomainEventApplierSnapshot(
+    SystemPeriodicRecoveryCanonicalizerSnapshot SystemPeriodicRecovery,
+    PeriodicPoolCanonicalizerSnapshot PeriodicPool,
+    CompactAvoidanceCanonicalizerSnapshot CompactAvoidance,
+    BossFocusStoreSnapshot BossFocus);

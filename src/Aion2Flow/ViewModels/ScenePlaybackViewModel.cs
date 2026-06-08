@@ -50,8 +50,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private ScenePlaybackFrameChangedEventArgs? _pendingFrameChanged;
     private IReadOnlyList<PlaybackTimelineLane> _timelineMarkerTracks = [];
     private double _timelineMarkerDuration = -1;
-    private long _lastDetailProjectionPosition = long.MinValue;
-    private long _lastEventWindowPosition = long.MinValue;
+    private long _lastDetailProjectionTick;
+    private long _lastEventWindowTick;
     private bool _isApplyingFrame;
     private bool _isDisposed;
     private bool _frameApplyQueued;
@@ -64,11 +64,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     }
 
     public ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext, LocalizationService localization)
+        : this(record, displayContext, localization, Ioc.Default.GetRequiredService<IScenePlaybackTickSourceFactory>())
+    {
+    }
+
+    internal ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory)
     {
         DisplayContext = displayContext;
         Localization = localization;
         _source = new ArchivedScenePlaybackSource(record);
-        _controller = new ScenePlaybackController(_source);
+        _controller = new ScenePlaybackController(_source, tickSourceFactory, ScenePlaybackControllerOptions.Default);
         _controller.FrameChanged += OnFrameChanged;
         Localization.LanguageChanged += OnLanguageChanged;
         WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], displayContext.ResolveMapName(record.Snapshot.MapId));
@@ -155,9 +160,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return;
 
         var duration = DurationMilliseconds;
-        var target = duration > 0
-            ? Math.Clamp(positionMilliseconds, 0d, duration)
-            : Math.Max(0d, positionMilliseconds);
+        var target = duration > 0 ? Math.Clamp(positionMilliseconds, 0d, duration) : Math.Max(0d, positionMilliseconds);
         _forceNextDetailProjection = true;
         _seekCancellation?.Cancel();
         _seekCancellation?.Dispose();
@@ -192,9 +195,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private void StepForward()
     {
         var duration = DurationMilliseconds;
-        PositionMilliseconds = duration > 0
-            ? Math.Min(duration, PositionMilliseconds + StepMilliseconds)
-            : PositionMilliseconds + StepMilliseconds;
+        PositionMilliseconds = duration > 0 ? Math.Min(duration, PositionMilliseconds + StepMilliseconds) : PositionMilliseconds + StepMilliseconds;
     }
 
     [RelayCommand]
@@ -317,10 +318,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (ShouldRefreshEventWindow(frame, state))
         {
             EventWindow = CreateEventWindow(frame, state);
-            _lastEventWindowPosition = frame.PositionMilliseconds;
+            _lastEventWindowTick = Environment.TickCount64;
         }
 
-        _lastDetailProjectionPosition = frame.PositionMilliseconds;
+        _lastDetailProjectionTick = Environment.TickCount64;
         _forceNextDetailProjection = false;
     }
 
@@ -329,13 +330,13 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (_forceNextDetailProjection || !state.IsPlaying)
             return true;
 
-        if (_lastDetailProjectionPosition == long.MinValue)
+        if (_lastDetailProjectionTick == 0)
             return true;
 
         if (frame.TimeRange.DurationMilliseconds > 0 && frame.PositionMilliseconds >= frame.TimeRange.DurationMilliseconds)
             return true;
 
-        return Math.Abs(frame.PositionMilliseconds - _lastDetailProjectionPosition) >= DetailRefreshIntervalMilliseconds;
+        return Environment.TickCount64 - _lastDetailProjectionTick >= DetailRefreshIntervalMilliseconds;
     }
 
     private bool ShouldRefreshEventWindow(ScenePlaybackFrame frame, ScenePlaybackControllerState state)
@@ -343,13 +344,13 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (_forceNextDetailProjection || !state.IsPlaying)
             return true;
 
-        if (_lastEventWindowPosition == long.MinValue)
+        if (_lastEventWindowTick == 0)
             return true;
 
         if (frame.TimeRange.DurationMilliseconds > 0 && frame.PositionMilliseconds >= frame.TimeRange.DurationMilliseconds)
             return true;
 
-        return Math.Abs(frame.PositionMilliseconds - _lastEventWindowPosition) >= EventWindowRefreshIntervalMilliseconds;
+        return Environment.TickCount64 - _lastEventWindowTick >= EventWindowRefreshIntervalMilliseconds;
     }
 
     private IReadOnlyList<PlaybackCombatantRowViewModel> CreateCombatants(ScenePlaybackFrame frame)
@@ -374,13 +375,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
             result.Add(new PlaybackCombatantRowViewModel(
                 entry.Id,
-                DisplayContext.ResolveEntityName(entry.Id),
-                FormatNumber(metrics.DamageAmount),
-                FormatNumber(metrics.DamagePerSecond),
-                FormatNumber(metrics.HealingAmount),
-                FormatNumber(metrics.HealingPerSecond),
-                CreateHpText(in resource),
-                CreateHpSegments(in resource)));
+                DisplayContext.ResolveEntityName(entry.Id), FormatNumber(metrics.DamageAmount), FormatNumber(metrics.DamagePerSecond), FormatNumber(metrics.HealingAmount), FormatNumber(metrics.HealingPerSecond), CreateHpText(in resource), CreateHpSegments(in resource)));
             added.Add(entry.Id);
         }
 
@@ -392,13 +387,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
             result.Add(new PlaybackCombatantRowViewModel(
                 resource.EntityId,
-                DisplayContext.ResolveEntityName(resource.EntityId),
-                "0",
-                "0",
-                "0",
-                "0",
-                CreateHpText(in resource),
-                CreateHpSegments(in resource)));
+                DisplayContext.ResolveEntityName(resource.EntityId), "0", "0", "0", "0", CreateHpText(in resource), CreateHpSegments(in resource)));
         }
 
         result.Sort(static (left, right) =>
@@ -418,13 +407,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         for (var i = 0; i < frame.ActiveAuras.Count; i++)
         {
             var aura = frame.ActiveAuras[i];
-            result[i] = new PlaybackAuraRowViewModel(
-                aura.SkillCode,
-                DisplayContext.ResolveSkillName(aura.SkillCode),
-                DisplayContext.ResolveEntityName(aura.SourceEntityId),
-                DisplayContext.ResolveEntityName(aura.TargetEntityId),
-                aura.StackCount,
-                aura.SequenceId);
+            result[i] = new PlaybackAuraRowViewModel(aura.SkillCode, DisplayContext.ResolveSkillName(aura.SkillCode), DisplayContext.ResolveEntityName(aura.SourceEntityId), DisplayContext.ResolveEntityName(aura.TargetEntityId), aura.StackCount, aura.SequenceId);
         }
 
         Array.Sort(result, static (left, right) =>
@@ -448,7 +431,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         TimelineTracks = ApplyTimelinePosition(_timelineMarkerTracks, frame.PositionMilliseconds, duration);
     }
 
-    private static IReadOnlyList<PlaybackTimelineLane> ApplyTimelinePosition(IReadOnlyList<PlaybackTimelineLane> lanes, double positionMilliseconds, double durationMilliseconds)
+    private static PlaybackTimelineLane[] ApplyTimelinePosition(IReadOnlyList<PlaybackTimelineLane> lanes, double positionMilliseconds, double durationMilliseconds)
     {
         if (lanes.Count == 0)
             return [];
@@ -487,7 +470,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     private IReadOnlyList<PlaybackTimelineLane> CreateTimelineTracks(ScenePlaybackFrame frame)
     {
-        var segment = _source.CreateTimelineSegment();
+        var segment = _controller.CreateTimelineSegment();
         var duration = frame.TimeRange.DurationMilliseconds;
         if (segment.IsEmpty || duration <= 0)
         {
@@ -521,14 +504,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             if (markers is null || markers.Count == 0)
                 continue;
 
-            lanes.Add(new PlaybackTimelineLane(
-                ResolveTrackName(track),
-                track,
-                ResolveTrackBrush(track),
-                markers,
-                duration,
-                frame.PositionMilliseconds,
-                markers.Count));
+            lanes.Add(new PlaybackTimelineLane(ResolveTrackName(track), track, ResolveTrackBrush(track), markers, duration, frame.PositionMilliseconds, markers.Count));
         }
 
         return lanes;
@@ -544,7 +520,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (state.IsPlaying && frame.RecentMarkers.Count > 0)
             return CreateEventWindowRows(FilterRecentMarkers(frame.RecentMarkers, start, end));
 
-        var segment = _source.CreateTimelineSegment();
+        var segment = _controller.CreateTimelineSegment(start, end);
         var read = ScenePlaybackTrackReader.Read(segment, frame.TimeRange, start, end, MaxEventWindowMarkers);
         if (read.Markers.Count == 0)
             return [];
@@ -653,30 +629,21 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _ => Localization["Playback_Track_Other"]
     };
 
-    private static string FormatSpeed(double speed)
-        => speed.ToString(speed % 1 == 0 ? "0x" : "0.##x", CultureInfo.InvariantCulture);
+    private static string FormatSpeed(double speed) => speed.ToString(speed % 1 == 0 ? "0x" : "0.##x", CultureInfo.InvariantCulture);
 
-    private static string FormatNumber(double value)
-        => value.ToString("N0", CultureInfo.CurrentCulture);
+    private static string FormatNumber(double value) => value.ToString("N0", CultureInfo.CurrentCulture);
 
-    private static string FormatNumber(long value)
-        => value.ToString("N0", CultureInfo.CurrentCulture);
+    private static string FormatNumber(long value) => value.ToString("N0", CultureInfo.CurrentCulture);
 
-    private static string FormatSigned(long value)
-        => value > 0
-            ? "+" + FormatNumber(value)
-            : value.ToString("N0", CultureInfo.CurrentCulture);
+    private static string FormatSigned(long value) => value > 0 ? "+" + FormatNumber(value) : value.ToString("N0", CultureInfo.CurrentCulture);
 
     private static string FormatTime(double milliseconds)
     {
         var value = TimeSpan.FromMilliseconds(Math.Max(0d, milliseconds));
-        return value.TotalHours >= 1
-            ? value.ToString(@"h\:mm\:ss\.fff", CultureInfo.InvariantCulture)
-            : value.ToString(@"mm\:ss\.fff", CultureInfo.InvariantCulture);
+        return value.TotalHours >= 1 ? value.ToString(@"h\:mm\:ss\.fff", CultureInfo.InvariantCulture) : value.ToString(@"mm\:ss\.fff", CultureInfo.InvariantCulture);
     }
 
-    private static double ParseSortable(string value)
-        => double.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var parsed) ? parsed : 0d;
+    private static double ParseSortable(string value) => double.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var parsed) ? parsed : 0d;
 
     public async ValueTask DisposeAsync()
     {

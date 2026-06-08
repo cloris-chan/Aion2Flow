@@ -95,6 +95,51 @@ public sealed class RuntimeMetadataRegistry
     public bool TryGetMapCode(uint mapInstanceId, out uint mapCode) =>
         _mapCodesByInstanceId.TryGetValue(mapInstanceId, out mapCode);
 
+    internal RuntimeMetadataRegistrySnapshot CreateSnapshot()
+    {
+        var pcMetadata = new PcMetadataEntry[_pcMetadataByEntityId.Count];
+        var index = 0;
+        foreach (var (entityId, metadata) in _pcMetadataByEntityId)
+            pcMetadata[index++] = new PcMetadataEntry(entityId, metadata);
+
+        var npcCodes = new NpcCodeEntry[_npcCodesByInstanceId.Count];
+        index = 0;
+        foreach (var (instanceId, npcCode) in _npcCodesByInstanceId)
+            npcCodes[index++] = new NpcCodeEntry(instanceId, npcCode);
+
+        var mapCodes = new MapCodeEntry[_mapCodesByInstanceId.Count];
+        index = 0;
+        foreach (var (instanceId, mapCode) in _mapCodesByInstanceId)
+            mapCodes[index++] = new MapCodeEntry(instanceId, mapCode);
+
+        return new RuntimeMetadataRegistrySnapshot(pcMetadata, npcCodes, mapCodes, _revision);
+    }
+
+    internal static RuntimeMetadataRegistry FromSnapshot(RuntimeMetadataRegistrySnapshot snapshot)
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry._revision = snapshot.Revision;
+        for (var i = 0; i < snapshot.PcMetadata.Length; i++)
+        {
+            var entry = snapshot.PcMetadata[i];
+            registry._pcMetadataByEntityId[entry.EntityId] = entry.Metadata;
+        }
+
+        for (var i = 0; i < snapshot.NpcCodes.Length; i++)
+        {
+            var entry = snapshot.NpcCodes[i];
+            registry._npcCodesByInstanceId[entry.InstanceId] = entry.NpcCode;
+        }
+
+        for (var i = 0; i < snapshot.MapCodes.Length; i++)
+        {
+            var entry = snapshot.MapCodes[i];
+            registry._mapCodesByInstanceId[entry.InstanceId] = entry.MapCode;
+        }
+
+        return registry;
+    }
+
     public void Clear()
     {
         if (_pcMetadataByEntityId.Count == 0 && _npcCodesByInstanceId.Count == 0 && _mapCodesByInstanceId.Count == 0)
@@ -107,6 +152,8 @@ public sealed class RuntimeMetadataRegistry
     }
 
 }
+
+internal sealed record RuntimeMetadataRegistrySnapshot(PcMetadataEntry[] PcMetadata, NpcCodeEntry[] NpcCodes, MapCodeEntry[] MapCodes, long Revision);
 
 public readonly struct SceneIdentityScope
 {

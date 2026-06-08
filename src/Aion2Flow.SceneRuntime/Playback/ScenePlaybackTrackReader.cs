@@ -5,8 +5,6 @@ namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
 public static class ScenePlaybackTrackReader
 {
-    private const int DefaultReadBatchSize = 512;
-
     public static ScenePlaybackTrackReadResult Read(SceneJournalSegment segment, ScenePlaybackTimeRange timeRange, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkers)
         => Read(segment, timeRange, startPositionMilliseconds, endPositionMilliseconds, maxMarkers, segment.CreateCursor());
 
@@ -20,12 +18,12 @@ public static class ScenePlaybackTrackReader
         while (markers.Count < maxMarkers)
         {
             JournalCursor? nextCursor = null;
-            var result = segment.ReadEntries(current, DefaultReadBatchSize, entries =>
+            var result = segment.ReadEntries(current, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
             {
                 foreach (ref readonly var entry in entries)
                 {
-                    var timestamp = ResolveTimestampMilliseconds(in entry);
-                    var position = ResolvePositionMilliseconds(timeRange, timestamp);
+                    var timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entry);
+                    var position = ScenePlaybackTimeline.ResolvePositionMilliseconds(timeRange, timestamp);
                     if (position < startPositionMilliseconds)
                         continue;
                     if (position > endPositionMilliseconds)
@@ -98,21 +96,6 @@ public static class ScenePlaybackTrackReader
         _ => ScenePlaybackTrack.Other
     };
 
-    private static long ResolvePositionMilliseconds(ScenePlaybackTimeRange timeRange, long timestamp)
-    {
-        if (!timeRange.HasTimestamps || timestamp <= 0)
-            return Math.Max(0, timestamp);
-
-        return Math.Max(0, timestamp - timeRange.StartTimestampMilliseconds);
-    }
-
-    private static long ResolveTimestampMilliseconds(in ObservedEventEnvelope entry)
-    {
-        if (entry.Raw.TimestampMilliseconds > 0)
-            return entry.Raw.TimestampMilliseconds;
-
-        return entry.Stamp.OffsetTicks > 0 ? entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond : 0;
-    }
 }
 
 public readonly record struct ScenePlaybackTrackMarker(ScenePlaybackTrack Track, long PositionMilliseconds, long TimestampMilliseconds, long ObservationOrdinal, int SourceEntityId, int TargetEntityId, int SkillCode, long Amount, long? CurrentValue, long? MaximumValue, int ResourceKind, int ResultCode);

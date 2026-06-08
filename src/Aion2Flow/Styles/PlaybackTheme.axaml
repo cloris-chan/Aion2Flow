@@ -2,27 +2,38 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls">
     <Styles.Resources>
-        <SolidColorBrush x:Key="PlaybackBrush.Window">#151A20</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.Panel">#202832</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.PanelStrong">#283340</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.PanelSoft">#192028</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.Border">#3C4A58</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.BorderStrong">#526577</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.Text">#EDF3F8</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.TextMuted">#AAB8C5</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.TextSubtle">#7F8D9A</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.Accent">#18D7F4</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.AccentSoft">#253D4A</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.Green">#8CE271</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.Lane">#11171E</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.Row">#152029</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.RowHover">#1D2A35</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.Window">#14181D</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.TopBar">#1B222A</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.Panel">#1E252D</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.PanelStrong">#27313B</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.Control">#252E38</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.ControlHover">#2D3A45</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.Border">#35424E</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.BorderStrong">#526676</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.Text">#EEF4F8</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.TextMuted">#AAB8C4</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.TextSubtle">#82909D</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.Accent">#22D3EE</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.AccentFill">#2E96A8</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.Green">#89D66B</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.TimelineTrack">#10161C</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.TimelineProgress">#204E5A</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.Row">#172028</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.RowHover">#202C36</SolidColorBrush>
     </Styles.Resources>
 
     <Style Selector="Window.PlaybackWindow">
         <Setter Property="Background" Value="{StaticResource PlaybackBrush.Window}" />
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
+    </Style>
+
+    <Style Selector="Border.PlaybackTopBar">
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.TopBar}" />
+        <Setter Property="BorderBrush" Value="{StaticResource PlaybackBrush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10,9" />
     </Style>
 
     <Style Selector="Border.PlaybackPanel">
@@ -33,35 +44,44 @@
         <Setter Property="Padding" Value="10" />
     </Style>
 
+    <Style Selector="Border.PlaybackPanel.PlaybackTimelinePanel">
+        <Setter Property="Padding" Value="10,9,10,10" />
+    </Style>
+
     <Style Selector="TextBlock.PlaybackPanelTitle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="controls|MapDisplay.PlaybackSceneTitle TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontSize" Value="17" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackHeaderSubtle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackHeaderStatus">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Accent}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="Button.PlaybackIconButton">
         <Setter Property="Width" Value="32" />
         <Setter Property="Height" Value="32" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="Background" Value="{StaticResource PlaybackBrush.PanelStrong}" />
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.Control}" />
         <Setter Property="BorderBrush" Value="{StaticResource PlaybackBrush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
@@ -69,58 +89,124 @@
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 
+    <Style Selector="Button.PlaybackIconButton.PlaybackPrimaryButton">
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.AccentFill}" />
+        <Setter Property="BorderBrush" Value="{StaticResource PlaybackBrush.Accent}" />
+    </Style>
+
     <Style Selector="Button.PlaybackTextButton">
         <Setter Property="MinWidth" Value="38" />
         <Setter Property="Height" Value="32" />
-        <Setter Property="Padding" Value="10,0" />
-        <Setter Property="Background" Value="{StaticResource PlaybackBrush.PanelStrong}" />
+        <Setter Property="Padding" Value="9,0" />
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.Control}" />
         <Setter Property="BorderBrush" Value="{StaticResource PlaybackBrush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Button.PlaybackTextButton.PlaybackCheckpointButton">
+        <Setter Property="MinWidth" Value="86" />
     </Style>
 
     <Style Selector="Button.PlaybackIconButton:pointerover, Button.PlaybackTextButton:pointerover">
-        <Setter Property="Background" Value="{StaticResource PlaybackBrush.AccentSoft}" />
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.ControlHover}" />
         <Setter Property="BorderBrush" Value="{StaticResource PlaybackBrush.BorderStrong}" />
     </Style>
 
+    <Style Selector="Button.PlaybackIconButton.PlaybackPrimaryButton:pointerover">
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.AccentFill}" />
+        <Setter Property="BorderBrush" Value="{StaticResource PlaybackBrush.Text}" />
+    </Style>
+
     <Style Selector="Path.PlaybackGlyph">
-        <Setter Property="Width" Value="17" />
-        <Setter Property="Height" Value="17" />
+        <Setter Property="Width" Value="16" />
+        <Setter Property="Height" Value="16" />
         <Setter Property="Stretch" Value="Uniform" />
         <Setter Property="Stroke" Value="{StaticResource PlaybackBrush.Text}" />
         <Setter Property="StrokeThickness" Value="2" />
         <Setter Property="StrokeLineCap" Value="Round" />
+        <Setter Property="StrokeJoin" Value="Round" />
     </Style>
 
-    <Style Selector="TextBlock.PlaybackTimeText">
-        <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+    <Style Selector="Border.PlaybackToolbarDivider">
+        <Setter Property="Width" Value="1" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.Border}" />
+        <Setter Property="Margin" Value="4,0" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <Style Selector="Slider.PlaybackSlider">
-        <Setter Property="MinHeight" Value="28" />
+    <Style Selector="StackPanel.PlaybackSpeedReadout">
+        <Setter Property="MinWidth" Value="46" />
+        <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackMetricLabel">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="10" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackMetricValue">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="14" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
-    <Style Selector="StackPanel.PlaybackInlineMetric">
-        <Setter Property="MinWidth" Value="78" />
+    <Style Selector="TextBlock.PlaybackTimeText, TextBlock.PlaybackTimeTextRight">
+        <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="TextBlock.PlaybackTimeTextRight">
+        <Setter Property="TextAlignment" Value="Right" />
+    </Style>
+
+    <Style Selector="Grid.PlaybackTimelineMasterRow">
+        <Setter Property="MinHeight" Value="28" />
+    </Style>
+
+    <Style Selector="Grid.PlaybackTimelineTrackRow">
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="Margin" Value="0,0,0,5" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="Border.PlaybackTrackAccent">
+        <Setter Property="Width" Value="5" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|PlaybackTimelineView.PlaybackTimelineRail">
+        <Setter Property="Height" Value="22" />
+        <Setter Property="TrackBrush" Value="{StaticResource PlaybackBrush.TimelineTrack}" />
+        <Setter Property="PlayheadBrush" Value="{StaticResource PlaybackBrush.Text}" />
+        <Setter Property="PlayheadThickness" Value="2" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|PlaybackTimelineView.PlaybackTimelineProgress">
+        <Setter Property="Height" Value="26" />
+        <Setter Property="ProgressBrush" Value="{StaticResource PlaybackBrush.TimelineProgress}" />
+        <Setter Property="PlayheadBrush" Value="{StaticResource PlaybackBrush.Accent}" />
+        <Setter Property="PlayheadThickness" Value="3" />
+    </Style>
+
+    <Style Selector="controls|PlaybackTimelineView.PlaybackTimelineLane">
+        <Setter Property="Height" Value="22" />
     </Style>
 
     <Style Selector="ScrollViewer.PlaybackPanelScroller">
@@ -145,14 +231,14 @@
         <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
-    <Style Selector="Grid.PlaybackCombatantRow, Grid.PlaybackEventRow, Grid.PlaybackTrackRow, Grid.PlaybackAuraRow">
+    <Style Selector="Grid.PlaybackCombatantRow, Grid.PlaybackEventRow, Grid.PlaybackAuraRow">
         <Setter Property="Background" Value="{StaticResource PlaybackBrush.Row}" />
-        <Setter Property="MinHeight" Value="32" />
         <Setter Property="Margin" Value="0,0,0,5" />
         <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
 
-    <Style Selector="Grid.PlaybackCombatantRow:pointerover, Grid.PlaybackEventRow:pointerover, Grid.PlaybackTrackRow:pointerover, Grid.PlaybackAuraRow:pointerover">
+    <Style Selector="Grid.PlaybackCombatantRow:pointerover, Grid.PlaybackEventRow:pointerover, Grid.PlaybackAuraRow:pointerover">
         <Setter Property="Background" Value="{StaticResource PlaybackBrush.RowHover}" />
     </Style>
 
@@ -160,22 +246,12 @@
         <Setter Property="MinHeight" Value="42" />
     </Style>
 
-    <Style Selector="Grid.PlaybackTrackRow">
-        <Setter Property="MinHeight" Value="34" />
-    </Style>
-
     <Style Selector="Grid.PlaybackEventRow">
         <Setter Property="MinHeight" Value="28" />
     </Style>
 
     <Style Selector="Grid.PlaybackAuraRow">
-        <Setter Property="MinHeight" Value="48" />
-    </Style>
-
-    <Style Selector="controls|CombatantDisplay.PlaybackCombatantName TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="12" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="MinHeight" Value="46" />
     </Style>
 
     <Style Selector="controls|CombatantDisplay.PlaybackCombatantName">
@@ -184,10 +260,18 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <Style Selector="controls|CombatantDisplay.PlaybackCombatantName TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
     <Style Selector="controls|SkillDisplay.PlaybackSkillName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackRowValue">
@@ -216,13 +300,6 @@
         <Setter Property="FontSize" Value="11" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />
-    </Style>
-
-    <Style Selector="controls|PlaybackLaneView.PlaybackLane">
-        <Setter Property="Height" Value="24" />
-        <Setter Property="LaneBackground" Value="{StaticResource PlaybackBrush.Lane}" />
-        <Setter Property="PlayheadBrush" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="Cursor" Value="Hand" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackEventTime">
@@ -256,6 +333,6 @@
 
     <Style Selector="controls|SegmentedProgressBar.PlaybackHpBar">
         <Setter Property="Height" Value="7" />
-        <Setter Property="Background" Value="{StaticResource PlaybackBrush.Lane}" />
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.TimelineTrack}" />
     </Style>
 </Styles>

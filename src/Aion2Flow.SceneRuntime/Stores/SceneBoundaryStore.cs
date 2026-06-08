@@ -75,6 +75,10 @@ public sealed class SceneBoundaryStore
         return kind;
     }
 
+    internal SceneBoundaryStoreSnapshot CreateSnapshot() => new(_sceneBoundary.CreateSnapshot(), _revision);
+
+    internal static SceneBoundaryStore FromSnapshot(SceneBoundaryStoreSnapshot snapshot) => new(SceneBoundaryService.FromSnapshot(snapshot.Boundary), snapshot.Revision);
+
     public void Clear()
     {
         if (_sceneBoundary.IsEmpty)
@@ -85,3 +89,5 @@ public sealed class SceneBoundaryStore
     }
 
 }
+
+internal readonly record struct SceneBoundaryStoreSnapshot(SceneBoundaryServiceSnapshot Boundary, long Revision);

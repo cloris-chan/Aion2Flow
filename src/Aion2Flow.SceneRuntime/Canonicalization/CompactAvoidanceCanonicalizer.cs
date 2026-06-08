@@ -55,6 +55,15 @@ public sealed class CompactAvoidanceCanonicalizer
         return FinalizeBatch();
     }
 
+    internal CompactAvoidanceCanonicalizerSnapshot CreateSnapshot() => new(_pendingCompact.ToArray(), _currentBatchOrdinal);
+
+    internal static CompactAvoidanceCanonicalizer FromSnapshot(CompactAvoidanceCanonicalizerSnapshot snapshot)
+    {
+        var canonicalizer = new CompactAvoidanceCanonicalizer { _currentBatchOrdinal = snapshot.CurrentBatchOrdinal };
+        canonicalizer._pendingCompact.AddRange(snapshot.Pending);
+        return canonicalizer;
+    }
+
     private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, in PacketStructurePath structurePath, long observedAtMilliseconds)
     {
         if (!IsCompactEvadeSignal(sourceId, targetId, in observation) || observation.Marker <= 0)
@@ -180,6 +189,8 @@ public sealed class CompactAvoidanceCanonicalizer
     }
 
 }
+
+internal sealed record CompactAvoidanceCanonicalizerSnapshot(CompactAvoidanceCanonicalizer.PendingCompactAvoidance[] Pending, long CurrentBatchOrdinal);
 
 public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
 
