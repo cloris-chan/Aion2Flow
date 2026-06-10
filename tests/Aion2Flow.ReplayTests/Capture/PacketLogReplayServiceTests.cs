@@ -220,6 +220,24 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260610222129_Recovers_After_Split_Transport_Frames()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SplitTransportFrameRecovery}"));
+
+        Assert.True(replay.ReplayedLines >= 600, $"ReplayedLines={replay.ReplayedLines}");
+        Assert.True(replay.Snapshot.EncounterStartTime > 0, $"EncounterStartTime={replay.Snapshot.EncounterStartTime}");
+        Assert.True(replay.Snapshot.EncounterEndTime >= replay.Snapshot.EncounterStartTime, $"EncounterEndTime={replay.Snapshot.EncounterEndTime}");
+
+        var combatantDump = BuildSummaryDump(replay.Combatants);
+        var player = Assert.Single(replay.Combatants, static summary => summary.CombatantId == 4679);
+        Assert.Equal("cloris", player.DisplayName);
+        Assert.True(player.OutgoingDamage > 500_000, combatantDump);
+        Assert.True(player.IncomingHealing > 18_000, combatantDump);
+    }
+
+    [Fact]
     public void Replay_20260426110459_Templar_KnownSelfRecovery_Packets_Are_Healing()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());

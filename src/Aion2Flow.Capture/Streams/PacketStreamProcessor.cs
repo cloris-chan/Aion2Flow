@@ -129,9 +129,9 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
             return false;
         }
 
-        if (PacketTransportCodec.TryReadTransportLength(buffer, 0, out packetLength) && packetLength <= buffer.Length)
+        if (PacketTransportCodec.TryReadTransportLength(buffer, 0, out packetLength))
         {
-            return true;
+            return packetLength <= buffer.Length;
         }
 
         var patternIndex = buffer.IndexOf(Pattern);
