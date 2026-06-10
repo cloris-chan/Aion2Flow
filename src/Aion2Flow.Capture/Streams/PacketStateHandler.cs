@@ -113,6 +113,11 @@ internal sealed class PacketStateHandler
             context.Writer.ApplyNpcCatalog(parsed.EntityId, npcCode, requireCatalogEntry: true);
         }
 
+        if (parsed.OwnerId is int ownerId)
+        {
+            context.Sink.AppendSummon(ownerId, parsed.EntityId);
+        }
+
         if (parsed.CurrentHp is int currentHp && parsed.MaxHp is int maxHp)
         {
             context.Sink.AppendNpcHp(parsed.EntityId, currentHp, maxHp, context.TimestampMilliseconds);

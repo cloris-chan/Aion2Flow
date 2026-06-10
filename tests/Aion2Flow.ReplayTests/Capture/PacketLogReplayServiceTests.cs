@@ -221,7 +221,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260610222129_Recovers_After_Split_Transport_Frames()
+    public void Replay_Recovers_After_Split_Transport_Frames()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
@@ -239,11 +239,11 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260610232724_Recovers_PcMetadata_From_048D_Metadata_Packets()
+    public void Replay_Recovers_PcMetadata_From_048D_Metadata_Packets()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10PcMetadata}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.PcMetadata048D}"));
 
         Assert.True(replay.ReplayedLines > 0);
         var summaryDump = BuildSummaryDump(replay.Combatants);
@@ -256,11 +256,11 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260610235630_Recovers_NearbyPcMetadata_From_4536_Metadata_Packets()
+    public void Replay_Recovers_PcMetadata_From_4536_Metadata_Packets()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10NearbyPcMetadata}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.PcMetadata4536}"));
 
         Assert.True(replay.ReplayedLines > 0);
         var summaryDump = BuildSummaryDump(replay.Combatants);
@@ -275,11 +275,11 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260610235630_Uses_Direct0438_Body_As_SkillVariant_For_ActionGrouping()
+    public void Replay_Uses_Direct0438_Body_As_SkillVariant_For_ActionGrouping()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10NearbyPcMetadata}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.Direct0438BodySkillVariant}"));
 
         const int playerId = 4679;
         const int combustionSkillCode = 16040030;
@@ -310,11 +310,11 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260610232724_Recovers_NpcCatalog_From_4136_State_Packets()
+    public void Replay_Recovers_NpcCatalog_From_4136_State_Packets()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10PcMetadata}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.NpcCatalogState4136}"));
 
         Assert.True(replay.ReplayedLines > 0);
         var summaryDump = BuildSummaryDump(replay.Combatants);
@@ -325,17 +325,37 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260610232551_Recovers_BossCatalog_From_4136_State_Packets()
+    public void Replay_Recovers_BossCatalog_From_4136_State_Packets()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10BossCatalog}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.BossCatalogState4136}"));
 
         Assert.True(replay.ReplayedLines > 0);
         var summaryDump = BuildSummaryDump(replay.Combatants);
         AssertNpcNameAndKind(replay, 22315, "狂暴的佩爾克", NpcKind.Boss, summaryDump);
         AssertNpcNameAndNotBoss(replay, 16737, "地之精靈", summaryDump);
         AssertNpcNameAndNotBoss(replay, 24740, "水之精靈", summaryDump);
+    }
+
+    [Fact]
+    public void Replay_Recovers_SummonOwner_And_Catalog_From_4136_Create_State()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SummonCreateState4136}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        const int ownerId = 1795;
+        var summonOwnerByInstance = SceneReplayTestView.SummonOwnerByInstance(replay);
+
+        Assert.Equal(ownerId, summonOwnerByInstance[30110]);
+        Assert.Equal(ownerId, summonOwnerByInstance[20255]);
+        AssertSummonNpc(replay, 30110, 2920650, "神聖氣息", summaryDump);
+        AssertSummonNpc(replay, 20255, 2920650, "神聖氣息", summaryDump);
+        Assert.DoesNotContain(replay.Combatants, static combatant => combatant.CombatantId is 30110 or 20255);
+        Assert.Contains(replay.Combatants, static combatant => combatant.CombatantId == ownerId && combatant.OutgoingDamage > 6_500_000);
     }
 
     [Fact]
@@ -734,6 +754,19 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(expectedKind, entity.Kind);
         Assert.True(CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry), summaryDump);
         Assert.Equal(expectedName, entry.Name);
+    }
+
+    private static void AssertSummonNpc(PacketLogReplayResult replay, int combatantId, int expectedNpcCode, string expectedName, string summaryDump)
+    {
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetNpcCode(combatantId, out var npcCode), summaryDump);
+        Assert.Equal(expectedNpcCode, npcCode);
+        Assert.Equal(expectedName, SceneReplayTestView.ResolveDisplayName(replay, combatantId));
+        Assert.True(replay.SceneOwner.Entities.TryGet(combatantId, out var entity), summaryDump);
+        Assert.Equal(NpcKind.Summon, entity.Kind);
+        Assert.Equal(expectedNpcCode, entity.NpcCode);
+        Assert.True(CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry), summaryDump);
+        Assert.Equal(expectedName, entry.Name);
+        Assert.Equal(NpcKind.Summon, CombatResourceRegistry.ResolveNpcKind(entry.Kind));
     }
 
     private static void AssertNpcNameAndNotBoss(PacketLogReplayResult replay, int combatantId, string expectedName, string summaryDump)
