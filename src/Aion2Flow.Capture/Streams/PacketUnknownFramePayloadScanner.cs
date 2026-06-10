@@ -107,7 +107,7 @@ internal static class PacketUnknownFramePayloadScanner
         if (!reader.TryReadVarInt(out var summonId)) return false;
         if (!reader.TryAdvance(3)) return false;
 
-        if (reader.TryReadUInt32Le(out var npcValue) && npcValue is >= 2_000_000 and <= 2_999_999)
+        if (reader.TryReadUInt32Le(out var npcValue) && PacketNpcStateFields.IsNpcCatalogCode(npcValue))
         {
             context.Writer.ApplyNpcCatalog(summonId, npcValue);
             context.Sink.AppendNpcKind(summonId, NpcKind.Summon);

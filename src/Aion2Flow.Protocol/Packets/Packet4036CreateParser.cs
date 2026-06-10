@@ -8,8 +8,6 @@ internal readonly record struct Packet4036NpcSpawn(Packet4036Kind Kind, int Enti
 
 internal static class Packet4036CreateParser
 {
-    private const int SpawnHpPairOffsetFromNpcCodeEnd = 21;
-
     private static ReadOnlySpan<byte> OwnerSectionSentinel => [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
 
     private static ReadOnlySpan<byte> OwnerHeaderMarker => [0x80, 0x75, 0xd5, 0x2a, 0xbb, 0x03, 0x00, 0x00];
@@ -38,7 +36,7 @@ internal static class Packet4036CreateParser
         if (!reader.TryAdvance(3)) return false;
 
         int? npcCode = null;
-        if (reader.TryReadUInt32Le(out var npcValue) && npcValue is >= 2_000_000 and <= 2_999_999)
+        if (reader.TryReadUInt32Le(out var npcValue) && PacketNpcStateFields.IsNpcCatalogCode(npcValue))
         {
             npcCode = npcValue;
         }
@@ -187,59 +185,18 @@ internal static class Packet4036CreateParser
         int? maxHp = null;
         if (spawnTagLikelyCarriesNpcCode &&
             reader.TryReadUInt32Le(out var npcValue) &&
-            npcValue is >= 2_000_000 and <= 2_999_999)
+            PacketNpcStateFields.IsNpcCatalogCode(npcValue))
         {
             npcCode = npcValue;
-            if (TryReadSpawnHpPair(packet, reader.Offset + SpawnHpPairOffsetFromNpcCodeEnd, out var parsedCurrentHp, out var parsedMaxHp))
+            if (PacketNpcStateFields.TryReadSpawnHpPair(packet, reader.Offset + PacketNpcStateFields.HpPairOffsetFromNpcCodeEnd, out var hp))
             {
-                currentHp = parsedCurrentHp;
-                maxHp = parsedMaxHp;
+                currentHp = hp.CurrentHp;
+                maxHp = hp.MaxHp;
             }
         }
 
         result = new Packet4036NpcSpawn(kind, entityId, npcCode, currentHp, maxHp);
         return true;
-    }
-
-    private static bool TryReadSpawnHpPair(ReadOnlySpan<byte> packet, int offset, out int currentHp, out int maxHp)
-    {
-        currentHp = 0;
-        maxHp = 0;
-
-        if (!TryReadVarInt(packet, offset, out currentHp, out var currentLength))
-        {
-            return false;
-        }
-
-        if (!TryReadVarInt(packet, offset + currentLength, out maxHp, out var maxLength))
-        {
-            return false;
-        }
-
-        if (currentHp < 0 || maxHp <= 0 || currentHp > maxHp)
-        {
-            return false;
-        }
-
-        var afterHpOffset = offset + currentLength + maxLength;
-        return HasPercentGaugePair(packet, afterHpOffset);
-    }
-
-    private static bool HasPercentGaugePair(ReadOnlySpan<byte> packet, int offset)
-    {
-        if ((uint)offset > packet.Length - 8u)
-        {
-            return false;
-        }
-
-        return packet[offset] == 0x64 &&
-               packet[offset + 1] == 0x00 &&
-               packet[offset + 2] == 0x00 &&
-               packet[offset + 3] == 0x00 &&
-               packet[offset + 4] == 0x64 &&
-               packet[offset + 5] == 0x00 &&
-               packet[offset + 6] == 0x00 &&
-               packet[offset + 7] == 0x00;
     }
 
     private static bool TryReadVarInt(ReadOnlySpan<byte> buffer, int offset, out int value, out int consumed)

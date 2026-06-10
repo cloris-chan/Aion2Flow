@@ -2,13 +2,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet048DNickname(
-    int PlayerId,
-    string Nickname,
-    int NicknameLength,
-    int TailOffset,
-    int? OriginServerId,
-    byte FactionCode);
+internal readonly record struct Packet048DNickname(int PlayerId, string Nickname, int NicknameLength, int TailOffset, int? OriginServerId, byte FactionCode);
 
 internal static class Packet048DNicknameParser
 {
@@ -44,88 +38,27 @@ internal static class Packet048DNicknameParser
         if (!reader.TryAdvance(HeaderLengthBeforePlayerId)) return false;
         if (!reader.TryReadVarInt(out var playerId)) return false;
 
-        var fieldOffset = reader.Offset;
-        if (TryParseOriginPrefixedNickname(payload, playerId, fieldOffset, out result))
+        var nameLengthOffset = reader.Offset;
+        int? originServerId = null;
+        if (NicknameParserUtil.TryReadPossibleOriginServerAt(payload, nameLengthOffset, out var parsedOriginServerId, out var originLength))
         {
-            return true;
+            originServerId = parsedOriginServerId;
+            nameLengthOffset += originLength;
         }
 
-        return TryParseDirectNickname(payload, playerId, fieldOffset, out result);
-    }
-
-    private static bool TryParseOriginPrefixedNickname(
-        ReadOnlySpan<byte> payload,
-        int playerId,
-        int originOffset,
-        out Packet048DNickname result)
-    {
-        result = default;
-
-        if (!NicknameParserUtil.TryReadPossibleOriginServerAt(payload, originOffset, out var originServerId, out var originLength))
-        {
-            return false;
-        }
-
-        var nameLengthOffset = originOffset + originLength;
-        if (!TryReadValidatedNickname(payload, nameLengthOffset, out var nickname, out var nicknameLength, out var tailOffset))
-        {
-            return false;
-        }
-
-        var factionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset);
-        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, originServerId, factionCode);
-        return true;
-    }
-
-    private static bool TryParseDirectNickname(
-        ReadOnlySpan<byte> payload,
-        int playerId,
-        int nameLengthOffset,
-        out Packet048DNickname result)
-    {
-        result = default;
-
-        if (!TryReadValidatedNickname(payload, nameLengthOffset, out var nickname, out var nicknameLength, out var tailOffset))
-        {
-            return false;
-        }
-
-        var factionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset);
-        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, null, factionCode);
-        return true;
-    }
-
-    private static bool TryReadValidatedNickname(
-        ReadOnlySpan<byte> payload,
-        int nameLengthOffset,
-        out string nickname,
-        out int nicknameLength,
-        out int tailOffset)
-    {
         if (!NicknameParserUtil.TryReadLengthPrefixedNickname(
                 payload,
                 nameLengthOffset,
                 strict: true,
-                out nickname,
-                out nicknameLength,
-                out var nicknameTailOffset))
+                out var nickname,
+                out var nicknameLength,
+                out var tailOffset))
         {
-            tailOffset = 0;
             return false;
         }
 
-        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(
-            payload,
-            nicknameTailOffset,
-            strict: true,
-            out _,
-            out _,
-            out tailOffset))
-        {
-            tailOffset = 0;
-            return false;
-        }
-
+        var factionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset + 7);
+        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, originServerId, factionCode);
         return true;
     }
 }

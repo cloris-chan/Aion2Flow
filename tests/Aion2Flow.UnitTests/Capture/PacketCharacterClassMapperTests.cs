@@ -22,7 +22,7 @@ public sealed class PacketCharacterClassMapperTests
     [InlineData(32, CharacterClass.Cleric)]
     [InlineData(33, CharacterClass.Chanter)]
     [InlineData(36, CharacterClass.Chanter)]
-    public void Maps_Profile_Metadata_Code_Bands(int code, CharacterClass expected)
+    public void Maps_PcMetadata_Class_Code_Bands(int code, CharacterClass expected)
     {
         Assert.Equal(expected, PacketCharacterClassMapper.ToCharacterClass(code));
     }

@@ -40,7 +40,6 @@ internal static class PacketEmbeddedIdentityScanner
             }
         }
 
-        PacketEmbeddedNicknameScanner.Scan(packet, ref context);
         return parsed;
     }
 

@@ -4,7 +4,7 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 
 internal static class PacketRecoveryParser
 {
-    public static bool ParseRecoveryPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context, out int nestedOffset, bool scanNicknames = true)
+    public static bool ParseRecoveryPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context, out int nestedOffset)
     {
         nestedOffset = -1;
 
@@ -87,7 +87,7 @@ internal static class PacketRecoveryParser
 
                     if (processed && endIdx < packet.Length)
                     {
-                        ParseRecoveryPacket(packet[endIdx..], ref context, out var remainingNestedOffset, scanNicknames: false);
+                        ParseRecoveryPacket(packet[endIdx..], ref context, out var remainingNestedOffset);
                         if (remainingNestedOffset >= 0)
                         {
                             nestedOffset = endIdx + remainingNestedOffset;
@@ -95,11 +95,6 @@ internal static class PacketRecoveryParser
                     }
                 }
             }
-        }
-
-        if (scanNicknames && !processed)
-        {
-            PacketEmbeddedNicknameScanner.Scan(packet, ref context);
         }
 
         return processed;

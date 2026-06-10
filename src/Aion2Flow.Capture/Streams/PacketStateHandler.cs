@@ -102,9 +102,20 @@ internal sealed class PacketStateHandler
 
     public static bool ParseState4136Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet4136Parser.TryParse(packet, out _))
+        if (!Packet4136Parser.TryParse(packet, out var parsed))
         {
             return false;
+        }
+
+        context.Sink.RememberNpcObservationSource(parsed.EntityId);
+        if (parsed.NpcCode is int npcCode)
+        {
+            context.Writer.ApplyNpcCatalog(parsed.EntityId, npcCode, requireCatalogEntry: true);
+        }
+
+        if (parsed.CurrentHp is int currentHp && parsed.MaxHp is int maxHp)
+        {
+            context.Sink.AppendNpcHp(parsed.EntityId, currentHp, maxHp, context.TimestampMilliseconds);
         }
 
         return context.MarkParsed();
@@ -222,6 +233,15 @@ internal sealed class PacketStateHandler
 
     public static bool ParseState4536Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
+        if (Packet4536PcMetadataParser.TryParse(packet, out var pcMetadata))
+        {
+            context.Sink.AppendNickname(
+                pcMetadata.EntityId,
+                pcMetadata.Nickname,
+                characterClass: PacketCharacterClassMapper.ToCharacterClass(pcMetadata.ClassCode));
+            return context.MarkParsed();
+        }
+
         if (!Packet4536Parser.TryParse(packet, out var parsed))
         {
             return false;

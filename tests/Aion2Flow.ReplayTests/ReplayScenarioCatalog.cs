@@ -21,6 +21,9 @@ public static class ReplayScenarioCatalog
     public const string CompactSidecarCancellation = "aion2flow.stream.20260512223507.log";
     public const string ShieldAbsorbedInvariant = "aion2flow.stream.20260411192501.log";
     public const string SplitTransportFrameRecovery = "aion2flow.stream.20260610222129.log";
+    public const string June10PcMetadata = "aion2flow.stream.20260610232724.log";
+    public const string June10BossCatalog = "aion2flow.stream.20260610232551.log";
+    public const string June10NearbyPcMetadata = "aion2flow.stream.20260610235630.log";
 
     public static IEnumerable<object[]> April11IncomingAvoidance =>
     [

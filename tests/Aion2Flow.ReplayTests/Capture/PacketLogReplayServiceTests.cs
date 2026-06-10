@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.Tests.Protocol;
 
@@ -235,6 +236,71 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal("cloris", player.DisplayName);
         Assert.True(player.OutgoingDamage > 500_000, combatantDump);
         Assert.True(player.IncomingHealing > 18_000, combatantDump);
+    }
+
+    [Fact]
+    public void Replay_20260610232724_Recovers_PcMetadata_From_048D_Metadata_Packets()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10PcMetadata}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        AssertPcName(replay, 2359, "风栖", summaryDump);
+        AssertPcName(replay, 5324, "星勇敢呦", summaryDump);
+        AssertPcName(replay, 6045, "發表", summaryDump);
+        AssertPcName(replay, 8179, "脸红红", summaryDump);
+        AssertPcName(replay, 12698, "成員術士", summaryDump);
+        AssertPcName(replay, 16199, "雾中看山河", summaryDump);
+    }
+
+    [Fact]
+    public void Replay_20260610235630_Recovers_NearbyPcMetadata_From_4536_Metadata_Packets()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10NearbyPcMetadata}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        AssertPcNameAndClass(replay, 11518, "鲍鲍龙", CharacterClass.Ranger, summaryDump);
+        AssertPcNameAndClass(replay, 14727, "沐雨橙风", CharacterClass.Ranger, summaryDump);
+        AssertPcNameAndClass(replay, 16199, "雾中看山河", CharacterClass.Elementalist, summaryDump);
+        AssertPcNameAndClass(replay, 12562, "楊狼噠", CharacterClass.Elementalist, summaryDump);
+        AssertPcNameAndClass(replay, 11898, "无名氏", CharacterClass.Elementalist, summaryDump);
+        AssertPcNameAndClass(replay, 6045, "發表", CharacterClass.Elementalist, summaryDump);
+        AssertPcNameAndClass(replay, 8001, "習慣了孤單", CharacterClass.Elementalist, summaryDump);
+        AssertPcNameAndClass(replay, 14091, "Sissi", CharacterClass.Cleric, summaryDump);
+    }
+
+    [Fact]
+    public void Replay_20260610232724_Recovers_NpcCatalog_From_4136_State_Packets()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10PcMetadata}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        AssertNpcNameAndKind(replay, 31812, "庭院蜘蛛", NpcKind.Monster, summaryDump);
+        AssertNpcNameAndKind(replay, 29327, "大葉格拉比", NpcKind.Monster, summaryDump);
+        AssertNpcNameAndKind(replay, 26373, "徬徨的風精靈", NpcKind.Monster, summaryDump);
+        AssertNpcNameAndKind(replay, 25464, "幻影魔法格拉比", NpcKind.Monster, summaryDump);
+    }
+
+    [Fact]
+    public void Replay_20260610232551_Recovers_BossCatalog_From_4136_State_Packets()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10BossCatalog}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        AssertNpcNameAndKind(replay, 22315, "狂暴的佩爾克", NpcKind.Boss, summaryDump);
+        AssertNpcNameAndNotBoss(replay, 16737, "地之精靈", summaryDump);
+        AssertNpcNameAndNotBoss(replay, 24740, "水之精靈", summaryDump);
     }
 
     [Fact]
@@ -648,9 +714,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(expected.MapId, actual.MapId);
         Assert.Equal(expected.MapInstanceId, actual.MapInstanceId);
         Assert.Equal(expected.TargetObservation?.InstanceId, actual.TargetObservation?.InstanceId);
-        Assert.Equal(
-            expected.Combatants.Keys.Order().ToArray(),
-            actual.Combatants.Keys.Order().ToArray());
+        Assert.Equal(expected.Combatants.Keys.Order().ToArray(), actual.Combatants.Keys.Order().ToArray());
 
         foreach (var id in expected.Combatants.Keys)
         {
@@ -701,6 +765,45 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(skills.TryGetBySkillCode(tailSkillCode, out var skill), $"{packetDump}\n{skillDump}");
         Assert.True(skill.PeriodicDamageAmount == expectedDamage, $"PeriodicDamageAmount={skill.PeriodicDamageAmount} expected={expectedDamage}\n{packetDump}\n{skillDump}");
         Assert.True(skill.PeriodicDamageTimes == expectedPacketCount, $"PeriodicDamageTimes={skill.PeriodicDamageTimes} expected={expectedPacketCount}\n{packetDump}\n{skillDump}");
+    }
+
+    private static void AssertPcName(PacketLogReplayResult replay, int combatantId, string expectedName, string summaryDump)
+    {
+        var combatant = Assert.Single(replay.Combatants, summary => summary.CombatantId == combatantId);
+        Assert.Equal(expectedName, combatant.DisplayName);
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(combatantId, out var metadata), summaryDump);
+        Assert.Equal(expectedName, metadata.Nickname);
+    }
+
+    private static void AssertPcNameAndClass(PacketLogReplayResult replay, int combatantId, string expectedName, CharacterClass expectedClass, string summaryDump)
+    {
+        AssertPcName(replay, combatantId, expectedName, summaryDump);
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(combatantId, out var metadata), summaryDump);
+        Assert.Equal(expectedClass, metadata.CharacterClass);
+        Assert.True(replay.SceneOwner.Entities.TryGet(combatantId, out var entity), summaryDump);
+        Assert.Equal(expectedClass, entity.CharacterClass);
+    }
+
+    private static void AssertNpcNameAndKind(PacketLogReplayResult replay, int combatantId, string expectedName, NpcKind expectedKind, string summaryDump)
+    {
+        var combatant = Assert.Single(replay.Combatants, summary => summary.CombatantId == combatantId);
+        Assert.Equal(expectedName, combatant.DisplayName);
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetNpcCode(combatantId, out var npcCode), summaryDump);
+        Assert.True(replay.SceneOwner.Entities.TryGet(combatantId, out var entity), summaryDump);
+        Assert.Equal(expectedKind, entity.Kind);
+        Assert.True(CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry), summaryDump);
+        Assert.Equal(expectedName, entry.Name);
+    }
+
+    private static void AssertNpcNameAndNotBoss(PacketLogReplayResult replay, int combatantId, string expectedName, string summaryDump)
+    {
+        var combatant = Assert.Single(replay.Combatants, summary => summary.CombatantId == combatantId);
+        Assert.Equal(expectedName, combatant.DisplayName);
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetNpcCode(combatantId, out var npcCode), summaryDump);
+        Assert.True(replay.SceneOwner.Entities.TryGet(combatantId, out var entity), summaryDump);
+        Assert.NotEqual(NpcKind.Boss, entity.Kind);
+        Assert.True(CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry), summaryDump);
+        Assert.Equal(expectedName, entry.Name);
     }
 
     private static CombatObservation[] ReadRawMode10Packets(PacketLogReplayResult replay, int sourceId, int targetId, int tailSkillCode)
