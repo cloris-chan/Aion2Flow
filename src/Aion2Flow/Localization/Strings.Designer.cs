@@ -916,6 +916,15 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Unknown effect.
+        /// </summary>
+        internal static string Skill_UnknownEffect {
+            get {
+                return ResourceManager.GetString("Skill_UnknownEffect", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Back Attack.
         /// </summary>
         internal static string Stat_Back {

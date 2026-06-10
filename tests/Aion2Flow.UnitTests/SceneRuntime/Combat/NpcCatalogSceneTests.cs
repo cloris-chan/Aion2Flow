@@ -42,7 +42,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = playerId,
             TargetId = npcInstanceId,
-            OriginalSkillCode = 17070000,
             SkillCode = 17070000,
             Damage = 1_000,
             Timestamp = 1_000
@@ -51,7 +50,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = playerId,
             TargetId = npcInstanceId,
-            OriginalSkillCode = 17070000,
             SkillCode = 17070000,
             Damage = 1,
             Timestamp = 1_050
@@ -82,7 +80,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = playerId,
             TargetId = npcInstanceId,
-            OriginalSkillCode = 17070000,
             SkillCode = 17070000,
             Damage = 1_000,
             Timestamp = 1_000
@@ -91,7 +88,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = playerId,
             TargetId = npcInstanceId,
-            OriginalSkillCode = 17070000,
             SkillCode = 17070000,
             Damage = 1,
             Timestamp = 1_050
@@ -121,7 +117,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = playerId,
             TargetId = npcInstanceId,
-            OriginalSkillCode = 17070000,
             SkillCode = 17070000,
             Damage = 1_000,
             Timestamp = 1_000
@@ -130,7 +125,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = playerId,
             TargetId = npcInstanceId,
-            OriginalSkillCode = 17070000,
             SkillCode = 17070000,
             Damage = 1,
             Timestamp = 1_050
@@ -161,7 +155,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = npcInstanceId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 1_841,
             Timestamp = 1_000
@@ -170,7 +163,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = npcInstanceId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 1,
             Timestamp = 1_050
@@ -200,7 +192,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = sourceId,
             TargetId = targetId,
-            OriginalSkillCode = 17070000,
             SkillCode = 17070000,
             Damage = 1_000,
             Timestamp = 1_000
@@ -209,7 +200,6 @@ public sealed class NpcCatalogSceneTests
         {
             SourceId = sourceId,
             TargetId = targetId,
-            OriginalSkillCode = 17070000,
             SkillCode = 17070000,
             Damage = 1,
             Timestamp = 1_050
@@ -240,7 +230,6 @@ public sealed class NpcCatalogSceneTests
             SourceId = playerId,
             TargetId = npcEntityId,
             SkillCode = 17070000,
-            OriginalSkillCode = 17070240,
             Damage = 36_358,
             Timestamp = 1_000,
             EventKind = CombatEventKind.Damage,
@@ -251,7 +240,6 @@ public sealed class NpcCatalogSceneTests
             SourceId = playerId,
             TargetId = npcEntityId,
             SkillCode = 17070000,
-            OriginalSkillCode = 17070240,
             Damage = 1,
             Timestamp = 1_050,
             EventKind = CombatEventKind.Damage,
@@ -286,7 +274,6 @@ public sealed class NpcCatalogSceneTests
             SourceId = playerId,
             TargetId = battle1Target,
             SkillCode = 17070000,
-            OriginalSkillCode = 17070240,
             Damage = 50_000,
             Timestamp = 1_000,
             EventKind = CombatEventKind.Damage,
@@ -309,7 +296,6 @@ public sealed class NpcCatalogSceneTests
             SourceId = playerId,
             TargetId = npcEntityId,
             SkillCode = 17070000,
-            OriginalSkillCode = 17070240,
             Damage = 14_547,
             Timestamp = 10_000,
             EventKind = CombatEventKind.Damage,
@@ -320,7 +306,6 @@ public sealed class NpcCatalogSceneTests
             SourceId = playerId,
             TargetId = npcEntityId,
             SkillCode = 17730000,
-            OriginalSkillCode = 17730001,
             Damage = 4_092,
             Timestamp = 10_100,
             EventKind = CombatEventKind.Damage,
@@ -374,7 +359,6 @@ public sealed class NpcCatalogSceneTests
             SourceId = sourceId,
             TargetId = entityId,
             SkillCode = 17070000,
-            OriginalSkillCode = 17070240,
             Damage = damage,
             Timestamp = 1_000,
             EventKind = CombatEventKind.Damage,
@@ -385,7 +369,6 @@ public sealed class NpcCatalogSceneTests
             SourceId = sourceId,
             TargetId = entityId,
             SkillCode = 17070000,
-            OriginalSkillCode = 17070240,
             Damage = 1,
             Timestamp = 1_050,
             EventKind = CombatEventKind.Damage,

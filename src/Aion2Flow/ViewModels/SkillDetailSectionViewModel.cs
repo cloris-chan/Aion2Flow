@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
@@ -7,8 +8,8 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
     private readonly UiFrameBatchService _frameBatchService = frameBatchService;
-    private readonly Dictionary<int, SkillDetailRowViewModel> _existingBySkillCode = [];
-    private readonly HashSet<int> _newSkillCodes = [];
+    private readonly Dictionary<CombatActionKey, SkillDetailRowViewModel> _existingByActionKey = [];
+    private readonly HashSet<CombatActionKey> _newActionKeys = [];
 
     public ObservableCollection<SkillDetailScopeOption> ScopeOptions { get; } = [];
     public ObservableCollection<SkillDetailRowViewModel> Rows { get; } = [];
@@ -83,21 +84,21 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
 
     public void ReplaceRows(List<SkillDetailRowData> dataRows)
     {
-        _existingBySkillCode.Clear();
+        _existingByActionKey.Clear();
         foreach (var row in Rows)
         {
-            _existingBySkillCode.TryAdd(row.SkillCode, row);
+            _existingByActionKey.TryAdd(row.ActionKey, row);
         }
 
-        _newSkillCodes.Clear();
+        _newActionKeys.Clear();
         for (var i = 0; i < dataRows.Count; i++)
         {
-            _newSkillCodes.Add(dataRows[i].SkillCode);
+            _newActionKeys.Add(dataRows[i].ActionKey);
         }
 
         for (var i = Rows.Count - 1; i >= 0; i--)
         {
-            if (!_newSkillCodes.Contains(Rows[i].SkillCode))
+            if (!_newActionKeys.Contains(Rows[i].ActionKey))
             {
                 Rows.RemoveAt(i);
             }
@@ -106,7 +107,7 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         for (var i = 0; i < dataRows.Count; i++)
         {
             ref var data = ref CollectionsMarshal.AsSpan(dataRows)[i];
-            if (_existingBySkillCode.TryGetValue(data.SkillCode, out var existing))
+            if (_existingByActionKey.TryGetValue(data.ActionKey, out var existing))
             {
                 existing.ApplyFrom(in data);
                 var currentIndex = Rows.IndexOf(existing);

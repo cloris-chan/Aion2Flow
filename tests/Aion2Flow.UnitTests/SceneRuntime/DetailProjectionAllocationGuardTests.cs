@@ -58,6 +58,32 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
+    public void CombatEventClassifier_UsesOnlyPacketStructureAndRelations()
+    {
+        var root = FindRepositoryRoot();
+        var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Combat", "CombatEventClassifier.cs"));
+        var forbiddenTerms = new[]
+        {
+            "SkillMap",
+            "SkillDisplayMap",
+            "DisplaySkillNameFor",
+            "ResourceEffectRef",
+            "observation.SkillCode",
+            "ParseSkillVariant",
+            "InferOriginalSkillCode",
+            "OriginalSkillCode",
+            "BaseSkillCode",
+            "ResourceSkillCode",
+            "EffectIndex",
+            "MatchesExact",
+            "MatchesBase"
+        };
+
+        foreach (var term in forbiddenTerms)
+            Assert.DoesNotContain(term, text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PeriodicPoolCanonicalizer_Mode10Path_UsesOnlyPacketStructure()
     {
         var root = FindRepositoryRoot();

@@ -22,7 +22,6 @@ public class CombatPacketFactTests
             Combat = new CombatObservation
             {
                 SkillCode = 17010230,
-                OriginalSkillCode = 17010230,
                 Damage = 2400,
                 HitCount = 1,
                 AttemptCount = 1,
@@ -49,7 +48,6 @@ public class CombatPacketFactTests
         var observation = new CombatObservation
         {
             SkillCode = 17010230,
-            OriginalSkillCode = 17010230,
             Damage = 2400,
             HitCount = 1,
             AttemptCount = 1,

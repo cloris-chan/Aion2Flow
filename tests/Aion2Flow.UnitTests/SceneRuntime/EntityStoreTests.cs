@@ -1055,7 +1055,6 @@ public class SceneReadModelOwnerTests
             SourceId = 100,
             TargetId = 200,
             SkillCode = 11000010,
-            OriginalSkillCode = 11000010,
             Damage = 500,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1076,7 +1075,6 @@ public class SceneReadModelOwnerTests
             SourceId = 100,
             TargetId = 200,
             SkillCode = 11000010,
-            OriginalSkillCode = 11000010,
             Damage = 300,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1107,7 +1105,6 @@ public class SceneReadModelOwnerTests
             SourceId = 100,
             TargetId = 200,
             SkillCode = 11000010,
-            OriginalSkillCode = 11000010,
             Damage = 500,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1120,7 +1117,6 @@ public class SceneReadModelOwnerTests
             SourceId = 100,
             TargetId = 200,
             SkillCode = 11000010,
-            OriginalSkillCode = 11000010,
             Damage = 300,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1150,7 +1146,6 @@ public class SceneReadModelOwnerTests
             SourceId = 100,
             TargetId = 200,
             SkillCode = 11000010,
-            OriginalSkillCode = 11000010,
             Damage = 500,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1163,7 +1158,6 @@ public class SceneReadModelOwnerTests
             SourceId = 100,
             TargetId = 200,
             SkillCode = 11000010,
-            OriginalSkillCode = 11000010,
             Damage = 300,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1196,7 +1190,6 @@ public class SceneReadModelOwnerTests
             SourceId = 100,
             TargetId = 200,
             SkillCode = 11000010,
-            OriginalSkillCode = 11000010,
             Damage = 500,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1258,7 +1251,6 @@ public class SceneReadModelOwnerTests
             SourceId = 100,
             TargetId = 200,
             SkillCode = 11000010,
-            OriginalSkillCode = 11000010,
             Damage = 500,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1305,7 +1297,6 @@ public class SceneReadModelOwnerTests
             combat.ApplyCombat(100, 200, new CombatObservation
             {
                 SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
                 Damage = 100 + i,
                 HitCount = 1,
                 AttemptCount = 1,
@@ -1345,7 +1336,6 @@ public class SceneReadModelOwnerTests
             combat.ApplyCombat(100, 200, new CombatObservation
             {
                 SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
                 Damage = 100 + i,
                 HitCount = 1,
                 AttemptCount = 1,
@@ -1366,7 +1356,7 @@ public class SceneReadModelOwnerTests
         var breakdown = owner.CreateSkillBreakdown(snapshot, 100);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - beforeBytes;
 
-        Assert.True(breakdown.Skills.TryGetValue(11000010, out var skill));
+        Assert.True(breakdown.Skills.TryGetBySkillCode(11000010, out var skill));
         Assert.Equal(128, skill.Times);
         Assert.True(allocated < 40_000, $"skill breakdown allocated {allocated:N0} bytes");
     }
@@ -1620,7 +1610,6 @@ public class SceneReadModelOwnerTests
                     SourceId = 100,
                     TargetId = targetId,
                     SkillCode = 11000010,
-                    OriginalSkillCode = 11000010,
                     Damage = 10,
                     Timestamp = 1_000 + currentBatch * 25,
                     BatchOrdinal = currentBatch,
@@ -1701,7 +1690,6 @@ public class SceneReadModelOwnerTests
                 SourceId = 100,
                 TargetId = 200,
                 SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
                 Damage = 500,
                 Timestamp = 1_000,
                 BatchOrdinal = 1,
@@ -1715,7 +1703,6 @@ public class SceneReadModelOwnerTests
                 SourceId = 100,
                 TargetId = 200,
                 SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
                 Damage = 300,
                 Timestamp = 2_000,
                 BatchOrdinal = 2,
@@ -1737,7 +1724,6 @@ public class SceneReadModelOwnerTests
                 SourceId = 100,
                 TargetId = 201,
                 SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
                 Damage = 700,
                 Timestamp = 3_000,
                 BatchOrdinal = 3,
@@ -1751,7 +1737,6 @@ public class SceneReadModelOwnerTests
                 SourceId = 100,
                 TargetId = 201,
                 SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
                 Damage = 300,
                 Timestamp = 4_000,
                 BatchOrdinal = 4,
@@ -1797,7 +1782,6 @@ public class SceneReadModelOwnerTests
                 SourceId = 100,
                 TargetId = npcId,
                 SkillCode = 11000010,
-                OriginalSkillCode = 11000010,
                 Damage = 500,
                 Timestamp = 1_000,
                 BatchOrdinal = 1,
@@ -1896,7 +1880,6 @@ public class SceneReadModelOwnerTests
             SourceId = sourceId,
             TargetId = targetId,
             SkillCode = skillCode,
-            OriginalSkillCode = skillCode,
             Damage = damage,
             Timestamp = timestamp,
             BatchOrdinal = batchOrdinal,

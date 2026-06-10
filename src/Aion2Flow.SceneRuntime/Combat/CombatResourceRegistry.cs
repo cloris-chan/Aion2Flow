@@ -9,7 +9,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 public static class CombatResourceRegistry
 {
     private static SkillCollection _skillMap = [];
-    private static readonly ConcurrentDictionary<int, int> _resolvedSkillCodeCache = [];
+    private static readonly ConcurrentDictionary<int, int> _skillCodeNormalizationCache = [];
 
     public static SkillCollection SkillMap
     {
@@ -19,7 +19,7 @@ public static class CombatResourceRegistry
             _skillMap = value;
             SkillDisplayMap = _skillMap;
             SkillCodes = [.. _skillMap.Select(static x => x.Id).OrderBy(static x => x)];
-            _resolvedSkillCodeCache.Clear();
+            _skillCodeNormalizationCache.Clear();
             SkillMapRevision++;
         }
     }
@@ -66,6 +66,19 @@ public static class CombatResourceRegistry
         return false;
     }
 
+    public static string DisplaySkillNameFor(int skillCode)
+    {
+        if (skillCode <= 0)
+            return string.Empty;
+
+        if (SkillDisplayMap.TryGetValue(skillCode, out var displaySkill) && !string.IsNullOrWhiteSpace(displaySkill.Name))
+            return displaySkill.Name;
+
+        return SkillMap.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name)
+            ? skill.Name
+            : string.Empty;
+    }
+
     public static NpcKind ResolveNpcKind(NpcCatalogKind kind) =>
         kind switch
         {
@@ -76,69 +89,6 @@ public static class CombatResourceRegistry
             _ => NpcKind.Unknown
         };
 
-    public static int? InferOriginalSkillCode(int skillCode)
-    {
-        if (skillCode <= 0)
-            return null;
-
-        Span<int> candidates = stackalloc int[12];
-        var count = 0;
-
-        static bool TryPush(Span<int> span, ref int count, int value)
-        {
-            if (value <= 0) return false;
-            for (var i = 0; i < count; i++)
-            {
-                if (span[i] == value) return false;
-            }
-
-            if (count >= span.Length) return false;
-            span[count++] = value;
-            return true;
-        }
-
-        if (TryPush(candidates, ref count, skillCode) && Array.BinarySearch(SkillCodes, skillCode) >= 0)
-            return skillCode;
-
-        var variant = ParseSkillVariant(skillCode);
-
-        var specializationWithoutCharge = variant.BaseSkillCode + EncodeVariantSuffix(variant.SpecializationMask, 0);
-        if (TryPush(candidates, ref count, specializationWithoutCharge) && Array.BinarySearch(SkillCodes, specializationWithoutCharge) >= 0)
-            return specializationWithoutCharge;
-
-        if (TryPush(candidates, ref count, variant.BaseSkillCode) && Array.BinarySearch(SkillCodes, variant.BaseSkillCode) >= 0)
-            return variant.BaseSkillCode;
-
-        var baseWithCharge = variant.BaseSkillCode + EncodeVariantSuffix(0, variant.ChargeStage);
-        if (TryPush(candidates, ref count, baseWithCharge) && Array.BinarySearch(SkillCodes, baseWithCharge) >= 0)
-            return baseWithCharge;
-
-        var byHundred = skillCode / 100;
-        if (TryPush(candidates, ref count, byHundred) && Array.BinarySearch(SkillCodes, byHundred) >= 0)
-            return byHundred;
-
-        var byHundredVariant = ParseSkillVariant(byHundred);
-        var byHundredSpecializationWithoutCharge = byHundredVariant.BaseSkillCode + EncodeVariantSuffix(byHundredVariant.SpecializationMask, 0);
-        if (TryPush(candidates, ref count, byHundredSpecializationWithoutCharge) && Array.BinarySearch(SkillCodes, byHundredSpecializationWithoutCharge) >= 0)
-            return byHundredSpecializationWithoutCharge;
-
-        if (byHundredVariant.BaseSkillCode >= 100000)
-        {
-            if (TryPush(candidates, ref count, byHundredVariant.BaseSkillCode) && Array.BinarySearch(SkillCodes, byHundredVariant.BaseSkillCode) >= 0)
-                return byHundredVariant.BaseSkillCode;
-
-            var byHundredBaseWithCharge = byHundredVariant.BaseSkillCode + EncodeVariantSuffix(0, byHundredVariant.ChargeStage);
-            if (TryPush(candidates, ref count, byHundredBaseWithCharge) && Array.BinarySearch(SkillCodes, byHundredBaseWithCharge) >= 0)
-                return byHundredBaseWithCharge;
-        }
-
-        var byThousand = skillCode - (skillCode % 1000);
-        if (TryPush(candidates, ref count, byThousand) && Array.BinarySearch(SkillCodes, byThousand) >= 0)
-            return byThousand;
-
-        return null;
-    }
-
     public static void NormalizePacketForStorage(ref ParsedCombatPacket packet)
     {
         if (packet.IsNormalized)
@@ -147,15 +97,12 @@ public static class CombatResourceRegistry
         var observation = packet.ToObservation();
         var normalized = NormalizeObservationForStorage(packet.SourceId, packet.TargetId, in observation);
         packet.SkillCode = normalized.SkillCode;
-        packet.OriginalSkillCode = normalized.OriginalSkillCode;
-        packet.BaseSkillCode = normalized.BaseSkillCode;
-        packet.ChargeStage = ParseSkillVariant(normalized.OriginalSkillCode).ChargeStage;
-        packet.SpecializationMask = ParseSkillVariant(normalized.OriginalSkillCode).SpecializationMask;
+        packet.BodyResourceEffectRef = normalized.BodyResourceEffectRef;
         packet.Damage = checked((int)normalized.Damage);
         packet.HitContribution = normalized.HitCount;
         packet.AttemptContribution = normalized.AttemptCount;
         packet.DetailRaw = normalized.DetailRaw;
-        packet.EffectRef = normalized.EffectRef;
+        packet.DetailResourceEffectRef = normalized.DetailResourceEffectRef;
         packet.Marker = normalized.Marker;
         packet.Type = normalized.Type;
         packet.Flag = normalized.Flag;
@@ -168,7 +115,6 @@ public static class CombatResourceRegistry
         packet.ResourceKind = normalized.ResourceKind;
         packet.EventKind = normalized.EventKind;
         packet.ValueKind = normalized.ValueKind;
-        packet.PeriodicBodySkillCode = normalized.PeriodicBodySkillCode;
         packet.PeriodicTailSkillCodeRaw = normalized.PeriodicTailSkillCodeRaw;
         packet.PeriodicTailPrefixValue = normalized.PeriodicTailPrefixValue;
         packet.PeriodicTailLength = normalized.PeriodicTailLength;
@@ -179,15 +125,10 @@ public static class CombatResourceRegistry
 
     public static CombatObservation NormalizeObservationForStorage(int sourceId, int targetId, in CombatObservation observation)
     {
-        var originalSkillCode = observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
-        var variant = ParseSkillVariant(originalSkillCode);
         var modifiers = observation.Type == 3 ? observation.Modifiers | DamageModifiers.Critical : observation.Modifiers;
-        var skillCode = ResolveSkillCode(observation.SkillCode, originalSkillCode, variant);
         var normalized = observation with
         {
-            SkillCode = skillCode,
-            OriginalSkillCode = variant.OriginalSkillCode,
-            BaseSkillCode = variant.BaseSkillCode,
+            SkillCode = NormalizeConfirmedSkillCode(observation.SkillCode),
             Modifiers = modifiers
         };
 
@@ -236,56 +177,44 @@ public static class CombatResourceRegistry
         return new SkillVariantInfo(originalSkillCode, normalizedSkillCode, baseSkillCode, chargeStage, specializationMask);
     }
 
-    private static int ResolveSkillCode(int packetSkillCode, int originalSkillCode, SkillVariantInfo variant)
+    private static int NormalizeConfirmedSkillCode(int skillCode)
     {
-        if (SkillMap.Count == 0)
-        {
-            if (packetSkillCode > 0)
-                return packetSkillCode;
+        if (skillCode <= 0 || SkillMap.Count == 0)
+            return Math.Max(0, skillCode);
 
-            if (originalSkillCode > 0)
-                return originalSkillCode;
-
-            return variant.NormalizedSkillCode;
-        }
-
-        if (originalSkillCode <= 0)
-            return variant.NormalizedSkillCode;
-
-        if (_resolvedSkillCodeCache.TryGetValue(originalSkillCode, out var cached))
+        if (_skillCodeNormalizationCache.TryGetValue(skillCode, out var cached))
             return cached;
 
-        var inferredSkillCode = InferOriginalSkillCode(originalSkillCode) ?? variant.NormalizedSkillCode;
-        var resolvedSkillCode = ResolveTriggeredSiblingSkillCode(originalSkillCode, inferredSkillCode);
+        var variant = ParseSkillVariant(skillCode);
+        var resolvedSkillCode = Array.BinarySearch(SkillCodes, skillCode) >= 0
+            ? skillCode
+            : ResolveKnownVariantSkillCode(skillCode, variant);
         resolvedSkillCode = ResolveSameNameVariantGroupSkillCode(resolvedSkillCode, variant);
-        _resolvedSkillCodeCache[originalSkillCode] = resolvedSkillCode;
+        _skillCodeNormalizationCache[skillCode] = resolvedSkillCode;
         return resolvedSkillCode;
     }
 
-    private static int ResolveTriggeredSiblingSkillCode(int originalSkillCode, int inferredSkillCode)
+    private static int ResolveKnownVariantSkillCode(int skillCode, SkillVariantInfo variant)
     {
-        if (originalSkillCode <= 0 || inferredSkillCode <= 0 || SkillMap.Count == 0 || Array.BinarySearch(SkillCodes, originalSkillCode) >= 0 || !SkillMap.TryGetValue(inferredSkillCode, out var inferredSkill))
-            return inferredSkillCode;
+        if (variant.BaseSkillCode <= 0)
+            return skillCode;
 
-        var variantSuffix = inferredSkillCode % 10000;
-        if (variantSuffix == 0)
-            return inferredSkillCode;
+        Span<int> candidates = stackalloc int[3];
+        var count = 0;
+        var specializationWithoutCharge = variant.BaseSkillCode + EncodeVariantSuffix(variant.SpecializationMask, 0);
+        if (specializationWithoutCharge > 0)
+            candidates[count++] = specializationWithoutCharge;
+        candidates[count++] = variant.BaseSkillCode;
+        candidates[count++] = variant.BaseSkillCode + EncodeVariantSuffix(0, variant.ChargeStage);
 
-        foreach (var triggeredSkillId in inferredSkill.EnumerateTriggeredSkillIds())
+        for (var i = 0; i < count; i++)
         {
-            if (triggeredSkillId <= 0)
-                continue;
-
-            if (!SkillMap.TryGetValue(triggeredSkillId, out var candidate))
-                continue;
-
-            if (candidate.Id == inferredSkillCode || candidate.Id % 10000 != variantSuffix || candidate.Category != inferredSkill.Category || candidate.SourceType != inferredSkill.SourceType)
-                continue;
-
-            return candidate.Id;
+            var candidate = candidates[i];
+            if (candidate > 0 && Array.BinarySearch(SkillCodes, candidate) >= 0)
+                return candidate;
         }
 
-        return inferredSkillCode;
+        return skillCode;
     }
 
     private static int ResolveSameNameVariantGroupSkillCode(int resolvedSkillCode, SkillVariantInfo variant)

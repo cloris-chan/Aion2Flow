@@ -1,20 +1,10 @@
+using System.Buffers.Binary;
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0438CompactValue(
-    int TargetId,
-    int LayoutTag,
-    int Flag,
-    int SourceId,
-    int SkillCodeRaw,
-    int Marker,
-    int Type,
-    int Unknown,
-    int Value,
-    int Loop,
-    int TailLength,
-    int TailRaw);
+internal readonly record struct Packet0438CompactValue(int TargetId, int LayoutTag, int Flag, int SourceId, ResourceEffectRef BodyResourceEffectRef, int Marker, int Type, int Unknown, int Value, int Loop, int TailLength, int TailRaw);
 
 internal static class Packet0438CompactValueParser
 {
@@ -36,7 +26,7 @@ internal static class Packet0438CompactValueParser
         if (targetId <= 0 || sourceId <= 0) return false;
         if (layoutTag != 0 || reader.Remaining < 5) return false;
 
-        if (!reader.TryReadUInt32Le(out var skillCodeRaw)) return false;
+        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadVarInt(out var type)) return false;
         if (!reader.TryReadVarInt(out var unknown)) return false;
@@ -53,25 +43,10 @@ internal static class Packet0438CompactValueParser
         if (tailLength >= 4)
         {
             var tail = packet[reader.Offset..];
-            tailRaw = tail[0]
-                | (tail[1] << 8)
-                | (tail[2] << 16)
-                | (tail[3] << 24);
+            tailRaw = BinaryPrimitives.ReadInt32LittleEndian(tail);
         }
 
-        result = new Packet0438CompactValue(
-            targetId,
-            layoutTag,
-            flag,
-            sourceId,
-            skillCodeRaw,
-            marker,
-            type,
-            unknown,
-            value,
-            loop,
-            tailLength,
-            tailRaw);
+        result = new Packet0438CompactValue(targetId, layoutTag, flag, sourceId, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), marker, type, unknown, value, loop, tailLength, tailRaw);
         return true;
     }
 }

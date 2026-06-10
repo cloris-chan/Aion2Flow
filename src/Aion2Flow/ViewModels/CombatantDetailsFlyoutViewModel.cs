@@ -21,8 +21,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     private readonly List<DetailCounterpartOption> _counterpartOptions = [];
     private readonly HashSet<int> _selectedDamageCounterpartIds = [];
     private readonly HashSet<int> _selectedSupportCounterpartIds = [];
-    private readonly Dictionary<int, SkillMetrics> _skillMetrics = [];
+    private readonly Dictionary<CombatActionKey, SkillMetrics> _skillMetrics = [];
     private readonly List<SkillDetailRowData> _sectionRows = [];
+    private readonly LocalizationService _localization;
     private SceneCombatSnapshot _currentSnapshot = new();
     private Guid _encounterContextId;
     private int? _combatantId;
@@ -40,6 +41,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     public CombatantDetailsFlyoutViewModel(LocalizationService localization, UiFrameBatchService frameBatchService)
     {
+        _localization = localization;
         OutgoingDetail = new CombatDirectionDetailViewModel(localization, frameBatchService, "Direction_Targets");
         IncomingDetail = new CombatDirectionDetailViewModel(localization, frameBatchService, "Direction_Sources");
         OutgoingDetail.DamageCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
@@ -457,7 +459,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
                 lastObserved = Math.Max(lastObserved, observedAt);
             }
 
-            ref var skill = ref CollectionsMarshal.GetValueRefOrAddDefault(metrics, detailPacket.SkillCode, out var exists);
+            var detailObservation = detailPacket.Observation;
+            var actionKey = CombatActionKey.FromObservation(in detailObservation);
+            ref var skill = ref CollectionsMarshal.GetValueRefOrAddDefault(metrics, actionKey, out var exists);
             if (!exists)
             {
                 var observation = detailPacket.Observation;
@@ -470,11 +474,11 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
         _sectionRows.Clear();
         if (sectionKind is DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage)
-            BuildDamageRows(metrics, DisplayContext, _sectionRows);
+            BuildDamageRows(metrics, DisplayContext, _localization, _sectionRows);
         else if (sectionKind is DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield)
-            BuildShieldRows(metrics, DisplayContext, _sectionRows);
+            BuildShieldRows(metrics, DisplayContext, _localization, _sectionRows);
         else
-            BuildHealingRows(metrics, DisplayContext, _sectionRows);
+            BuildHealingRows(metrics, DisplayContext, _localization, _sectionRows);
 
         var durationSeconds = hasSubsetFilter
             ? ResolveObservedDurationSeconds(firstObserved, lastObserved)
@@ -484,7 +488,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     private static void ApplySectionRows(
         SkillDetailSectionViewModel section,
-        Dictionary<int, SkillMetrics> skills,
+        Dictionary<CombatActionKey, SkillMetrics> skills,
         List<SkillDetailRowData> rows,
         DetailSectionKind sectionKind,
         double durationSeconds,
@@ -565,7 +569,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         section.InvincibleRate = 0d;
     }
 
-    private static void ApplyDamageSection(SkillDetailSectionViewModel section, Dictionary<int, SkillMetrics> skills, double durationSeconds)
+    private static void ApplyDamageSection(SkillDetailSectionViewModel section, Dictionary<CombatActionKey, SkillMetrics> skills, double durationSeconds)
     {
         long total = 0, directTotal = 0, periodicTotal = 0;
         int totalHits = 0, totalAttempts = 0, totalPeriodicHits = 0;
@@ -698,7 +702,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     private static long ResolveObservedAt(in CombatDetailEvent detailPacket)
         => detailPacket.ObservedAt;
 
-    private static void BuildDamageRows(Dictionary<int, SkillMetrics> skills, SceneDisplayContext? displayContext, List<SkillDetailRowData> rows)
+    private static void BuildDamageRows(Dictionary<CombatActionKey, SkillMetrics> skills, SceneDisplayContext? displayContext, LocalizationService localization, List<SkillDetailRowData> rows)
     {
         foreach (var (_, skill) in skills)
         {
@@ -720,7 +724,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
             rows.Add(new SkillDetailRowData
             {
+                ActionKey = skill.ActionKey,
                 SkillCode = skill.SkillCode,
+                DisplayName = ResolveActionDisplayName(skill.ActionKey, displayContext, localization),
                 TotalAmount = totalAmount,
                 DirectAmount = skill.DamageAmount,
                 PeriodicAmount = skill.PeriodicDamageAmount,
@@ -749,7 +755,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             if (cmp != 0) return cmp;
             cmp = b.Hits.CompareTo(a.Hits);
             if (cmp != 0) return cmp;
-            return CompareSkillNames(a.SkillCode, b.SkillCode, displayContext);
+            return CompareActionNames(a.ActionKey, b.ActionKey, displayContext, localization);
         });
 
         var sectionTotal = 0L;
@@ -771,7 +777,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     private static bool IsHiddenDamageOutcomeSkill(int skillCode)
         => skillCode == SyntheticCombatSkillCodes.UnresolvedInvincible;
 
-    private static void BuildHealingRows(Dictionary<int, SkillMetrics> skills, SceneDisplayContext? displayContext, List<SkillDetailRowData> rows)
+    private static void BuildHealingRows(Dictionary<CombatActionKey, SkillMetrics> skills, SceneDisplayContext? displayContext, LocalizationService localization, List<SkillDetailRowData> rows)
     {
         foreach (var (_, skill) in skills)
         {
@@ -786,7 +792,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
             rows.Add(new SkillDetailRowData
             {
+                ActionKey = skill.ActionKey,
                 SkillCode = skill.SkillCode,
+                DisplayName = ResolveActionDisplayName(skill.ActionKey, displayContext, localization),
                 TotalAmount = totalAmount,
                 DirectAmount = directHealingAmount,
                 PeriodicAmount = skill.PeriodicHealingAmount,
@@ -804,7 +812,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             if (cmp != 0) return cmp;
             cmp = b.Hits.CompareTo(a.Hits);
             if (cmp != 0) return cmp;
-            return CompareSkillNames(a.SkillCode, b.SkillCode, displayContext);
+            return CompareActionNames(a.ActionKey, b.ActionKey, displayContext, localization);
         });
 
         var sectionTotal = 0L;
@@ -823,7 +831,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     }
 
-    private static void BuildShieldRows(Dictionary<int, SkillMetrics> skills, SceneDisplayContext? displayContext, List<SkillDetailRowData> rows)
+    private static void BuildShieldRows(Dictionary<CombatActionKey, SkillMetrics> skills, SceneDisplayContext? displayContext, LocalizationService localization, List<SkillDetailRowData> rows)
     {
         foreach (var (_, skill) in skills)
         {
@@ -835,7 +843,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
             rows.Add(new SkillDetailRowData
             {
+                ActionKey = skill.ActionKey,
                 SkillCode = skill.SkillCode,
+                DisplayName = ResolveActionDisplayName(skill.ActionKey, displayContext, localization),
                 TotalAmount = skill.ShieldAmount,
                 ShieldAmount = skill.ShieldAmount,
                 ShieldAbsorbedAmount = skill.ShieldAbsorbedAmount,
@@ -850,7 +860,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             if (cmp != 0) return cmp;
             cmp = b.Hits.CompareTo(a.Hits);
             if (cmp != 0) return cmp;
-            return CompareSkillNames(a.SkillCode, b.SkillCode, displayContext);
+            return CompareActionNames(a.ActionKey, b.ActionKey, displayContext, localization);
         });
 
         var sectionTotal = 0L;
@@ -869,10 +879,22 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     }
 
-    private static int CompareSkillNames(int leftSkillCode, int rightSkillCode, SceneDisplayContext? displayContext)
+    private static string ResolveActionDisplayName(CombatActionKey actionKey, SceneDisplayContext? displayContext, LocalizationService localization)
     {
-        var leftName = displayContext?.GetSkillSortKey(leftSkillCode) ?? leftSkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var rightName = displayContext?.GetSkillSortKey(rightSkillCode) ?? rightSkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (actionKey.SkillCode > 0)
+            return displayContext?.ResolveSkillName(actionKey.SkillCode) ?? actionKey.SkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        return actionKey.FormatFallbackLabel(localization["Skill_UnknownEffect"]);
+    }
+
+    private static int CompareActionNames(CombatActionKey leftActionKey, CombatActionKey rightActionKey, SceneDisplayContext? displayContext, LocalizationService localization)
+    {
+        var leftName = leftActionKey.SkillCode > 0
+            ? displayContext?.GetSkillSortKey(leftActionKey.SkillCode) ?? leftActionKey.FormatSortKey()
+            : leftActionKey.FormatSortKey(localization["Skill_UnknownEffect"]);
+        var rightName = rightActionKey.SkillCode > 0
+            ? displayContext?.GetSkillSortKey(rightActionKey.SkillCode) ?? rightActionKey.FormatSortKey()
+            : rightActionKey.FormatSortKey(localization["Skill_UnknownEffect"]);
         return StringComparer.CurrentCulture.Compare(leftName, rightName);
     }
 

@@ -1,26 +1,13 @@
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0538PeriodicValue(
-    int TargetId,
-    int Mode,
-    int SourceId,
-    int Unknown,
-    int SkillCodeRaw,
-    int NormalizedSkillCode,
-    int Damage,
-    int TailLength,
-    int TailRaw,
-    int TailSkillCodeRaw,
-    int TailPrefixValue)
+internal readonly record struct Packet0538PeriodicValue(int TargetId, int Mode, int SourceId, int Unknown, ResourceEffectRef BodyResourceEffectRef, int Damage, int TailLength, int TailRaw, int TailSkillCodeRaw, int TailPrefixValue)
 {
     public bool IsLinkRecord => Mode == 48;
 
-    public int LinkId
-        => IsLinkRecord
-            ? Damage
-            : 0;
+    public int LinkId => IsLinkRecord ? Damage : 0;
 }
 
 internal static class Packet0538PeriodicValueParser
@@ -40,7 +27,7 @@ internal static class Packet0538PeriodicValueParser
         if (!reader.TryReadVarInt(out var mode)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (!reader.TryReadVarInt(out var unknown)) return false;
-        if (!reader.TryReadUInt32Le(out var skillCodeRaw)) return false;
+        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
         if (!reader.TryReadVarInt(out var damage)) return false;
         var tailLength = reader.Remaining;
         var tailRaw = 0;
@@ -70,18 +57,7 @@ internal static class Packet0538PeriodicValueParser
             }
         }
 
-        result = new Packet0538PeriodicValue(
-            targetId,
-            mode,
-            sourceId,
-            unknown,
-            skillCodeRaw,
-            skillCodeRaw / 100,
-            damage,
-            tailLength,
-            tailRaw,
-            tailSkillCodeRaw,
-            tailPrefixValue);
+        result = new Packet0538PeriodicValue(targetId, mode, sourceId, unknown, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), damage, tailLength, tailRaw, tailSkillCodeRaw, tailPrefixValue);
         return true;
     }
 

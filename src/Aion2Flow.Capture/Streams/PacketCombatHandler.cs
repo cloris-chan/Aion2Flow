@@ -21,8 +21,7 @@ internal static class PacketCombatHandler
             {
                 LayoutTag = parsed.LayoutTag,
                 Flag = parsed.Flag,
-                OriginalSkillCode = parsed.SkillCodeRaw,
-                SkillCode = parsed.SkillCodeRaw,
+                BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                 Marker = parsed.Marker,
                 Type = parsed.Type,
                 Modifiers = parsed.Modifiers,
@@ -34,7 +33,7 @@ internal static class PacketCombatHandler
                 DrainHealAmount = parsed.DrainHealAmount,
                 RegenerationAmount = parsed.RegenerationAmount,
                 DetailRaw = parsed.DetailRaw,
-                EffectRef = parsed.EffectRef,
+                DetailResourceEffectRef = parsed.DetailResourceEffectRef,
                 ResourceKind = parsed.ResourceKind,
                 ChainId = parsed.Unknown
             };
@@ -45,12 +44,11 @@ internal static class PacketCombatHandler
             {
                 var regenObservation = new CombatObservation
                 {
-                    OriginalSkillCode = parsed.SkillCodeRaw,
-                    SkillCode = parsed.SkillCodeRaw,
+                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                     Damage = parsed.RegenerationAmount,
                     HitCount = 1,
                     AttemptCount = 1,
-                    EffectRef = parsed.EffectRef,
+                    DetailResourceEffectRef = parsed.DetailResourceEffectRef,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.Healing,
                     EffectTag = PacketEffectTag.RegenerationHealing
@@ -62,13 +60,12 @@ internal static class PacketCombatHandler
             {
                 var drainObservation = new CombatObservation
                 {
-                    OriginalSkillCode = parsed.SkillCodeRaw,
-                    SkillCode = parsed.SkillCodeRaw,
+                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                     Damage = parsed.DrainHealAmount,
                     HitCount = 1,
                     AttemptCount = 1,
                     DrainHealAmount = parsed.DrainHealAmount,
-                    EffectRef = parsed.EffectRef,
+                    DetailResourceEffectRef = parsed.DetailResourceEffectRef,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.DrainHealing
                 };
@@ -80,7 +77,7 @@ internal static class PacketCombatHandler
 
         if (Packet0438CompactValueParser.TryParse(packet, out var compact))
         {
-            context.Sink.RegisterCompactValue0438(compact.TargetId, compact.SourceId, compact.SkillCodeRaw, compact.Marker, compact.LayoutTag, compact.Type, compact.Value, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
+            context.Sink.RegisterCompactValue0438(compact.TargetId, compact.SourceId, compact.BodyResourceEffectRef, compact.Marker, compact.LayoutTag, compact.Type, compact.Value, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
             RawPacketDump.ObserveParsedPacket("compact-value", context.Connection);
             return context.MarkParsed();
         }
@@ -90,7 +87,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactValue0438(compactSignal.TargetId, compactSignal.SourceId, compactSignal.SkillCodeRaw, compactSignal.Marker, compactSignal.LayoutTag, compactSignal.Type, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
+        context.Sink.RegisterCompactValue0438(compactSignal.TargetId, compactSignal.SourceId, compactSignal.BodyResourceEffectRef, compactSignal.Marker, compactSignal.LayoutTag, compactSignal.Type, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
         return context.MarkParsed();
     }
 
@@ -111,15 +108,14 @@ internal static class PacketCombatHandler
                 context.Sink.RememberNpcObservationSource(parsed.TargetId);
                 var invincibleObservation = new CombatObservation
                 {
-                    OriginalSkillCode = parsed.TailRaw,
-                    SkillCode = parsed.TailRaw,
+                    SkillCode = parsed.TailSkillCodeRaw,
+                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                     Damage = 0,
                     HitCount = 0,
                     AttemptCount = 1,
                     DetailRaw = parsed.LinkId,
                     Marker = parsed.Unknown,
                     Type = 48,
-                    PeriodicBodySkillCode = parsed.NormalizedSkillCode,
                     PeriodicTailSkillCodeRaw = parsed.TailSkillCodeRaw,
                     PeriodicTailPrefixValue = parsed.TailPrefixValue,
                     PeriodicTailLength = parsed.TailLength,
@@ -138,15 +134,14 @@ internal static class PacketCombatHandler
         {
             var invincibleObservation = new CombatObservation
             {
-                OriginalSkillCode = parsed.SkillCodeRaw,
-                SkillCode = parsed.NormalizedSkillCode,
+                SkillCode = parsed.TailSkillCodeRaw,
+                BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 1,
                 DetailRaw = parsed.Damage,
                 Marker = parsed.Unknown,
                 Type = parsed.Mode,
-                PeriodicBodySkillCode = parsed.NormalizedSkillCode,
                 PeriodicTailSkillCodeRaw = parsed.TailSkillCodeRaw,
                 PeriodicTailPrefixValue = parsed.TailPrefixValue,
                 PeriodicTailLength = parsed.TailLength,
@@ -161,15 +156,14 @@ internal static class PacketCombatHandler
 
         var observation = new CombatObservation
         {
-            OriginalSkillCode = parsed.SkillCodeRaw,
-            SkillCode = parsed.NormalizedSkillCode,
+            SkillCode = parsed.TailSkillCodeRaw,
+            BodyResourceEffectRef = parsed.BodyResourceEffectRef,
             ChainId = parsed.Unknown,
             Damage = parsed.Damage,
             HitCount = 1,
             AttemptCount = 1,
             PeriodicRelation = parsed.TargetId == parsed.SourceId ? PeriodicEffectRelation.Self : PeriodicEffectRelation.Target,
             PeriodicMode = parsed.Mode,
-            PeriodicBodySkillCode = parsed.NormalizedSkillCode,
             PeriodicTailSkillCodeRaw = parsed.TailSkillCodeRaw,
             PeriodicTailPrefixValue = parsed.TailPrefixValue,
             PeriodicTailLength = parsed.TailLength
@@ -186,7 +180,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0238(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, context.BatchOrdinal, context.CurrentStructurePath);
+        context.Sink.RegisterCompactControl0238(parsed.SourceId, parsed.BodyResourceEffectRef, parsed.Marker, context.BatchOrdinal, context.CurrentStructurePath);
         RawPacketDump.ObserveParsedPacket("compact-0238", context.Connection);
         return context.MarkParsed();
     }
@@ -198,7 +192,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0638(parsed.SourceId, parsed.SkillCodeRaw, parsed.Marker, parsed.Flag, context.TimestampMilliseconds, context.FrameOrdinal, context.BatchOrdinal, context.CurrentStructurePath);
+        context.Sink.RegisterCompactControl0638(parsed.SourceId, parsed.BodyResourceEffectRef, parsed.Marker, parsed.Flag, context.TimestampMilliseconds, context.FrameOrdinal, context.BatchOrdinal, context.CurrentStructurePath);
         RawPacketDump.ObserveParsedPacket("compact-0638", context.Connection);
         return context.MarkParsed();
     }
@@ -223,8 +217,6 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        var resolvedSkillCode = ResolveSkillCode(parsed.SkillCodeRaw) ?? parsed.SkillCodeRaw;
-
         if (parsed.Damage <= 0) return false;
 
         if (!context.Sink.IsKnownEntity(parsed.SourceId) && !context.Sink.IsKnownEntity(parsed.TargetId))
@@ -239,8 +231,7 @@ internal static class PacketCombatHandler
             {
                 LayoutTag = parsed.LayoutTag,
                 Flag = parsed.Flag,
-                OriginalSkillCode = parsed.SkillCodeRaw,
-                SkillCode = resolvedSkillCode,
+                BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                 Marker = parsed.Marker,
                 Type = parsed.Type,
                 Modifiers = parsed.Modifiers,
@@ -253,7 +244,7 @@ internal static class PacketCombatHandler
                 DrainHealAmount = parsed.DrainHealAmount,
                 RegenerationAmount = parsed.RegenerationAmount,
                 DetailRaw = parsed.DetailRaw,
-                EffectRef = parsed.EffectRef,
+                DetailResourceEffectRef = parsed.DetailResourceEffectRef,
                 ResourceKind = parsed.ResourceKind
             };
 
@@ -263,12 +254,11 @@ internal static class PacketCombatHandler
             {
                 var regenObservation = new CombatObservation
                 {
-                    OriginalSkillCode = parsed.SkillCodeRaw,
-                    SkillCode = resolvedSkillCode,
+                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                     Damage = parsed.RegenerationAmount,
                     HitCount = 1,
                     AttemptCount = 1,
-                    EffectRef = parsed.EffectRef,
+                    DetailResourceEffectRef = parsed.DetailResourceEffectRef,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.Healing,
                     EffectTag = PacketEffectTag.RegenerationHealing
@@ -280,13 +270,12 @@ internal static class PacketCombatHandler
             {
                 var drainObservation = new CombatObservation
                 {
-                    OriginalSkillCode = parsed.SkillCodeRaw,
-                    SkillCode = resolvedSkillCode,
+                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                     Damage = parsed.DrainHealAmount,
                     HitCount = 1,
                     AttemptCount = 1,
                     DrainHealAmount = parsed.DrainHealAmount,
-                    EffectRef = parsed.EffectRef,
+                    DetailResourceEffectRef = parsed.DetailResourceEffectRef,
                     EventKind = CombatEventKind.Healing,
                     ValueKind = CombatValueKind.DrainHealing
                 };
@@ -322,10 +311,8 @@ internal static class PacketCombatHandler
         if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (sourceId == 0 || targetId == 0) return false;
         if (!reader.TryReadVarInt(out var unknownInfo)) return false;
-        if (!reader.TryReadUInt32Le(out var skillRaw)) return false;
-
-        var resolvedSkillCode = ResolveSkillCode(skillRaw) ?? ResolveSkillCode(skillRaw / 100);
-        if (resolvedSkillCode is null) return false;
+        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
+        var bodyResourceEffectRef = ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw);
 
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (damage <= 0) return false;
@@ -348,15 +335,13 @@ internal static class PacketCombatHandler
             {
                 var invincibleObservation = new CombatObservation
                 {
-                    OriginalSkillCode = skillRaw,
-                    SkillCode = resolvedSkillCode.Value,
                     ChainId = unknownInfo,
                     Damage = 0,
                     HitCount = 0,
                     AttemptCount = 1,
                     DetailRaw = damage,
                     Type = mode,
-                    PeriodicBodySkillCode = resolvedSkillCode.Value,
+                    BodyResourceEffectRef = bodyResourceEffectRef,
                     Modifiers = DamageModifiers.Invincible,
                     EventKind = CombatEventKind.Damage,
                     ValueKind = CombatValueKind.Damage,
@@ -368,15 +353,13 @@ internal static class PacketCombatHandler
 
             var observation = new CombatObservation
             {
-                OriginalSkillCode = skillRaw,
-                SkillCode = resolvedSkillCode.Value,
                 ChainId = unknownInfo,
+                BodyResourceEffectRef = bodyResourceEffectRef,
                 Damage = damage,
                 HitCount = 1,
                 AttemptCount = 1,
                 PeriodicRelation = PeriodicEffectRelation.Target,
-                PeriodicMode = mode,
-                PeriodicBodySkillCode = resolvedSkillCode.Value
+                PeriodicMode = mode
             };
 
             context.Sink.AppendCombatObservation(sourceId, targetId, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, in observation, 0x0538, consumed, 0, context.CurrentStructurePath);
@@ -386,16 +369,6 @@ internal static class PacketCombatHandler
         {
             context.RestoreStructure(previous);
         }
-    }
-
-    private static int? ResolveSkillCode(int skillCode)
-    {
-        if (skillCode <= 0)
-        {
-            return null;
-        }
-
-        return CombatResourceRegistry.InferOriginalSkillCode(skillCode);
     }
 
     private static bool ShouldStoreRegenerationHealing(int targetId, IRuntimeObservationSink sink)

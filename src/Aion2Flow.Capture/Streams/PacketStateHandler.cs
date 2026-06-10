@@ -45,11 +45,15 @@ internal sealed class PacketStateHandler
 
     public static bool ParseAux2B38Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet2B38Parser.TryParse(packet, out _))
+        var frameOrdinal = context.FrameOrdinal;
+        var batchOrdinal = context.BatchOrdinal;
+
+        if (!Packet2B38Parser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
+        context.Sink.RegisterObservation2B38(parsed.SourceId, parsed.SourceIdCopy, parsed.Phase, parsed.Marker, parsed.ActionResourceEffectRef, parsed.Sequence, parsed.StateValue, parsed.DetailValue, parsed.TailLength, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
         return context.MarkParsed();
     }
 
@@ -63,7 +67,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.RegisterObservation2A38(parsed.SourceId, parsed.Mode, parsed.GroupCode, parsed.SequenceId, parsed.HeadValue, parsed.BuffCodeRaw, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
+        context.Sink.RegisterObservation2A38(parsed.SourceId, parsed.Mode, parsed.GroupCode, parsed.SequenceId, parsed.HeadValue, parsed.BuffResourceEffectRef, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
 
         RawPacketDump.ObserveParsedPacket("aux-2a38", context.Connection);
         return context.MarkParsed();

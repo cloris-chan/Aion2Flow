@@ -180,7 +180,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return CombatSkillBreakdownSnapshot.Empty;
 
         PrepareProjectionCaches();
-        var skills = new Dictionary<int, SkillMetrics>();
+        var skills = new Dictionary<CombatActionKey, SkillMetrics>();
         ApplySkillBreakdownEvents(snapshot, combatantId, skills);
 
         return CombatSkillBreakdownSnapshot.From(skills);
@@ -322,7 +322,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private void ApplySkillBreakdownEvents(SceneCombatSnapshot snapshot, int combatantId, Dictionary<int, SkillMetrics> skills)
+    private void ApplySkillBreakdownEvents(SceneCombatSnapshot snapshot, int combatantId, Dictionary<CombatActionKey, SkillMetrics> skills)
     {
         Span<int> relevantBuffer = stackalloc int[SmallSetStackCapacity];
         var relevant = new SmallIntSet(relevantBuffer);
@@ -360,10 +360,11 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private static void AddSkillEvent(Dictionary<int, SkillMetrics> skills, in CombatEventRecord e)
+    private static void AddSkillEvent(Dictionary<CombatActionKey, SkillMetrics> skills, in CombatEventRecord e)
     {
         var observation = e.Observation;
-        ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(skills, observation.SkillCode, out var exists);
+        var actionKey = CombatActionKey.FromObservation(in observation);
+        ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(skills, actionKey, out var exists);
         if (!exists)
         {
             metrics = new SkillMetrics(in observation);
@@ -1004,10 +1005,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private static bool TryResolveSkill(in CombatObservation observation, out Skill skill)
     {
         if (observation.SkillCode > 0 && CombatResourceRegistry.SkillMap.TryGetValue(observation.SkillCode, out skill))
-            return true;
-
-        var originalSkillCode = observation.OriginalSkillCode != 0 ? observation.OriginalSkillCode : observation.SkillCode;
-        if (CombatResourceRegistry.InferOriginalSkillCode(originalSkillCode) is { } inferredSkillCode && CombatResourceRegistry.SkillMap.TryGetValue(inferredSkillCode, out skill))
             return true;
 
         skill = default;

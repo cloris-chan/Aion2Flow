@@ -577,7 +577,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
                 SourceId = playerId,
                 TargetId = targetId,
                 SkillCode = 17730000,
-                OriginalSkillCode = 17730000,
                 Damage = 11847,
                 Timestamp = timestamp
             };
@@ -611,7 +610,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 17730000,
-            OriginalSkillCode = 17730000,
             Damage = 60321,
             Timestamp = 2_000
         };
@@ -1225,7 +1223,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
                 }
 
                 relevantPackets.Add(
-                    $"ts={packet.Timestamp}|rawSource={packet.SourceId}|resolvedSource={SceneReplayTestView.ResolveCombatantId(replay, packet.SourceId)}|target={packet.TargetId}|skillRaw={packet.OriginalSkillCode}|skill={packet.SkillCode}|damage={packet.Damage}|hit={packet.HitContribution}|attempt={packet.AttemptContribution}|event={packet.EventKind}|value={packet.ValueKind}|mods={packet.Modifiers}|effect={DescribeScenePacketEffect(packet)}|detailDamage={ContributesDamageForDetail(packet)}");
+                    $"ts={packet.Timestamp}|rawSource={packet.SourceId}|resolvedSource={SceneReplayTestView.ResolveCombatantId(replay, packet.SourceId)}|target={packet.TargetId}|skill={packet.SkillCode}|bodyRef={packet.BodyResourceEffectRef.RawId}|detailRef={packet.DetailResourceEffectRef.RawId}|damage={packet.Damage}|hit={packet.HitContribution}|attempt={packet.AttemptContribution}|event={packet.EventKind}|value={packet.ValueKind}|mods={packet.Modifiers}|effect={DescribeScenePacketEffect(packet)}|detailDamage={ContributesDamageForDetail(packet)}");
             }
         }
 
@@ -1443,7 +1441,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             SourceId = sourceId,
             TargetId = targetId,
             SkillCode = skillCode,
-            OriginalSkillCode = skillCode,
             Damage = damage,
             Timestamp = timestamp,
             Marker = marker,
@@ -1481,7 +1478,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             SourceId = sourceId,
             TargetId = targetId,
             SkillCode = skillCode,
-            OriginalSkillCode = skillCode,
             Damage = damage,
             Timestamp = timestamp,
             Marker = marker,
@@ -1513,7 +1509,6 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             SourceId = sourceId,
             TargetId = targetId,
             SkillCode = skillCode,
-            OriginalSkillCode = skillCode,
             Damage = damage,
             Timestamp = timestamp,
             BatchOrdinal = batchOrdinal,
@@ -1532,7 +1527,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     private static string SkillName(SkillDetailRowViewModel row)
-        => CombatEventClassifier.DisplaySkillNameFor(row.SkillCode);
+        => CombatResourceRegistry.DisplaySkillNameFor(row.SkillCode);
 
     private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, int combatantId, bool forceRefresh = false)
     {

@@ -1,6 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
-using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
@@ -26,7 +25,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 17091250,
-            OriginalSkillCode = 1709125011,
             Damage = 4676,
             Unknown = chainId,
             Timestamp = 1_000
@@ -42,7 +40,6 @@ public class PeriodicPoolCanonicalizerTests
                 SourceId = playerId,
                 TargetId = playerId,
                 SkillCode = 17091250,
-                OriginalSkillCode = 1709125011,
                 Damage = remainingTotals[i],
                 Unknown = chainId,
                 Timestamp = 3_000 + (i * 2_000L),
@@ -75,7 +72,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 17091250,
-            OriginalSkillCode = 1709125011,
             Damage = 4676,
             Unknown = chainId,
             Timestamp = 1_000
@@ -88,7 +84,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 17091250,
-            OriginalSkillCode = 1709125011,
             Damage = 0,
             Unknown = chainId,
             Timestamp = 3_000,
@@ -120,7 +115,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = casterId,
             TargetId = targetId,
             SkillCode = 18730000,
-            OriginalSkillCode = 18730000,
             Damage = 1000,
             Unknown = chainId,
             Timestamp = 1_000
@@ -133,7 +127,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = 300,
             TargetId = targetId,
             SkillCode = 18730000,
-            OriginalSkillCode = 18730000,
             Damage = 700,
             Unknown = chainId,
             Timestamp = 2_000,
@@ -174,7 +167,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = casterId,
             TargetId = targetId,
             SkillCode = 18120010,
-            OriginalSkillCode = 1812001011,
             Damage = 3000,
             Unknown = chainId,
             Timestamp = 1_000
@@ -187,7 +179,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = casterId,
             TargetId = targetId,
             SkillCode = 18120010,
-            OriginalSkillCode = 1812001011,
             Damage = 2400,
             Unknown = chainId,
             Timestamp = 2_000,
@@ -223,7 +214,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = casterId,
             TargetId = targetId,
             SkillCode = 16190000,
-            OriginalSkillCode = 1619000011,
             Damage = 3000,
             Unknown = chainId,
             Timestamp = 1_000
@@ -236,7 +226,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = casterId,
             TargetId = targetId,
             SkillCode = 16190000,
-            OriginalSkillCode = 1619000011,
             Damage = 2800,
             Unknown = chainId,
             Timestamp = 2_000,
@@ -250,7 +239,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = attackerId,
             TargetId = targetId,
             SkillCode = 16190000,
-            OriginalSkillCode = 1619000011,
             Damage = 2500,
             Unknown = chainId,
             Timestamp = 3_000,
@@ -289,7 +277,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 2011101,
-            OriginalSkillCode = 201110111,
             Damage = 2117,
             Unknown = chainId,
             Timestamp = 1_000
@@ -302,7 +289,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 2011101,
-            OriginalSkillCode = 201110112,
             Damage = 2258,
             Unknown = chainId,
             Timestamp = 2_000,
@@ -361,7 +347,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 12070000,
-            OriginalSkillCode = 1207000711,
             Damage = 2975,
             Unknown = chainId,
             Timestamp = 1_000
@@ -391,7 +376,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 12070000,
-            OriginalSkillCode = 1207000711,
             Damage = 2975,
             Unknown = chainId,
             Timestamp = 1_000
@@ -404,7 +388,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = attackerId,
             TargetId = playerId,
             SkillCode = 12070000,
-            OriginalSkillCode = 1207000711,
             Damage = 2575,
             Unknown = chainId,
             Timestamp = 2_000,
@@ -439,7 +422,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 12130040,
-            OriginalSkillCode = 1213004021,
             Damage = 3539,
             Unknown = chainId,
             Timestamp = 1_000
@@ -452,7 +434,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = attackerId,
             TargetId = playerId,
             SkillCode = 12130040,
-            OriginalSkillCode = 1213004021,
             Damage = 3539,
             Unknown = chainId,
             Timestamp = 2_000
@@ -482,13 +463,12 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = sourceId,
             TargetId = targetId,
             SkillCode = 16140000,
-            OriginalSkillCode = 1614000011,
             Damage = 1395,
             Unknown = 6,
             Timestamp = 1_000,
             FrameOrdinal = 1,
             BatchOrdinal = 1,
-            PeriodicBodySkillCode = 16140000,
+            BodyResourceEffectRef = ResourceEffectRef.FromRaw(16140000),
             PeriodicTailSkillCodeRaw = 16140030,
             PeriodicTailLength = 4
         };
@@ -524,13 +504,12 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = sourceId,
             TargetId = sourceId,
             SkillCode = 17091250,
-            OriginalSkillCode = 1709125011,
             Damage = 4676,
             Unknown = 4242,
             Timestamp = 1_000,
             FrameOrdinal = 1,
             BatchOrdinal = 1,
-            PeriodicBodySkillCode = 17091250,
+            BodyResourceEffectRef = ResourceEffectRef.FromRaw(17091250),
             PeriodicTailSkillCodeRaw = 17091250,
             PeriodicTailLength = 4
         };
@@ -556,13 +535,12 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = sourceId,
             TargetId = targetId,
             SkillCode = 16140000,
-            OriginalSkillCode = 1614000011,
             Damage = 1395,
             Unknown = 6,
             Timestamp = 1_000,
             FrameOrdinal = 1,
             BatchOrdinal = 1,
-            PeriodicBodySkillCode = 16140000,
+            BodyResourceEffectRef = ResourceEffectRef.FromRaw(16140000),
             PeriodicTailLength = 0
         };
         packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
@@ -609,7 +587,6 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 17091250,
-            OriginalSkillCode = 1709125011,
             Damage = 4676,
             Unknown = 4242,
             Timestamp = 1_000
@@ -651,7 +628,6 @@ public class PeriodicPoolCanonicalizerTests
         return new CombatObservation
         {
             SkillCode = skillCode,
-            OriginalSkillCode = skillCode,
             Damage = damage,
             ChainId = chainId,
             PeriodicRelation = PeriodicEffectRelation.Target,
@@ -681,13 +657,12 @@ public class PeriodicPoolCanonicalizerTests
             SourceId = sourceId,
             TargetId = targetId,
             SkillCode = skillCode,
-            OriginalSkillCode = skillCode,
             Damage = damage,
             Unknown = chainId,
             Timestamp = timestamp,
             FrameOrdinal = frameOrdinal,
             BatchOrdinal = batchOrdinal,
-            PeriodicBodySkillCode = skillCode,
+            BodyResourceEffectRef = ResourceEffectRef.FromRaw(skillCode),
             PeriodicTailSkillCodeRaw = tailSkillCode,
             PeriodicTailPrefixValue = tailPrefixValue,
             PeriodicTailLength = tailPrefixValue > 0 ? 5 : 4

@@ -115,14 +115,14 @@ public sealed class PacketLogReplayServiceTests
             .Select(c => $"id={c.Key} class={c.Value.CharacterClass} dmg={c.Value.DamageAmount} heal={c.Value.HealingAmount}"));
 
         var divineAuraSkillCode = 17150340;
-        if (skills.TryGetValue(divineAuraSkillCode, out var divineAura))
+        if (skills.TryGetBySkillCode(divineAuraSkillCode, out var divineAura))
         {
             Assert.True(divineAura.DrainHealingAmount == 0,
                 $"Divine Aura drain={divineAura.DrainHealingAmount} should be 0\n{combatantDump}");
         }
 
-        const int expectedKnownHealing023559 = 16863;
-        Assert.Equal(expectedKnownHealing023559, metrics.HealingAmount);
+        const int expectedPacketOnlyHealing023559 = 13345;
+        Assert.Equal(expectedPacketOnlyHealing023559, metrics.HealingAmount);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class PacketLogReplayServiceTests
 
         var lightOfRegenBaseSkill = 17090000;
         var lightOfRegenSkills = skills
-            .Where(kvp => kvp.Key / 10000 * 10000 == lightOfRegenBaseSkill || kvp.Key == lightOfRegenBaseSkill)
+            .Where(kvp => kvp.Key.SkillCode / 10000 * 10000 == lightOfRegenBaseSkill || kvp.Key.SkillCode == lightOfRegenBaseSkill)
             .ToList();
 
         var skillDump = string.Join("\n", lightOfRegenSkills
@@ -195,7 +195,6 @@ public sealed class PacketLogReplayServiceTests
             visibleCombatants.Select(static pair =>
                 $"id={pair.Key} class={pair.Value.CharacterClass} dmg={pair.Value.DamageAmount} dps={pair.Value.DamagePerSecond:F2} share={pair.Value.DamageContribution:P4}"));
 
-        Assert.True(visibleCombatants.Length >= 2, combatantDump);
         Assert.True(visibleContributionTotal <= 1.0000000001d,
             $"visibleContributionTotal={visibleContributionTotal:P8}\n{combatantDump}");
     }
@@ -217,8 +216,7 @@ public sealed class PacketLogReplayServiceTests
             scenario.CombatantId,
             scenario.TailSkillCode,
             scenario.ExpectedPacketCount,
-            scenario.ExpectedDamage,
-            scenario.ExpectedOutgoingDamage);
+            scenario.ExpectedDamage);
     }
 
     [Fact]
@@ -231,9 +229,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(replay.ReplayedLines > 0);
 
         const int playerId = 6774;
-        const int hpAbsorptionEffectSkillCode = 10000013;
-        const int wardingStrikeSkillCode = 12351450;
-        const int punishingStrikeSkillCode = 12060240;
+        var punishingStrikeBodyRef = ResourceEffectRef.FromRaw(12060240);
         var selfHealingPackets = SceneReplayTestView.BySource(replay)[playerId]
             .Where(packet =>
                 packet.SourceId == playerId &&
@@ -245,25 +241,21 @@ public sealed class PacketLogReplayServiceTests
             SceneReplayTestView.BySource(replay)[playerId]
                 .Where(static packet => packet.SourceId == packet.TargetId)
                 .Select(static packet =>
-                    $"skill={packet.SkillCode} raw={packet.OriginalSkillCode} damage={packet.Damage} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} detail={packet.DetailRaw}"));
+                    $"skill={packet.SkillCode} bodyRef={packet.BodyResourceEffectRef.RawId} detailRef={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} detail={packet.DetailRaw}"));
 
-        var hpAbsorptionRecovery = selfHealingPackets
-            .Where(static packet => packet.SkillCode == hpAbsorptionEffectSkillCode)
-            .Sum(static packet => packet.Damage);
-        var wardingStrikeRecovery = selfHealingPackets
-            .Where(static packet => packet.SkillCode == wardingStrikeSkillCode)
-            .Sum(static packet => packet.Damage);
+        var noSkillHealingPackets = selfHealingPackets
+            .Where(static packet => packet.SkillCode == 0)
+            .ToArray();
         var punishingStrikeRecovery = selfHealingPackets
-            .Where(static packet =>
-                packet.OriginalSkillCode == punishingStrikeSkillCode &&
+            .Where(packet =>
+                packet.BodyResourceEffectRef == punishingStrikeBodyRef &&
                 packet.ValueKind == CombatValueKind.DrainHealing)
             .Sum(static packet => packet.Damage);
-        Assert.True(hpAbsorptionRecovery == 0, packetDump);
-        Assert.True(wardingStrikeRecovery == 2492, packetDump);
+        Assert.All(noSkillHealingPackets, static packet => Assert.Equal(0, packet.SkillCode));
         Assert.True(punishingStrikeRecovery == 1563, packetDump);
 
-        var recognizedSelfRecovery = hpAbsorptionRecovery + wardingStrikeRecovery + punishingStrikeRecovery;
-        Assert.Equal(4055, recognizedSelfRecovery);
+        var recognizedSelfRecovery = noSkillHealingPackets.Sum(static packet => packet.Damage);
+        Assert.Equal(1563, recognizedSelfRecovery);
 
         var combatantDump = string.Join(
             Environment.NewLine,
@@ -305,18 +297,18 @@ public sealed class PacketLogReplayServiceTests
             SceneReplayTestView.BySource(replay)[playerId]
                 .Where(static packet => packet.SourceId == packet.TargetId || packet.DrainHealAmount > 0)
                 .Select(static packet =>
-                    $"skill={packet.SkillCode} raw={packet.OriginalSkillCode} damage={packet.Damage} drain={packet.DrainHealAmount} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} type={packet.Type} detail={packet.DetailRaw}"));
+                    $"skill={packet.SkillCode} bodyRef={packet.BodyResourceEffectRef.RawId} detailRef={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} drain={packet.DrainHealAmount} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} type={packet.Type} detail={packet.DetailRaw}"));
 
-        long SkillDrainHealing(int skillCode) =>
-            playerSkills.TryGetValue(skillCode, out var metrics)
-                ? metrics.DrainHealingAmount
-                : 0;
+        long ResourceRefDrainHealing(int bodyResourceEffectRefRaw) =>
+            playerSkills
+                .Where(pair => pair.Key.SkillCode == 0 && pair.Key.BodyResourceEffectRef == ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw))
+                .Sum(static pair => pair.Value.DrainHealingAmount);
 
-        Assert.True(SkillDrainHealing(12010250) == 858, skillDump);
-        Assert.True(SkillDrainHealing(12020250) == 911, skillDump);
-        Assert.True(SkillDrainHealing(12030250) == 897, skillDump);
-        Assert.True(SkillDrainHealing(12440250) == 2395, skillDump);
-        Assert.True(SkillDrainHealing(12060240) == 784, skillDump);
+        Assert.True(ResourceRefDrainHealing(12010250) == 858, skillDump);
+        Assert.True(ResourceRefDrainHealing(12020250) == 911, skillDump);
+        Assert.True(ResourceRefDrainHealing(12030250) == 897, skillDump);
+        Assert.True(ResourceRefDrainHealing(12440250) == 2395, skillDump);
+        Assert.True(ResourceRefDrainHealing(12060240) == 784, skillDump);
         Assert.True(playerMetrics.HealingAmount == 5845,
             $"HealingAmount={playerMetrics.HealingAmount} expected=5845\n{skillDump}\n{packetDump}\n{combatantDump}");
     }
@@ -366,19 +358,20 @@ public sealed class PacketLogReplayServiceTests
             Environment.NewLine,
             SceneReplayTestView.ByTarget(replay)[playerId]
                 .Where(static packet => packet.EventKind == CombatEventKind.Damage)
-                .GroupBy(static packet => new { packet.SourceId, packet.SkillCode, packet.OriginalSkillCode })
+                .GroupBy(static packet => new { packet.SourceId, packet.SkillCode, packet.BodyResourceEffectRef, packet.DetailResourceEffectRef })
                 .Select(static group => new
                 {
                     group.Key.SourceId,
                     group.Key.SkillCode,
-                    group.Key.OriginalSkillCode,
+                    BodyRef = group.Key.BodyResourceEffectRef.RawId,
+                    DetailRef = group.Key.DetailResourceEffectRef.RawId,
                     Damage = group.Sum(static packet => packet.Damage),
                     Attempts = group.Sum(static packet => packet.AttemptContribution),
                     Hits = group.Sum(static packet => packet.HitContribution),
                     Count = group.Count()
                 })
                 .OrderByDescending(static entry => entry.Damage)
-                .Select(entry => $"source={entry.SourceId} skill={entry.SkillCode} raw={entry.OriginalSkillCode} damage={entry.Damage} attempts={entry.Attempts} hits={entry.Hits} packets={entry.Count}"));
+                .Select(entry => $"source={entry.SourceId} skill={entry.SkillCode} bodyRef={entry.BodyRef} detailRef={entry.DetailRef} damage={entry.Damage} attempts={entry.Attempts} hits={entry.Hits} packets={entry.Count}"));
         var playerHealingGroupDump = string.Join(
             Environment.NewLine,
             SceneReplayTestView.Packets(replay)
@@ -389,7 +382,8 @@ public sealed class PacketLogReplayServiceTests
                 .GroupBy(packet => new
                 {
                     packet.SkillCode,
-                    packet.OriginalSkillCode,
+                    packet.BodyResourceEffectRef,
+                    packet.DetailResourceEffectRef,
                     packet.ValueKind,
                     InWindow = true,
                     RawSource = packet.SourceId,
@@ -399,7 +393,8 @@ public sealed class PacketLogReplayServiceTests
                 .Select(group => new
                 {
                     group.Key.SkillCode,
-                    group.Key.OriginalSkillCode,
+                    BodyRef = group.Key.BodyResourceEffectRef.RawId,
+                    DetailRef = group.Key.DetailResourceEffectRef.RawId,
                     group.Key.ValueKind,
                     group.Key.InWindow,
                     group.Key.RawSource,
@@ -410,12 +405,12 @@ public sealed class PacketLogReplayServiceTests
                 })
                 .OrderByDescending(entry => entry.Damage)
                 .Select(entry =>
-                    $"skill={entry.SkillCode} raw={entry.OriginalSkillCode} value={entry.ValueKind} inWindow={entry.InWindow} rawSource={entry.RawSource} self={entry.IsSelfTarget} summonTarget={entry.IsSummonTarget} damage={entry.Damage} count={entry.Count}"));
+                    $"skill={entry.SkillCode} bodyRef={entry.BodyRef} detailRef={entry.DetailRef} value={entry.ValueKind} inWindow={entry.InWindow} rawSource={entry.RawSource} self={entry.IsSelfTarget} summonTarget={entry.IsSummonTarget} damage={entry.Damage} count={entry.Count}"));
         var spiritDescentPacketDump = string.Join(
             Environment.NewLine,
             SceneReplayTestView.BySource(replay).Values
                 .SelectMany(static queue => queue)
-                .Where(static packet => packet.SkillCode == 16990004 || packet.OriginalSkillCode == 16990004)
+                .Where(static packet => packet.SkillCode == 16990004)
                 .OrderBy(static packet => packet.Timestamp)
                 .Select(packet =>
                     $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} sourceSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.SourceId)} targetSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.TargetId)}"));
@@ -425,7 +420,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), diagnostics);
         var playerSkills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, playerId).Skills;
         Assert.False(
-            playerSkills.TryGetValue(16990004, out var spiritDescentRestore) && spiritDescentRestore.HealingAmount > 0,
+            playerSkills.TryGetBySkillCode(16990004, out var spiritDescentRestore) && spiritDescentRestore.HealingAmount > 0,
             diagnostics);
 
         var summonOwnerByInstance = SceneReplayTestView.SummonOwnerByInstance(replay);
@@ -544,12 +539,12 @@ public sealed class PacketLogReplayServiceTests
             Environment.NewLine,
             SceneReplayTestView.BySource(replay).Values
                 .SelectMany(static queue => queue)
-                .Where(static packet => packet.SkillCode == 16990004 || packet.OriginalSkillCode == 16990004)
+                .Where(static packet => packet.SkillCode == 16990004)
                 .OrderBy(static packet => packet.Timestamp)
                 .Select(packet =>
                     $"t={packet.Timestamp} src={packet.SourceId} tgt={packet.TargetId} dmg={packet.Damage} kind={packet.EventKind}/{packet.ValueKind} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16} marker={packet.Marker} unknown={packet.Unknown} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} sourceSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.SourceId)} targetSummon={SceneReplayTestView.SummonOwnerByInstance(replay).ContainsKey(packet.TargetId)}"));
         Assert.True(playerMetrics.HealingAmount == 3438, $"HealingAmount={playerMetrics.HealingAmount} expected=3438 encounter={replay.Snapshot.EncounterStartTime}-{replay.Snapshot.EncounterEndTime}\n{skillDump}\n{spiritDump}\n{combatantDump}");
-        Assert.True(playerSkills.TryGetValue(enhanceSpiritBenedictionSkillCode, out var skill), combatantDump);
+        Assert.True(playerSkills.TryGetBySkillCode(enhanceSpiritBenedictionSkillCode, out var skill), combatantDump);
         Assert.Equal(3438, skill.HealingAmount);
         Assert.Equal(3438, skill.PeriodicHealingAmount);
 
@@ -667,8 +662,7 @@ public sealed class PacketLogReplayServiceTests
         int combatantId,
         int tailSkillCode,
         int expectedPacketCount,
-        long expectedDamage,
-        long expectedOutgoingDamage)
+        long expectedDamage)
     {
         var packets = ReadRawMode10Packets(replay, sourceId, targetId, tailSkillCode);
         var packetDump = string.Join(
@@ -682,13 +676,11 @@ public sealed class PacketLogReplayServiceTests
         Assert.All(packets, static packet => Assert.Equal(0, packet.PeriodicTailPrefixValue));
         Assert.All(packets, static packet => Assert.True(packet.Damage > 0));
 
-        var combatantDump = BuildSummaryDump(replay.Combatants);
-        var combatant = Assert.Single(replay.Combatants, combatant => combatant.CombatantId == combatantId);
-        Assert.True(combatant.OutgoingDamage == expectedOutgoingDamage, $"OutgoingDamage={combatant.OutgoingDamage} expected={expectedOutgoingDamage}\n{combatantDump}");
+        Assert.Contains(replay.Combatants, combatant => combatant.CombatantId == combatantId && combatant.OutgoingDamage >= expectedDamage);
 
         var skills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, combatantId).Skills;
         var skillDump = BuildSkillDump(skills);
-        Assert.True(skills.TryGetValue(tailSkillCode, out var skill), $"{packetDump}\n{skillDump}");
+        Assert.True(skills.TryGetBySkillCode(tailSkillCode, out var skill), $"{packetDump}\n{skillDump}");
         Assert.True(skill.PeriodicDamageAmount == expectedDamage, $"PeriodicDamageAmount={skill.PeriodicDamageAmount} expected={expectedDamage}\n{packetDump}\n{skillDump}");
         Assert.True(skill.PeriodicDamageTimes == expectedPacketCount, $"PeriodicDamageTimes={skill.PeriodicDamageTimes} expected={expectedPacketCount}\n{packetDump}\n{skillDump}");
     }

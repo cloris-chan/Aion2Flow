@@ -84,13 +84,12 @@ public readonly record struct RawPacketReference
 public readonly record struct CombatObservation
 {
     public int SkillCode { get; init; }
-    public int OriginalSkillCode { get; init; }
-    public int BaseSkillCode { get; init; }
+    public ResourceEffectRef BodyResourceEffectRef { get; init; }
     public long Damage { get; init; }
     public int HitCount { get; init; }
     public int AttemptCount { get; init; }
     public long DetailRaw { get; init; }
-    public CombatEffectRef EffectRef { get; init; }
+    public ResourceEffectRef DetailResourceEffectRef { get; init; }
     public int Marker { get; init; }
     public int Type { get; init; }
     public int Flag { get; init; }
@@ -106,7 +105,6 @@ public readonly record struct CombatObservation
     public PacketEffectTag EffectTag { get; init; }
     public PeriodicEffectRelation PeriodicRelation { get; init; }
     public int PeriodicMode { get; init; }
-    public int PeriodicBodySkillCode { get; init; }
     public int PeriodicTailSkillCodeRaw { get; init; }
     public int PeriodicTailPrefixValue { get; init; }
     public int PeriodicTailLength { get; init; }
@@ -119,4 +117,40 @@ public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, i
 
 public readonly record struct ResourceObservation(int EntityId, long? CurrentValue, long? MaximumValue, long? Delta, int ResourceKind);
 
-public readonly record struct AuraObservation(int SourceEntityId, int TargetEntityId, int SkillCode, int StackCount, int SequenceId, int ChainId, int ResultCode, int Mode);
+public readonly record struct AuraObservation
+{
+    public int SourceEntityId { get; init; }
+    public int TargetEntityId { get; init; }
+    public int SkillCode { get; init; }
+    public ResourceEffectRef BuffResourceEffectRef { get; init; }
+    public int StackCount { get; init; }
+    public int SequenceId { get; init; }
+    public int ChainId { get; init; }
+    public int ResultCode { get; init; }
+    public int Mode { get; init; }
+
+    public AuraObservation(int sourceEntityId, int targetEntityId, int skillCode, int stackCount, int sequenceId, int chainId, int resultCode, int mode)
+    {
+        SourceEntityId = sourceEntityId;
+        TargetEntityId = targetEntityId;
+        SkillCode = skillCode;
+        StackCount = stackCount;
+        SequenceId = sequenceId;
+        ChainId = chainId;
+        ResultCode = resultCode;
+        Mode = mode;
+    }
+}
+
+public readonly record struct ActionObservation
+{
+    public int SourceEntityId { get; init; }
+    public int SourceEntityIdCopy { get; init; }
+    public int Phase { get; init; }
+    public int Marker { get; init; }
+    public ResourceEffectRef ActionResourceEffectRef { get; init; }
+    public int SequenceId { get; init; }
+    public int StateValue { get; init; }
+    public int DetailValue { get; init; }
+    public int TailLength { get; init; }
+}

@@ -122,11 +122,8 @@ public sealed class SceneTestHarness : IDisposable
             TargetId = packet.TargetId,
             Flag = packet.Flag,
             Damage = packet.Damage,
-            OriginalSkillCode = packet.OriginalSkillCode,
             SkillCode = packet.SkillCode,
-            BaseSkillCode = packet.BaseSkillCode,
-            ChargeStage = packet.ChargeStage,
-            SpecializationMask = packet.SpecializationMask,
+            BodyResourceEffectRef = packet.BodyResourceEffectRef,
             Marker = packet.Marker,
             Type = packet.Type,
             Unknown = packet.Unknown,
@@ -138,7 +135,7 @@ public sealed class SceneTestHarness : IDisposable
             DrainHealAmount = packet.DrainHealAmount,
             RegenerationAmount = packet.RegenerationAmount,
             DetailRaw = packet.DetailRaw,
-            EffectRef = packet.EffectRef,
+            DetailResourceEffectRef = packet.DetailResourceEffectRef,
             ResourceKind = packet.ResourceKind,
             FrameOrdinal = packet.FrameOrdinal,
             BatchOrdinal = packet.BatchOrdinal,
@@ -147,7 +144,6 @@ public sealed class SceneTestHarness : IDisposable
             Modifiers = packet.Modifiers,
             EventKind = packet.EventKind,
             ValueKind = packet.ValueKind,
-            PeriodicBodySkillCode = packet.PeriodicBodySkillCode,
             PeriodicTailSkillCodeRaw = packet.PeriodicTailSkillCodeRaw,
             PeriodicTailPrefixValue = packet.PeriodicTailPrefixValue,
             PeriodicTailLength = packet.PeriodicTailLength,
@@ -194,11 +190,12 @@ public sealed class SceneTestHarness : IDisposable
             inner.AppendCombatObservation(packet.SourceId, packet.TargetId, packet.Timestamp, packet.FrameOrdinal, packet.BatchOrdinal, in prepared, opcode, payloadLength, captureSequence, structurePath);
         }
         public void CompleteBatch(long batchOrdinal) => owner.CompleteBatch(batchOrdinal);
-        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal, structurePath);
-        public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactValue0438(targetId, sourceId, skillCodeRaw, marker, layoutTag, type, value, timestamp, frameOrdinal, batchOrdinal, structurePath);
-        public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactControl0238(sourceId, skillCodeRaw, marker, batchOrdinal, structurePath);
-        public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactControl0638(sourceId, skillCodeRaw, marker, flag, timestamp, frameOrdinal, batchOrdinal, structurePath);
-        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterObservation2A38(sourceId, mode, groupCode, sequenceId, headValue, buffCodeRaw, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        public void RegisterCompactValue0438(int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactValue0438(targetId, sourceId, bodyResourceEffectRef, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        public void RegisterCompactValue0438(int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactValue0438(targetId, sourceId, bodyResourceEffectRef, marker, layoutTag, type, value, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        public void RegisterCompactControl0238(int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactControl0238(sourceId, bodyResourceEffectRef, marker, batchOrdinal, structurePath);
+        public void RegisterCompactControl0638(int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterCompactControl0638(sourceId, bodyResourceEffectRef, marker, flag, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterObservation2A38(sourceId, mode, groupCode, sequenceId, headValue, buffResourceEffectRef, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        public void RegisterObservation2B38(int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterObservation2B38(sourceId, sourceIdCopy, phase, marker, actionResourceEffectRef, sequenceId, stateValue, detailValue, tailLength, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default) => inner.RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal, structurePath);
         public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null) => inner.AppendNickname(uid, nickname, originServerId, faction, characterClass);
         public void AppendNpcCode(int instanceId, int npcCode) => inner.AppendNpcCode(instanceId, npcCode);

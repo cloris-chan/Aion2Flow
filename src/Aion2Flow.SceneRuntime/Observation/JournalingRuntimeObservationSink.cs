@@ -3,6 +3,7 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
+using Cloris.Aion2Flow.Protocol.Combat;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -204,7 +205,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void CompleteBatch(long batchOrdinal) => journal.CompleteBatch(MapBatchOrdinal(batchOrdinal));
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactValue0438(int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
@@ -226,7 +227,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             },
             Combat = new CombatObservation
             {
-                SkillCode = skillCodeRaw,
+                BodyResourceEffectRef = bodyResourceEffectRef,
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
@@ -238,7 +239,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, int skillCodeRaw, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactValue0438(int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
@@ -260,7 +261,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             },
             Combat = new CombatObservation
             {
-                SkillCode = skillCodeRaw,
+                BodyResourceEffectRef = bodyResourceEffectRef,
                 Damage = value,
                 HitCount = 0,
                 AttemptCount = 0,
@@ -272,7 +273,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0238(int sourceId, int skillCodeRaw, int marker, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactControl0238(int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStampFromOffset(0, 0, MapBatchOrdinal(batchOrdinal));
@@ -293,7 +294,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             },
             Combat = new CombatObservation
             {
-                SkillCode = skillCodeRaw,
+                BodyResourceEffectRef = bodyResourceEffectRef,
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
@@ -305,7 +306,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0638(int sourceId, int skillCodeRaw, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactControl0638(int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
@@ -326,7 +327,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             },
             Combat = new CombatObservation
             {
-                SkillCode = skillCodeRaw,
+                BodyResourceEffectRef = bodyResourceEffectRef,
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
@@ -339,7 +340,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, uint buffCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
     {
         sourceId = ResolveLifecycleId(sourceId);
         AddKnownEntity(sourceId);
@@ -363,12 +364,49 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             {
                 SourceEntityId = sourceId,
                 TargetEntityId = 0,
-                SkillCode = (int)buffCodeRaw,
+                BuffResourceEffectRef = buffResourceEffectRef,
                 StackCount = 0,
                 SequenceId = sequenceId,
                 ChainId = 0,
                 ResultCode = 0,
                 Mode = mode
+            }
+        });
+    }
+
+    public void RegisterObservation2B38(int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    {
+        sourceId = ResolveLifecycleId(sourceId);
+        sourceIdCopy = ResolveLifecycleId(sourceIdCopy);
+        AddKnownEntity(sourceId);
+        AddKnownEntity(sourceIdCopy);
+        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneSessionId(),
+            Stamp = stamp,
+            Domain = ObservedEventDomain.Action,
+            SourceEntityId = sourceId,
+            TargetEntityId = 0,
+            Raw = new RawPacketReference
+            {
+                Opcode = 0x2B38,
+                PayloadLength = 0,
+                CaptureSequence = 0,
+                TimestampMilliseconds = timestamp,
+                StructurePath = structurePath
+            },
+            Action = new ActionObservation
+            {
+                SourceEntityId = sourceId,
+                SourceEntityIdCopy = sourceIdCopy,
+                Phase = phase,
+                Marker = marker,
+                ActionResourceEffectRef = actionResourceEffectRef,
+                SequenceId = sequenceId,
+                StateValue = stateValue,
+                DetailValue = detailValue,
+                TailLength = tailLength
             }
         });
     }

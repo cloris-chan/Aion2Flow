@@ -20,7 +20,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = targetId,
-            OriginalSkillCode = 17150342,
             SkillCode = 17150342,
             Damage = 4609,
             Type = 3
@@ -32,7 +31,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = targetId,
-            OriginalSkillCode = 17150342,
             SkillCode = 17150342,
             Damage = 4384,
             Type = 2
@@ -71,7 +69,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = ownerId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 405,
             Timestamp = 1_000
@@ -81,7 +78,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = targetId,
-            OriginalSkillCode = 16100003,
             SkillCode = 16100003,
             Damage = 1205,
             Timestamp = 1_010
@@ -112,7 +108,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = ownerId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 405,
             Timestamp = 1_000
@@ -121,7 +116,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = otherElementalistId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 777,
             Timestamp = 1_010
@@ -130,7 +124,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = ownerId,
             TargetId = summonId,
-            OriginalSkillCode = 16770001,
             SkillCode = 16770001,
             Damage = 587,
             EventKind = CombatEventKind.Healing,
@@ -141,7 +134,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = targetId,
-            OriginalSkillCode = 16100004,
             SkillCode = 16100004,
             Damage = 1205,
             Timestamp = 1_030
@@ -174,7 +166,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = firstElementalistId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 405,
             Timestamp = 1_000
@@ -183,7 +174,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = secondElementalistId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 777,
             Timestamp = 1_010
@@ -192,7 +182,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = firstElementalistId,
             TargetId = summonId,
-            OriginalSkillCode = 16770001,
             SkillCode = 16770001,
             Damage = 587,
             EventKind = CombatEventKind.Healing,
@@ -203,7 +192,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = secondElementalistId,
             TargetId = summonId,
-            OriginalSkillCode = 16770001,
             SkillCode = 16770001,
             Damage = 586,
             EventKind = CombatEventKind.Healing,
@@ -214,7 +202,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = targetId,
-            OriginalSkillCode = 16100004,
             SkillCode = 16100004,
             Damage = 1205,
             Timestamp = 1_030
@@ -241,7 +228,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = ownerId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 405,
             Timestamp = 1_000
@@ -251,7 +237,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = summonId,
-            OriginalSkillCode = 16990004,
             SkillCode = 16990004,
             Damage = 10_921,
             Timestamp = 1_050
@@ -261,7 +246,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = summonId,
-            OriginalSkillCode = 16990004,
             SkillCode = 16990004,
             Damage = 110_000,
             Timestamp = 1_051
@@ -272,7 +256,7 @@ public sealed class SummonAttributionSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
         var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
         Assert.Equal(0, owner.HealingAmount);
-        Assert.True(skills.TryGetValue(16990004, out var restore));
+        Assert.True(skills.TryGetBySkillCode(16990004, out var restore));
         Assert.Equal(0, restore.HealingAmount);
         Assert.Equal(0, restore.HealingTimes);
         Assert.Equal(2, restore.SupportTimes);
@@ -294,7 +278,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = ownerId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 405,
             Timestamp = 1_000
@@ -304,7 +287,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = summonId,
-            OriginalSkillCode = 16990004,
             SkillCode = 16990004,
             Damage = 9_410,
             Marker = 1,
@@ -315,7 +297,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = summonId,
-            OriginalSkillCode = 16990004,
             SkillCode = 16990004,
             Damage = 100_000,
             Marker = 1,
@@ -326,7 +307,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = summonId,
-            OriginalSkillCode = 16990004,
             SkillCode = 16990004,
             Damage = 9_410,
             Marker = 6,
@@ -337,7 +317,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = summonId,
-            OriginalSkillCode = 16990004,
             SkillCode = 16990004,
             Damage = 100_000,
             Marker = 6,
@@ -349,7 +328,7 @@ public sealed class SummonAttributionSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
         var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
         Assert.Equal(0, owner.HealingAmount);
-        Assert.True(skills.TryGetValue(16990004, out var restore));
+        Assert.True(skills.TryGetBySkillCode(16990004, out var restore));
         Assert.Equal(0, restore.HealingAmount);
         Assert.Equal(0, restore.HealingTimes);
         Assert.Equal(4, restore.SupportTimes);
@@ -372,7 +351,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = ownerId,
             TargetId = targetId,
-            OriginalSkillCode = 16010000,
             SkillCode = 16010000,
             Damage = 405,
             Timestamp = 1_000
@@ -388,7 +366,7 @@ public sealed class SummonAttributionSceneTests
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
         var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
         Assert.Equal(0, owner.HealingAmount);
-        Assert.True(skills.TryGetValue(16990004, out var restore));
+        Assert.True(skills.TryGetBySkillCode(16990004, out var restore));
         Assert.Equal(0, restore.HealingAmount);
         Assert.Equal(0, restore.HealingTimes);
         Assert.Equal(4, restore.SupportTimes);
@@ -405,7 +383,6 @@ public sealed class SummonAttributionSceneTests
         {
             SourceId = summonId,
             TargetId = summonId,
-            OriginalSkillCode = 16990004,
             SkillCode = 16990004,
             Damage = amount,
             Marker = marker,

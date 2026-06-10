@@ -14,13 +14,12 @@ public static class SceneReplayTestView
                 SourceId = e.SourceId,
                 TargetId = e.TargetId,
                 SkillCode = observation.SkillCode,
-                OriginalSkillCode = observation.OriginalSkillCode,
-                BaseSkillCode = observation.BaseSkillCode,
+                BodyResourceEffectRef = observation.BodyResourceEffectRef,
                 Damage = observation.Damage,
                 HitContribution = observation.HitCount,
                 AttemptContribution = observation.AttemptCount,
                 DetailRaw = observation.DetailRaw,
-                EffectRef = observation.EffectRef,
+                DetailResourceEffectRef = observation.DetailResourceEffectRef,
                 Marker = observation.Marker,
                 Unknown = observation.ChainId,
                 Type = observation.Type,
@@ -36,7 +35,6 @@ public static class SceneReplayTestView
                 EffectTag = observation.EffectTag,
                 PeriodicRelation = observation.PeriodicRelation,
                 PeriodicMode = observation.PeriodicMode,
-                PeriodicBodySkillCode = observation.PeriodicBodySkillCode,
                 PeriodicTailSkillCodeRaw = observation.PeriodicTailSkillCodeRaw,
                 PeriodicTailPrefixValue = observation.PeriodicTailPrefixValue,
                 PeriodicTailLength = observation.PeriodicTailLength,
@@ -99,13 +97,12 @@ public readonly record struct SceneReplayPacket
     public int SourceId { get; init; }
     public int TargetId { get; init; }
     public int SkillCode { get; init; }
-    public int OriginalSkillCode { get; init; }
-    public int BaseSkillCode { get; init; }
+    public ResourceEffectRef BodyResourceEffectRef { get; init; }
     public long Damage { get; init; }
     public int HitContribution { get; init; }
     public int AttemptContribution { get; init; }
     public long DetailRaw { get; init; }
-    public CombatEffectRef EffectRef { get; init; }
+    public ResourceEffectRef DetailResourceEffectRef { get; init; }
     public int Marker { get; init; }
     public int Unknown { get; init; }
     public int Type { get; init; }
@@ -121,7 +118,6 @@ public readonly record struct SceneReplayPacket
     public PacketEffectTag EffectTag { get; init; }
     public PeriodicEffectRelation PeriodicRelation { get; init; }
     public int PeriodicMode { get; init; }
-    public int PeriodicBodySkillCode { get; init; }
     public int PeriodicTailSkillCodeRaw { get; init; }
     public int PeriodicTailPrefixValue { get; init; }
     public int PeriodicTailLength { get; init; }

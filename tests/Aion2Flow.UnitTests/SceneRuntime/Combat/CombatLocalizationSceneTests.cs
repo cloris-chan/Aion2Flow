@@ -6,14 +6,13 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 public sealed class CombatLocalizationSceneTests
 {
     [Fact]
-    public void CombatEventClassifier_DisplaySkillName_Tracks_Current_Language_Resources()
+    public void CombatResourceRegistry_DisplaySkillName_Tracks_Current_Language_Resources()
     {
         try
         {
             var observation = new CombatObservation
             {
                 SkillCode = 2011101,
-                OriginalSkillCode = 2011101,
                 Damage = 100,
                 EventKind = CombatEventKind.Healing,
                 ValueKind = CombatValueKind.PeriodicHealing
@@ -22,12 +21,12 @@ public sealed class CombatLocalizationSceneTests
             CombatResourceRegistry.LoadSkillMap("zh-TW");
             var zhName = ResourceDatabase.LoadSkills("zh-TW")[2011101].Name;
 
-            Assert.Equal(zhName, CombatEventClassifier.DisplaySkillNameFor(observation.SkillCode));
+            Assert.Equal(zhName, CombatResourceRegistry.DisplaySkillNameFor(observation.SkillCode));
 
             CombatResourceRegistry.LoadSkillMap("en-US");
             var enName = ResourceDatabase.LoadSkills("en-US")[2011101].Name;
 
-            Assert.Equal(enName, CombatEventClassifier.DisplaySkillNameFor(observation.SkillCode));
+            Assert.Equal(enName, CombatResourceRegistry.DisplaySkillNameFor(observation.SkillCode));
             Assert.NotEqual(zhName, enName);
         }
         finally
@@ -53,7 +52,6 @@ public sealed class CombatLocalizationSceneTests
                 SourceId = sourceId,
                 TargetId = targetId,
                 SkillCode = skillCode,
-                OriginalSkillCode = skillCode,
                 Damage = 77669
             });
             Thread.Sleep(5);
@@ -62,22 +60,21 @@ public sealed class CombatLocalizationSceneTests
                 SourceId = sourceId,
                 TargetId = targetId,
                 SkillCode = skillCode,
-                OriginalSkillCode = skillCode,
                 Damage = 77669
             });
 
             var zhSnapshot = scene.CreateSnapshot();
             Assert.True(zhSnapshot.Combatants.TryGetValue(sourceId, out var zhCombatant));
             var zhSkills = scene.CreateSkillBreakdown(zhSnapshot, sourceId).Skills;
-            Assert.True(zhSkills.TryGetValue(skillCode, out var zhSkill));
-            var zhSkillName = CombatEventClassifier.DisplaySkillNameFor(zhSkill.SkillCode);
+            Assert.True(zhSkills.TryGetBySkillCode(skillCode, out var zhSkill));
+            var zhSkillName = CombatResourceRegistry.DisplaySkillNameFor(zhSkill.SkillCode);
 
             CombatResourceRegistry.LoadSkillMap("en-US");
             var enSnapshot = scene.CreateSnapshot();
 
             Assert.True(enSnapshot.Combatants.TryGetValue(sourceId, out var enCombatant));
             var enSkills = scene.CreateSkillBreakdown(enSnapshot, sourceId).Skills;
-            Assert.True(enSkills.TryGetValue(skillCode, out var enSkill));
+            Assert.True(enSkills.TryGetBySkillCode(skillCode, out var enSkill));
 
             Assert.Equal(zhCombatant.DamageAmount, enCombatant.DamageAmount);
             Assert.Equal(zhCombatant.HealingAmount, enCombatant.HealingAmount);
@@ -91,7 +88,7 @@ public sealed class CombatLocalizationSceneTests
             Assert.Equal(zhSkill.EventKind, enSkill.EventKind);
 
             Assert.Equal("殺氣破裂", zhSkillName);
-            var enSkillName = CombatEventClassifier.DisplaySkillNameFor(enSkill.SkillCode);
+            var enSkillName = CombatResourceRegistry.DisplaySkillNameFor(enSkill.SkillCode);
             Assert.Equal("Murderous Burst", enSkillName);
             Assert.NotEqual(zhSkillName, enSkillName);
         }

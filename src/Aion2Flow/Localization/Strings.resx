@@ -69,6 +69,7 @@
   <data name="Empty_History" xml:space="preserve"><value>No archived battles</value></data>
   <data name="Empty_Combatants" xml:space="preserve"><value>No combat data yet</value></data>
   <data name="Empty_Skills" xml:space="preserve"><value>No skill data</value></data>
+  <data name="Skill_UnknownEffect" xml:space="preserve"><value>Unknown effect</value></data>
 
   <!-- Aggregate metrics (full names, used as labels and table headers) -->
   <data name="Metric_Total" xml:space="preserve"><value>Total</value></data>

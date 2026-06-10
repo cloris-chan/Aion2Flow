@@ -8,6 +8,7 @@ public struct SkillMetrics(in CombatObservation observation)
 {
     private readonly CombatValueKind _primaryValueKind = observation.ValueKind;
 
+    public CombatActionKey ActionKey { get; private set; } = CombatActionKey.FromObservation(in observation);
     public int SkillCode { get; private set; } = observation.SkillCode;
     public CombatEventKind EventKind { get; private set; } = observation.EventKind;
     public readonly CombatValueKind PrimaryValueKind => ResolvePrimaryValueKind();
@@ -47,43 +48,46 @@ public struct SkillMetrics(in CombatObservation observation)
 
     internal readonly SkillMetricsSnapshot ToSnapshot()
     {
-        return new SkillMetricsSnapshot(
-            SkillCode,
-            EventKind,
-            PrimaryValueKind,
-            DamageAmount,
-            PeriodicDamageAmount,
-            PeriodicDamageTimes,
-            HealingAmount,
-            HealingTimes,
-            SupportTimes,
-            PeriodicHealingAmount,
-            PeriodicHealingTimes,
-            DrainDamageAmount,
-            DrainDamageTimes,
-            DrainHealingAmount,
-            DrainHealingTimes,
-            RegenerationHealingAmount,
-            RegenerationHealingTimes,
-            ShieldAmount,
-            ShieldTimes,
-            ShieldAbsorbedAmount,
-            ShieldAbsorbedTimes,
-            CriticalTimes,
-            Times,
-            AttemptTimes,
-            EvadeTimes,
-            InvincibleTimes,
-            MultiHitTimes,
-            BackTimes,
-            PerfectTimes,
-            SmiteTimes,
-            ParryTimes,
-            BlockTimes,
-            PerfectParryTimes,
-            PerfectBlockTimes,
-            EnduranceTimes,
-            RegenerationTimes);
+        return new SkillMetricsSnapshot
+        {
+            ActionKey = ActionKey,
+            SkillCode = SkillCode,
+            EventKind = EventKind,
+            PrimaryValueKind = PrimaryValueKind,
+            DamageAmount = DamageAmount,
+            PeriodicDamageAmount = PeriodicDamageAmount,
+            PeriodicDamageTimes = PeriodicDamageTimes,
+            HealingAmount = HealingAmount,
+            HealingTimes = HealingTimes,
+            SupportTimes = SupportTimes,
+            PeriodicHealingAmount = PeriodicHealingAmount,
+            PeriodicHealingTimes = PeriodicHealingTimes,
+            DrainDamageAmount = DrainDamageAmount,
+            DrainDamageTimes = DrainDamageTimes,
+            DrainHealingAmount = DrainHealingAmount,
+            DrainHealingTimes = DrainHealingTimes,
+            RegenerationHealingAmount = RegenerationHealingAmount,
+            RegenerationHealingTimes = RegenerationHealingTimes,
+            ShieldAmount = ShieldAmount,
+            ShieldTimes = ShieldTimes,
+            ShieldAbsorbedAmount = ShieldAbsorbedAmount,
+            ShieldAbsorbedTimes = ShieldAbsorbedTimes,
+            CriticalTimes = CriticalTimes,
+            Times = Times,
+            AttemptTimes = AttemptTimes,
+            EvadeTimes = EvadeTimes,
+            InvincibleTimes = InvincibleTimes,
+            MultiHitTimes = MultiHitTimes,
+            BackTimes = BackTimes,
+            PerfectTimes = PerfectTimes,
+            SmiteTimes = SmiteTimes,
+            ParryTimes = ParryTimes,
+            BlockTimes = BlockTimes,
+            PerfectParryTimes = PerfectParryTimes,
+            PerfectBlockTimes = PerfectBlockTimes,
+            EnduranceTimes = EnduranceTimes,
+            RegenerationTimes = RegenerationTimes
+        };
     }
 
     private void ApplyDamageAttemptMetrics(long damage, DamageModifiers modifiers, in CombatContribution contribution)
@@ -261,6 +265,7 @@ public struct SkillMetrics(in CombatObservation observation)
 }
 
 public readonly record struct SkillMetricsSnapshot(
+    CombatActionKey ActionKey,
     int SkillCode,
     CombatEventKind EventKind,
     CombatValueKind PrimaryValueKind,
@@ -296,15 +301,15 @@ public readonly record struct SkillMetricsSnapshot(
     int PerfectParryTimes,
     int PerfectBlockTimes,
     int EnduranceTimes,
-    int RegenerationTimes)
-{
-}
+    int RegenerationTimes);
 
-public readonly record struct SkillMetricsSnapshotEntry(int SkillCode, SkillMetricsSnapshot Metrics)
+public readonly record struct SkillMetricsSnapshotEntry(CombatActionKey ActionKey, SkillMetricsSnapshot Metrics)
 {
-    public void Deconstruct(out int skillCode, out SkillMetricsSnapshot metrics)
+    public int SkillCode => ActionKey.SkillCode;
+
+    public void Deconstruct(out CombatActionKey actionKey, out SkillMetricsSnapshot metrics)
     {
-        skillCode = SkillCode;
+        actionKey = ActionKey;
         metrics = Metrics;
     }
 }
@@ -322,7 +327,7 @@ public readonly struct CombatSkillBreakdownSnapshot
 
     public SkillMetricsSnapshotMap Skills { get; }
 
-    internal static CombatSkillBreakdownSnapshot From(Dictionary<int, SkillMetrics> metrics)
+    internal static CombatSkillBreakdownSnapshot From(Dictionary<CombatActionKey, SkillMetrics> metrics)
     {
         if (metrics.Count == 0)
         {
@@ -331,18 +336,18 @@ public readonly struct CombatSkillBreakdownSnapshot
 
         var entries = new SkillMetricsSnapshotEntry[metrics.Count];
         var index = 0;
-        foreach (var (skillCode, skillMetrics) in metrics)
+        foreach (var (actionKey, skillMetrics) in metrics)
         {
-            entries[index++] = new SkillMetricsSnapshotEntry(skillCode, skillMetrics.ToSnapshot());
+            entries[index++] = new SkillMetricsSnapshotEntry(actionKey, skillMetrics.ToSnapshot());
         }
 
-        Array.Sort(entries, static (left, right) => left.SkillCode.CompareTo(right.SkillCode));
+        Array.Sort(entries, static (left, right) => left.ActionKey.CompareTo(right.ActionKey));
         return new CombatSkillBreakdownSnapshot(entries);
     }
 
 }
 
-public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillMetricsSnapshot>
+public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActionKey, SkillMetricsSnapshot>
 {
     private readonly SkillMetricsSnapshotEntry[]? _entries;
 
@@ -357,13 +362,13 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillM
 
     public ValueCollection Values => new(_entries);
 
-    IEnumerable<int> IReadOnlyDictionary<int, SkillMetricsSnapshot>.Keys => Keys;
+    IEnumerable<CombatActionKey> IReadOnlyDictionary<CombatActionKey, SkillMetricsSnapshot>.Keys => Keys;
 
-    IEnumerable<SkillMetricsSnapshot> IReadOnlyDictionary<int, SkillMetricsSnapshot>.Values => Values;
+    IEnumerable<SkillMetricsSnapshot> IReadOnlyDictionary<CombatActionKey, SkillMetricsSnapshot>.Values => Values;
 
     private ReadOnlySpan<SkillMetricsSnapshotEntry> Entries => _entries ?? [];
 
-    public SkillMetricsSnapshot this[int key]
+    public SkillMetricsSnapshot this[CombatActionKey key]
     {
         get
         {
@@ -376,12 +381,12 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillM
         }
     }
 
-    public bool ContainsKey(int key)
+    public bool ContainsKey(CombatActionKey key)
     {
         return FindIndex(key) >= 0;
     }
 
-    public bool TryGetValue(int key, out SkillMetricsSnapshot value)
+    public bool TryGetValue(CombatActionKey key, out SkillMetricsSnapshot value)
     {
         var index = FindIndex(key);
         if (index >= 0)
@@ -399,27 +404,38 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillM
         return Entries;
     }
 
+    public bool ContainsSkillCode(int skillCode) => TryGetBySkillCode(skillCode, out _);
+
+    public bool TryGetBySkillCode(int skillCode, out SkillMetricsSnapshot value)
+    {
+        if (skillCode > 0)
+            return TryGetValue(new CombatActionKey(skillCode, default, default), out value);
+
+        value = default;
+        return false;
+    }
+
     public Enumerator GetEnumerator()
     {
         return new Enumerator(_entries);
     }
 
-    IEnumerator<KeyValuePair<int, SkillMetricsSnapshot>> IEnumerable<KeyValuePair<int, SkillMetricsSnapshot>>.GetEnumerator()
+    IEnumerator<KeyValuePair<CombatActionKey, SkillMetricsSnapshot>> IEnumerable<KeyValuePair<CombatActionKey, SkillMetricsSnapshot>>.GetEnumerator()
     {
         var entries = _entries ?? [];
         for (var i = 0; i < entries.Length; i++)
         {
             var entry = entries[i];
-            yield return new KeyValuePair<int, SkillMetricsSnapshot>(entry.SkillCode, entry.Metrics);
+            yield return new KeyValuePair<CombatActionKey, SkillMetricsSnapshot>(entry.ActionKey, entry.Metrics);
         }
     }
 
     IEnumerator IEnumerable.GetEnumerator()
     {
-        return ((IEnumerable<KeyValuePair<int, SkillMetricsSnapshot>>)this).GetEnumerator();
+        return ((IEnumerable<KeyValuePair<CombatActionKey, SkillMetricsSnapshot>>)this).GetEnumerator();
     }
 
-    private int FindIndex(int key)
+    private int FindIndex(CombatActionKey key)
     {
         var entries = Entries;
         var low = 0;
@@ -428,13 +444,14 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillM
         while (low <= high)
         {
             var mid = low + ((high - low) >> 1);
-            var midKey = entries[mid].SkillCode;
-            if (midKey == key)
+            var midKey = entries[mid].ActionKey;
+            var cmp = midKey.CompareTo(key);
+            if (cmp == 0)
             {
                 return mid;
             }
 
-            if (midKey < key)
+            if (cmp < 0)
             {
                 low = mid + 1;
             }
@@ -476,7 +493,7 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillM
         }
     }
 
-    public readonly struct KeyCollection : IReadOnlyCollection<int>
+    public readonly struct KeyCollection : IReadOnlyCollection<CombatActionKey>
     {
         private readonly SkillMetricsSnapshotEntry[]? _entries;
 
@@ -492,18 +509,18 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillM
             return new Enumerator(_entries);
         }
 
-        IEnumerator<int> IEnumerable<int>.GetEnumerator()
+        IEnumerator<CombatActionKey> IEnumerable<CombatActionKey>.GetEnumerator()
         {
             var entries = _entries ?? [];
             for (var i = 0; i < entries.Length; i++)
             {
-                yield return entries[i].SkillCode;
+                yield return entries[i].ActionKey;
             }
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable<int>)this).GetEnumerator();
+            return ((IEnumerable<CombatActionKey>)this).GetEnumerator();
         }
 
         public struct Enumerator
@@ -518,7 +535,7 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillM
                 Current = default;
             }
 
-            public int Current { get; private set; }
+            public CombatActionKey Current { get; private set; }
 
             public bool MoveNext()
             {
@@ -530,7 +547,7 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<int, SkillM
                 }
 
                 _index = next;
-                Current = entries[next].SkillCode;
+                Current = entries[next].ActionKey;
                 return true;
             }
         }

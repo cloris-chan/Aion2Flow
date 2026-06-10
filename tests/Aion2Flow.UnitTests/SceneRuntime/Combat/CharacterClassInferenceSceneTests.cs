@@ -19,7 +19,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 18160030,
-            OriginalSkillCode = 18160030,
             Damage = 120
         };
         periodicPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 0);
@@ -32,7 +31,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 99999999,
-            OriginalSkillCode = 99999999,
             Damage = 1350,
         });
 
@@ -56,7 +54,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 18160030,
-            OriginalSkillCode = 18160030,
             Damage = 90
         };
         periodicPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 0);
@@ -69,7 +66,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 14342350,
-            OriginalSkillCode = 14342350,
             Damage = 2450,
         });
 
@@ -93,7 +89,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 99999999,
-            OriginalSkillCode = 99999999,
             Damage = 1000,
         });
 
@@ -104,7 +99,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 14342350,
-            OriginalSkillCode = 14342350,
             Damage = 500,
         });
 
@@ -138,7 +132,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = assassinId,
             TargetId = playerId,
             SkillCode = 13352450,
-            OriginalSkillCode = 13352450,
             Damage = 12000,
             Timestamp = 1_000
         });
@@ -148,7 +141,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 13352450,
-            OriginalSkillCode = 13352450,
             Damage = 781,
             EventKind = CombatEventKind.Healing,
             ValueKind = CombatValueKind.Healing,
@@ -162,7 +154,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 16790001,
-            OriginalSkillCode = 16790001,
             Damage = 1,
             EventKind = CombatEventKind.Support,
             ValueKind = CombatValueKind.Support,
@@ -173,7 +164,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = playerId,
             SkillCode = 16200130,
-            OriginalSkillCode = 16200130,
             Damage = 1,
             EventKind = CombatEventKind.Support,
             ValueKind = CombatValueKind.Support,
@@ -184,7 +174,6 @@ public sealed class CharacterClassInferenceSceneTests
             SourceId = playerId,
             TargetId = targetId,
             SkillCode = 16190040,
-            OriginalSkillCode = 16190040,
             Damage = 1,
             EventKind = CombatEventKind.Support,
             ValueKind = CombatValueKind.Support,

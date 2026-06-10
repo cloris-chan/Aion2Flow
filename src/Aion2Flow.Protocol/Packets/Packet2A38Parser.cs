@@ -1,22 +1,10 @@
 using System.Buffers.Binary;
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet2A38Observation(
-    int SourceId,
-    int Mode,
-    int GroupCode,
-    int SequenceId,
-    uint HeadCode,
-    ushort HeadValue,
-    uint TimelineValue,
-    uint StableValue,
-    int EchoSourceId,
-    int StackValue,
-    uint BuffCodeRaw,
-    string TailSignature,
-    int TailLength);
+internal readonly record struct Packet2A38Observation(int SourceId, int Mode, int GroupCode, int SequenceId, uint HeadCode, ushort HeadValue, uint TimelineValue, uint StableValue, int EchoSourceId, int StackValue, ResourceEffectRef BuffResourceEffectRef, string TailSignature, int TailLength);
 
 internal static class Packet2A38Parser
 {
@@ -46,23 +34,10 @@ internal static class Packet2A38Parser
         if (!tailReader.TryReadVarInt(out var echoSourceId)) return false;
         if (!tailReader.TryReadVarInt(out var stackValue)) return false;
         if (tailReader.Remaining < 4) return false;
-        var buffCodeRaw = BinaryPrimitives.ReadUInt32LittleEndian(tailReader.RemainingSpan[..4]);
+        var buffResourceEffectRef = ResourceEffectRef.FromRaw(BinaryPrimitives.ReadUInt32LittleEndian(tailReader.RemainingSpan[..4]));
         tailReader.TryAdvance(4);
 
-        result = new Packet2A38Observation(
-            sourceId,
-            mode,
-            groupCode,
-            sequenceId,
-            headCode,
-            headValue,
-            timelineValue,
-            stableValue,
-            echoSourceId,
-            stackValue,
-            buffCodeRaw,
-            Convert.ToHexString(tailReader.RemainingSpan[..Math.Min(8, tailReader.Remaining)]),
-            tailReader.Remaining);
+        result = new Packet2A38Observation(sourceId, mode, groupCode, sequenceId, headCode, headValue, timelineValue, stableValue, echoSourceId, stackValue, buffResourceEffectRef, Convert.ToHexString(tailReader.RemainingSpan[..Math.Min(8, tailReader.Remaining)]), tailReader.Remaining);
         return true;
     }
 }

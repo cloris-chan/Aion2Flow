@@ -69,6 +69,7 @@
   <data name="Empty_History" xml:space="preserve"><value>보관된 전투 없음</value></data>
   <data name="Empty_Combatants" xml:space="preserve"><value>전투 데이터 없음</value></data>
   <data name="Empty_Skills" xml:space="preserve"><value>스킬 데이터 없음</value></data>
+  <data name="Skill_UnknownEffect" xml:space="preserve"><value>알 수 없는 효과</value></data>
 
   <!-- Aggregate metrics -->
   <data name="Metric_Total" xml:space="preserve"><value>총량</value></data>

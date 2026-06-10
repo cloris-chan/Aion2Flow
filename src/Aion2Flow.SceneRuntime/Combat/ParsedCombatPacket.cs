@@ -28,11 +28,8 @@ public struct ParsedCombatPacket
     public int TargetId { get; set; }
     public int Flag { get; set; }
     public int Damage { get; set; }
-    public int OriginalSkillCode { get; set; }
     public int SkillCode { get; set; }
-    public int BaseSkillCode { get; set; }
-    public int ChargeStage { get; set; }
-    public int SpecializationMask { get; set; }
+    public ResourceEffectRef BodyResourceEffectRef { get; set; }
     public int Marker { get; set; }
     public int Type { get; set; }
     public int Unknown { get; set; }
@@ -44,7 +41,7 @@ public struct ParsedCombatPacket
     public int DrainHealAmount { get; set; }
     public int RegenerationAmount { get; set; }
     public long DetailRaw { get; set; }
-    public CombatEffectRef EffectRef { get; set; }
+    public ResourceEffectRef DetailResourceEffectRef { get; set; }
     public CombatResourceKind ResourceKind { get; set; } = CombatResourceKind.Unknown;
     public long FrameOrdinal { get; set; }
     public long BatchOrdinal { get; set; }
@@ -55,7 +52,6 @@ public struct ParsedCombatPacket
     public CombatValueKind ValueKind { get; set; } = CombatValueKind.Unknown;
     public PeriodicEffectRelation PeriodicRelation { get; private set; }
     public int PeriodicMode { get; private set; }
-    public int PeriodicBodySkillCode { get; set; }
     public int PeriodicTailSkillCodeRaw { get; set; }
     public int PeriodicTailPrefixValue { get; set; }
     public int PeriodicTailLength { get; set; }
@@ -65,7 +61,6 @@ public struct ParsedCombatPacket
     public readonly bool IsPeriodicSelfEffect => PeriodicRelation == PeriodicEffectRelation.Self;
     public readonly bool IsPeriodicTargetEffect => PeriodicRelation == PeriodicEffectRelation.Target;
     public readonly bool IsPeriodicTargetInitialEffect => IsPeriodicTargetEffect && PeriodicMode == 1;
-    public readonly SkillVariantInfo SkillVariant => new(OriginalSkillCode, SkillCode, BaseSkillCode, ChargeStage, SpecializationMask);
 
     public ParsedCombatPacket()
     {
@@ -97,13 +92,12 @@ public struct ParsedCombatPacket
     public readonly CombatObservation ToObservation() => new()
     {
         SkillCode = SkillCode,
-        OriginalSkillCode = OriginalSkillCode,
-        BaseSkillCode = BaseSkillCode,
+        BodyResourceEffectRef = BodyResourceEffectRef,
         Damage = Damage,
         HitCount = HitContribution,
         AttemptCount = AttemptContribution,
         DetailRaw = DetailRaw,
-        EffectRef = EffectRef,
+        DetailResourceEffectRef = DetailResourceEffectRef,
         Marker = Marker,
         Type = Type,
         Flag = Flag,
@@ -119,7 +113,6 @@ public struct ParsedCombatPacket
         EffectTag = EffectTag,
         PeriodicRelation = PeriodicRelation,
         PeriodicMode = PeriodicMode,
-        PeriodicBodySkillCode = PeriodicBodySkillCode,
         PeriodicTailSkillCodeRaw = PeriodicTailSkillCodeRaw,
         PeriodicTailPrefixValue = PeriodicTailPrefixValue,
         PeriodicTailLength = PeriodicTailLength,
@@ -131,13 +124,12 @@ public struct ParsedCombatPacket
         SourceId = sourceId,
         TargetId = targetId,
         SkillCode = observation.SkillCode,
-        OriginalSkillCode = observation.OriginalSkillCode,
-        BaseSkillCode = observation.BaseSkillCode,
+        BodyResourceEffectRef = observation.BodyResourceEffectRef,
         Damage = checked((int)observation.Damage),
         HitContribution = observation.HitCount,
         AttemptContribution = observation.AttemptCount,
         DetailRaw = observation.DetailRaw,
-        EffectRef = observation.EffectRef,
+        DetailResourceEffectRef = observation.DetailResourceEffectRef,
         Marker = observation.Marker,
         Type = observation.Type,
         Flag = observation.Flag,
@@ -154,7 +146,6 @@ public struct ParsedCombatPacket
         PeriodicMode = observation.PeriodicMode,
         EffectTag = observation.EffectTag,
         Unknown = observation.ChainId,
-        PeriodicBodySkillCode = observation.PeriodicBodySkillCode,
         PeriodicTailSkillCodeRaw = observation.PeriodicTailSkillCodeRaw,
         PeriodicTailPrefixValue = observation.PeriodicTailPrefixValue,
         PeriodicTailLength = observation.PeriodicTailLength,
@@ -170,9 +161,7 @@ public struct ParsedCombatPacket
             return FormatPeriodicEffectLabel(PeriodicRelation, PeriodicMode);
         }
 
-        return EffectTag == PacketEffectTag.None
-            ? string.Empty
-            : FormatEffectTagLabel(EffectTag);
+        return EffectTag == PacketEffectTag.None ? string.Empty : FormatEffectTagLabel(EffectTag);
     }
 
     private static string FormatPeriodicEffectLabel(PeriodicEffectRelation relation, int mode)

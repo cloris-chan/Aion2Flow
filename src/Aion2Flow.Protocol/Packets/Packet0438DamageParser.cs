@@ -3,7 +3,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0438Damage(int TargetId, int LayoutTag, int Flag, int SourceId, int SkillCodeRaw, int Marker, int Type, DamageModifiers Modifiers, int Unknown, int Damage, int Loop, int TailLength, int MultiHitCount, int DrainHealAmount = 0, int RegenerationAmount = 0, long DetailRaw = 0, CombatEffectRef EffectRef = default, CombatResourceKind ResourceKind = CombatResourceKind.Unknown);
+internal readonly record struct Packet0438Damage(int TargetId, int LayoutTag, int Flag, int SourceId, ResourceEffectRef BodyResourceEffectRef, int Marker, int Type, DamageModifiers Modifiers, int Unknown, int Damage, int Loop, int TailLength, int MultiHitCount, int DrainHealAmount = 0, int RegenerationAmount = 0, long DetailRaw = 0, ResourceEffectRef DetailResourceEffectRef = default, CombatResourceKind ResourceKind = CombatResourceKind.Unknown);
 
 internal static class Packet0438DamageParser
 {
@@ -43,7 +43,7 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (targetId == 0 || sourceId == 0) return false;
         if (reader.Remaining < 5) return false;
-        if (!reader.TryReadUInt32Le(out var skillCodeRaw)) return false;
+        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadVarInt(out var type)) return false;
 
@@ -55,7 +55,7 @@ internal static class Packet0438DamageParser
         var detailSlice = payload.Slice(reader.Offset, detailLength);
         var modifiers = ParseDamageModifiers(detailSlice, type);
         var (regenAmount, detailRaw) = ExtractRegenerationAmount(detailSlice, modifiers);
-        var effectRef = CombatEffectRef.FromDetail(detailSlice);
+        var detailResourceEffectRef = ResourceEffectRef.FromDetail(detailSlice);
         var resourceKind = ExtractResourceKind(detailSlice);
         if (!reader.TryAdvance(detailLength)) return false;
 
@@ -80,7 +80,7 @@ internal static class Packet0438DamageParser
             modifiers |= DamageModifiers.MultiHit;
 
         consumed = reader.Offset;
-        result = new Packet0438Damage(targetId, layoutTag, flag, sourceId, skillCodeRaw, marker, type, modifiers, unknown, damage, loop, payload.Length - consumed, multiHitCount, drainHealAmount, regenAmount, detailRaw, effectRef, resourceKind);
+        result = new Packet0438Damage(targetId, layoutTag, flag, sourceId, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), marker, type, modifiers, unknown, damage, loop, payload.Length - consumed, multiHitCount, drainHealAmount, regenAmount, detailRaw, detailResourceEffectRef, resourceKind);
         return true;
     }
 

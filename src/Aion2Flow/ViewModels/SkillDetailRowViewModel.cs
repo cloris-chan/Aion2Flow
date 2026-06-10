@@ -1,8 +1,12 @@
+using Cloris.Aion2Flow.SceneRuntime.Combat;
+
 namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
+    public CombatActionKey ActionKey { get; set; }
     public int SkillCode { get; set; }
+    public string DisplayName { get; set => SetFrameProperty(ref field, value); } = string.Empty;
 
     public long TotalAmount { get; set => SetFrameProperty(ref field, value); }
     public long DirectAmount { get; set => SetFrameProperty(ref field, value); }
@@ -61,7 +65,9 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         var evadeRate = data.Attempts > 0 ? data.Evades / (double)data.Attempts : 0d;
         var invincibleRate = data.Attempts > 0 ? data.Invincible / (double)data.Attempts : 0d;
 
+        ActionKey = data.ActionKey;
         SkillCode = data.SkillCode;
+        DisplayName = data.DisplayName;
         TotalAmount = data.TotalAmount;
         DirectAmount = data.DirectAmount;
         PeriodicAmount = data.PeriodicAmount;
@@ -104,7 +110,9 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
 
 public struct SkillDetailRowData
 {
+    public CombatActionKey ActionKey;
     public int SkillCode;
+    public string DisplayName;
     public long TotalAmount;
     public long DirectAmount;
     public long PeriodicAmount;

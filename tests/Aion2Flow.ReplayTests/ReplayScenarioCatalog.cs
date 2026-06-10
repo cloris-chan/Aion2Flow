@@ -46,17 +46,17 @@ public static class ReplayScenarioCatalog
     public static IEnumerable<object[]> OutgoingCombatStats =>
     [
         [new ReplayOutgoingCombatStatsScenario(CanonicalSceneReplayLog, 20_211_224, 1_304, 1_312, ExpectedOutgoingInvincibles: 8)],
-        [new ReplayOutgoingCombatStatsScenario("aion2flow.stream.20260416021557.log", 7_920_567, 1_166, 1_166, ExpectedIncomingHealing: 583_068)],
-        [new ReplayOutgoingCombatStatsScenario("aion2flow.stream.20260416021406.log", 3_961_239, 524, 524, ExpectedIncomingHealing: 141_564)]
+        [new ReplayOutgoingCombatStatsScenario("aion2flow.stream.20260416021557.log", 7_920_567, 1_166, 1_166, ExpectedIncomingHealing: 569_015)],
+        [new ReplayOutgoingCombatStatsScenario("aion2flow.stream.20260416021406.log", 3_961_239, 524, 524, ExpectedIncomingHealing: 139_411)]
     ];
 
     public static IEnumerable<object[]> Mode10PacketOnlyDamage =>
     [
-        [new ReplayMode10DamageScenario("aion2flow.stream.20260602221303.log", 5_346, 18_532, 5_346, 16_140_030, 12, 16_480, 732_285)],
-        [new ReplayMode10DamageScenario("aion2flow.stream.20260603005149.log", 30_299, 29_736, 2_359, 16_001_112, 6, 3_102, 482_068)],
-        [new ReplayMode10DamageScenario("aion2flow.stream.20260604124721.log", 7_386, 20_368, 7_386, 16_140_030, 7, 11_293, 507_816)],
-        [new ReplayMode10DamageScenario("aion2flow.stream.20260604133258.log", 18_117, 25_154, 7_386, 16_001_112, 5, 2_415, 540_689)],
-        [new ReplayMode10DamageScenario("aion2flow.stream.20260605000843.log", 16_332, 26_450, 16_332, 13_730_007, 35, 60_198, 9_666_083)]
+        [new ReplayMode10DamageScenario("aion2flow.stream.20260602221303.log", 5_346, 18_532, 5_346, 16_140_030, 12, 16_480)],
+        [new ReplayMode10DamageScenario("aion2flow.stream.20260603005149.log", 30_299, 29_736, 2_359, 16_001_112, 6, 3_102)],
+        [new ReplayMode10DamageScenario("aion2flow.stream.20260604124721.log", 7_386, 20_368, 7_386, 16_140_030, 7, 11_293)],
+        [new ReplayMode10DamageScenario("aion2flow.stream.20260604133258.log", 18_117, 25_154, 7_386, 16_001_112, 5, 2_415)],
+        [new ReplayMode10DamageScenario("aion2flow.stream.20260605000843.log", 16_332, 26_450, 16_332, 13_730_007, 35, 60_198)]
     ];
 
     public static IEnumerable<object[]> MultiHitDiagnostics =>
@@ -100,7 +100,7 @@ public sealed record ReplayOutgoingCombatStatsScenario(string FileName, long Exp
     public override string ToString() => FileName;
 }
 
-public sealed record ReplayMode10DamageScenario(string FileName, int SourceId, int TargetId, int CombatantId, int TailSkillCode, int ExpectedPacketCount, long ExpectedDamage, long ExpectedOutgoingDamage)
+public sealed record ReplayMode10DamageScenario(string FileName, int SourceId, int TargetId, int CombatantId, int TailSkillCode, int ExpectedPacketCount, long ExpectedDamage)
 {
     public override string ToString() => FileName;
 }

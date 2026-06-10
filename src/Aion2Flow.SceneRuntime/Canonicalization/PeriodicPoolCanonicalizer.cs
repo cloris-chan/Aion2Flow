@@ -73,7 +73,6 @@ public sealed class PeriodicPoolCanonicalizer
         var normalized = observation with
         {
             SkillCode = observation.PeriodicTailSkillCodeRaw,
-            BaseSkillCode = 0,
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.PeriodicDamage,
             HitCount = 0,
@@ -156,16 +155,7 @@ public sealed class PeriodicPoolCanonicalizer
 
 internal sealed record PeriodicPoolCanonicalizerSnapshot(PeriodicPoolCanonicalizerStateSnapshot[] States);
 
-internal readonly record struct PeriodicPoolCanonicalizerStateSnapshot(
-    int TargetId,
-    int ChainId,
-    int SkillIdentityCode,
-    long Remaining,
-    int CasterId,
-    int GrantSourceId,
-    int GrantTargetId,
-    CombatObservation Grant,
-    bool ShieldGrantEmitted);
+internal readonly record struct PeriodicPoolCanonicalizerStateSnapshot(int TargetId, int ChainId, int SkillIdentityCode, long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatObservation Grant, bool ShieldGrantEmitted);
 
 public readonly record struct CombatCanonicalizationResult(int SourceId, int TargetId, CombatObservation Observation);
 
