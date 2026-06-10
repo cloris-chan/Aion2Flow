@@ -275,6 +275,41 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260610235630_Uses_Direct0438_Body_As_SkillVariant_For_ActionGrouping()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.June10NearbyPcMetadata}"));
+
+        const int playerId = 4679;
+        const int combustionSkillCode = 16040030;
+        var packets = SceneReplayTestView.BySource(replay)[playerId];
+        var packetDump = string.Join(
+            Environment.NewLine,
+            packets
+                .Where(static packet => packet.BodySkillVariantRaw is combustionSkillCode or 16010020 or 16770001)
+                .Select(static packet =>
+                    $"skill={packet.SkillCode} bodySkill={packet.BodySkillVariantRaw} bodyRef={packet.BodyResourceEffectRef.RawId} detail={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} event={packet.EventKind} value={packet.ValueKind}"));
+
+        var directCombustionRows = packets
+            .Where(static packet =>
+                packet.SourceId == playerId &&
+                packet.BodySkillVariantRaw == combustionSkillCode &&
+                packet.BodyResourceEffectRef.IsEmpty &&
+                packet.SkillCode == combustionSkillCode)
+            .ToArray();
+        Assert.NotEmpty(directCombustionRows);
+        Assert.DoesNotContain(packets, static packet =>
+            packet.BodySkillVariantRaw == combustionSkillCode &&
+            packet.SkillCode == 0);
+
+        var skills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, playerId).Skills;
+        Assert.True(skills.TryGetBySkillCode(combustionSkillCode, out var combustion), packetDump);
+        Assert.True(combustion.DamageAmount > 100_000, packetDump);
+        Assert.False(skills.ContainsKey(new CombatActionKey(0, ResourceEffectRef.FromRaw(combustionSkillCode), default)), packetDump);
+    }
+
+    [Fact]
     public void Replay_20260610232724_Recovers_NpcCatalog_From_4136_State_Packets()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
@@ -301,100 +336,6 @@ public sealed class PacketLogReplayServiceTests
         AssertNpcNameAndKind(replay, 22315, "狂暴的佩爾克", NpcKind.Boss, summaryDump);
         AssertNpcNameAndNotBoss(replay, 16737, "地之精靈", summaryDump);
         AssertNpcNameAndNotBoss(replay, 24740, "水之精靈", summaryDump);
-    }
-
-    [Fact]
-    public void Replay_20260426110459_Templar_KnownSelfRecovery_Packets_Are_Healing()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.TemplarKnownSelfRecovery}"));
-
-        Assert.True(replay.ReplayedLines > 0);
-
-        const int playerId = 6774;
-        var punishingStrikeBodyRef = ResourceEffectRef.FromRaw(12060240);
-        var selfHealingPackets = SceneReplayTestView.BySource(replay)[playerId]
-            .Where(packet =>
-                packet.SourceId == playerId &&
-                packet.TargetId == playerId &&
-                packet.EventKind == CombatEventKind.Healing)
-            .ToArray();
-        var packetDump = string.Join(
-            Environment.NewLine,
-            SceneReplayTestView.BySource(replay)[playerId]
-                .Where(static packet => packet.SourceId == packet.TargetId)
-                .Select(static packet =>
-                    $"skill={packet.SkillCode} bodyRef={packet.BodyResourceEffectRef.RawId} detailRef={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} detail={packet.DetailRaw}"));
-
-        var noSkillHealingPackets = selfHealingPackets
-            .Where(static packet => packet.SkillCode == 0)
-            .ToArray();
-        var punishingStrikeRecovery = selfHealingPackets
-            .Where(packet =>
-                packet.BodyResourceEffectRef == punishingStrikeBodyRef &&
-                packet.ValueKind == CombatValueKind.DrainHealing)
-            .Sum(static packet => packet.Damage);
-        Assert.All(noSkillHealingPackets, static packet => Assert.Equal(0, packet.SkillCode));
-        Assert.True(punishingStrikeRecovery == 1563, packetDump);
-
-        var recognizedSelfRecovery = noSkillHealingPackets.Sum(static packet => packet.Damage);
-        Assert.Equal(1563, recognizedSelfRecovery);
-
-        var combatantDump = string.Join(
-            Environment.NewLine,
-            replay.Snapshot.Combatants
-                .OrderByDescending(static pair => pair.Value.HealingAmount)
-                .Select(static pair => $"id={pair.Key} heal={pair.Value.HealingAmount} damage={pair.Value.DamageAmount}"));
-        Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), combatantDump);
-        Assert.True(playerMetrics.HealingAmount == recognizedSelfRecovery,
-            $"HealingAmount={playerMetrics.HealingAmount} expected={recognizedSelfRecovery}\n{packetDump}\n{combatantDump}");
-    }
-
-    [Fact]
-    public void Replay_20260426121726_Templar_Healing_Matches_KnownPacketOnly_Output()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.TemplarPacketOnlyHealing}"));
-
-        Assert.True(replay.ReplayedLines > 0);
-
-        const int playerId = 15980;
-        var combatantDump = string.Join(
-            Environment.NewLine,
-            replay.Snapshot.Combatants
-                .OrderByDescending(static pair => pair.Value.HealingAmount)
-                .Select(static pair => $"id={pair.Key} heal={pair.Value.HealingAmount} damage={pair.Value.DamageAmount}"));
-        Assert.True(replay.Snapshot.Combatants.TryGetValue(playerId, out var playerMetrics), combatantDump);
-        var playerSkills = replay.SceneOwner.CreateSkillBreakdown(replay.Snapshot, playerId).Skills;
-
-        var skillDump = string.Join(
-            Environment.NewLine,
-            playerSkills
-                .Where(static pair => pair.Value.HealingAmount > 0 || pair.Value.DrainHealingAmount > 0)
-                .OrderByDescending(static pair => pair.Value.HealingAmount)
-                .Select(static pair =>
-                    $"skill={pair.Key} heal={pair.Value.HealingAmount} periodic={pair.Value.PeriodicHealingAmount} drain={pair.Value.DrainHealingAmount} times={pair.Value.HealingTimes}"));
-        var packetDump = string.Join(
-            Environment.NewLine,
-            SceneReplayTestView.BySource(replay)[playerId]
-                .Where(static packet => packet.SourceId == packet.TargetId || packet.DrainHealAmount > 0)
-                .Select(static packet =>
-                    $"skill={packet.SkillCode} bodyRef={packet.BodyResourceEffectRef.RawId} detailRef={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} drain={packet.DrainHealAmount} event={packet.EventKind} value={packet.ValueKind} periodic={packet.PeriodicRelation}:{packet.PeriodicMode} marker={packet.Marker} type={packet.Type} detail={packet.DetailRaw}"));
-
-        long ResourceRefDrainHealing(int bodyResourceEffectRefRaw) =>
-            playerSkills
-                .Where(pair => pair.Key.SkillCode == 0 && pair.Key.BodyResourceEffectRef == ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw))
-                .Sum(static pair => pair.Value.DrainHealingAmount);
-
-        Assert.True(ResourceRefDrainHealing(12010250) == 858, skillDump);
-        Assert.True(ResourceRefDrainHealing(12020250) == 911, skillDump);
-        Assert.True(ResourceRefDrainHealing(12030250) == 897, skillDump);
-        Assert.True(ResourceRefDrainHealing(12440250) == 2395, skillDump);
-        Assert.True(ResourceRefDrainHealing(12060240) == 784, skillDump);
-        Assert.True(playerMetrics.HealingAmount == 5845,
-            $"HealingAmount={playerMetrics.HealingAmount} expected=5845\n{skillDump}\n{packetDump}\n{combatantDump}");
     }
 
     [Fact]

@@ -19,9 +19,10 @@ internal static class PacketCombatHandler
         {
             var observation = new CombatObservation
             {
+                SkillCode = parsed.BodySkillVariantRaw,
+                BodySkillVariantRaw = parsed.BodySkillVariantRaw,
                 LayoutTag = parsed.LayoutTag,
                 Flag = parsed.Flag,
-                BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                 Marker = parsed.Marker,
                 Type = parsed.Type,
                 Modifiers = parsed.Modifiers,
@@ -44,7 +45,8 @@ internal static class PacketCombatHandler
             {
                 var regenObservation = new CombatObservation
                 {
-                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
+                    SkillCode = parsed.BodySkillVariantRaw,
+                    BodySkillVariantRaw = parsed.BodySkillVariantRaw,
                     Damage = parsed.RegenerationAmount,
                     HitCount = 1,
                     AttemptCount = 1,
@@ -60,7 +62,8 @@ internal static class PacketCombatHandler
             {
                 var drainObservation = new CombatObservation
                 {
-                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
+                    SkillCode = parsed.BodySkillVariantRaw,
+                    BodySkillVariantRaw = parsed.BodySkillVariantRaw,
                     Damage = parsed.DrainHealAmount,
                     HitCount = 1,
                     AttemptCount = 1,
@@ -229,9 +232,10 @@ internal static class PacketCombatHandler
         {
             var observation = new CombatObservation
             {
+                SkillCode = parsed.BodySkillVariantRaw,
+                BodySkillVariantRaw = parsed.BodySkillVariantRaw,
                 LayoutTag = parsed.LayoutTag,
                 Flag = parsed.Flag,
-                BodyResourceEffectRef = parsed.BodyResourceEffectRef,
                 Marker = parsed.Marker,
                 Type = parsed.Type,
                 Modifiers = parsed.Modifiers,
@@ -254,7 +258,8 @@ internal static class PacketCombatHandler
             {
                 var regenObservation = new CombatObservation
                 {
-                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
+                    SkillCode = parsed.BodySkillVariantRaw,
+                    BodySkillVariantRaw = parsed.BodySkillVariantRaw,
                     Damage = parsed.RegenerationAmount,
                     HitCount = 1,
                     AttemptCount = 1,
@@ -270,7 +275,8 @@ internal static class PacketCombatHandler
             {
                 var drainObservation = new CombatObservation
                 {
-                    BodyResourceEffectRef = parsed.BodyResourceEffectRef,
+                    SkillCode = parsed.BodySkillVariantRaw,
+                    BodySkillVariantRaw = parsed.BodySkillVariantRaw,
                     Damage = parsed.DrainHealAmount,
                     HitCount = 1,
                     AttemptCount = 1,

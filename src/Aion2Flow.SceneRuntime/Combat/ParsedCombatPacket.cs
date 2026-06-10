@@ -29,6 +29,7 @@ public struct ParsedCombatPacket
     public int Flag { get; set; }
     public int Damage { get; set; }
     public int SkillCode { get; set; }
+    public int BodySkillVariantRaw { get; set; }
     public ResourceEffectRef BodyResourceEffectRef { get; set; }
     public int Marker { get; set; }
     public int Type { get; set; }
@@ -92,6 +93,7 @@ public struct ParsedCombatPacket
     public readonly CombatObservation ToObservation() => new()
     {
         SkillCode = SkillCode,
+        BodySkillVariantRaw = BodySkillVariantRaw,
         BodyResourceEffectRef = BodyResourceEffectRef,
         Damage = Damage,
         HitCount = HitContribution,
@@ -124,6 +126,7 @@ public struct ParsedCombatPacket
         SourceId = sourceId,
         TargetId = targetId,
         SkillCode = observation.SkillCode,
+        BodySkillVariantRaw = observation.BodySkillVariantRaw,
         BodyResourceEffectRef = observation.BodyResourceEffectRef,
         Damage = checked((int)observation.Damage),
         HitContribution = observation.HitCount,

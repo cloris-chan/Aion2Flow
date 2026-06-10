@@ -97,6 +97,7 @@ public static class CombatResourceRegistry
         var observation = packet.ToObservation();
         var normalized = NormalizeObservationForStorage(packet.SourceId, packet.TargetId, in observation);
         packet.SkillCode = normalized.SkillCode;
+        packet.BodySkillVariantRaw = normalized.BodySkillVariantRaw;
         packet.BodyResourceEffectRef = normalized.BodyResourceEffectRef;
         packet.Damage = checked((int)normalized.Damage);
         packet.HitContribution = normalized.HitCount;

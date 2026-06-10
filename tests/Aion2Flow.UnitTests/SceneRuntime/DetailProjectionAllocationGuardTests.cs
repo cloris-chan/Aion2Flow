@@ -69,6 +69,7 @@ public sealed class DetailProjectionAllocationGuardTests
             "DisplaySkillNameFor",
             "ResourceEffectRef",
             "observation.SkillCode",
+            "BodySkillVariantRaw",
             "ParseSkillVariant",
             "InferOriginalSkillCode",
             "OriginalSkillCode",

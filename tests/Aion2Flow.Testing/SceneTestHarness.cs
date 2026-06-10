@@ -123,6 +123,7 @@ public sealed class SceneTestHarness : IDisposable
             Flag = packet.Flag,
             Damage = packet.Damage,
             SkillCode = packet.SkillCode,
+            BodySkillVariantRaw = packet.BodySkillVariantRaw,
             BodyResourceEffectRef = packet.BodyResourceEffectRef,
             Marker = packet.Marker,
             Type = packet.Type,

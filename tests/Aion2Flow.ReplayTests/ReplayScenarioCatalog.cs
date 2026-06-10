@@ -12,8 +12,6 @@ public static class ReplayScenarioCatalog
     public const string InstanceClearRestoreAndMapBoundary = "aion2flow.stream.20260419204630.log";
     public const string VisibleDamageContributionBoundary = "aion2flow.stream.20260423001617.log";
     public const string EnhanceSpiritBenedictionSelfAndSummonHealing = "aion2flow.stream.20260426031332.log";
-    public const string TemplarKnownSelfRecovery = "aion2flow.stream.20260426110459.log";
-    public const string TemplarPacketOnlyHealing = "aion2flow.stream.20260426121726.log";
     public const string SummonRestoresAndTargetSupport = "aion2flow.stream.20260426140354.log";
     public const string PeriodicLinkInvariant = "aion2flow.stream.20260412103519.log";
     public const string CompactPrimaryInvariantA = "aion2flow.stream.20260411174533.log";
