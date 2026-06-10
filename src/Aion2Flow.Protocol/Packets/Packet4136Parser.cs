@@ -11,6 +11,8 @@ internal static class Packet4136Parser
 
     private static ReadOnlySpan<byte> OwnerSectionSentinel => [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
 
+    private static ReadOnlySpan<byte> OwnerHeaderMarker => [0x80, 0x75, 0xd5, 0x2a, 0xbb, 0x03, 0x00, 0x00];
+
     private static ReadOnlySpan<byte> OwnerOpcodeMarker => [0x07, 0x02, 0x06];
 
     private static ReadOnlySpan<byte> OwnerOpcodeMarkerAlt => [0x07, 0x02, 0x01];
@@ -63,12 +65,20 @@ internal static class Packet4136Parser
     private static bool TryReadSummonCreateNpcCode(ReadOnlySpan<byte> packet, int tailStart, byte mode0, byte mode1, byte mode2, out int npcCode)
     {
         npcCode = 0;
-        if (mode0 != 0x5f || mode1 != 0x00 || mode2 != 0x01)
+
+        if (mode0 != 0x5f)
         {
             return false;
         }
 
-        return PacketNpcStateFields.TryReadNpcCatalogCode(packet, tailStart + SummonCreateNpcCodeOffsetFromModes, out npcCode);
+        if (mode1 == 0x00 && mode2 == 0x01)
+        {
+            return PacketNpcStateFields.TryReadNpcCatalogCode(packet, tailStart + SummonCreateNpcCodeOffsetFromModes, out npcCode);
+        }
+
+        return mode1 == 0x10 &&
+               mode2 == 0x00 &&
+               PacketNpcStateFields.TryReadNpcCatalogCode(packet, tailStart + NpcCodeOffsetFromModes, out npcCode);
     }
 
     private static bool TryExtractSummonOwnerId(ReadOnlySpan<byte> packet, int entityId, out int ownerId)
@@ -82,6 +92,11 @@ internal static class Packet4136Parser
         }
 
         var afterSentinel = packet[(sentinelOffset + OwnerSectionSentinel.Length)..];
+        if (TryExtractOwnerIdFromHeader(afterSentinel, entityId, out ownerId))
+        {
+            return true;
+        }
+
         var ownerMarkerOffset = afterSentinel.LastIndexOf(OwnerOpcodeMarker);
         if (ownerMarkerOffset < 0)
         {
@@ -104,5 +119,29 @@ internal static class Packet4136Parser
             | (packet[ownerOffset + 2] << 16)
             | (packet[ownerOffset + 3] << 24);
         return ownerId > 0 && ownerId != entityId;
+    }
+
+    private static bool TryExtractOwnerIdFromHeader(ReadOnlySpan<byte> afterSentinel, int entityId, out int ownerId)
+    {
+        ownerId = 0;
+        if (!afterSentinel.StartsWith(OwnerHeaderMarker))
+        {
+            return false;
+        }
+
+        var reader = new PacketSpanReader(afterSentinel[OwnerHeaderMarker.Length..]);
+        if (!reader.TryReadVarInt(out var candidate) || candidate <= 0 || candidate == entityId)
+        {
+            return false;
+        }
+
+        var tail = afterSentinel[(OwnerHeaderMarker.Length + reader.Offset)..];
+        if (tail.Length < 2 || tail[1] != 0x02 || tail[0] is < 0x0e or > 0x11)
+        {
+            return false;
+        }
+
+        ownerId = candidate;
+        return true;
     }
 }

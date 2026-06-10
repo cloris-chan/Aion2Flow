@@ -256,9 +256,22 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             if (sourceId <= 0)
                 continue;
 
+            var totalDamage = IsSummonDamageTargetCached(pair.SourceId, pair.TargetId, pair.TotalDamage) ? 0 : pair.TotalDamage;
+            if (totalDamage <= 0 &&
+                pair.TotalHealing <= 0 &&
+                pair.TotalPeriodicHealing <= 0 &&
+                pair.TotalDrainDamage <= 0 &&
+                pair.TotalDrainHealing <= 0 &&
+                pair.TotalRegenerationHealing <= 0 &&
+                pair.TotalShield <= 0 &&
+                pair.TotalShieldAbsorbed <= 0)
+            {
+                continue;
+            }
+
             ref var metrics = ref builder.GetOrAddCombatant(sourceId);
             metrics.ApplyCombatTotals(
-                pair.TotalDamage,
+                totalDamage,
                 pair.TotalHealing,
                 pair.TotalPeriodicHealing,
                 pair.TotalDrainDamage,

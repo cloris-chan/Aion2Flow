@@ -359,6 +359,41 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_Folds_Elementalist_Summon_Boss_Damage_To_Owner()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.ElementalistSummonBossDamageAttribution}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        const int ownerId = 336;
+        const int bossId = 22487;
+        var summonOwnerByInstance = SceneReplayTestView.SummonOwnerByInstance(replay);
+
+        Assert.Equal(ownerId, summonOwnerByInstance[23247]);
+        Assert.Equal(ownerId, summonOwnerByInstance[33318]);
+        Assert.Equal(ownerId, summonOwnerByInstance[20281]);
+        Assert.Equal(ownerId, summonOwnerByInstance[21096]);
+        AssertSummonNpc(replay, 23247, 2920114, "火之精靈", summaryDump);
+        AssertSummonNpc(replay, 33318, 2920114, "火之精靈", summaryDump);
+        AssertSummonNpc(replay, 20281, 2920175, "地之精靈", summaryDump);
+        AssertSummonNpc(replay, 21096, 2920154, "風之精靈", summaryDump);
+
+        var ownerSummary = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == ownerId);
+        Assert.Equal(486_287, ownerSummary.OutgoingDamage);
+        var bossSummary = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == bossId);
+        Assert.Equal(486_287, bossSummary.IncomingDamage);
+
+        Assert.True(replay.Snapshot.Combatants.TryGetValue(ownerId, out var ownerMetrics), summaryDump);
+        Assert.Equal(486_287, ownerMetrics.DamageAmount);
+        Assert.DoesNotContain(23247, replay.Snapshot.Combatants.Keys);
+        Assert.DoesNotContain(33318, replay.Snapshot.Combatants.Keys);
+        Assert.DoesNotContain(20281, replay.Snapshot.Combatants.Keys);
+        Assert.DoesNotContain(21096, replay.Snapshot.Combatants.Keys);
+    }
+
+    [Fact]
     public void Replay_20260426140354_SummonRestores_And_TargetSupport_Are_Classified_From_PacketShape()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));

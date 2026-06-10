@@ -25,6 +25,7 @@ public static class ReplayScenarioCatalog
     public const string PcMetadata4536 = "aion2flow.stream.20260610235630.log";
     public const string Direct0438BodySkillVariant = "aion2flow.stream.20260610235630.log";
     public const string SummonCreateState4136 = "aion2flow.stream.20260611024229.log";
+    public const string ElementalistSummonBossDamageAttribution = "aion2flow.stream.20260611034030.log";
 
     public static IEnumerable<object[]> April11IncomingAvoidance =>
     [
