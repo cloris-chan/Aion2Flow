@@ -50,8 +50,6 @@
                                    Text="{Binding StatusText}" />
                         <TextBlock Classes="PlaybackHeaderSubtle"
                                    Text="{Binding CheckpointText}" />
-                        <TextBlock Classes="PlaybackHeaderSubtle"
-                                   Text="{Binding TimelineMarkerLimitText}" />
                     </StackPanel>
                 </Grid>
 
@@ -174,7 +172,7 @@
         </Border>
 
         <Grid Grid.Row="2"
-              ColumnDefinitions="460,*,300"
+              ColumnDefinitions="460,*"
               ColumnSpacing="12"
               MinHeight="0">
             <Border Classes="PlaybackPanel"
@@ -306,41 +304,6 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2"
-                    Classes="PlaybackPanel"
-                    MinHeight="0">
-                <Grid RowDefinitions="Auto,*"
-                      RowSpacing="8"
-                      MinHeight="0">
-                    <TextBlock Classes="PlaybackPanelTitle"
-                               Text="{markups:Translate Playback_ActiveAuras}" />
-                    <ScrollViewer Grid.Row="1"
-                                  Classes="PlaybackPanelScroller AppScrollViewer">
-                        <ItemsControl ItemsSource="{Binding ActiveAuras}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:PlaybackAuraRowViewModel">
-                                    <Grid Classes="PlaybackAuraRow"
-                                          RowDefinitions="Auto,Auto"
-                                          RowSpacing="2">
-                                        <controls:SkillDisplay Classes="PlaybackSkillName"
-                                                               SkillCode="{Binding SkillCode}"
-                                                               IconSize="18" />
-                                        <Grid Grid.Row="1"
-                                              ColumnDefinitions="*,Auto"
-                                              ColumnSpacing="8">
-                                            <TextBlock Classes="PlaybackRowSubtle"
-                                                       Text="{Binding TargetName}" />
-                                            <TextBlock Grid.Column="1"
-                                                       Classes="PlaybackRowSubtle"
-                                                       Text="{Binding StackCount}" />
-                                        </Grid>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Grid>
-            </Border>
         </Grid>
     </Grid>
 </Window>

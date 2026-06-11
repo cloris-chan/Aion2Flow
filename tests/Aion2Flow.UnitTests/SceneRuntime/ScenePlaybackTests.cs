@@ -163,6 +163,64 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void TrackReader_SampledRead_PreservesOccupiedBucketsAndCountsAcrossArbitraryGaps()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        long ordinal = 1;
+        long[] combatBurstStarts = [1_000, 20_000, 55_000, 90_000];
+        foreach (var burstStart in combatBurstStarts)
+        {
+            for (var i = 0; i < 550; i++)
+                AppendCombat(journal, sceneId, 100, 200, i + 1, ordinal++, burstStart + i * 5);
+        }
+
+        long[] resourceBurstStarts = [8_000, 45_000, 75_000];
+        foreach (var burstStart in resourceBurstStarts)
+        {
+            for (var i = 0; i < 300; i++)
+                AppendResource(journal, sceneId, 200, 50_000 - i, 50_000, ordinal++, burstStart + i * 7);
+        }
+
+        AppendState(journal, sceneId, 100, StateCodes.PlayerIdentity, 0, 0, "Tester", ordinal, 130_000);
+        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
+        var snapshot = owner.CreateSnapshot();
+        var segment = owner.CreateArchivePayload(snapshot).TimelineSegment;
+        var timeRange = ScenePlaybackTimeline.ResolveTimeRange(segment, snapshot);
+
+        var read = ScenePlaybackTrackReader.ReadSampled(segment, timeRange, 0, timeRange.DurationMilliseconds, 32);
+        var full = ScenePlaybackTrackReader.Read(segment, timeRange, 0, timeRange.DurationMilliseconds, 4_000);
+
+        Assert.InRange(read.Samples.Count, 3, 96);
+        Assert.Equal(2_200, Assert.Single(read.TrackCounts, static count => count.Track == ScenePlaybackTrack.Combat).Count);
+        Assert.Equal(900, Assert.Single(read.TrackCounts, static count => count.Track == ScenePlaybackTrack.Resource).Count);
+        Assert.Equal(1, Assert.Single(read.TrackCounts, static count => count.Track == ScenePlaybackTrack.State).Count);
+        AssertOccupiedBucketsPreserved(ScenePlaybackTrack.Combat);
+        AssertOccupiedBucketsPreserved(ScenePlaybackTrack.Resource);
+        AssertOccupiedBucketsPreserved(ScenePlaybackTrack.State);
+
+        void AssertOccupiedBucketsPreserved(ScenePlaybackTrack track)
+        {
+            var occupiedBuckets = full.Markers
+                .Where(marker => marker.Track == track)
+                .Select(marker => ResolveBucket(marker.PositionMilliseconds))
+                .Distinct()
+                .Order()
+                .ToArray();
+            var sampledBuckets = read.Samples
+                .Where(sample => sample.Marker.Track == track)
+                .Select(sample => ResolveBucket(sample.Marker.PositionMilliseconds))
+                .Distinct()
+                .Order()
+                .ToArray();
+            Assert.Equal(occupiedBuckets, sampledBuckets);
+        }
+
+        int ResolveBucket(long position)
+            => Math.Clamp((int)(position / (double)Math.Max(1, timeRange.DurationMilliseconds) * 32), 0, 31);
+    }
+
+    [Fact]
     public void Seek_Backwards_RebuildsAuraState()
     {
         var journal = new ObservedEventJournal();

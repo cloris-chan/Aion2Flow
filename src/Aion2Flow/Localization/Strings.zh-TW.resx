@@ -125,12 +125,10 @@
   <data name="Playback_CheckpointsBuildingFormat" xml:space="preserve"><value>正在建立 checkpoints... {0}</value></data>
   <data name="Playback_CheckpointsReadyFormat" xml:space="preserve"><value>Checkpoints {0}</value></data>
   <data name="Playback_CheckpointsButton" xml:space="preserve"><value>Checkpoints</value></data>
-  <data name="Playback_TimelineMarkerLimitFormat" xml:space="preserve"><value>僅顯示前 {0} 個 timeline 標記</value></data>
   <data name="Playback_Label_Speed" xml:space="preserve"><value>速率</value></data>
   <data name="Playback_TimelineTracks" xml:space="preserve"><value>時間軸軌道</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>戰鬥對象</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>事件窗口</value></data>
-  <data name="Playback_ActiveAuras" xml:space="preserve"><value>作用中 Buff / Debuff</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>對象</value></data>
   <data name="Playback_Column_Damage" xml:space="preserve"><value>傷害</value></data>
   <data name="Playback_Column_Healing" xml:space="preserve"><value>治療</value></data>

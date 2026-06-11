@@ -232,14 +232,14 @@
         <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
-    <Style Selector="Grid.PlaybackCombatantRow, Grid.PlaybackEventRow, Grid.PlaybackAuraRow">
+    <Style Selector="Grid.PlaybackCombatantRow, Grid.PlaybackEventRow">
         <Setter Property="Background" Value="{StaticResource PlaybackBrush.Row}" />
         <Setter Property="Margin" Value="0,0,0,5" />
         <Setter Property="ClipToBounds" Value="True" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
 
-    <Style Selector="Grid.PlaybackCombatantRow:pointerover, Grid.PlaybackEventRow:pointerover, Grid.PlaybackAuraRow:pointerover">
+    <Style Selector="Grid.PlaybackCombatantRow:pointerover, Grid.PlaybackEventRow:pointerover">
         <Setter Property="Background" Value="{StaticResource PlaybackBrush.RowHover}" />
     </Style>
 
@@ -249,10 +249,6 @@
 
     <Style Selector="Grid.PlaybackEventRow">
         <Setter Property="MinHeight" Value="28" />
-    </Style>
-
-    <Style Selector="Grid.PlaybackAuraRow">
-        <Setter Property="MinHeight" Value="46" />
     </Style>
 
     <Style Selector="controls|CombatantDisplay.PlaybackCombatantName">

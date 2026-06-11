@@ -25,7 +25,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         ScenePlaybackTrack.Other
     ];
 
-    private const int MaxTimelineMarkers = 1_800;
+    private const int MaxTimelineMarkersPerTrack = 256;
     private const int MaxEventWindowMarkers = 96;
     private const long EventWindowRadiusMilliseconds = 4_000;
     private const long StepMilliseconds = 1_000;
@@ -133,16 +133,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     public partial string CheckpointText { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string TimelineMarkerLimitText { get; set; } = string.Empty;
-
-    [ObservableProperty]
     public partial IReadOnlyList<PlaybackTimelineLane> TimelineTracks { get; set; } = [];
 
     [ObservableProperty]
     public partial IReadOnlyList<PlaybackCombatantRowViewModel> Combatants { get; set; } = [];
-
-    [ObservableProperty]
-    public partial IReadOnlyList<PlaybackAuraRowViewModel> ActiveAuras { get; set; } = [];
 
     [ObservableProperty]
     public partial IReadOnlyList<PlaybackEventRowViewModel> EventWindow { get; set; } = [];
@@ -314,7 +308,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return;
 
         Combatants = CreateCombatants(frame);
-        ActiveAuras = CreateAuras(frame);
         if (ShouldRefreshEventWindow(frame, state))
         {
             EventWindow = CreateEventWindow(frame, state);
@@ -396,26 +389,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         return result;
     }
 
-    private IReadOnlyList<PlaybackAuraRowViewModel> CreateAuras(ScenePlaybackFrame frame)
-    {
-        if (frame.ActiveAuras.Count == 0)
-            return [];
-
-        var result = new PlaybackAuraRowViewModel[frame.ActiveAuras.Count];
-        for (var i = 0; i < frame.ActiveAuras.Count; i++)
-        {
-            var aura = frame.ActiveAuras[i];
-            result[i] = new PlaybackAuraRowViewModel(aura.SkillCode, DisplayContext.ResolveSkillName(aura.SkillCode), DisplayContext.ResolveEntityName(aura.SourceEntityId), DisplayContext.ResolveEntityName(aura.TargetEntityId), aura.StackCount, aura.SequenceId);
-        }
-
-        Array.Sort(result, static (left, right) =>
-        {
-            var cmp = string.Compare(left.TargetName, right.TargetName, StringComparison.CurrentCulture);
-            return cmp != 0 ? cmp : string.Compare(left.SkillName, right.SkillName, StringComparison.CurrentCulture);
-        });
-        return result;
-    }
-
     private void RefreshTimelineTracks(ScenePlaybackFrame frame)
     {
         var duration = frame.TimeRange.DurationMilliseconds;
@@ -471,16 +444,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         var segment = _controller.CreateTimelineSegment();
         var duration = frame.TimeRange.DurationMilliseconds;
         if (segment.IsEmpty || duration <= 0)
-        {
-            TimelineMarkerLimitText = string.Empty;
             return [];
-        }
 
-        var read = ScenePlaybackTrackReader.Read(segment, frame.TimeRange, 0, duration, MaxTimelineMarkers);
+        var read = ScenePlaybackTrackReader.ReadSampled(segment, frame.TimeRange, 0, duration, MaxTimelineMarkersPerTrack);
         var groups = new Dictionary<ScenePlaybackTrack, List<PlaybackTimelineMarker>>();
-        for (var i = 0; i < read.Markers.Count; i++)
+        for (var i = 0; i < read.Samples.Count; i++)
         {
-            var marker = read.Markers[i];
+            var sample = read.Samples[i];
+            var marker = sample.Marker;
             var track = marker.Track;
             if (!groups.TryGetValue(track, out var list))
             {
@@ -488,12 +459,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                 groups.Add(track, list);
             }
 
-            list.Add(new PlaybackTimelineMarker(marker.PositionMilliseconds, ResolveMarkerWeight(marker), ResolveTrackBrush(track), CreateMarkerText(marker)));
+            list.Add(new PlaybackTimelineMarker(marker.PositionMilliseconds, ResolveMarkerWeight(marker, sample.EventCount), ResolveTrackBrush(track), CreateMarkerText(marker)));
         }
-
-        TimelineMarkerLimitText = read.HasMore
-            ? string.Format(CultureInfo.CurrentCulture, Localization["Playback_TimelineMarkerLimitFormat"], MaxTimelineMarkers.ToString("N0", CultureInfo.CurrentCulture))
-            : string.Empty;
 
         var lanes = new List<PlaybackTimelineLane>(TrackOrder.Length);
         foreach (var track in TrackOrder)
@@ -502,7 +469,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             if (markers is null || markers.Count == 0)
                 continue;
 
-            lanes.Add(new PlaybackTimelineLane(ResolveTrackName(track), track, ResolveTrackBrush(track), markers, duration, frame.PositionMilliseconds, markers.Count));
+            lanes.Add(new PlaybackTimelineLane(ResolveTrackName(track), track, ResolveTrackBrush(track), markers, duration, frame.PositionMilliseconds, ResolveTrackCount(read.TrackCounts, track)));
         }
 
         return lanes;
@@ -595,12 +562,24 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         return string.Empty;
     }
 
-    private static double ResolveMarkerWeight(ScenePlaybackTrackMarker marker)
+    private static double ResolveMarkerWeight(ScenePlaybackTrackMarker marker, int eventCount)
     {
-        var amount = Math.Abs(marker.Amount);
-        return marker.Track == ScenePlaybackTrack.Combat && amount > 0
+        var amount = marker.Amount >= 0 ? (double)marker.Amount : -(double)marker.Amount;
+        var baseWeight = marker.Track == ScenePlaybackTrack.Combat && amount > 0
             ? Math.Clamp(Math.Log10(amount + 1) * 2.2d, 3d, 12d)
             : 5d;
+        return Math.Clamp(baseWeight + Math.Log2(Math.Max(1, eventCount)) * 0.75d, 3d, 12d);
+    }
+
+    private static int ResolveTrackCount(IReadOnlyList<ScenePlaybackTrackCount> counts, ScenePlaybackTrack track)
+    {
+        for (var i = 0; i < counts.Count; i++)
+        {
+            if (counts[i].Track == track)
+                return counts[i].Count;
+        }
+
+        return 0;
     }
 
     private static IBrush ResolveTrackBrush(ScenePlaybackTrack track) => track switch
@@ -665,7 +644,5 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 }
 
 public sealed record PlaybackCombatantRowViewModel(int EntityId, string Name, string DamageText, string DamagePerSecondText, string HealingText, string HealingPerSecondText, string HpText, IReadOnlyList<ProgressSegment> HpSegments);
-
-public sealed record PlaybackAuraRowViewModel(int SkillCode, string SkillName, string SourceName, string TargetName, int StackCount, int SequenceId);
 
 public sealed record PlaybackEventRowViewModel(string TimeText, string TrackText, string SourceText, string TargetText, string SkillText, string AmountText);

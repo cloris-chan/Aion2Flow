@@ -125,12 +125,10 @@
   <data name="Playback_CheckpointsBuildingFormat" xml:space="preserve"><value>체크포인트 생성 중... {0}</value></data>
   <data name="Playback_CheckpointsReadyFormat" xml:space="preserve"><value>체크포인트 {0}</value></data>
   <data name="Playback_CheckpointsButton" xml:space="preserve"><value>체크포인트</value></data>
-  <data name="Playback_TimelineMarkerLimitFormat" xml:space="preserve"><value>처음 {0}개 timeline 마커 표시</value></data>
   <data name="Playback_Label_Speed" xml:space="preserve"><value>속도</value></data>
   <data name="Playback_TimelineTracks" xml:space="preserve"><value>Timeline Tracks</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>전투 대상</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>이벤트 창</value></data>
-  <data name="Playback_ActiveAuras" xml:space="preserve"><value>활성 Buff / Debuff</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>대상</value></data>
   <data name="Playback_Column_Damage" xml:space="preserve"><value>피해</value></data>
   <data name="Playback_Column_Healing" xml:space="preserve"><value>치유</value></data>
