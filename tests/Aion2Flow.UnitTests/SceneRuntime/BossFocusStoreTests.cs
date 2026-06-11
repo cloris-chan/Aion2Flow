@@ -209,6 +209,39 @@ public sealed class BossFocusStoreTests
     }
 
     [Fact]
+    public void ScenePath_RestoresActiveBossFromEntityStateAfterFocusStoreReset()
+    {
+        var entities = new EntityStore();
+        entities.ApplyNpcKind(3518, NpcKind.Boss);
+        entities.ApplyNpcHp(3518, 157_000, 167_000);
+        entities.ApplyBattleToggle(3518, true);
+        var focus = new BossFocusStore(entities);
+
+        entities.ApplyNpcHp(3518, 152_000, 167_000);
+        focus.ApplyNpcHp(3518, 152_000, 167_000, 100);
+
+        Assert.True(focus.TryGetObservedBoss(200, 2_000, out var boss));
+        Assert.Equal(3518, boss.InstanceId);
+        Assert.Equal(152_000, boss.Hp);
+        Assert.Equal(167_000, boss.MaxHp);
+    }
+
+    [Fact]
+    public void ScenePath_DoesNotRestoreActiveMonsterFromEntityStateAfterFocusStoreReset()
+    {
+        var entities = new EntityStore();
+        entities.ApplyNpcKind(3518, NpcKind.Monster);
+        entities.ApplyNpcHp(3518, 157_000, 167_000);
+        entities.ApplyBattleToggle(3518, true);
+        var focus = new BossFocusStore(entities);
+
+        entities.ApplyNpcHp(3518, 152_000, 167_000);
+        focus.ApplyNpcHp(3518, 152_000, 167_000, 100);
+
+        Assert.False(focus.TryGetObservedBoss(200, 2_000, out _));
+    }
+
+    [Fact]
     public void JournalingSink_RecordsNpcKindBattleAndHpProtocolFields()
     {
         var journal = new ObservedEventJournal();

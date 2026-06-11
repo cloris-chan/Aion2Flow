@@ -1817,6 +1817,53 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
+    public void LiveReadModel_Reset_RestoresActiveBossFocusAndPreservesNpcCatalogIdentity()
+    {
+        const int bossId = 29194;
+        const int bossCode = 2_980_122;
+        const int monsterId = 29195;
+        const int monsterCode = 2_980_123;
+        var firstStarted = new DateTimeOffset(2026, 6, 12, 12, 0, 0, TimeSpan.Zero);
+        var secondStarted = firstStarted.AddSeconds(10);
+        var scene = new SceneLiveReadModel(firstStarted);
+        try
+        {
+            var sink = SceneSinkFactory.CreateForLive(scene)();
+            var identitySource = SyntheticObservationExtensions.Source(firstStarted.ToUnixTimeMilliseconds() + 10);
+            sink.AppendNpcCode(in identitySource, bossId, bossCode);
+            sink.AppendNpcKind(in identitySource, bossId, NpcKind.Boss);
+            sink.AppendNpcCode(in identitySource, monsterId, monsterCode);
+            sink.AppendNpcKind(in identitySource, monsterId, NpcKind.Monster);
+            sink.SetNpcBattle(bossId, true, firstStarted.ToUnixTimeMilliseconds() + 20);
+            sink.AppendNpcHp(bossId, 100, 100, firstStarted.ToUnixTimeMilliseconds() + 30);
+            _ = scene.Owner.CreateSnapshot();
+
+            scene.Reset(secondStarted);
+
+            sink.AppendNpcHp(bossId, 70, 100, secondStarted.ToUnixTimeMilliseconds() + 100);
+            var snapshot = scene.Owner.CreateSnapshot();
+
+            var boss = Assert.Single(snapshot.BossFocuses);
+            Assert.Equal(bossId, boss.InstanceId);
+            Assert.Equal(70, boss.Hp);
+            Assert.Equal(100, boss.MaxHp);
+            Assert.True(scene.Owner.Entities.TryGet(bossId, out var retainedBoss));
+            Assert.Equal(bossCode, retainedBoss.NpcCode);
+            Assert.Equal(NpcKind.Boss, retainedBoss.Kind);
+            Assert.True(scene.Owner.Entities.TryGet(monsterId, out var retainedMonster));
+            Assert.Equal(monsterCode, retainedMonster.NpcCode);
+            Assert.Equal(NpcKind.Monster, retainedMonster.Kind);
+            Assert.True(scene.Owner.MetadataRegistry.TryGetNpcCode(bossId, out var retainedBossCode));
+            Assert.Equal(bossCode, retainedBossCode);
+            Assert.True(scene.Owner.MetadataRegistry.TryGetNpcCode(monsterId, out var retainedMonsterCode));
+            Assert.Equal(monsterCode, retainedMonsterCode);
+        }
+        finally
+        {
+        }
+    }
+
+    [Fact]
     public void LiveReadModel_FactoryCreatesSceneSink()
     {
         var scene = new SceneLiveReadModel();
