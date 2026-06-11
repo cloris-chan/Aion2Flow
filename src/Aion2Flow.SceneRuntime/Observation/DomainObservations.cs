@@ -127,6 +127,8 @@ public readonly record struct AuraObservation
     public int ChainId { get; init; }
     public int ResultCode { get; init; }
     public int Mode { get; init; }
+    public int TailFirstValue { get; init; }
+    public int TailUInt32Raw { get; init; }
 
     public AuraObservation(int sourceEntityId, int targetEntityId, int skillCode, int stackCount, int sequenceId, int chainId, int resultCode, int mode)
     {

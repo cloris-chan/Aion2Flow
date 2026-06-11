@@ -362,12 +362,10 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw)
+    public void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailFirstValue, int tailUInt32Raw)
     {
         instanceId = ResolveLifecycleId(instanceId);
-        tailSourceId = ResolveLifecycleId(tailSourceId);
         AddKnownEntity(instanceId);
-        AddKnownEntity(tailSourceId);
         var state = GetOrAddNpcState(instanceId);
         state.Latest2C38 = (sequenceId, resultCode);
         RememberNpcObservationSource(instanceId);
@@ -377,19 +375,20 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             SceneSessionId = sceneSessionId(),
             Stamp = stamp,
             Domain = ObservedEventDomain.Aura,
-            SourceEntityId = tailSourceId,
+            SourceEntityId = 0,
             TargetEntityId = instanceId,
             Raw = packet.Raw,
             Aura = new AuraObservation
             {
-                SourceEntityId = tailSourceId,
+                SourceEntityId = 0,
                 TargetEntityId = instanceId,
-                SkillCode = tailSkillCodeRaw,
                 StackCount = 0,
                 SequenceId = sequenceId,
                 ChainId = 0,
                 ResultCode = resultCode,
-                Mode = mode
+                Mode = mode,
+                TailFirstValue = tailFirstValue,
+                TailUInt32Raw = tailUInt32Raw
             }
         });
     }

@@ -539,6 +539,26 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
+    public void JournalingSink_Preserves2C38TailWithoutInferringSkillOrSource()
+    {
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        var source = new PacketObservationSource(1_000, 1, 1, 0x2C38, 16, 7, default);
+
+        sink.RegisterObservation2C38(in source, 42, 2, 95, 7, 23_771, 16_300_243);
+
+        var entry = journal.Read(0);
+        var aura = Assert.IsType<AuraObservation>(entry.Aura);
+        Assert.Equal(0, entry.SourceEntityId);
+        Assert.Equal(42, entry.TargetEntityId);
+        Assert.Equal(0, aura.SourceEntityId);
+        Assert.Equal(0, aura.SkillCode);
+        Assert.Equal(23_771, aura.TailFirstValue);
+        Assert.Equal(16_300_243, aura.TailUInt32Raw);
+        Assert.False(sink.IsKnownEntity(23_771));
+    }
+
+    [Fact]
     public void JournalingSink_RecordsStageDestinationMap()
     {
         var journal = new ObservedEventJournal();

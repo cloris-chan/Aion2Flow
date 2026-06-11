@@ -2,15 +2,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet2C38Observation(
-    int SourceId,
-    int Mode,
-    int StateCode,
-    int SequenceId,
-    int ResultCode,
-    int TailLength,
-    int TailSourceId,
-    int TailSkillCodeRaw);
+internal readonly record struct Packet2C38Observation(int SourceId, int Mode, int StateCode, int SequenceId, int ResultCode, int TailLength, int TailFirstValue, int TailUInt32Raw);
 
 internal static class Packet2C38Parser
 {
@@ -30,30 +22,22 @@ internal static class Packet2C38Parser
         if (!reader.TryReadVarInt(out var sequenceId)) return false;
         if (!reader.TryReadVarInt(out var resultCode)) return false;
 
-        var tailSourceId = 0;
-        var tailSkillCodeRaw = 0;
+        var tailFirstValue = 0;
+        var tailUInt32Raw = 0;
         var tailLength = reader.Remaining;
         if (tailLength >= 5)
         {
             var tailReader = reader;
-            if (tailReader.TryReadVarInt(out var parsedTailSourceId) &&
+            if (tailReader.TryReadVarInt(out var parsedTailFirstValue) &&
                 tailReader.Remaining >= 4 &&
-                tailReader.TryReadUInt32Le(out var parsedTailSkillCodeRaw))
+                tailReader.TryReadUInt32Le(out var parsedTailUInt32Raw))
             {
-                tailSourceId = parsedTailSourceId;
-                tailSkillCodeRaw = unchecked(parsedTailSkillCodeRaw);
+                tailFirstValue = parsedTailFirstValue;
+                tailUInt32Raw = unchecked(parsedTailUInt32Raw);
             }
         }
 
-        result = new Packet2C38Observation(
-            sourceId,
-            mode,
-            stateCode,
-            sequenceId,
-            resultCode,
-            tailLength,
-            tailSourceId,
-            tailSkillCodeRaw);
+        result = new Packet2C38Observation(sourceId, mode, stateCode, sequenceId, resultCode, tailLength, tailFirstValue, tailUInt32Raw);
         return true;
     }
 }

@@ -76,7 +76,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.RegisterObservation2C38(context.CreateObservationSource(0x2C38, packet.Length), parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, parsed.TailSourceId, parsed.TailSkillCodeRaw);
+        context.Sink.RegisterObservation2C38(context.CreateObservationSource(0x2C38, packet.Length), parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, parsed.TailFirstValue, parsed.TailUInt32Raw);
 
         RawPacketDump.ObserveParsedPacket("aux-2c38", context.Connection);
         return context.MarkParsed();

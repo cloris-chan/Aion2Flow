@@ -2,10 +2,10 @@ using Cloris.Aion2Flow.Resources;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
-public sealed class SkillNormalizationSceneTests
+public sealed class SkillIdentitySceneTests
 {
     [Fact]
-    public void Normalizes_Confirmed_Specialization_Variant_To_Known_Base_Skill()
+    public void Keeps_Confirmed_Specialization_Variant_Without_Resource_Normalization()
     {
         CombatResourceRegistry.SetGameResources(
         [
@@ -23,7 +23,7 @@ public sealed class SkillNormalizationSceneTests
         CombatResourceRegistry.NormalizePacketForStorage(ref packet);
 
         Assert.True(packet.IsNormalized);
-        Assert.Equal(17750000, packet.SkillCode);
+        Assert.Equal(17750010, packet.SkillCode);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class SkillNormalizationSceneTests
     }
 
     [Fact]
-    public void Normalizes_Confirmed_Triggered_Variant_To_Known_Primary_Skill_Code()
+    public void Keeps_Confirmed_Variant_As_Packet_Identity_And_Uses_Resources_Only_For_Display()
     {
         CombatResourceRegistry.LoadSkillMap("zh-TW");
         using var scene = new SceneTestHarness();
@@ -79,7 +79,7 @@ public sealed class SkillNormalizationSceneTests
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out _));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
-        Assert.True(skills.TryGetBySkillCode(17040250, out var skill));
+        Assert.True(skills.TryGetBySkillCode(17040257, out var skill));
         Assert.Equal("審判之電", CombatResourceRegistry.DisplaySkillNameFor(skill.SkillCode));
         Assert.Equal(77282, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
@@ -120,7 +120,7 @@ public sealed class SkillNormalizationSceneTests
     }
 
     [Fact]
-    public void Collapses_SameName_NonTriggered_PcSkill_Variants_To_Base_Skill()
+    public void Keeps_SameName_PcSkill_Variants_As_Distinct_Packet_Identities()
     {
         CombatResourceRegistry.SetGameResources(
         [
@@ -155,12 +155,14 @@ public sealed class SkillNormalizationSceneTests
 
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out _));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
-        Assert.True(skills.TryGetBySkillCode(12240000, out var judgment));
-        Assert.Equal("審判", CombatResourceRegistry.DisplaySkillNameFor(judgment.SkillCode));
-        Assert.Equal(39065, judgment.DamageAmount);
-        Assert.Equal(2, judgment.Times);
-        Assert.False(skills.ContainsSkillCode(12240350));
-        Assert.False(skills.ContainsSkillCode(12240030));
+        Assert.True(skills.TryGetBySkillCode(12240350, out var specialized));
+        Assert.True(skills.TryGetBySkillCode(12240039, out var variantState));
+        Assert.Equal("審判", CombatResourceRegistry.DisplaySkillNameFor(specialized.SkillCode));
+        Assert.Equal("審判", CombatResourceRegistry.DisplaySkillNameFor(variantState.SkillCode));
+        Assert.Equal(23108, specialized.DamageAmount);
+        Assert.Equal(15957, variantState.DamageAmount);
+        Assert.Equal(1, specialized.Times);
+        Assert.Equal(1, variantState.Times);
     }
 
     [Fact]

@@ -140,9 +140,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterObservation2B38(in packet, sourceId, sourceIdCopy, phase, marker, actionResourceEffectRef, sequenceId, stateValue, detailValue, tailLength);
     }
 
-    public void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw)
+    public void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailFirstValue, int tailUInt32Raw)
     {
-        lock (gate) inner.RegisterObservation2C38(in packet, instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw);
+        lock (gate) inner.RegisterObservation2C38(in packet, instanceId, mode, sequenceId, resultCode, tailFirstValue, tailUInt32Raw);
     }
 
     public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)

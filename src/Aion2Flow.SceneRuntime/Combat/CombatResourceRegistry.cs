@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -9,7 +8,6 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 public static class CombatResourceRegistry
 {
     private static SkillCollection _skillMap = [];
-    private static readonly ConcurrentDictionary<int, int> _skillCodeNormalizationCache = [];
 
     public static SkillCollection SkillMap
     {
@@ -18,14 +16,11 @@ public static class CombatResourceRegistry
         {
             _skillMap = value;
             SkillDisplayMap = _skillMap;
-            SkillCodes = [.. _skillMap.Select(static x => x.Id).OrderBy(static x => x)];
-            _skillCodeNormalizationCache.Clear();
             SkillMapRevision++;
         }
     }
 
     public static SkillCollection SkillDisplayMap { get; private set; } = [];
-    public static int[] SkillCodes { get; private set; } = [];
     public static long SkillMapRevision { get; private set; }
     public static IReadOnlyDictionary<int, NpcCatalogEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcCatalogEntry>();
 
@@ -74,9 +69,28 @@ public static class CombatResourceRegistry
         if (SkillDisplayMap.TryGetValue(skillCode, out var displaySkill) && !string.IsNullOrWhiteSpace(displaySkill.Name))
             return displaySkill.Name;
 
-        return SkillMap.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name)
-            ? skill.Name
-            : string.Empty;
+        if (SkillMap.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name))
+            return skill.Name;
+
+        var variant = SkillVariantInfo.Parse(skillCode);
+        Span<int> fallbackCodes = stackalloc int[3];
+        fallbackCodes[0] = variant.BaseSkillCode + EncodeVariantSuffix(variant.SpecializationMask, 0);
+        fallbackCodes[1] = variant.BaseSkillCode;
+        fallbackCodes[2] = variant.BaseSkillCode + variant.VariantState;
+
+        foreach (var fallbackCode in fallbackCodes)
+        {
+            if (fallbackCode <= 0 || fallbackCode == skillCode)
+                continue;
+
+            if (SkillDisplayMap.TryGetValue(fallbackCode, out displaySkill) && !string.IsNullOrWhiteSpace(displaySkill.Name))
+                return displaySkill.Name;
+
+            if (SkillMap.TryGetValue(fallbackCode, out skill) && !string.IsNullOrWhiteSpace(skill.Name))
+                return skill.Name;
+        }
+
+        return string.Empty;
     }
 
     public static NpcKind ResolveNpcKind(NpcCatalogKind kind) =>
@@ -129,7 +143,7 @@ public static class CombatResourceRegistry
         var modifiers = observation.Type == 3 ? observation.Modifiers | DamageModifiers.Critical : observation.Modifiers;
         var normalized = observation with
         {
-            SkillCode = NormalizeConfirmedSkillCode(observation.SkillCode),
+            SkillCode = Math.Max(0, observation.SkillCode),
             Modifiers = modifiers
         };
 
@@ -155,103 +169,7 @@ public static class CombatResourceRegistry
         return normalized;
     }
 
-    public static SkillVariantInfo ParseSkillVariant(int originalSkillCode)
-    {
-        if (originalSkillCode <= 0)
-            return new SkillVariantInfo(0, 0, 0, 0, 0);
-
-        var chargeStage = originalSkillCode % 10;
-        var specializationDigits = (originalSkillCode / 10) % 1000;
-        var specializationMask = 0;
-        var specializationAccumulator = specializationDigits;
-
-        while (specializationAccumulator > 0)
-        {
-            var digit = specializationAccumulator % 10;
-            specializationAccumulator /= 10;
-            if (digit is >= 1 and <= 5)
-                specializationMask |= 1 << (digit - 1);
-        }
-
-        var baseSkillCode = originalSkillCode - (originalSkillCode % 10000);
-        var normalizedSkillCode = baseSkillCode + chargeStage;
-        return new SkillVariantInfo(originalSkillCode, normalizedSkillCode, baseSkillCode, chargeStage, specializationMask);
-    }
-
-    private static int NormalizeConfirmedSkillCode(int skillCode)
-    {
-        if (skillCode <= 0 || SkillMap.Count == 0)
-            return Math.Max(0, skillCode);
-
-        if (_skillCodeNormalizationCache.TryGetValue(skillCode, out var cached))
-            return cached;
-
-        var variant = ParseSkillVariant(skillCode);
-        var resolvedSkillCode = Array.BinarySearch(SkillCodes, skillCode) >= 0
-            ? skillCode
-            : ResolveKnownVariantSkillCode(skillCode, variant);
-        resolvedSkillCode = ResolveSameNameVariantGroupSkillCode(resolvedSkillCode, variant);
-        _skillCodeNormalizationCache[skillCode] = resolvedSkillCode;
-        return resolvedSkillCode;
-    }
-
-    private static int ResolveKnownVariantSkillCode(int skillCode, SkillVariantInfo variant)
-    {
-        if (variant.BaseSkillCode <= 0)
-            return skillCode;
-
-        Span<int> candidates = stackalloc int[3];
-        var count = 0;
-        var specializationWithoutCharge = variant.BaseSkillCode + EncodeVariantSuffix(variant.SpecializationMask, 0);
-        if (specializationWithoutCharge > 0)
-            candidates[count++] = specializationWithoutCharge;
-        candidates[count++] = variant.BaseSkillCode;
-        candidates[count++] = variant.BaseSkillCode + EncodeVariantSuffix(0, variant.ChargeStage);
-
-        for (var i = 0; i < count; i++)
-        {
-            var candidate = candidates[i];
-            if (candidate > 0 && Array.BinarySearch(SkillCodes, candidate) >= 0)
-                return candidate;
-        }
-
-        return skillCode;
-    }
-
-    private static int ResolveSameNameVariantGroupSkillCode(int resolvedSkillCode, SkillVariantInfo variant)
-    {
-        if (resolvedSkillCode <= 0 || variant.BaseSkillCode <= 0 || resolvedSkillCode == variant.BaseSkillCode || !ShouldCollapseSameNameVariantGroup(variant.BaseSkillCode) || SkillMap.Count == 0)
-            return resolvedSkillCode;
-
-        if (!SkillMap.TryGetValue(resolvedSkillCode, out var resolvedSkill) || !SkillMap.TryGetValue(variant.BaseSkillCode, out var baseSkill))
-            return resolvedSkillCode;
-
-        if (resolvedSkill.SourceType != SkillSourceType.PcSkill || baseSkill.SourceType != resolvedSkill.SourceType || baseSkill.Category != resolvedSkill.Category || !string.Equals(baseSkill.Name, resolvedSkill.Name, StringComparison.Ordinal))
-            return resolvedSkillCode;
-
-        if (BaseSkillGroupHasTriggeredSiblings(variant.BaseSkillCode))
-            return resolvedSkillCode;
-
-        return variant.BaseSkillCode;
-    }
-
-    private static bool ShouldCollapseSameNameVariantGroup(int baseSkillCode) => baseSkillCode == 12240000;
-
-    private static bool BaseSkillGroupHasTriggeredSiblings(int baseSkillCode)
-    {
-        foreach (var skill in SkillMap)
-        {
-            if (skill.Id <= 0 || ParseSkillVariant(skill.Id).BaseSkillCode != baseSkillCode)
-                continue;
-
-            if (skill.EnumerateTriggeredSkillIds().Any())
-                return true;
-        }
-
-        return false;
-    }
-
-    private static int EncodeVariantSuffix(int specializationMask, int chargeStage)
+    private static int EncodeVariantSuffix(int specializationMask, int variantState)
     {
         var suffix = 0;
         for (var specialization = 1; specialization <= 5; specialization++)
@@ -261,6 +179,6 @@ public static class CombatResourceRegistry
                 suffix = (suffix * 10) + specialization;
         }
 
-        return (suffix * 10) + chargeStage;
+        return (suffix * 10) + variantState;
     }
 }
