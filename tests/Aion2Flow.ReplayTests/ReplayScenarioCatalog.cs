@@ -26,6 +26,7 @@ public static class ReplayScenarioCatalog
     public const string Direct0438BodySkillVariant = "aion2flow.stream.20260610235630.log";
     public const string SummonCreateState4136 = "aion2flow.stream.20260611024229.log";
     public const string ElementalistSummonBossDamageAttribution = "aion2flow.stream.20260611034030.log";
+    public const string PlaybackSceneRelativeTimestamps = "aion2flow.stream.20260611151958.log";
 
     public static IEnumerable<object[]> April11IncomingAvoidance =>
     [

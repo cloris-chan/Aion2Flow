@@ -229,7 +229,7 @@ public sealed class BossFocusStoreTests
         var battle = journal.Read(1);
         Assert.Equal(StateCodes.NpcBattle, battle.State!.Value.StateCode);
         Assert.Equal(1, battle.State.Value.Value0);
-        Assert.Equal(900, battle.Raw.TimestampMilliseconds);
+        Assert.Equal(900, battle.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
 
         var toggle = journal.Read(2);
         Assert.Equal(StateCodes.NpcBattleToggle, toggle.State!.Value.StateCode);
@@ -237,7 +237,7 @@ public sealed class BossFocusStoreTests
         var hp = journal.Read(3);
         Assert.Equal(ObservedEventDomain.Resource, hp.Domain);
         Assert.Equal(22_847, hp.Resource!.Value.CurrentValue);
-        Assert.Equal(1_100, hp.Raw.TimestampMilliseconds);
+        Assert.Equal(1_100, hp.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
     }
 
     private sealed class Harness

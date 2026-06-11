@@ -17,6 +17,9 @@ internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObserv
 
     public readonly long BatchOrdinal => ordinals.CurrentBatchOrdinal;
 
+    public readonly PacketObservationSource CreateObservationSource(ushort opcode, int payloadLength, long captureSequence = 0)
+        => new(TimestampMilliseconds, FrameOrdinal, BatchOrdinal, opcode, payloadLength, captureSequence, CurrentStructurePath);
+
     public PacketStructurePath EnterStructure(PacketStructureKind kind, int offset, int length, int bodyOffset, int bodyLength, int siblingIndex)
     {
         var previous = CurrentStructurePath;

@@ -607,12 +607,12 @@ public sealed class MainViewModelCombatantFilterTests
     {
         var fixture = MainViewModelFixture.Create();
         var sink = fixture.CreateLiveSink();
-        AppendLiveBattle(sink, 100, "Player", 800, 1_000, 2_000, 1);
+        AppendLiveBattle(sink, fixture.SceneStartedMilliseconds, 100, "Player", 800, 1_000, 2_000, 1);
         var firstScene = fixture.CreateSceneSnapshot();
 
         fixture.ViewModel.ResetLiveModelsForTesting();
 
-        AppendLiveBattle(sink, 100, "Player", 900, 3_000, 4_000, 3);
+        AppendLiveBattle(sink, fixture.SceneStartedMilliseconds, 100, "Player", 900, 3_000, 4_000, 3);
         var secondScene = fixture.CreateSceneSnapshot();
 
         Assert.NotEqual(firstScene.EncounterId, secondScene.EncounterId);
@@ -732,6 +732,7 @@ public sealed class MainViewModelCombatantFilterTests
         public SettingsFlyoutViewModel Settings => ViewModel.SettingsFlyout;
         public EncounterArchiveService Archive { get; }
         public RuntimeMetadataRegistry MetadataRegistry => _captureService.Scene.Owner.MetadataRegistry;
+        public long SceneStartedMilliseconds => _captureService.Scene.SessionStarted.ToUnixTimeMilliseconds();
 
         public static MainViewModelFixture Create()
         {
@@ -775,6 +776,7 @@ public sealed class MainViewModelCombatantFilterTests
     private static void AppendSceneEncounter(SceneLiveReadModel scene, int playerId, string name, int damage, long start, long end)
     {
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var origin = scene.SessionStarted.ToUnixTimeMilliseconds();
         sink.AppendNickname(playerId, name);
         sink.AppendCombatPacket(new ParsedCombatPacket
         {
@@ -782,7 +784,7 @@ public sealed class MainViewModelCombatantFilterTests
             TargetId = 900_002,
             SkillCode = 11000010,
             Damage = damage / 2,
-            Timestamp = start,
+            Timestamp = origin + start,
             BatchOrdinal = 1,
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage
@@ -793,7 +795,7 @@ public sealed class MainViewModelCombatantFilterTests
             TargetId = 900_002,
             SkillCode = 11000010,
             Damage = damage - damage / 2,
-            Timestamp = end,
+            Timestamp = origin + end,
             BatchOrdinal = 2,
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage
@@ -808,7 +810,7 @@ public sealed class MainViewModelCombatantFilterTests
         sink.AppendNickname(playerId, name);
     }
 
-    private static void AppendLiveBattle(IRuntimeObservationSink sink, int playerId, string name, int damage, long start, long end, long firstBatchOrdinal)
+    private static void AppendLiveBattle(IRuntimeObservationSink sink, long sceneStartedMilliseconds, int playerId, string name, int damage, long start, long end, long firstBatchOrdinal)
     {
         sink.AppendNickname(playerId, name);
         sink.AppendCombatPacket(new ParsedCombatPacket
@@ -817,7 +819,7 @@ public sealed class MainViewModelCombatantFilterTests
             TargetId = 900_002,
             SkillCode = 11000010,
             Damage = damage / 2,
-            Timestamp = start,
+            Timestamp = sceneStartedMilliseconds + start,
             BatchOrdinal = firstBatchOrdinal,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -830,7 +832,7 @@ public sealed class MainViewModelCombatantFilterTests
             TargetId = 900_002,
             SkillCode = 11000010,
             Damage = damage - damage / 2,
-            Timestamp = end,
+            Timestamp = sceneStartedMilliseconds + end,
             BatchOrdinal = firstBatchOrdinal + 1,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -851,20 +853,22 @@ public sealed class MainViewModelCombatantFilterTests
     private static void AppendSceneBossFocus(SceneLiveReadModel scene, int instanceId, string name, int hp, int maxHp, long timestamp)
     {
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var origin = scene.SessionStarted.ToUnixTimeMilliseconds();
         sink.AppendNpcName(2_100_351, name);
         sink.AppendNpcCode(instanceId, 2_100_351);
         sink.AppendNpcKind(instanceId, NpcKind.Boss);
-        sink.SetNpcBattle(instanceId, true, timestamp - 100);
-        sink.AppendNpcHp(instanceId, hp, maxHp, timestamp);
+        sink.SetNpcBattle(instanceId, true, origin + timestamp - 100);
+        sink.AppendNpcHp(instanceId, hp, maxHp, origin + timestamp);
     }
 
     private static void AppendSceneBossFocusUnknownHp(SceneLiveReadModel scene, int instanceId, string name, long timestamp)
     {
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var origin = scene.SessionStarted.ToUnixTimeMilliseconds();
         sink.AppendNpcName(2_100_351, name);
         sink.AppendNpcCode(instanceId, 2_100_351);
         sink.AppendNpcKind(instanceId, NpcKind.Boss);
-        sink.SetNpcBattle(instanceId, true, timestamp);
+        sink.SetNpcBattle(instanceId, true, origin + timestamp);
     }
 
     private static void AppendSceneDamage(SceneLiveReadModel scene, int sourceId, int targetId, int skillCode, int damage, long timestamp, long batchOrdinal)
@@ -876,7 +880,7 @@ public sealed class MainViewModelCombatantFilterTests
             TargetId = targetId,
             SkillCode = skillCode,
             Damage = damage,
-            Timestamp = timestamp,
+            Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + timestamp,
             BatchOrdinal = batchOrdinal,
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage

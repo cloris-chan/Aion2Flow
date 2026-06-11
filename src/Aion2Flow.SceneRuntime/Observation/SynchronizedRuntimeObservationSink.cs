@@ -60,49 +60,49 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RememberNpcObservationSource(instanceId);
     }
 
-    public void StageDestinationMap(uint mapId)
+    public void StageDestinationMap(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.StageDestinationMap(mapId);
+        lock (gate) inner.StageDestinationMap(in packet, mapId);
     }
 
-    public void StageDestinationMap(uint mapId, bool allowSameMapReload)
+    public void StageDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload)
     {
-        lock (gate) inner.StageDestinationMap(mapId, allowSameMapReload);
+        lock (gate) inner.StageDestinationMap(in packet, mapId, allowSameMapReload);
     }
 
-    public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload)
+    public void StagePendingDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload)
     {
-        lock (gate) inner.StagePendingDestinationMap(mapId, allowSameMapReload);
+        lock (gate) inner.StagePendingDestinationMap(in packet, mapId, allowSameMapReload);
     }
 
-    public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload)
+    public void ConfirmDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload)
     {
-        lock (gate) inner.ConfirmDestinationMap(mapId, allowSameMapReload);
+        lock (gate) inner.ConfirmDestinationMap(in packet, mapId, allowSameMapReload);
     }
 
-    public void ConfirmPendingDestinationMapArrival()
+    public void ConfirmPendingDestinationMapArrival(in PacketObservationSource packet)
     {
-        lock (gate) inner.ConfirmPendingDestinationMapArrival();
+        lock (gate) inner.ConfirmPendingDestinationMapArrival(in packet);
     }
 
-    public void StageDestinationMapInstance(uint instanceId)
+    public void StageDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
     {
-        lock (gate) inner.StageDestinationMapInstance(instanceId);
+        lock (gate) inner.StageDestinationMapInstance(in packet, instanceId);
     }
 
-    public void ConfirmDestinationMapInstance(uint instanceId)
+    public void ConfirmDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
     {
-        lock (gate) inner.ConfirmDestinationMapInstance(instanceId);
+        lock (gate) inner.ConfirmDestinationMapInstance(in packet, instanceId);
     }
 
-    public void MarkSceneTransportBoundary()
+    public void MarkSceneTransportBoundary(in PacketObservationSource packet)
     {
-        lock (gate) inner.MarkSceneTransportBoundary();
+        lock (gate) inner.MarkSceneTransportBoundary(in packet);
     }
 
-    public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructurePath structurePath = default)
+    public void AppendCombatObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatObservation observation)
     {
-        lock (gate) inner.AppendCombatObservation(sourceId, targetId, timestamp, frameOrdinal, batchOrdinal, in observation, opcode, payloadLength, captureSequence, structurePath);
+        lock (gate) inner.AppendCombatObservation(in packet, sourceId, targetId, in observation);
     }
 
     public void CompleteBatch(long batchOrdinal)
@@ -110,103 +110,103 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.CompleteBatch(batchOrdinal);
     }
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type)
     {
-        lock (gate) inner.RegisterCompactValue0438(targetId, sourceId, bodyResourceEffectRef, marker, layoutTag, type, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        lock (gate) inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodyResourceEffectRef, marker, layoutTag, type);
     }
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, int value)
     {
-        lock (gate) inner.RegisterCompactValue0438(targetId, sourceId, bodyResourceEffectRef, marker, layoutTag, type, value, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        lock (gate) inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodyResourceEffectRef, marker, layoutTag, type, value);
     }
 
-    public void RegisterCompactControl0238(int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker)
     {
-        lock (gate) inner.RegisterCompactControl0238(sourceId, bodyResourceEffectRef, marker, batchOrdinal, structurePath);
+        lock (gate) inner.RegisterCompactControl0238(in packet, sourceId, bodyResourceEffectRef, marker);
     }
 
-    public void RegisterCompactControl0638(int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
     {
-        lock (gate) inner.RegisterCompactControl0638(sourceId, bodyResourceEffectRef, marker, flag, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        lock (gate) inner.RegisterCompactControl0638(in packet, sourceId, bodyResourceEffectRef, marker, flag);
     }
 
-    public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterObservation2A38(in PacketObservationSource packet, int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef)
     {
-        lock (gate) inner.RegisterObservation2A38(sourceId, mode, groupCode, sequenceId, headValue, buffResourceEffectRef, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        lock (gate) inner.RegisterObservation2A38(in packet, sourceId, mode, groupCode, sequenceId, headValue, buffResourceEffectRef);
     }
 
-    public void RegisterObservation2B38(int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength)
     {
-        lock (gate) inner.RegisterObservation2B38(sourceId, sourceIdCopy, phase, marker, actionResourceEffectRef, sequenceId, stateValue, detailValue, tailLength, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        lock (gate) inner.RegisterObservation2B38(in packet, sourceId, sourceIdCopy, phase, marker, actionResourceEffectRef, sequenceId, stateValue, detailValue, tailLength);
     }
 
-    public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw)
     {
-        lock (gate) inner.RegisterObservation2C38(instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw, timestamp, frameOrdinal, batchOrdinal, structurePath);
+        lock (gate) inner.RegisterObservation2C38(in packet, instanceId, mode, sequenceId, resultCode, tailSourceId, tailSkillCodeRaw);
     }
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
+    public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
     {
-        lock (gate) inner.AppendNickname(uid, nickname, originServerId, faction, characterClass);
+        lock (gate) inner.AppendNickname(in packet, uid, nickname, originServerId, faction, characterClass);
     }
 
-    public void AppendNpcCode(int instanceId, int npcCode)
+    public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode)
     {
-        lock (gate) inner.AppendNpcCode(instanceId, npcCode);
+        lock (gate) inner.AppendNpcCode(in packet, instanceId, npcCode);
     }
 
-    public void AppendNpcName(int npcCode, string name)
+    public void AppendNpcName(in PacketObservationSource packet, int npcCode, string name)
     {
-        lock (gate) inner.AppendNpcName(npcCode, name);
+        lock (gate) inner.AppendNpcName(in packet, npcCode, name);
     }
 
-    public void AppendNpcKind(int instanceId, NpcKind kind)
+    public void AppendNpcKind(in PacketObservationSource packet, int instanceId, NpcKind kind)
     {
-        lock (gate) inner.AppendNpcKind(instanceId, kind);
+        lock (gate) inner.AppendNpcKind(in packet, instanceId, kind);
     }
 
-    public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp)
     {
-        lock (gate) inner.AppendNpcHp(instanceId, hp, observedAtMilliseconds);
+        lock (gate) inner.AppendNpcHp(in packet, instanceId, hp);
     }
 
-    public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp, int maxHp)
     {
-        lock (gate) inner.AppendNpcHp(instanceId, hp, maxHp, observedAtMilliseconds);
+        lock (gate) inner.AppendNpcHp(in packet, instanceId, hp, maxHp);
     }
 
-    public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds)
+    public void SetNpcBattle(in PacketObservationSource packet, int instanceId, bool isActive)
     {
-        lock (gate) inner.SetNpcBattle(instanceId, isActive, observedAtMilliseconds);
+        lock (gate) inner.SetNpcBattle(in packet, instanceId, isActive);
     }
 
-    public void ToggleNpcBattle(int instanceId)
+    public void ToggleNpcBattle(in PacketObservationSource packet, int instanceId)
     {
-        lock (gate) inner.ToggleNpcBattle(instanceId);
+        lock (gate) inner.ToggleNpcBattle(in packet, instanceId);
     }
 
-    public void AppendNpc2136State(int instanceId, uint sequence, uint value0)
+    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, uint sequence, uint value0)
     {
-        lock (gate) inner.AppendNpc2136State(instanceId, sequence, value0);
+        lock (gate) inner.AppendNpc2136State(in packet, instanceId, sequence, value0);
     }
 
-    public void AppendNpc0140Value(int instanceId, uint value0)
+    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, uint value0)
     {
-        lock (gate) inner.AppendNpc0140Value(instanceId, value0);
+        lock (gate) inner.AppendNpc0140Value(in packet, instanceId, value0);
     }
 
-    public void AppendNpc0240Value(int instanceId, uint value0)
+    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, uint value0)
     {
-        lock (gate) inner.AppendNpc0240Value(instanceId, value0);
+        lock (gate) inner.AppendNpc0240Value(in packet, instanceId, value0);
     }
 
-    public void AppendNpc4636State(int instanceId, byte state0, byte state1)
+    public void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1)
     {
-        lock (gate) inner.AppendNpc4636State(instanceId, state0, state1);
+        lock (gate) inner.AppendNpc4636State(in packet, instanceId, state0, state1);
     }
 
-    public void AppendSummon(int ownerId, int summonInstanceId)
+    public void AppendSummon(in PacketObservationSource packet, int ownerId, int summonInstanceId)
     {
-        lock (gate) inner.AppendSummon(ownerId, summonInstanceId);
+        lock (gate) inner.AppendSummon(in packet, ownerId, summonInstanceId);
     }
 }

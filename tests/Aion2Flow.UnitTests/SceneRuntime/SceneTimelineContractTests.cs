@@ -1,7 +1,9 @@
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 using ParsedCombatPacket = Cloris.Aion2Flow.SceneRuntime.Combat.ParsedCombatPacket;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
@@ -86,7 +88,7 @@ public class SceneTimelineContractTests
             Domain: ObservedEventDomain.Combat,
             SourceEntityId: 100,
             TargetEntityId: 200,
-            Raw: new RawPacketReference(0x0438, 32, 1, 1000),
+            Raw: new RawPacketReference(0x0438, 32, 1),
             Combat: new CombatObservation { SkillCode = 1234, Damage = 500, HitCount = 1, AttemptCount = 1, DetailRaw = 0 });
 
         Assert.Equal(ObservedEventDomain.Combat, envelope.Domain);
@@ -138,12 +140,11 @@ public class SceneTimelineContractTests
     [Fact]
     public void RawPacketReference_PreservesAuditFields()
     {
-        var raw = new RawPacketReference(Opcode: 0x0438, PayloadLength: 64, CaptureSequence: 42, TimestampMilliseconds: 1234567890);
+        var raw = new RawPacketReference(Opcode: 0x0438, PayloadLength: 64, CaptureSequence: 42);
 
         Assert.Equal(0x0438, raw.Opcode);
         Assert.Equal(64, raw.PayloadLength);
         Assert.Equal(42, raw.CaptureSequence);
-        Assert.Equal(1234567890, raw.TimestampMilliseconds);
         Assert.Equal(default, raw.Structure);
         Assert.Equal(default, raw.StructurePath);
     }
@@ -161,7 +162,7 @@ public class SceneTimelineContractTests
             Length: 64,
             BodyOffset: 4,
             BodyLength: 60);
-        var raw = new RawPacketReference(0x0538, 64, 7, 1000, structure);
+        var raw = new RawPacketReference(0x0538, 64, 7, structure);
 
         Assert.Equal(structure, raw.Structure);
         Assert.Equal(structure, raw.StructurePath.Leaf);
@@ -175,7 +176,7 @@ public class SceneTimelineContractTests
         var root = new PacketStructureReference(PacketStructureKind.TransportPacket, 1, 0, 1, 0, 0, 100, 0, 100);
         var frame = new PacketStructureReference(PacketStructureKind.FrameBatchEntry, 2, 1, 2, 0, 0, 30, 3, 27);
         var path = default(PacketStructurePath).Push(root).Push(frame);
-        var raw = new RawPacketReference(0x0438, 30, 0, 1000, path);
+        var raw = new RawPacketReference(0x0438, 30, 0, path);
 
         Assert.Equal(frame, raw.Structure);
         Assert.Equal(root, raw.StructurePath.Root);
@@ -448,7 +449,7 @@ public class SceneTimelineContractTests
     [Fact]
     public void Clock_CreateStamp_AssignsSequentialOrdinals()
     {
-        var clock = new SceneRuntimeClock(startMonotonicTicks: 0);
+        var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 0);
 
         var s1 = clock.CreateStamp(1000, 1, 1);
         var s2 = clock.CreateStamp(2000, 2, 1);
@@ -462,7 +463,7 @@ public class SceneTimelineContractTests
     [Fact]
     public void Clock_CreateStamp_PreservesFrameAndBatch()
     {
-        var clock = new SceneRuntimeClock(startMonotonicTicks: 0);
+        var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 0);
 
         var stamp = clock.CreateStamp(5000, frameOrdinal: 42, batchOrdinal: 7);
 
@@ -473,22 +474,68 @@ public class SceneTimelineContractTests
     [Fact]
     public void Clock_CreateStamp_ComputesOffsetFromSceneStart()
     {
-        var clock = new SceneRuntimeClock(startMonotonicTicks: 50_000);
+        var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 5_000);
 
-        var stamp = clock.CreateStamp(10000, 0, 0);
-        Assert.Equal(99_950_000, stamp.OffsetTicks);
+        var atStart = clock.CreateStamp(5_000, 0, 0);
+        var afterStart = clock.CreateStamp(10_000, 0, 0);
+
+        Assert.Equal(0, atStart.OffsetTicks);
+        Assert.Equal(TimeSpan.FromSeconds(5).Ticks, afterStart.OffsetTicks);
     }
 
     [Fact]
-    public void Clock_CreateStampFromOffset_UsesExplicitOffset()
+    public void Clock_Reset_ChangesSceneRelativeOrigin()
     {
-        var clock = new SceneRuntimeClock(startMonotonicTicks: 0);
+        var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 0);
+        clock.Reset(DateTimeOffset.FromUnixTimeMilliseconds(4_000));
 
-        var stamp = clock.CreateStampFromOffset(offsetTicks: 9999, frameOrdinal: 5, batchOrdinal: 3);
+        var stamp = clock.CreateStamp(5_000, frameOrdinal: 5, batchOrdinal: 3);
 
-        Assert.Equal(9999, stamp.OffsetTicks);
+        Assert.Equal(10_000_000, stamp.OffsetTicks);
         Assert.Equal(5, stamp.FrameOrdinal);
         Assert.Equal(3, stamp.BatchOrdinal);
+    }
+
+    [Fact]
+    public void CombatProjection_PreservesZeroSceneOffset()
+    {
+        var entities = new EntityStore();
+        var combat = new CombatStore();
+        var observation = new CombatObservation
+        {
+            Damage = 100,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        };
+
+        combat.ApplyCombat(10, 20, in observation, 0);
+        combat.ApplyCombat(10, 20, in observation, 1_000);
+
+        var pair = Assert.Single(combat.Pairs).Value;
+        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, new SceneBoundaryStore()).CreateSnapshot();
+
+        Assert.Equal(0, pair.FirstObserved);
+        Assert.Equal(1_000, pair.LastObserved);
+        Assert.Equal(0, snapshot.EncounterStartTime);
+        Assert.Equal(1_000, snapshot.EncounterEndTime);
+        Assert.Equal(1_000, snapshot.EncounterTime);
+    }
+
+    [Fact]
+    public void JournalingSink_NpcRuntimeStateUsesSceneRelativeTime()
+    {
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 5_000);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+        var source = new PacketObservationSource(6_250, 1, 1, 0x008D, 16, 7, default);
+
+        sink.AppendNpcHp(in source, 42, 9_000, 10_000);
+
+        Assert.True(sink.TryGetNpcRuntimeState(42, out var state));
+        Assert.Equal(1_250, state.HpObservedAtMilliseconds);
+        Assert.Equal(TimeSpan.FromMilliseconds(1_250).Ticks, journal.Read(0).Stamp.OffsetTicks);
     }
 
     [Fact]

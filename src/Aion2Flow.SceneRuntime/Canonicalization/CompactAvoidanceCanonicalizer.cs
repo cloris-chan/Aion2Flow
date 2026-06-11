@@ -14,14 +14,14 @@ public sealed class CompactAvoidanceCanonicalizer
     private readonly List<PendingCompactAvoidance> _pendingCompact = new(MaxPendingAvoidances);
     private long _currentBatchOrdinal;
 
-    public StampedCombatCanonicalizationBatch NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds = 0)
+    public StampedCombatCanonicalizationBatch NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds)
     {
         var prefix = EnsureBatch(stamp.BatchOrdinal);
         var result = new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, observation);
         return Append(prefix, result);
     }
 
-    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, in PacketStructurePath structurePath, long observedAtMilliseconds = 0)
+    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, in PacketStructurePath structurePath, long observedAtMilliseconds)
     {
         var isCompactSignal = IsCompactSignalShape(in observation) &&
                               observation.EventKind == CombatEventKind.Unknown &&

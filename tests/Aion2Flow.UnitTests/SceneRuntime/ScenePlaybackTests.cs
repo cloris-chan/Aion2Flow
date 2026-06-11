@@ -68,9 +68,9 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_000);
+        var frame = session.Seek(1_500);
 
-        Assert.Equal(1_000, frame.PositionMilliseconds);
+        Assert.Equal(1_500, frame.PositionMilliseconds);
         Assert.Equal(300, frame.CombatTotals.TotalDamage);
         Assert.Single(frame.Resources);
         Assert.Equal(30_000, frame.Resources[0].CurrentValue);
@@ -85,8 +85,8 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var first = session.Seek(1_000);
-        var second = session.AdvanceTo(2_000);
+        var first = session.Seek(1_500);
+        var second = session.AdvanceTo(2_500);
 
         Assert.Equal(300, first.CombatTotals.TotalDamage);
         Assert.Equal(600, second.CombatTotals.TotalDamage);
@@ -113,7 +113,7 @@ public sealed class ScenePlaybackTests
         };
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(500);
+        var frame = session.Seek(1_500);
 
         var resource = Assert.Single(frame.Resources);
         Assert.Equal(30_000, resource.CurrentValue);
@@ -129,7 +129,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_000);
+        var frame = session.Seek(1_500);
 
         var combat = Assert.Single(frame.Tracks, static track => track.Track == ScenePlaybackTrack.Combat);
         var resource = Assert.Single(frame.Tracks, static track => track.Track == ScenePlaybackTrack.Resource);
@@ -149,8 +149,8 @@ public sealed class ScenePlaybackTests
         var frame = session.Seek(0);
         var segment = record.ScenePayload.TimelineSegment;
 
-        var first = ScenePlaybackTrackReader.Read(segment, frame.TimeRange, 400, 1_000, 2);
-        var second = ScenePlaybackTrackReader.Read(segment, frame.TimeRange, 400, 1_000, 10, first.NextCursor);
+        var first = ScenePlaybackTrackReader.Read(segment, 1_000, 1_500, 2);
+        var second = ScenePlaybackTrackReader.Read(segment, 1_000, 1_500, 10, first.NextCursor);
 
         Assert.True(first.HasMore);
         Assert.Equal([ScenePlaybackTrack.Combat, ScenePlaybackTrack.Combat], first.Markers.Select(static marker => marker.Track));
@@ -188,8 +188,8 @@ public sealed class ScenePlaybackTests
         var segment = owner.CreateArchivePayload(snapshot).TimelineSegment;
         var timeRange = ScenePlaybackTimeline.ResolveTimeRange(segment, snapshot);
 
-        var read = ScenePlaybackTrackReader.ReadSampled(segment, timeRange, 0, timeRange.DurationMilliseconds, 32);
-        var full = ScenePlaybackTrackReader.Read(segment, timeRange, 0, timeRange.DurationMilliseconds, 4_000);
+        var read = ScenePlaybackTrackReader.ReadSampled(segment, 0, timeRange.DurationMilliseconds, 32);
+        var full = ScenePlaybackTrackReader.Read(segment, 0, timeRange.DurationMilliseconds, 4_000);
 
         Assert.InRange(read.Samples.Count, 3, 96);
         Assert.Equal(2_200, Assert.Single(read.TrackCounts, static count => count.Track == ScenePlaybackTrack.Combat).Count);
@@ -238,8 +238,8 @@ public sealed class ScenePlaybackTests
         };
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var afterRemove = session.Seek(1_000);
-        var beforeRemove = session.Seek(0);
+        var afterRemove = session.Seek(2_000);
+        var beforeRemove = session.Seek(1_000);
 
         Assert.Empty(afterRemove.ActiveAuras);
         Assert.Single(beforeRemove.ActiveAuras);
@@ -254,7 +254,7 @@ public sealed class ScenePlaybackTests
         Assert.False(controller.IsPlaying);
         Assert.False(controller.IsLoading);
         Assert.Equal(0, controller.PositionMilliseconds);
-        Assert.Equal(2_000, controller.DurationMilliseconds);
+        Assert.Equal(2_500, controller.DurationMilliseconds);
         Assert.Equal(1d, controller.Speed);
         Assert.Equal(ScenePlaybackSourceKind.Archived, controller.State.SourceKind);
         Assert.Equal(0, controller.CurrentFrame.PositionMilliseconds);
@@ -317,24 +317,28 @@ public sealed class ScenePlaybackTests
         };
         await using var controller = CreateController(record);
 
-        Assert.Equal(1, controller.CurrentFrame.AppliedSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(0, controller.CurrentFrame.AppliedSegment.EndObservationOrdinalExclusive);
 
         var first = await controller.StepEventAsync(1, TestContext.Current.CancellationToken);
         var second = await controller.StepEventAsync(1, TestContext.Current.CancellationToken);
+        var third = await controller.StepEventAsync(1, TestContext.Current.CancellationToken);
         var previous = await controller.StepEventAsync(-1, TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, first.AppliedSegment.EndObservationOrdinalExclusive);
-        Assert.Equal(1, first.RecentMarkers[^1].ObservationOrdinal);
-        Assert.Equal(100, first.RecentMarkers[^1].Amount);
+        Assert.Equal(1, first.AppliedSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(0, first.RecentMarkers[^1].ObservationOrdinal);
         Assert.Equal(500, first.PositionMilliseconds);
-        Assert.Equal(3, second.AppliedSegment.EndObservationOrdinalExclusive);
-        Assert.Equal(2, second.RecentMarkers[^1].ObservationOrdinal);
-        Assert.Equal(200, second.RecentMarkers[^1].Amount);
-        Assert.Equal(500, second.PositionMilliseconds);
+        Assert.Equal(2, second.AppliedSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(1, second.RecentMarkers[^1].ObservationOrdinal);
+        Assert.Equal(100, second.RecentMarkers[^1].Amount);
+        Assert.Equal(1_000, second.PositionMilliseconds);
+        Assert.Equal(3, third.AppliedSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(2, third.RecentMarkers[^1].ObservationOrdinal);
+        Assert.Equal(200, third.RecentMarkers[^1].Amount);
+        Assert.Equal(1_000, third.PositionMilliseconds);
         Assert.Equal(2, previous.AppliedSegment.EndObservationOrdinalExclusive);
         Assert.Equal(1, previous.RecentMarkers[^1].ObservationOrdinal);
         Assert.Equal(100, previous.RecentMarkers[^1].Amount);
-        Assert.Equal(500, previous.PositionMilliseconds);
+        Assert.Equal(1_000, previous.PositionMilliseconds);
     }
 
     [Fact]
@@ -359,12 +363,12 @@ public sealed class ScenePlaybackTests
         await WaitUntil(() => controller.PositionMilliseconds == 500);
         tickFactory.Source.Tick(TimeSpan.FromMilliseconds(5_000));
         await WaitUntil(() => !controller.IsPlaying && controller.PositionMilliseconds == controller.DurationMilliseconds);
-        await WaitUntil(() => frames.Count >= 2 && frames.Last().PositionMilliseconds == 2_000);
+        await WaitUntil(() => frames.Count >= 2 && frames.Last().PositionMilliseconds == 2_500);
 
-        Assert.Equal(2_000, controller.PositionMilliseconds);
-        Assert.Equal(2_000, controller.DurationMilliseconds);
+        Assert.Equal(2_500, controller.PositionMilliseconds);
+        Assert.Equal(2_500, controller.DurationMilliseconds);
         Assert.True(frames.Count >= 2);
-        Assert.Equal(2_000, frames.Last().PositionMilliseconds);
+        Assert.Equal(2_500, frames.Last().PositionMilliseconds);
     }
 
     [Fact]
@@ -424,8 +428,8 @@ public sealed class ScenePlaybackTests
 
         var frame = await controller.RefreshAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(2_000, controller.DurationMilliseconds);
-        Assert.Equal(2_000, frame.TimeRange.DurationMilliseconds);
+        Assert.Equal(2_500, controller.DurationMilliseconds);
+        Assert.Equal(2_500, frame.TimeRange.DurationMilliseconds);
     }
 
     [Fact]
@@ -440,8 +444,8 @@ public sealed class ScenePlaybackTests
         var frame = await controller.RefreshAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(ScenePlaybackSourceKind.Live, controller.State.SourceKind);
-        Assert.Equal(3_000, controller.DurationMilliseconds);
-        Assert.Equal(3_000, frame.TimeRange.DurationMilliseconds);
+        Assert.Equal(4_000, controller.DurationMilliseconds);
+        Assert.Equal(4_000, frame.TimeRange.DurationMilliseconds);
     }
 
     [Fact]
@@ -482,9 +486,9 @@ public sealed class ScenePlaybackTests
 
         var checkpoints = controller.GetCheckpoints();
         Assert.False(controller.IsCheckpointing);
-        Assert.Equal(3, checkpoints.Length);
-        Assert.Equal([0L, 1_000L, 2_000L], checkpoints.Select(static checkpoint => checkpoint.PositionMilliseconds));
-        Assert.Equal(3, controller.State.CheckpointCount);
+        Assert.Equal(4, checkpoints.Length);
+        Assert.Equal([0L, 1_000L, 2_000L, 2_500L], checkpoints.Select(static checkpoint => checkpoint.PositionMilliseconds));
+        Assert.Equal(4, controller.State.CheckpointCount);
         Assert.All(checkpoints, static checkpoint => Assert.True(checkpoint.JournalCursor.NextObservationOrdinal >= 0));
     }
 
@@ -501,11 +505,11 @@ public sealed class ScenePlaybackTests
 
         await controller.RebuildCheckpointsAsync(TestContext.Current.CancellationToken);
         var checkpoint = Assert.Single(controller.GetCheckpoints(), static checkpoint => checkpoint.PositionMilliseconds == 1_000);
-        Assert.Equal(2, checkpoint.JournalCursor.NextObservationOrdinal);
+        Assert.Equal(1, checkpoint.JournalCursor.NextObservationOrdinal);
 
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 300, 3, 3_000);
 
-        var frame = await controller.SeekAsync(2_000, TestContext.Current.CancellationToken);
+        var frame = await controller.SeekAsync(3_000, TestContext.Current.CancellationToken);
 
         Assert.Equal(600, frame.CombatTotals.TotalDamage);
         Assert.Equal(3, frame.AppliedSegment.EndObservationOrdinalExclusive);
@@ -522,11 +526,11 @@ public sealed class ScenePlaybackTests
         await controller.RebuildCheckpointsAsync(TestContext.Current.CancellationToken);
 
         var segment = controller.CreateTimelineSegment(1_000, 1_000);
-        var read = ScenePlaybackTrackReader.Read(segment, controller.CurrentFrame.TimeRange, 1_000, 1_000, 10);
+        var read = ScenePlaybackTrackReader.Read(segment, 1_000, 1_000, 10);
 
         var marker = Assert.Single(read.Markers);
-        Assert.Equal(ScenePlaybackTrack.Resource, marker.Track);
-        Assert.Equal(3, marker.ObservationOrdinal);
+        Assert.Equal(ScenePlaybackTrack.Combat, marker.Track);
+        Assert.Equal(1, marker.ObservationOrdinal);
     }
 
     [Fact]
@@ -538,9 +542,9 @@ public sealed class ScenePlaybackTests
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
 
         controller.StartCheckpointRebuild();
-        await WaitUntil(() => !controller.IsCheckpointing && controller.CheckpointCount == 3);
+        await WaitUntil(() => !controller.IsCheckpointing && controller.CheckpointCount == 4);
 
-        Assert.Equal([0L, 1_000L, 2_000L], controller.GetCheckpoints().Select(static checkpoint => checkpoint.PositionMilliseconds));
+        Assert.Equal([0L, 1_000L, 2_000L, 2_500L], controller.GetCheckpoints().Select(static checkpoint => checkpoint.PositionMilliseconds));
     }
 
     [Fact]
@@ -631,11 +635,11 @@ public sealed class ScenePlaybackTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
             Domain = ObservedEventDomain.State,
             SourceEntityId = entityId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference(0, 0, ordinal, observedAt),
+            Raw = new RawPacketReference(0, 0, ordinal),
             State = new StateObservation(entityId, stateCode, value0, value1, 0, text)
         });
     }
@@ -645,11 +649,11 @@ public sealed class ScenePlaybackTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
             Domain = ObservedEventDomain.Resource,
             SourceEntityId = entityId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference(0, 0, ordinal, observedAt),
+            Raw = new RawPacketReference(0, 0, ordinal),
             Resource = new ResourceObservation(entityId, current, maximum, null, 0)
         });
     }
@@ -659,11 +663,11 @@ public sealed class ScenePlaybackTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
-            Raw = new RawPacketReference(0x0438, 0, ordinal, observedAt),
+            Raw = new RawPacketReference(0x0438, 0, ordinal),
             Combat = new CombatObservation
             {
                 SkillCode = 11000010,
@@ -681,11 +685,11 @@ public sealed class ScenePlaybackTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
             Domain = ObservedEventDomain.Aura,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
-            Raw = new RawPacketReference(0x2C38, 0, ordinal, observedAt),
+            Raw = new RawPacketReference(0x2C38, 0, ordinal),
             Aura = new AuraObservation(sourceId, targetId, skillCode, 0, sequenceId, 0, resultCode, mode)
         });
     }

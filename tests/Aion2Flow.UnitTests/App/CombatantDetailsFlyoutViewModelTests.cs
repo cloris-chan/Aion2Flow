@@ -253,12 +253,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         sink.AppendNickname(playerId, "Perigee");
         sink.AppendNickname(healerId, "Helper");
-        AppendScenePacket(sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
-        AppendScenePacket(sink, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing, 2);
-        AppendScenePacket(sink, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, 3);
-        AppendScenePacket(sink, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing, 4);
-        AppendScenePacket(sink, playerId, bossId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, 5);
-        AppendScenePacket(sink, playerId, addId, 11000010, 200, 5_500, CombatEventKind.Damage, CombatValueKind.Damage, 6);
+        AppendScenePacket(scene, sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(scene, sink, playerId, playerId, 12000010, 250, 2_000, CombatEventKind.Healing, CombatValueKind.Healing, 2);
+        AppendScenePacket(scene, sink, bossId, playerId, 99000010, 180, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, 3);
+        AppendScenePacket(scene, sink, healerId, playerId, 13000010, 90, 4_000, CombatEventKind.Healing, CombatValueKind.Healing, 4);
+        AppendScenePacket(scene, sink, playerId, bossId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, 5);
+        AppendScenePacket(scene, sink, playerId, addId, 11000010, 200, 5_500, CombatEventKind.Damage, CombatValueKind.Damage, 6);
         for (var i = 1; i <= 6; i++)
             sink.CompleteBatch(i);
 
@@ -303,8 +303,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         sink.AppendNickname(playerId, "Perigee");
         sink.AppendSummon(playerId, summonId);
-        AppendScenePacket(sink, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
-        AppendScenePacket(sink, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        AppendScenePacket(scene, sink, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(scene, sink, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
@@ -334,8 +334,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
 
         sink.AppendNickname(playerId, "Perigee");
-        AppendScenePacket(sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
-        AppendScenePacket(sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        AppendScenePacket(scene, sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(scene, sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
@@ -370,8 +370,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         const int bossId = 9001;
 
         sink.AppendNickname(playerId, "Scene Player");
-        AppendScenePacket(sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
-        AppendScenePacket(sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        AppendScenePacket(scene, sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(scene, sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
@@ -441,8 +441,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         sink.AppendNickname(playerId, "Perigee");
         sink.AppendSummon(playerId, summonId);
-        AppendScenePacket(sink, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
-        AppendScenePacket(sink, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        AppendScenePacket(scene, sink, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(scene, sink, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
@@ -1252,16 +1252,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var scene = new SceneLiveReadModel();
+        var entries = ReadStreamLogEntries("aion2flow.stream.20260412103519.log")
+            .Where(static entry => entry.IsInbound)
+            .ToArray();
+        var scene = new SceneLiveReadModel(DateTimeOffset.FromUnixTimeMilliseconds(entries[0].TimestampMilliseconds));
         using var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
 
-        foreach (var entry in ReadStreamLogEntries("aion2flow.stream.20260412103519.log"))
+        foreach (var entry in entries)
         {
-            if (!entry.IsInbound)
-            {
-                continue;
-            }
-
             processor.AppendAndProcess(entry.Payload, entry.Connection, entry.TimestampMilliseconds);
         }
 
@@ -1272,7 +1270,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         scene.Owner.Refresh();
         var snapshot = scene.Owner.CreateSnapshot();
         var battlePackets = scene.Owner.Combat.Events
-            .Where(static e => e.TargetId == 3737 && e.ObservedAtMilliseconds >= 0)
+            .Where(static e => e.TargetId == 3737)
             .ToArray();
         var battleInvincibles = battlePackets
             .Where(static e => (e.Observation.Modifiers & DamageModifiers.Invincible) != 0)
@@ -1494,6 +1492,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     private static void AppendScenePacket(
+        SceneLiveReadModel scene,
         JournalingRuntimeObservationSink sink,
         int sourceId,
         int targetId,
@@ -1510,7 +1509,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             TargetId = targetId,
             SkillCode = skillCode,
             Damage = damage,
-            Timestamp = timestamp,
+            Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + timestamp,
             BatchOrdinal = batchOrdinal,
             HitContribution = 1,
             AttemptContribution = 1,
@@ -1621,8 +1620,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.AppendNpcCode(npcInstanceId, npcCode);
         sink.AppendNpcKind(npcInstanceId, NpcKind.Monster);
         sink.AppendNpcName(npcCode, "訓練用稻草人");
-        AppendScenePacket(sink, playerId, npcInstanceId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
-        AppendScenePacket(sink, playerId, npcInstanceId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
+        AppendScenePacket(scene, sink, playerId, npcInstanceId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
+        AppendScenePacket(scene, sink, playerId, npcInstanceId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 

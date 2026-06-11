@@ -57,26 +57,24 @@ public readonly record struct RawPacketReference
     public ushort Opcode { get; init; }
     public int PayloadLength { get; init; }
     public long CaptureSequence { get; init; }
-    public long TimestampMilliseconds { get; init; }
     public PacketStructurePath StructurePath { get; init; }
     public PacketStructureReference Structure => StructurePath.Leaf;
 
-    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds)
-        : this(Opcode, PayloadLength, CaptureSequence, TimestampMilliseconds, default(PacketStructurePath))
+    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence)
+        : this(Opcode, PayloadLength, CaptureSequence, default(PacketStructurePath))
     {
     }
 
-    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds, PacketStructureReference Structure)
-        : this(Opcode, PayloadLength, CaptureSequence, TimestampMilliseconds, PacketStructurePath.FromLeaf(Structure))
+    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, PacketStructureReference Structure)
+        : this(Opcode, PayloadLength, CaptureSequence, PacketStructurePath.FromLeaf(Structure))
     {
     }
 
-    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, long TimestampMilliseconds, PacketStructurePath StructurePath)
+    public RawPacketReference(ushort Opcode, int PayloadLength, long CaptureSequence, PacketStructurePath StructurePath)
     {
         this.Opcode = Opcode;
         this.PayloadLength = PayloadLength;
         this.CaptureSequence = CaptureSequence;
-        this.TimestampMilliseconds = TimestampMilliseconds;
         this.StructurePath = StructurePath;
     }
 }

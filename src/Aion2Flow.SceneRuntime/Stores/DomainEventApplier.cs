@@ -91,6 +91,7 @@ public sealed class DomainEventApplier
 
     public void ApplyEntry(in ObservedEventEnvelope entry)
     {
+        var observedAtMilliseconds = entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         switch (entry.Domain)
         {
             case ObservedEventDomain.Combat when entry.Combat is { } c:
@@ -101,7 +102,7 @@ public sealed class DomainEventApplier
                 break;
             case ObservedEventDomain.Resource when entry.Resource is { } resource:
                 _entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
-                _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), entry.Raw.TimestampMilliseconds);
+                _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), observedAtMilliseconds);
                 break;
             case ObservedEventDomain.Scene when entry.Scene is { } scene:
                 ApplyScene(in scene);
@@ -129,12 +130,13 @@ public sealed class DomainEventApplier
     {
         var stamp = entry.Stamp;
         var structurePath = entry.Raw.StructurePath;
+        var observedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         var rawResults = entry.Raw.Opcode switch
         {
-            0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, entry.Raw.TimestampMilliseconds),
+            0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, observedAtMilliseconds),
             0x0238 => _compactAvoidance.AdvanceBatch(in stamp),
             0x0638 => _compactAvoidance.AdvanceBatch(in stamp),
-            _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, entry.Raw.TimestampMilliseconds)
+            _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds)
         };
 
         foreach (var rawResult in rawResults)
@@ -254,7 +256,7 @@ public sealed class DomainEventApplier
         {
             var kind = Enum.IsDefined((NpcKind)state.Value0) ? (NpcKind)state.Value0 : NpcKind.Unknown;
             _entities.ApplyNpcKind(state.EntityId, kind);
-            _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Raw.TimestampMilliseconds);
+            _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
 
@@ -262,7 +264,7 @@ public sealed class DomainEventApplier
         {
             var isActive = state.Value0 != 0 && CanNpcBattleActivate(state.EntityId);
             _entities.ApplyBattleToggle(state.EntityId, isActive);
-            _bossFocus.ApplyBattle(state.EntityId, isActive, entry.Raw.TimestampMilliseconds);
+            _bossFocus.ApplyBattle(state.EntityId, isActive, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
 
@@ -270,7 +272,7 @@ public sealed class DomainEventApplier
         {
             var isActive = !_entities.GetOrAdd(state.EntityId).NpcCombatActive && CanNpcBattleActivate(state.EntityId);
             _entities.ApplyBattleToggle(state.EntityId, isActive);
-            _bossFocus.ApplyBattleToggle(state.EntityId, isActive, entry.Raw.TimestampMilliseconds);
+            _bossFocus.ApplyBattleToggle(state.EntityId, isActive, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
 

@@ -78,9 +78,10 @@ public sealed class PacketLogReplayService
     {
         var journal = new ObservedEventJournal(lines is ICollection<string> collection ? ResolveJournalCapacity(collection.Count) : 16_384);
         var sceneId = Guid.NewGuid();
-        var clock = new SceneRuntimeClock(DateTimeOffset.UtcNow.Ticks);
+        var sceneStarted = DateTimeOffset.UtcNow;
+        var clock = new SceneRuntimeClock(sceneStarted.ToUnixTimeMilliseconds());
         var metadataRegistry = new RuntimeMetadataRegistry();
-        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now, metadataRegistry);
+        var owner = new SceneReadModelOwner(journal, sceneId, sceneStarted, metadataRegistry);
         long nextBatchOrdinal = 0;
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -90,6 +91,7 @@ public sealed class PacketLogReplayService
         var skippedLines = 0;
         var lastParsedConnection = default(TcpConnection);
         var hasLastParsedConnection = false;
+        var hasSceneStarted = false;
         var ingestStart = CaptureBaselineStart();
 
         foreach (var line in lines)
@@ -107,6 +109,14 @@ public sealed class PacketLogReplayService
                 IncrementCount(skippedEventCounts, "outbound-ignored");
                 skippedLines++;
                 continue;
+            }
+
+            if (!hasSceneStarted)
+            {
+                sceneStarted = entry.Timestamp;
+                clock.Reset(sceneStarted);
+                owner.ResetCombat(sceneId, clock.NextObservationOrdinal, sceneStarted);
+                hasSceneStarted = true;
             }
 
             if (!inboundProcessors.TryGetValue(entry.Connection, out var inboundProcessor))
@@ -132,7 +142,8 @@ public sealed class PacketLogReplayService
                 var connection = entry.Connection;
                 if (hasLastParsedConnection && !lastParsedConnection.IsSameConnection(in connection, out _))
                 {
-                    inboundProcessor.Sink.MarkSceneTransportBoundary();
+                    var source = new PacketObservationSource(entry.Timestamp.ToUnixTimeMilliseconds(), 0, 0, 0, entry.Payload.Length, 0, default);
+                    inboundProcessor.Sink.MarkSceneTransportBoundary(in source);
                 }
 
                 lastParsedConnection = connection;
@@ -240,7 +251,7 @@ public sealed class PacketLogReplayService
 
     private static CombatEventSpan EnumerateSummaryEvents(CombatStore combat, EntityStore entities, SceneCombatSnapshot snapshot)
     {
-        if (snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime)
+        if (snapshot.EncounterEndTime < snapshot.EncounterStartTime)
             return new CombatEventSpan([], []);
 
         var events = combat.EventSpan;

@@ -2,7 +2,7 @@ using System.Buffers;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal delegate void TcpReassembledChunkHandler<TState>(uint sequenceNumber, ReadOnlySpan<byte> chunk, ref TState state);
+internal delegate void TcpReassembledChunkHandler<TState>(uint sequenceNumber, ReadOnlySpan<byte> chunk, long captureTimestampMilliseconds, ref TState state);
 
 internal sealed class TcpStreamReassembler : IDisposable
 {
@@ -12,7 +12,7 @@ internal sealed class TcpStreamReassembler : IDisposable
     private uint _nextExpectedSequence;
     private int _pendingBytes;
 
-    public void Feed<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, ref TState state, TcpReassembledChunkHandler<TState> handler)
+    public void Feed<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, long captureTimestampMilliseconds, ref TState state, TcpReassembledChunkHandler<TState> handler)
     {
         if (payload.IsEmpty)
         {
@@ -27,7 +27,7 @@ internal sealed class TcpStreamReassembler : IDisposable
 
         if (sequenceNumber == _nextExpectedSequence)
         {
-            Emit(sequenceNumber, payload, ref state, handler);
+            Emit(sequenceNumber, payload, captureTimestampMilliseconds, ref state, handler);
             DrainPending(ref state, handler);
             return;
         }
@@ -40,12 +40,12 @@ internal sealed class TcpStreamReassembler : IDisposable
                 return;
             }
 
-            Emit(_nextExpectedSequence, payload[overlap..], ref state, handler);
+            Emit(_nextExpectedSequence, payload[overlap..], captureTimestampMilliseconds, ref state, handler);
             DrainPending(ref state, handler);
             return;
         }
 
-        BufferPending(sequenceNumber, payload);
+        BufferPending(sequenceNumber, payload, captureTimestampMilliseconds);
     }
 
     public void Reset()
@@ -66,10 +66,10 @@ internal sealed class TcpStreamReassembler : IDisposable
         Reset();
     }
 
-    private void Emit<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, ref TState state, TcpReassembledChunkHandler<TState> handler)
+    private void Emit<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, long captureTimestampMilliseconds, ref TState state, TcpReassembledChunkHandler<TState> handler)
     {
         _nextExpectedSequence = sequenceNumber + (uint)payload.Length;
-        handler(sequenceNumber, payload, ref state);
+        handler(sequenceNumber, payload, captureTimestampMilliseconds, ref state);
     }
 
     private void DrainPending<TState>(ref TState state, TcpReassembledChunkHandler<TState> handler)
@@ -78,7 +78,7 @@ internal sealed class TcpStreamReassembler : IDisposable
         {
             try
             {
-                Emit(sequenceNumber, nextChunk.AsSpan()[offset..], ref state, handler);
+                Emit(sequenceNumber, nextChunk.AsSpan()[offset..], nextChunk.CaptureTimestampMilliseconds, ref state, handler);
             }
             finally
             {
@@ -124,7 +124,7 @@ internal sealed class TcpStreamReassembler : IDisposable
         return false;
     }
 
-    private void BufferPending(uint sequenceNumber, ReadOnlySpan<byte> payload)
+    private void BufferPending(uint sequenceNumber, ReadOnlySpan<byte> payload, long captureTimestampMilliseconds)
     {
         if (_pending.TryGetValue(sequenceNumber, out var existing))
         {
@@ -139,7 +139,7 @@ internal sealed class TcpStreamReassembler : IDisposable
 
         var owner = MemoryPool<byte>.Shared.Rent(payload.Length);
         payload.CopyTo(owner.Memory.Span);
-        _pending[sequenceNumber] = new PendingSegment(owner, payload.Length);
+        _pending[sequenceNumber] = new PendingSegment(owner, payload.Length, captureTimestampMilliseconds);
         _pendingBytes += payload.Length;
 
         while (_pending.Count > CaptureBufferLimits.ReassemblyPendingSegmentLimit || _pendingBytes > CaptureBufferLimits.ReassemblyPendingByteLimit)
@@ -180,11 +180,12 @@ internal sealed class TcpStreamReassembler : IDisposable
         return unchecked((int)(left - right)) < 0;
     }
 
-    private readonly struct PendingSegment(IMemoryOwner<byte>? owner, int length)
+    private readonly struct PendingSegment(IMemoryOwner<byte>? owner, int length, long captureTimestampMilliseconds)
     {
         private readonly IMemoryOwner<byte>? _owner = owner;
 
         public int Length { get; } = length;
+        public long CaptureTimestampMilliseconds { get; } = captureTimestampMilliseconds;
 
         public ReadOnlySpan<byte> AsSpan() =>
             _owner is null || Length == 0

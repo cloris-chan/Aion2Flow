@@ -43,21 +43,9 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         }
     }
 
-    public void ApplyCombat(int sourceId, int targetId, long damage, int hitCount, int attemptCount, int skillCode)
-        => ApplyCombat(sourceId, targetId, new CombatObservation
-        {
-            SkillCode = skillCode,
-            Damage = damage,
-            HitCount = hitCount,
-            AttemptCount = attemptCount,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
-
-    public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation) => ApplyCombat(sourceId, targetId, in observation, 0);
-
     public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation, long observedAtMilliseconds)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(observedAtMilliseconds);
         _revision++;
         var contribution = CombatContributionClassifier.Evaluate(in observation);
         var eventRecord = new CombatEventRecord
@@ -89,7 +77,14 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         CombatPairRecord pairRecord;
         if (!pairExists)
         {
-            pairRecord = new CombatPairRecord { SourceId = sourceId, TargetId = targetId, FirstRevision = _revision };
+            pairRecord = new CombatPairRecord
+            {
+                SourceId = sourceId,
+                TargetId = targetId,
+                FirstObserved = observedAtMilliseconds,
+                LastObserved = observedAtMilliseconds,
+                FirstRevision = _revision
+            };
             pair = pairRecord;
         }
         else if (pair is { } existingPair)
@@ -123,7 +118,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         MarkDetailRevision(sourceId, _revision);
         MarkDetailRevision(targetId, _revision);
 
-        var source = GetOrAddCombatant(sourceId);
+        var source = GetOrAddCombatant(sourceId, observedAtMilliseconds);
         source.OutgoingDamage += contribution.DamageAmount;
         source.OutgoingHealing += totalHealing;
         source.OutgoingShield += contribution.ShieldGrantAmount;
@@ -141,7 +136,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
 
         if (targetId > 0)
         {
-            var target = GetOrAddCombatant(targetId);
+            var target = GetOrAddCombatant(targetId, observedAtMilliseconds);
             target.IncomingDamage += contribution.DamageAmount;
             target.IncomingHealing += contribution.HealingAmount;
             target.IncomingShield += contribution.ShieldGrantAmount;
@@ -191,19 +186,13 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
 
     private static void ApplyObservedAt(CombatPairRecord record, long observedAtMilliseconds)
     {
-        if (observedAtMilliseconds <= 0)
-            return;
-
-        record.FirstObserved = record.FirstObserved > 0 ? Math.Min(record.FirstObserved, observedAtMilliseconds) : observedAtMilliseconds;
+        record.FirstObserved = Math.Min(record.FirstObserved, observedAtMilliseconds);
         record.LastObserved = Math.Max(record.LastObserved, observedAtMilliseconds);
     }
 
     private static void ApplyObservedAt(CombatantRecord record, long observedAtMilliseconds)
     {
-        if (observedAtMilliseconds <= 0)
-            return;
-
-        record.FirstObserved = record.FirstObserved > 0 ? Math.Min(record.FirstObserved, observedAtMilliseconds) : observedAtMilliseconds;
+        record.FirstObserved = Math.Min(record.FirstObserved, observedAtMilliseconds);
         record.LastObserved = Math.Max(record.LastObserved, observedAtMilliseconds);
     }
 
@@ -288,13 +277,18 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         return store;
     }
 
-    private CombatantRecord GetOrAddCombatant(int combatantId)
+    private CombatantRecord GetOrAddCombatant(int combatantId, long observedAtMilliseconds)
     {
         ref var record = ref CollectionsMarshal.GetValueRefOrAddDefault(_combatants, combatantId, out var exists);
 
         if (!exists)
         {
-            record = new CombatantRecord { CombatantId = combatantId };
+            record = new CombatantRecord
+            {
+                CombatantId = combatantId,
+                FirstObserved = observedAtMilliseconds,
+                LastObserved = observedAtMilliseconds
+            };
         }
 
         return record!;

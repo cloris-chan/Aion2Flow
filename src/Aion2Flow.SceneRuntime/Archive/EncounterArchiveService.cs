@@ -24,7 +24,7 @@ public sealed class EncounterArchiveService
 
     private ArchivedEncounterRecord? AddArchiveRecord(SceneCombatSnapshot archivedSnapshot, SceneArchivePayload scenePayload, string trigger, bool isAutomatic)
     {
-        if (archivedSnapshot.EncounterTime <= 0 || archivedSnapshot.EncounterStartTime <= 0 || archivedSnapshot.EncounterEndTime < archivedSnapshot.EncounterStartTime || archivedSnapshot.Combatants.Count == 0)
+        if (archivedSnapshot.EncounterTime <= 0 || archivedSnapshot.EncounterEndTime < archivedSnapshot.EncounterStartTime || archivedSnapshot.Combatants.Count == 0)
         {
             return null;
         }

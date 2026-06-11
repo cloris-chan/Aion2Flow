@@ -109,8 +109,9 @@ internal static class PacketUnknownFramePayloadScanner
 
         if (reader.TryReadUInt32Le(out var npcValue) && PacketNpcStateFields.IsNpcCatalogCode(npcValue))
         {
-            context.Writer.ApplyNpcCatalog(summonId, npcValue);
-            context.Sink.AppendNpcKind(summonId, NpcKind.Summon);
+            var source = context.CreateObservationSource(0x4036, payload.Length);
+            context.Writer.ApplyNpcCatalog(in source, summonId, npcValue);
+            context.Sink.AppendNpcKind(in source, summonId, NpcKind.Summon);
         }
 
         if (!Packet4036CreateParser.TryExtractOwnerId(payload, out var realSourceId, out var ownerTailOffset))
@@ -118,8 +119,8 @@ internal static class PacketUnknownFramePayloadScanner
 
         if (realSourceId == 0) return false;
 
-        context.Sink.AppendSummon(realSourceId, summonId);
         consumed = ResolveEmbedded4036Length(packet, opcodeOffset, Math.Max(reader.Offset, ownerTailOffset));
+        context.Sink.AppendSummon(context.CreateObservationSource(0x4036, consumed), realSourceId, summonId);
         return context.MarkParsed();
     }
 

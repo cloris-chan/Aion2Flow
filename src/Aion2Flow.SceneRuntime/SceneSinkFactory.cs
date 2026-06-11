@@ -16,10 +16,11 @@ public static class SceneSinkFactory
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
-        var clock = new SceneRuntimeClock(DateTimeOffset.UtcNow.Ticks);
+        var sceneStarted = DateTimeOffset.UtcNow;
+        var clock = new SceneRuntimeClock(0);
         var journaling = new JournalingRuntimeObservationSink(journal, clock, sceneId);
         var metadataRegistry = new RuntimeMetadataRegistry();
-        return new ReplaySinkHolder(journaling, journal, new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now, metadataRegistry));
+        return new ReplaySinkHolder(journaling, journal, new SceneReadModelOwner(journal, sceneId, sceneStarted, metadataRegistry));
     }
 }
 
@@ -35,7 +36,7 @@ public sealed class SceneLiveReadModel
     public Guid SessionId { get; private set; }
     public DateTimeOffset SessionStarted { get; private set; }
     public ObservedEventJournal Journal { get; }
-    public SceneRuntimeClock Clock { get; } = new(DateTimeOffset.UtcNow.Ticks);
+    public SceneRuntimeClock Clock { get; }
     public RuntimeMetadataRegistry MetadataRegistry { get; } = new();
     public SceneReadModelOwner Owner { get; }
 
@@ -47,6 +48,7 @@ public sealed class SceneLiveReadModel
     {
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
+        Clock = new SceneRuntimeClock(sessionStarted.ToUnixTimeMilliseconds());
         Journal = new ObservedEventJournal(LiveJournalInitialCapacity);
         Owner = new SceneReadModelOwner(
             Journal,
@@ -101,6 +103,7 @@ public sealed class SceneLiveReadModel
     {
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
+        Clock.Reset(sessionStarted);
         Owner.ResetCombat(SessionId, Clock.NextObservationOrdinal, sessionStarted);
     }
 }

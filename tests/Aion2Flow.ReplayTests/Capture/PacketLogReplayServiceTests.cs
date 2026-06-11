@@ -550,13 +550,14 @@ public sealed class PacketLogReplayServiceTests
 
         foreach (var key in expected)
         {
+            var offset = key.Timestamp - replay.SceneOwner.SceneStarted.ToUnixTimeMilliseconds();
             var raw = Enumerable.Range(0, replay.SceneJournal.Count)
                 .Select(index => replay.SceneJournal.Read(index))
                 .Where(entry =>
                     entry.Raw.Opcode == 0x0438 &&
                     entry.SourceEntityId == key.SourceId &&
                     entry.TargetEntityId == key.TargetId &&
-                    entry.Raw.TimestampMilliseconds == key.Timestamp &&
+                    entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond == offset &&
                     entry.Combat is { } observation &&
                     observation.Marker == key.Marker &&
                     observation.HitCount == 0 &&
@@ -572,7 +573,7 @@ public sealed class PacketLogReplayServiceTests
                 combat =>
                     combat.SourceId == key.SourceId &&
                     combat.TargetId == key.TargetId &&
-                    combat.ObservedAtMilliseconds == key.Timestamp &&
+                    combat.ObservedAtMilliseconds == offset &&
                     combat.Observation.Marker == key.Marker &&
                     combat.Observation.EffectTag == PacketEffectTag.CompactEvade);
         }

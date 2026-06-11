@@ -88,7 +88,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         var start = targetDecision.EncounterStartTime;
         var end = targetDecision.EncounterEndTime;
-        if (start == end && start > 0 && combat.EventSpan.Length > 0)
+        if (start == end && start >= 0 && combat.EventSpan.Length > 0)
             ExpandSinglePointEncounterWindowFromRelevantRecovery(ref start, ref end);
         var encounterTime = end > start ? end - start : 0;
         builder.SetEncounterWindow(start, end, encounterTime);
@@ -118,7 +118,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     public IReadOnlyList<CombatDetailEvent> CreateDetailEvents(SceneCombatSnapshot snapshot, int combatantId)
     {
-        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
+        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
             return [];
 
         var events = new List<CombatDetailEvent>();
@@ -128,7 +128,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     internal CombatDetailWriteResult WriteDetailEvents(SceneCombatSnapshot snapshot, int combatantId, ICombatDetailEventWriter writer)
     {
-        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
+        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
             return default;
 
         PrepareProjectionCaches();
@@ -176,7 +176,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId)
     {
-        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterStartTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime)
+        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime)
             return CombatSkillBreakdownSnapshot.Empty;
 
         PrepareProjectionCaches();
@@ -473,13 +473,13 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         observedAt >= start && observedAt <= end;
 
     private static long ObservedAt(in CombatEventRecord e) =>
-        e.ObservedAtMilliseconds > 0 ? e.ObservedAtMilliseconds : e.Revision;
+        e.ObservedAtMilliseconds;
 
     private static long FirstObservedAt(CombatPairRecord pair) =>
-        pair.FirstObserved > 0 ? pair.FirstObserved : pair.FirstRevision > 0 ? pair.FirstRevision : pair.Revision;
+        pair.FirstObserved;
 
     private static long ObservedAt(CombatPairRecord pair) =>
-        pair.LastObserved > 0 ? pair.LastObserved : pair.Revision;
+        pair.LastObserved;
 
     private static bool HasDamageActivity(CombatPairRecord pair) =>
         pair.TotalDamage > 0 || pair.AttemptCount > 0 || pair.EvadeCount > 0 || pair.InvincibleCount > 0 || pair.MultiHitCount > 0;
@@ -1099,7 +1099,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     {
         var now = latestObservedAt;
 
-        if (now <= 0 && bossFocus is not null)
+        if (combat.Pairs.Count == 0 && bossFocus is not null)
         {
             var snapshots = bossFocus.GetObservedBosses(0, long.MaxValue);
             for (var i = 0; i < snapshots.Count; i++)
@@ -1146,7 +1146,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         public void Add(long observedAt)
         {
-            FirstDamageAt = FirstDamageAt > 0 ? Math.Min(FirstDamageAt, observedAt) : observedAt;
+            FirstDamageAt = Math.Min(FirstDamageAt, observedAt);
             LastDamageAt = Math.Max(LastDamageAt, observedAt);
         }
     }

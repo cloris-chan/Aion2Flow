@@ -16,26 +16,28 @@ internal sealed class PacketStateHandler
 
         if (Packet4036CreateParser.TryParse(packet, out var parsed))
         {
+            var source = context.CreateObservationSource(0x4036, packet.Length);
             if (parsed.NpcCode.HasValue)
             {
-                context.Writer.ApplyNpcCatalog(parsed.SummonId, parsed.NpcCode.Value);
+                context.Writer.ApplyNpcCatalog(in source, parsed.SummonId, parsed.NpcCode.Value);
             }
 
-            context.Sink.AppendNpcKind(parsed.SummonId, NpcKind.Summon);
-            context.Sink.AppendSummon(parsed.OwnerId, parsed.SummonId);
+            context.Sink.AppendNpcKind(in source, parsed.SummonId, NpcKind.Summon);
+            context.Sink.AppendSummon(in source, parsed.OwnerId, parsed.SummonId);
             return context.MarkParsed();
         }
 
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn))
         {
+            var source = context.CreateObservationSource(0x4036, packet.Length);
             if (spawn.NpcCode.HasValue)
             {
-                context.Writer.ApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value);
+                context.Writer.ApplyNpcCatalog(in source, spawn.EntityId, spawn.NpcCode.Value);
             }
 
             if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
             {
-                context.Sink.AppendNpcHp(spawn.EntityId, currentHp, maxHp, context.TimestampMilliseconds);
+                context.Sink.AppendNpcHp(in source, spawn.EntityId, currentHp, maxHp);
             }
             return context.MarkParsed();
         }
@@ -45,29 +47,23 @@ internal sealed class PacketStateHandler
 
     public static bool ParseAux2B38Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        var frameOrdinal = context.FrameOrdinal;
-        var batchOrdinal = context.BatchOrdinal;
-
         if (!Packet2B38Parser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        context.Sink.RegisterObservation2B38(parsed.SourceId, parsed.SourceIdCopy, parsed.Phase, parsed.Marker, parsed.ActionResourceEffectRef, parsed.Sequence, parsed.StateValue, parsed.DetailValue, parsed.TailLength, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
+        context.Sink.RegisterObservation2B38(context.CreateObservationSource(0x2B38, packet.Length), parsed.SourceId, parsed.SourceIdCopy, parsed.Phase, parsed.Marker, parsed.ActionResourceEffectRef, parsed.Sequence, parsed.StateValue, parsed.DetailValue, parsed.TailLength);
         return context.MarkParsed();
     }
 
     public static bool ParseAux2A38Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        var frameOrdinal = context.FrameOrdinal;
-        var batchOrdinal = context.BatchOrdinal;
-
         if (!Packet2A38Parser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        context.Sink.RegisterObservation2A38(parsed.SourceId, parsed.Mode, parsed.GroupCode, parsed.SequenceId, parsed.HeadValue, parsed.BuffResourceEffectRef, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
+        context.Sink.RegisterObservation2A38(context.CreateObservationSource(0x2A38, packet.Length), parsed.SourceId, parsed.Mode, parsed.GroupCode, parsed.SequenceId, parsed.HeadValue, parsed.BuffResourceEffectRef);
 
         RawPacketDump.ObserveParsedPacket("aux-2a38", context.Connection);
         return context.MarkParsed();
@@ -75,15 +71,12 @@ internal sealed class PacketStateHandler
 
     public static bool ParseAux2C38Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        var frameOrdinal = context.FrameOrdinal;
-        var batchOrdinal = context.BatchOrdinal;
-
         if (!Packet2C38Parser.TryParse(packet, out var parsed))
         {
             return false;
         }
 
-        context.Sink.RegisterObservation2C38(parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, parsed.TailSourceId, parsed.TailSkillCodeRaw, context.TimestampMilliseconds, frameOrdinal, batchOrdinal, context.CurrentStructurePath);
+        context.Sink.RegisterObservation2C38(context.CreateObservationSource(0x2C38, packet.Length), parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, parsed.TailSourceId, parsed.TailSkillCodeRaw);
 
         RawPacketDump.ObserveParsedPacket("aux-2c38", context.Connection);
         return context.MarkParsed();
@@ -108,19 +101,20 @@ internal sealed class PacketStateHandler
         }
 
         context.Sink.RememberNpcObservationSource(parsed.EntityId);
+        var source = context.CreateObservationSource(0x4136, packet.Length);
         if (parsed.NpcCode is int npcCode)
         {
-            context.Writer.ApplyNpcCatalog(parsed.EntityId, npcCode, requireCatalogEntry: true);
+            context.Writer.ApplyNpcCatalog(in source, parsed.EntityId, npcCode, requireCatalogEntry: true);
         }
 
         if (parsed.OwnerId is int ownerId)
         {
-            context.Sink.AppendSummon(ownerId, parsed.EntityId);
+            context.Sink.AppendSummon(in source, ownerId, parsed.EntityId);
         }
 
         if (parsed.CurrentHp is int currentHp && parsed.MaxHp is int maxHp)
         {
-            context.Sink.AppendNpcHp(parsed.EntityId, currentHp, maxHp, context.TimestampMilliseconds);
+            context.Sink.AppendNpcHp(in source, parsed.EntityId, currentHp, maxHp);
         }
 
         return context.MarkParsed();
@@ -143,14 +137,15 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Writer.ConfirmDestinationMapFromSceneState(parsed.Value0);
+        var source = context.CreateObservationSource(0x0140, packet.Length);
+        context.Writer.ConfirmDestinationMapFromSceneState(in source, parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
-            context.Sink.AppendNpc0140Value(targetId, parsed.Value0);
+            context.Sink.AppendNpc0140Value(in source, targetId, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                context.Writer.ApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
+                context.Writer.ApplyNpcCatalog(in source, targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 
@@ -164,15 +159,16 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Writer.StagePendingDestinationMapFromSceneState(parsed.Value0);
+        var source = context.CreateObservationSource(0x2136, packet.Length);
+        context.Writer.StagePendingDestinationMapFromSceneState(in source, parsed.Value0);
 
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
-            context.Sink.AppendNpc2136State(targetId, parsed.Sequence, parsed.Value0);
+            context.Sink.AppendNpc2136State(in source, targetId, parsed.Sequence, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                context.Writer.ApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
+                context.Writer.ApplyNpcCatalog(in source, targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 
@@ -186,7 +182,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.ConfirmPendingDestinationMapArrival();
+        context.Sink.ConfirmPendingDestinationMapArrival(context.CreateObservationSource(0x2336, packet.Length));
         return context.MarkParsed();
     }
 
@@ -197,7 +193,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.ConfirmDestinationMapInstance(parsed.InstanceId);
+        context.Sink.ConfirmDestinationMapInstance(context.CreateObservationSource(0x2E92, packet.Length), parsed.InstanceId);
 
         return context.MarkParsed();
     }
@@ -209,14 +205,15 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Writer.ConfirmDestinationMapFromSceneState(parsed.Value0);
+        var source = context.CreateObservationSource(0x0240, packet.Length);
+        context.Writer.ConfirmDestinationMapFromSceneState(in source, parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
-            context.Sink.AppendNpc0240Value(targetId, parsed.Value0);
+            context.Sink.AppendNpc0240Value(in source, targetId, parsed.Value0);
             if (parsed.Value0 <= int.MaxValue)
             {
-                context.Writer.ApplyNpcCatalog(targetId, (int)parsed.Value0, requireCatalogEntry: true);
+                context.Writer.ApplyNpcCatalog(in source, targetId, (int)parsed.Value0, requireCatalogEntry: true);
             }
         }
 
@@ -230,7 +227,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.AppendNpc4636State(parsed.SourceId, parsed.State0, parsed.State1);
+        context.Sink.AppendNpc4636State(context.CreateObservationSource(0x4636, packet.Length), parsed.SourceId, parsed.State0, parsed.State1);
         context.Sink.RememberNpcObservationSource(parsed.SourceId);
 
         return context.MarkParsed();
@@ -241,6 +238,7 @@ internal sealed class PacketStateHandler
         if (Packet4536PcMetadataParser.TryParse(packet, out var pcMetadata))
         {
             context.Sink.AppendNickname(
+                context.CreateObservationSource(0x4536, packet.Length),
                 pcMetadata.EntityId,
                 pcMetadata.Nickname,
                 characterClass: PacketCharacterClassMapper.ToCharacterClass(pcMetadata.ClassCode));
@@ -277,7 +275,7 @@ internal sealed class PacketStateHandler
         var isHealth = Packet008DRemainHpParser.IsHealthValue(parsed);
         if (isHealth)
         {
-            context.Sink.AppendNpcHp(parsed.NpcId, checked((int)parsed.Hp), context.TimestampMilliseconds);
+            context.Sink.AppendNpcHp(context.CreateObservationSource(0x008D, packet.Length), parsed.NpcId, checked((int)parsed.Hp));
         }
 
         if (isHealth)
@@ -297,11 +295,11 @@ internal sealed class PacketStateHandler
 
         if (parsed.IsActive is bool isActive)
         {
-            context.Sink.SetNpcBattle(parsed.NpcId, isActive, context.TimestampMilliseconds);
+            context.Sink.SetNpcBattle(context.CreateObservationSource(0x218D, packet.Length), parsed.NpcId, isActive);
         }
         else
         {
-            context.Sink.ToggleNpcBattle(parsed.NpcId);
+            context.Sink.ToggleNpcBattle(context.CreateObservationSource(0x218D, packet.Length), parsed.NpcId);
         }
 
         return context.MarkParsed();
@@ -311,16 +309,17 @@ internal sealed class PacketStateHandler
     {
         if (Packet4036CreateParser.TryParseNpcSpawn(packet, out var spawn) && spawn.NpcCode.HasValue)
         {
-            context.Writer.ApplyNpcCatalog(spawn.EntityId, spawn.NpcCode.Value, requireCatalogEntry: true);
+            var source = context.CreateObservationSource(0x4036, packet.Length);
+            context.Writer.ApplyNpcCatalog(in source, spawn.EntityId, spawn.NpcCode.Value, requireCatalogEntry: true);
             if (spawn.CurrentHp is int currentHp && spawn.MaxHp is int maxHp)
             {
-                context.Sink.AppendNpcHp(spawn.EntityId, currentHp, maxHp, context.TimestampMilliseconds);
+                context.Sink.AppendNpcHp(in source, spawn.EntityId, currentHp, maxHp);
             }
         }
 
         if (Packet4036CreateParser.TryParseOwner(packet, out var entityId, out var ownerId))
         {
-            context.Sink.AppendSummon(ownerId, entityId);
+            context.Sink.AppendSummon(context.CreateObservationSource(0x4036, packet.Length), ownerId, entityId);
         }
 
         if (!Packet4036Parser.TryParse(packet, out _))

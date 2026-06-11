@@ -461,7 +461,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (segment.IsEmpty || duration <= 0)
             return [];
 
-        var read = ScenePlaybackTrackReader.ReadSampled(segment, frame.TimeRange, 0, duration, MaxTimelineMarkersPerTrack);
+        var read = ScenePlaybackTrackReader.ReadSampled(segment, 0, duration, MaxTimelineMarkersPerTrack);
         var groups = new Dictionary<ScenePlaybackTrack, List<PlaybackTimelineMarker>>();
         for (var i = 0; i < read.Samples.Count; i++)
         {
@@ -501,7 +501,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return CreateEventWindowRows(FilterRecentMarkers(frame.RecentMarkers, start, end));
 
         var segment = _controller.CreateTimelineSegment(start, end);
-        var read = ScenePlaybackTrackReader.Read(segment, frame.TimeRange, start, end, MaxEventWindowMarkers);
+        var read = ScenePlaybackTrackReader.Read(segment, start, end, MaxEventWindowMarkers);
         if (read.Markers.Count == 0)
             return [];
 

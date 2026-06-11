@@ -6,8 +6,6 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
 {
     private readonly PacketTailBuffer _tail = new(CaptureBufferLimits.StreamTailBufferSize);
     private readonly PacketFrameParser _parser = new(sink);
-    private long? _timestampOverrideMilliseconds;
-
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
 
     public void Dispose()
@@ -16,18 +14,18 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
         _tail.Dispose();
     }
 
-    public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection)
+    public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection, long captureTimestampMilliseconds)
     {
         if (sink is IRuntimeObservationSynchronization synchronization)
         {
             lock (synchronization.Gate)
-                return AppendAndProcessCore(payload, in connection);
+                return AppendAndProcessCore(payload, in connection, captureTimestampMilliseconds);
         }
 
-        return AppendAndProcessCore(payload, in connection);
+        return AppendAndProcessCore(payload, in connection, captureTimestampMilliseconds);
     }
 
-    private bool AppendAndProcessCore(ReadOnlySpan<byte> payload, in TcpConnection connection)
+    private bool AppendAndProcessCore(ReadOnlySpan<byte> payload, in TcpConnection connection, long captureTimestampMilliseconds)
     {
         var previousAppendBatchOrdinal = _parser.BeginAppendBatch();
 
@@ -42,7 +40,7 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
                     AppendToTail(payload);
                 }
 
-                ProcessBufferedPackets(ref hasParsed, in connection);
+                ProcessBufferedPackets(ref hasParsed, in connection, captureTimestampMilliseconds);
                 return hasParsed;
             }
 
@@ -54,7 +52,7 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
             var remaining = payload;
             while (TryTakePacket(ref remaining, out var packet))
             {
-                if (EmitPacket(packet, in connection))
+                if (EmitPacket(packet, in connection, captureTimestampMilliseconds))
                 {
                     hasParsed = true;
                 }
@@ -77,32 +75,12 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
         }
     }
 
-    public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection, long timestampMilliseconds)
-    {
-        var previousTimestampOverride = _timestampOverrideMilliseconds;
-        _timestampOverrideMilliseconds = timestampMilliseconds > 0
-            ? timestampMilliseconds
-            : null;
-
-        try
-        {
-            return AppendAndProcess(payload, connection);
-        }
-        finally
-        {
-            _timestampOverrideMilliseconds = previousTimestampOverride;
-        }
-    }
-
-    private long CurrentTimestampMilliseconds
-        => _timestampOverrideMilliseconds ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-    private void ProcessBufferedPackets(ref bool hasParsed, in TcpConnection connection)
+    private void ProcessBufferedPackets(ref bool hasParsed, in TcpConnection connection, long captureTimestampMilliseconds)
     {
         while (TryDequeuePacketLength(out var packetLength))
         {
             var packet = _tail.Data[..packetLength];
-            if (EmitPacket(packet, in connection))
+            if (EmitPacket(packet, in connection, captureTimestampMilliseconds))
             {
                 hasParsed = true;
             }
@@ -111,8 +89,8 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
         }
     }
 
-    private bool EmitPacket(ReadOnlySpan<byte> data, in TcpConnection connection)
-        => _parser.ParsePacketEntry(data, in connection, CurrentTimestampMilliseconds);
+    private bool EmitPacket(ReadOnlySpan<byte> data, in TcpConnection connection, long captureTimestampMilliseconds)
+        => _parser.ParsePacketEntry(data, in connection, captureTimestampMilliseconds);
 
     private void AppendToTail(ReadOnlySpan<byte> data)
     {

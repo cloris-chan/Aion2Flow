@@ -7,10 +7,10 @@ public static class ScenePlaybackTrackReader
 {
     private static readonly ScenePlaybackTrack[] Tracks = Enum.GetValues<ScenePlaybackTrack>();
 
-    public static ScenePlaybackTrackReadResult Read(SceneJournalSegment segment, ScenePlaybackTimeRange timeRange, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkers)
-        => Read(segment, timeRange, startPositionMilliseconds, endPositionMilliseconds, maxMarkers, segment.CreateCursor());
+    public static ScenePlaybackTrackReadResult Read(SceneJournalSegment segment, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkers)
+        => Read(segment, startPositionMilliseconds, endPositionMilliseconds, maxMarkers, segment.CreateCursor());
 
-    public static ScenePlaybackTrackReadResult Read(SceneJournalSegment segment, ScenePlaybackTimeRange timeRange, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkers, JournalCursor cursor)
+    public static ScenePlaybackTrackReadResult Read(SceneJournalSegment segment, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkers, JournalCursor cursor)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maxMarkers);
         var markers = new List<ScenePlaybackTrackMarker>(Math.Min(maxMarkers, 256));
@@ -24,8 +24,8 @@ public static class ScenePlaybackTrackReader
             {
                 foreach (ref readonly var entry in entries)
                 {
-                    var timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entry);
-                    var position = ScenePlaybackTimeline.ResolvePositionMilliseconds(timeRange, timestamp);
+                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                    var position = Math.Max(0, offset);
                     if (position < startPositionMilliseconds)
                         continue;
                     if (position > endPositionMilliseconds)
@@ -35,7 +35,7 @@ public static class ScenePlaybackTrackReader
                         return;
                     }
 
-                    markers.Add(CreateMarker(in entry, timestamp, position));
+                    markers.Add(CreateMarker(in entry, offset, position));
                     if (markers.Count >= maxMarkers)
                     {
                         hasMore = true;
@@ -56,7 +56,7 @@ public static class ScenePlaybackTrackReader
         return new ScenePlaybackTrackReadResult(markers.ToArray(), hasMore, current);
     }
 
-    public static ScenePlaybackTrackSampledReadResult ReadSampled(SceneJournalSegment segment, ScenePlaybackTimeRange timeRange, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkersPerTrack)
+    public static ScenePlaybackTrackSampledReadResult ReadSampled(SceneJournalSegment segment, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkersPerTrack)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxMarkersPerTrack);
         if (segment.IsEmpty || endPositionMilliseconds < startPositionMilliseconds)
@@ -73,8 +73,8 @@ public static class ScenePlaybackTrackReader
             {
                 foreach (ref readonly var entry in entries)
                 {
-                    var timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entry);
-                    var position = ScenePlaybackTimeline.ResolvePositionMilliseconds(timeRange, timestamp);
+                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                    var position = Math.Max(0, offset);
                     if (position < startPositionMilliseconds)
                         continue;
                     if (position > endPositionMilliseconds)
@@ -83,7 +83,7 @@ public static class ScenePlaybackTrackReader
                         return;
                     }
 
-                    var marker = CreateMarker(in entry, timestamp, position);
+                    var marker = CreateMarker(in entry, offset, position);
                     var trackIndex = (int)marker.Track;
                     trackCounts[trackIndex]++;
                     var ratio = (position - startPositionMilliseconds) / (double)windowDuration;
@@ -119,7 +119,7 @@ public static class ScenePlaybackTrackReader
         return new ScenePlaybackTrackSampledReadResult(samples.ToArray(), counts.ToArray());
     }
 
-    private static ScenePlaybackTrackMarker CreateMarker(in ObservedEventEnvelope entry, long timestamp, long position)
+    private static ScenePlaybackTrackMarker CreateMarker(in ObservedEventEnvelope entry, long offset, long position)
     {
         var track = ResolveTrack(entry.Domain);
         var skillCode = 0;
@@ -146,7 +146,7 @@ public static class ScenePlaybackTrackReader
             resultCode = aura.ResultCode;
         }
 
-        return new ScenePlaybackTrackMarker(track, position, timestamp, entry.Stamp.ObservationOrdinal, entry.SourceEntityId, entry.TargetEntityId, skillCode, amount, currentValue, maximumValue, resourceKind, resultCode);
+        return new ScenePlaybackTrackMarker(track, position, offset, entry.Stamp.ObservationOrdinal, entry.SourceEntityId, entry.TargetEntityId, skillCode, amount, currentValue, maximumValue, resourceKind, resultCode);
     }
 
     private static ScenePlaybackTrack ResolveTrack(ObservedEventDomain domain) => domain switch
@@ -184,7 +184,7 @@ public static class ScenePlaybackTrackReader
     }
 }
 
-public readonly record struct ScenePlaybackTrackMarker(ScenePlaybackTrack Track, long PositionMilliseconds, long TimestampMilliseconds, long ObservationOrdinal, int SourceEntityId, int TargetEntityId, int SkillCode, long Amount, long? CurrentValue, long? MaximumValue, int ResourceKind, int ResultCode);
+public readonly record struct ScenePlaybackTrackMarker(ScenePlaybackTrack Track, long PositionMilliseconds, long OffsetMilliseconds, long ObservationOrdinal, int SourceEntityId, int TargetEntityId, int SkillCode, long Amount, long? CurrentValue, long? MaximumValue, int ResourceKind, int ResultCode);
 
 public readonly record struct ScenePlaybackTrackReadResult(IReadOnlyList<ScenePlaybackTrackMarker> Markers, bool HasMore, JournalCursor NextCursor);
 

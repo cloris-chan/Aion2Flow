@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Capture.Diagnostics;
@@ -21,6 +22,8 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
     private Task? _worker;
     private readonly TcpRoundTripEstimator _tcpRttEstimator = new();
     private readonly ProtocolRoundTripEstimator _protocolRttEstimator = new();
+    private readonly long _captureClockOriginTicks = Stopwatch.GetTimestamp();
+    private readonly long _captureClockOriginUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService = processPortDiscoveryService;
     private readonly SceneLiveReadModel _scene = new(RawPacketDump.CurrentSessionStarted);
@@ -193,7 +196,9 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         continue;
                     }
 
-                    var capturedPacket = CapturedPacket.CreateCopy(connection, packetSpan.Slice(payloadOffset, payloadLength), tcp.HostSequenceNumber);
+                    var captureTimestampMilliseconds = _captureClockOriginUnixMilliseconds +
+                        (long)((captureTicks - _captureClockOriginTicks) * 1000d / Stopwatch.Frequency);
+                    var capturedPacket = CapturedPacket.CreateCopy(connection, packetSpan.Slice(payloadOffset, payloadLength), tcp.HostSequenceNumber, captureTimestampMilliseconds);
                     if (!PacketCaptureChannel.TryWrite(capturedPacket))
                     {
                         capturedPacket.Return();

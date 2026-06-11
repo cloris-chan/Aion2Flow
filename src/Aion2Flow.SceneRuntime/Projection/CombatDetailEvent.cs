@@ -10,5 +10,5 @@ public readonly record struct CombatDetailEvent(CombatObservation Observation, i
     public CombatEventKind EventKind => Observation.EventKind;
     public CombatValueKind ValueKind => Observation.ValueKind;
     public PacketEffectTag EffectTag => Observation.EffectTag;
-    public long ObservedAt => ObservedAtMilliseconds > 0 ? ObservedAtMilliseconds : Revision;
+    public long ObservedAt => ObservedAtMilliseconds;
 }

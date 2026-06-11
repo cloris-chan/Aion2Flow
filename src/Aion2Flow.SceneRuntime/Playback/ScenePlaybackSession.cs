@@ -142,7 +142,7 @@ public sealed class ScenePlaybackSession
         private SceneJournalSegment _segment;
         private ScenePlaybackTimeRange _timeRange;
         private JournalCursor _cursor;
-        private long _targetTimestamp;
+        private long _targetOffsetMilliseconds;
         private long _positionMilliseconds;
         private long _appliedEndOrdinal;
         private long _currentBatchOrdinal = -1;
@@ -162,7 +162,7 @@ public sealed class ScenePlaybackSession
                 tracks: [],
                 recentMarkers: new Queue<ScenePlaybackTrackMarker>(DefaultRecentMarkerCapacity),
                 segment.CreateCursor(),
-                timeRange.HasTimestamps ? timeRange.StartTimestampMilliseconds : 0,
+                timeRange.HasTiming ? timeRange.StartOffsetMilliseconds : 0,
                 0,
                 segment.StartObservationOrdinal,
                 -1,
@@ -185,7 +185,7 @@ public sealed class ScenePlaybackSession
             Dictionary<ScenePlaybackTrack, TrackAccumulator> tracks,
             Queue<ScenePlaybackTrackMarker> recentMarkers,
             JournalCursor cursor,
-            long targetTimestamp,
+            long targetOffsetMilliseconds,
             long positionMilliseconds,
             long appliedEndOrdinal,
             long currentBatchOrdinal,
@@ -205,7 +205,7 @@ public sealed class ScenePlaybackSession
             _tracks = tracks;
             _recentMarkers = recentMarkers;
             _cursor = cursor;
-            _targetTimestamp = targetTimestamp;
+            _targetOffsetMilliseconds = targetOffsetMilliseconds;
             _positionMilliseconds = positionMilliseconds;
             _appliedEndOrdinal = appliedEndOrdinal;
             _currentBatchOrdinal = currentBatchOrdinal;
@@ -241,7 +241,7 @@ public sealed class ScenePlaybackSession
                 CreateTrackState(snapshot.Tracks),
                 CreateRecentMarkerState(snapshot.RecentMarkers),
                 cursor,
-                snapshot.TargetTimestampMilliseconds,
+                snapshot.TargetOffsetMilliseconds,
                 snapshot.PositionMilliseconds,
                 cursor.NextObservationOrdinal,
                 snapshot.CurrentBatchOrdinal,
@@ -252,7 +252,7 @@ public sealed class ScenePlaybackSession
 
         public ScenePlaybackProjectionSnapshot CreateSnapshot() => new(
             _positionMilliseconds,
-            _targetTimestamp,
+            _targetOffsetMilliseconds,
             _timeRange,
             _currentBatchOrdinal,
             _completedBatchOrdinal,
@@ -272,8 +272,8 @@ public sealed class ScenePlaybackSession
             _segment = segment;
             _timeRange = timeRange;
             _positionMilliseconds = ScenePlaybackTimeline.ClampPosition(positionMilliseconds, _timeRange.DurationMilliseconds);
-            _targetTimestamp = _timeRange.HasTimestamps
-                ? _timeRange.StartTimestampMilliseconds + _positionMilliseconds
+            _targetOffsetMilliseconds = _timeRange.HasTiming
+                ? _timeRange.StartOffsetMilliseconds + _positionMilliseconds
                 : _positionMilliseconds;
             if (_cursor.NextObservationOrdinal < _segment.StartObservationOrdinal)
                 _cursor = _segment.CreateCursor();
@@ -301,7 +301,6 @@ public sealed class ScenePlaybackSession
             {
                 EncounterId = _encounterId,
                 PositionMilliseconds = _positionMilliseconds,
-                PositionTimestampMilliseconds = _timeRange.HasTimestamps ? _targetTimestamp : _positionMilliseconds,
                 TimeRange = _timeRange,
                 AppliedSegment = new SceneJournalSegment(_segment.Journal, _segment.StartObservationOrdinal, _appliedEndOrdinal, IsLiveGrowing: false),
                 Snapshot = snapshot,
@@ -361,14 +360,14 @@ public sealed class ScenePlaybackSession
                 {
                     foreach (ref readonly var entry in entries)
                     {
-                        var timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entry);
-                        if (_timeRange.HasTimestamps && timestamp > _targetTimestamp)
+                        var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                        if (_timeRange.HasTiming && offset > _targetOffsetMilliseconds)
                         {
                             stoppedAtTarget = true;
                             return;
                         }
 
-                        ApplyEntry(in entry, timestamp);
+                        ApplyEntry(in entry, offset);
                         appliedAny = true;
                     }
                 });
@@ -396,8 +395,8 @@ public sealed class ScenePlaybackSession
                             return;
                         }
 
-                        var timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entry);
-                        ApplyEntry(in entry, timestamp);
+                        var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                        ApplyEntry(in entry, offset);
                         appliedAny = true;
                     }
                 });
@@ -414,21 +413,21 @@ public sealed class ScenePlaybackSession
             if (endObservationOrdinalExclusive <= _segment.StartObservationOrdinal)
             {
                 _positionMilliseconds = 0;
-                _targetTimestamp = _timeRange.HasTimestamps ? _timeRange.StartTimestampMilliseconds : 0;
+                _targetOffsetMilliseconds = _timeRange.HasTiming ? _timeRange.StartOffsetMilliseconds : 0;
                 return;
             }
 
-            var timestamp = 0L;
+            var offset = 0L;
             _segment.ReadEntries(new JournalCursor(endObservationOrdinalExclusive - 1), 1, entries =>
             {
                 if (entries.Length > 0)
-                    timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entries[0]);
+                    offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entries[0]);
             });
-            _targetTimestamp = timestamp;
-            _positionMilliseconds = ScenePlaybackTimeline.ResolvePositionMilliseconds(_timeRange, timestamp);
+            _targetOffsetMilliseconds = offset;
+            _positionMilliseconds = Math.Max(0, offset);
         }
 
-        private void ApplyEntry(in ObservedEventEnvelope entry, long timestamp)
+        private void ApplyEntry(in ObservedEventEnvelope entry, long offset)
         {
             var batchOrdinal = entry.Stamp.BatchOrdinal;
             if (_currentBatchOrdinal >= 0 && batchOrdinal != _currentBatchOrdinal)
@@ -436,7 +435,7 @@ public sealed class ScenePlaybackSession
 
             _currentBatchOrdinal = batchOrdinal;
             _applier.ApplyEntry(in entry);
-            ApplyFrameTracks(in entry, timestamp);
+            ApplyFrameTracks(in entry, offset);
             _appliedEndOrdinal = entry.Stamp.ObservationOrdinal + 1;
             _cursor = new JournalCursor(_appliedEndOrdinal);
         }
@@ -461,14 +460,14 @@ public sealed class ScenePlaybackSession
             CompleteBatch(_currentBatchOrdinal);
         }
 
-        private void ApplyFrameTracks(in ObservedEventEnvelope entry, long timestamp)
+        private void ApplyFrameTracks(in ObservedEventEnvelope entry, long offset)
         {
             var track = ResolveTrack(entry.Domain);
             ref var accumulator = ref CollectionsMarshal.GetValueRefOrAddDefault(_tracks, track, out var exists);
             if (!exists)
                 accumulator = new TrackAccumulator(entry.Stamp.ObservationOrdinal);
             accumulator.Apply(entry.Stamp.ObservationOrdinal);
-            AddRecentMarker(CreateMarker(in entry, track, timestamp));
+            AddRecentMarker(CreateMarker(in entry, track, offset));
 
             if (entry.Domain == ObservedEventDomain.Resource && entry.Resource is { } resource)
             {
@@ -479,7 +478,7 @@ public sealed class ScenePlaybackSession
                     maximumValue,
                     resource.Delta,
                     resource.ResourceKind,
-                    timestamp,
+                    offset,
                     entry.Stamp.ObservationOrdinal);
                 return;
             }
@@ -493,7 +492,7 @@ public sealed class ScenePlaybackSession
                     return;
                 }
 
-                _activeAuras[key] = new ScenePlaybackAuraState(aura.SourceEntityId, aura.TargetEntityId, aura.SkillCode, aura.StackCount, aura.SequenceId, aura.ChainId, aura.ResultCode, aura.Mode, timestamp, entry.Stamp.ObservationOrdinal);
+                _activeAuras[key] = new ScenePlaybackAuraState(aura.SourceEntityId, aura.TargetEntityId, aura.SkillCode, aura.StackCount, aura.SequenceId, aura.ChainId, aura.ResultCode, aura.Mode, offset, entry.Stamp.ObservationOrdinal);
             }
         }
 
@@ -516,7 +515,7 @@ public sealed class ScenePlaybackSession
                 _recentMarkers.Dequeue();
         }
 
-        private ScenePlaybackTrackMarker CreateMarker(in ObservedEventEnvelope entry, ScenePlaybackTrack track, long timestamp)
+        private ScenePlaybackTrackMarker CreateMarker(in ObservedEventEnvelope entry, ScenePlaybackTrack track, long offset)
         {
             var skillCode = 0;
             var amount = 0L;
@@ -542,12 +541,7 @@ public sealed class ScenePlaybackSession
                 resultCode = aura.ResultCode;
             }
 
-            return new ScenePlaybackTrackMarker(track, ResolvePositionMilliseconds(timestamp), timestamp, entry.Stamp.ObservationOrdinal, entry.SourceEntityId, entry.TargetEntityId, skillCode, amount, currentValue, maximumValue, resourceKind, resultCode);
-        }
-
-        private long ResolvePositionMilliseconds(long timestamp)
-        {
-            return ScenePlaybackTimeline.ResolvePositionMilliseconds(_timeRange, timestamp);
+            return new ScenePlaybackTrackMarker(track, Math.Max(0, offset), offset, entry.Stamp.ObservationOrdinal, entry.SourceEntityId, entry.TargetEntityId, skillCode, amount, currentValue, maximumValue, resourceKind, resultCode);
         }
 
         private static ScenePlaybackTrack ResolveTrack(ObservedEventDomain domain) => domain switch
@@ -579,7 +573,7 @@ public sealed class ScenePlaybackSession
                 totalShieldAbsorbed += combatant.Metrics.ShieldAbsorbedAmount;
             }
 
-            var elapsed = snapshot.EncounterTime > 0 ? snapshot.EncounterTime : Math.Max(0, _targetTimestamp - _timeRange.StartTimestampMilliseconds);
+            var elapsed = snapshot.EncounterTime > 0 ? snapshot.EncounterTime : Math.Max(0, _targetOffsetMilliseconds - _timeRange.StartOffsetMilliseconds);
             var dps = elapsed > 0 ? (double)totalDamage / elapsed * 1000 : 0d;
             var hps = elapsed > 0 ? (double)totalHealing / elapsed * 1000 : 0d;
             return new ScenePlaybackCombatTotals(totalDamage, totalHealing, totalShield, totalShieldAbsorbed, dps, hps, elapsed);
@@ -678,7 +672,7 @@ public sealed class ScenePlaybackSession
 
 internal sealed record ScenePlaybackProjectionSnapshot(
     long PositionMilliseconds,
-    long TargetTimestampMilliseconds,
+    long TargetOffsetMilliseconds,
     ScenePlaybackTimeRange TimeRange,
     long CurrentBatchOrdinal,
     long CompletedBatchOrdinal,

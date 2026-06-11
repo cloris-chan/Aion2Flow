@@ -79,13 +79,14 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
         }
 
         var context = new DispatchContext(tcpStream, connection);
-        tcpStream.Reassembler.Feed(packet.SequenceNumber, packet.Payload, ref context, HandleReassembledChunk);
+        tcpStream.Reassembler.Feed(packet.SequenceNumber, packet.Payload, packet.CaptureTimestampMilliseconds, ref context, HandleReassembledChunk);
 
         if (context.HasParsed && ShouldLockParsedConnection(in connection))
         {
             if (_hasLastParsedConnection && !_lastParsedConnection.IsSameConnection(in connection, out _))
             {
-                tcpStream.Sink.MarkSceneTransportBoundary();
+                var source = new PacketObservationSource(context.LastParsedTimestampMilliseconds, 0, 0, 0, 0, packet.SequenceNumber, default);
+                tcpStream.Sink.MarkSceneTransportBoundary(in source);
             }
 
             _lastParsedConnection = connection;
@@ -105,11 +106,15 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
         return !lockedConnection.IsSameConnection(in connection, out _);
     }
 
-    private static void HandleReassembledChunk(uint sequenceNumber, ReadOnlySpan<byte> chunk, ref DispatchContext context)
+    private static void HandleReassembledChunk(uint sequenceNumber, ReadOnlySpan<byte> chunk, long captureTimestampMilliseconds, ref DispatchContext context)
     {
-        RawPacketDump.AppendReassembled("inbound", context.Connection, sequenceNumber, chunk);
+        RawPacketDump.AppendReassembled("inbound", context.Connection, sequenceNumber, captureTimestampMilliseconds, chunk);
 
-        context.HasParsed |= context.Stream.Processor.AppendAndProcess(chunk, context.Connection);
+        if (context.Stream.Processor.AppendAndProcess(chunk, context.Connection, captureTimestampMilliseconds))
+        {
+            context.HasParsed = true;
+            context.LastParsedTimestampMilliseconds = captureTimestampMilliseconds;
+        }
     }
 
     private void DisposeOtherStreams(TcpConnection keepConnection)
@@ -162,6 +167,7 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
         public readonly TcpCaptureStreamState Stream = stream;
         public readonly TcpConnection Connection = connection;
         public bool HasParsed;
+        public long LastParsedTimestampMilliseconds;
     }
 
     private sealed class TcpCaptureStreamState(TcpStreamReassembler reassembler, PacketStreamProcessor processor, IRuntimeObservationSink sink) : IDisposable

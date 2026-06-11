@@ -9,7 +9,7 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
 {
     public IRuntimeObservationSink Sink => sink;
 
-    public void ApplyNpcCatalog(int instanceId, int npcCode, bool requireCatalogEntry = false)
+    public void ApplyNpcCatalog(in PacketObservationSource packet, int instanceId, int npcCode, bool requireCatalogEntry = false)
     {
         if (instanceId <= 0 || npcCode <= 0)
         {
@@ -32,41 +32,41 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
             sink.RebindInstanceLifecycle(instanceId);
         }
 
-        sink.AppendNpcCode(instanceId, npcCode);
+        sink.AppendNpcCode(in packet, instanceId, npcCode);
 
         if (!hasCatalogEntry)
         {
             return;
         }
 
-        sink.AppendNpcName(npcCode, entry.Name);
+        sink.AppendNpcName(in packet, npcCode, entry.Name);
 
         var kind = CombatResourceRegistry.ResolveNpcKind(entry.Kind);
         if (kind != NpcKind.Unknown && kind != NpcKind.Summon)
         {
-            sink.AppendNpcKind(instanceId, kind);
+            sink.AppendNpcKind(in packet, instanceId, kind);
         }
     }
 
-    public bool StagePendingDestinationMapFromSceneState(uint value)
+    public bool StagePendingDestinationMapFromSceneState(in PacketObservationSource packet, uint value)
     {
         if (!SceneMapIdClassifier.IsSceneStateMapId(value))
         {
             return false;
         }
 
-        sink.StagePendingDestinationMap(value, allowSameMapReload: true);
+        sink.StagePendingDestinationMap(in packet, value, allowSameMapReload: true);
         return true;
     }
 
-    public bool ConfirmDestinationMapFromSceneState(uint value)
+    public bool ConfirmDestinationMapFromSceneState(in PacketObservationSource packet, uint value)
     {
         if (!SceneMapIdClassifier.IsSceneStateMapId(value))
         {
             return false;
         }
 
-        sink.ConfirmDestinationMap(value, allowSameMapReload: true);
+        sink.ConfirmDestinationMap(in packet, value, allowSameMapReload: true);
         return true;
     }
 }

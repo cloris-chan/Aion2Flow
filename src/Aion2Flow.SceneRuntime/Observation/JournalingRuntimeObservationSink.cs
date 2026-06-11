@@ -1,9 +1,9 @@
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
-using Cloris.Aion2Flow.Protocol.Combat;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -58,17 +58,17 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         AddKnownEntity(instanceId);
     }
 
-    public void StageDestinationMap(uint mapId) => StageDestinationMap(mapId, allowSameMapReload: false);
+    public void StageDestinationMap(in PacketObservationSource packet, uint mapId) => StageDestinationMap(in packet, mapId, allowSameMapReload: false);
 
-    public void StageDestinationMap(uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(mapId, allowSameMapReload, "stage-destination-map");
+    public void StageDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(in packet, mapId, allowSameMapReload, "stage-destination-map");
 
-    public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(mapId, allowSameMapReload, "pending-destination-map");
+    public void StagePendingDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(in packet, mapId, allowSameMapReload, "pending-destination-map");
 
-    public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(mapId, allowSameMapReload, "confirm-destination-map");
+    public void ConfirmDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(in packet, mapId, allowSameMapReload, "confirm-destination-map");
 
-    public void ConfirmPendingDestinationMapArrival()
+    public void ConfirmPendingDestinationMapArrival(in PacketObservationSource packet)
     {
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -76,7 +76,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Scene,
             SourceEntityId = 0,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             Scene = new SceneObservation
             {
                 MapId = 0,
@@ -88,9 +88,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    private void AppendSceneMapObservation(uint mapId, bool allowSameMapReload, string diagnosticKey)
+    private void AppendSceneMapObservation(in PacketObservationSource packet, uint mapId, bool allowSameMapReload, string diagnosticKey)
     {
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -98,7 +98,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Scene,
             SourceEntityId = 0,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             Scene = new SceneObservation
             {
                 MapId = mapId,
@@ -110,9 +110,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void StageDestinationMapInstance(uint instanceId)
+    public void StageDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
     {
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -120,7 +120,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Scene,
             SourceEntityId = 0,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             Scene = new SceneObservation
             {
                 MapId = 0,
@@ -132,9 +132,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void ConfirmDestinationMapInstance(uint instanceId)
+    public void ConfirmDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
     {
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -142,7 +142,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Scene,
             SourceEntityId = 0,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             Scene = new SceneObservation
             {
                 MapId = 0,
@@ -154,9 +154,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void MarkSceneTransportBoundary()
+    public void MarkSceneTransportBoundary(in PacketObservationSource packet)
     {
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -164,7 +164,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Scene,
             SourceEntityId = 0,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             Scene = new SceneObservation
             {
                 MapId = 0,
@@ -176,14 +176,14 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendCombatObservation(int sourceId, int targetId, long timestamp, long frameOrdinal, long batchOrdinal, in CombatObservation observation, ushort opcode = 0, int payloadLength = 0, long captureSequence = 0, PacketStructurePath structurePath = default)
+    public void AppendCombatObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatObservation observation)
     {
         var normalized = CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
         sourceId = ResolveLifecycleId(sourceId);
         targetId = ResolveLifecycleId(targetId);
         AddKnownEntity(sourceId);
         AddKnownEntity(targetId);
-        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -191,25 +191,18 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
-            Raw = new RawPacketReference
-            {
-                Opcode = opcode,
-                PayloadLength = payloadLength,
-                CaptureSequence = captureSequence,
-                TimestampMilliseconds = timestamp,
-                StructurePath = structurePath
-            },
+            Raw = packet.Raw,
             Combat = normalized
         });
     }
 
     public void CompleteBatch(long batchOrdinal) => journal.CompleteBatch(MapBatchOrdinal(batchOrdinal));
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
-        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -217,14 +210,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x0438,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = timestamp,
-                StructurePath = structurePath
-            },
+            Raw = packet.Raw,
             Combat = new CombatObservation
             {
                 BodyResourceEffectRef = bodyResourceEffectRef,
@@ -239,11 +225,11 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactValue0438(int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, int value, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, int value)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
-        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -251,14 +237,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x0438,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = timestamp,
-                StructurePath = structurePath
-            },
+            Raw = packet.Raw,
             Combat = new CombatObservation
             {
                 BodyResourceEffectRef = bodyResourceEffectRef,
@@ -273,10 +252,10 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0238(int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker)
     {
         sourceId = ResolveLifecycleId(sourceId);
-        var stamp = clock.CreateStampFromOffset(0, 0, MapBatchOrdinal(batchOrdinal));
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -284,14 +263,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x0238,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = 0,
-                StructurePath = structurePath
-            },
+            Raw = packet.Raw,
             Combat = new CombatObservation
             {
                 BodyResourceEffectRef = bodyResourceEffectRef,
@@ -306,10 +278,10 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterCompactControl0638(int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
     {
         sourceId = ResolveLifecycleId(sourceId);
-        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -317,14 +289,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x0638,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = timestamp,
-                StructurePath = structurePath
-            },
+            Raw = packet.Raw,
             Combat = new CombatObservation
             {
                 BodyResourceEffectRef = bodyResourceEffectRef,
@@ -340,11 +305,11 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2A38(int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterObservation2A38(in PacketObservationSource packet, int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef)
     {
         sourceId = ResolveLifecycleId(sourceId);
         AddKnownEntity(sourceId);
-        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -352,14 +317,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Aura,
             SourceEntityId = sourceId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x2A38,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = timestamp,
-                StructurePath = structurePath
-            },
+            Raw = packet.Raw,
             Aura = new AuraObservation
             {
                 SourceEntityId = sourceId,
@@ -374,13 +332,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2B38(int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength)
     {
         sourceId = ResolveLifecycleId(sourceId);
         sourceIdCopy = ResolveLifecycleId(sourceIdCopy);
         AddKnownEntity(sourceId);
         AddKnownEntity(sourceIdCopy);
-        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -388,14 +346,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Action,
             SourceEntityId = sourceId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x2B38,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = timestamp,
-                StructurePath = structurePath
-            },
+            Raw = packet.Raw,
             Action = new ActionObservation
             {
                 SourceEntityId = sourceId,
@@ -411,7 +362,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2C38(int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw, long timestamp, long frameOrdinal, long batchOrdinal, PacketStructurePath structurePath = default)
+    public void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailSourceId, int tailSkillCodeRaw)
     {
         instanceId = ResolveLifecycleId(instanceId);
         tailSourceId = ResolveLifecycleId(tailSourceId);
@@ -420,7 +371,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         var state = GetOrAddNpcState(instanceId);
         state.Latest2C38 = (sequenceId, resultCode);
         RememberNpcObservationSource(instanceId);
-        var stamp = clock.CreateStamp(timestamp, frameOrdinal, MapBatchOrdinal(batchOrdinal));
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -428,14 +379,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Aura,
             SourceEntityId = tailSourceId,
             TargetEntityId = instanceId,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x2C38,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = timestamp,
-                StructurePath = structurePath
-            },
+            Raw = packet.Raw,
             Aura = new AuraObservation
             {
                 SourceEntityId = tailSourceId,
@@ -450,11 +394,11 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
+    public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
     {
         uid = ResolveLifecycleId(uid);
         AddKnownEntity(uid);
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -462,7 +406,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = uid,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = uid,
@@ -478,13 +422,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpcCode(int instanceId, int npcCode)
+    public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.NpcCode = npcCode;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -492,7 +436,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = instanceId,
@@ -504,9 +448,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpcName(int npcCode, string name)
+    public void AppendNpcName(in PacketObservationSource packet, int npcCode, string name)
     {
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -514,7 +458,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = 0,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = npcCode,
@@ -527,13 +471,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpcKind(int instanceId, NpcKind kind)
+    public void AppendNpcKind(in PacketObservationSource packet, int instanceId, NpcKind kind)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.Kind = kind;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -541,7 +485,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = instanceId,
@@ -553,17 +497,17 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp)
     {
         instanceId = ResolveLifecycleId(instanceId);
+        var stamp = CreateStamp(in packet);
         var state = GetOrAddNpcState(instanceId);
         state.Hp = hp;
         state.MaxHp = Math.Max(state.MaxHp ?? 0, hp);
-        state.HpObservedAtMilliseconds = observedAtMilliseconds;
+        state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         if (hp == 0)
             state.BattleToggledOn = false;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStamp(observedAtMilliseconds, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -571,13 +515,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Resource,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x008D,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = observedAtMilliseconds
-            },
+            Raw = packet.Raw,
             Resource = new ResourceObservation
             {
                 EntityId = instanceId,
@@ -589,17 +527,17 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp, int maxHp)
     {
         instanceId = ResolveLifecycleId(instanceId);
+        var stamp = CreateStamp(in packet);
         var state = GetOrAddNpcState(instanceId);
         state.Hp = hp;
         state.MaxHp = Math.Max(maxHp, hp);
-        state.HpObservedAtMilliseconds = observedAtMilliseconds;
+        state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         if (hp == 0)
             state.BattleToggledOn = false;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStamp(observedAtMilliseconds, 0, 0);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -607,13 +545,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.Resource,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x008D,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = observedAtMilliseconds
-            },
+            Raw = packet.Raw,
             Resource = new ResourceObservation
             {
                 EntityId = instanceId,
@@ -625,13 +557,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds)
+    public void SetNpcBattle(in PacketObservationSource packet, int instanceId, bool isActive)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.BattleToggledOn = isActive && state.Hp != 0;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStamp(observedAtMilliseconds, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -639,13 +571,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference
-            {
-                Opcode = 0x218D,
-                PayloadLength = 0,
-                CaptureSequence = 0,
-                TimestampMilliseconds = observedAtMilliseconds
-            },
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = instanceId,
@@ -657,14 +583,14 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void ToggleNpcBattle(int instanceId)
+    public void ToggleNpcBattle(in PacketObservationSource packet, int instanceId)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         var next = !(state.BattleToggledOn ?? false);
         state.BattleToggledOn = next && state.Hp != 0;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -672,7 +598,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = instanceId,
@@ -684,14 +610,14 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpc2136State(int instanceId, uint sequence, uint value0)
+    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, uint sequence, uint value0)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.Sequence2136 = sequence;
         state.Value2136 = value0;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -699,7 +625,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = instanceId,
@@ -711,13 +637,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpc0140Value(int instanceId, uint value0)
+    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, uint value0)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.Value0140 = value0;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -725,7 +651,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = instanceId,
@@ -737,13 +663,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpc0240Value(int instanceId, uint value0)
+    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, uint value0)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.Value0240 = value0;
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -751,7 +677,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = instanceId,
@@ -763,13 +689,13 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendNpc4636State(int instanceId, byte state0, byte state1)
+    public void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.State4636 = (state0, state1);
         AddKnownEntity(instanceId);
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -777,7 +703,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = instanceId,
             TargetEntityId = 0,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = instanceId,
@@ -789,7 +715,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void AppendSummon(int ownerId, int summonInstanceId)
+    public void AppendSummon(in PacketObservationSource packet, int ownerId, int summonInstanceId)
     {
         ownerId = ResolveLifecycleId(ownerId);
         summonInstanceId = ResolveLifecycleId(summonInstanceId);
@@ -797,7 +723,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         AddKnownEntity(summonInstanceId);
         _summonOwnerByInstance[summonInstanceId] = ownerId;
         GetOrAddNpcState(summonInstanceId).Kind = NpcKind.Summon;
-        var stamp = clock.CreateStampFromOffset(0, 0, 0);
+        var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -805,7 +731,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
             Domain = ObservedEventDomain.State,
             SourceEntityId = ownerId,
             TargetEntityId = summonInstanceId,
-            Raw = default,
+            Raw = packet.Raw,
             State = new StateObservation
             {
                 EntityId = summonInstanceId,
@@ -829,6 +755,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         _mappedBatchOrdinals[batchOrdinal] = mapped;
         return mapped;
     }
+
+    private TimelineStamp CreateStamp(in PacketObservationSource packet)
+        => clock.CreateStamp(packet.CaptureTimestampMilliseconds, packet.FrameOrdinal, MapBatchOrdinal(packet.BatchOrdinal));
 
     private RuntimeNpcState GetOrAddNpcState(int instanceId)
     {

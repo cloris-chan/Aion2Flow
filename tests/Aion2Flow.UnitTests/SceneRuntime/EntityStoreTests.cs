@@ -193,7 +193,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1 },
             Domain = ObservedEventDomain.State,
             SourceEntityId = 2007,
             TargetEntityId = 0,
@@ -1420,7 +1420,7 @@ public class SceneReadModelOwnerTests
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = 100,
             TargetEntityId = 200,
-            Raw = new RawPacketReference { TimestampMilliseconds = 1_000 },
+            Raw = default,
             Combat = new CombatObservation
             {
                 SkillCode = 11000010,
@@ -1450,11 +1450,11 @@ public class SceneReadModelOwnerTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0, BatchOrdinal = 100 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0, BatchOrdinal = 100 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = 100,
             TargetEntityId = 200,
-            Raw = new RawPacketReference { Opcode = 0x0438, TimestampMilliseconds = 1_000 },
+            Raw = new RawPacketReference { Opcode = 0x0438 },
             Combat = new CombatObservation
             {
                 SkillCode = 11000010,
@@ -1488,15 +1488,15 @@ public class SceneReadModelOwnerTests
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
-        AppendScenePacket(sink, 100, 200, 11000010, 500, 1_000, 1);
-        AppendScenePacket(sink, 100, 200, 11000010, 300, 2_000, 2);
+        AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
+        AppendScenePacket(scene, sink, 100, 200, 11000010, 300, 2_000, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
         var firstSnapshot = scene.Owner.CreateSnapshot();
         var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
 
-        AppendScenePacket(sink, 300, 400, 11000010, 700, 3_000, 3);
+        AppendScenePacket(scene, sink, 300, 400, 11000010, 700, 3_000, 3);
         sink.CompleteBatch(3);
 
         var secondSnapshot = scene.Owner.CreateSnapshot();
@@ -1515,15 +1515,15 @@ public class SceneReadModelOwnerTests
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
-        AppendScenePacket(sink, 100, 200, 11000010, 500, 1_000, 1);
-        AppendScenePacket(sink, 100, 200, 11000010, 300, 2_000, 2);
+        AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
+        AppendScenePacket(scene, sink, 100, 200, 11000010, 300, 2_000, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
         var firstSnapshot = scene.Owner.CreateSnapshot();
         var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
 
-        AppendScenePacket(sink, 100, 200, 11000010, 200, 3_000, 3);
+        AppendScenePacket(scene, sink, 100, 200, 11000010, 200, 3_000, 3);
         sink.CompleteBatch(3);
 
         var secondSnapshot = scene.Owner.CreateSnapshot();
@@ -1542,8 +1542,8 @@ public class SceneReadModelOwnerTests
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
 
-        AppendScenePacket(sink, 100, 200, 11000010, 500, 1_000, 1);
-        AppendScenePacket(sink, 300, 400, 11000010, 700, 2_000, 2);
+        AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
+        AppendScenePacket(scene, sink, 300, 400, 11000010, 700, 2_000, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
@@ -1568,15 +1568,15 @@ public class SceneReadModelOwnerTests
 
         sink.AppendNickname(100, "Owner");
         sink.AppendSummon(100, 500);
-        AppendScenePacket(sink, 500, 200, 11000010, 500, 1_000, 1);
-        AppendScenePacket(sink, 500, 200, 11000010, 300, 2_000, 2);
+        AppendScenePacket(scene, sink, 500, 200, 11000010, 500, 1_000, 1);
+        AppendScenePacket(scene, sink, 500, 200, 11000010, 300, 2_000, 2);
         sink.CompleteBatch(1);
         sink.CompleteBatch(2);
 
         var firstSnapshot = scene.Owner.CreateSnapshot();
         var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
 
-        AppendScenePacket(sink, 500, 200, 11000010, 200, 3_000, 3);
+        AppendScenePacket(scene, sink, 500, 200, 11000010, 200, 3_000, 3);
         sink.CompleteBatch(3);
 
         var secondSnapshot = scene.Owner.CreateSnapshot();
@@ -1691,7 +1691,7 @@ public class SceneReadModelOwnerTests
                 TargetId = 200,
                 SkillCode = 11000010,
                 Damage = 500,
-                Timestamp = 1_000,
+                Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + 1_000,
                 BatchOrdinal = 1,
                 HitContribution = 1,
                 AttemptContribution = 1,
@@ -1704,7 +1704,7 @@ public class SceneReadModelOwnerTests
                 TargetId = 200,
                 SkillCode = 11000010,
                 Damage = 300,
-                Timestamp = 2_000,
+                Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + 2_000,
                 BatchOrdinal = 2,
                 HitContribution = 1,
                 AttemptContribution = 1,
@@ -1725,7 +1725,7 @@ public class SceneReadModelOwnerTests
                 TargetId = 201,
                 SkillCode = 11000010,
                 Damage = 700,
-                Timestamp = 3_000,
+                Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + 3_000,
                 BatchOrdinal = 3,
                 HitContribution = 1,
                 AttemptContribution = 1,
@@ -1738,7 +1738,7 @@ public class SceneReadModelOwnerTests
                 TargetId = 201,
                 SkillCode = 11000010,
                 Damage = 300,
-                Timestamp = 4_000,
+                Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + 4_000,
                 BatchOrdinal = 4,
                 HitContribution = 1,
                 AttemptContribution = 1,
@@ -1867,6 +1867,7 @@ public class SceneReadModelOwnerTests
     }
 
     private static void AppendScenePacket(
+        SceneLiveReadModel scene,
         JournalingRuntimeObservationSink sink,
         int sourceId,
         int targetId,
@@ -1881,7 +1882,7 @@ public class SceneReadModelOwnerTests
             TargetId = targetId,
             SkillCode = skillCode,
             Damage = damage,
-            Timestamp = timestamp,
+            Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + timestamp,
             BatchOrdinal = batchOrdinal,
             HitContribution = 1,
             AttemptContribution = 1,

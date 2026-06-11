@@ -15,7 +15,10 @@ public sealed class LiveClassInferenceSceneTests
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var scene = new SceneLiveReadModel();
+        var entries = ReadStreamLogEntries("aion2flow.stream.20260423002750.log")
+            .Where(static entry => entry.IsInbound)
+            .ToArray();
+        var scene = new SceneLiveReadModel(DateTimeOffset.FromUnixTimeMilliseconds(entries[0].TimestampMilliseconds));
         using var processor = new PacketStreamProcessor(scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal)));
 
         const int combatantId = 2906;
@@ -23,13 +26,8 @@ public sealed class LiveClassInferenceSceneTests
         var lostClassSnapshots = new List<string>();
         var overflowSnapshots = new List<string>();
 
-        foreach (var entry in ReadStreamLogEntries("aion2flow.stream.20260423002750.log"))
+        foreach (var entry in entries)
         {
-            if (!entry.IsInbound)
-            {
-                continue;
-            }
-
             if (!processor.AppendAndProcess(entry.Payload, entry.Connection, entry.TimestampMilliseconds))
             {
                 continue;

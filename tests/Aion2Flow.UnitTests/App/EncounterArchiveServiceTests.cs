@@ -352,11 +352,11 @@ public sealed class EncounterArchiveServiceTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
             Domain = ObservedEventDomain.State,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
-            Raw = new RawPacketReference(0, 0, ordinal, observedAt),
+            Raw = new RawPacketReference(0, 0, ordinal),
             State = new StateObservation(sourceId, stateCode, value0, value1, 0, text)
         });
     }
@@ -366,11 +366,11 @@ public sealed class EncounterArchiveServiceTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
             Domain = ObservedEventDomain.Resource,
             SourceEntityId = entityId,
             TargetEntityId = 0,
-            Raw = new RawPacketReference(0, 0, ordinal, observedAt),
+            Raw = new RawPacketReference(0, 0, ordinal),
             Resource = new ResourceObservation(entityId, current, maximum, null, 0)
         });
     }
@@ -380,11 +380,11 @@ public sealed class EncounterArchiveServiceTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
-            Raw = new RawPacketReference(0x0438, 0, ordinal, observedAt),
+            Raw = new RawPacketReference(0x0438, 0, ordinal),
             Combat = new CombatObservation
             {
                 SkillCode = 11000010,

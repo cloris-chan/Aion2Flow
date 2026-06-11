@@ -7,7 +7,6 @@ public sealed class ScenePlaybackFrame
 {
     public Guid EncounterId { get; init; }
     public long PositionMilliseconds { get; init; }
-    public long PositionTimestampMilliseconds { get; init; }
     public ScenePlaybackTimeRange TimeRange { get; init; }
     public SceneJournalSegment AppliedSegment { get; init; }
     public SceneCombatSnapshot Snapshot { get; init; } = SceneCombatSnapshot.Empty;
@@ -18,7 +17,7 @@ public sealed class ScenePlaybackFrame
     public IReadOnlyList<ScenePlaybackTrackMarker> RecentMarkers { get; init; } = [];
 }
 
-public readonly record struct ScenePlaybackTimeRange(long StartTimestampMilliseconds, long EndTimestampMilliseconds, long DurationMilliseconds, bool HasTimestamps);
+public readonly record struct ScenePlaybackTimeRange(long StartOffsetMilliseconds, long EndOffsetMilliseconds, long DurationMilliseconds, bool HasTiming);
 
 public readonly record struct ScenePlaybackCombatTotals(long TotalDamage, long TotalHealing, long TotalShield, long TotalShieldAbsorbed, double DamagePerSecond, double HealingPerSecond, long ElapsedMilliseconds);
 

@@ -400,6 +400,7 @@ public sealed class SceneArchivePayload
         private int _lastSkillCode;
         private long _firstObserved;
         private long _lastObserved;
+        private bool _hasObserved;
         private long _revision;
 
         public void Apply(SceneArchiveCombatEvent e)
@@ -421,8 +422,17 @@ public sealed class SceneArchivePayload
             _lastSkillCode = observation.SkillCode;
             _revision = Math.Max(_revision, e.Revision);
             var observedAt = e.ObservedAt;
-            _firstObserved = _firstObserved > 0 ? Math.Min(_firstObserved, observedAt) : observedAt;
-            _lastObserved = Math.Max(_lastObserved, observedAt);
+            if (_hasObserved)
+            {
+                _firstObserved = Math.Min(_firstObserved, observedAt);
+                _lastObserved = Math.Max(_lastObserved, observedAt);
+            }
+            else
+            {
+                _firstObserved = observedAt;
+                _lastObserved = observedAt;
+                _hasObserved = true;
+            }
         }
 
         public DirectedPairSnapshot ToSnapshot() => new()
@@ -472,6 +482,7 @@ public sealed class SceneArchivePayload
         private int _incomingShieldAbsorbedCount;
         private long _firstObserved;
         private long _lastObserved;
+        private bool _hasObserved;
         private long _revision;
 
         public void ApplyOutgoing(DirectedPairSnapshot pair)
@@ -538,9 +549,17 @@ public sealed class SceneArchivePayload
 
         private void ApplyObserved(DirectedPairSnapshot pair)
         {
-            if (pair.FirstObserved > 0)
-                _firstObserved = _firstObserved > 0 ? Math.Min(_firstObserved, pair.FirstObserved) : pair.FirstObserved;
-            _lastObserved = Math.Max(_lastObserved, pair.LastObserved);
+            if (_hasObserved)
+            {
+                _firstObserved = Math.Min(_firstObserved, pair.FirstObserved);
+                _lastObserved = Math.Max(_lastObserved, pair.LastObserved);
+            }
+            else
+            {
+                _firstObserved = pair.FirstObserved;
+                _lastObserved = pair.LastObserved;
+                _hasObserved = true;
+            }
             _revision = Math.Max(_revision, pair.Revision);
         }
     }
@@ -767,7 +786,7 @@ public readonly record struct SceneArchiveCombatEvent
     public CombatObservation Observation { get; init; }
     public long ObservedAtMilliseconds { get; init; }
     public long Revision { get; init; }
-    public long ObservedAt => ObservedAtMilliseconds > 0 ? ObservedAtMilliseconds : Revision;
+    public long ObservedAt => ObservedAtMilliseconds;
 
     public static SceneArchiveCombatEvent From(in CombatDetailEvent e) => new()
     {
