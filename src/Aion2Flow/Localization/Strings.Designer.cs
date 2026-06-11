@@ -529,11 +529,47 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Next event.
+        /// </summary>
+        internal static string Playback_NextEvent {
+            get {
+                return ResourceManager.GetString("Playback_NextEvent", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Forward 1 second.
+        /// </summary>
+        internal static string Playback_NextSecond {
+            get {
+                return ResourceManager.GetString("Playback_NextSecond", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Playback.
         /// </summary>
         internal static string Playback_Open {
             get {
                 return ResourceManager.GetString("Playback_Open", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Previous event.
+        /// </summary>
+        internal static string Playback_PreviousEvent {
+            get {
+                return ResourceManager.GetString("Playback_PreviousEvent", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Back 1 second.
+        /// </summary>
+        internal static string Playback_PreviousSecond {
+            get {
+                return ResourceManager.GetString("Playback_PreviousSecond", resourceCulture);
             }
         }
         

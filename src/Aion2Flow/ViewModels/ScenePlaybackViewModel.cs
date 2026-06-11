@@ -30,7 +30,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private const long EventWindowRadiusMilliseconds = 4_000;
     private const long StepMilliseconds = 1_000;
     private const long DetailRefreshIntervalMilliseconds = 250;
-    private const long EventWindowRefreshIntervalMilliseconds = 1_000;
 
     private static readonly IBrush CombatBrush = Brush.Parse("#18D7F4");
     private static readonly IBrush ResourceBrush = Brush.Parse("#8CE271");
@@ -51,7 +50,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private IReadOnlyList<PlaybackTimelineLane> _timelineMarkerTracks = [];
     private double _timelineMarkerDuration = -1;
     private long _lastDetailProjectionTick;
-    private long _lastEventWindowTick;
+    private long _lastEventWindowEndObservationOrdinal = long.MinValue;
     private bool _isApplyingFrame;
     private bool _isDisposed;
     private bool _frameApplyQueued;
@@ -193,6 +192,12 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     }
 
     [RelayCommand]
+    private Task StepEventBackwardAsync() => StepEventAsync(-1);
+
+    [RelayCommand]
+    private Task StepEventForwardAsync() => StepEventAsync(1);
+
+    [RelayCommand]
     private void SetSpeed(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var speed))
@@ -223,6 +228,23 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         {
             IsLoading = true;
             await _controller.SeekAsync(positionMilliseconds, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => StatusText = ex.Message);
+        }
+    }
+
+    private async Task StepEventAsync(int direction)
+    {
+        try
+        {
+            _forceNextDetailProjection = true;
+            IsLoading = true;
+            await _controller.StepEventAsync(direction).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -303,17 +325,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                 : Localization["Playback_Status_Paused"];
 
         RefreshTimelineTracks(frame);
+        if (ShouldRefreshEventWindow(frame, state))
+        {
+            EventWindow = CreateEventWindow(frame);
+            _lastEventWindowEndObservationOrdinal = frame.AppliedSegment.EndObservationOrdinalExclusive;
+        }
 
         if (!ShouldRefreshDetails(frame, state))
             return;
 
         Combatants = CreateCombatants(frame);
-        if (ShouldRefreshEventWindow(frame, state))
-        {
-            EventWindow = CreateEventWindow(frame, state);
-            _lastEventWindowTick = Environment.TickCount64;
-        }
-
         _lastDetailProjectionTick = Environment.TickCount64;
         _forceNextDetailProjection = false;
     }
@@ -337,13 +358,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (_forceNextDetailProjection || !state.IsPlaying)
             return true;
 
-        if (_lastEventWindowTick == 0)
-            return true;
-
-        if (frame.TimeRange.DurationMilliseconds > 0 && frame.PositionMilliseconds >= frame.TimeRange.DurationMilliseconds)
-            return true;
-
-        return Environment.TickCount64 - _lastEventWindowTick >= EventWindowRefreshIntervalMilliseconds;
+        return frame.AppliedSegment.EndObservationOrdinalExclusive != _lastEventWindowEndObservationOrdinal;
     }
 
     private IReadOnlyList<PlaybackCombatantRowViewModel> CreateCombatants(ScenePlaybackFrame frame)
@@ -475,14 +490,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         return lanes;
     }
 
-    private IReadOnlyList<PlaybackEventRowViewModel> CreateEventWindow(ScenePlaybackFrame frame, ScenePlaybackControllerState state)
+    private IReadOnlyList<PlaybackEventRowViewModel> CreateEventWindow(ScenePlaybackFrame frame)
     {
         var position = frame.PositionMilliseconds;
         var start = Math.Max(0, position - EventWindowRadiusMilliseconds);
         var end = frame.TimeRange.DurationMilliseconds > 0
             ? Math.Min(frame.TimeRange.DurationMilliseconds, position + EventWindowRadiusMilliseconds)
             : position + EventWindowRadiusMilliseconds;
-        if (state.IsPlaying && frame.RecentMarkers.Count > 0)
+        if (frame.RecentMarkers.Count > 0)
             return CreateEventWindowRows(FilterRecentMarkers(frame.RecentMarkers, start, end));
 
         var segment = _controller.CreateTimelineSegment(start, end);
@@ -639,6 +654,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     {
         WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], DisplayContext.ResolveMapName(MapId));
         _timelineMarkersInitialized = false;
+        _forceNextDetailProjection = true;
         ApplyFrame(_currentFrame, _controller.State);
     }
 }

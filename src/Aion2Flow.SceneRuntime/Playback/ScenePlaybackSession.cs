@@ -75,6 +75,23 @@ public sealed class ScenePlaybackSession
         return ApplyFrame(projector.AdvanceTo(positionMilliseconds, segment, timeRange));
     }
 
+    internal ScenePlaybackFrame SeekObservationOrdinal(long endObservationOrdinalExclusive, ScenePlaybackCheckpoint? checkpoint)
+    {
+        var segment = _source.CreateTimelineSegment();
+        var target = Math.Clamp(endObservationOrdinalExclusive, segment.StartObservationOrdinal, segment.CurrentEndObservationOrdinalExclusive);
+        var projector = _projector;
+        if (projector is null || target < _nextLoadedObservationOrdinal)
+        {
+            projector = checkpoint is null || checkpoint.JournalCursor.NextObservationOrdinal > target
+                ? CreateProjector()
+                : CreateProjector(checkpoint);
+            _projector = projector;
+        }
+
+        var timeRange = segment.IsLiveGrowing ? ScenePlaybackTimeline.ResolveTimeRange(segment, _source.CreateSnapshot()) : projector.TimeRange;
+        return ApplyFrame(projector.AdvanceToObservationOrdinal(target, segment, timeRange));
+    }
+
     private ScenePlaybackFrame ApplyFrame(ScenePlaybackFrame frame)
     {
         _positionMilliseconds = frame.PositionMilliseconds;
@@ -264,6 +281,18 @@ public sealed class ScenePlaybackSession
             return BuildFrame();
         }
 
+        public ScenePlaybackFrame AdvanceToObservationOrdinal(long endObservationOrdinalExclusive, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
+        {
+            _segment = segment;
+            _timeRange = timeRange;
+            var target = Math.Clamp(endObservationOrdinalExclusive, _segment.StartObservationOrdinal, _segment.CurrentEndObservationOrdinalExclusive);
+            if (_cursor.NextObservationOrdinal < _segment.StartObservationOrdinal)
+                _cursor = _segment.CreateCursor();
+            ApplyEntriesToObservationOrdinal(target);
+            ResolvePositionAtObservationBoundary(target);
+            return BuildFrame();
+        }
+
         private ScenePlaybackFrame BuildFrame()
         {
             var snapshot = _adapter.CreateSnapshot();
@@ -349,6 +378,54 @@ public sealed class ScenePlaybackSession
             }
 
             TryCompleteCurrentBatchAtSegmentEnd();
+        }
+
+        private void ApplyEntriesToObservationOrdinal(long endObservationOrdinalExclusive)
+        {
+            while (_cursor.NextObservationOrdinal < endObservationOrdinalExclusive)
+            {
+                var stoppedAtTarget = false;
+                var appliedAny = false;
+                var result = _segment.ReadEntries(_cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
+                {
+                    foreach (ref readonly var entry in entries)
+                    {
+                        if (entry.Stamp.ObservationOrdinal >= endObservationOrdinalExclusive)
+                        {
+                            stoppedAtTarget = true;
+                            return;
+                        }
+
+                        var timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entry);
+                        ApplyEntry(in entry, timestamp);
+                        appliedAny = true;
+                    }
+                });
+
+                if (result.Count == 0 || stoppedAtTarget || !appliedAny)
+                    break;
+            }
+
+            TryCompleteCurrentBatchAtSegmentEnd();
+        }
+
+        private void ResolvePositionAtObservationBoundary(long endObservationOrdinalExclusive)
+        {
+            if (endObservationOrdinalExclusive <= _segment.StartObservationOrdinal)
+            {
+                _positionMilliseconds = 0;
+                _targetTimestamp = _timeRange.HasTimestamps ? _timeRange.StartTimestampMilliseconds : 0;
+                return;
+            }
+
+            var timestamp = 0L;
+            _segment.ReadEntries(new JournalCursor(endObservationOrdinalExclusive - 1), 1, entries =>
+            {
+                if (entries.Length > 0)
+                    timestamp = ScenePlaybackTimeline.ResolveTimestampMilliseconds(in entries[0]);
+            });
+            _targetTimestamp = timestamp;
+            _positionMilliseconds = ScenePlaybackTimeline.ResolvePositionMilliseconds(_timeRange, timestamp);
         }
 
         private void ApplyEntry(in ObservedEventEnvelope entry, long timestamp)

@@ -125,6 +125,10 @@
   <data name="Playback_CheckpointsBuildingFormat" xml:space="preserve"><value>체크포인트 생성 중... {0}</value></data>
   <data name="Playback_CheckpointsReadyFormat" xml:space="preserve"><value>체크포인트 {0}</value></data>
   <data name="Playback_CheckpointsButton" xml:space="preserve"><value>체크포인트</value></data>
+  <data name="Playback_PreviousEvent" xml:space="preserve"><value>이전 이벤트</value></data>
+  <data name="Playback_PreviousSecond" xml:space="preserve"><value>1초 뒤로</value></data>
+  <data name="Playback_NextSecond" xml:space="preserve"><value>1초 앞으로</value></data>
+  <data name="Playback_NextEvent" xml:space="preserve"><value>다음 이벤트</value></data>
   <data name="Playback_Label_Speed" xml:space="preserve"><value>속도</value></data>
   <data name="Playback_TimelineTracks" xml:space="preserve"><value>Timeline Tracks</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>전투 대상</value></data>

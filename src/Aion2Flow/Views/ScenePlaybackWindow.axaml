@@ -72,12 +72,24 @@
                         <Path Classes="PlaybackGlyph" Data="{StaticResource square}" />
                     </Button>
                     <Button Classes="PlaybackIconButton"
-                            Command="{Binding StepBackwardCommand}">
+                            Command="{Binding StepEventBackwardCommand}"
+                            ToolTip.Tip="{markups:Translate Playback_PreviousEvent}">
+                        <Path Classes="PlaybackGlyph" Data="{StaticResource chevron-left}" />
+                    </Button>
+                    <Button Classes="PlaybackIconButton"
+                            Command="{Binding StepBackwardCommand}"
+                            ToolTip.Tip="{markups:Translate Playback_PreviousSecond}">
                         <Path Classes="PlaybackGlyph" Data="{StaticResource skip-back}" />
                     </Button>
                     <Button Classes="PlaybackIconButton"
-                            Command="{Binding StepForwardCommand}">
+                            Command="{Binding StepForwardCommand}"
+                            ToolTip.Tip="{markups:Translate Playback_NextSecond}">
                         <Path Classes="PlaybackGlyph" Data="{StaticResource skip-forward}" />
+                    </Button>
+                    <Button Classes="PlaybackIconButton"
+                            Command="{Binding StepEventForwardCommand}"
+                            ToolTip.Tip="{markups:Translate Playback_NextEvent}">
+                        <Path Classes="PlaybackGlyph" Data="{StaticResource chevron-right}" />
                     </Button>
 
                     <Border Classes="PlaybackToolbarDivider" />

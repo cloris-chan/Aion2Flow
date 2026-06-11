@@ -200,12 +200,20 @@ public sealed class ScenePlaybackController : IAsyncDisposable
     }
 
     public ValueTask<ScenePlaybackFrame> SeekAsync(long positionMilliseconds, CancellationToken cancellationToken = default) =>
-        SeekCoreAsync(positionMilliseconds, cancelPrevious: true, cancellationToken);
+        NavigateAsync((token, generation) => SeekOperationAsync(positionMilliseconds, token, generation), cancellationToken);
+
+    public ValueTask<ScenePlaybackFrame> StepEventAsync(int direction, CancellationToken cancellationToken = default)
+    {
+        if (direction is not (-1 or 1))
+            throw new ArgumentOutOfRangeException(nameof(direction));
+
+        return NavigateAsync((token, generation) => StepEventOperationAsync(direction, token, generation), cancellationToken);
+    }
 
     public ValueTask<ScenePlaybackFrame> RefreshAsync(CancellationToken cancellationToken = default)
     {
         var position = PositionMilliseconds;
-        return SeekCoreAsync(position, cancelPrevious: true, cancellationToken);
+        return SeekAsync(position, cancellationToken);
     }
 
     public void SetSpeed(double speed)
@@ -348,27 +356,23 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    private async ValueTask<ScenePlaybackFrame> SeekCoreAsync(long positionMilliseconds, bool cancelPrevious, CancellationToken cancellationToken)
-        => await SeekCoreAsync(positionMilliseconds, cancelPrevious, cancellationToken, null).ConfigureAwait(false);
-
-    private async ValueTask<ScenePlaybackFrame> SeekCoreAsync(long positionMilliseconds, bool cancelPrevious, CancellationToken cancellationToken, long? expectedGeneration)
+    private async ValueTask<ScenePlaybackFrame> NavigateAsync(Func<CancellationToken, long, ValueTask<ScenePlaybackFrame>> operation, CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
         CancellationTokenSource linkedCancellation;
-        CancellationTokenSource? previousCancellation = null;
+        CancellationTokenSource? previousCancellation;
         long generation;
         lock (_stateGate)
         {
-            previousCancellation = cancelPrevious ? _activeSeekCancellation : null;
+            previousCancellation = _activeSeekCancellation;
             linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            if (cancelPrevious)
-                _activeSeekCancellation = linkedCancellation;
-            generation = cancelPrevious ? ++_seekGeneration : expectedGeneration ?? _seekGeneration;
+            _activeSeekCancellation = linkedCancellation;
+            generation = ++_seekGeneration;
             _isLoading = true;
         }
 
         previousCancellation?.Cancel();
-        var operationTask = SeekOperationAsync(positionMilliseconds, linkedCancellation.Token, generation).AsTask();
+        var operationTask = operation(linkedCancellation.Token, generation).AsTask();
         lock (_stateGate)
         {
             if (ReferenceEquals(_activeSeekCancellation, linkedCancellation))
@@ -400,6 +404,43 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             }
 
             linkedCancellation.Dispose();
+        }
+    }
+
+    private async ValueTask<ScenePlaybackFrame> StepEventOperationAsync(int direction, CancellationToken cancellationToken, long generation)
+    {
+        await Task.Yield();
+        cancellationToken.ThrowIfCancellationRequested();
+        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ScenePlaybackFrame currentFrame;
+            lock (_stateGate)
+                currentFrame = _currentFrame;
+
+            var segment = Source.CreateTimelineSegment();
+            var current = currentFrame.AppliedSegment.EndObservationOrdinalExclusive;
+            var target = direction > 0
+                ? Math.Min(segment.CurrentEndObservationOrdinalExclusive, current + 1)
+                : Math.Max(segment.StartObservationOrdinal, current - 1);
+            var frame = await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var checkpoint = direction < 0 ? ResolveOrdinalCheckpoint(target) : null;
+                return Session.SeekObservationOrdinal(target, checkpoint);
+            }, cancellationToken).ConfigureAwait(false);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryApplyFrame(frame, generation, resetPlaybackClock: true, out var playbackCancellation, out var playbackTask))
+                return frame;
+
+            CancelAndDisposeAfterCompletion(playbackCancellation, playbackTask);
+            PublishFrameChanged(frame);
+            return frame;
+        }
+        finally
+        {
+            _operationGate.Release();
         }
     }
 
@@ -509,6 +550,15 @@ public sealed class ScenePlaybackController : IAsyncDisposable
     private ScenePlaybackCheckpoint? ResolveSeekCheckpoint(long positionMilliseconds)
     {
         if (!_checkpoints.TryGetFloor(positionMilliseconds, out var checkpoint) || checkpoint is null)
+            return null;
+
+        var currentEnd = Source.CreateTimelineSegment().CurrentEndObservationOrdinalExclusive;
+        return checkpoint.JournalCursor.NextObservationOrdinal <= currentEnd ? checkpoint : null;
+    }
+
+    private ScenePlaybackCheckpoint? ResolveOrdinalCheckpoint(long endObservationOrdinalExclusive)
+    {
+        if (!_checkpoints.TryGetOrdinalFloor(endObservationOrdinalExclusive, out var checkpoint) || checkpoint is null)
             return null;
 
         var currentEnd = Source.CreateTimelineSegment().CurrentEndObservationOrdinalExclusive;

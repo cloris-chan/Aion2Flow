@@ -62,6 +62,25 @@ internal sealed class ScenePlaybackCheckpointCache
         }
     }
 
+    public bool TryGetOrdinalFloor(long endObservationOrdinalExclusive, out ScenePlaybackCheckpoint? checkpoint)
+    {
+        lock (_gate)
+        {
+            checkpoint = null;
+            foreach (var candidate in _checkpoints.Values)
+            {
+                if (candidate.JournalCursor.NextObservationOrdinal > endObservationOrdinalExclusive)
+                    continue;
+
+                if (checkpoint is null ||
+                    candidate.JournalCursor.NextObservationOrdinal > checkpoint.JournalCursor.NextObservationOrdinal)
+                    checkpoint = candidate;
+            }
+
+            return checkpoint is not null;
+        }
+    }
+
     public void Upsert(ScenePlaybackCheckpoint checkpoint)
     {
         lock (_gate)

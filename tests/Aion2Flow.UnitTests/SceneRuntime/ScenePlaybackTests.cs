@@ -299,6 +299,54 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public async Task Controller_StepEventAsync_MovesExactlyOneJournalEventAcrossEqualTimestamps()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendState(journal, sceneId, 100, StateCodes.PlayerIdentity, 0, 0, "Tester", 1, 500);
+        AppendCombat(journal, sceneId, 100, 200, 100, 2, 1_000);
+        AppendCombat(journal, sceneId, 100, 200, 200, 3, 1_000);
+        AppendResource(journal, sceneId, 200, 30_000, 50_000, 4, 2_000);
+        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
+        var snapshot = owner.CreateSnapshot();
+        var record = new ArchivedEncounterRecord
+        {
+            EncounterId = sceneId,
+            Snapshot = snapshot,
+            ScenePayload = owner.CreateArchivePayload(snapshot)
+        };
+        await using var controller = CreateController(record);
+
+        Assert.Equal(1, controller.CurrentFrame.AppliedSegment.EndObservationOrdinalExclusive);
+
+        var first = await controller.StepEventAsync(1, TestContext.Current.CancellationToken);
+        var second = await controller.StepEventAsync(1, TestContext.Current.CancellationToken);
+        var previous = await controller.StepEventAsync(-1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, first.AppliedSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(1, first.RecentMarkers[^1].ObservationOrdinal);
+        Assert.Equal(100, first.RecentMarkers[^1].Amount);
+        Assert.Equal(500, first.PositionMilliseconds);
+        Assert.Equal(3, second.AppliedSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(2, second.RecentMarkers[^1].ObservationOrdinal);
+        Assert.Equal(200, second.RecentMarkers[^1].Amount);
+        Assert.Equal(500, second.PositionMilliseconds);
+        Assert.Equal(2, previous.AppliedSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(1, previous.RecentMarkers[^1].ObservationOrdinal);
+        Assert.Equal(100, previous.RecentMarkers[^1].Amount);
+        Assert.Equal(500, previous.PositionMilliseconds);
+    }
+
+    [Fact]
+    public async Task Controller_StepEventAsync_RejectsNonUnitDirection()
+    {
+        await using var controller = CreateController(CreateArchiveRecord());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => controller.StepEventAsync(0, TestContext.Current.CancellationToken));
+        Assert.Throws<ArgumentOutOfRangeException>(() => controller.StepEventAsync(2, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Controller_Play_AdvancesAndPausesAtArchivedEnd()
     {
         var tickFactory = new ManualTickSourceFactory();
