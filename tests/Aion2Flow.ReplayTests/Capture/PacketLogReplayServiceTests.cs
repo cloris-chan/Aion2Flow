@@ -379,18 +379,23 @@ public sealed class PacketLogReplayServiceTests
         AssertSummonNpc(replay, 33318, 2920114, "火之精靈", summaryDump);
         AssertSummonNpc(replay, 20281, 2920175, "地之精靈", summaryDump);
         AssertSummonNpc(replay, 21096, 2920154, "風之精靈", summaryDump);
+        AssertNpcIdentity(replay, 17329, 2920804, "法夫尼爾毒血池", summaryDump);
+        AssertNpcIdentity(replay, 18393, 2920804, "法夫尼爾毒血池", summaryDump);
+        AssertNpcIdentity(replay, 20978, 2920804, "法夫尼爾毒血池", summaryDump);
+        AssertNpcIdentity(replay, 21334, 2920804, "法夫尼爾毒血池", summaryDump);
+        AssertNpcIdentity(replay, 23433, 2920804, "法夫尼爾毒血池", summaryDump);
 
         var ownerSummary = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == ownerId);
         Assert.Equal(486_287, ownerSummary.OutgoingDamage);
         var bossSummary = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == bossId);
         Assert.Equal(486_287, bossSummary.IncomingDamage);
+        AssertZeroDamageSummary(replay, 23247, "火之精靈", summaryDump);
+        AssertZeroDamageSummary(replay, 33318, "火之精靈", summaryDump);
+        AssertZeroDamageSummary(replay, 20281, "地之精靈", summaryDump);
+        AssertZeroDamageSummary(replay, 21096, "風之精靈", summaryDump);
 
         Assert.True(replay.Snapshot.Combatants.TryGetValue(ownerId, out var ownerMetrics), summaryDump);
         Assert.Equal(486_287, ownerMetrics.DamageAmount);
-        Assert.DoesNotContain(23247, replay.Snapshot.Combatants.Keys);
-        Assert.DoesNotContain(33318, replay.Snapshot.Combatants.Keys);
-        Assert.DoesNotContain(20281, replay.Snapshot.Combatants.Keys);
-        Assert.DoesNotContain(21096, replay.Snapshot.Combatants.Keys);
     }
 
     [Fact]
@@ -802,6 +807,26 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry), summaryDump);
         Assert.Equal(expectedName, entry.Name);
         Assert.Equal(NpcKind.Summon, CombatResourceRegistry.ResolveNpcKind(entry.Kind));
+    }
+
+    private static void AssertNpcIdentity(PacketLogReplayResult replay, int entityId, int expectedNpcCode, string expectedName, string summaryDump)
+    {
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetNpcCode(entityId, out var npcCode), summaryDump);
+        Assert.Equal(expectedNpcCode, npcCode);
+        Assert.Equal(expectedName, SceneReplayTestView.ResolveDisplayName(replay, entityId));
+        Assert.True(replay.SceneOwner.Entities.TryGet(entityId, out var entity), summaryDump);
+        Assert.Equal(expectedNpcCode, entity.NpcCode);
+        Assert.True(CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry), summaryDump);
+        Assert.Equal(expectedName, entry.Name);
+        Assert.NotEqual(NpcKind.Boss, CombatResourceRegistry.ResolveNpcKind(entry.Kind));
+    }
+
+    private static void AssertZeroDamageSummary(PacketLogReplayResult replay, int combatantId, string expectedName, string summaryDump)
+    {
+        var combatant = Assert.Single(replay.Combatants, summary => summary.CombatantId == combatantId);
+        Assert.Equal(expectedName, combatant.DisplayName);
+        Assert.Equal(0, combatant.OutgoingDamage);
+        Assert.Equal(0, combatant.IncomingDamage);
     }
 
     private static void AssertNpcNameAndNotBoss(PacketLogReplayResult replay, int combatantId, string expectedName, string summaryDump)

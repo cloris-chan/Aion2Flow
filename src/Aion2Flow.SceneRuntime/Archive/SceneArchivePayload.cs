@@ -53,6 +53,8 @@ public sealed class SceneArchivePayload
             AddCombatantDetailEvents(eventsByKey, entityIds, adapter, archivedSnapshot, targetId);
         }
 
+        AddKnownEntities(entityIds, entities);
+
         var eventsSnapshot = eventsByKey.Values.ToArray();
         Array.Sort(eventsSnapshot, CompareEvents);
         var identities = BuildIdentities(entities, entityIds);
@@ -157,6 +159,12 @@ public sealed class SceneArchivePayload
     {
         if (entityId > 0)
             entityIds.Add(entityId);
+    }
+
+    private static void AddKnownEntities(HashSet<int> entityIds, EntityStore entities)
+    {
+        foreach (var entityId in entities.Entities.Keys)
+            AddEntity(entityIds, entityId);
     }
 
     private static void AddCombatantDetailEvents(Dictionary<EventKey, SceneArchiveCombatEvent> eventsByKey, HashSet<int> entityIds, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot archivedSnapshot, int combatantId)

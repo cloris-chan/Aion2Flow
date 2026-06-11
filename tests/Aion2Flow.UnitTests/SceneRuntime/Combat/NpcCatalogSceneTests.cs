@@ -66,6 +66,48 @@ public sealed class NpcCatalogSceneTests
     }
 
     [Fact]
+    public void SceneArchiveScope_Captures_Known_NpcCode_Outside_Combat_Details_For_Playback()
+    {
+        const int playbackOnlyEntityId = 17329;
+        const int playbackOnlyNpcCode = 2920804;
+        const int targetEntityId = 29994;
+        const int targetNpcCode = 2400032;
+        const int playerId = 2007;
+        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
+        using var scene = new SceneTestHarness();
+
+        scene.AppendNpcCode(playbackOnlyEntityId, playbackOnlyNpcCode);
+        scene.AppendNpcKind(playbackOnlyEntityId, CombatResourceRegistry.ResolveNpcKind(catalog[playbackOnlyNpcCode].Kind));
+        scene.AppendNpcCode(targetEntityId, targetNpcCode);
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = targetEntityId,
+            SkillCode = 17070000,
+            Damage = 1_000,
+            Timestamp = 1_000
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = targetEntityId,
+            SkillCode = 17070000,
+            Damage = 1,
+            Timestamp = 1_050
+        });
+
+        var snapshot = scene.CreateSnapshot();
+        var archive = scene.Owner.CreateArchivePayload(snapshot);
+
+        Assert.True(archive.IdentityScope.TryGetNpcCode(playbackOnlyEntityId, out var scopedNpcCode));
+        Assert.Equal(playbackOnlyNpcCode, scopedNpcCode);
+        Assert.Equal(catalog[playbackOnlyNpcCode].Name, catalog[scopedNpcCode].Name);
+        var identity = Assert.Single(archive.Entities, static e => e.EntityId == playbackOnlyEntityId);
+        Assert.Equal(playbackOnlyNpcCode, identity.NpcCode);
+    }
+
+    [Fact]
     public void SceneArchiveScope_Captures_NpcCode_When_Catalog_Missing()
     {
         const int npcInstanceId = 5555;

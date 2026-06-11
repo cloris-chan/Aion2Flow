@@ -215,7 +215,11 @@ public sealed class PacketLogReplayService
             var observation = e.Observation;
             if (e.ContributesDamage)
             {
-                ApplyDamageSummary(summariesByCombatantId, sourceId, targetId, in observation);
+                if (!IsSummonDamageTarget(entities, in e))
+                {
+                    ApplyDamageSummary(summariesByCombatantId, sourceId, targetId, in observation);
+                }
+
                 continue;
             }
 
@@ -245,7 +249,7 @@ public sealed class PacketLogReplayService
         for (var i = 0; i < events.Length; i++)
         {
             ref readonly var e = ref events[i];
-            if (!IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTarget(entities, in e))
+            if (!IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
                 continue;
 
             var sourceId = ResolveCombatantId(entities, e.SourceId);
@@ -262,7 +266,7 @@ public sealed class PacketLogReplayService
         for (var i = 0; i < events.Length; i++)
         {
             ref readonly var e = ref events[i];
-            if (IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTarget(entities, in e))
+            if (IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
                 continue;
 
             var sourceId = ResolveCombatantId(entities, e.SourceId);

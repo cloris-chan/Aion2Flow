@@ -370,8 +370,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             var entry = combatants[i];
             var metrics = entry.Metrics;
             resources.TryGetValue(entry.Id, out var resource);
-            if (metrics.DamageAmount <= 0 && metrics.HealingAmount <= 0 && resource.EntityId == 0)
-                continue;
 
             result.Add(new PlaybackCombatantRowViewModel(
                 entry.Id,
