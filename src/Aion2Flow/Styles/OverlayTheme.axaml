@@ -2,6 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
         xmlns:media="clr-namespace:Avalonia.Media;assembly=Avalonia.Base">
+    <StyleInclude Source="avares://Aion2Flow/Styles/CommonTheme.axaml" />
+
     <Styles.Resources>
         <SolidColorBrush x:Key="OverlayBrush.WindowTint">#72071015</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.Surface">#26131B25</SolidColorBrush>
@@ -27,10 +29,6 @@
         <SolidColorBrush x:Key="OverlayBrush.DetailSurfaceStrong">#34070B0E</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailCard">#48070B0F</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSeparator">#16FFFFFF</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailScrollbarTrack">#3403080C</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailScrollbarThumb">#688AA4B6</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailScrollbarThumbHover">#86B5C9D6</SolidColorBrush>
-
         <LinearGradientBrush x:Key="OverlayBrush.RowCardSelected" StartPoint="0%,0%" EndPoint="100%,0%">
             <GradientStop Color="#14000000" Offset="0" />
             <GradientStop Color="#1A000000" Offset="1" />
@@ -104,7 +102,6 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.85" />
-        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="Border.BossFocusPanel">
@@ -996,7 +993,6 @@
     <Style Selector="controls|CombatantDisplay.CounterpartName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="controls|CombatantDisplay.CounterpartName">
@@ -1040,73 +1036,6 @@
         <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
         <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
         <Setter Property="Margin" Value="0,0,0,2" />
-    </Style>
-
-    <Style Selector="ScrollViewer.DetailTableScroller /template/ ScrollBar#PART_HorizontalScrollBar">
-        <Setter Property="Height" Value="12" />
-        <Setter Property="Margin" Value="0,8,0,0" />
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailScrollbarTrack}" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.DetailScrollbarThumb}" />
-        <Setter Property="Template">
-            <ControlTemplate>
-                <Grid Height="{TemplateBinding Height}">
-                    <Border Height="6"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="999"
-                            VerticalAlignment="Center" />
-
-                    <Track Name="PART_Track"
-                           Minimum="{TemplateBinding Minimum}"
-                           Maximum="{TemplateBinding Maximum}"
-                           Value="{TemplateBinding Value, Mode=TwoWay}"
-                           ViewportSize="{TemplateBinding ViewportSize}"
-                           Orientation="{TemplateBinding Orientation}">
-                        <Track.DecreaseButton>
-                            <RepeatButton Classes="DetailScrollbarPageButton"
-                                          Focusable="False" />
-                        </Track.DecreaseButton>
-                        <Track.IncreaseButton>
-                            <RepeatButton Classes="DetailScrollbarPageButton"
-                                          Focusable="False" />
-                        </Track.IncreaseButton>
-                        <Thumb Name="DetailTableThumb"
-                               Background="{TemplateBinding Foreground}" />
-                    </Track>
-                </Grid>
-            </ControlTemplate>
-        </Setter>
-    </Style>
-
-    <Style Selector="ScrollViewer.DetailTableScroller /template/ ScrollBar#PART_HorizontalScrollBar /template/ RepeatButton.DetailScrollbarPageButton">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="MinWidth" Value="0" />
-        <Setter Property="MinHeight" Value="0" />
-        <Setter Property="Template">
-            <ControlTemplate>
-                <Border Background="{TemplateBinding Background}" />
-            </ControlTemplate>
-        </Setter>
-    </Style>
-
-    <Style Selector="ScrollViewer.DetailTableScroller /template/ ScrollBar#PART_HorizontalScrollBar /template/ Thumb#DetailTableThumb">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailScrollbarThumb}" />
-        <Setter Property="MinWidth" Value="48" />
-        <Setter Property="Height" Value="6" />
-        <Setter Property="Template">
-            <ControlTemplate>
-                <Border Background="{TemplateBinding Background}"
-                        CornerRadius="999" />
-            </ControlTemplate>
-        </Setter>
-    </Style>
-
-    <Style Selector="ScrollViewer.DetailTableScroller /template/ ScrollBar#PART_HorizontalScrollBar /template/ Thumb#DetailTableThumb:pointerover">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailScrollbarThumbHover}" />
-    </Style>
-
-    <Style Selector="ScrollViewer.DetailTableScroller /template/ ScrollBar#PART_HorizontalScrollBar /template/ Thumb#DetailTableThumb:pressed">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailScrollbarThumbHover}" />
     </Style>
 
     <Style Selector="Border.DetailTableHeaderBand">
@@ -1171,7 +1100,6 @@
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="Margin" Value="0,2" />
-        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="controls|NumericBlock.DetailRowValue">

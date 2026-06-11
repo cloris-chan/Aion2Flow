@@ -25,7 +25,8 @@ internal sealed class MarqueeTextPresenter : Decorator
         {
             Name = "PART_Text",
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            TextWrapping = TextWrapping.NoWrap
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.None
         };
         TextBlock.Classes.Add("IconTextDisplayText");
         _content = new Grid

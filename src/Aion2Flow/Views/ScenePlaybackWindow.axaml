@@ -174,7 +174,7 @@
         </Border>
 
         <Grid Grid.Row="2"
-              ColumnDefinitions="400,*,300"
+              ColumnDefinitions="460,*,300"
               ColumnSpacing="12"
               MinHeight="0">
             <Border Classes="PlaybackPanel"
@@ -201,7 +201,7 @@
                                    Text="{markups:Translate Playback_Column_RemainingHp}" />
                     </Grid>
                     <ScrollViewer Grid.Row="2"
-                                  Classes="PlaybackPanelScroller">
+                                  Classes="PlaybackPanelScroller AppScrollViewer">
                         <ItemsControl ItemsSource="{Binding Combatants}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:PlaybackCombatantRowViewModel">
@@ -274,7 +274,7 @@
                                    Text="{markups:Translate Playback_Column_Amount}" />
                     </Grid>
                     <ScrollViewer Grid.Row="2"
-                                  Classes="PlaybackPanelScroller">
+                                  Classes="PlaybackPanelScroller AppScrollViewer">
                         <ItemsControl ItemsSource="{Binding EventWindow}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:PlaybackEventRowViewModel">
@@ -315,7 +315,7 @@
                     <TextBlock Classes="PlaybackPanelTitle"
                                Text="{markups:Translate Playback_ActiveAuras}" />
                     <ScrollViewer Grid.Row="1"
-                                  Classes="PlaybackPanelScroller">
+                                  Classes="PlaybackPanelScroller AppScrollViewer">
                         <ItemsControl ItemsSource="{Binding ActiveAuras}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:PlaybackAuraRowViewModel">

@@ -169,7 +169,7 @@
                 </Grid>
 
                 <Border Classes="DetailTableCard">
-                    <ScrollViewer Classes="DetailTableScroller">
+                    <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                         <StackPanel Orientation="Vertical"
                                     MinWidth="1828"
                                     Spacing="6">
@@ -544,7 +544,7 @@
                     <TextBlock Classes="SectionTitle"
                                Text="{markups:Translate Category_Healing}" />
                     <Border Classes="DetailTableCard">
-                        <ScrollViewer Classes="DetailTableScroller">
+                        <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                             <StackPanel Orientation="Vertical"
                                         MinWidth="874"
                                         Spacing="6">
@@ -626,7 +626,7 @@
                     <TextBlock Classes="SectionTitle"
                                Text="{markups:Translate Category_Shield}" />
                     <Border Classes="DetailTableCard">
-                        <ScrollViewer Classes="DetailTableScroller">
+                        <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                             <StackPanel Orientation="Vertical"
                                         MinWidth="584"
                                         Spacing="6">

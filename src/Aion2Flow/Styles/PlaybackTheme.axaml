@@ -1,6 +1,8 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls">
+    <StyleInclude Source="avares://Aion2Flow/Styles/CommonTheme.axaml" />
+
     <Styles.Resources>
         <SolidColorBrush x:Key="PlaybackBrush.Window">#14181D</SolidColorBrush>
         <SolidColorBrush x:Key="PlaybackBrush.TopBar">#1B222A</SolidColorBrush>
@@ -60,7 +62,6 @@
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
         <Setter Property="FontSize" Value="17" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackHeaderSubtle">
@@ -264,14 +265,12 @@
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="controls|SkillDisplay.PlaybackSkillName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackRowValue">

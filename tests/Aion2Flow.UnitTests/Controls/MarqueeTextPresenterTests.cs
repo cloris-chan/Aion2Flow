@@ -1,9 +1,20 @@
+using Avalonia.Controls;
+using Avalonia.Media;
 using Cloris.Aion2Flow.Controls;
 
 namespace Cloris.Aion2Flow.UnitTests.Controls;
 
 public sealed class MarqueeTextPresenterTests
 {
+    [Fact]
+    public void PresenterOwnsNonTrimmingTextBehavior()
+    {
+        var presenter = new MarqueeTextPresenter();
+
+        Assert.Equal(TextTrimming.None, presenter.TextBlock.TextTrimming);
+        Assert.True(presenter.TextBlock.IsSet(TextBlock.TextTrimmingProperty));
+    }
+
     [Fact]
     public void CycleWithoutOverflowRemainsStatic()
     {

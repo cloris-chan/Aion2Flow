@@ -1,0 +1,119 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Styles.Resources>
+        <SolidColorBrush x:Key="CommonBrush.ScrollbarTrack">#3403080C</SolidColorBrush>
+        <SolidColorBrush x:Key="CommonBrush.ScrollbarThumb">#688AA4B6</SolidColorBrush>
+        <SolidColorBrush x:Key="CommonBrush.ScrollbarThumbHover">#86B5C9D6</SolidColorBrush>
+
+        <ControlTheme x:Key="CommonScrollbarPageButtonTheme"
+                      TargetType="RepeatButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}" />
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
+
+        <ControlTheme x:Key="CommonScrollbarThumbTheme"
+                      TargetType="Thumb">
+            <Setter Property="Background" Value="{StaticResource CommonBrush.ScrollbarThumb}" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="999" />
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{StaticResource CommonBrush.ScrollbarThumbHover}" />
+            </Style>
+            <Style Selector="^:pressed">
+                <Setter Property="Background" Value="{StaticResource CommonBrush.ScrollbarThumbHover}" />
+            </Style>
+        </ControlTheme>
+
+        <ControlTheme x:Key="CommonScrollbarTheme"
+                      TargetType="ScrollBar">
+            <Setter Property="Background" Value="{StaticResource CommonBrush.ScrollbarTrack}" />
+            <Setter Property="Foreground" Value="{StaticResource CommonBrush.ScrollbarThumb}" />
+
+            <Style Selector="^:horizontal">
+                <Setter Property="Height" Value="12" />
+                <Setter Property="Margin" Value="0,8,0,0" />
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Grid Height="{TemplateBinding Height}">
+                            <Border Height="6"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="999"
+                                    VerticalAlignment="Center" />
+                            <Track Name="PART_Track"
+                                   Minimum="{TemplateBinding Minimum}"
+                                   Maximum="{TemplateBinding Maximum}"
+                                   Value="{TemplateBinding Value, Mode=TwoWay}"
+                                   ViewportSize="{TemplateBinding ViewportSize}"
+                                   Orientation="{TemplateBinding Orientation}">
+                                <Track.DecreaseButton>
+                                    <RepeatButton Theme="{StaticResource CommonScrollbarPageButtonTheme}"
+                                                  Focusable="False" />
+                                </Track.DecreaseButton>
+                                <Track.IncreaseButton>
+                                    <RepeatButton Theme="{StaticResource CommonScrollbarPageButtonTheme}"
+                                                  Focusable="False" />
+                                </Track.IncreaseButton>
+                                <Thumb Name="AppScrollbarThumb"
+                                       Theme="{StaticResource CommonScrollbarThumbTheme}"
+                                       MinWidth="48"
+                                       Height="6"
+                                       VerticalAlignment="Center" />
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter>
+            </Style>
+
+            <Style Selector="^:vertical">
+                <Setter Property="Width" Value="12" />
+                <Setter Property="Margin" Value="8,0,0,0" />
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Grid Width="{TemplateBinding Width}">
+                            <Border Width="6"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="999"
+                                    HorizontalAlignment="Center" />
+                            <Track Name="PART_Track"
+                                   Minimum="{TemplateBinding Minimum}"
+                                   Maximum="{TemplateBinding Maximum}"
+                                   Value="{TemplateBinding Value, Mode=TwoWay}"
+                                   ViewportSize="{TemplateBinding ViewportSize}"
+                                   Orientation="{TemplateBinding Orientation}"
+                                   IsDirectionReversed="True">
+                                <Track.DecreaseButton>
+                                    <RepeatButton Theme="{StaticResource CommonScrollbarPageButtonTheme}"
+                                                  Focusable="False" />
+                                </Track.DecreaseButton>
+                                <Track.IncreaseButton>
+                                    <RepeatButton Theme="{StaticResource CommonScrollbarPageButtonTheme}"
+                                                  Focusable="False" />
+                                </Track.IncreaseButton>
+                                <Thumb Name="AppScrollbarThumb"
+                                       Theme="{StaticResource CommonScrollbarThumbTheme}"
+                                       Width="6"
+                                       MinHeight="48"
+                                       HorizontalAlignment="Center" />
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter>
+            </Style>
+        </ControlTheme>
+    </Styles.Resources>
+
+    <Style Selector="ScrollViewer.AppScrollViewer /template/ ScrollBar">
+        <Setter Property="Theme" Value="{StaticResource CommonScrollbarTheme}" />
+    </Style>
+</Styles>
