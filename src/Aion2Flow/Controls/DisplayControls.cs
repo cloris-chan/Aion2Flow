@@ -43,6 +43,7 @@ public abstract class IconTextDisplay : UserControl
     public static readonly StyledProperty<double> IconSpacingProperty = AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconSpacing), 4);
 
     private readonly Grid _layout;
+    private readonly MarqueeTextPresenter _textPresenter;
     private readonly TextBlock _textBlock;
     private Image? _iconImage;
     private Image? _overlayImage;
@@ -66,13 +67,8 @@ public abstract class IconTextDisplay : UserControl
             Color = Color.Parse("#D0000000")
         };
 
-        _textBlock = new TextBlock
-        {
-            Name = "PART_Text",
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
-        _textBlock.Classes.Add("IconTextDisplayText");
+        _textPresenter = new MarqueeTextPresenter();
+        _textBlock = _textPresenter.TextBlock;
 
         _layout = new Grid
         {
@@ -80,12 +76,12 @@ public abstract class IconTextDisplay : UserControl
             ColumnSpacing = IconSpacing,
             Children =
             {
-                _textBlock
+                _textPresenter
             }
         };
         Content = _layout;
-        Grid.SetColumn(_textBlock, 0);
-        Grid.SetColumnSpan(_textBlock, 2);
+        Grid.SetColumn(_textPresenter, 0);
+        Grid.SetColumnSpan(_textPresenter, 2);
         UpdateDisplay();
     }
 
@@ -204,6 +200,7 @@ public abstract class IconTextDisplay : UserControl
         if (!string.Equals(_currentText, text, StringComparison.Ordinal))
         {
             _textBlock.Text = text;
+            _textPresenter.Restart();
             _currentText = text;
         }
 
@@ -246,8 +243,9 @@ public abstract class IconTextDisplay : UserControl
             UpdateIconTransform();
         }
 
-        Grid.SetColumn(_textBlock, visible ? 1 : 0);
-        Grid.SetColumnSpan(_textBlock, visible ? 1 : 2);
+        Grid.SetColumn(_textPresenter, visible ? 1 : 0);
+        Grid.SetColumnSpan(_textPresenter, visible ? 1 : 2);
+        _textPresenter.Restart();
         _isIconVisible = visible;
     }
 
