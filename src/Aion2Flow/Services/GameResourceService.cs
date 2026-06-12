@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 
@@ -34,14 +35,63 @@ public sealed class GameResourceService : IDisposable
     {
         lock (_lock)
         {
-            return Skills.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name)
-                ? skill.Name
-                : skillCode.ToString(CultureInfo.InvariantCulture);
+            if (TryResolveSkillName(Skills, skillCode, out var name))
+            {
+                return name;
+            }
+
+            var variant = SkillVariantInfo.Parse(skillCode);
+            Span<int> fallbackCodes = stackalloc int[3];
+            variant.WriteDisplayFallbackCodes(fallbackCodes);
+            foreach (var fallbackCode in fallbackCodes)
+            {
+                if (fallbackCode != skillCode && TryResolveSkillName(Skills, fallbackCode, out name))
+                {
+                    return name;
+                }
+            }
         }
+
+        return skillCode.ToString(CultureInfo.InvariantCulture);
     }
 
     public string? ResolveSkillIconAssetName(int skillCode)
-        => SkillIconCatalog.ResolveAssetName(skillCode);
+    {
+        var assetName = SkillIconCatalog.ResolveAssetName(skillCode);
+        if (assetName is not null || skillCode <= 0)
+        {
+            return assetName;
+        }
+
+        var variant = SkillVariantInfo.Parse(skillCode);
+        Span<int> fallbackCodes = stackalloc int[3];
+        variant.WriteDisplayFallbackCodes(fallbackCodes);
+        foreach (var fallbackCode in fallbackCodes)
+        {
+            assetName = ResolveSkillIconFallback(fallbackCode, skillCode);
+            if (assetName is not null)
+            {
+                return assetName;
+            }
+        }
+
+        return assetName;
+    }
+
+    private static bool TryResolveSkillName(SkillCollection skills, int skillCode, out string name)
+    {
+        if (skills.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name))
+        {
+            name = skill.Name;
+            return true;
+        }
+
+        name = string.Empty;
+        return false;
+    }
+
+    private static string? ResolveSkillIconFallback(int fallbackCode, int skillCode)
+        => fallbackCode > 0 && fallbackCode != skillCode ? SkillIconCatalog.ResolveAssetName(fallbackCode) : null;
 
     public bool TryResolveNpcCatalogEntry(int npcCode, out NpcCatalogEntry entry)
     {

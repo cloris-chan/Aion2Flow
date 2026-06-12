@@ -64,4 +64,25 @@ public sealed class LocalizationServicesTests
             CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
         }
     }
+
+    [Theory]
+    [InlineData(17040257, "審判之電", "ICON_CL_SKILL_004.webp")]
+    [InlineData(17730001, "主神恩寵", "ICON_CL_SKILL_Passive_012.webp")]
+    public void GameResourceService_Resolves_Display_Resources_For_Packet_Variants(int skillCode, string expectedName, string expectedIcon)
+    {
+        try
+        {
+            var languageService = new LanguageService();
+            languageService.SetLanguage(LanguageService.English);
+            languageService.SetLanguage(LanguageService.TraditionalChinese);
+            using var resources = new GameResourceService(languageService);
+
+            Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
+            Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
+        }
+        finally
+        {
+            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
+        }
+    }
 }

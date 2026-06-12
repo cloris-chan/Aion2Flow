@@ -18,4 +18,24 @@ public sealed class SkillVariantInfoTests
         Assert.Equal(specializationMask, variant.SpecializationMask);
         Assert.Equal(variantState, variant.VariantState);
     }
+
+    [Theory]
+    [InlineData(17040257, 17040250, 17040000, 17040007)]
+    [InlineData(17730001, 17730000, 17730000, 17730001)]
+    public void Parse_Exposes_Display_Fallback_Codes(
+        int skillCode,
+        int expectedSpecializationSkillCode,
+        int expectedBaseSkillCode,
+        int expectedBaseVariantSkillCode)
+    {
+        var variant = SkillVariantInfo.Parse(skillCode);
+
+        Assert.Equal(expectedSpecializationSkillCode, variant.SpecializationSkillCode);
+        Assert.Equal(expectedBaseSkillCode, variant.BaseSkillCode);
+        Assert.Equal(expectedBaseVariantSkillCode, variant.BaseVariantSkillCode);
+
+        Span<int> fallbackCodes = stackalloc int[3];
+        variant.WriteDisplayFallbackCodes(fallbackCodes);
+        Assert.Equal([expectedSpecializationSkillCode, expectedBaseSkillCode, expectedBaseVariantSkillCode], fallbackCodes);
+    }
 }

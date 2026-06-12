@@ -611,6 +611,7 @@ public sealed class NpcDisplay : IconTextDisplay
 public sealed class SkillDisplay : IconTextDisplay
 {
     public static readonly DirectProperty<SkillDisplay, int> SkillCodeProperty = AvaloniaProperty.RegisterDirect<SkillDisplay, int>(nameof(SkillCode), x => x.SkillCode, (x, value) => x.SkillCode = value);
+    public static readonly DirectProperty<SkillDisplay, string> FallbackTextProperty = AvaloniaProperty.RegisterDirect<SkillDisplay, string>(nameof(FallbackText), x => x.FallbackText, (x, value) => x.FallbackText = value);
 
     public int SkillCode
     {
@@ -618,11 +619,19 @@ public sealed class SkillDisplay : IconTextDisplay
         set => SetAndRaise(SkillCodeProperty, ref field, value);
     }
 
+    public string FallbackText
+    {
+        get;
+        set => SetAndRaise(FallbackTextProperty, ref field, value);
+    } = string.Empty;
+
     protected override bool ShouldUpdateDisplay(AvaloniaProperty property)
-        => base.ShouldUpdateDisplay(property) || property == SkillCodeProperty;
+        => base.ShouldUpdateDisplay(property) || property == SkillCodeProperty || property == FallbackTextProperty;
 
     protected override string ResolveTextCore(SceneDisplayContext? context, int entityId)
-        => context?.ResolveSkillName(SkillCode) ?? (SkillCode > 0 ? SkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty);
+        => SkillCode > 0
+            ? context?.ResolveSkillName(SkillCode) ?? SkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : FallbackText;
 
     protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId)
     {

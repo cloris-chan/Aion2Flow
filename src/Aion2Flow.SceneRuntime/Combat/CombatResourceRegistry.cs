@@ -74,9 +74,7 @@ public static class CombatResourceRegistry
 
         var variant = SkillVariantInfo.Parse(skillCode);
         Span<int> fallbackCodes = stackalloc int[3];
-        fallbackCodes[0] = variant.BaseSkillCode + EncodeVariantSuffix(variant.SpecializationMask, 0);
-        fallbackCodes[1] = variant.BaseSkillCode;
-        fallbackCodes[2] = variant.BaseSkillCode + variant.VariantState;
+        variant.WriteDisplayFallbackCodes(fallbackCodes);
 
         foreach (var fallbackCode in fallbackCodes)
         {
@@ -167,18 +165,5 @@ public static class CombatResourceRegistry
         }
 
         return normalized;
-    }
-
-    private static int EncodeVariantSuffix(int specializationMask, int variantState)
-    {
-        var suffix = 0;
-        for (var specialization = 1; specialization <= 5; specialization++)
-        {
-            var bit = 1 << (specialization - 1);
-            if ((specializationMask & bit) != 0)
-                suffix = (suffix * 10) + specialization;
-        }
-
-        return (suffix * 10) + variantState;
     }
 }
