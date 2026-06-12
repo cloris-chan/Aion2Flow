@@ -172,9 +172,8 @@ public sealed class DomainEventApplier
 
     private void ApplyAura(in AuraObservation aura)
     {
-        if (aura.TargetEntityId > 0 && aura.SequenceId > 0)
-            _entities.ApplyNpc2C38State(aura.TargetEntityId, aura.SequenceId, aura.ResultCode);
-
+        if (aura.Kind == AuraObservationKind.Result && aura.EntityId > 0 && aura.InstanceSequenceId > 0)
+            _entities.ApplyNpc2C38State(aura.EntityId, aura.InstanceSequenceId, aura.ResultCode);
     }
 
     private void ApplyScene(in SceneObservation scene)

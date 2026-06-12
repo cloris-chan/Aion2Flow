@@ -4,7 +4,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet2A38Observation(int SourceId, int Mode, int GroupCode, int SequenceId, uint HeadCode, ushort HeadValue, uint TimelineValue, uint StableValue, int EchoSourceId, int StackValue, ResourceEffectRef BuffResourceEffectRef, string TailSignature, int TailLength);
+internal readonly record struct Packet2A38Observation(int EntityId, int Mode, int GroupCode, int InstanceSequenceId, uint HeadCode, ushort HeadValue, ulong HeadMiddleRaw, uint TimelineValue, uint StableValue, int EchoSourceId, int StackValue, ResourceEffectRef BuffResourceEffectRef, int TailLength, ulong TailLow64, ulong TailHigh64);
 
 internal static class Packet2A38Parser
 {
@@ -27,6 +27,7 @@ internal static class Packet2A38Parser
         var body = reader.RemainingSpan;
         var headCode = BinaryPrimitives.ReadUInt32LittleEndian(body[..4]);
         var headValue = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(4, 2));
+        var headMiddleRaw = ReadWord(body.Slice(6, 6));
         var timelineValue = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(12, 4));
         var stableValue = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(16, 4));
 
@@ -37,7 +38,16 @@ internal static class Packet2A38Parser
         var buffResourceEffectRef = ResourceEffectRef.FromRaw(BinaryPrimitives.ReadUInt32LittleEndian(tailReader.RemainingSpan[..4]));
         tailReader.TryAdvance(4);
 
-        result = new Packet2A38Observation(sourceId, mode, groupCode, sequenceId, headCode, headValue, timelineValue, stableValue, echoSourceId, stackValue, buffResourceEffectRef, Convert.ToHexString(tailReader.RemainingSpan[..Math.Min(8, tailReader.Remaining)]), tailReader.Remaining);
+        var tail = tailReader.RemainingSpan;
+        result = new Packet2A38Observation(sourceId, mode, groupCode, sequenceId, headCode, headValue, headMiddleRaw, timelineValue, stableValue, echoSourceId, stackValue, buffResourceEffectRef, tail.Length, ReadWord(tail[..Math.Min(8, tail.Length)]), tail.Length > 8 ? ReadWord(tail.Slice(8, Math.Min(8, tail.Length - 8))) : 0);
         return true;
+    }
+
+    private static ulong ReadWord(ReadOnlySpan<byte> bytes)
+    {
+        ulong value = 0;
+        for (var index = 0; index < bytes.Length; index++)
+            value |= (ulong)bytes[index] << (index * 8);
+        return value;
     }
 }

@@ -158,17 +158,12 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         if (segment.IsEmpty || _checkpoints.Count == 0)
             return segment;
 
-        var startOrdinal = segment.StartObservationOrdinal;
         var endOrdinal = segment.CurrentEndObservationOrdinalExclusive;
-        var startPosition = Math.Max(0, startPositionMilliseconds);
-        if (_checkpoints.TryGetFloor(startPosition, out var floor) && floor is not null && floor.PositionMilliseconds < startPosition)
-            startOrdinal = Math.Max(startOrdinal, floor.JournalCursor.NextObservationOrdinal);
 
         if (_checkpoints.TryGetCeiling(Math.Max(startPositionMilliseconds, endPositionMilliseconds), out var ceiling) && ceiling is not null)
             endOrdinal = Math.Min(endOrdinal, ceiling.JournalCursor.NextObservationOrdinal);
 
-        startOrdinal = Math.Min(startOrdinal, endOrdinal);
-        return new SceneJournalSegment(segment.Journal, startOrdinal, endOrdinal, IsLiveGrowing: false);
+        return new SceneJournalSegment(segment.Journal, Math.Min(segment.StartObservationOrdinal, endOrdinal), endOrdinal, IsLiveGrowing: false);
     }
 
     public void StartCheckpointRebuild()

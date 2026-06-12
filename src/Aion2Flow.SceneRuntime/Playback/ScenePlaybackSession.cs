@@ -129,16 +129,16 @@ public sealed class ScenePlaybackSession
     private sealed class FrameProjector
     {
         private readonly Guid _encounterId;
-        private EntityStore _entities;
-        private SceneBoundaryStore _boundary;
-        private RuntimeMetadataRegistry _metadata;
-        private CombatStore _combat;
-        private DomainEventApplier _applier;
-        private SceneCombatSnapshotAdapter _adapter;
-        private Dictionary<int, ScenePlaybackResourceState> _resources;
-        private Dictionary<AuraKey, ScenePlaybackAuraState> _activeAuras;
-        private Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks;
-        private Queue<ScenePlaybackTrackMarker> _recentMarkers;
+        private readonly EntityStore _entities;
+        private readonly SceneBoundaryStore _boundary;
+        private readonly RuntimeMetadataRegistry _metadata;
+        private readonly CombatStore _combat;
+        private readonly DomainEventApplier _applier;
+        private readonly SceneCombatSnapshotAdapter _adapter;
+        private readonly Dictionary<int, ScenePlaybackResourceState> _resources;
+        private readonly Dictionary<ScenePlaybackAuraInstanceKey, ScenePlaybackAuraState> _auraInstances;
+        private readonly Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks;
+        private readonly Queue<ScenePlaybackTrackMarker> _recentMarkers;
         private SceneJournalSegment _segment;
         private ScenePlaybackTimeRange _timeRange;
         private JournalCursor _cursor;
@@ -158,7 +158,7 @@ public sealed class ScenePlaybackSession
                 new RuntimeMetadataRegistry(),
                 new CombatStore(),
                 resources: [],
-                activeAuras: [],
+                auraInstances: [],
                 tracks: [],
                 recentMarkers: new Queue<ScenePlaybackTrackMarker>(DefaultRecentMarkerCapacity),
                 segment.CreateCursor(),
@@ -181,7 +181,7 @@ public sealed class ScenePlaybackSession
             RuntimeMetadataRegistry metadata,
             CombatStore combat,
             Dictionary<int, ScenePlaybackResourceState> resources,
-            Dictionary<AuraKey, ScenePlaybackAuraState> activeAuras,
+            Dictionary<ScenePlaybackAuraInstanceKey, ScenePlaybackAuraState> auraInstances,
             Dictionary<ScenePlaybackTrack, TrackAccumulator> tracks,
             Queue<ScenePlaybackTrackMarker> recentMarkers,
             JournalCursor cursor,
@@ -201,7 +201,7 @@ public sealed class ScenePlaybackSession
             _metadata = metadata;
             _combat = combat;
             _resources = resources;
-            _activeAuras = activeAuras;
+            _auraInstances = auraInstances;
             _tracks = tracks;
             _recentMarkers = recentMarkers;
             _cursor = cursor;
@@ -237,7 +237,7 @@ public sealed class ScenePlaybackSession
                 metadata,
                 combat,
                 CreateResourceState(snapshot.Resources),
-                CreateAuraState(snapshot.ActiveAuras),
+                CreateAuraState(snapshot.AuraInstances),
                 CreateTrackState(snapshot.Tracks),
                 CreateRecentMarkerState(snapshot.RecentMarkers),
                 cursor,
@@ -263,7 +263,7 @@ public sealed class ScenePlaybackSession
             _applier.CreateSnapshot(),
             _adapter.CreateProjectionSnapshot(),
             CreateResourceSnapshot(),
-            CreateAuraSnapshot(),
+            CreateAuraInstanceSnapshot(),
             CreateTrackSnapshot(),
             CreateRecentMarkerSnapshot());
 
@@ -306,7 +306,7 @@ public sealed class ScenePlaybackSession
                 Snapshot = snapshot,
                 CombatTotals = totals,
                 Resources = CreateResourceSnapshot(),
-                ActiveAuras = CreateAuraSnapshot(),
+                ActiveAuras = CreateActiveAuraSnapshot(),
                 Tracks = CreateTrackSnapshot(),
                 RecentMarkers = CreateRecentMarkerSnapshot()
             };
@@ -320,13 +320,13 @@ public sealed class ScenePlaybackSession
             return result;
         }
 
-        private static Dictionary<AuraKey, ScenePlaybackAuraState> CreateAuraState(IReadOnlyList<ScenePlaybackAuraState> activeAuras)
+        private static Dictionary<ScenePlaybackAuraInstanceKey, ScenePlaybackAuraState> CreateAuraState(IReadOnlyList<ScenePlaybackAuraState> auraInstances)
         {
-            var result = new Dictionary<AuraKey, ScenePlaybackAuraState>(activeAuras.Count);
-            for (var i = 0; i < activeAuras.Count; i++)
+            var result = new Dictionary<ScenePlaybackAuraInstanceKey, ScenePlaybackAuraState>(auraInstances.Count);
+            for (var i = 0; i < auraInstances.Count; i++)
             {
-                var aura = activeAuras[i];
-                result[new AuraKey(aura.TargetEntityId, aura.SequenceId, aura.SkillCode, aura.ChainId)] = aura;
+                var aura = auraInstances[i];
+                result[new ScenePlaybackAuraInstanceKey(aura.EntityId, aura.InstanceSequenceId)] = aura;
             }
 
             return result;
@@ -462,16 +462,20 @@ public sealed class ScenePlaybackSession
 
         private void ApplyFrameTracks(in ObservedEventEnvelope entry, long offset)
         {
-            var track = ResolveTrack(entry.Domain);
+            var isAuraRenewal = entry.Action is { } action &&
+                ScenePlaybackLifecycleTrackState.IsRenewalShape(in action) &&
+                _auraInstances.ContainsKey(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId));
+            var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, Math.Max(0, offset), isAuraRenewal);
+            var track = marker.Track;
             ref var accumulator = ref CollectionsMarshal.GetValueRefOrAddDefault(_tracks, track, out var exists);
             if (!exists)
                 accumulator = new TrackAccumulator(entry.Stamp.ObservationOrdinal);
             accumulator.Apply(entry.Stamp.ObservationOrdinal);
-            AddRecentMarker(CreateMarker(in entry, track, offset));
 
             if (entry.Domain == ObservedEventDomain.Resource && entry.Resource is { } resource)
             {
                 var maximumValue = ResolveResourceMaximum(in resource);
+                marker = marker with { MaximumValue = maximumValue };
                 _resources[resource.EntityId] = new ScenePlaybackResourceState(
                     resource.EntityId,
                     resource.CurrentValue,
@@ -480,20 +484,32 @@ public sealed class ScenePlaybackSession
                     resource.ResourceKind,
                     offset,
                     entry.Stamp.ObservationOrdinal);
-                return;
             }
-
-            if (entry.Domain == ObservedEventDomain.Aura && entry.Aura is { } aura)
+            else if (entry.Domain == ObservedEventDomain.Aura && entry.Aura is { } aura)
             {
-                var key = new AuraKey(aura.TargetEntityId, aura.SequenceId, aura.SkillCode, aura.ChainId);
-                if (IsAuraRemoval(in aura))
+                var key = new ScenePlaybackAuraInstanceKey(aura.EntityId, aura.InstanceSequenceId);
+                if (aura.Kind == AuraObservationKind.Result)
                 {
-                    _activeAuras.Remove(key);
-                    return;
+                    _auraInstances.Remove(key);
                 }
-
-                _activeAuras[key] = new ScenePlaybackAuraState(aura.SourceEntityId, aura.TargetEntityId, aura.SkillCode, aura.StackCount, aura.SequenceId, aura.ChainId, aura.ResultCode, aura.Mode, offset, entry.Stamp.ObservationOrdinal);
+                else
+                {
+                    _auraInstances[key] = new ScenePlaybackAuraState(aura.EntityId, aura.EchoSourceEntityId, aura.InstanceSequenceId, aura.StackCount, aura.OpenMode, aura.GroupCode, aura.HeadValue, aura.BuffResourceEffectRef, offset, offset, ResolveExpiration(offset, aura.HeadValue), entry.Stamp.ObservationOrdinal, entry.Stamp.ObservationOrdinal);
+                }
             }
+            else if (isAuraRenewal && entry.Action is { } renewal)
+            {
+                var key = new ScenePlaybackAuraInstanceKey(renewal.SourceEntityId, renewal.InstanceSequenceId);
+                var active = _auraInstances[key];
+                _auraInstances[key] = active with
+                {
+                    RenewedAtMilliseconds = offset,
+                    ExpiresAtMilliseconds = ResolveExpiration(offset, active.DurationMilliseconds),
+                    LastObservationOrdinal = entry.Stamp.ObservationOrdinal
+                };
+            }
+
+            AddRecentMarker(marker);
         }
 
         private long? ResolveResourceMaximum(in ResourceObservation resource)
@@ -515,48 +531,8 @@ public sealed class ScenePlaybackSession
                 _recentMarkers.Dequeue();
         }
 
-        private ScenePlaybackTrackMarker CreateMarker(in ObservedEventEnvelope entry, ScenePlaybackTrack track, long offset)
-        {
-            var skillCode = 0;
-            var amount = 0L;
-            long? currentValue = null;
-            long? maximumValue = null;
-            var resourceKind = 0;
-            var resultCode = 0;
-            if (entry.Combat is { } combat)
-            {
-                skillCode = combat.SkillCode;
-                amount = combat.Damage;
-            }
-            else if (entry.Resource is { } resource)
-            {
-                currentValue = resource.CurrentValue;
-                maximumValue = ResolveResourceMaximum(in resource);
-                resourceKind = resource.ResourceKind;
-                amount = resource.Delta ?? 0;
-            }
-            else if (entry.Aura is { } aura)
-            {
-                skillCode = aura.SkillCode;
-                resultCode = aura.ResultCode;
-            }
-
-            return new ScenePlaybackTrackMarker(track, Math.Max(0, offset), offset, entry.Stamp.ObservationOrdinal, entry.SourceEntityId, entry.TargetEntityId, skillCode, amount, currentValue, maximumValue, resourceKind, resultCode);
-        }
-
-        private static ScenePlaybackTrack ResolveTrack(ObservedEventDomain domain) => domain switch
-        {
-            ObservedEventDomain.Combat => ScenePlaybackTrack.Combat,
-            ObservedEventDomain.Resource => ScenePlaybackTrack.Resource,
-            ObservedEventDomain.Aura => ScenePlaybackTrack.Aura,
-            ObservedEventDomain.Scene => ScenePlaybackTrack.Scene,
-            ObservedEventDomain.State => ScenePlaybackTrack.State,
-            ObservedEventDomain.Diagnostic => ScenePlaybackTrack.Diagnostic,
-            ObservedEventDomain.Action => ScenePlaybackTrack.Action,
-            _ => ScenePlaybackTrack.Other
-        };
-
-        private static bool IsAuraRemoval(in AuraObservation aura) => aura.Mode == 1 || aura.ResultCode != 0 && aura.StackCount <= 0;
+        private static long? ResolveExpiration(long renewedAtMilliseconds, ushort durationMilliseconds)
+            => durationMilliseconds == ushort.MaxValue ? null : renewedAtMilliseconds + durationMilliseconds;
 
         private ScenePlaybackCombatTotals CreateTotals(SceneCombatSnapshot snapshot)
         {
@@ -592,25 +568,56 @@ public sealed class ScenePlaybackSession
             return result;
         }
 
-        private ScenePlaybackAuraState[] CreateAuraSnapshot()
+        private ScenePlaybackAuraState[] CreateAuraInstanceSnapshot()
         {
-            if (_activeAuras.Count == 0)
+            if (_auraInstances.Count == 0)
                 return [];
 
-            var result = new ScenePlaybackAuraState[_activeAuras.Count];
+            var result = new ScenePlaybackAuraState[_auraInstances.Count];
             var index = 0;
-            foreach (var state in _activeAuras.Values)
+            foreach (var state in _auraInstances.Values)
                 result[index++] = state;
             Array.Sort(result, static (left, right) =>
             {
-                var cmp = left.TargetEntityId.CompareTo(right.TargetEntityId);
+                var cmp = left.EntityId.CompareTo(right.EntityId);
                 if (cmp != 0)
                     return cmp;
-                cmp = left.SequenceId.CompareTo(right.SequenceId);
-                return cmp != 0 ? cmp : left.SkillCode.CompareTo(right.SkillCode);
+                return left.InstanceSequenceId.CompareTo(right.InstanceSequenceId);
             });
             return result;
         }
+
+        private ScenePlaybackAuraState[] CreateActiveAuraSnapshot()
+        {
+            if (_auraInstances.Count == 0)
+                return [];
+
+            var count = 0;
+            foreach (var pair in _auraInstances)
+            {
+                if (IsActive(pair.Value))
+                    count++;
+            }
+
+            if (count == 0)
+                return [];
+
+            var result = new ScenePlaybackAuraState[count];
+            var index = 0;
+            foreach (var state in _auraInstances.Values)
+            {
+                if (IsActive(state))
+                    result[index++] = state;
+            }
+            Array.Sort(result, static (left, right) =>
+            {
+                var cmp = left.EntityId.CompareTo(right.EntityId);
+                return cmp != 0 ? cmp : left.InstanceSequenceId.CompareTo(right.InstanceSequenceId);
+            });
+            return result;
+        }
+
+        private bool IsActive(ScenePlaybackAuraState state) => state.ExpiresAtMilliseconds is not long expiresAt || expiresAt > _targetOffsetMilliseconds;
 
         private ScenePlaybackTrackWindow[] CreateTrackSnapshot()
         {
@@ -633,8 +640,6 @@ public sealed class ScenePlaybackSession
             return _recentMarkers.ToArray();
         }
     }
-
-    private readonly record struct AuraKey(int TargetEntityId, int SequenceId, int SkillCode, int ChainId);
 
     private struct TrackAccumulator
     {
@@ -683,6 +688,6 @@ internal sealed record ScenePlaybackProjectionSnapshot(
     DomainEventApplierSnapshot Applier,
     SceneCombatSnapshotAdapterSnapshot Adapter,
     ScenePlaybackResourceState[] Resources,
-    ScenePlaybackAuraState[] ActiveAuras,
+    ScenePlaybackAuraState[] AuraInstances,
     ScenePlaybackTrackWindow[] Tracks,
     ScenePlaybackTrackMarker[] RecentMarkers);

@@ -145,7 +145,11 @@
   <data name="Playback_Column_Amount" xml:space="preserve"><value>값</value></data>
   <data name="Playback_Track_Combat" xml:space="preserve"><value>전투</value></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>남은 HP</value></data>
-  <data name="Playback_Track_Aura" xml:space="preserve"><value>Buff / Debuff</value></data>
+  <data name="Playback_Track_Aura" xml:space="preserve"><value>효과 수명 주기</value></data>
+  <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>적용 {0} ms</value></data>
+  <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>적용</value></data>
+  <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>갱신</value></data>
+  <data name="Playback_Lifecycle_ResultFormat" xml:space="preserve"><value>종료 ({0})</value></data>
   <data name="Playback_Track_State" xml:space="preserve"><value>상태</value></data>
   <data name="Playback_Track_Scene" xml:space="preserve"><value>장면</value></data>
   <data name="Playback_Track_Action" xml:space="preserve"><value>행동</value></data>

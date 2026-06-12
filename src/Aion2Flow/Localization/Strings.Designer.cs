@@ -10,8 +10,8 @@
 
 namespace Cloris.Aion2Flow.Localization {
     using System;
-    
-    
+
+
     /// <summary>
     ///   A strongly-typed resource class, for looking up localized strings, etc.
     /// </summary>
@@ -23,7 +23,7 @@ namespace Cloris.Aion2Flow.Localization {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Strings {
-        
+
         private static global::System.Resources.ResourceManager resourceMan;
         
         private static global::System.Globalization.CultureInfo resourceCulture;
@@ -529,6 +529,42 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Apply {0} ms.
+        /// </summary>
+        internal static string Playback_Lifecycle_OpenFormat {
+            get {
+                return ResourceManager.GetString("Playback_Lifecycle_OpenFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Apply.
+        /// </summary>
+        internal static string Playback_Lifecycle_OpenIndefinite {
+            get {
+                return ResourceManager.GetString("Playback_Lifecycle_OpenIndefinite", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Refresh.
+        /// </summary>
+        internal static string Playback_Lifecycle_Renew {
+            get {
+                return ResourceManager.GetString("Playback_Lifecycle_Renew", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to End ({0}).
+        /// </summary>
+        internal static string Playback_Lifecycle_ResultFormat {
+            get {
+                return ResourceManager.GetString("Playback_Lifecycle_ResultFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Next event.
         /// </summary>
         internal static string Playback_NextEvent {
@@ -619,7 +655,7 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Buff / Debuff.
+        ///   Looks up a localized string similar to Effect lifecycle.
         /// </summary>
         internal static string Playback_Track_Aura {
             get {

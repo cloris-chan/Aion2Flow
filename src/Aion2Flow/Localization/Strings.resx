@@ -145,7 +145,11 @@
   <data name="Playback_Column_Amount" xml:space="preserve"><value>Amount</value></data>
   <data name="Playback_Track_Combat" xml:space="preserve"><value>Combat</value></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>Remaining HP</value></data>
-  <data name="Playback_Track_Aura" xml:space="preserve"><value>Buff / Debuff</value></data>
+  <data name="Playback_Track_Aura" xml:space="preserve"><value>Effect lifecycle</value></data>
+  <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>Apply {0} ms</value></data>
+  <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>Apply</value></data>
+  <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Playback_Lifecycle_ResultFormat" xml:space="preserve"><value>End ({0})</value></data>
   <data name="Playback_Track_State" xml:space="preserve"><value>State</value></data>
   <data name="Playback_Track_Scene" xml:space="preserve"><value>Scene</value></data>
   <data name="Playback_Track_Action" xml:space="preserve"><value>Action</value></data>

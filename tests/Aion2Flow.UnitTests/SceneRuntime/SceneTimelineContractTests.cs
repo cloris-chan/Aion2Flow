@@ -539,22 +539,74 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void JournalingSink_Preserves2C38TailWithoutInferringSkillOrSource()
+    public void JournalingSink_Preserves2A38OpenLease()
+    {
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        var source = new PacketObservationSource(1_000, 1, 1, 0x2A38, 41, 7, default);
+
+        sink.RegisterObservation2A38(in source, 42, 1, 19, 95, 163_000_001, 3_000, 0x010203040506, 0x10203040, 414, 77, 2, ResourceEffectRef.FromRaw(16_300_243), 13, 0x0102030405060708, 0x090A0B0C0D);
+
+        var entry = journal.Read(0);
+        var aura = Assert.IsType<AuraObservation>(entry.Aura);
+        Assert.Equal(AuraObservationKind.Open, aura.Kind);
+        Assert.Equal(42, aura.EntityId);
+        Assert.Equal(95, aura.InstanceSequenceId);
+        Assert.Equal(3_000, aura.HeadValue);
+        Assert.Equal(77, aura.EchoSourceEntityId);
+        Assert.Equal(2, aura.StackCount);
+        Assert.Equal(16_300_243u, aura.BuffResourceEffectRef.RawId);
+        Assert.Equal(13, aura.TailLength);
+    }
+
+    [Fact]
+    public void JournalingSink_Preserves2B38RenewalIdentity()
+    {
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        var source = new PacketObservationSource(1_000, 1, 1, 0x2B38, 50, 7, default);
+
+        sink.RegisterObservation2B38(in source, 42, 77, 19, 95, ResourceEffectRef.FromRaw(16_300_243), 123_456, 1, 2, 20);
+
+        var entry = journal.Read(0);
+        var action = Assert.IsType<ActionObservation>(entry.Action);
+        Assert.Equal(42, action.SourceEntityId);
+        Assert.Equal(77, action.SourceEntityIdCopy);
+        Assert.Equal(95, action.InstanceSequenceId);
+        Assert.Equal(123_456, action.SequenceValue);
+        Assert.Equal(16_300_243u, action.ActionResourceEffectRef.RawId);
+        Assert.Equal(20, action.TailLength);
+    }
+
+    [Fact]
+    public void JournalingSink_Preserves2C38BatchResultWithoutInferringLifecycleIdentity()
     {
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
         var source = new PacketObservationSource(1_000, 1, 1, 0x2C38, 16, 7, default);
 
-        sink.RegisterObservation2C38(in source, 42, 2, 95, 7, 23_771, 16_300_243);
+        Span<AuraResultRecord> results = stackalloc AuraResultRecord[4];
+        results[0] = new AuraResultRecord(7, 93, 11, 23_771, 1, 2);
+        results[1] = new AuraResultRecord(7, 94, 11, 23_771, 3, 4);
+        results[2] = new AuraResultRecord(7, 95, 11, 23_771, 0x01020304, 0x05060708);
+        results[3] = new AuraResultRecord(7, 96, 11, 23_771, 5, 6);
+        sink.RegisterObservation2C38(in source, 42, results);
 
-        var entry = journal.Read(0);
+        Assert.Equal(4, journal.Count);
+        var entry = journal.Read(2);
         var aura = Assert.IsType<AuraObservation>(entry.Aura);
         Assert.Equal(0, entry.SourceEntityId);
         Assert.Equal(42, entry.TargetEntityId);
-        Assert.Equal(0, aura.SourceEntityId);
-        Assert.Equal(0, aura.SkillCode);
-        Assert.Equal(23_771, aura.TailFirstValue);
-        Assert.Equal(16_300_243, aura.TailUInt32Raw);
+        Assert.Equal(AuraObservationKind.Result, aura.Kind);
+        Assert.Equal(42, aura.EntityId);
+        Assert.Equal(4, aura.ResultCount);
+        Assert.Equal(2, aura.ResultIndex);
+        Assert.Equal(95, aura.InstanceSequenceId);
+        Assert.Equal(7, aura.StateCode);
+        Assert.Equal(11, aura.ResultCode);
+        Assert.Equal(23_771, aura.ResultDetailEntityId);
+        Assert.Equal(0x01020304u, aura.ResultDetailValue0);
+        Assert.Equal(0x05060708u, aura.ResultDetailValue1);
         Assert.False(sink.IsKnownEntity(23_771));
     }
 

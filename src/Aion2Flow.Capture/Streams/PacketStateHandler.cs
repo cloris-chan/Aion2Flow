@@ -1,6 +1,8 @@
+using System.Buffers;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
@@ -52,7 +54,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.RegisterObservation2B38(context.CreateObservationSource(0x2B38, packet.Length), parsed.SourceId, parsed.SourceIdCopy, parsed.Phase, parsed.Marker, parsed.ActionResourceEffectRef, parsed.Sequence, parsed.StateValue, parsed.DetailValue, parsed.TailLength);
+        context.Sink.RegisterObservation2B38(context.CreateObservationSource(0x2B38, packet.Length), parsed.SourceId, parsed.SourceIdCopy, parsed.Phase, parsed.InstanceSequenceId, parsed.ActionResourceEffectRef, parsed.SequenceValue, parsed.StateValue, parsed.DetailValue, parsed.TailLength);
         return context.MarkParsed();
     }
 
@@ -63,7 +65,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.RegisterObservation2A38(context.CreateObservationSource(0x2A38, packet.Length), parsed.SourceId, parsed.Mode, parsed.GroupCode, parsed.SequenceId, parsed.HeadValue, parsed.BuffResourceEffectRef);
+        context.Sink.RegisterObservation2A38(context.CreateObservationSource(0x2A38, packet.Length), parsed.EntityId, parsed.Mode, parsed.GroupCode, parsed.InstanceSequenceId, parsed.HeadCode, parsed.HeadValue, parsed.HeadMiddleRaw, parsed.TimelineValue, parsed.StableValue, parsed.EchoSourceId, parsed.StackValue, parsed.BuffResourceEffectRef, parsed.TailLength, parsed.TailLow64, parsed.TailHigh64);
 
         RawPacketDump.ObserveParsedPacket("aux-2a38", context.Connection);
         return context.MarkParsed();
@@ -71,12 +73,32 @@ internal sealed class PacketStateHandler
 
     public static bool ParseAux2C38Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet2C38Parser.TryParse(packet, out var parsed))
+        if (!Packet2C38Parser.TryParse(packet, out var batch))
         {
             return false;
         }
 
-        context.Sink.RegisterObservation2C38(context.CreateObservationSource(0x2C38, packet.Length), parsed.SourceId, parsed.Mode, parsed.SequenceId, parsed.ResultCode, parsed.TailFirstValue, parsed.TailUInt32Raw);
+        AuraResultRecord[]? rented = null;
+        Span<AuraResultRecord> results = batch.ResultCount <= 64
+            ? stackalloc AuraResultRecord[batch.ResultCount]
+            : (rented = ArrayPool<AuraResultRecord>.Shared.Rent(batch.ResultCount)).AsSpan(0, batch.ResultCount);
+        try
+        {
+            for (var resultIndex = 0; resultIndex < results.Length; resultIndex++)
+            {
+                if (!batch.TryRead(out var result))
+                    return false;
+                results[resultIndex] = new AuraResultRecord(result.StateCode, result.InstanceSequenceId, result.ResultCode, result.DetailEntityId, result.DetailValue0, result.DetailValue1);
+            }
+
+            var source = context.CreateObservationSource(0x2C38, packet.Length);
+            context.Sink.RegisterObservation2C38(in source, batch.EntityId, results);
+        }
+        finally
+        {
+            if (rented is not null)
+                ArrayPool<AuraResultRecord>.Shared.Return(rented);
+        }
 
         RawPacketDump.ObserveParsedPacket("aux-2c38", context.Connection);
         return context.MarkParsed();

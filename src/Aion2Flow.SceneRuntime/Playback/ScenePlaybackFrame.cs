@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 
@@ -23,7 +24,7 @@ public readonly record struct ScenePlaybackCombatTotals(long TotalDamage, long T
 
 public readonly record struct ScenePlaybackResourceState(int EntityId, long? CurrentValue, long? MaximumValue, long? Delta, int ResourceKind, long ObservedAtMilliseconds, long ObservationOrdinal);
 
-public readonly record struct ScenePlaybackAuraState(int SourceEntityId, int TargetEntityId, int SkillCode, int StackCount, int SequenceId, int ChainId, int ResultCode, int Mode, long ObservedAtMilliseconds, long ObservationOrdinal);
+public readonly record struct ScenePlaybackAuraState(int EntityId, int OriginEntityId, int InstanceSequenceId, int StackCount, int Mode, int GroupCode, ushort DurationMilliseconds, ResourceEffectRef DisplayResourceEffectRef, long OpenedAtMilliseconds, long RenewedAtMilliseconds, long? ExpiresAtMilliseconds, long OpenObservationOrdinal, long LastObservationOrdinal);
 
 public readonly record struct ScenePlaybackTrackWindow(ScenePlaybackTrack Track, long StartObservationOrdinal, long EndObservationOrdinalExclusive, int Count);
 

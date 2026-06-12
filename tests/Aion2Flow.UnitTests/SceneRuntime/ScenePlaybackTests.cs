@@ -225,25 +225,152 @@ public sealed class ScenePlaybackTests
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
-        AppendAura(journal, sceneId, 100, 200, 501, 7, 0, 0, 1, 1_000);
-        AppendAura(journal, sceneId, 100, 200, 501, 7, 1, 1, 2, 2_000);
-        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
-        var snapshot = owner.CreateSnapshot();
-        var payload = owner.CreateArchivePayload(snapshot);
-        var record = new ArchivedEncounterRecord
-        {
-            EncounterId = sceneId,
-            Snapshot = snapshot,
-            ScenePayload = payload
-        };
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 800);
+        AppendAuraResult(journal, sceneId, 200, 7, 19, 3, 1_800);
+        var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var afterRemove = session.Seek(2_000);
-        var beforeRemove = session.Seek(1_000);
+        var afterRemove = session.Seek(1_800);
+        var beforeRemove = session.Seek(1_799);
 
         Assert.Empty(afterRemove.ActiveAuras);
         Assert.Single(beforeRemove.ActiveAuras);
-        Assert.Equal(501, beforeRemove.ActiveAuras[0].SkillCode);
+        Assert.Equal(200, beforeRemove.ActiveAuras[0].EntityId);
+        Assert.Equal(7, beforeRemove.ActiveAuras[0].InstanceSequenceId);
+        Assert.Equal(1_800, beforeRemove.ActiveAuras[0].ExpiresAtMilliseconds);
+    }
+
+    [Fact]
+    public void AuraLeaseExpiresWithoutResultAndRenewalExtendsIt()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 800);
+        AppendCombat(journal, sceneId, 100, 200, 1, 3, 2_000);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+
+        var beforeOriginalExpiry = session.Seek(999);
+        var afterOriginalExpiry = session.Seek(1_799);
+        var afterRenewedExpiry = session.Seek(1_800);
+
+        Assert.Single(beforeOriginalExpiry.ActiveAuras);
+        Assert.Single(afterOriginalExpiry.ActiveAuras);
+        Assert.Empty(afterRenewedExpiry.ActiveAuras);
+    }
+
+    [Fact]
+    public void AuraLeaseCanRenewAfterTemporaryExpiry()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
+        AppendCombat(journal, sceneId, 100, 200, 1, 2, 1_000);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 3, 1_200);
+        AppendCombat(journal, sceneId, 100, 200, 1, 4, 2_500);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+
+        var expired = session.Seek(1_000);
+        var renewed = session.AdvanceTo(1_200);
+
+        Assert.Empty(expired.ActiveAuras);
+        Assert.Single(renewed.ActiveAuras);
+        Assert.Equal(2_200, renewed.ActiveAuras[0].ExpiresAtMilliseconds);
+    }
+
+    [Fact]
+    public void AuraLifecyclePacketsShareOnePlaybackTrack()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 500);
+        AppendAuraResult(journal, sceneId, 200, 7, 6, 3, 1_500);
+        var segment = CreateArchiveRecord(journal, sceneId).ScenePayload.TimelineSegment;
+
+        var read = ScenePlaybackTrackReader.Read(segment, 0, 1_500, 10);
+
+        Assert.Equal(3, read.Markers.Count);
+        Assert.All(read.Markers, static marker => Assert.Equal(ScenePlaybackTrack.Aura, marker.Track));
+        Assert.Equal(ScenePlaybackLifecycleEventKind.Open, read.Markers[0].LifecycleEventKind);
+        Assert.Equal(ScenePlaybackLifecycleEventKind.Renew, read.Markers[1].LifecycleEventKind);
+        Assert.Equal(ScenePlaybackLifecycleEventKind.Result, read.Markers[2].LifecycleEventKind);
+        Assert.Equal(7, read.Markers[1].InstanceSequenceId);
+        Assert.Equal(6, read.Markers[2].ResultCode);
+    }
+
+    [Fact]
+    public void AuraResultBatch_ClosesEverySequenceAndPublishesEveryMarker()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 5_000, 1, 0);
+        AppendAuraOpen(journal, sceneId, 200, 100, 8, 5_000, 2, 100);
+        AppendAuraBatchResult(journal, sceneId, 200, 7, 7, 2, 0, 3, 1_000);
+        AppendAuraBatchResult(journal, sceneId, 200, 8, 7, 2, 1, 4, 1_000);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+
+        var frame = session.Seek(1_000);
+
+        Assert.Empty(frame.ActiveAuras);
+        var results = frame.RecentMarkers.Where(static marker => marker.LifecycleEventKind == ScenePlaybackLifecycleEventKind.Result).ToArray();
+        Assert.Equal(2, results.Length);
+        Assert.Equal([7, 8], results.Select(static marker => marker.InstanceSequenceId));
+    }
+
+    [Fact]
+    public void AuraLifecycleTrack_OnlyClassifiesMarkerBoundActionsAsRenewalsAcrossPages()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
+        AppendAuraRenew(journal, sceneId, 200, 100, 8, 2, 250);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 3, 500);
+        AppendAuraResult(journal, sceneId, 200, 7, 1, 4, 1_500);
+        var segment = CreateArchiveRecord(journal, sceneId).ScenePayload.TimelineSegment;
+
+        var first = ScenePlaybackTrackReader.Read(segment, 0, 1_500, 2);
+        var second = ScenePlaybackTrackReader.Read(segment, 0, 1_500, 10, first.NextCursor);
+
+        Assert.Equal([ScenePlaybackTrack.Aura, ScenePlaybackTrack.Action], first.Markers.Select(static marker => marker.Track));
+        Assert.Equal(ScenePlaybackLifecycleEventKind.None, first.Markers[1].LifecycleEventKind);
+        Assert.Equal([ScenePlaybackTrack.Aura, ScenePlaybackTrack.Aura], second.Markers.Select(static marker => marker.Track));
+        Assert.Equal(ScenePlaybackLifecycleEventKind.Renew, second.Markers[0].LifecycleEventKind);
+        Assert.Equal(ScenePlaybackLifecycleEventKind.Result, second.Markers[1].LifecycleEventKind);
+    }
+
+    [Fact]
+    public void PlaybackSession_OnlyRenewsMatchingAuraInstances()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
+        AppendAuraRenew(journal, sceneId, 200, 100, 8, 2, 250);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 3, 500);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+
+        var frame = session.Seek(500);
+
+        var aura = Assert.Single(frame.ActiveAuras);
+        Assert.Equal(1_500, aura.ExpiresAtMilliseconds);
+        Assert.Equal([ScenePlaybackTrack.Aura, ScenePlaybackTrack.Action, ScenePlaybackTrack.Aura], frame.RecentMarkers.Select(static marker => marker.Track));
+    }
+
+    [Fact]
+    public void PlaybackSession_OnlyRenewsPhase19LifecycleSidecars()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 500, phase: 17);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+
+        var frame = session.Seek(500);
+
+        var aura = Assert.Single(frame.ActiveAuras);
+        Assert.Equal(1_000, aura.ExpiresAtMilliseconds);
+        Assert.Equal([ScenePlaybackTrack.Aura, ScenePlaybackTrack.Action], frame.RecentMarkers.Select(static marker => marker.Track));
     }
 
     [Fact]
@@ -619,6 +746,11 @@ public sealed class ScenePlaybackTests
         AppendResource(journal, sceneId, bossId, 30_000, 50_000, 4, 1_500);
         AppendCombat(journal, sceneId, playerId, bossId, 300, 5, 2_500);
         journal.CompleteBatch(1);
+        return CreateArchiveRecord(journal, sceneId);
+    }
+
+    private static ArchivedEncounterRecord CreateArchiveRecord(ObservedEventJournal journal, Guid sceneId)
+    {
         var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
         var snapshot = owner.CreateSnapshot();
         var payload = owner.CreateArchivePayload(snapshot);
@@ -680,17 +812,72 @@ public sealed class ScenePlaybackTests
         });
     }
 
-    private static void AppendAura(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int skillCode, int sequenceId, int mode, int resultCode, long ordinal, long observedAt)
+    private static void AppendAuraOpen(ObservedEventJournal journal, Guid sceneId, int entityId, int originEntityId, int sequenceId, ushort durationMilliseconds, long ordinal, long observedAt)
     {
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
             Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
             Domain = ObservedEventDomain.Aura,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
+            SourceEntityId = entityId,
+            TargetEntityId = 0,
+            Raw = new RawPacketReference(0x2A38, 0, ordinal),
+            Aura = new AuraObservation
+            {
+                Kind = AuraObservationKind.Open,
+                EntityId = entityId,
+                EchoSourceEntityId = originEntityId,
+                InstanceSequenceId = sequenceId,
+                OpenMode = 1,
+                GroupCode = 19,
+                HeadValue = durationMilliseconds,
+                StackCount = 1
+            }
+        });
+    }
+
+    private static void AppendAuraRenew(ObservedEventJournal journal, Guid sceneId, int entityId, int originEntityId, int sequenceId, long ordinal, long observedAt, int phase = 19)
+    {
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Domain = ObservedEventDomain.Action,
+            SourceEntityId = entityId,
+            TargetEntityId = 0,
+            Raw = new RawPacketReference(0x2B38, 0, ordinal),
+            Action = new ActionObservation
+            {
+                SourceEntityId = entityId,
+                SourceEntityIdCopy = originEntityId,
+                Phase = phase,
+                InstanceSequenceId = sequenceId
+            }
+        });
+    }
+
+    private static void AppendAuraResult(ObservedEventJournal journal, Guid sceneId, int entityId, int sequenceId, int resultCode, long ordinal, long observedAt)
+        => AppendAuraBatchResult(journal, sceneId, entityId, sequenceId, resultCode, 1, 0, ordinal, observedAt);
+
+    private static void AppendAuraBatchResult(ObservedEventJournal journal, Guid sceneId, int entityId, int sequenceId, int resultCode, int resultCount, int resultIndex, long ordinal, long observedAt)
+    {
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Domain = ObservedEventDomain.Aura,
+            SourceEntityId = 0,
+            TargetEntityId = entityId,
             Raw = new RawPacketReference(0x2C38, 0, ordinal),
-            Aura = new AuraObservation(sourceId, targetId, skillCode, 0, sequenceId, 0, resultCode, mode)
+            Aura = new AuraObservation
+            {
+                Kind = AuraObservationKind.Result,
+                EntityId = entityId,
+                InstanceSequenceId = sequenceId,
+                ResultCount = resultCount,
+                ResultIndex = resultIndex,
+                ResultCode = resultCode
+            }
         });
     }
 

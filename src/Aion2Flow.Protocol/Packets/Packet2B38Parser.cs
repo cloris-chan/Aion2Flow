@@ -3,7 +3,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet2B38Aux(int SourceId, int SourceIdCopy, int Phase, int Marker, ResourceEffectRef ActionResourceEffectRef, int Sequence, int StateValue, int DetailValue, int TailLength);
+internal readonly record struct Packet2B38Aux(int SourceId, int SourceIdCopy, int Phase, int InstanceSequenceId, ResourceEffectRef ActionResourceEffectRef, int SequenceValue, int StateValue, int DetailValue, int TailLength);
 
 internal static class Packet2B38Parser
 {

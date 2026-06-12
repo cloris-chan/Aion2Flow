@@ -116,31 +116,39 @@ public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, i
 
 public readonly record struct ResourceObservation(int EntityId, long? CurrentValue, long? MaximumValue, long? Delta, int ResourceKind);
 
+public enum AuraObservationKind : byte
+{
+    Open,
+    Result
+}
+
+public readonly record struct AuraResultRecord(int StateCode, int InstanceSequenceId, int ResultCode, int DetailEntityId, uint DetailValue0, uint DetailValue1);
+
 public readonly record struct AuraObservation
 {
-    public int SourceEntityId { get; init; }
-    public int TargetEntityId { get; init; }
-    public int SkillCode { get; init; }
+    public AuraObservationKind Kind { get; init; }
+    public int EntityId { get; init; }
+    public int InstanceSequenceId { get; init; }
     public ResourceEffectRef BuffResourceEffectRef { get; init; }
     public int StackCount { get; init; }
-    public int SequenceId { get; init; }
-    public int ChainId { get; init; }
     public int ResultCode { get; init; }
-    public int Mode { get; init; }
-    public int TailFirstValue { get; init; }
-    public int TailUInt32Raw { get; init; }
-
-    public AuraObservation(int sourceEntityId, int targetEntityId, int skillCode, int stackCount, int sequenceId, int chainId, int resultCode, int mode)
-    {
-        SourceEntityId = sourceEntityId;
-        TargetEntityId = targetEntityId;
-        SkillCode = skillCode;
-        StackCount = stackCount;
-        SequenceId = sequenceId;
-        ChainId = chainId;
-        ResultCode = resultCode;
-        Mode = mode;
-    }
+    public int OpenMode { get; init; }
+    public int ResultCount { get; init; }
+    public int ResultIndex { get; init; }
+    public int GroupCode { get; init; }
+    public uint HeadCode { get; init; }
+    public ushort HeadValue { get; init; }
+    public ulong HeadMiddleRaw { get; init; }
+    public uint TimelineValue { get; init; }
+    public uint StableValue { get; init; }
+    public int EchoSourceEntityId { get; init; }
+    public int StateCode { get; init; }
+    public int ResultDetailEntityId { get; init; }
+    public uint ResultDetailValue0 { get; init; }
+    public uint ResultDetailValue1 { get; init; }
+    public int TailLength { get; init; }
+    public ulong TailLow64 { get; init; }
+    public ulong TailHigh64 { get; init; }
 }
 
 public readonly record struct ActionObservation
@@ -148,9 +156,9 @@ public readonly record struct ActionObservation
     public int SourceEntityId { get; init; }
     public int SourceEntityIdCopy { get; init; }
     public int Phase { get; init; }
-    public int Marker { get; init; }
+    public int InstanceSequenceId { get; init; }
     public ResourceEffectRef ActionResourceEffectRef { get; init; }
-    public int SequenceId { get; init; }
+    public int SequenceValue { get; init; }
     public int StateValue { get; init; }
     public int DetailValue { get; init; }
     public int TailLength { get; init; }

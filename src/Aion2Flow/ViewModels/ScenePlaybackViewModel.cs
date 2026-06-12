@@ -559,7 +559,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         return FormatTime(marker.PositionMilliseconds);
     }
 
-    private static string CreateAmountText(ScenePlaybackTrackMarker marker)
+    private string CreateAmountText(ScenePlaybackTrackMarker marker)
     {
         if (marker.Track == ScenePlaybackTrack.Combat && marker.Amount != 0)
             return FormatSigned(marker.Amount);
@@ -572,7 +572,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
 
         if (marker.Track == ScenePlaybackTrack.Aura)
-            return $"result {marker.ResultCode.ToString(CultureInfo.InvariantCulture)}";
+        {
+            return marker.LifecycleEventKind switch
+            {
+                ScenePlaybackLifecycleEventKind.Open when marker.DurationMilliseconds == ushort.MaxValue => Localization["Playback_Lifecycle_OpenIndefinite"],
+                ScenePlaybackLifecycleEventKind.Open => string.Format(CultureInfo.CurrentCulture, Localization["Playback_Lifecycle_OpenFormat"], marker.DurationMilliseconds),
+                ScenePlaybackLifecycleEventKind.Renew => Localization["Playback_Lifecycle_Renew"],
+                ScenePlaybackLifecycleEventKind.Result => string.Format(CultureInfo.CurrentCulture, Localization["Playback_Lifecycle_ResultFormat"], marker.ResultCode),
+                _ => string.Empty
+            };
+        }
 
         return string.Empty;
     }

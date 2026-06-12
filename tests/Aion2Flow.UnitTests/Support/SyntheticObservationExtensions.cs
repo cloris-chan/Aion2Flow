@@ -122,9 +122,11 @@ internal static class SyntheticObservationExtensions
         sink.AppendSummon(in source, ownerId, summonInstanceId);
     }
 
-    public static void RegisterObservation2C38(this IRuntimeObservationSink sink, int instanceId, int mode, int sequenceId, int resultCode, int tailFirstValue, int tailUInt32Raw, long timestamp, long frameOrdinal, long batchOrdinal)
+    public static void RegisterObservation2C38(this IRuntimeObservationSink sink, int entityId, int instanceSequenceId, int resultCode, long timestamp, long frameOrdinal, long batchOrdinal)
     {
         var source = new PacketObservationSource(timestamp, frameOrdinal, batchOrdinal, 0x2C38, 0, 0, default);
-        sink.RegisterObservation2C38(in source, instanceId, mode, sequenceId, resultCode, tailFirstValue, tailUInt32Raw);
+        Span<AuraResultRecord> results = stackalloc AuraResultRecord[1];
+        results[0] = new AuraResultRecord(0, instanceSequenceId, resultCode, 0, 0, 0);
+        sink.RegisterObservation2C38(in source, entityId, results);
     }
 }

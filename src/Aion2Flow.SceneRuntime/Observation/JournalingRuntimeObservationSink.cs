@@ -305,34 +305,43 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2A38(in PacketObservationSource packet, int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef)
+    public void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64)
     {
-        sourceId = ResolveLifecycleId(sourceId);
-        AddKnownEntity(sourceId);
+        entityId = ResolveLifecycleId(entityId);
+        AddKnownEntity(entityId);
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
             Stamp = stamp,
             Domain = ObservedEventDomain.Aura,
-            SourceEntityId = sourceId,
+            SourceEntityId = entityId,
             TargetEntityId = 0,
             Raw = packet.Raw,
             Aura = new AuraObservation
             {
-                SourceEntityId = sourceId,
-                TargetEntityId = 0,
+                Kind = AuraObservationKind.Open,
+                EntityId = entityId,
                 BuffResourceEffectRef = buffResourceEffectRef,
-                StackCount = 0,
-                SequenceId = sequenceId,
-                ChainId = 0,
+                StackCount = stackValue,
+                InstanceSequenceId = instanceSequenceId,
                 ResultCode = 0,
-                Mode = mode
+                OpenMode = mode,
+                GroupCode = groupCode,
+                HeadCode = headCode,
+                HeadValue = headValue,
+                HeadMiddleRaw = headMiddleRaw,
+                TimelineValue = timelineValue,
+                StableValue = stableValue,
+                EchoSourceEntityId = echoSourceId,
+                TailLength = tailLength,
+                TailLow64 = tailLow64,
+                TailHigh64 = tailHigh64
             }
         });
     }
 
-    public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength)
+    public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int instanceSequenceId, ResourceEffectRef actionResourceEffectRef, int sequenceValue, int stateValue, int detailValue, int tailLength)
     {
         sourceId = ResolveLifecycleId(sourceId);
         sourceIdCopy = ResolveLifecycleId(sourceIdCopy);
@@ -352,9 +361,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 SourceEntityId = sourceId,
                 SourceEntityIdCopy = sourceIdCopy,
                 Phase = phase,
-                Marker = marker,
+                InstanceSequenceId = instanceSequenceId,
                 ActionResourceEffectRef = actionResourceEffectRef,
-                SequenceId = sequenceId,
+                SequenceValue = sequenceValue,
                 StateValue = stateValue,
                 DetailValue = detailValue,
                 TailLength = tailLength
@@ -362,35 +371,41 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         });
     }
 
-    public void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailFirstValue, int tailUInt32Raw)
+    public void RegisterObservation2C38(in PacketObservationSource packet, int entityId, scoped ReadOnlySpan<AuraResultRecord> results)
     {
-        instanceId = ResolveLifecycleId(instanceId);
-        AddKnownEntity(instanceId);
-        var state = GetOrAddNpcState(instanceId);
-        state.Latest2C38 = (sequenceId, resultCode);
-        RememberNpcObservationSource(instanceId);
-        var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
+        entityId = ResolveLifecycleId(entityId);
+        AddKnownEntity(entityId);
+        var state = GetOrAddNpcState(entityId);
+        RememberNpcObservationSource(entityId);
+        for (var resultIndex = 0; resultIndex < results.Length; resultIndex++)
         {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Aura,
-            SourceEntityId = 0,
-            TargetEntityId = instanceId,
-            Raw = packet.Raw,
-            Aura = new AuraObservation
+            ref readonly var result = ref results[resultIndex];
+            state.Latest2C38 = (result.InstanceSequenceId, result.ResultCode);
+            var stamp = CreateStamp(in packet);
+            journal.Append(new ObservedEventEnvelope
             {
+                SceneSessionId = sceneSessionId(),
+                Stamp = stamp,
+                Domain = ObservedEventDomain.Aura,
                 SourceEntityId = 0,
-                TargetEntityId = instanceId,
-                StackCount = 0,
-                SequenceId = sequenceId,
-                ChainId = 0,
-                ResultCode = resultCode,
-                Mode = mode,
-                TailFirstValue = tailFirstValue,
-                TailUInt32Raw = tailUInt32Raw
-            }
-        });
+                TargetEntityId = entityId,
+                Raw = packet.Raw,
+                Aura = new AuraObservation
+                {
+                    Kind = AuraObservationKind.Result,
+                    EntityId = entityId,
+                    StackCount = 0,
+                    InstanceSequenceId = result.InstanceSequenceId,
+                    ResultCode = result.ResultCode,
+                    ResultCount = results.Length,
+                    ResultIndex = resultIndex,
+                    StateCode = result.StateCode,
+                    ResultDetailEntityId = result.DetailEntityId,
+                    ResultDetailValue0 = result.DetailValue0,
+                    ResultDetailValue1 = result.DetailValue1
+                }
+            });
+        }
     }
 
     public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)

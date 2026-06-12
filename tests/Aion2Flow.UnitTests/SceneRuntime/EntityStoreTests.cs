@@ -369,7 +369,7 @@ public class DomainEventApplierTests
             Domain = ObservedEventDomain.Aura,
             SourceEntityId = 0,
             TargetEntityId = 4370,
-            Aura = new AuraObservation { TargetEntityId = 4370, SequenceId = 95, ResultCode = 7 }
+            Aura = new AuraObservation { Kind = AuraObservationKind.Result, EntityId = 4370, InstanceSequenceId = 95, ResultCode = 7 }
         });
 
         var entities = new EntityStore();

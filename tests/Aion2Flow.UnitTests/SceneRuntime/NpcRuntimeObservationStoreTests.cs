@@ -13,7 +13,7 @@ public sealed class NpcRuntimeObservationStoreTests
         scene.AppendNpc0140Value(4370, 200003);
         scene.AppendNpc0240Value(4370, 200003);
         scene.AppendNpc4636State(4370, 2, 79);
-        scene.Sink.RegisterObservation2C38(4370, 0, 95, 7, 0, 0, 0, 0, 0);
+        scene.Sink.RegisterObservation2C38(4370, 95, 7, 0, 0, 0);
 
         Assert.True(scene.TryGetNpcRuntimeState(4370, out var state));
         Assert.Equal((uint)6, state.Sequence2136);

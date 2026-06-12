@@ -145,7 +145,11 @@
   <data name="Playback_Column_Amount" xml:space="preserve"><value>數值</value></data>
   <data name="Playback_Track_Combat" xml:space="preserve"><value>戰鬥</value></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>剩餘 HP</value></data>
-  <data name="Playback_Track_Aura" xml:space="preserve"><value>Buff / Debuff</value></data>
+  <data name="Playback_Track_Aura" xml:space="preserve"><value>效果生命週期</value></data>
+  <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>套用 {0} ms</value></data>
+  <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>套用</value></data>
+  <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>刷新</value></data>
+  <data name="Playback_Lifecycle_ResultFormat" xml:space="preserve"><value>結束 ({0})</value></data>
   <data name="Playback_Track_State" xml:space="preserve"><value>狀態</value></data>
   <data name="Playback_Track_Scene" xml:space="preserve"><value>場景</value></data>
   <data name="Playback_Track_Action" xml:space="preserve"><value>動作</value></data>

@@ -50,11 +50,11 @@ public interface IRuntimeObservationSink
 
     void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag);
 
-    void RegisterObservation2A38(in PacketObservationSource packet, int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef);
+    void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64);
 
-    void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength);
+    void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int instanceSequenceId, ResourceEffectRef actionResourceEffectRef, int sequenceValue, int stateValue, int detailValue, int tailLength);
 
-    void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailFirstValue, int tailUInt32Raw);
+    void RegisterObservation2C38(in PacketObservationSource packet, int entityId, scoped ReadOnlySpan<AuraResultRecord> results);
 
     void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null);
 

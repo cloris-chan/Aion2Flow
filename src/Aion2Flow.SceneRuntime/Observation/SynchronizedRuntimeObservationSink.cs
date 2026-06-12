@@ -130,19 +130,19 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterCompactControl0638(in packet, sourceId, bodyResourceEffectRef, marker, flag);
     }
 
-    public void RegisterObservation2A38(in PacketObservationSource packet, int sourceId, int mode, int groupCode, int sequenceId, ushort headValue, ResourceEffectRef buffResourceEffectRef)
+    public void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64)
     {
-        lock (gate) inner.RegisterObservation2A38(in packet, sourceId, mode, groupCode, sequenceId, headValue, buffResourceEffectRef);
+        lock (gate) inner.RegisterObservation2A38(in packet, entityId, mode, groupCode, instanceSequenceId, headCode, headValue, headMiddleRaw, timelineValue, stableValue, echoSourceId, stackValue, buffResourceEffectRef, tailLength, tailLow64, tailHigh64);
     }
 
-    public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int marker, ResourceEffectRef actionResourceEffectRef, int sequenceId, int stateValue, int detailValue, int tailLength)
+    public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int instanceSequenceId, ResourceEffectRef actionResourceEffectRef, int sequenceValue, int stateValue, int detailValue, int tailLength)
     {
-        lock (gate) inner.RegisterObservation2B38(in packet, sourceId, sourceIdCopy, phase, marker, actionResourceEffectRef, sequenceId, stateValue, detailValue, tailLength);
+        lock (gate) inner.RegisterObservation2B38(in packet, sourceId, sourceIdCopy, phase, instanceSequenceId, actionResourceEffectRef, sequenceValue, stateValue, detailValue, tailLength);
     }
 
-    public void RegisterObservation2C38(in PacketObservationSource packet, int instanceId, int mode, int sequenceId, int resultCode, int tailFirstValue, int tailUInt32Raw)
+    public void RegisterObservation2C38(in PacketObservationSource packet, int entityId, scoped ReadOnlySpan<AuraResultRecord> results)
     {
-        lock (gate) inner.RegisterObservation2C38(in packet, instanceId, mode, sequenceId, resultCode, tailFirstValue, tailUInt32Raw);
+        lock (gate) inner.RegisterObservation2C38(in packet, entityId, results);
     }
 
     public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
