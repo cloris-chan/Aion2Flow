@@ -8,10 +8,11 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
+public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, TimeProvider? timeProvider = null)
 {
     private const long BossFocusVisibilityTimeoutMilliseconds = 2_000;
     private readonly Lock _gate = new();
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private DomainEventApplier _applier = new(entities, boundary, metadataRegistry, combat);
     private readonly SceneCombatSnapshotBuilder _snapshotBuilder = new();
     private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
@@ -24,6 +25,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private long _appliedBatchOrdinal = -1;
     private SnapshotCacheKey _snapshotCacheKey;
     private SceneCombatSnapshot? _snapshotCache;
+    private long _snapshotCacheValidUntilMilliseconds = -1;
     private ProjectionCacheStats _projectionCacheStats;
 
     public SceneReadModelOwner(ObservedEventJournal journal) : this(journal, Guid.NewGuid(), DateTimeOffset.Now)
@@ -39,6 +41,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     }
 
     public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, RuntimeMetadataRegistry metadataRegistry) : this(journal, encounterId, sceneStarted, new EntityStore(), new SceneBoundaryStore(), metadataRegistry, new CombatStore())
+    {
+    }
+
+    public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, RuntimeMetadataRegistry metadataRegistry, TimeProvider timeProvider) : this(journal, encounterId, sceneStarted, new EntityStore(), new SceneBoundaryStore(), metadataRegistry, new CombatStore(), timeProvider)
     {
     }
 
@@ -264,8 +270,9 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
     private SceneCombatSnapshot CreateSnapshotCore()
     {
+        var now = GetSceneNowMilliseconds();
         var key = SnapshotCacheKey.From(EncounterId, entities, boundary, combat, _applier.BossFocus);
-        if (_snapshotCache is not null && _snapshotCacheKey == key && IsSnapshotCacheStable(_snapshotCache))
+        if (_snapshotCache is not null && _snapshotCacheKey == key && now <= _snapshotCacheValidUntilMilliseconds)
         {
             _projectionCacheStats = _projectionCacheStats.WithHit();
             return _snapshotCache;
@@ -274,18 +281,11 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         var adapter = CreateAdapter();
         _snapshotBuilder.Reset(EncounterId, combat.Combatants.Count, 0);
         adapter.BuildSnapshot(_snapshotBuilder);
-        ApplyBossFocusSnapshots(_snapshotBuilder);
+        ApplyBossFocusSnapshots(_snapshotBuilder, now);
         var snapshot = _snapshotBuilder.ToSnapshot(combat.Revision);
-        if (IsSnapshotCacheStable(snapshot))
-        {
-            _snapshotCacheKey = SnapshotCacheKey.From(EncounterId, entities, boundary, combat, _applier.BossFocus);
-            _snapshotCache = snapshot;
-        }
-        else
-        {
-            _snapshotCacheKey = default;
-            _snapshotCache = null;
-        }
+        _snapshotCacheKey = SnapshotCacheKey.From(EncounterId, entities, boundary, combat, _applier.BossFocus);
+        _snapshotCache = snapshot;
+        _snapshotCacheValidUntilMilliseconds = GetSnapshotCacheValidUntilMilliseconds(snapshot);
         _projectionCacheStats = _projectionCacheStats.WithMiss();
         return snapshot;
     }
@@ -341,8 +341,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         return false;
     }
 
-    private static bool IsSnapshotCacheStable(SceneCombatSnapshot snapshot) => snapshot.EncounterEndTime > 0 || snapshot.BossFocuses.Count == 0 && snapshot.Encounter.TrackingTargetId == 0;
-
     private CombatDetailDelta CreateDetailDeltaCore(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh)
     {
         var subscription = GetDetailSubscription(combatantId);
@@ -368,11 +366,26 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         return subscription.Update(adapter, snapshot, forceRefresh, writer);
     }
 
-    private void ApplyBossFocusSnapshots(SceneCombatSnapshotBuilder builder)
+    private long GetSceneNowMilliseconds() =>
+        Math.Max(0, (_timeProvider.GetUtcNow() - SceneStarted).Ticks / TimeSpan.TicksPerMillisecond);
+
+    private static long GetSnapshotCacheValidUntilMilliseconds(SceneCombatSnapshot snapshot)
     {
-        var now = builder.EncounterEndTime > 0
-            ? builder.EncounterEndTime
-            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var validUntil = long.MaxValue;
+        for (var i = 0; i < snapshot.BossFocuses.Count; i++)
+        {
+            var observedAt = snapshot.BossFocuses[i].LastObservedAtMilliseconds;
+            var expiresAt = observedAt > long.MaxValue - BossFocusVisibilityTimeoutMilliseconds
+                ? long.MaxValue
+                : observedAt + BossFocusVisibilityTimeoutMilliseconds;
+            validUntil = Math.Min(validUntil, expiresAt);
+        }
+
+        return validUntil;
+    }
+
+    private void ApplyBossFocusSnapshots(SceneCombatSnapshotBuilder builder, long now)
+    {
         var bosses = _applier.BossFocus.GetObservedBosses(now, BossFocusVisibilityTimeoutMilliseconds);
         for (var i = 0; i < bosses.Count; i++)
         {
@@ -420,6 +433,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _appliedBatchOrdinal = journal.LastCompletedBatchOrdinal;
             _snapshotCache = null;
             _snapshotCacheKey = default;
+            _snapshotCacheValidUntilMilliseconds = -1;
         }
     }
 }

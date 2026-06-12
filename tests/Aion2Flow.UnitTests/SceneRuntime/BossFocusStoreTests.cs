@@ -1,6 +1,8 @@
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -19,7 +21,7 @@ public sealed class BossFocusStoreTests
         h.Hp(3518, 167_000, 1_100);
         h.Hp(3518, 152_000, 1_200);
 
-        Assert.True(h.Focus.TryGetObservedBoss(10_000, 2_000, out var boss));
+        Assert.True(h.Focus.TryGetObservedBoss(1_400, 2_000, out var boss));
         Assert.True(boss.HasHp);
         Assert.Equal(3518, boss.InstanceId);
         Assert.Equal(152_000, boss.Hp);
@@ -66,6 +68,21 @@ public sealed class BossFocusStoreTests
         Assert.True(h.Focus.TryGetObservedBoss(1_100, 2_000, out var boss));
         Assert.True(boss.HasHp);
         Assert.Equal(157_000, boss.Hp);
+    }
+
+    [Fact]
+    public void ScenePath_ExpiresWhenBossPacketActivityStops()
+    {
+        var h = new Harness();
+
+        h.Kind(3518, NpcKind.Boss);
+        h.Battle(3518, true, 900);
+        h.Hp(3518, 157_000, 1_000);
+
+        Assert.True(h.Focus.TryGetObservedBoss(3_000, 2_000, out _));
+        Assert.False(h.Focus.TryGetObservedBoss(3_001, 2_000, out _));
+        Assert.True(h.Entities.TryGet(3518, out var entity));
+        Assert.Equal(NpcKind.Boss, entity.Kind);
     }
 
     [Fact]
@@ -148,7 +165,7 @@ public sealed class BossFocusStoreTests
         h.Battle(3518, true, 900);
         h.Hp(3518, 157_000, 1_000);
 
-        Assert.True(h.Focus.TryGetObservedBoss(10_000, 2_000, out _));
+        Assert.True(h.Focus.TryGetObservedBoss(1_050, 2_000, out _));
 
         h.Hp(3518, 0, 1_100);
         h.Battle(3518, true, 1_200);
@@ -266,6 +283,41 @@ public sealed class BossFocusStoreTests
     }
 
     [Fact]
+    public void ReadModel_ExpiresBossFocusAgainstSceneRelativeClockWithoutNewEvents()
+    {
+        var sceneStarted = new DateTimeOffset(2026, 6, 12, 13, 37, 31, TimeSpan.Zero);
+        var timeProvider = new MutableTimeProvider(sceneStarted);
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(sceneStarted.ToUnixTimeMilliseconds());
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), sceneStarted, new RuntimeMetadataRegistry(), timeProvider);
+        var kindSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 100, 0, 0, 0, 0, 0, default);
+        var hpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 200, 0, 0, 0, 0, 0, default);
+        var combatSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 300, 0, 0, 0, 0, 0, default);
+        var combat = new CombatObservation
+        {
+            Damage = 500,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        };
+
+        sink.AppendNpcKind(in kindSource, 3518, NpcKind.Boss);
+        sink.AppendNpcHp(in hpSource, 3518, 157_000, 167_000);
+        sink.AppendCombatObservation(in combatSource, 100, 3518, in combat);
+        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(300));
+
+        Assert.Single(owner.CreateSnapshot().BossFocuses);
+
+        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(2_301));
+
+        Assert.Empty(owner.CreateSnapshot().BossFocuses);
+        Assert.True(owner.Entities.TryGet(3518, out var entity));
+        Assert.Equal(NpcKind.Boss, entity.Kind);
+    }
+
+    [Fact]
     public void ScenePath_RestoresActiveBossFromEntityStateAfterFocusStoreReset()
     {
         var entities = new EntityStore();
@@ -365,5 +417,14 @@ public sealed class BossFocusStoreTests
 
         private bool CanActivate(int instanceId) =>
             !Entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
+    }
+
+    private sealed class MutableTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        private DateTimeOffset _utcNow = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public void SetUtcNow(DateTimeOffset value) => _utcNow = value;
     }
 }

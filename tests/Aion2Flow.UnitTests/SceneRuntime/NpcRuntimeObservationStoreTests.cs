@@ -49,7 +49,7 @@ public sealed class NpcRuntimeObservationStoreTests
         scene.AppendNpcHp(3518, 157_000, 1_000);
 
         scene.Owner.Refresh();
-        Assert.True(scene.Owner.BossFocus.TryGetObservedBoss(10_000, 2_000, out _));
+        Assert.True(scene.Owner.BossFocus.TryGetObservedBoss(1_050, 2_000, out _));
 
         scene.AppendNpcHp(3518, 0, 1_100);
         scene.SetNpcBattle(3518, true, 1_200);

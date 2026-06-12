@@ -358,6 +358,24 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_Expires_BossFocus_When_BossPackets_Stop_After_Leaving_Range()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.BossFocusExpiresAfterLeavingRange}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        const int bossId = 31808;
+        AssertNpcNameAndKind(replay, bossId, "憤怒的薩呂", NpcKind.Boss, summaryDump);
+        Assert.DoesNotContain(replay.Snapshot.BossFocuses, static focus => focus.InstanceId == bossId);
+        Assert.Contains(replay.Combatants, static combatant => combatant.CombatantId == bossId && combatant.IncomingDamage > 7_500_000);
+        Assert.True(replay.SceneOwner.Entities.TryGet(bossId, out var entity));
+        Assert.Equal(243_750_000, entity.MaxHp);
+        Assert.Equal(98_050_877, entity.CurrentHp);
+    }
+
+    [Fact]
     public void Replay_Recovers_SummonOwner_And_Catalog_From_4136_Create_State()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));

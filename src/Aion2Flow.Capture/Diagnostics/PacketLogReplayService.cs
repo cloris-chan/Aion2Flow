@@ -81,7 +81,8 @@ public sealed class PacketLogReplayService
         var sceneStarted = DateTimeOffset.UtcNow;
         var clock = new SceneRuntimeClock(sceneStarted.ToUnixTimeMilliseconds());
         var metadataRegistry = new RuntimeMetadataRegistry();
-        var owner = new SceneReadModelOwner(journal, sceneId, sceneStarted, metadataRegistry);
+        var replayTimeProvider = new ReplayTimeProvider(sceneStarted);
+        var owner = new SceneReadModelOwner(journal, sceneId, sceneStarted, metadataRegistry, replayTimeProvider);
         long nextBatchOrdinal = 0;
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -104,6 +105,7 @@ public sealed class PacketLogReplayService
                 continue;
             }
 
+            replayTimeProvider.SetUtcNow(entry.Timestamp);
             if (string.Equals(entry.Direction, "outbound", StringComparison.OrdinalIgnoreCase))
             {
                 IncrementCount(skippedEventCounts, "outbound-ignored");
@@ -743,6 +745,15 @@ public sealed class PacketLogReplayService
     }
 
     private readonly record struct BaselineStart(long Timestamp, long AllocatedBytes);
+
+    private sealed class ReplayTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        private DateTimeOffset _utcNow = utcNow.ToUniversalTime();
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public void SetUtcNow(DateTimeOffset value) => _utcNow = value.ToUniversalTime();
+    }
 }
 
 public sealed record PacketLogReplayResult(

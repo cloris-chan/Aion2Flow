@@ -44,7 +44,11 @@ public sealed class SceneLiveReadModel
     {
     }
 
-    public SceneLiveReadModel(DateTimeOffset sessionStarted)
+    public SceneLiveReadModel(DateTimeOffset sessionStarted) : this(sessionStarted, TimeProvider.System)
+    {
+    }
+
+    public SceneLiveReadModel(DateTimeOffset sessionStarted, TimeProvider timeProvider)
     {
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
@@ -57,7 +61,8 @@ public sealed class SceneLiveReadModel
             new EntityStore(),
             new SceneBoundaryStore(),
             MetadataRegistry,
-            new CombatStore(LiveCombatEventInitialCapacity, LiveCombatantInitialCapacity, LivePairInitialCapacity));
+            new CombatStore(LiveCombatEventInitialCapacity, LiveCombatantInitialCapacity, LivePairInitialCapacity),
+            timeProvider);
     }
 
     public void Reset()

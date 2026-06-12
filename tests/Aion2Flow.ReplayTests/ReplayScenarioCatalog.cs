@@ -28,6 +28,7 @@ public static class ReplayScenarioCatalog
     public const string ElementalistSummonBossDamageAttribution = "aion2flow.stream.20260611034030.log";
     public const string PlaybackSceneRelativeTimestamps = "aion2flow.stream.20260611151958.log";
     public const string BossFocusWithoutBattleToggle = "aion2flow.stream.20260612151026.log";
+    public const string BossFocusExpiresAfterLeavingRange = "aion2flow.stream.20260612213724.log";
 
     public static IEnumerable<object[]> April11IncomingAvoidance =>
     [

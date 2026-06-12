@@ -1372,18 +1372,29 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
-    public void Owner_CreateSnapshot_DoesNotCacheBossFocusOnlySnapshot()
+    public void Owner_CreateSnapshot_CachesBossFocusOnlyUntilActivityLeaseExpires()
     {
-        using var scene = new SceneTestHarness();
-        scene.AppendNpcKind(200, NpcKind.Boss);
-        scene.SetNpcBattle(200, true, 1_000);
+        var sceneStarted = new DateTimeOffset(2026, 6, 12, 12, 0, 0, TimeSpan.Zero);
+        var timeProvider = new MutableSceneTimeProvider(sceneStarted.AddMilliseconds(1_000));
+        var scene = new SceneLiveReadModel(sceneStarted, timeProvider);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        var source = SyntheticObservationExtensions.Source(sceneStarted.ToUnixTimeMilliseconds() + 1_000);
+        sink.AppendNpcKind(in source, 200, NpcKind.Boss);
+        sink.SetNpcBattle(in source, 200, true);
 
         var first = scene.Owner.CreateSnapshot();
         var second = scene.Owner.CreateSnapshot();
 
-        Assert.NotSame(first, second);
+        Assert.Same(first, second);
+        Assert.Single(second.BossFocuses);
+
+        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(3_001));
+        var expired = scene.Owner.CreateSnapshot();
+
+        Assert.NotSame(second, expired);
+        Assert.Empty(expired.BossFocuses);
         Assert.Equal(2, scene.Owner.ProjectionCacheStats.SnapshotBuilds);
-        Assert.Equal(0, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
+        Assert.Equal(1, scene.Owner.ProjectionCacheStats.SnapshotCacheHits);
     }
 
     [Fact]
@@ -1825,7 +1836,8 @@ public class SceneReadModelOwnerTests
         const int monsterCode = 2_980_123;
         var firstStarted = new DateTimeOffset(2026, 6, 12, 12, 0, 0, TimeSpan.Zero);
         var secondStarted = firstStarted.AddSeconds(10);
-        var scene = new SceneLiveReadModel(firstStarted);
+        var timeProvider = new MutableSceneTimeProvider(firstStarted);
+        var scene = new SceneLiveReadModel(firstStarted, timeProvider);
         try
         {
             var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -1841,6 +1853,7 @@ public class SceneReadModelOwnerTests
             scene.Reset(secondStarted);
 
             sink.AppendNpcHp(bossId, 70, 100, secondStarted.ToUnixTimeMilliseconds() + 100);
+            timeProvider.SetUtcNow(secondStarted.AddMilliseconds(100));
             var snapshot = scene.Owner.CreateSnapshot();
 
             var boss = Assert.Single(snapshot.BossFocuses);
@@ -1861,6 +1874,15 @@ public class SceneReadModelOwnerTests
         finally
         {
         }
+    }
+
+    private sealed class MutableSceneTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        private DateTimeOffset _utcNow = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public void SetUtcNow(DateTimeOffset value) => _utcNow = value;
     }
 
     [Fact]
