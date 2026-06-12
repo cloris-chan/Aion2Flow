@@ -24,10 +24,10 @@
         <SolidColorBrush x:Key="OverlayBrush.RowCardBorder">#00000000</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowCardBorderStrong">#0CFFFFFF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainAccent">#E3C78C</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailBackdrop">#5A060A0D</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailSurface">#24060A0D</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailSurfaceStrong">#34070B0E</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailCard">#48070B0F</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailBackdrop">#9E060A0D</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailSurface">#52060A0D</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailSurfaceStrong">#6A070B0E</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailCard">#72070B0F</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSeparator">#16FFFFFF</SolidColorBrush>
         <LinearGradientBrush x:Key="OverlayBrush.RowCardSelected" StartPoint="0%,0%" EndPoint="100%,0%">
             <GradientStop Color="#14000000" Offset="0" />
