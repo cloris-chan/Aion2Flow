@@ -103,6 +103,7 @@ public sealed class DomainEventApplier
             case ObservedEventDomain.Resource when entry.Resource is { } resource:
                 _entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
                 _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), observedAtMilliseconds);
+                TryApplyBossCombatActivity(resource.EntityId, observedAtMilliseconds);
                 break;
             case ObservedEventDomain.Scene when entry.Scene is { } scene:
                 ApplyScene(in scene);
@@ -165,6 +166,8 @@ public sealed class DomainEventApplier
         _entities.ApplyCharacterClassEvidence(result.SourceId, in observation);
 
         _combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
+        TryApplyBossCombatActivity(result.SourceId, observedAtMilliseconds);
+        TryApplyBossCombatActivity(result.TargetId, observedAtMilliseconds);
     }
 
     private void ApplyAura(in AuraObservation aura)
@@ -257,6 +260,7 @@ public sealed class DomainEventApplier
             var kind = Enum.IsDefined((NpcKind)state.Value0) ? (NpcKind)state.Value0 : NpcKind.Unknown;
             _entities.ApplyNpcKind(state.EntityId, kind);
             _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+            TryApplyBossCombatActivity(state.EntityId, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
 
@@ -311,6 +315,20 @@ public sealed class DomainEventApplier
     }
 
     private bool CanNpcBattleActivate(int instanceId) => !_entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
+
+    private void TryApplyBossCombatActivity(int instanceId, long observedAtMilliseconds)
+    {
+        if (instanceId <= 0 ||
+            !_entities.TryGet(instanceId, out var entity) ||
+            entity.Kind != NpcKind.Boss ||
+            entity.CurrentHp == 0 ||
+            !_combat.TryGetLastCombatActivityObservedAt(instanceId, out var activityObservedAtMilliseconds))
+        {
+            return;
+        }
+
+        _bossFocus.ApplyCombatActivity(instanceId, activityObservedAtMilliseconds, observedAtMilliseconds);
+    }
 }
 
 internal sealed record DomainEventApplierSnapshot(

@@ -204,6 +204,17 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
 
     public IReadOnlyCollection<(int, int)> GetIncomingPairs(int targetId) => _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
 
+    public bool TryGetLastCombatActivityObservedAt(int combatantId, out long observedAtMilliseconds)
+    {
+        observedAtMilliseconds = 0;
+        if (combatantId <= 0)
+            return false;
+
+        var hasActivity = TryApplyLastCombatActivityObservedAt(_outgoingBySource, combatantId, ref observedAtMilliseconds);
+        hasActivity |= TryApplyLastCombatActivityObservedAt(_incomingByTarget, combatantId, ref observedAtMilliseconds);
+        return hasActivity;
+    }
+
     public ref readonly CombatEventRecord GetEvent(int index) => ref CollectionsMarshal.AsSpan(_events)[index];
 
     public bool TryGetEventByRevision(long revision, out CombatEventRecord record)
@@ -302,6 +313,35 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_detailRevisionByCombatant, combatantId, out var exists);
         current = exists ? Math.Max(current, revision) : revision;
     }
+
+    private bool TryApplyLastCombatActivityObservedAt(Dictionary<int, HashSet<(int, int)>> index, int combatantId, ref long observedAtMilliseconds)
+    {
+        if (!index.TryGetValue(combatantId, out var pairs))
+            return false;
+
+        var hasActivity = false;
+        foreach (var key in pairs)
+        {
+            if (_pairs.TryGetValue(key, out var pair) && HasCombatActivity(pair))
+            {
+                observedAtMilliseconds = Math.Max(observedAtMilliseconds, pair.LastObserved);
+                hasActivity = true;
+            }
+        }
+
+        return hasActivity;
+    }
+
+    private static bool HasCombatActivity(CombatPairRecord pair) =>
+        pair.TotalDamage > 0 ||
+        pair.TotalHealing > 0 ||
+        pair.TotalShield > 0 ||
+        pair.TotalShieldAbsorbed > 0 ||
+        pair.AttemptCount > 0 ||
+        pair.HitCount > 0 ||
+        pair.EvadeCount > 0 ||
+        pair.InvincibleCount > 0 ||
+        pair.MultiHitCount > 0;
 
     public void Clear()
     {

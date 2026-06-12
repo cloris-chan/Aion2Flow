@@ -339,6 +339,25 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_Promotes_BossFocus_From_CombatActivity_When_BattleToggle_Is_Missing()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.BossFocusWithoutBattleToggle}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        const int bossId = 22346;
+        AssertNpcNameAndKind(replay, bossId, "東側涅凱爾", NpcKind.Boss, summaryDump);
+
+        var bossFocus = Assert.Single(replay.Snapshot.BossFocuses, static focus => focus.InstanceId == bossId);
+        Assert.True(bossFocus.HasHp, summaryDump);
+        Assert.Equal(143_658_393, bossFocus.Hp);
+        Assert.Equal(146_250_000, bossFocus.MaxHp);
+        Assert.Contains(replay.Combatants, static combatant => combatant.CombatantId == bossId && combatant.IncomingDamage > 2_400_000);
+    }
+
+    [Fact]
     public void Replay_Recovers_SummonOwner_And_Catalog_From_4136_Create_State()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));

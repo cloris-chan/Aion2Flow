@@ -209,6 +209,63 @@ public sealed class BossFocusStoreTests
     }
 
     [Fact]
+    public void ReadModel_PromotesBossFocusFromConfirmedCombatActivityWithoutBattleToggle()
+    {
+        using var scene = new SceneTestHarness();
+
+        scene.AppendNpcKind(3518, NpcKind.Boss);
+        scene.AppendNpcHp(3518, 156_500, 167_000, 1_000);
+
+        var spawnOnly = scene.CreateSnapshot();
+        Assert.Empty(spawnOnly.BossFocuses);
+
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 3518,
+            Damage = 500,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage,
+            Timestamp = 1_100
+        });
+
+        var snapshot = scene.CreateSnapshot();
+        var boss = Assert.Single(snapshot.BossFocuses);
+        Assert.Equal(3518, boss.InstanceId);
+        Assert.True(boss.HasHp);
+        Assert.Equal(156_500, boss.Hp);
+        Assert.Equal(167_000, boss.MaxHp);
+    }
+
+    [Fact]
+    public void ReadModel_DoesNotRestoreClearedBossFocusFromPreviousCombatActivity()
+    {
+        using var scene = new SceneTestHarness();
+
+        scene.AppendNpcKind(3518, NpcKind.Boss);
+        scene.AppendNpcHp(3518, 156_500, 167_000, 1_000);
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = 100,
+            TargetId = 3518,
+            Damage = 500,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage,
+            Timestamp = 1_100
+        });
+        Assert.Single(scene.CreateSnapshot().BossFocuses);
+
+        scene.AppendNpcHp(3518, 0, 167_000, 1_200);
+        scene.AppendNpcHp(3518, 167_000, 167_000, 1_300);
+
+        Assert.Empty(scene.CreateSnapshot().BossFocuses);
+    }
+
+    [Fact]
     public void ScenePath_RestoresActiveBossFromEntityStateAfterFocusStoreReset()
     {
         var entities = new EntityStore();

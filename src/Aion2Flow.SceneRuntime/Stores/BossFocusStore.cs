@@ -6,6 +6,7 @@ public sealed class BossFocusStore(EntityStore entities)
 {
     private readonly Dictionary<int, Snapshot> _observed = [];
     private readonly HashSet<int> _focused = [];
+    private readonly Dictionary<int, long> _lastClearedAtMilliseconds = [];
     private long _revision;
 
     public long Revision => _revision;
@@ -60,10 +61,7 @@ public sealed class BossFocusStore(EntityStore entities)
     {
         if (kind != NpcKind.Boss)
         {
-            var changed = _focused.Remove(instanceId);
-            changed |= _observed.Remove(instanceId);
-            if (changed)
-                _revision++;
+            Clear(instanceId, observedAtMilliseconds);
             return;
         }
 
@@ -78,10 +76,7 @@ public sealed class BossFocusStore(EntityStore entities)
     {
         if (hp == 0)
         {
-            var changed = _focused.Remove(instanceId);
-            changed |= _observed.Remove(instanceId);
-            if (changed)
-                _revision++;
+            Clear(instanceId, observedAtMilliseconds);
             return;
         }
 
@@ -105,10 +100,24 @@ public sealed class BossFocusStore(EntityStore entities)
         removed |= _observed.Remove(instanceId);
         if (removed)
             _revision++;
+        _lastClearedAtMilliseconds[instanceId] = Math.Max(0, observedAtMilliseconds);
         return false;
     }
 
     public bool ApplyBattleToggle(int instanceId, bool isActive, long observedAtMilliseconds) => ApplyBattle(instanceId, isActive, observedAtMilliseconds);
+
+    public void ApplyCombatActivity(int instanceId, long activityObservedAtMilliseconds, long observedAtMilliseconds)
+    {
+        if (!IsBossInstance(instanceId) ||
+            IsObservedDead(instanceId) ||
+            !IsAfterLastClear(instanceId, activityObservedAtMilliseconds))
+        {
+            return;
+        }
+
+        _focused.Add(instanceId);
+        RememberActivity(instanceId, observedAtMilliseconds);
+    }
 
     internal BossFocusStoreSnapshot CreateSnapshot()
     {
@@ -116,7 +125,11 @@ public sealed class BossFocusStore(EntityStore entities)
         var index = 0;
         foreach (var (instanceId, snapshot) in _observed)
             observed[index++] = new BossFocusObservedSnapshot(instanceId, snapshot);
-        return new BossFocusStoreSnapshot(observed, _focused.ToArray(), _revision);
+        var cleared = new BossFocusClearedSnapshot[_lastClearedAtMilliseconds.Count];
+        index = 0;
+        foreach (var (instanceId, observedAtMilliseconds) in _lastClearedAtMilliseconds)
+            cleared[index++] = new BossFocusClearedSnapshot(instanceId, observedAtMilliseconds);
+        return new BossFocusStoreSnapshot(observed, _focused.ToArray(), cleared, _revision);
     }
 
     internal static BossFocusStore FromSnapshot(EntityStore entities, BossFocusStoreSnapshot snapshot)
@@ -130,7 +143,22 @@ public sealed class BossFocusStore(EntityStore entities)
 
         for (var i = 0; i < snapshot.Focused.Length; i++)
             store._focused.Add(snapshot.Focused[i]);
+        for (var i = 0; i < snapshot.Cleared.Length; i++)
+        {
+            var cleared = snapshot.Cleared[i];
+            store._lastClearedAtMilliseconds[cleared.InstanceId] = cleared.ObservedAtMilliseconds;
+        }
         return store;
+    }
+
+    private void Clear(int instanceId, long observedAtMilliseconds)
+    {
+        var changed = _focused.Remove(instanceId);
+        changed |= _observed.Remove(instanceId);
+        if (changed || IsBossInstance(instanceId) || _lastClearedAtMilliseconds.ContainsKey(instanceId))
+            _lastClearedAtMilliseconds[instanceId] = Math.Max(0, observedAtMilliseconds);
+        if (changed)
+            _revision++;
     }
 
     private void RememberActivity(int instanceId, long observedAtMilliseconds)
@@ -212,6 +240,10 @@ public sealed class BossFocusStore(EntityStore entities)
 
     private bool IsObservedDead(int instanceId) => entities.TryGet(instanceId, out var entity) && entity.CurrentHp == 0;
 
+    private bool IsAfterLastClear(int instanceId, long activityObservedAtMilliseconds) =>
+        !_lastClearedAtMilliseconds.TryGetValue(instanceId, out var clearedAt) ||
+        activityObservedAtMilliseconds > clearedAt;
+
     public readonly record struct Snapshot
     {
         public int InstanceId { get; init; }
@@ -223,6 +255,8 @@ public sealed class BossFocusStore(EntityStore entities)
     }
 }
 
-internal sealed record BossFocusStoreSnapshot(BossFocusObservedSnapshot[] Observed, int[] Focused, long Revision);
+internal sealed record BossFocusStoreSnapshot(BossFocusObservedSnapshot[] Observed, int[] Focused, BossFocusClearedSnapshot[] Cleared, long Revision);
 
 internal readonly record struct BossFocusObservedSnapshot(int InstanceId, BossFocusStore.Snapshot Snapshot);
+
+internal readonly record struct BossFocusClearedSnapshot(int InstanceId, long ObservedAtMilliseconds);
