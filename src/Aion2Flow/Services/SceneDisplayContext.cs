@@ -97,6 +97,9 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
     public string ResolveSkillName(int skillCode)
         => skillCode > 0 ? Resources.ResolveSkillName(skillCode) : string.Empty;
 
+    public string? ResolveSkillIconAssetName(int skillCode)
+        => skillCode > 0 ? Resources.ResolveSkillIconAssetName(skillCode) : null;
+
     public string ResolveMapName(uint mapId)
     {
         var mapName = mapId == 0 ? string.Empty : Resources.ResolveMapName(mapId);

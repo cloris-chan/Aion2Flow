@@ -40,6 +40,9 @@ public sealed class GameResourceService : IDisposable
         }
     }
 
+    public string? ResolveSkillIconAssetName(int skillCode)
+        => SkillIconCatalog.ResolveAssetName(skillCode);
+
     public bool TryResolveNpcCatalogEntry(int npcCode, out NpcCatalogEntry entry)
     {
         lock (_lock)

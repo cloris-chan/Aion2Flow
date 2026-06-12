@@ -625,7 +625,10 @@ public sealed class SkillDisplay : IconTextDisplay
         => context?.ResolveSkillName(SkillCode) ?? (SkillCode > 0 ? SkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty);
 
     protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId)
-        => null;
+    {
+        var icon = DisplayIconCache.ResolveSkillIcon(context?.ResolveSkillIconAssetName(SkillCode));
+        return icon is null ? null : new DisplayIcon(icon, UsesSpriteSheet: false);
+    }
 }
 
 public sealed class MapDisplay : IconTextDisplay
@@ -665,6 +668,8 @@ public sealed class MapDisplay : IconTextDisplay
 
 internal static class DisplayIconCache
 {
+    private static readonly Dictionary<string, IImage> SkillIcons = new(StringComparer.Ordinal);
+    private static readonly Lock SkillIconsLock = new();
     public static IImage OverlayIcon { get => field ??= Load("Overlay.webp"); }
     private static IImage NpcBossMarkerIcon { get => field ??= Load("UT_Marker_Monster_Boss.png"); }
     private static IImage NpcDefaultMarkerIcon { get => field ??= Load("UT_Marker_Default.png"); }
@@ -718,6 +723,36 @@ internal static class DisplayIconCache
             NpcCatalogKind.Monster => "UT_Marker_SkillMaster.png",
             _ => "UT_Marker_Default.png"
         };
+
+    public static IImage? ResolveSkillIcon(string? assetName)
+    {
+        if (string.IsNullOrWhiteSpace(assetName))
+        {
+            return null;
+        }
+
+        lock (SkillIconsLock)
+        {
+            if (!SkillIcons.TryGetValue(assetName, out var icon))
+            {
+                icon = new Bitmap(AssetLoader.Open(ResolveSkillIconAssetUri(assetName)));
+                SkillIcons.Add(assetName, icon);
+            }
+
+            return icon;
+        }
+    }
+
+    internal static Uri ResolveSkillIconAssetUri(string assetName)
+    {
+        if (Path.GetFileName(assetName) != assetName ||
+            !assetName.EndsWith(".webp", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Skill icon asset name must be a WebP file name.", nameof(assetName));
+        }
+
+        return new Uri($"avares://Aion2Flow/Assets/Images/Skills/{assetName}");
+    }
 
     private static Bitmap Load(string fileName) => new(AssetLoader.Open(new Uri($"avares://Aion2Flow/Assets/Images/{fileName}")));
 }

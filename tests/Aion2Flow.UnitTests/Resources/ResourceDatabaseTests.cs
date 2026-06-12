@@ -73,6 +73,18 @@ public sealed class ResourceDatabaseTests
     }
 
     [Theory]
+    [InlineData(1, "ICON_TE_SKILL_001.webp")]
+    [InlineData(12240010, "ICON_TE_SKILL_004.webp")]
+    [InlineData(16300243, "ICON_EL_SKILL_030.webp")]
+    public void Generated_SkillIconCatalog_Resolves_Asset_Outside_Database(int skillCode, string expectedAssetName)
+    {
+        var assetName = SkillIconCatalog.ResolveAssetName(skillCode);
+
+        Assert.Equal(expectedAssetName, assetName);
+        Assert.True(File.Exists(ResolveSkillIconPath(assetName)));
+    }
+
+    [Theory]
     [InlineData(20u, "渾沌艾雷修藍塔下層")]
     [InlineData(22u, "渾沌艾雷修藍塔中層")]
     [InlineData(50u, "萬神殿")]
@@ -144,6 +156,7 @@ public sealed class ResourceDatabaseTests
         Assert.Contains("Category", columns);
         Assert.Contains("SourceType", columns);
         Assert.Contains("SourceKey", columns);
+        Assert.DoesNotContain("IconAssetName", columns);
         Assert.DoesNotContain("Kind", columns);
         Assert.DoesNotContain("Semantics", columns);
         Assert.DoesNotContain("SummaryEnUs", columns);
@@ -177,6 +190,30 @@ public sealed class ResourceDatabaseTests
         }
 
         return fileName;
+    }
+
+    private static string ResolveSkillIconPath(string? assetName)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(assetName));
+        foreach (var root in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory }.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (var current in EnumerateParents(new DirectoryInfo(root)))
+            {
+                var candidate = Path.Combine(current.FullName, "Aion2Flow", "Assets", "Images", "Skills", assetName!);
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+
+                var srcCandidate = Path.Combine(current.FullName, "src", "Aion2Flow", "Assets", "Images", "Skills", assetName!);
+                if (File.Exists(srcCandidate))
+                {
+                    return srcCandidate;
+                }
+            }
+        }
+
+        return assetName!;
     }
 
     private static IEnumerable<DirectoryInfo> EnumerateParents(DirectoryInfo? start)

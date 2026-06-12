@@ -22,4 +22,20 @@ public sealed class DisplayIconCacheTests
     {
         Assert.Null(DisplayIconCache.ResolveNpcMarkerIcon(null));
     }
+
+    [Fact]
+    public void SkillIconAssetName_Resolves_Embedded_Asset_Uri()
+    {
+        Assert.Equal(
+            new Uri("avares://Aion2Flow/Assets/Images/Skills/ICON_TE_SKILL_004.webp"),
+            DisplayIconCache.ResolveSkillIconAssetUri("ICON_TE_SKILL_004.webp"));
+    }
+
+    [Theory]
+    [InlineData("../ICON_TE_SKILL_004.webp")]
+    [InlineData("ICON_TE_SKILL_004.png")]
+    public void SkillIconAssetName_Rejects_NonGenerated_Paths(string assetName)
+    {
+        Assert.Throws<ArgumentException>(() => DisplayIconCache.ResolveSkillIconAssetUri(assetName));
+    }
 }
