@@ -148,6 +148,8 @@
   <data name="Playback_Track_Combat" xml:space="preserve"><value>전투</value></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>남은 HP</value></data>
   <data name="Playback_Track_Aura" xml:space="preserve"><value>효과 수명 주기</value></data>
+  <data name="Playback_AuraCoverage" xml:space="preserve"><value>버프 / 디버프</value></data>
+  <data name="Playback_AuraUnknownFormat" xml:space="preserve"><value>효과 #{0}</value></data>
   <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>적용 {0} ms</value></data>
   <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>적용</value></data>
   <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>갱신</value></data>

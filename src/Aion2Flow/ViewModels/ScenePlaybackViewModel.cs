@@ -3,6 +3,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -17,7 +18,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     [
         ScenePlaybackTrack.Combat,
         ScenePlaybackTrack.Resource,
-        ScenePlaybackTrack.Aura,
         ScenePlaybackTrack.State,
         ScenePlaybackTrack.Scene,
         ScenePlaybackTrack.Action,
@@ -39,17 +39,38 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private static readonly IBrush ActionBrush = Brush.Parse("#65A7FF");
     private static readonly IBrush DiagnosticBrush = Brush.Parse("#9AA8B4");
     private static readonly IBrush OtherBrush = Brush.Parse("#D4DCE5");
+    private static readonly IBrush[] AuraAccentBrushes =
+    [
+        Brush.Parse("#22D3EE"),
+        Brush.Parse("#89D66B"),
+        Brush.Parse("#FFD166"),
+        Brush.Parse("#C98EFF"),
+        Brush.Parse("#FF8A65"),
+        Brush.Parse("#65A7FF")
+    ];
+    private static readonly IBrush[] AuraFillBrushes =
+    [
+        Brush.Parse("#4022D3EE"),
+        Brush.Parse("#4089D66B"),
+        Brush.Parse("#40FFD166"),
+        Brush.Parse("#40C98EFF"),
+        Brush.Parse("#40FF8A65"),
+        Brush.Parse("#4065A7FF")
+    ];
     private static readonly ProgressSegment[] EmptySegments = [];
 
     private readonly Lock _frameGate = new();
     private readonly ScenePlaybackController _controller;
     private readonly IScenePlaybackSource _source;
     private CancellationTokenSource? _detailCancellation;
+    private CancellationTokenSource? _auraTimelineCancellation;
     private CancellationTokenSource? _seekCancellation;
     private Task? _detailTask;
+    private Task? _auraTimelineTask;
     private ScenePlaybackFrame _currentFrame;
     private ScenePlaybackFrameChangedEventArgs? _pendingFrameChanged;
     private IReadOnlyList<PlaybackTimelineLane> _timelineMarkerTracks = [];
+    private IReadOnlyList<PlaybackAuraTimelineLane> _auraTimelineTracks = [];
     private double _timelineMarkerDuration = -1;
     private long _lastDetailProjectionTick;
     private long _lastEventWindowEndObservationOrdinal = long.MinValue;
@@ -104,6 +125,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     public bool IsCombatantDetailsVisible => SelectedCombatantId > 0;
 
+    public bool IsAuraTimelineVisible => SelectedCombatantId > 0 && AuraTimelineTracks.Count > 0;
+
     [ObservableProperty]
     public partial string WindowTitle { get; set; } = "Playback";
 
@@ -153,10 +176,15 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     public partial IReadOnlyList<PlaybackTimelineLane> TimelineTracks { get; set; } = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAuraTimelineVisible))]
+    public partial IReadOnlyList<PlaybackAuraTimelineLane> AuraTimelineTracks { get; set; } = [];
+
+    [ObservableProperty]
     public partial IReadOnlyList<PlaybackCombatantRowViewModel> Combatants { get; set; } = [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCombatantDetailsVisible))]
+    [NotifyPropertyChangedFor(nameof(IsAuraTimelineVisible))]
     public partial int SelectedCombatantId { get; set; }
 
     [ObservableProperty]
@@ -173,7 +201,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     {
         Combatants = ApplyCombatantSelection(Combatants, value);
         _detailCancellation?.Cancel();
+        _auraTimelineCancellation?.Cancel();
         _detailRequestGeneration++;
+        _auraTimelineTracks = [];
+        AuraTimelineTracks = [];
         if (value <= 0)
         {
             _detailRefreshQueued = false;
@@ -183,6 +214,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
         _forceNextDetailProjection = true;
         _detailRefreshQueued = true;
+        RequestAuraTimeline(value);
         if (!_detailRequestPending)
             RequestCombatantDetail(_currentFrame);
     }
@@ -540,6 +572,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
 
         TimelineTracks = ApplyTimelinePosition(_timelineMarkerTracks, frame.PositionMilliseconds, duration);
+        AuraTimelineTracks = ApplyAuraTimelinePosition(_auraTimelineTracks, frame.PositionMilliseconds, duration);
     }
 
     private static PlaybackTimelineLane[] ApplyTimelinePosition(IReadOnlyList<PlaybackTimelineLane> lanes, double positionMilliseconds, double durationMilliseconds)
@@ -548,6 +581,17 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return [];
 
         var result = new PlaybackTimelineLane[lanes.Count];
+        for (var i = 0; i < lanes.Count; i++)
+            result[i] = lanes[i] with { PositionMilliseconds = positionMilliseconds, DurationMilliseconds = durationMilliseconds };
+        return result;
+    }
+
+    private static PlaybackAuraTimelineLane[] ApplyAuraTimelinePosition(IReadOnlyList<PlaybackAuraTimelineLane> lanes, double positionMilliseconds, double durationMilliseconds)
+    {
+        if (lanes.Count == 0)
+            return [];
+
+        var result = new PlaybackAuraTimelineLane[lanes.Count];
         for (var i = 0; i < lanes.Count; i++)
             result[i] = lanes[i] with { PositionMilliseconds = positionMilliseconds, DurationMilliseconds = durationMilliseconds };
         return result;
@@ -613,6 +657,164 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
 
         return lanes;
+    }
+
+    private void RequestAuraTimeline(int targetEntityId)
+    {
+        _auraTimelineCancellation?.Cancel();
+        _auraTimelineCancellation?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        _auraTimelineCancellation = cancellation;
+        var segment = _controller.CreateTimelineSegment();
+        var duration = (long)Math.Round(DurationMilliseconds, MidpointRounding.AwayFromZero);
+        _auraTimelineTask = ProjectAuraTimelineAsync(targetEntityId, segment, duration, cancellation);
+    }
+
+    private async Task ProjectAuraTimelineAsync(int targetEntityId, SceneJournalSegment segment, long durationMilliseconds, CancellationTokenSource cancellation)
+    {
+        try
+        {
+            var timeline = await Task.Run(
+                () => ScenePlaybackAuraTimelineReader.Read(segment, targetEntityId, durationMilliseconds, cancellation.Token),
+                cancellation.Token).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_isDisposed || cancellation.IsCancellationRequested || targetEntityId != SelectedCombatantId)
+                    return;
+
+                _auraTimelineTracks = CreateAuraTimelineTracks(timeline, durationMilliseconds);
+                AuraTimelineTracks = ApplyAuraTimelinePosition(_auraTimelineTracks, PositionMilliseconds, DurationMilliseconds);
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => StatusText = ex.Message);
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ReferenceEquals(_auraTimelineCancellation, cancellation))
+                    return;
+
+                cancellation.Dispose();
+                _auraTimelineCancellation = null;
+                _auraTimelineTask = null;
+            });
+        }
+    }
+
+    private PlaybackAuraTimelineLane[] CreateAuraTimelineTracks(ScenePlaybackAuraTimeline timeline, long durationMilliseconds)
+    {
+        if (timeline.Coverages.Count == 0 && timeline.Applications.Count == 0)
+            return [];
+
+        var groups = new Dictionary<AuraTimelineDisplayKey, AuraTimelineLaneBuilder>();
+        for (var i = 0; i < timeline.Coverages.Count; i++)
+        {
+            var coverage = timeline.Coverages[i];
+            var key = AuraTimelineDisplayKey.Create(coverage.DisplayResourceEffectRef.RawId, coverage.InstanceSequenceId);
+            GetAuraTimelineBuilder(groups, key, coverage.DisplayResourceEffectRef.RawId, coverage.InstanceSequenceId)
+                .Coverages.Add((coverage.StartMilliseconds, coverage.EndMilliseconds));
+        }
+
+        for (var i = 0; i < timeline.Applications.Count; i++)
+        {
+            var application = timeline.Applications[i];
+            var key = AuraTimelineDisplayKey.Create(application.DisplayResourceEffectRef.RawId, application.InstanceSequenceId);
+            GetAuraTimelineBuilder(groups, key, application.DisplayResourceEffectRef.RawId, application.InstanceSequenceId)
+                .Applications.Add((application.PositionMilliseconds, application.Kind));
+        }
+
+        var result = new List<PlaybackAuraTimelineLane>(groups.Count);
+        foreach (var builder in groups.Values)
+        {
+            var paletteIndex = ResolveAuraPaletteIndex(builder.DisplayResourceEffectRefRaw, builder.InstanceSequenceId);
+            var accent = AuraAccentBrushes[paletteIndex];
+            var fill = AuraFillBrushes[paletteIndex];
+            var skillCode = builder.DisplayResourceEffectRefRaw is > 0 and <= int.MaxValue
+                ? (int)builder.DisplayResourceEffectRefRaw
+                : 0;
+            var fallback = builder.DisplayResourceEffectRefRaw > 0
+                ? builder.DisplayResourceEffectRefRaw.ToString(CultureInfo.InvariantCulture)
+                : string.Format(CultureInfo.CurrentCulture, Localization["Playback_AuraUnknownFormat"], builder.InstanceSequenceId);
+            var markers = new PlaybackTimelineMarker[builder.Applications.Count];
+            builder.Applications.Sort(static (left, right) => left.PositionMilliseconds.CompareTo(right.PositionMilliseconds));
+            for (var i = 0; i < builder.Applications.Count; i++)
+            {
+                var application = builder.Applications[i];
+                var text = application.Kind == ScenePlaybackLifecycleEventKind.Renew
+                    ? Localization["Playback_Lifecycle_Renew"]
+                    : Localization["Playback_Lifecycle_OpenIndefinite"];
+                markers[i] = new PlaybackTimelineMarker(application.PositionMilliseconds, 16d, accent, text, IsApplication: true);
+            }
+
+            var spans = MergeAuraCoverages(builder.Coverages, fill, accent);
+            result.Add(new PlaybackAuraTimelineLane(skillCode, fallback, accent, markers, spans, durationMilliseconds, PositionMilliseconds, builder.Applications.Count));
+        }
+
+        result.Sort((left, right) =>
+        {
+            var leftName = left.SkillCode > 0 ? DisplayContext.ResolveSkillName(left.SkillCode) : left.FallbackText;
+            var rightName = right.SkillCode > 0 ? DisplayContext.ResolveSkillName(right.SkillCode) : right.FallbackText;
+            return string.Compare(leftName, rightName, StringComparison.CurrentCulture);
+        });
+        return result.ToArray();
+    }
+
+    private static AuraTimelineLaneBuilder GetAuraTimelineBuilder(
+        Dictionary<AuraTimelineDisplayKey, AuraTimelineLaneBuilder> groups,
+        AuraTimelineDisplayKey key,
+        uint displayResourceEffectRefRaw,
+        int instanceSequenceId)
+    {
+        if (groups.TryGetValue(key, out var builder))
+            return builder;
+
+        builder = new AuraTimelineLaneBuilder(displayResourceEffectRefRaw, instanceSequenceId);
+        groups.Add(key, builder);
+        return builder;
+    }
+
+    private static PlaybackTimelineSpan[] MergeAuraCoverages(List<(long StartMilliseconds, long EndMilliseconds)> coverages, IBrush fillBrush, IBrush borderBrush)
+    {
+        if (coverages.Count == 0)
+            return [];
+
+        coverages.Sort(static (left, right) =>
+        {
+            var comparison = left.StartMilliseconds.CompareTo(right.StartMilliseconds);
+            return comparison != 0 ? comparison : left.EndMilliseconds.CompareTo(right.EndMilliseconds);
+        });
+        var result = new List<PlaybackTimelineSpan>(coverages.Count);
+        var start = coverages[0].StartMilliseconds;
+        var end = coverages[0].EndMilliseconds;
+        for (var i = 1; i < coverages.Count; i++)
+        {
+            var coverage = coverages[i];
+            if (coverage.StartMilliseconds <= end)
+            {
+                end = Math.Max(end, coverage.EndMilliseconds);
+                continue;
+            }
+
+            result.Add(new PlaybackTimelineSpan(start, end, fillBrush, borderBrush));
+            start = coverage.StartMilliseconds;
+            end = coverage.EndMilliseconds;
+        }
+
+        result.Add(new PlaybackTimelineSpan(start, end, fillBrush, borderBrush));
+        return result.ToArray();
+    }
+
+    private static int ResolveAuraPaletteIndex(uint displayResourceEffectRefRaw, int instanceSequenceId)
+    {
+        var value = displayResourceEffectRefRaw != 0 ? displayResourceEffectRefRaw : unchecked((uint)instanceSequenceId);
+        value ^= value >> 16;
+        return (int)(value % AuraAccentBrushes.Length);
     }
 
     private IReadOnlyList<PlaybackEventRowViewModel> CreateEventWindow(ScenePlaybackFrame frame)
@@ -778,6 +980,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
         _isDisposed = true;
         _detailCancellation?.Cancel();
+        _auraTimelineCancellation?.Cancel();
         _seekCancellation?.Cancel();
         _seekCancellation?.Dispose();
         Localization.LanguageChanged -= OnLanguageChanged;
@@ -793,7 +996,19 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             }
         }
 
+        if (_auraTimelineTask is not null)
+        {
+            try
+            {
+                await _auraTimelineTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
         _detailCancellation?.Dispose();
+        _auraTimelineCancellation?.Dispose();
         await _controller.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -809,3 +1024,22 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 public sealed record PlaybackCombatantRowViewModel(int EntityId, string Name, string DamageText, string DamagePerSecondText, string HealingText, string HealingPerSecondText, string HpText, IReadOnlyList<ProgressSegment> HpSegments, bool IsSelected);
 
 public sealed record PlaybackEventRowViewModel(string TimeText, string TrackText, string SourceText, string TargetText, string SkillText, string AmountText);
+
+internal readonly record struct AuraTimelineDisplayKey(uint DisplayResourceEffectRefRaw, int InstanceSequenceId)
+{
+    public static AuraTimelineDisplayKey Create(uint displayResourceEffectRefRaw, int instanceSequenceId)
+        => displayResourceEffectRefRaw != 0
+            ? new AuraTimelineDisplayKey(displayResourceEffectRefRaw, 0)
+            : new AuraTimelineDisplayKey(0, instanceSequenceId);
+}
+
+internal sealed class AuraTimelineLaneBuilder(uint displayResourceEffectRefRaw, int instanceSequenceId)
+{
+    public uint DisplayResourceEffectRefRaw { get; } = displayResourceEffectRefRaw;
+
+    public int InstanceSequenceId { get; } = instanceSequenceId;
+
+    public List<(long StartMilliseconds, long EndMilliseconds)> Coverages { get; } = [];
+
+    public List<(long PositionMilliseconds, ScenePlaybackLifecycleEventKind Kind)> Applications { get; } = [];
+}

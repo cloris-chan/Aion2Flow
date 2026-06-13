@@ -16,6 +16,9 @@ public sealed class PlaybackTimelineView : Control
     public static readonly DirectProperty<PlaybackTimelineView, IReadOnlyList<PlaybackTimelineMarker>?> MarkersProperty =
         AvaloniaProperty.RegisterDirect<PlaybackTimelineView, IReadOnlyList<PlaybackTimelineMarker>?>(nameof(Markers), view => view.Markers, (view, value) => view.Markers = value);
 
+    public static readonly DirectProperty<PlaybackTimelineView, IReadOnlyList<PlaybackTimelineSpan>?> SpansProperty =
+        AvaloniaProperty.RegisterDirect<PlaybackTimelineView, IReadOnlyList<PlaybackTimelineSpan>?>(nameof(Spans), view => view.Spans, (view, value) => view.Spans = value);
+
     public static readonly DirectProperty<PlaybackTimelineView, double> DurationMillisecondsProperty =
         AvaloniaProperty.RegisterDirect<PlaybackTimelineView, double>(nameof(DurationMilliseconds), view => view.DurationMilliseconds, (view, value) => view.DurationMilliseconds = value);
 
@@ -32,10 +35,11 @@ public sealed class PlaybackTimelineView : Control
 
     static PlaybackTimelineView()
     {
-        AffectsRender<PlaybackTimelineView>(MarkersProperty, DurationMillisecondsProperty, PositionMillisecondsProperty, TrackBrushProperty, ProgressBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty);
+        AffectsRender<PlaybackTimelineView>(MarkersProperty, SpansProperty, DurationMillisecondsProperty, PositionMillisecondsProperty, TrackBrushProperty, ProgressBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty);
     }
 
     private IReadOnlyList<PlaybackTimelineMarker>? _markers;
+    private IReadOnlyList<PlaybackTimelineSpan>? _spans;
     private double _durationMilliseconds;
     private double _positionMilliseconds;
 
@@ -45,6 +49,12 @@ public sealed class PlaybackTimelineView : Control
     {
         get => _markers;
         set => SetAndRaise(MarkersProperty, ref _markers, value);
+    }
+
+    public IReadOnlyList<PlaybackTimelineSpan>? Spans
+    {
+        get => _spans;
+        set => SetAndRaise(SpansProperty, ref _spans, value);
     }
 
     public double DurationMilliseconds
@@ -101,6 +111,13 @@ public sealed class PlaybackTimelineView : Control
         if (progress is not null && playheadX > 0)
             context.FillRectangle(progress, new Rect(0, 0, playheadX, bounds.Height));
 
+        var spans = Spans;
+        if (spans is not null)
+        {
+            for (var i = 0; i < spans.Count; i++)
+                DrawSpan(context, spans[i], duration, bounds);
+        }
+
         var markers = Markers;
         if (markers is not null)
         {
@@ -143,11 +160,21 @@ public sealed class PlaybackTimelineView : Control
 
     private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, double duration, Rect bounds)
     {
-        var markerWidth = Math.Clamp(marker.Weight, 3d, 12d);
-        var x = TimeToX(marker.PositionMilliseconds, duration, bounds.Width) - markerWidth * 0.5d;
-        var height = Math.Max(8d, bounds.Height - 8d);
+        var markerWidth = marker.IsApplication ? Math.Clamp(bounds.Height - 6d, 10d, 16d) : Math.Clamp(marker.Weight, 3d, 12d);
+        var x = Math.Clamp(TimeToX(marker.PositionMilliseconds, duration, bounds.Width) - markerWidth * 0.5d, 0d, Math.Max(0d, bounds.Width - markerWidth));
+        var height = marker.IsApplication ? markerWidth : Math.Max(8d, bounds.Height - 8d);
         var y = (bounds.Height - height) * 0.5d;
         context.FillRectangle(marker.Brush, new Rect(x, y, markerWidth, height));
+    }
+
+    private static void DrawSpan(DrawingContext context, PlaybackTimelineSpan span, double duration, Rect bounds)
+    {
+        var start = TimeToX(span.StartMilliseconds, duration, bounds.Width);
+        var end = TimeToX(span.EndMilliseconds, duration, bounds.Width);
+        var width = Math.Max(1d, end - start);
+        var rect = new Rect(start, 3d, width, Math.Max(1d, bounds.Height - 6d));
+        context.FillRectangle(span.FillBrush, rect);
+        context.DrawRectangle(null, new Pen(span.BorderBrush, 1d), rect);
     }
 
     private void RequestSeek(double x)

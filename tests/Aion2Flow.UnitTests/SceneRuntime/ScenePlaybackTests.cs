@@ -327,6 +327,47 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void AuraTimelineReader_ProjectsRefreshMarkersAndContinuousCoverageForSelectedTarget()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0, 16_300_020);
+        AppendAuraOpen(journal, sceneId, 300, 100, 8, 2_000, 2, 200, 17_150_010);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 3, 800);
+        AppendAuraResult(journal, sceneId, 200, 7, 6, 4, 1_500);
+        AppendCombat(journal, sceneId, 100, 200, 1, 5, 2_000);
+        var segment = CreateArchiveRecord(journal, sceneId).ScenePayload.TimelineSegment;
+
+        var timeline = ScenePlaybackAuraTimelineReader.Read(segment, 200, 2_000, TestContext.Current.CancellationToken);
+
+        var coverage = Assert.Single(timeline.Coverages);
+        Assert.Equal(16_300_020u, coverage.DisplayResourceEffectRef.RawId);
+        Assert.Equal(0, coverage.StartMilliseconds);
+        Assert.Equal(1_500, coverage.EndMilliseconds);
+        Assert.Equal(
+            [ScenePlaybackLifecycleEventKind.Open, ScenePlaybackLifecycleEventKind.Renew],
+            timeline.Applications.Select(static application => application.Kind));
+        Assert.Equal([0L, 800L], timeline.Applications.Select(static application => application.PositionMilliseconds));
+    }
+
+    [Fact]
+    public void AuraTimelineReader_PreservesGapWhenRefreshArrivesAfterExpiration()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 500, 1, 0, 16_300_020);
+        AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 800);
+        AppendCombat(journal, sceneId, 100, 200, 1, 3, 1_500);
+        var segment = CreateArchiveRecord(journal, sceneId).ScenePayload.TimelineSegment;
+
+        var timeline = ScenePlaybackAuraTimelineReader.Read(segment, 200, 1_500, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, timeline.Coverages.Count);
+        Assert.Equal((0L, 500L), (timeline.Coverages[0].StartMilliseconds, timeline.Coverages[0].EndMilliseconds));
+        Assert.Equal((800L, 1_300L), (timeline.Coverages[1].StartMilliseconds, timeline.Coverages[1].EndMilliseconds));
+    }
+
+    [Fact]
     public void AuraResultBatch_ClosesEverySequenceAndPublishesEveryMarker()
     {
         var journal = new ObservedEventJournal();
@@ -851,7 +892,7 @@ public sealed class ScenePlaybackTests
         });
     }
 
-    private static void AppendAuraOpen(ObservedEventJournal journal, Guid sceneId, int entityId, int originEntityId, int sequenceId, ushort durationMilliseconds, long ordinal, long observedAt)
+    private static void AppendAuraOpen(ObservedEventJournal journal, Guid sceneId, int entityId, int originEntityId, int sequenceId, ushort durationMilliseconds, long ordinal, long observedAt, uint displayResourceEffectRefRaw = 0)
     {
         journal.Append(new ObservedEventEnvelope
         {
@@ -870,7 +911,8 @@ public sealed class ScenePlaybackTests
                 OpenMode = 1,
                 GroupCode = 19,
                 HeadValue = durationMilliseconds,
-                StackCount = 1
+                StackCount = 1,
+                BuffResourceEffectRef = ResourceEffectRef.FromRaw(displayResourceEffectRefRaw)
             }
         });
     }

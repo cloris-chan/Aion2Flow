@@ -134,7 +134,7 @@
         <Border Grid.Row="1"
                 Classes="PlaybackPanel PlaybackTimelinePanel"
                 MinHeight="0">
-            <Grid RowDefinitions="Auto,*"
+            <Grid RowDefinitions="Auto,Auto,Auto"
                   RowSpacing="8"
                   MinHeight="0">
                 <Grid Classes="PlaybackTimelineMasterRow"
@@ -181,6 +181,59 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <Grid Grid.Row="2"
+                      RowDefinitions="Auto,*"
+                      RowSpacing="6"
+                      Margin="0,2,0,0"
+                      IsVisible="{Binding IsAuraTimelineVisible}">
+                    <Border Classes="PlaybackAuraTimelineHeader">
+                        <Grid ColumnDefinitions="92,*,76"
+                              ColumnSpacing="10">
+                            <TextBlock Classes="PlaybackTrackName"
+                                       Text="{markups:Translate Playback_AuraCoverage}" />
+                            <controls:CombatantDisplay Grid.Column="1"
+                                                       Classes="PlaybackAuraTarget"
+                                                       EntityId="{Binding SelectedCombatantId}"
+                                                       IconSize="16" />
+                        </Grid>
+                    </Border>
+                    <ScrollViewer Grid.Row="1"
+                                  Classes="PlaybackAuraTimelineScroller AppScrollViewer"
+                                  VerticalScrollBarVisibility="Visible"
+                                  MaxHeight="180">
+                        <ItemsControl ItemsSource="{Binding AuraTimelineTracks}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="pres:PlaybackAuraTimelineLane">
+                                    <Grid Classes="PlaybackAuraTimelineRow"
+                                          ColumnDefinitions="92,*,56"
+                                          ColumnSpacing="10">
+                                        <Grid ColumnDefinitions="4,*"
+                                              ColumnSpacing="4">
+                                            <Border Classes="PlaybackAuraAccent"
+                                                    Background="{Binding AccentBrush}" />
+                                            <controls:SkillDisplay Grid.Column="1"
+                                                                   Classes="PlaybackAuraSkill"
+                                                                   SkillCode="{Binding SkillCode}"
+                                                                   FallbackText="{Binding FallbackText}"
+                                                                   IconSize="18" />
+                                        </Grid>
+                                        <controls:PlaybackTimelineView Grid.Column="1"
+                                                                       Classes="PlaybackTimelineRail PlaybackAuraTimelineLane"
+                                                                       Markers="{Binding Markers}"
+                                                                       Spans="{Binding Spans}"
+                                                                       DurationMilliseconds="{Binding DurationMilliseconds}"
+                                                                       PositionMilliseconds="{Binding PositionMilliseconds}"
+                                                                       SeekRequested="TimelineSeekRequested" />
+                                        <TextBlock Grid.Column="2"
+                                                   Classes="PlaybackTrackCount"
+                                                   Text="{Binding Count}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
             </Grid>
         </Border>
 

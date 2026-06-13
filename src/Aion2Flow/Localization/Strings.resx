@@ -148,6 +148,8 @@
   <data name="Playback_Track_Combat" xml:space="preserve"><value>Combat</value></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>Remaining HP</value></data>
   <data name="Playback_Track_Aura" xml:space="preserve"><value>Effect lifecycle</value></data>
+  <data name="Playback_AuraCoverage" xml:space="preserve"><value>Buff / Debuff</value></data>
+  <data name="Playback_AuraUnknownFormat" xml:space="preserve"><value>Effect #{0}</value></data>
   <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>Apply {0} ms</value></data>
   <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>Apply</value></data>
   <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>Refresh</value></data>

@@ -219,6 +219,56 @@
         <Setter Property="Height" Value="22" />
     </Style>
 
+    <Style Selector="Border.PlaybackAuraTimelineHeader">
+        <Setter Property="MinHeight" Value="24" />
+        <Setter Property="Padding" Value="0,5,0,0" />
+        <Setter Property="BorderBrush" Value="{StaticResource PlaybackBrush.Border}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+    </Style>
+
+    <Style Selector="Grid.PlaybackAuraTimelineRow">
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="Border.PlaybackAuraAccent">
+        <Setter Property="Width" Value="4" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|PlaybackTimelineView.PlaybackAuraTimelineLane">
+        <Setter Property="Height" Value="24" />
+    </Style>
+
+    <Style Selector="ScrollViewer.PlaybackAuraTimelineScroller">
+        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+    </Style>
+
+    <Style Selector="controls|CombatantDisplay.PlaybackAuraTarget">
+        <Setter Property="IconSpacing" Value="4" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|CombatantDisplay.PlaybackAuraTarget TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
+        <Setter Property="FontSize" Value="11" />
+    </Style>
+
+    <Style Selector="controls|SkillDisplay.PlaybackAuraSkill">
+        <Setter Property="IconSpacing" Value="4" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|SkillDisplay.PlaybackAuraSkill TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextMuted}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
     <Style Selector="ScrollViewer.PlaybackPanelScroller">
         <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
         <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
