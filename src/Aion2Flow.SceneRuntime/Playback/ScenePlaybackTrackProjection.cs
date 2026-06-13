@@ -4,47 +4,66 @@ namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
 internal readonly record struct ScenePlaybackAuraInstanceKey(int EntityId, int InstanceSequenceId);
 
+internal static class ScenePlaybackAuraProtocol
+{
+    public static bool IsTrackableOpen(in AuraObservation aura)
+        => aura.Kind == AuraObservationKind.Open &&
+           aura.EntityId > 0 &&
+           aura.InstanceSequenceId > 0 &&
+           aura.OpenMode == 1 &&
+           aura.GroupCode == 19;
+
+    public static bool IsRenewal(in ActionObservation action)
+        => action.Phase == 19 && action.StateValue == 0 && action.DetailValue == 0;
+}
+
 internal sealed class ScenePlaybackLifecycleTrackState
 {
     private readonly HashSet<ScenePlaybackAuraInstanceKey> _instances = [];
 
-    public bool Apply(in ObservedEventEnvelope entry)
+    public ScenePlaybackLifecycleEventKind Apply(in ObservedEventEnvelope entry)
     {
         if (entry.Aura is { } aura)
         {
             var key = new ScenePlaybackAuraInstanceKey(aura.EntityId, aura.InstanceSequenceId);
             if (aura.Kind == AuraObservationKind.Open)
-                _instances.Add(key);
-            else
+            {
                 _instances.Remove(key);
-            return false;
+                if (!ScenePlaybackAuraProtocol.IsTrackableOpen(in aura))
+                    return ScenePlaybackLifecycleEventKind.None;
+
+                _instances.Add(key);
+                return ScenePlaybackLifecycleEventKind.Open;
+            }
+
+            return _instances.Remove(key)
+                ? ScenePlaybackLifecycleEventKind.Result
+                : ScenePlaybackLifecycleEventKind.None;
         }
 
         if (entry.Action is not { } action)
-            return false;
+            return ScenePlaybackLifecycleEventKind.None;
 
-        if (!IsRenewalShape(in action))
-            return false;
+        if (!ScenePlaybackAuraProtocol.IsRenewal(in action))
+            return ScenePlaybackLifecycleEventKind.None;
 
-        return _instances.Contains(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId));
+        return _instances.Contains(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId))
+            ? ScenePlaybackLifecycleEventKind.Renew
+            : ScenePlaybackLifecycleEventKind.None;
     }
-
-    public static bool IsRenewalShape(in ActionObservation action)
-        => action.Phase == 19 && action.StateValue == 0 && action.DetailValue == 0;
 }
 
 internal static class ScenePlaybackTrackProjection
 {
-    public static ScenePlaybackTrackMarker CreateMarker(in ObservedEventEnvelope entry, long offset, long position, bool isAuraRenewal)
+    public static ScenePlaybackTrackMarker CreateMarker(in ObservedEventEnvelope entry, long offset, long position, ScenePlaybackLifecycleEventKind lifecycleEventKind)
     {
-        var track = ResolveTrack(entry.Domain, isAuraRenewal);
+        var track = ResolveTrack(entry.Domain, lifecycleEventKind);
         var skillCode = 0;
         var amount = 0L;
         long? currentValue = null;
         long? maximumValue = null;
         var resourceKind = 0;
         var resultCode = 0;
-        var lifecycleEventKind = ScenePlaybackLifecycleEventKind.None;
         var instanceSequenceId = 0;
         var durationMilliseconds = 0;
         var displayResourceEffectRefRaw = 0u;
@@ -66,17 +85,18 @@ internal static class ScenePlaybackTrackProjection
         {
             sourceEntityId = aura.Kind == AuraObservationKind.Open ? aura.EchoSourceEntityId : 0;
             targetEntityId = aura.EntityId;
-            resultCode = aura.ResultCode;
-            lifecycleEventKind = aura.Kind == AuraObservationKind.Open ? ScenePlaybackLifecycleEventKind.Open : ScenePlaybackLifecycleEventKind.Result;
-            instanceSequenceId = aura.InstanceSequenceId;
-            durationMilliseconds = aura.Kind == AuraObservationKind.Open ? aura.HeadValue : 0;
-            displayResourceEffectRefRaw = aura.BuffResourceEffectRef.RawId;
+            if (lifecycleEventKind != ScenePlaybackLifecycleEventKind.None)
+            {
+                resultCode = aura.ResultCode;
+                instanceSequenceId = aura.InstanceSequenceId;
+                durationMilliseconds = aura.Kind == AuraObservationKind.Open ? aura.HeadValue : 0;
+                displayResourceEffectRefRaw = aura.BuffResourceEffectRef.RawId;
+            }
         }
-        else if (isAuraRenewal && entry.Action is { } action)
+        else if (lifecycleEventKind == ScenePlaybackLifecycleEventKind.Renew && entry.Action is { } action)
         {
             sourceEntityId = action.SourceEntityIdCopy;
             targetEntityId = action.SourceEntityId;
-            lifecycleEventKind = ScenePlaybackLifecycleEventKind.Renew;
             instanceSequenceId = action.InstanceSequenceId;
             displayResourceEffectRefRaw = action.ActionResourceEffectRef.RawId;
         }
@@ -84,15 +104,16 @@ internal static class ScenePlaybackTrackProjection
         return new ScenePlaybackTrackMarker(track, position, offset, entry.Stamp.ObservationOrdinal, sourceEntityId, targetEntityId, skillCode, amount, currentValue, maximumValue, resourceKind, resultCode, lifecycleEventKind, instanceSequenceId, durationMilliseconds, displayResourceEffectRefRaw);
     }
 
-    private static ScenePlaybackTrack ResolveTrack(ObservedEventDomain domain, bool isAuraRenewal) => domain switch
+    private static ScenePlaybackTrack ResolveTrack(ObservedEventDomain domain, ScenePlaybackLifecycleEventKind lifecycleEventKind) => domain switch
     {
         ObservedEventDomain.Combat => ScenePlaybackTrack.Combat,
         ObservedEventDomain.Resource => ScenePlaybackTrack.Resource,
-        ObservedEventDomain.Aura => ScenePlaybackTrack.Aura,
+        ObservedEventDomain.Aura when lifecycleEventKind != ScenePlaybackLifecycleEventKind.None => ScenePlaybackTrack.Aura,
+        ObservedEventDomain.Aura => ScenePlaybackTrack.Action,
         ObservedEventDomain.Scene => ScenePlaybackTrack.Scene,
         ObservedEventDomain.State => ScenePlaybackTrack.State,
         ObservedEventDomain.Diagnostic => ScenePlaybackTrack.Diagnostic,
-        ObservedEventDomain.Action when isAuraRenewal => ScenePlaybackTrack.Aura,
+        ObservedEventDomain.Action when lifecycleEventKind == ScenePlaybackLifecycleEventKind.Renew => ScenePlaybackTrack.Aura,
         ObservedEventDomain.Action => ScenePlaybackTrack.Action,
         _ => ScenePlaybackTrack.Other
     };

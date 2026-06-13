@@ -368,6 +368,55 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void AuraPlayback_ExcludesGroup17ActionStateRecords()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, ushort.MaxValue, 1, 0, 3_629_313_792, groupCode: 17);
+        AppendAuraOpen(journal, sceneId, 200, 100, 8, 1_000, 2, 100, 16_300_020);
+        AppendAuraResult(journal, sceneId, 200, 7, 5, 3, 200);
+        AppendCombat(journal, sceneId, 100, 200, 1, 4, 1_000);
+        var record = CreateArchiveRecord(journal, sceneId);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+
+        var frame = session.Seek(250);
+        var timeline = ScenePlaybackAuraTimelineReader.Read(record.ScenePayload.TimelineSegment, 200, 1_000, TestContext.Current.CancellationToken);
+        var markers = ScenePlaybackTrackReader.Read(record.ScenePayload.TimelineSegment, 0, 250, 10).Markers;
+
+        var active = Assert.Single(frame.ActiveAuras);
+        Assert.Equal(8, active.InstanceSequenceId);
+        Assert.Equal(16_300_020u, active.DisplayResourceEffectRef.RawId);
+        Assert.Equal([ScenePlaybackTrack.Action, ScenePlaybackTrack.Aura, ScenePlaybackTrack.Action], markers.Select(static marker => marker.Track));
+        Assert.Equal(
+            [ScenePlaybackLifecycleEventKind.None, ScenePlaybackLifecycleEventKind.Open, ScenePlaybackLifecycleEventKind.None],
+            markers.Select(static marker => marker.LifecycleEventKind));
+        var coverage = Assert.Single(timeline.Coverages);
+        Assert.Equal(16_300_020u, coverage.DisplayResourceEffectRef.RawId);
+        Assert.Equal(8, coverage.InstanceSequenceId);
+        Assert.Single(timeline.Applications);
+    }
+
+    [Fact]
+    public void AuraPlayback_Group17ReopenReplacesTrackedSequence()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0, 16_300_020);
+        AppendAuraOpen(journal, sceneId, 200, 100, 7, ushort.MaxValue, 2, 200, 3_629_313_792, groupCode: 17);
+        AppendCombat(journal, sceneId, 100, 200, 1, 3, 1_000);
+        var record = CreateArchiveRecord(journal, sceneId);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+
+        var frame = session.Seek(200);
+        var timeline = ScenePlaybackAuraTimelineReader.Read(record.ScenePayload.TimelineSegment, 200, 1_000, TestContext.Current.CancellationToken);
+
+        Assert.Empty(frame.ActiveAuras);
+        var coverage = Assert.Single(timeline.Coverages);
+        Assert.Equal((0L, 200L), (coverage.StartMilliseconds, coverage.EndMilliseconds));
+        Assert.Equal(16_300_020u, coverage.DisplayResourceEffectRef.RawId);
+    }
+
+    [Fact]
     public void AuraResultBatch_ClosesEverySequenceAndPublishesEveryMarker()
     {
         var journal = new ObservedEventJournal();
@@ -892,7 +941,7 @@ public sealed class ScenePlaybackTests
         });
     }
 
-    private static void AppendAuraOpen(ObservedEventJournal journal, Guid sceneId, int entityId, int originEntityId, int sequenceId, ushort durationMilliseconds, long ordinal, long observedAt, uint displayResourceEffectRefRaw = 0)
+    private static void AppendAuraOpen(ObservedEventJournal journal, Guid sceneId, int entityId, int originEntityId, int sequenceId, ushort durationMilliseconds, long ordinal, long observedAt, uint displayResourceEffectRefRaw = 0, int groupCode = 19)
     {
         journal.Append(new ObservedEventEnvelope
         {
@@ -909,7 +958,7 @@ public sealed class ScenePlaybackTests
                 EchoSourceEntityId = originEntityId,
                 InstanceSequenceId = sequenceId,
                 OpenMode = 1,
-                GroupCode = 19,
+                GroupCode = groupCode,
                 HeadValue = durationMilliseconds,
                 StackCount = 1,
                 BuffResourceEffectRef = ResourceEffectRef.FromRaw(displayResourceEffectRefRaw)

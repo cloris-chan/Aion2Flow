@@ -33,11 +33,11 @@ public static class ScenePlaybackTrackReader
                         return;
                     }
 
-                    var isAuraRenewal = lifecycle.Apply(in entry);
+                    var lifecycleEventKind = lifecycle.Apply(in entry);
                     if (position < startPositionMilliseconds)
                         continue;
 
-                    markers.Add(ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, isAuraRenewal));
+                    markers.Add(ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, lifecycleEventKind));
                     if (markers.Count >= maxMarkers)
                     {
                         hasMore = true;
@@ -84,11 +84,11 @@ public static class ScenePlaybackTrackReader
                         return;
                     }
 
-                    var isAuraRenewal = lifecycle.Apply(in entry);
+                    var lifecycleEventKind = lifecycle.Apply(in entry);
                     if (position < startPositionMilliseconds)
                         continue;
 
-                    var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, isAuraRenewal);
+                    var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, lifecycleEventKind);
                     var trackIndex = (int)marker.Track;
                     trackCounts[trackIndex]++;
                     var ratio = (position - startPositionMilliseconds) / (double)windowDuration;

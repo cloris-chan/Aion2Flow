@@ -486,10 +486,8 @@ public sealed class ScenePlaybackSession
 
         private void ApplyFrameTracks(in ObservedEventEnvelope entry, long offset)
         {
-            var isAuraRenewal = entry.Action is { } action &&
-                ScenePlaybackLifecycleTrackState.IsRenewalShape(in action) &&
-                _auraInstances.ContainsKey(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId));
-            var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, Math.Max(0, offset), isAuraRenewal);
+            var lifecycleEventKind = ResolveLifecycleEventKind(in entry);
+            var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, Math.Max(0, offset), lifecycleEventKind);
             var track = marker.Track;
             ref var accumulator = ref CollectionsMarshal.GetValueRefOrAddDefault(_tracks, track, out var exists);
             if (!exists)
@@ -512,16 +510,20 @@ public sealed class ScenePlaybackSession
             else if (entry.Domain == ObservedEventDomain.Aura && entry.Aura is { } aura)
             {
                 var key = new ScenePlaybackAuraInstanceKey(aura.EntityId, aura.InstanceSequenceId);
-                if (aura.Kind == AuraObservationKind.Result)
+                if (lifecycleEventKind == ScenePlaybackLifecycleEventKind.Result)
                 {
                     _auraInstances.Remove(key);
                 }
-                else
+                else if (lifecycleEventKind == ScenePlaybackLifecycleEventKind.Open)
                 {
                     _auraInstances[key] = new ScenePlaybackAuraState(aura.EntityId, aura.EchoSourceEntityId, aura.InstanceSequenceId, aura.StackCount, aura.OpenMode, aura.GroupCode, aura.HeadValue, aura.BuffResourceEffectRef, offset, offset, ResolveExpiration(offset, aura.HeadValue), entry.Stamp.ObservationOrdinal, entry.Stamp.ObservationOrdinal);
                 }
+                else if (aura.Kind == AuraObservationKind.Open)
+                {
+                    _auraInstances.Remove(key);
+                }
             }
-            else if (isAuraRenewal && entry.Action is { } renewal)
+            else if (lifecycleEventKind == ScenePlaybackLifecycleEventKind.Renew && entry.Action is { } renewal)
             {
                 var key = new ScenePlaybackAuraInstanceKey(renewal.SourceEntityId, renewal.InstanceSequenceId);
                 var active = _auraInstances[key];
@@ -534,6 +536,29 @@ public sealed class ScenePlaybackSession
             }
 
             AddRecentMarker(marker);
+        }
+
+        private ScenePlaybackLifecycleEventKind ResolveLifecycleEventKind(in ObservedEventEnvelope entry)
+        {
+            if (entry.Aura is { } aura)
+            {
+                if (aura.Kind == AuraObservationKind.Open)
+                    return ScenePlaybackAuraProtocol.IsTrackableOpen(in aura)
+                        ? ScenePlaybackLifecycleEventKind.Open
+                        : ScenePlaybackLifecycleEventKind.None;
+
+                return _auraInstances.ContainsKey(new ScenePlaybackAuraInstanceKey(aura.EntityId, aura.InstanceSequenceId))
+                    ? ScenePlaybackLifecycleEventKind.Result
+                    : ScenePlaybackLifecycleEventKind.None;
+            }
+
+            if (entry.Action is not { } action ||
+                !ScenePlaybackAuraProtocol.IsRenewal(in action))
+                return ScenePlaybackLifecycleEventKind.None;
+
+            return _auraInstances.ContainsKey(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId))
+                ? ScenePlaybackLifecycleEventKind.Renew
+                : ScenePlaybackLifecycleEventKind.None;
         }
 
         private long? ResolveResourceMaximum(in ResourceObservation resource)

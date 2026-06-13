@@ -26,14 +26,16 @@ public static class ScenePlaybackAuraTimelineReader
                     var position = Math.Max(0, ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry));
                     if (entry.Aura is { } aura && aura.EntityId == targetEntityId)
                     {
-                        if (aura.Kind == AuraObservationKind.Open)
+                        if (ScenePlaybackAuraProtocol.IsTrackableOpen(in aura))
                             ApplyOpen(in aura, position, durationMilliseconds, active, coverages, applications);
-                        else
+                        else if (aura.Kind == AuraObservationKind.Open)
+                            ApplyReplacement(in aura, position, durationMilliseconds, active, coverages);
+                        else if (aura.Kind == AuraObservationKind.Result)
                             ApplyResult(in aura, position, durationMilliseconds, active, coverages);
                     }
                     else if (entry.Action is { } action &&
                              action.SourceEntityId == targetEntityId &&
-                             ScenePlaybackLifecycleTrackState.IsRenewalShape(in action))
+                             ScenePlaybackAuraProtocol.IsRenewal(in action))
                     {
                         ApplyRenew(in action, position, durationMilliseconds, active, coverages, applications);
                     }
@@ -75,6 +77,19 @@ public static class ScenePlaybackAuraTimelineReader
             ResolveExpiration(positionMilliseconds, observation.HeadValue));
         active.Add(observation.InstanceSequenceId, aura);
         AddApplication(aura, positionMilliseconds, ScenePlaybackLifecycleEventKind.Open, durationMilliseconds, applications);
+    }
+
+    private static void ApplyReplacement(
+        in AuraObservation observation,
+        long positionMilliseconds,
+        long durationMilliseconds,
+        Dictionary<int, ActiveAura> active,
+        List<ScenePlaybackAuraCoverage> coverages)
+    {
+        if (!active.Remove(observation.InstanceSequenceId, out var aura))
+            return;
+
+        AddCoverage(aura, Math.Min(positionMilliseconds, ResolveCoverageEnd(aura, durationMilliseconds)), durationMilliseconds, coverages);
     }
 
     private static void ApplyRenew(
