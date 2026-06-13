@@ -65,7 +65,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private readonly ArchivedEncounterRecord _record;
     private CancellationTokenSource? _detailCancellation;
     private CancellationTokenSource? _auraTimelineCancellation;
-    private CancellationTokenSource? _seekCancellation;
     private Task? _detailTask;
     private Task? _auraTimelineTask;
     private ScenePlaybackFrame _currentFrame;
@@ -238,11 +237,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         var duration = DurationMilliseconds;
         var target = duration > 0 ? Math.Clamp(positionMilliseconds, 0d, duration) : Math.Max(0d, positionMilliseconds);
         _forceNextDetailProjection = true;
-        _seekCancellation?.Cancel();
-        _seekCancellation?.Dispose();
-        var cancellation = new CancellationTokenSource();
-        _seekCancellation = cancellation;
-        _ = SeekCoreAsync((long)Math.Round(target, MidpointRounding.AwayFromZero), cancellation.Token);
+        _ = SeekCoreAsync((long)Math.Round(target, MidpointRounding.AwayFromZero));
     }
 
     [RelayCommand]
@@ -305,15 +300,12 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         ApplyFrame(_controller.CurrentFrame, _controller.State);
     }
 
-    private async Task SeekCoreAsync(long positionMilliseconds, CancellationToken cancellationToken)
+    private async Task SeekCoreAsync(long positionMilliseconds)
     {
         try
         {
             IsLoading = true;
-            await _controller.SeekAsync(positionMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
+            await _controller.SeekAsync(positionMilliseconds).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -983,8 +975,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _isDisposed = true;
         _detailCancellation?.Cancel();
         _auraTimelineCancellation?.Cancel();
-        _seekCancellation?.Cancel();
-        _seekCancellation?.Dispose();
         Localization.LanguageChanged -= OnLanguageChanged;
         _controller.FrameChanged -= OnFrameChanged;
         if (_detailTask is not null)

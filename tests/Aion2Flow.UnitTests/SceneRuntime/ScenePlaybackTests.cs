@@ -814,14 +814,7 @@ public sealed class ScenePlaybackTests
         var first = controller.SeekAsync(500, cancellationToken).AsTask();
         var second = controller.SeekAsync(1_000, cancellationToken).AsTask();
 
-        try
-        {
-            await first;
-        }
-        catch (OperationCanceledException)
-        {
-        }
-
+        _ = await first;
         var frame = await second;
         var published = frames.ToArray();
 

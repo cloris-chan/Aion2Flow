@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Playback;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
@@ -163,6 +164,38 @@ public sealed class BossSceneCollectionTests
         Assert.False(scene.TryDequeuePendingArchive(out _));
     }
 
+    [Fact]
+    public async Task FrozenBossSceneArchiveCanOpenPlayback()
+    {
+        var scene = CreateBossScene();
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        AppendDamage(sink, 100, 300, 200, 1_800, 2);
+        sink.CompleteBatch(2);
+        _ = scene.CreateFrame();
+        sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
+        var archive = scene.CreateArchiveCapture();
+
+        await using var controller = new ScenePlaybackController(
+            new ArchivedScenePlaybackSource(new()
+            {
+                EncounterId = archive.Snapshot.EncounterId,
+                Snapshot = archive.Snapshot,
+                ScenePayload = archive.Payload
+            }),
+            new ManualTickSourceFactory(),
+            TimeSpan.FromMilliseconds(33));
+
+        var frame = await controller.SeekAsync(controller.DurationMilliseconds, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SceneKind.Boss, frame.Snapshot.Kind);
+        Assert.Equal(700, frame.CombatTotals.TotalDamage);
+        Assert.Equal(frame.TimeRange.DurationMilliseconds, frame.PositionMilliseconds);
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
+    }
+
     private static SceneLiveReadModel CreateBossScene()
     {
         var timeProvider = new MutableTimeProvider(Started);
@@ -211,5 +244,18 @@ public sealed class BossSceneCollectionTests
     private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class ManualTickSourceFactory : IScenePlaybackTickSourceFactory
+    {
+        public IScenePlaybackTickSource Create(TimeSpan interval) => new ManualTickSource();
+    }
+
+    private sealed class ManualTickSource : IScenePlaybackTickSource
+    {
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public ValueTask<ScenePlaybackTick> WaitForNextTickAsync(CancellationToken cancellationToken)
+            => new(new ScenePlaybackTick(TimeSpan.FromMilliseconds(33)));
     }
 }

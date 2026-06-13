@@ -13,10 +13,10 @@ public sealed class ScenePlaybackController : IAsyncDisposable
     private readonly ScenePlaybackControllerOptions _options;
     private readonly ScenePlaybackCheckpointCache _checkpoints = new();
     private CancellationTokenSource? _playbackCancellation;
-    private CancellationTokenSource? _activeSeekCancellation;
+    private CancellationTokenSource? _activeNavigationCancellation;
     private CancellationTokenSource? _checkpointCancellation;
     private Task? _playbackTask;
-    private Task? _activeSeekTask;
+    private Task? _activeNavigationTask;
     private Task? _checkpointTask;
     private ScenePlaybackFrame _currentFrame;
     private long _positionMilliseconds;
@@ -195,14 +195,14 @@ public sealed class ScenePlaybackController : IAsyncDisposable
     }
 
     public ValueTask<ScenePlaybackFrame> SeekAsync(long positionMilliseconds, CancellationToken cancellationToken = default) =>
-        NavigateAsync((token, generation) => SeekOperationAsync(positionMilliseconds, token, generation), cancellationToken);
+        NavigateAsync(operation => SeekOperationAsync(positionMilliseconds, operation), cancellationToken);
 
     public ValueTask<ScenePlaybackFrame> StepEventAsync(int direction, CancellationToken cancellationToken = default)
     {
         if (direction is not (-1 or 1))
             throw new ArgumentOutOfRangeException(nameof(direction));
 
-        return NavigateAsync((token, generation) => StepEventOperationAsync(direction, token, generation), cancellationToken);
+        return NavigateAsync(operation => StepEventOperationAsync(direction, operation), cancellationToken);
     }
 
     public ValueTask<ScenePlaybackFrame> RefreshAsync(CancellationToken cancellationToken = default)
@@ -244,8 +244,8 @@ public sealed class ScenePlaybackController : IAsyncDisposable
     {
         Task? playbackTask;
         CancellationTokenSource? playbackCancellation;
-        CancellationTokenSource? seekCancellation;
-        Task? seekTask;
+        CancellationTokenSource? navigationCancellation;
+        Task? navigationTask;
         Task? checkpointTask;
         CancellationTokenSource? checkpointCancellation;
         lock (_stateGate)
@@ -260,17 +260,17 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             _playbackTask = null;
             playbackCancellation = _playbackCancellation;
             _playbackCancellation = null;
-            seekCancellation = _activeSeekCancellation;
-            _activeSeekCancellation = null;
-            seekTask = _activeSeekTask;
-            _activeSeekTask = null;
+            navigationCancellation = _activeNavigationCancellation;
+            navigationCancellation?.Cancel();
+            _activeNavigationCancellation = null;
+            navigationTask = _activeNavigationTask;
+            _activeNavigationTask = null;
             checkpointTask = _checkpointTask;
             _checkpointTask = null;
             checkpointCancellation = _checkpointCancellation;
             _checkpointCancellation = null;
         }
 
-        seekCancellation?.Cancel();
         playbackCancellation?.Cancel();
         checkpointCancellation?.Cancel();
         if (playbackTask is not null)
@@ -295,11 +295,11 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             }
         }
 
-        if (seekTask is not null)
+        if (navigationTask is not null)
         {
             try
             {
-                await seekTask.ConfigureAwait(false);
+                await navigationTask.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -307,7 +307,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
 
         playbackCancellation?.Dispose();
-        seekCancellation?.Dispose();
+        navigationCancellation?.Dispose();
         checkpointCancellation?.Dispose();
     }
 
@@ -367,27 +367,28 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    private async ValueTask<ScenePlaybackFrame> NavigateAsync(Func<CancellationToken, long, ValueTask<ScenePlaybackFrame>> operation, CancellationToken cancellationToken)
+    private async ValueTask<ScenePlaybackFrame> NavigateAsync(Func<NavigationOperation, ValueTask<ScenePlaybackFrame>> operation, CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        CancellationTokenSource linkedCancellation;
+        cancellationToken.ThrowIfCancellationRequested();
+        CancellationTokenSource navigationCancellation;
         CancellationTokenSource? previousCancellation;
         long generation;
         lock (_stateGate)
         {
-            previousCancellation = _activeSeekCancellation;
-            linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _activeSeekCancellation = linkedCancellation;
+            previousCancellation = _activeNavigationCancellation;
+            previousCancellation?.Cancel();
+            navigationCancellation = new CancellationTokenSource();
+            _activeNavigationCancellation = navigationCancellation;
             generation = ++_seekGeneration;
             _isLoading = true;
         }
 
-        previousCancellation?.Cancel();
-        var operationTask = operation(linkedCancellation.Token, generation).AsTask();
+        var operationTask = operation(new NavigationOperation(generation, navigationCancellation.Token, cancellationToken)).AsTask();
         lock (_stateGate)
         {
-            if (ReferenceEquals(_activeSeekCancellation, linkedCancellation))
-                _activeSeekTask = operationTask;
+            if (ReferenceEquals(_activeNavigationCancellation, navigationCancellation))
+                _activeNavigationTask = operationTask;
         }
 
         try
@@ -408,23 +409,30 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         {
             lock (_stateGate)
             {
-                if (ReferenceEquals(_activeSeekCancellation, linkedCancellation))
-                    _activeSeekCancellation = null;
-                if (ReferenceEquals(_activeSeekTask, operationTask))
-                    _activeSeekTask = null;
+                if (ReferenceEquals(_activeNavigationCancellation, navigationCancellation))
+                    _activeNavigationCancellation = null;
+                if (ReferenceEquals(_activeNavigationTask, operationTask))
+                    _activeNavigationTask = null;
             }
 
-            linkedCancellation.Dispose();
+            navigationCancellation.Dispose();
         }
     }
 
-    private async ValueTask<ScenePlaybackFrame> StepEventOperationAsync(int direction, CancellationToken cancellationToken, long generation)
+    private async ValueTask<ScenePlaybackFrame> StepEventOperationAsync(int direction, NavigationOperation operation)
     {
         await Task.Yield();
-        cancellationToken.ThrowIfCancellationRequested();
-        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        operation.CallerCancellationToken.ThrowIfCancellationRequested();
+        if (IsNavigationSuperseded(operation))
+            return CompleteSupersededNavigation(operation);
+
+        await _operationGate.WaitAsync(operation.CallerCancellationToken).ConfigureAwait(false);
         try
         {
+            operation.CallerCancellationToken.ThrowIfCancellationRequested();
+            if (IsNavigationSuperseded(operation))
+                return CompleteSupersededNavigation(operation);
+
             ScenePlaybackFrame currentFrame;
             lock (_stateGate)
                 currentFrame = _currentFrame;
@@ -436,13 +444,23 @@ public sealed class ScenePlaybackController : IAsyncDisposable
                 : Math.Max(segment.StartObservationOrdinal, current - 1);
             var frame = await Task.Run(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var checkpoint = direction < 0 ? ResolveOrdinalCheckpoint(target) : null;
-                return Session.SeekObservationOrdinal(target, checkpoint);
-            }, cancellationToken).ConfigureAwait(false);
+                operation.CallerCancellationToken.ThrowIfCancellationRequested();
+                if (IsNavigationSuperseded(operation))
+                    return CompleteSupersededNavigation(operation);
 
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!TryApplyFrame(frame, generation, resetPlaybackClock: true, out var playbackCancellation, out var playbackTask))
+                var checkpoint = direction < 0 ? ResolveOrdinalCheckpoint(target) : null;
+                operation.CallerCancellationToken.ThrowIfCancellationRequested();
+                if (IsNavigationSuperseded(operation))
+                    return CompleteSupersededNavigation(operation);
+
+                return Session.SeekObservationOrdinal(target, checkpoint);
+            }, operation.CallerCancellationToken).ConfigureAwait(false);
+
+            operation.CallerCancellationToken.ThrowIfCancellationRequested();
+            if (IsNavigationSuperseded(operation))
+                return CompleteSupersededNavigation(operation);
+
+            if (!TryApplyFrame(frame, operation.Generation, resetPlaybackClock: true, out var playbackCancellation, out var playbackTask))
                 return frame;
 
             CancelAndDisposeAfterCompletion(playbackCancellation, playbackTask);
@@ -455,22 +473,39 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    private async ValueTask<ScenePlaybackFrame> SeekOperationAsync(long positionMilliseconds, CancellationToken cancellationToken, long generation)
+    private async ValueTask<ScenePlaybackFrame> SeekOperationAsync(long positionMilliseconds, NavigationOperation operation)
     {
         await Task.Yield();
-        cancellationToken.ThrowIfCancellationRequested();
-        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        operation.CallerCancellationToken.ThrowIfCancellationRequested();
+        if (IsNavigationSuperseded(operation))
+            return CompleteSupersededNavigation(operation);
+
+        await _operationGate.WaitAsync(operation.CallerCancellationToken).ConfigureAwait(false);
         try
         {
+            operation.CallerCancellationToken.ThrowIfCancellationRequested();
+            if (IsNavigationSuperseded(operation))
+                return CompleteSupersededNavigation(operation);
+
             var frame = await Task.Run(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var checkpoint = ResolveSeekCheckpoint(positionMilliseconds);
-                return Session.Seek(positionMilliseconds, checkpoint);
-            }, cancellationToken).ConfigureAwait(false);
+                operation.CallerCancellationToken.ThrowIfCancellationRequested();
+                if (IsNavigationSuperseded(operation))
+                    return CompleteSupersededNavigation(operation);
 
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!TryApplyFrame(frame, generation, resetPlaybackClock: true, out var playbackCancellation, out var playbackTask))
+                var checkpoint = ResolveSeekCheckpoint(positionMilliseconds);
+                operation.CallerCancellationToken.ThrowIfCancellationRequested();
+                if (IsNavigationSuperseded(operation))
+                    return CompleteSupersededNavigation(operation);
+
+                return Session.Seek(positionMilliseconds, checkpoint);
+            }, operation.CallerCancellationToken).ConfigureAwait(false);
+
+            operation.CallerCancellationToken.ThrowIfCancellationRequested();
+            if (IsNavigationSuperseded(operation))
+                return CompleteSupersededNavigation(operation);
+
+            if (!TryApplyFrame(frame, operation.Generation, resetPlaybackClock: true, out var playbackCancellation, out var playbackTask))
                 return frame;
 
             CancelAndDisposeAfterCompletion(playbackCancellation, playbackTask);
@@ -480,6 +515,26 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         finally
         {
             _operationGate.Release();
+        }
+    }
+
+    private bool IsNavigationSuperseded(NavigationOperation operation)
+    {
+        if (operation.SupersessionToken.IsCancellationRequested)
+            return true;
+
+        lock (_stateGate)
+            return _disposed || operation.Generation != _seekGeneration;
+    }
+
+    private ScenePlaybackFrame CompleteSupersededNavigation(NavigationOperation operation)
+    {
+        lock (_stateGate)
+        {
+            if (operation.Generation == _seekGeneration)
+                _isLoading = false;
+
+            return _currentFrame;
         }
     }
 
@@ -691,6 +746,8 @@ public sealed class ScenePlaybackController : IAsyncDisposable
 public readonly record struct ScenePlaybackControllerState(ScenePlaybackSourceKind SourceKind, long PositionMilliseconds, long DurationMilliseconds, double Speed, bool IsPlaying, bool IsLoading, bool IsCheckpointing, int CheckpointCount);
 
 internal readonly record struct PlaybackTickTarget(long PositionMilliseconds, long SeekGeneration);
+
+internal readonly record struct NavigationOperation(long Generation, CancellationToken SupersessionToken, CancellationToken CallerCancellationToken);
 
 public sealed class ScenePlaybackFrameChangedEventArgs(ScenePlaybackControllerState state, ScenePlaybackFrame frame) : EventArgs
 {
