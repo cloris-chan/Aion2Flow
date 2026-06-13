@@ -28,11 +28,10 @@ public sealed class OwnerTargetSummonResourceCanonicalizer(EntityStore entities)
             observation.Flag != 0 ||
             observation.Type != 2 ||
             observation.Loop != 1 ||
-            (observation.HitCount <= 0 && observation.AttemptCount <= 0) ||
-            !entities.TryGet(sourceId, out var entity) ||
-            entity.OwnerEntityId != targetId)
+            (observation.HitCount <= 0 && observation.AttemptCount <= 0))
             return false;
 
-        return true;
+        return entities.TryGet(sourceId, out var source) && source.OwnerEntityId == targetId ||
+               entities.TryGet(targetId, out var target) && target.OwnerEntityId == sourceId;
     }
 }

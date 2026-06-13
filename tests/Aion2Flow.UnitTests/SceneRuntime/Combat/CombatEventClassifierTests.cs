@@ -44,7 +44,7 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
-    public void Classifies_Direct_Support_Value_Shape_As_Support()
+    public void Classifies_Other_Target_Loop2_Direct_Value_As_Damage()
     {
         var packet = DirectPacket(9782, 139201, 16190020, 6354);
         packet.LayoutTag = 4;
@@ -52,7 +52,7 @@ public sealed class CombatEventClassifierTests
         packet.Type = 2;
         packet.Loop = 2;
 
-        AssertClassifies(packet, CombatEventKind.Support, CombatValueKind.Support);
+        AssertClassifies(packet, CombatEventKind.Damage, CombatValueKind.Damage);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class CombatEventClassifierTests
         packet.Type = 2;
         packet.Loop = 2;
 
-        AssertClassifies(packet, CombatEventKind.Support, CombatValueKind.Support);
+        AssertClassifies(packet, CombatEventKind.Damage, CombatValueKind.Damage);
     }
 
     private static void AssertClassifies(ParsedCombatPacket packet, CombatEventKind eventKind, CombatValueKind valueKind)

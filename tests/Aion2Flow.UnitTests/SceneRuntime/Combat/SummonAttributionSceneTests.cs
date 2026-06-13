@@ -263,6 +263,70 @@ public sealed class SummonAttributionSceneTests
     }
 
     [Fact]
+    public void Treats_Owner_To_Known_Summon_Direct_Resource_Value_As_Support()
+    {
+        using var scene = new SceneTestHarness();
+        const int ownerId = 1734;
+        const int summonId = 76631;
+
+        scene.AppendNickname(ownerId, "Owner");
+        scene.AppendSummon(ownerId, summonId);
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = summonId,
+            SkillCode = 16770001,
+            Damage = 587,
+            LayoutTag = 4,
+            Flag = 0,
+            Type = 2,
+            Loop = 1,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage,
+            Timestamp = 1_000
+        });
+
+        _ = scene.CreateSnapshot();
+        var combatEvent = Assert.Single(scene.Owner.Combat.Events);
+        Assert.Equal(CombatEventKind.Support, combatEvent.Observation.EventKind);
+        Assert.Equal(CombatValueKind.Support, combatEvent.Observation.ValueKind);
+    }
+
+    [Fact]
+    public void Treats_Known_Summon_To_Owner_Direct_Resource_Value_As_Support()
+    {
+        using var scene = new SceneTestHarness();
+        const int ownerId = 1734;
+        const int summonId = 76631;
+
+        scene.AppendNickname(ownerId, "Owner");
+        scene.AppendSummon(ownerId, summonId);
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = ownerId,
+            SkillCode = 16990004,
+            Damage = 10_921,
+            LayoutTag = 4,
+            Flag = 0,
+            Type = 2,
+            Loop = 1,
+            HitContribution = 1,
+            AttemptContribution = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage,
+            Timestamp = 1_000
+        });
+
+        _ = scene.CreateSnapshot();
+        var combatEvent = Assert.Single(scene.Owner.Combat.Events);
+        Assert.Equal(CombatEventKind.Support, combatEvent.Observation.EventKind);
+        Assert.Equal(CombatValueKind.Support, combatEvent.Observation.ValueKind);
+    }
+
+    [Fact]
     public void Treats_Repeated_Spirit_Descent_Summon_Restore_As_Support()
     {
         CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());

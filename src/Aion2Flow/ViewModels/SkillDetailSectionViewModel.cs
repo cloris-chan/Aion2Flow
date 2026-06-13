@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
@@ -8,8 +7,8 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
     private readonly UiFrameBatchService _frameBatchService = frameBatchService;
-    private readonly Dictionary<CombatActionKey, SkillDetailRowViewModel> _existingByActionKey = [];
-    private readonly HashSet<CombatActionKey> _newActionKeys = [];
+    private readonly Dictionary<SkillPresentationKey, SkillDetailRowViewModel> _existingByPresentationKey = [];
+    private readonly HashSet<SkillPresentationKey> _newPresentationKeys = [];
 
     public ObservableCollection<SkillDetailScopeOption> ScopeOptions { get; } = [];
     public ObservableCollection<SkillDetailRowViewModel> Rows { get; } = [];
@@ -84,21 +83,21 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
 
     public void ReplaceRows(List<SkillDetailRowData> dataRows)
     {
-        _existingByActionKey.Clear();
+        _existingByPresentationKey.Clear();
         foreach (var row in Rows)
         {
-            _existingByActionKey.TryAdd(row.ActionKey, row);
+            _existingByPresentationKey.TryAdd(row.PresentationKey, row);
         }
 
-        _newActionKeys.Clear();
+        _newPresentationKeys.Clear();
         for (var i = 0; i < dataRows.Count; i++)
         {
-            _newActionKeys.Add(dataRows[i].ActionKey);
+            _newPresentationKeys.Add(dataRows[i].PresentationKey);
         }
 
         for (var i = Rows.Count - 1; i >= 0; i--)
         {
-            if (!_newActionKeys.Contains(Rows[i].ActionKey))
+            if (!_newPresentationKeys.Contains(Rows[i].PresentationKey))
             {
                 Rows.RemoveAt(i);
             }
@@ -107,7 +106,7 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         for (var i = 0; i < dataRows.Count; i++)
         {
             ref var data = ref CollectionsMarshal.AsSpan(dataRows)[i];
-            if (_existingByActionKey.TryGetValue(data.ActionKey, out var existing))
+            if (_existingByPresentationKey.TryGetValue(data.PresentationKey, out var existing))
             {
                 existing.ApplyFrom(in data);
                 var currentIndex = Rows.IndexOf(existing);

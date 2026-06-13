@@ -4,6 +4,7 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
+    public SkillPresentationKey PresentationKey { get; set; }
     public CombatActionKey ActionKey { get; set; }
     public int SkillCode { get; set; }
     public string DisplayName { get; set => SetFrameProperty(ref field, value); } = string.Empty;
@@ -65,6 +66,7 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         var evadeRate = data.Attempts > 0 ? data.Evades / (double)data.Attempts : 0d;
         var invincibleRate = data.Attempts > 0 ? data.Invincible / (double)data.Attempts : 0d;
 
+        PresentationKey = data.PresentationKey;
         ActionKey = data.ActionKey;
         SkillCode = data.SkillCode;
         DisplayName = data.DisplayName;
@@ -108,8 +110,29 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
     }
 }
 
+public readonly record struct SkillPresentationKey(string DisplayName, string? IconAssetName);
+
+internal static class SkillDetailPresentationAggregator
+{
+    public static void AddOrMerge(
+        List<SkillDetailRowData> rows,
+        Dictionary<SkillPresentationKey, int> rowIndexes,
+        in SkillDetailRowData row)
+    {
+        if (rowIndexes.TryGetValue(row.PresentationKey, out var index))
+        {
+            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows)[index].Merge(in row);
+            return;
+        }
+
+        rowIndexes.Add(row.PresentationKey, rows.Count);
+        rows.Add(row);
+    }
+}
+
 public struct SkillDetailRowData
 {
+    public SkillPresentationKey PresentationKey;
     public CombatActionKey ActionKey;
     public int SkillCode;
     public string DisplayName;
@@ -137,4 +160,37 @@ public struct SkillDetailRowData
     public int Block;
     public int PerfectBlock;
     public double SharePercent;
+
+    public void Merge(in SkillDetailRowData other)
+    {
+        if (other.ActionKey.CompareTo(ActionKey) < 0)
+        {
+            ActionKey = other.ActionKey;
+            SkillCode = other.SkillCode;
+        }
+
+        TotalAmount += other.TotalAmount;
+        DirectAmount += other.DirectAmount;
+        PeriodicAmount += other.PeriodicAmount;
+        DrainAmount += other.DrainAmount;
+        RegenerationAmount += other.RegenerationAmount;
+        ShieldAmount += other.ShieldAmount;
+        ShieldAbsorbedAmount += other.ShieldAbsorbedAmount;
+        Hits += other.Hits;
+        Attempts += other.Attempts;
+        PeriodicHits += other.PeriodicHits;
+        Evades += other.Evades;
+        Invincible += other.Invincible;
+        Criticals += other.Criticals;
+        Back += other.Back;
+        Parry += other.Parry;
+        PerfectParry += other.PerfectParry;
+        Perfect += other.Perfect;
+        Smite += other.Smite;
+        MultiHit += other.MultiHit;
+        Endurance += other.Endurance;
+        Regeneration += other.Regeneration;
+        Block += other.Block;
+        PerfectBlock += other.PerfectBlock;
+    }
 }

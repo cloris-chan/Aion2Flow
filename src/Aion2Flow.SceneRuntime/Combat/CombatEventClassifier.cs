@@ -38,9 +38,6 @@ public static class CombatEventClassifier
         if (observation.ResourceKind == CombatResourceKind.Health)
             return (CombatEventKind.Healing, CombatValueKind.Healing);
 
-        if (CombatObservationTraits.IsDirectSupportValueShape(sourceId, targetId, in observation))
-            return (CombatEventKind.Support, CombatValueKind.Support);
-
         if (observation.ResourceKind == CombatResourceKind.Mana)
             return (CombatEventKind.Support, CombatValueKind.Support);
 
@@ -105,10 +102,6 @@ public static class CombatEventClassifier
 
 public static class CombatObservationTraits
 {
-    public static bool IsDirectSupportValueShape(int sourceId, int targetId, in CombatObservation observation) =>
-        IsPositiveDirect0438Value(sourceId, targetId, in observation) &&
-        observation.Loop == 2;
-
     public static bool IsTargetPeriodicSupportSeed(in CombatObservation observation) => IsPeriodicTargetMode(in observation, 9) || IsPeriodicTargetMode(in observation, 11);
 
     public static bool IsPeriodicSelfMode(in CombatObservation observation, int mode) => observation.PeriodicRelation == PeriodicEffectRelation.Self && observation.PeriodicMode == mode;
@@ -124,8 +117,6 @@ public static class CombatObservationTraits
 
         return observation.EffectTag == PacketEffectTag.None ? string.Empty : FormatEffectTagLabel(observation.EffectTag);
     }
-
-    private static bool IsPositiveDirect0438Value(int sourceId, int targetId, in CombatObservation observation) => sourceId > 0 && targetId > 0 && observation is { Damage: > 0, PeriodicRelation: PeriodicEffectRelation.None, LayoutTag: 4, Flag: 0, Type: 2 };
 
     private static string FormatPeriodicEffectLabel(PeriodicEffectRelation relation, int mode)
     {

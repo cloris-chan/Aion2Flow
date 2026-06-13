@@ -66,6 +66,12 @@ public sealed class LocalizationServicesTests
     }
 
     [Theory]
+    [InlineData(100014, "火之精靈：基本攻擊", "ICON_EL_SKILL_010.webp")]
+    [InlineData(100018, "火之精靈：基本攻擊", "ICON_EL_SKILL_010.webp")]
+    [InlineData(100024, "水之精靈：基本攻擊", "ICON_EL_SKILL_011.webp")]
+    [InlineData(100028, "水之精靈：基本攻擊", "ICON_EL_SKILL_011.webp")]
+    [InlineData(100034, "風之精靈：基本攻擊", "ICON_EL_SKILL_012.webp")]
+    [InlineData(100048, "地之精靈：基本攻擊", "ICON_EL_SKILL_013.webp")]
     [InlineData(17040257, "審判之電", "ICON_CL_SKILL_004.webp")]
     [InlineData(17730001, "主神恩寵", "ICON_CL_SKILL_Passive_012.webp")]
     public void GameResourceService_Resolves_Display_Resources_For_Packet_Variants(int skillCode, string expectedName, string expectedIcon)
