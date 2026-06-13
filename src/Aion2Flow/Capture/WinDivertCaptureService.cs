@@ -74,7 +74,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         {
             await StopAsync();
             var message = $"WinDivert error: {ex.Message}";
-            AppLog.Write(AppLogLevel.Error, message);
+            AppLog.Write(AppLogLevel.Error, $"{message}{Environment.NewLine}{ex}");
             PublishStatus(message, isError: true);
             throw;
         }
@@ -82,7 +82,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         {
             await StopAsync();
             var message = $"Failed to start capture: {ex.Message}";
-            AppLog.Write(AppLogLevel.Error, message);
+            AppLog.Write(AppLogLevel.Error, $"{message}{Environment.NewLine}{ex}");
             PublishStatus(message, isError: true);
             throw;
         }
@@ -210,12 +210,16 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                 }
                 catch (Win32Exception ex)
                 {
-                    PublishStatus($"WinDivert recv error: {ex.Message}", isError: true);
+                    var message = $"WinDivert recv error: {ex.Message}";
+                    AppLog.Write(AppLogLevel.Error, $"{message}{Environment.NewLine}{ex}");
+                    PublishStatus(message, isError: true);
                     break;
                 }
                 catch (Exception ex)
                 {
-                    PublishStatus($"Capture loop error: {ex.Message}", isError: true);
+                    var message = $"Capture loop error after {ex.GetType().Name}: {ex.Message}";
+                    AppLog.Write(AppLogLevel.Error, $"{message}{Environment.NewLine}{ex}");
+                    PublishStatus(message, isError: true);
                     break;
                 }
             }
@@ -234,6 +238,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         _tcpRttEstimator.Clear();
         _protocolRttEstimator.Clear();
         RawPacketDump.ParsedPacketObserved -= OnParsedPacketObserved;
+        _divert.ShutdownReceive();
 
         if (_worker is not null)
         {

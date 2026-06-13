@@ -78,6 +78,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
         if (_cts is null) return;
 
         _cts.Cancel();
+        _divert?.ShutdownReceive();
 
         try
         {
@@ -89,7 +90,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
                 await _divertTask.ConfigureAwait(false);
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { AppLog.Write(AppLogLevel.Warning, $"Stop error: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Write(AppLogLevel.Warning, $"Process port discovery stop error: {ex}"); }
 
         _divert?.Dispose();
         _divert = null;
@@ -136,7 +137,11 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
                     }
                 }
                 catch (OperationCanceledException) { break; }
-                catch (Exception) { }
+                catch (Exception ex)
+                {
+                    AppLog.Write(AppLogLevel.Error, $"WinDivert flow session stopped: {ex}");
+                    break;
+                }
             }
         }, TaskCreationOptions.LongRunning);
     }
@@ -213,8 +218,9 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    AppLog.Write(AppLogLevel.Warning, $"Process port discovery polling failed: {ex}");
                 }
 
                 var delay = knownPids.Count == 0 ? SearchPollInterval : KnownProcessPollInterval;

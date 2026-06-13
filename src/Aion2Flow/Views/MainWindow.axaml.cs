@@ -126,7 +126,6 @@ public partial class MainWindow : Window
         }
 
         base.OnClosed(e);
-        DataContext.DisposeAsync().AsTask().ConfigureAwait(false);
     }
 
     private void Minimize(object? sender, RoutedEventArgs e)

@@ -32,6 +32,10 @@ internal static partial class WinDivertInterop
         return false;
     }
 
+    [LibraryImport(LibraryName, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool WinDivertShutdown(WinDivertSafeHandle handle, WinDivertShutdownMode mode);
+
     [LibraryImport(LibraryName, EntryPoint = "WinDivertClose", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool WinDivertClose(nint handle);
