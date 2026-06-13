@@ -118,7 +118,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     public IReadOnlyList<CombatDetailEvent> CreateDetailEvents(SceneCombatSnapshot snapshot, int combatantId)
     {
-        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
+        if (!CanProjectDetailCombatant(snapshot, combatantId))
             return [];
 
         var events = new List<CombatDetailEvent>();
@@ -128,7 +128,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     internal CombatDetailWriteResult WriteDetailEvents(SceneCombatSnapshot snapshot, int combatantId, ICombatDetailEventWriter writer)
     {
-        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime || !snapshot.Combatants.ContainsKey(combatantId) && !IsSnapshotTarget(snapshot, combatantId))
+        if (!CanProjectDetailCombatant(snapshot, combatantId))
             return default;
 
         PrepareProjectionCaches();
@@ -188,6 +188,14 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private static bool IsSnapshotTarget(SceneCombatSnapshot snapshot, int entityId) =>
         snapshot.TargetObservation?.InstanceId == entityId || snapshot.Encounter.TrackingTargetId == entityId;
+
+    private bool CanProjectDetailCombatant(SceneCombatSnapshot snapshot, int combatantId) =>
+        combatantId > 0 &&
+        snapshot.EncounterTime > 0 &&
+        snapshot.EncounterEndTime >= snapshot.EncounterStartTime &&
+        (snapshot.Combatants.ContainsKey(combatantId) ||
+         IsSnapshotTarget(snapshot, combatantId) ||
+         CombatPairProjection.GetCombatant(combat, combatantId) is not null);
 
     public int ResolveDetailCombatantId(int entityId)
     {

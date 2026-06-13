@@ -7,11 +7,11 @@ public partial class CombatantDetailsFlyoutView : UserControl
 {
     private Border? _rootCard;
 
-	public CombatantDetailsFlyoutView()
-	{
-		AvaloniaXamlLoader.Load(this);
+    public CombatantDetailsFlyoutView()
+    {
+        AvaloniaXamlLoader.Load(this);
         _rootCard = Content as Border ?? this.FindControl<Border>("RootCard");
-	}
+    }
 
     public void ConfigureViewport(double availableWidth, double availableHeight)
     {

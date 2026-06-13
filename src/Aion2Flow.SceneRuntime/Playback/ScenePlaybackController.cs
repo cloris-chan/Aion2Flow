@@ -211,6 +211,22 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         return SeekAsync(position, cancellationToken);
     }
 
+    public async ValueTask<ScenePlaybackCombatantDetail> CreateCombatantDetailAsync(int combatantId, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(combatantId);
+        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Session.CreateCombatantDetail(combatantId);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
     public void SetSpeed(double speed)
     {
         ThrowIfDisposed();

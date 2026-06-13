@@ -10,8 +10,8 @@
 
 namespace Cloris.Aion2Flow.Localization {
     using System;
-
-
+    
+    
     /// <summary>
     ///   A strongly-typed resource class, for looking up localized strings, etc.
     /// </summary>
@@ -23,7 +23,7 @@ namespace Cloris.Aion2Flow.Localization {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Strings {
-
+        
         private static global::System.Resources.ResourceManager resourceMan;
         
         private static global::System.Globalization.CultureInfo resourceCulture;
@@ -66,6 +66,15 @@ namespace Cloris.Aion2Flow.Localization {
         internal static string Action_BattleReset {
             get {
                 return ResourceManager.GetString("Action_BattleReset", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Close.
+        /// </summary>
+        internal static string Action_Close {
+            get {
+                return ResourceManager.GetString("Action_Close", resourceCulture);
             }
         }
         
@@ -502,6 +511,15 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Combatant Details.
+        /// </summary>
+        internal static string Playback_CombatantDetails {
+            get {
+                return ResourceManager.GetString("Playback_CombatantDetails", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Combatants.
         /// </summary>
         internal static string Playback_Combatants {
@@ -536,7 +554,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Lifecycle_OpenFormat", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Looks up a localized string similar to Apply.
         /// </summary>
@@ -545,7 +563,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Lifecycle_OpenIndefinite", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Looks up a localized string similar to Refresh.
         /// </summary>
@@ -554,7 +572,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Lifecycle_Renew", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Looks up a localized string similar to End ({0}).
         /// </summary>
@@ -563,7 +581,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Lifecycle_ResultFormat", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Looks up a localized string similar to Next event.
         /// </summary>

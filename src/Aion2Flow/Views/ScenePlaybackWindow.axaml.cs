@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Cloris.Aion2Flow.Controls;
 using Cloris.Aion2Flow.Services;
@@ -53,5 +54,11 @@ public partial class ScenePlaybackWindow : Window
     private void TimelineSeekRequested(object? sender, PlaybackSeekRequestedEventArgs e)
     {
         DataContext?.RequestSeek(e.PositionMilliseconds);
+    }
+
+    private void CombatantRowTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is Control { DataContext: PlaybackCombatantRowViewModel combatant })
+            DataContext?.SelectCombatant(combatant);
     }
 }

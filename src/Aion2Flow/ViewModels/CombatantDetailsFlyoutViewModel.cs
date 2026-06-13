@@ -115,6 +115,17 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         RefreshLiveSceneContext(encounterContextId, combatantId, snapshot, update, forceRefresh);
     }
 
+    public void SelectPlaybackSceneEncounterCombatant(Guid encounterContextId, int combatantId, SceneCombatSnapshot snapshot, CombatDetailUpdateResult update, IReadOnlyList<CombatDetailEvent> events)
+    {
+        if (update.IsFullSnapshot)
+            _detailEvents.Clear();
+
+        for (var i = 0; i < events.Count; i++)
+            _detailEvents.Add(events[i]);
+
+        RefreshLiveSceneContext(encounterContextId, combatantId, snapshot, update, forceRefresh: false);
+    }
+
     public void Deactivate()
     {
         SelectedCombatantId = 0;
@@ -166,7 +177,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     private void RefreshSceneContext(Guid encounterContextId, int? combatantId, SceneCombatSnapshot snapshot, CombatDetailDelta detail, bool forceRefresh)
     {
-        if (combatantId is null || encounterContextId == Guid.Empty || !snapshot.Combatants.ContainsKey(combatantId.Value))
+        if (combatantId is null ||
+            encounterContextId == Guid.Empty ||
+            !snapshot.Combatants.ContainsKey(combatantId.Value) && detail.Combatant is null && detail.Events.Count == 0)
         {
             _encounterContextId = encounterContextId;
             _combatantId = combatantId;
@@ -205,7 +218,9 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     private void RefreshLiveSceneContext(Guid encounterContextId, int? combatantId, SceneCombatSnapshot snapshot, CombatDetailUpdateResult update, bool forceRefresh)
     {
-        if (combatantId is null || encounterContextId == Guid.Empty || !snapshot.Combatants.ContainsKey(combatantId.Value))
+        if (combatantId is null ||
+            encounterContextId == Guid.Empty ||
+            !snapshot.Combatants.ContainsKey(combatantId.Value) && update.Combatant is null && _detailEvents.Count == 0)
         {
             _encounterContextId = encounterContextId;
             _combatantId = combatantId;

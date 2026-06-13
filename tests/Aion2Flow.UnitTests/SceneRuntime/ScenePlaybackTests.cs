@@ -95,6 +95,32 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void Session_CreateCombatantDetail_UsesCurrentProjectionBoundary()
+    {
+        var record = CreateArchiveRecord();
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var targetSession = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+
+        session.Seek(1_500);
+        var midpoint = session.CreateCombatantDetail(100);
+        session.AdvanceTo(2_500);
+        var completed = session.CreateCombatantDetail(100);
+        targetSession.Seek(1_500);
+        var target = targetSession.CreateCombatantDetail(200);
+
+        Assert.Equal(1_500, midpoint.PositionMilliseconds);
+        Assert.Equal(4, midpoint.EndObservationOrdinalExclusive);
+        Assert.True(midpoint.Update.IsFullSnapshot);
+        Assert.Equal(300, midpoint.Events.Sum(static entry => entry.Amount));
+        Assert.True(target.Update.IsFullSnapshot);
+        Assert.Equal(300, target.Events.Sum(static entry => entry.Amount));
+        Assert.Equal(2_500, completed.PositionMilliseconds);
+        Assert.Equal(5, completed.EndObservationOrdinalExclusive);
+        Assert.False(completed.Update.IsFullSnapshot);
+        Assert.Equal(300, completed.Events.Sum(static entry => entry.Amount));
+    }
+
+    [Fact]
     public void Seek_ResourceWithoutMaximum_PreservesKnownMaxHp()
     {
         var journal = new ObservedEventJournal();
@@ -511,6 +537,19 @@ public sealed class ScenePlaybackTests
         await WaitUntil(() => controller.PositionMilliseconds == 1_000);
 
         Assert.Equal(1, controller.CheckpointCount);
+    }
+
+    [Fact]
+    public async Task Controller_CreateCombatantDetailAsync_ProjectsCurrentFrame()
+    {
+        await using var controller = CreateController(CreateArchiveRecord());
+
+        await controller.SeekAsync(1_500, TestContext.Current.CancellationToken);
+        var projection = await controller.CreateCombatantDetailAsync(100, TestContext.Current.CancellationToken);
+
+        Assert.Equal(controller.PositionMilliseconds, projection.PositionMilliseconds);
+        Assert.Equal(controller.CurrentFrame.AppliedSegment.EndObservationOrdinalExclusive, projection.EndObservationOrdinalExclusive);
+        Assert.Equal(300, projection.Events.Sum(static entry => entry.Amount));
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -27,6 +28,8 @@ public readonly record struct ScenePlaybackResourceState(int EntityId, long? Cur
 public readonly record struct ScenePlaybackAuraState(int EntityId, int OriginEntityId, int InstanceSequenceId, int StackCount, int Mode, int GroupCode, ushort DurationMilliseconds, ResourceEffectRef DisplayResourceEffectRef, long OpenedAtMilliseconds, long RenewedAtMilliseconds, long? ExpiresAtMilliseconds, long OpenObservationOrdinal, long LastObservationOrdinal);
 
 public readonly record struct ScenePlaybackTrackWindow(ScenePlaybackTrack Track, long StartObservationOrdinal, long EndObservationOrdinalExclusive, int Count);
+
+public readonly record struct ScenePlaybackCombatantDetail(long PositionMilliseconds, long EndObservationOrdinalExclusive, SceneCombatSnapshot Snapshot, CombatDetailUpdateResult Update, IReadOnlyList<CombatDetailEvent> Events);
 
 public enum ScenePlaybackTrack
 {

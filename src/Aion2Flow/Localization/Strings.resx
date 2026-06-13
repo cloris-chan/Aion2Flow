@@ -17,6 +17,7 @@
     <data name="Action_BattleReset" xml:space="preserve"><value>Reset battle</value></data>
   <data name="Action_Live" xml:space="preserve"><value>Live</value></data>
   <data name="Action_SelectAll" xml:space="preserve"><value>Select All</value></data>
+  <data name="Action_Close" xml:space="preserve"><value>Close</value></data>
 
   <!-- Settings -->
   <data name="Settings_Title" xml:space="preserve"><value>Settings</value></data>
@@ -132,6 +133,7 @@
   <data name="Playback_Label_Speed" xml:space="preserve"><value>Speed</value></data>
   <data name="Playback_TimelineTracks" xml:space="preserve"><value>Timeline Tracks</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>Combatants</value></data>
+  <data name="Playback_CombatantDetails" xml:space="preserve"><value>Combatant Details</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>Event Window</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>Combatant</value></data>
   <data name="Playback_Column_Damage" xml:space="preserve"><value>Damage</value></data>

@@ -44,7 +44,9 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private readonly Lock _frameGate = new();
     private readonly ScenePlaybackController _controller;
     private readonly IScenePlaybackSource _source;
+    private CancellationTokenSource? _detailCancellation;
     private CancellationTokenSource? _seekCancellation;
+    private Task? _detailTask;
     private ScenePlaybackFrame _currentFrame;
     private ScenePlaybackFrameChangedEventArgs? _pendingFrameChanged;
     private IReadOnlyList<PlaybackTimelineLane> _timelineMarkerTracks = [];
@@ -55,7 +57,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private bool _isDisposed;
     private bool _frameApplyQueued;
     private bool _forceNextDetailProjection = true;
+    private bool _detailRefreshQueued;
+    private bool _detailRequestPending;
     private bool _timelineMarkersInitialized;
+    private long _detailRequestGeneration;
 
     public ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext)
         : this(record, displayContext, Ioc.Default.GetRequiredService<LocalizationService>())
@@ -68,9 +73,18 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     }
 
     internal ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory)
+        : this(record, displayContext, localization, tickSourceFactory, Ioc.Default.GetRequiredService<UiFrameBatchService>())
+    {
+    }
+
+    internal ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory, UiFrameBatchService frameBatchService)
     {
         DisplayContext = displayContext;
         Localization = localization;
+        CombatantDetails = new CombatantDetailsFlyoutViewModel(localization, frameBatchService)
+        {
+            DisplayContext = displayContext
+        };
         _source = new ArchivedScenePlaybackSource(record);
         _controller = new ScenePlaybackController(_source, tickSourceFactory, ScenePlaybackControllerOptions.Default);
         _controller.FrameChanged += OnFrameChanged;
@@ -85,6 +99,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     public SceneDisplayContext DisplayContext { get; }
 
     public LocalizationService Localization { get; }
+
+    public CombatantDetailsFlyoutViewModel CombatantDetails { get; }
+
+    public bool IsCombatantDetailsVisible => SelectedCombatantId > 0;
 
     [ObservableProperty]
     public partial string WindowTitle { get; set; } = "Playback";
@@ -138,6 +156,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     public partial IReadOnlyList<PlaybackCombatantRowViewModel> Combatants { get; set; } = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCombatantDetailsVisible))]
+    public partial int SelectedCombatantId { get; set; }
+
+    [ObservableProperty]
     public partial IReadOnlyList<PlaybackEventRowViewModel> EventWindow { get; set; } = [];
 
     partial void OnPositionMillisecondsChanged(double value)
@@ -146,6 +168,33 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (!_isApplyingFrame)
             RequestSeek(value);
     }
+
+    partial void OnSelectedCombatantIdChanged(int value)
+    {
+        Combatants = ApplyCombatantSelection(Combatants, value);
+        _detailCancellation?.Cancel();
+        _detailRequestGeneration++;
+        if (value <= 0)
+        {
+            _detailRefreshQueued = false;
+            CombatantDetails.Deactivate();
+            return;
+        }
+
+        _forceNextDetailProjection = true;
+        _detailRefreshQueued = true;
+        if (!_detailRequestPending)
+            RequestCombatantDetail(_currentFrame);
+    }
+
+    public void SelectCombatant(PlaybackCombatantRowViewModel combatant)
+    {
+        if (combatant.EntityId > 0)
+            SelectedCombatantId = combatant.EntityId;
+    }
+
+    [RelayCommand]
+    private void ClearCombatantDetails() => SelectedCombatantId = 0;
 
     public void RequestSeek(double positionMilliseconds)
     {
@@ -335,6 +384,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return;
 
         Combatants = CreateCombatants(frame);
+        RequestCombatantDetail(frame);
         _lastDetailProjectionTick = Environment.TickCount64;
         _forceNextDetailProjection = false;
     }
@@ -381,7 +431,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
             result.Add(new PlaybackCombatantRowViewModel(
                 entry.Id,
-                DisplayContext.ResolveEntityName(entry.Id), FormatNumber(metrics.DamageAmount), FormatNumber(metrics.DamagePerSecond), FormatNumber(metrics.HealingAmount), FormatNumber(metrics.HealingPerSecond), CreateHpText(in resource), CreateHpSegments(in resource)));
+                DisplayContext.ResolveEntityName(entry.Id), FormatNumber(metrics.DamageAmount), FormatNumber(metrics.DamagePerSecond), FormatNumber(metrics.HealingAmount), FormatNumber(metrics.HealingPerSecond), CreateHpText(in resource), CreateHpSegments(in resource), entry.Id == SelectedCombatantId));
             added.Add(entry.Id);
         }
 
@@ -393,7 +443,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
             result.Add(new PlaybackCombatantRowViewModel(
                 resource.EntityId,
-                DisplayContext.ResolveEntityName(resource.EntityId), "0", "0", "0", "0", CreateHpText(in resource), CreateHpSegments(in resource)));
+                DisplayContext.ResolveEntityName(resource.EntityId), "0", "0", "0", "0", CreateHpText(in resource), CreateHpSegments(in resource), resource.EntityId == SelectedCombatantId));
         }
 
         result.Sort(static (left, right) =>
@@ -402,6 +452,81 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return cmp != 0 ? cmp : string.Compare(left.Name, right.Name, StringComparison.CurrentCulture);
         });
         return result;
+    }
+
+    private static IReadOnlyList<PlaybackCombatantRowViewModel> ApplyCombatantSelection(IReadOnlyList<PlaybackCombatantRowViewModel> combatants, int selectedCombatantId)
+    {
+        if (combatants.Count == 0)
+            return combatants;
+
+        var changed = false;
+        var result = new PlaybackCombatantRowViewModel[combatants.Count];
+        for (var i = 0; i < combatants.Count; i++)
+        {
+            var combatant = combatants[i];
+            var isSelected = combatant.EntityId == selectedCombatantId;
+            result[i] = combatant with { IsSelected = isSelected };
+            changed |= combatant.IsSelected != isSelected;
+        }
+
+        return changed ? result : combatants;
+    }
+
+    private void RequestCombatantDetail(ScenePlaybackFrame frame)
+    {
+        var combatantId = SelectedCombatantId;
+        if (_isDisposed || combatantId <= 0)
+            return;
+
+        if (_detailRequestPending)
+        {
+            _detailRefreshQueued = true;
+            return;
+        }
+
+        var cancellation = new CancellationTokenSource();
+        _detailCancellation = cancellation;
+        _detailRequestPending = true;
+        _detailRefreshQueued = false;
+        var generation = ++_detailRequestGeneration;
+        _detailTask = ProjectCombatantDetailAsync(frame.EncounterId, combatantId, generation, cancellation);
+    }
+
+    private async Task ProjectCombatantDetailAsync(Guid encounterId, int combatantId, long generation, CancellationTokenSource cancellation)
+    {
+        try
+        {
+            var projection = await _controller.CreateCombatantDetailAsync(combatantId, cancellation.Token).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_isDisposed || generation != _detailRequestGeneration || combatantId != SelectedCombatantId)
+                    return;
+
+                CombatantDetails.SelectPlaybackSceneEncounterCombatant(encounterId, combatantId, projection.Snapshot, projection.Update, projection.Events);
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => StatusText = ex.Message);
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ReferenceEquals(_detailCancellation, cancellation))
+                    return;
+
+                cancellation.Dispose();
+                _detailCancellation = null;
+                _detailTask = null;
+                _detailRequestPending = false;
+                if (_detailRefreshQueued && !_isDisposed && SelectedCombatantId > 0)
+                    RequestCombatantDetail(_currentFrame);
+            });
+        }
     }
 
     private void RefreshTimelineTracks(ScenePlaybackFrame frame)
@@ -652,10 +777,23 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return;
 
         _isDisposed = true;
+        _detailCancellation?.Cancel();
         _seekCancellation?.Cancel();
         _seekCancellation?.Dispose();
         Localization.LanguageChanged -= OnLanguageChanged;
         _controller.FrameChanged -= OnFrameChanged;
+        if (_detailTask is not null)
+        {
+            try
+            {
+                await _detailTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _detailCancellation?.Dispose();
         await _controller.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -668,6 +806,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     }
 }
 
-public sealed record PlaybackCombatantRowViewModel(int EntityId, string Name, string DamageText, string DamagePerSecondText, string HealingText, string HealingPerSecondText, string HpText, IReadOnlyList<ProgressSegment> HpSegments);
+public sealed record PlaybackCombatantRowViewModel(int EntityId, string Name, string DamageText, string DamagePerSecondText, string HealingText, string HealingPerSecondText, string HpText, IReadOnlyList<ProgressSegment> HpSegments, bool IsSelected);
 
 public sealed record PlaybackEventRowViewModel(string TimeText, string TrackText, string SourceText, string TargetText, string SkillText, string AmountText);

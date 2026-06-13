@@ -5,12 +5,13 @@
         xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
         xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
         xmlns:pres="clr-namespace:Cloris.Aion2Flow.Presentation"
+        xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
         x:Class="Cloris.Aion2Flow.Views.ScenePlaybackWindow"
         x:DataType="vm:ScenePlaybackViewModel"
         Classes="PlaybackWindow"
-        Width="1240"
-        Height="760"
-        MinWidth="1020"
+        Width="1600"
+        Height="860"
+        MinWidth="1180"
         MinHeight="660"
         Title="{Binding WindowTitle}"
         Icon="/Assets/Images/Aion2Flow.png">
@@ -183,12 +184,39 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2"
-              ColumnDefinitions="460,*"
-              ColumnSpacing="12"
-              MinHeight="0">
-            <Border Classes="PlaybackPanel"
+        <DockPanel Grid.Row="2"
+                   LastChildFill="True"
+                   MinHeight="0">
+            <Border DockPanel.Dock="Right"
+                    Classes="PlaybackPanel PlaybackDetailsPanel"
+                    Width="720"
+                    Margin="12,0,0,0"
+                    IsVisible="{Binding IsCombatantDetailsVisible}"
                     MinHeight="0">
+                <Grid RowDefinitions="Auto,*"
+                      RowSpacing="8"
+                      MinHeight="0">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Classes="PlaybackPanelTitle"
+                                   Text="{markups:Translate Playback_CombatantDetails}" />
+                        <Button Grid.Column="1"
+                                Classes="PlaybackIconButton PlaybackDetailsCloseButton"
+                                Command="{Binding ClearCombatantDetailsCommand}"
+                                ToolTip.Tip="{markups:Translate Action_Close}">
+                            <Path Classes="PlaybackGlyph" Data="{StaticResource x}" />
+                        </Button>
+                    </Grid>
+                    <views:CombatantDetailsView Grid.Row="1"
+                                                DataContext="{Binding CombatantDetails}"
+                                                VerticalScrollBarVisibility="Auto" />
+                </Grid>
+            </Border>
+
+            <Grid ColumnDefinitions="460,*"
+                  ColumnSpacing="12"
+                  MinHeight="0">
+                <Border Classes="PlaybackPanel"
+                        MinHeight="0">
                 <Grid RowDefinitions="Auto,Auto,*"
                       RowSpacing="8"
                       MinHeight="0">
@@ -216,8 +244,10 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:PlaybackCombatantRowViewModel">
                                     <Grid Classes="PlaybackCombatantRow"
+                                          Classes.PlaybackSelected="{Binding IsSelected}"
                                           ColumnDefinitions="*,78,70,130"
-                                          ColumnSpacing="8">
+                                          ColumnSpacing="8"
+                                          Tapped="CombatantRowTapped">
                                         <controls:CombatantDisplay Classes="PlaybackCombatantName"
                                                                    EntityId="{Binding EntityId}"
                                                                    IconSize="20" />
@@ -251,11 +281,11 @@
                         </ItemsControl>
                     </ScrollViewer>
                 </Grid>
-            </Border>
+                </Border>
 
-            <Border Grid.Column="1"
-                    Classes="PlaybackPanel"
-                    MinHeight="0">
+                <Border Grid.Column="1"
+                        Classes="PlaybackPanel"
+                        MinHeight="0">
                 <Grid RowDefinitions="Auto,Auto,*"
                       RowSpacing="8"
                       MinHeight="0">
@@ -314,8 +344,8 @@
                         </ItemsControl>
                     </ScrollViewer>
                 </Grid>
-            </Border>
-
-        </Grid>
+                </Border>
+            </Grid>
+        </DockPanel>
     </Grid>
 </Window>

@@ -110,6 +110,13 @@ public sealed class ScenePlaybackSession
         return new ScenePlaybackCheckpoint(_projector.CreateSnapshot(), new JournalCursor(_nextLoadedObservationOrdinal));
     }
 
+    internal ScenePlaybackCombatantDetail CreateCombatantDetail(int combatantId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(combatantId);
+        var projector = _projector ??= CreateProjector();
+        return projector.CreateCombatantDetail(combatantId);
+    }
+
     private FrameProjector CreateProjector()
     {
         var segment = _source.CreateTimelineSegment();
@@ -147,6 +154,8 @@ public sealed class ScenePlaybackSession
         private long _appliedEndOrdinal;
         private long _currentBatchOrdinal = -1;
         private long _completedBatchOrdinal = -1;
+        private int _detailCombatantId;
+        private CombatDetailSubscription? _detailSubscription;
 
         public FrameProjector(Guid encounterId, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
             : this(
@@ -266,6 +275,21 @@ public sealed class ScenePlaybackSession
             CreateAuraInstanceSnapshot(),
             CreateTrackSnapshot(),
             CreateRecentMarkerSnapshot());
+
+        public ScenePlaybackCombatantDetail CreateCombatantDetail(int combatantId)
+        {
+            var snapshot = _adapter.CreateSnapshot();
+            var forceRefresh = _detailSubscription is null || _detailCombatantId != combatantId;
+            if (forceRefresh)
+            {
+                _detailCombatantId = combatantId;
+                _detailSubscription = new CombatDetailSubscription(_combat, combatantId);
+            }
+
+            var writer = new PlaybackDetailEventWriter();
+            var update = _detailSubscription!.Update(_adapter, snapshot, forceRefresh, writer);
+            return new ScenePlaybackCombatantDetail(_positionMilliseconds, _appliedEndOrdinal, snapshot, update, writer.Events);
+        }
 
         public ScenePlaybackFrame AdvanceTo(long positionMilliseconds, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
         {
@@ -638,6 +662,17 @@ public sealed class ScenePlaybackSession
                 return [];
 
             return _recentMarkers.ToArray();
+        }
+
+        private sealed class PlaybackDetailEventWriter : ICombatDetailEventWriter
+        {
+            private readonly List<CombatDetailEvent> _events = [];
+
+            public IReadOnlyList<CombatDetailEvent> Events => _events;
+
+            public void Clear() => _events.Clear();
+
+            public void Add(in CombatDetailEvent detailEvent) => _events.Add(detailEvent);
         }
     }
 

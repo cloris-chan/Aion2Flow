@@ -17,6 +17,7 @@
     <data name="Action_BattleReset" xml:space="preserve"><value>重置戰鬥</value></data>
   <data name="Action_Live" xml:space="preserve"><value>即時</value></data>
   <data name="Action_SelectAll" xml:space="preserve"><value>全選</value></data>
+  <data name="Action_Close" xml:space="preserve"><value>關閉</value></data>
 
   <!-- Settings -->
   <data name="Settings_Title" xml:space="preserve"><value>設定</value></data>
@@ -132,6 +133,7 @@
   <data name="Playback_Label_Speed" xml:space="preserve"><value>速率</value></data>
   <data name="Playback_TimelineTracks" xml:space="preserve"><value>時間軸軌道</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>戰鬥對象</value></data>
+  <data name="Playback_CombatantDetails" xml:space="preserve"><value>戰鬥對象詳情</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>事件窗口</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>對象</value></data>
   <data name="Playback_Column_Damage" xml:space="preserve"><value>傷害</value></data>

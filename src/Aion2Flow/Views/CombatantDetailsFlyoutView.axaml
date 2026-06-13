@@ -1,7 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
-             xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
              xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.CombatantDetailsFlyoutView"
@@ -15,41 +13,6 @@
             Width="920"
             MaxWidth="1080"
             MaxHeight="720">
-        <Grid RowDefinitions="Auto,*"
-              RowSpacing="14"
-              controls:DisplayContextProvider.DisplayContext="{Binding DisplayContext}">
-            <Grid Grid.Row="0"
-                  ColumnDefinitions="*,Auto"
-                  ColumnSpacing="16">
-                <controls:CombatantDisplay Grid.Column="0"
-                                            Classes="DetailHeaderName"
-                                            EntityId="{Binding SelectedCombatantId}"
-                                            VerticalAlignment="Center" />
-
-                <StackPanel Grid.Column="1"
-                            Classes="DetailDirectionTabs"
-                            Orientation="Horizontal"
-                            Spacing="2">
-                    <ToggleButton Classes="DetailDirectionTab"
-                                  IsChecked="{Binding IsOutgoingSelected, Mode=TwoWay}"
-                                  Content="{markups:Translate Direction_Outgoing}" />
-                    <ToggleButton Classes="DetailDirectionTab"
-                                  IsChecked="{Binding IsIncomingSelected, Mode=TwoWay}"
-                                  Content="{markups:Translate Direction_Incoming}" />
-                </StackPanel>
-            </Grid>
-
-            <ScrollViewer Grid.Row="1"
-                          Classes="DetailContentScroller">
-                <Grid>
-                    <Border IsVisible="{Binding IsOutgoingSelected}">
-                        <views:CombatDirectionDetailView DataContext="{Binding OutgoingDetail}" />
-                    </Border>
-                    <Border IsVisible="{Binding IsIncomingSelected}">
-                        <views:CombatDirectionDetailView DataContext="{Binding IncomingDetail}" />
-                    </Border>
-                </Grid>
-            </ScrollViewer>
-        </Grid>
+        <views:CombatantDetailsView />
     </Border>
 </UserControl>

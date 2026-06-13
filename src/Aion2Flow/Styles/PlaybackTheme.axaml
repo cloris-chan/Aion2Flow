@@ -50,6 +50,10 @@
         <Setter Property="Padding" Value="10,9,10,10" />
     </Style>
 
+    <Style Selector="Border.PlaybackPanel.PlaybackDetailsPanel">
+        <Setter Property="Padding" Value="12" />
+    </Style>
+
     <Style Selector="TextBlock.PlaybackPanelTitle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
         <Setter Property="FontSize" Value="12" />
@@ -93,6 +97,11 @@
     <Style Selector="Button.PlaybackIconButton.PlaybackPrimaryButton">
         <Setter Property="Background" Value="{StaticResource PlaybackBrush.AccentFill}" />
         <Setter Property="BorderBrush" Value="{StaticResource PlaybackBrush.Accent}" />
+    </Style>
+
+    <Style Selector="Button.PlaybackIconButton.PlaybackDetailsCloseButton">
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="26" />
     </Style>
 
     <Style Selector="Button.PlaybackTextButton">
@@ -245,6 +254,11 @@
 
     <Style Selector="Grid.PlaybackCombatantRow">
         <Setter Property="MinHeight" Value="42" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="Grid.PlaybackCombatantRow.PlaybackSelected">
+        <Setter Property="Background" Value="{StaticResource PlaybackBrush.ControlHover}" />
     </Style>
 
     <Style Selector="Grid.PlaybackEventRow">
