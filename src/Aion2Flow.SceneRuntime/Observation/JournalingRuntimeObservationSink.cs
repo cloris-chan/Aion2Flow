@@ -7,16 +7,35 @@ using Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Observation;
 
-public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextBatchOrdinal = null) : IRuntimeObservationSink
+public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
 {
+    private readonly ObservedEventJournal journal;
+    private readonly SceneRuntimeClock clock;
+    private readonly Func<Guid> sceneSessionId;
+    private readonly Func<long>? nextBatchOrdinal;
+    private readonly ILiveSceneCollectionPolicy? collectionPolicy;
     private readonly LifecycleRemapService _lifecycle = new();
     private readonly Dictionary<long, long> _mappedBatchOrdinals = [];
     private readonly Dictionary<int, RuntimeNpcState> _npcStates = [];
     private readonly HashSet<int> _knownEntities = [];
     private readonly Dictionary<int, int> _summonOwnerByInstance = [];
 
-    public JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Guid sceneSessionId) : this(journal, clock, () => sceneSessionId)
+    public JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Guid sceneSessionId) : this(journal, clock, () => sceneSessionId, null, null)
     {
+    }
+
+    public JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextBatchOrdinal = null)
+        : this(journal, clock, sceneSessionId, nextBatchOrdinal, null)
+    {
+    }
+
+    internal JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextBatchOrdinal, ILiveSceneCollectionPolicy? collectionPolicy)
+    {
+        this.journal = journal;
+        this.clock = clock;
+        this.sceneSessionId = sceneSessionId;
+        this.nextBatchOrdinal = nextBatchOrdinal;
+        this.collectionPolicy = collectionPolicy;
     }
 
     public ObservedEventJournal Journal => journal;
@@ -181,6 +200,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         var normalized = CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
         sourceId = ResolveLifecycleId(sourceId);
         targetId = ResolveLifecycleId(targetId);
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId))
+            return;
         AddKnownEntity(sourceId);
         AddKnownEntity(targetId);
         var stamp = CreateStamp(in packet);
@@ -202,6 +223,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId))
+            return;
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
@@ -229,6 +252,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId))
+            return;
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
@@ -254,6 +279,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker)
     {
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
+            return;
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
@@ -280,6 +307,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
     {
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
+            return;
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
@@ -307,6 +336,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64)
     {
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
+            return;
         entityId = ResolveLifecycleId(entityId);
         AddKnownEntity(entityId);
         var stamp = CreateStamp(in packet);
@@ -343,6 +374,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int instanceSequenceId, ResourceEffectRef actionResourceEffectRef, int sequenceValue, int stateValue, int detailValue, int tailLength)
     {
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
+            return;
         sourceId = ResolveLifecycleId(sourceId);
         sourceIdCopy = ResolveLifecycleId(sourceIdCopy);
         AddKnownEntity(sourceId);
@@ -377,6 +410,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         AddKnownEntity(entityId);
         var state = GetOrAddNpcState(entityId);
         RememberNpcObservationSource(entityId);
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
+            return;
         for (var resultIndex = 0; resultIndex < results.Length; resultIndex++)
         {
             ref readonly var result = ref results[resultIndex];
@@ -509,19 +544,23 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 DetailRaw = 0
             }
         });
+        collectionPolicy?.OnBossMetadataChanged();
     }
 
     public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp)
     {
         instanceId = ResolveLifecycleId(instanceId);
-        var stamp = CreateStamp(in packet);
         var state = GetOrAddNpcState(instanceId);
         state.Hp = hp;
         state.MaxHp = Math.Max(state.MaxHp ?? 0, hp);
-        state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
+        state.HpObservedAtMilliseconds = ResolvePacketOffsetMilliseconds(in packet);
         if (hp == 0)
             state.BattleToggledOn = false;
         AddKnownEntity(instanceId);
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendResourceObservation())
+            return;
+        var stamp = CreateStamp(in packet);
+        state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -539,19 +578,23 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 ResourceKind = 0
             }
         });
+        collectionPolicy?.OnBossMetadataChanged();
     }
 
     public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp, int maxHp)
     {
         instanceId = ResolveLifecycleId(instanceId);
-        var stamp = CreateStamp(in packet);
         var state = GetOrAddNpcState(instanceId);
         state.Hp = hp;
         state.MaxHp = Math.Max(maxHp, hp);
-        state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
+        state.HpObservedAtMilliseconds = ResolvePacketOffsetMilliseconds(in packet);
         if (hp == 0)
             state.BattleToggledOn = false;
         AddKnownEntity(instanceId);
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendResourceObservation())
+            return;
+        var stamp = CreateStamp(in packet);
+        state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneSessionId(),
@@ -569,6 +612,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 ResourceKind = 0
             }
         });
+        collectionPolicy?.OnBossMetadataChanged();
     }
 
     public void SetNpcBattle(in PacketObservationSource packet, int instanceId, bool isActive)
@@ -577,6 +621,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         var state = GetOrAddNpcState(instanceId);
         state.BattleToggledOn = isActive && state.Hp != 0;
         AddKnownEntity(instanceId);
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
+            return;
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
@@ -595,6 +641,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 DetailRaw = 0
             }
         });
+        collectionPolicy?.OnBossMetadataChanged();
     }
 
     public void ToggleNpcBattle(in PacketObservationSource packet, int instanceId)
@@ -604,6 +651,8 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
         var next = !(state.BattleToggledOn ?? false);
         state.BattleToggledOn = next && state.Hp != 0;
         AddKnownEntity(instanceId);
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
+            return;
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
         {
@@ -622,6 +671,7 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
                 DetailRaw = 0
             }
         });
+        collectionPolicy?.OnBossMetadataChanged();
     }
 
     public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, uint sequence, uint value0)
@@ -772,6 +822,9 @@ public sealed class JournalingRuntimeObservationSink(ObservedEventJournal journa
 
     private TimelineStamp CreateStamp(in PacketObservationSource packet)
         => clock.CreateStamp(packet.CaptureTimestampMilliseconds, packet.FrameOrdinal, MapBatchOrdinal(packet.BatchOrdinal));
+
+    private long ResolvePacketOffsetMilliseconds(in PacketObservationSource packet) =>
+        Math.Max(0, packet.CaptureTimestampMilliseconds - clock.SceneStartedAtMilliseconds);
 
     private RuntimeNpcState GetOrAddNpcState(int instanceId)
     {

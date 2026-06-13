@@ -5,6 +5,8 @@ namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 public sealed class BossFocusStore(EntityStore entities)
 {
     private readonly Dictionary<int, Snapshot> _observed = [];
+    private readonly Dictionary<int, Snapshot> _encounterBosses = [];
+    private readonly List<int> _encounterBossOrder = [];
     private readonly Dictionary<int, long> _lastClearedAtMilliseconds = [];
     private long _revision;
 
@@ -53,6 +55,17 @@ public sealed class BossFocusStore(EntityStore entities)
         }
 
         result.Sort(static (a, b) => a.InstanceId.CompareTo(b.InstanceId));
+        return result;
+    }
+
+    public IReadOnlyList<Snapshot> GetEncounterBosses()
+    {
+        if (_encounterBossOrder.Count == 0)
+            return [];
+
+        var result = new Snapshot[_encounterBossOrder.Count];
+        for (var i = 0; i < result.Length; i++)
+            result[i] = _encounterBosses[_encounterBossOrder[i]];
         return result;
     }
 
@@ -119,7 +132,13 @@ public sealed class BossFocusStore(EntityStore entities)
         index = 0;
         foreach (var (instanceId, observedAtMilliseconds) in _lastClearedAtMilliseconds)
             cleared[index++] = new BossFocusClearedSnapshot(instanceId, observedAtMilliseconds);
-        return new BossFocusStoreSnapshot(observed, cleared, _revision);
+        var encounterBosses = new BossFocusObservedSnapshot[_encounterBossOrder.Count];
+        for (var i = 0; i < encounterBosses.Length; i++)
+        {
+            var instanceId = _encounterBossOrder[i];
+            encounterBosses[i] = new BossFocusObservedSnapshot(instanceId, _encounterBosses[instanceId]);
+        }
+        return new BossFocusStoreSnapshot(observed, cleared, encounterBosses, _revision);
     }
 
     internal static BossFocusStore FromSnapshot(EntityStore entities, BossFocusStoreSnapshot snapshot)
@@ -135,6 +154,12 @@ public sealed class BossFocusStore(EntityStore entities)
         {
             var cleared = snapshot.Cleared[i];
             store._lastClearedAtMilliseconds[cleared.InstanceId] = cleared.ObservedAtMilliseconds;
+        }
+        for (var i = 0; i < snapshot.EncounterBosses.Length; i++)
+        {
+            var encounterBoss = snapshot.EncounterBosses[i];
+            store._encounterBossOrder.Add(encounterBoss.InstanceId);
+            store._encounterBosses[encounterBoss.InstanceId] = encounterBoss.Snapshot;
         }
         return store;
     }
@@ -163,6 +188,7 @@ public sealed class BossFocusStore(EntityStore entities)
             if (!next.Equals(current))
             {
                 _observed[instanceId] = next;
+                RememberEncounterBoss(instanceId, in next);
                 _revision++;
             }
             return;
@@ -179,6 +205,7 @@ public sealed class BossFocusStore(EntityStore entities)
         if (!_observed.TryGetValue(instanceId, out var previous) || !previous.Equals(snapshot))
         {
             _observed[instanceId] = snapshot;
+            RememberEncounterBoss(instanceId, in snapshot);
             _revision++;
         }
     }
@@ -207,8 +234,16 @@ public sealed class BossFocusStore(EntityStore entities)
         if (!_observed.TryGetValue(instanceId, out var current) || !current.Equals(snapshot))
         {
             _observed[instanceId] = snapshot;
+            RememberEncounterBoss(instanceId, in snapshot);
             _revision++;
         }
+    }
+
+    private void RememberEncounterBoss(int instanceId, in Snapshot snapshot)
+    {
+        if (!_encounterBosses.ContainsKey(instanceId))
+            _encounterBossOrder.Add(instanceId);
+        _encounterBosses[instanceId] = snapshot;
     }
 
     private int ResolveMaxHp(int instanceId, int hp, int maxHp)
@@ -242,7 +277,7 @@ public sealed class BossFocusStore(EntityStore entities)
     }
 }
 
-internal sealed record BossFocusStoreSnapshot(BossFocusObservedSnapshot[] Observed, BossFocusClearedSnapshot[] Cleared, long Revision);
+internal sealed record BossFocusStoreSnapshot(BossFocusObservedSnapshot[] Observed, BossFocusClearedSnapshot[] Cleared, BossFocusObservedSnapshot[] EncounterBosses, long Revision);
 
 internal readonly record struct BossFocusObservedSnapshot(int InstanceId, BossFocusStore.Snapshot Snapshot);
 

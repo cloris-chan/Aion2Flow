@@ -8,6 +8,7 @@ public sealed class SceneRuntimeClock(long sceneStartedAtMilliseconds)
     private long _sceneStartedAtMilliseconds = sceneStartedAtMilliseconds;
 
     public long NextObservationOrdinal => Volatile.Read(ref _nextObservationOrdinal);
+    internal long SceneStartedAtMilliseconds => Volatile.Read(ref _sceneStartedAtMilliseconds);
 
     public void Reset(DateTimeOffset sceneStartedAt) => Volatile.Write(ref _sceneStartedAtMilliseconds, sceneStartedAt.ToUnixTimeMilliseconds());
 

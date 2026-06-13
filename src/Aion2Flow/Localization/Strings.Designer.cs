@@ -10,8 +10,8 @@
 
 namespace Cloris.Aion2Flow.Localization {
     using System;
-    
-    
+
+
     /// <summary>
     ///   A strongly-typed resource class, for looking up localized strings, etc.
     /// </summary>
@@ -23,9 +23,9 @@ namespace Cloris.Aion2Flow.Localization {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Strings {
-        
+
         private static global::System.Resources.ResourceManager resourceMan;
-        
+
         private static global::System.Globalization.CultureInfo resourceCulture;
         
         [global::System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode")]
@@ -393,6 +393,24 @@ namespace Cloris.Aion2Flow.Localization {
             }
         }
         
+        /// <summary>
+        ///   Looks up a localized string similar to Buff / Debuff.
+        /// </summary>
+        internal static string Playback_AuraCoverage {
+            get {
+                return ResourceManager.GetString("Playback_AuraCoverage", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Effect #{0}.
+        /// </summary>
+        internal static string Playback_AuraUnknownFormat {
+            get {
+                return ResourceManager.GetString("Playback_AuraUnknownFormat", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Building checkpoints... {0}.
         /// </summary>
@@ -861,6 +879,33 @@ namespace Cloris.Aion2Flow.Localization {
             }
         }
         
+        /// <summary>
+        ///   Looks up a localized string similar to Scene mode.
+        /// </summary>
+        internal static string Settings_SceneKind {
+            get {
+                return ResourceManager.GetString("Settings_SceneKind", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Boss battles only.
+        /// </summary>
+        internal static string Settings_SceneKind_Boss {
+            get {
+                return ResourceManager.GetString("Settings_SceneKind_Boss", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Standard.
+        /// </summary>
+        internal static string Settings_SceneKind_Standard {
+            get {
+                return ResourceManager.GetString("Settings_SceneKind_Standard", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Settings.
         /// </summary>

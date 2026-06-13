@@ -62,6 +62,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private readonly Lock _frameGate = new();
     private readonly ScenePlaybackController _controller;
     private readonly IScenePlaybackSource _source;
+    private readonly ArchivedEncounterRecord _record;
     private CancellationTokenSource? _detailCancellation;
     private CancellationTokenSource? _auraTimelineCancellation;
     private CancellationTokenSource? _seekCancellation;
@@ -100,6 +101,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     internal ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory, UiFrameBatchService frameBatchService)
     {
+        _record = record;
         DisplayContext = displayContext;
         Localization = localization;
         CombatantDetails = new CombatantDetailsFlyoutViewModel(localization, frameBatchService)
@@ -110,9 +112,9 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _controller = new ScenePlaybackController(_source, tickSourceFactory, ScenePlaybackControllerOptions.Default);
         _controller.FrameChanged += OnFrameChanged;
         Localization.LanguageChanged += OnLanguageChanged;
-        WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], displayContext.ResolveMapName(record.Snapshot.MapId));
+        SceneName = displayContext.ResolveSceneName(record.ScenePayload.Kind, record.Snapshot.MapId, record.ScenePayload.BossNpcCodes);
+        WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], SceneName);
         ArchivedAtText = record.ArchivedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
-        MapId = record.Snapshot.MapId;
         _currentFrame = _controller.CurrentFrame;
         ApplyFrame(_currentFrame, _controller.State);
     }
@@ -134,7 +136,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     public partial string ArchivedAtText { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial uint MapId { get; set; }
+    public partial string SceneName { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial double PositionMilliseconds { get; set; }
@@ -1014,7 +1016,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
-        WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], DisplayContext.ResolveMapName(MapId));
+        SceneName = DisplayContext.ResolveSceneName(_record.ScenePayload.Kind, _record.Snapshot.MapId, _record.ScenePayload.BossNpcCodes);
+        WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], SceneName);
         _timelineMarkersInitialized = false;
         _forceNextDetailProjection = true;
         ApplyFrame(_currentFrame, _controller.State);

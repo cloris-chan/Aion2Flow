@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -122,7 +123,7 @@ public sealed class ScenePlaybackSession
         var segment = _source.CreateTimelineSegment();
         var baseSnapshot = _source.CreateSnapshot();
         var timeRange = ScenePlaybackTimeline.ResolveTimeRange(segment, baseSnapshot);
-        return new FrameProjector(_source.EncounterId, segment, timeRange);
+        return new FrameProjector(_source.EncounterId, baseSnapshot.Kind, segment, timeRange);
     }
 
     private FrameProjector CreateProjector(ScenePlaybackCheckpoint checkpoint)
@@ -136,6 +137,7 @@ public sealed class ScenePlaybackSession
     private sealed class FrameProjector
     {
         private readonly Guid _encounterId;
+        private readonly SceneKind _kind;
         private readonly EntityStore _entities;
         private readonly SceneBoundaryStore _boundary;
         private readonly RuntimeMetadataRegistry _metadata;
@@ -157,9 +159,10 @@ public sealed class ScenePlaybackSession
         private int _detailCombatantId;
         private CombatDetailSubscription? _detailSubscription;
 
-        public FrameProjector(Guid encounterId, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
+        public FrameProjector(Guid encounterId, SceneKind kind, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
             : this(
                 encounterId,
+                kind,
                 segment,
                 timeRange,
                 new EntityStore(),
@@ -183,6 +186,7 @@ public sealed class ScenePlaybackSession
 
         private FrameProjector(
             Guid encounterId,
+            SceneKind kind,
             SceneJournalSegment segment,
             ScenePlaybackTimeRange timeRange,
             EntityStore entities,
@@ -203,6 +207,7 @@ public sealed class ScenePlaybackSession
             SceneCombatSnapshotAdapterSnapshot? adapterSnapshot)
         {
             _encounterId = encounterId;
+            _kind = kind;
             _segment = segment;
             _timeRange = timeRange;
             _entities = entities;
@@ -239,6 +244,7 @@ public sealed class ScenePlaybackSession
             var combat = CombatStore.FromSnapshot(snapshot.Combat);
             return new FrameProjector(
                 encounterId,
+                snapshot.Kind,
                 segment,
                 timeRange,
                 entities,
@@ -265,6 +271,7 @@ public sealed class ScenePlaybackSession
             _timeRange,
             _currentBatchOrdinal,
             _completedBatchOrdinal,
+            _kind,
             _entities.CreateSnapshot(),
             _boundary.CreateSnapshot(),
             _metadata.CreateSnapshot(),
@@ -278,7 +285,7 @@ public sealed class ScenePlaybackSession
 
         public ScenePlaybackCombatantDetail CreateCombatantDetail(int combatantId)
         {
-            var snapshot = _adapter.CreateSnapshot();
+            var snapshot = _adapter.CreateSnapshot(_kind);
             var forceRefresh = _detailSubscription is null || _detailCombatantId != combatantId;
             if (forceRefresh)
             {
@@ -319,7 +326,7 @@ public sealed class ScenePlaybackSession
 
         private ScenePlaybackFrame BuildFrame()
         {
-            var snapshot = _adapter.CreateSnapshot();
+            var snapshot = _adapter.CreateSnapshot(_kind);
             var totals = CreateTotals(snapshot);
             return new ScenePlaybackFrame
             {
@@ -741,6 +748,7 @@ internal sealed record ScenePlaybackProjectionSnapshot(
     ScenePlaybackTimeRange TimeRange,
     long CurrentBatchOrdinal,
     long CompletedBatchOrdinal,
+    SceneKind Kind,
     EntityStoreSnapshot Entities,
     SceneBoundaryStoreSnapshot Boundary,
     RuntimeMetadataRegistrySnapshot Metadata,

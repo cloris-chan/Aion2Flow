@@ -47,6 +47,7 @@ public sealed class DomainEventApplier
     public RuntimeMetadataRegistry MetadataRegistry => _metadataRegistry;
     public CombatStore Combat => _combat;
     public BossFocusStore BossFocus => _bossFocus;
+    public bool TrackBossFocus { get; set; } = true;
 
     internal DomainEventApplierSnapshot CreateSnapshot() => new(
         _systemPeriodicRecovery.CreateSnapshot(),
@@ -102,7 +103,8 @@ public sealed class DomainEventApplier
                 break;
             case ObservedEventDomain.Resource when entry.Resource is { } resource:
                 _entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
-                _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), observedAtMilliseconds);
+                if (TrackBossFocus)
+                    _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), observedAtMilliseconds);
                 TryApplyBossCombatActivity(resource.EntityId, observedAtMilliseconds);
                 break;
             case ObservedEventDomain.Scene when entry.Scene is { } scene:
@@ -258,7 +260,8 @@ public sealed class DomainEventApplier
         {
             var kind = Enum.IsDefined((NpcKind)state.Value0) ? (NpcKind)state.Value0 : NpcKind.Unknown;
             _entities.ApplyNpcKind(state.EntityId, kind);
-            _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+            if (TrackBossFocus)
+                _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             TryApplyBossCombatActivity(state.EntityId, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
@@ -267,7 +270,8 @@ public sealed class DomainEventApplier
         {
             var isActive = state.Value0 != 0 && CanNpcBattleActivate(state.EntityId);
             _entities.ApplyBattleToggle(state.EntityId, isActive);
-            _bossFocus.ApplyBattle(state.EntityId, isActive, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+            if (TrackBossFocus)
+                _bossFocus.ApplyBattle(state.EntityId, isActive, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
 
@@ -275,7 +279,8 @@ public sealed class DomainEventApplier
         {
             var isActive = !_entities.GetOrAdd(state.EntityId).NpcCombatActive && CanNpcBattleActivate(state.EntityId);
             _entities.ApplyBattleToggle(state.EntityId, isActive);
-            _bossFocus.ApplyBattleToggle(state.EntityId, isActive, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+            if (TrackBossFocus)
+                _bossFocus.ApplyBattleToggle(state.EntityId, isActive, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
 
@@ -317,7 +322,8 @@ public sealed class DomainEventApplier
 
     private void TryApplyBossCombatActivity(int instanceId, long observedAtMilliseconds)
     {
-        if (instanceId <= 0 ||
+        if (!TrackBossFocus ||
+            instanceId <= 0 ||
             !_entities.TryGet(instanceId, out var entity) ||
             entity.Kind != NpcKind.Boss ||
             entity.CurrentHp == 0 ||

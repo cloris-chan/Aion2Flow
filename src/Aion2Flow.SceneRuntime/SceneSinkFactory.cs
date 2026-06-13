@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
@@ -10,7 +11,7 @@ namespace Cloris.Aion2Flow.SceneRuntime;
 public static class SceneSinkFactory
 {
     public static Func<IRuntimeObservationSink> CreateForLive(SceneLiveReadModel scene) =>
-        () => scene.Synchronize(new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal));
+        scene.CreateSink;
 
     public static ReplaySinkHolder CreateForReplay()
     {
@@ -24,14 +25,19 @@ public static class SceneSinkFactory
     }
 }
 
-public sealed class SceneLiveReadModel
+public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 {
     private const int LiveJournalInitialCapacity = 4_096;
     private const int LiveCombatEventInitialCapacity = 4_096;
     private const int LiveCombatantInitialCapacity = 128;
     private const int LivePairInitialCapacity = 512;
     private readonly Lock _gate = new();
+    private readonly Queue<SceneArchiveCapture> _pendingArchives = [];
     private long _nextBatchOrdinal;
+    private SceneKind _kind;
+    private BossSceneState _bossState;
+    private long _frozenEndObservationOrdinalExclusive = -1;
+    private SceneArchiveCapture? _frozenArchive;
 
     public Guid SessionId { get; private set; }
     public DateTimeOffset SessionStarted { get; private set; }
@@ -39,6 +45,22 @@ public sealed class SceneLiveReadModel
     public SceneRuntimeClock Clock { get; }
     public RuntimeMetadataRegistry MetadataRegistry { get; } = new();
     public SceneReadModelOwner Owner { get; }
+    public SceneKind Kind
+    {
+        get
+        {
+            lock (_gate)
+                return _kind;
+        }
+    }
+    public BossSceneState BossState
+    {
+        get
+        {
+            lock (_gate)
+                return _bossState;
+        }
+    }
 
     public SceneLiveReadModel() : this(DateTimeOffset.Now)
     {
@@ -63,6 +85,8 @@ public sealed class SceneLiveReadModel
             MetadataRegistry,
             new CombatStore(LiveCombatEventInitialCapacity, LiveCombatantInitialCapacity, LivePairInitialCapacity),
             timeProvider);
+        _kind = SceneKind.Standard;
+        _bossState = BossSceneState.Waiting;
     }
 
     public void Reset()
@@ -94,6 +118,73 @@ public sealed class SceneLiveReadModel
 
     public IRuntimeObservationSink Synchronize(IRuntimeObservationSink sink) => new SynchronizedRuntimeObservationSink(sink, _gate);
 
+    internal IRuntimeObservationSink CreateSink()
+    {
+        var journaling = new JournalingRuntimeObservationSink(Journal, Clock, () => SessionId, NextBatchOrdinal, this);
+        return Synchronize(journaling);
+    }
+
+    public SceneReadModelFrame CreateFrame(int detailCombatantId = 0, bool forceDetailRefresh = false)
+    {
+        lock (_gate)
+        {
+            var frame = Owner.CreateFrame(detailCombatantId, forceDetailRefresh);
+            UpdateBossStateFromFrame(frame);
+            return frame;
+        }
+    }
+
+    public SceneReadModelFrame CreateFrame(int detailCombatantId, ICombatDetailEventWriter detailWriter, bool forceDetailRefresh = false)
+    {
+        lock (_gate)
+        {
+            var frame = Owner.CreateFrame(detailCombatantId, detailWriter, forceDetailRefresh);
+            UpdateBossStateFromFrame(frame);
+            return frame;
+        }
+    }
+
+    public SceneArchiveCapture? ChangeKind(SceneKind kind, DateTimeOffset sessionStarted, bool archiveCurrent)
+    {
+        lock (_gate)
+        {
+            SceneArchiveCapture? archive = archiveCurrent ? CreateArchiveCaptureCore() : null;
+            ResetCore(sessionStarted, kind);
+            return archive;
+        }
+    }
+
+    public SceneArchiveCapture? ChangeKind(SceneKind kind, Func<DateTimeOffset> resolveSessionStarted, bool archiveCurrent)
+    {
+        lock (_gate)
+        {
+            SceneArchiveCapture? archive = archiveCurrent ? CreateArchiveCaptureCore() : null;
+            ResetCore(resolveSessionStarted(), kind);
+            return archive;
+        }
+    }
+
+    public bool TryDequeuePendingArchive(out SceneArchiveCapture archive)
+    {
+        lock (_gate)
+        {
+            if (_pendingArchives.Count == 0)
+            {
+                archive = default;
+                return false;
+            }
+
+            archive = _pendingArchives.Dequeue();
+            return true;
+        }
+    }
+
+    public SceneArchiveCapture CreateArchiveCapture()
+    {
+        lock (_gate)
+            return CreateArchiveCaptureCore();
+    }
+
     private void ResetCore() => ResetCore(DateTimeOffset.Now);
 
     public void Reset(DateTimeOffset sessionStarted)
@@ -105,11 +196,173 @@ public sealed class SceneLiveReadModel
     }
 
     private void ResetCore(DateTimeOffset sessionStarted)
+        => ResetCore(sessionStarted, _kind);
+
+    private void ResetCore(DateTimeOffset sessionStarted, SceneKind kind)
     {
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
         Clock.Reset(sessionStarted);
-        Owner.ResetCombat(SessionId, Clock.NextObservationOrdinal, sessionStarted);
+        _kind = kind;
+        _bossState = BossSceneState.Waiting;
+        _frozenEndObservationOrdinalExclusive = -1;
+        _frozenArchive = null;
+        Owner.ResetCombat(
+            SessionId,
+            Clock.NextObservationOrdinal,
+            sessionStarted,
+            kind,
+            trackBossFocus: kind == SceneKind.Standard);
+    }
+
+    bool ILiveSceneCollectionPolicy.ShouldAppendCombat(in PacketObservationSource packet, int sourceId, int targetId)
+    {
+        if (_kind == SceneKind.Standard)
+            return true;
+
+        RefreshBossStateCore();
+        if (_bossState == BossSceneState.Recording)
+        {
+            if (TryResolveBossPlayerCombat(sourceId, targetId, out var activeBossId))
+                Owner.ObserveBossCombatTrigger(activeBossId, ResolveObservedAtMilliseconds(in packet));
+            return true;
+        }
+
+        Owner.Refresh();
+        if (!TryResolveBossPlayerCombat(sourceId, targetId, out var bossId))
+            return false;
+
+        if (_bossState == BossSceneState.Frozen)
+        {
+            _pendingArchives.Enqueue(GetFrozenArchiveCore());
+        }
+
+        var started = packet.CaptureTimestampMilliseconds > 0
+            ? DateTimeOffset.FromUnixTimeMilliseconds(packet.CaptureTimestampMilliseconds)
+            : DateTimeOffset.Now;
+        ResetCore(started, SceneKind.Boss);
+        _bossState = BossSceneState.Recording;
+        Owner.SetBossFocusTracking(true);
+        Owner.ObserveBossCombatTrigger(bossId, 0);
+        return true;
+    }
+
+    bool ILiveSceneCollectionPolicy.ShouldAppendExtendedObservation() =>
+        _kind == SceneKind.Standard || _bossState == BossSceneState.Recording;
+
+    bool ILiveSceneCollectionPolicy.ShouldAppendResourceObservation() =>
+        _kind == SceneKind.Standard || _bossState == BossSceneState.Recording;
+
+    void ILiveSceneCollectionPolicy.OnBossMetadataChanged()
+    {
+        if (_kind == SceneKind.Boss && _bossState == BossSceneState.Recording)
+            RefreshBossStateCore();
+    }
+
+    private void RefreshBossStateCore()
+    {
+        if (_kind != SceneKind.Boss || _bossState != BossSceneState.Recording)
+            return;
+
+        if (Owner.GetActiveBossFocusCount() != 0)
+            return;
+
+        FreezeBossSceneCore();
+    }
+
+    private void UpdateBossStateFromFrame(SceneReadModelFrame frame)
+    {
+        if (_kind == SceneKind.Boss &&
+            _bossState == BossSceneState.Recording &&
+            frame.BossFocuses.Count == 0)
+        {
+            FreezeBossSceneCore();
+        }
+    }
+
+    private void FreezeBossSceneCore()
+    {
+        if (_bossState == BossSceneState.Frozen)
+            return;
+
+        _frozenEndObservationOrdinalExclusive = Owner.AppliedNextObservationOrdinal;
+        _frozenArchive = Owner.CreateArchiveCapture(_frozenEndObservationOrdinalExclusive);
+        _bossState = BossSceneState.Frozen;
+        Owner.SetBossFocusTracking(false);
+    }
+
+    private SceneArchiveCapture CreateArchiveCaptureCore()
+    {
+        if (_kind == SceneKind.Boss &&
+            _bossState == BossSceneState.Frozen &&
+            _frozenEndObservationOrdinalExclusive >= 0)
+        {
+            return GetFrozenArchiveCore();
+        }
+
+        return Owner.CreateArchiveCapture();
+    }
+
+    private SceneArchiveCapture GetFrozenArchiveCore() =>
+        _frozenArchive ?? throw new InvalidOperationException("Frozen boss scene has no archive capture.");
+
+    private bool TryResolveBossPlayerCombat(int sourceId, int targetId, out int bossId)
+    {
+        var sourceIsBoss = IsBoss(sourceId);
+        var targetIsBoss = IsBoss(targetId);
+        if (sourceIsBoss && IsPlayerSide(targetId))
+        {
+            bossId = sourceId;
+            return true;
+        }
+
+        if (targetIsBoss && IsPlayerSide(sourceId))
+        {
+            bossId = targetId;
+            return true;
+        }
+
+        bossId = 0;
+        return false;
+    }
+
+    private long ResolveObservedAtMilliseconds(in PacketObservationSource packet) =>
+        packet.CaptureTimestampMilliseconds > 0
+            ? Math.Max(0, packet.CaptureTimestampMilliseconds - SessionStarted.ToUnixTimeMilliseconds())
+            : 0;
+
+    private bool IsBoss(int entityId) =>
+        entityId > 0 &&
+        Owner.Entities.TryGet(entityId, out var entity) &&
+        entity.Kind == NpcKind.Boss;
+
+    private bool IsPlayerSide(int entityId)
+    {
+        if (entityId <= 0)
+            return false;
+
+        var currentId = entityId;
+        for (var depth = 0; depth < 4; depth++)
+        {
+            if (Owner.MetadataRegistry.TryGetPcMetadata(currentId, out _))
+                return true;
+
+            if (!Owner.Entities.TryGet(currentId, out var entity))
+                return true;
+
+            if (entity.IsPlayer || entity.CharacterClass is not null and not CharacterClass.None)
+                return true;
+
+            if (entity.Kind == NpcKind.Summon && entity.OwnerEntityId is int ownerId && ownerId > 0 && ownerId != currentId)
+            {
+                currentId = ownerId;
+                continue;
+            }
+
+            return entity.Kind == NpcKind.Unknown && entity.NpcCode is null;
+        }
+
+        return false;
     }
 }
 

@@ -37,10 +37,8 @@
                     <StackPanel Orientation="Horizontal"
                                 Spacing="10"
                                 VerticalAlignment="Center">
-                        <controls:MapDisplay Classes="PlaybackSceneTitle"
-                                             MapId="{Binding MapId}"
-                                             UseBrackets="True"
-                                             IconSize="22" />
+                        <TextBlock Classes="PlaybackSceneTitle"
+                                   Text="{Binding SceneName, StringFormat='[{0}]'}" />
                         <TextBlock Classes="PlaybackHeaderSubtle"
                                    Text="{Binding ArchivedAtText}" />
                     </StackPanel>

@@ -95,6 +95,20 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
         return string.IsNullOrWhiteSpace(mapName) ? UnknownSceneName : mapName;
     }
 
+    public string ResolveSceneName(SceneKind kind, uint mapId, IReadOnlyList<int> bossNpcCodes)
+    {
+        if (kind != SceneKind.Boss)
+            return ResolveMapName(mapId);
+
+        if (bossNpcCodes.Count == 0)
+            return UnknownSceneName;
+
+        var names = new string[bossNpcCodes.Count];
+        for (var i = 0; i < names.Length; i++)
+            names[i] = ResolveNpcCodeName(bossNpcCodes[i]);
+        return string.Join(" / ", names);
+    }
+
     public string GetEntitySortKey(int entityId) => ResolveEntityName(entityId);
 
     public string GetSkillSortKey(int skillCode) => ResolveSkillName(skillCode);

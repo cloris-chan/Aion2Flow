@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.ViewModels;
 
@@ -15,6 +16,7 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _topmostMenuItem;
     private MenuItem? _visibleRowsMenuItem;
     private MenuItem? _combatantSortMetricMenuItem;
+    private MenuItem? _sceneKindMenuItem;
     private MenuItem? _languageMenuItem;
     private SettingsFlyoutViewModel? _viewModel;
     private Services.LocalizationService? _localization;
@@ -49,6 +51,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildTopmostMenuItems();
         RebuildVisibleRowsMenuItems();
         RebuildCombatantSortMetricMenuItems();
+        RebuildSceneKindMenuItems();
         RebuildLanguageMenuItems();
     }
 
@@ -57,6 +60,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildTopmostMenuItems();
         RebuildVisibleRowsMenuItems();
         RebuildCombatantSortMetricMenuItems();
+        RebuildSceneKindMenuItems();
         RebuildLanguageMenuItems();
     }
 
@@ -79,6 +83,11 @@ public partial class SettingsFlyoutView : UserControl
                 RefreshCombatantSortMetricHeader();
                 RefreshCombatantSortMetricCheckmarks();
                 break;
+            case nameof(SettingsFlyoutViewModel.SceneKind):
+            case nameof(SettingsFlyoutViewModel.SceneKindDisplay):
+                RefreshSceneKindHeader();
+                RefreshSceneKindCheckmarks();
+                break;
             case nameof(SettingsFlyoutViewModel.SelectedLanguage):
             case nameof(SettingsFlyoutViewModel.LanguageDisplay):
                 RefreshLanguageHeader();
@@ -92,6 +101,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildLanguageMenuItems();
         RebuildTopmostMenuItems();
         RebuildCombatantSortMetricMenuItems();
+        RebuildSceneKindMenuItems();
     }
 
     private void TopmostMenuItemLoaded(object? sender, RoutedEventArgs e)
@@ -127,6 +137,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _combatantSortMetricMenuItem = mi;
             RebuildCombatantSortMetricMenuItems();
+        }
+    }
+
+    private void SceneKindMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _sceneKindMenuItem != mi)
+        {
+            _sceneKindMenuItem = mi;
+            RebuildSceneKindMenuItems();
         }
     }
 
@@ -253,6 +272,45 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
+    private void RebuildSceneKindMenuItems()
+    {
+        RefreshSceneKindHeader();
+        var vm = ViewModel;
+        if (_sceneKindMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        _sceneKindMenuItem.Items.Clear();
+        foreach (var kind in vm.SceneKindOptions)
+        {
+            var item = new MenuItem
+            {
+                Header = vm.Localization[$"Settings_SceneKind_{kind}"],
+                Tag = kind
+            };
+            item.Classes.Add("FlyoutMenuItem");
+            item.Icon = CreateCheckmark(kind == vm.SceneKind);
+            item.Click += SceneKindItemClicked;
+            _sceneKindMenuItem.Items.Add(item);
+        }
+    }
+
+    private void RefreshSceneKindCheckmarks()
+    {
+        var vm = ViewModel;
+        if (_sceneKindMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        foreach (var child in _sceneKindMenuItem.Items)
+        {
+            if (child is MenuItem { Tag: SceneKind kind } mi)
+                mi.Icon = CreateCheckmark(kind == vm.SceneKind);
+        }
+    }
+
     private void RebuildLanguageMenuItems()
     {
         RefreshLanguageHeader();
@@ -318,6 +376,12 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
+    private void SceneKindItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && sender is MenuItem { Tag: SceneKind kind })
+            vm.SceneKind = kind;
+    }
+
     private void LanguageItemClicked(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm && sender is MenuItem { Tag: string code })
@@ -349,6 +413,13 @@ public partial class SettingsFlyoutView : UserControl
         var vm = ViewModel;
         if (_combatantSortMetricMenuItem is null || vm is null) return;
         _combatantSortMetricMenuItem.Header = CreateRowHeader(vm.Localization["Settings_CombatantSortMetric"], vm.CombatantSortMetricDisplay);
+    }
+
+    private void RefreshSceneKindHeader()
+    {
+        var vm = ViewModel;
+        if (_sceneKindMenuItem is null || vm is null) return;
+        _sceneKindMenuItem.Header = CreateRowHeader(vm.Localization["Settings_SceneKind"], vm.SceneKindDisplay);
     }
 
     private void RefreshLanguageHeader()

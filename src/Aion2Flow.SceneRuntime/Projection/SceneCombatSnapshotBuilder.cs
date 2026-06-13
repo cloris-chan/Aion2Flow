@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
@@ -8,8 +9,11 @@ internal sealed class SceneCombatSnapshotBuilder
 {
     private readonly Dictionary<int, SceneCombatantMetricsAccumulator> _combatants = [];
     private readonly List<SceneBossFocusSnapshot> _bossFocuses = [];
+    private readonly List<int> _bossNpcCodes = [];
 
     public Guid EncounterId { get; private set; }
+
+    public SceneKind Kind { get; private set; }
 
     public long SceneTransitionRevision { get; private set; }
 
@@ -31,14 +35,16 @@ internal sealed class SceneCombatSnapshotBuilder
 
     public Dictionary<int, SceneCombatantMetricsAccumulator>.KeyCollection CombatantIds => _combatants.Keys;
 
-    public void Reset(Guid encounterId, int combatantCapacity, int bossFocusCapacity)
+    public void Reset(Guid encounterId, SceneKind kind, int combatantCapacity, int bossFocusCapacity)
     {
         _combatants.Clear();
         _bossFocuses.Clear();
+        _bossNpcCodes.Clear();
         _combatants.EnsureCapacity(Math.Max(0, combatantCapacity));
         _bossFocuses.EnsureCapacity(Math.Max(0, bossFocusCapacity));
 
         EncounterId = encounterId == default ? Guid.NewGuid() : encounterId;
+        Kind = kind;
         SceneTransitionRevision = 0;
         MapId = 0;
         MapInstanceId = 0;
@@ -78,6 +84,12 @@ internal sealed class SceneCombatSnapshotBuilder
         _bossFocuses.Add(focus);
     }
 
+    public void AddBossNpcCode(int npcCode)
+    {
+        if (npcCode > 0 && !_bossNpcCodes.Contains(npcCode))
+            _bossNpcCodes.Add(npcCode);
+    }
+
     public ref SceneCombatantMetricsAccumulator GetOrAddCombatant(int combatantId)
     {
         ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(_combatants, combatantId, out var exists);
@@ -104,6 +116,7 @@ internal sealed class SceneCombatSnapshotBuilder
     {
         if (_combatants.Count == 0 &&
             _bossFocuses.Count == 0 &&
+            _bossNpcCodes.Count == 0 &&
             readModelRevision == 0 &&
             SceneTransitionRevision == 0 &&
             MapId == 0 &&
@@ -135,9 +148,13 @@ internal sealed class SceneCombatSnapshotBuilder
         var bossFocuses = _bossFocuses.Count == 0
             ? []
             : _bossFocuses.ToArray();
+        var bossNpcCodes = _bossNpcCodes.Count == 0
+            ? []
+            : _bossNpcCodes.ToArray();
 
         return new SceneCombatSnapshot(
             EncounterId,
+            Kind,
             readModelRevision,
             SceneTransitionRevision,
             MapId,
@@ -148,6 +165,7 @@ internal sealed class SceneCombatSnapshotBuilder
             entries,
             TargetObservation,
             Encounter,
-            bossFocuses);
+            bossFocuses,
+            bossNpcCodes);
     }
 }

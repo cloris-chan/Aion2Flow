@@ -46,10 +46,9 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             IsHitTestVisible="False">
-                    <controls:MapDisplay Classes="OverlayHeaderScene"
-                                         MapId="{Binding LiveSceneMapId}"
-                                         UseBrackets="True"
-                                         VerticalAlignment="Center" />
+                    <TextBlock Classes="OverlayHeaderScene"
+                               Text="{Binding SceneName, StringFormat='[{0}]'}"
+                               VerticalAlignment="Center" />
                     <controls:NumericBlock Classes="OverlayHeaderMetric"
                                            Value="{Binding EncounterTimeSeconds}"
                                            FractionDigits="1"

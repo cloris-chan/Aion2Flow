@@ -13,6 +13,7 @@ public sealed class SceneArchivePayload
 {
     private ArchivePayloadIndex? _detailIndex;
 
+    public SceneKind Kind { get; init; }
     public DateTimeOffset SceneStarted { get; init; }
     public SceneJournalSegment TimelineSegment { get; init; }
     public IReadOnlyList<SceneArchiveCombatEvent> Events { get; init; } = [];
@@ -21,6 +22,7 @@ public sealed class SceneArchivePayload
     public IReadOnlyList<CombatantSummary> Combatants { get; init; } = [];
     public IReadOnlyList<SceneArchiveEntityIdentity> Entities { get; init; } = [];
     public IReadOnlyList<SceneArchiveBossFocus> Bosses { get; init; } = [];
+    public IReadOnlyList<int> BossNpcCodes { get; init; } = [];
 
     internal IReadOnlyDictionary<int, int[]> EventIndicesByCombatant => DetailIndex.EventIndicesByCombatant;
     internal IReadOnlyDictionary<int, DirectedPairKey[]> OutgoingPairsByCombatant => DetailIndex.OutgoingPairsByCombatant;
@@ -61,11 +63,12 @@ public sealed class SceneArchivePayload
         var identityScope = BuildIdentityScope(entityIds, identities, boundary, metadataRegistry);
         var pairs = BuildPairs(eventsSnapshot);
         var combatants = BuildCombatants(pairs);
-        var bosses = BuildBosses(bossFocus, archivedSnapshot);
+        var bosses = BuildBosses(bossFocus);
         var detailIndex = ArchivePayloadIndex.Create(eventsSnapshot, pairs, combatants);
 
         return new SceneArchivePayload
         {
+            Kind = archivedSnapshot.Kind,
             SceneStarted = sceneStarted,
             TimelineSegment = timelineSegment,
             Events = eventsSnapshot,
@@ -74,6 +77,7 @@ public sealed class SceneArchivePayload
             Combatants = combatants,
             Entities = identities,
             Bosses = bosses,
+            BossNpcCodes = archivedSnapshot.BossNpcCodes.AsSpan().ToArray(),
             DetailIndex = detailIndex
         };
     }
@@ -99,9 +103,13 @@ public sealed class SceneArchivePayload
         var bosses = new SceneArchiveBossFocus[Bosses.Count];
         for (var i = 0; i < bosses.Length; i++)
             bosses[i] = Bosses[i].DeepClone();
+        var bossNpcCodes = new int[BossNpcCodes.Count];
+        for (var i = 0; i < bossNpcCodes.Length; i++)
+            bossNpcCodes[i] = BossNpcCodes[i];
 
         return new SceneArchivePayload
         {
+            Kind = Kind,
             SceneStarted = SceneStarted,
             TimelineSegment = TimelineSegment,
             Events = events,
@@ -110,6 +118,7 @@ public sealed class SceneArchivePayload
             Combatants = combatants,
             Entities = entities,
             Bosses = bosses,
+            BossNpcCodes = bossNpcCodes,
             DetailIndex = ArchivePayloadIndex.Create(events, pairs, combatants)
         };
     }
@@ -330,29 +339,17 @@ public sealed class SceneArchivePayload
         return result;
     }
 
-    private static SceneArchiveBossFocus[] BuildBosses(BossFocusStore bossFocus, SceneCombatSnapshot snapshot)
+    private static SceneArchiveBossFocus[] BuildBosses(BossFocusStore bossFocus)
     {
-        var targetId = snapshot.TargetObservation?.InstanceId ?? 0;
-        var trackingId = snapshot.Encounter.TrackingTargetId;
-        if (targetId <= 0 && trackingId <= 0)
-            return [];
-
-        var bosses = bossFocus.GetObservedBosses(0, long.MaxValue);
+        var bosses = bossFocus.GetEncounterBosses();
         if (bosses.Count == 0)
             return [];
 
-        SceneArchiveBossFocus? first = null;
-        SceneArchiveBossFocus? second = null;
+        var result = new SceneArchiveBossFocus[bosses.Count];
         for (var i = 0; i < bosses.Count; i++)
         {
             var boss = bosses[i];
-            if (boss.InstanceId != targetId && boss.InstanceId != trackingId)
-                continue;
-
-            if (first?.InstanceId == boss.InstanceId)
-                continue;
-
-            var focus = new SceneArchiveBossFocus
+            result[i] = new SceneArchiveBossFocus
             {
                 InstanceId = boss.InstanceId,
                 Hp = boss.Hp,
@@ -361,27 +358,9 @@ public sealed class SceneArchivePayload
                 LastObservedAtMilliseconds = boss.LastObservedAtMilliseconds,
                 HasHp = boss.HasHp
             };
-
-            if (first is null)
-            {
-                first = focus;
-                continue;
-            }
-
-            second = focus;
-            break;
         }
 
-        if (first is null)
-            return [];
-
-        if (second is null)
-            return [first];
-
-        if (first.InstanceId <= second.InstanceId)
-            return [first, second];
-
-        return [second, first];
+        return result;
     }
 
     private sealed class PairAccumulator(DirectedPairKey key)

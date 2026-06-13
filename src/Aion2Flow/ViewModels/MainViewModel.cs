@@ -9,6 +9,7 @@ using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -102,6 +103,12 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         set => SetFrameProperty(ref field, value);
     }
 
+    public string SceneName
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = string.Empty;
+
     public string DriverIndicatorColor
     {
         get;
@@ -186,6 +193,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _frameBatchService = frameBatchService;
         Localization = localization;
         SettingsFlyout = settingsFlyout;
+        if (_captureService.Scene.Kind != SettingsFlyout.SceneKind)
+            _captureService.Scene.ChangeKind(SettingsFlyout.SceneKind, _captureService.Scene.SessionStarted, archiveCurrent: false);
         CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService);
         DisplayContext = CreateLiveDisplayContext(_displayedSnapshot);
         _combatantDetails.DisplayContext = DisplayContext;
@@ -249,6 +258,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         if (e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantSortMetric))
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
+        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.SceneKind))
+            Dispatcher.UIThread.Post(ChangeSceneKind);
     }
 
     [RelayCommand]
@@ -294,20 +305,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _suppressRefresh = true;
         try
         {
+            DrainPendingBossArchives();
             ArchiveEncounter("manual-reset", isAutomatic: true);
             ResetLiveModels(RawPacketDump.RotateLogs);
 
-            _latestLiveSnapshot = new SceneCombatSnapshot();
-            _displayedSnapshot = new SceneCombatSnapshot();
-            _latestLiveFrame = new SceneReadModelFrame();
-            Combatants.Clear();
-            CombatantDetails.Clear();
-            BossFocuses.Clear();
-            CombatantColumns.Update(hasBossColumn: false, SettingsFlyout.CombatantSortMetric);
-            SelectedCombatant = null;
-            SelectedEncounterHistory = null;
-            IsViewingArchivedEncounter = false;
-            ApplyLocalizedUiText();
+            ResetLivePresentation();
             RefreshCaptureIndicators();
         }
         finally
@@ -362,8 +364,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         }
 
         var previousLiveSnapshot = _latestLiveSnapshot;
+        DrainPendingBossArchives();
         var selectedCombatantId = IsViewingArchivedEncounter ? 0 : SelectedCombatant?.Id ?? 0;
         var nextLiveFrame = CreateLiveFrame(selectedCombatantId);
+        DrainPendingBossArchives();
         if (TryAutoResetEncounter(previousLiveSnapshot, nextLiveFrame.Snapshot))
         {
             nextLiveFrame = CreateLiveFrame(selectedCombatantId);
@@ -398,8 +402,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private SceneReadModelFrame CreateLiveFrame(int detailCombatantId = 0, bool forceDetailRefresh = false) =>
         detailCombatantId > 0
-            ? _captureService.Scene.Owner.CreateFrame(detailCombatantId, _combatantDetails, forceDetailRefresh)
-            : _captureService.Scene.Owner.CreateFrame();
+            ? _captureService.Scene.CreateFrame(detailCombatantId, _combatantDetails, forceDetailRefresh)
+            : _captureService.Scene.CreateFrame();
 
     private void ApplySnapshot(SceneCombatSnapshot snapshot, bool forceDetailRefresh = false)
     {
@@ -408,6 +412,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         var encounterSeconds = snapshot.EncounterTime / 1000.0;
         EncounterTimeSeconds = encounterSeconds;
         LiveSceneMapId = snapshot.MapId;
+        SceneName = DisplayContext?.ResolveSceneName(snapshot.Kind, snapshot.MapId, snapshot.BossNpcCodes) ?? string.Empty;
         EnsureBarBrushScope(snapshot.EncounterId);
 
         using var deferral = Combatants.SuspendNotifications();
@@ -821,6 +826,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         RoundTripTimeMilliseconds = 0;
         LiveSceneMapId = _displayedSnapshot.MapId;
         UpdateDisplayContext(_displayedSnapshot);
+        SceneName = DisplayContext?.ResolveSceneName(_displayedSnapshot.Kind, _displayedSnapshot.MapId, _displayedSnapshot.BossNpcCodes) ?? string.Empty;
     }
 
     private void RebuildEncounterHistory()
@@ -829,10 +835,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         EncounterHistory.Clear();
         foreach (var record in _encounterArchiveService.History)
         {
+            var displayContext = CreateArchivedDisplayContext(record);
             EncounterHistory.Add(new EncounterHistoryItemViewModel(
                 record,
-                CreateArchivedDisplayContext(record),
-                record.Snapshot.MapId,
+                displayContext,
+                displayContext.ResolveSceneName(record.ScenePayload.Kind, record.Snapshot.MapId, record.ScenePayload.BossNpcCodes),
                 record.ArchivedAt.ToString("HH:mm:ss")));
         }
 
@@ -876,7 +883,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         var owner = _captureService.Scene.Owner;
         if (archivedSnapshot is null)
         {
-            var archive = owner.CreateArchiveCapture();
+            var archive = _captureService.Scene.CreateArchiveCapture();
             return _encounterArchiveService.Archive(archive.Snapshot, archive.Payload, trigger, isAutomatic);
         }
 
@@ -886,6 +893,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private bool TryAutoResetEncounter(SceneCombatSnapshot previousLiveSnapshot, SceneCombatSnapshot latestLiveSnapshot)
     {
+        if (_captureService.Scene.Kind == SceneKind.Boss)
+            return false;
+
         if (TryResolveMapTransitionResetReason(previousLiveSnapshot, latestLiveSnapshot, out var mapTransitionReason))
         {
             ArchiveEncounter(mapTransitionReason, isAutomatic: true, previousLiveSnapshot);
@@ -934,6 +944,50 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private void ResetLiveModels(Func<DateTimeOffset> resolveSessionStarted)
     {
         _captureService.Scene.Reset(resolveSessionStarted);
+    }
+
+    private void ChangeSceneKind()
+    {
+        if (_isDisposed || _suppressRefresh || _captureService.Scene.Kind == SettingsFlyout.SceneKind)
+            return;
+
+        _suppressRefresh = true;
+        try
+        {
+            DrainPendingBossArchives();
+            var archive = _captureService.Scene.ChangeKind(SettingsFlyout.SceneKind, RawPacketDump.RotateLogs, archiveCurrent: true);
+            if (archive is { } capture)
+                ArchiveCapture(in capture, "scene-kind-change", isAutomatic: true);
+            ResetLivePresentation();
+        }
+        finally
+        {
+            _suppressRefresh = false;
+        }
+    }
+
+    private void DrainPendingBossArchives()
+    {
+        while (_captureService.Scene.TryDequeuePendingArchive(out var capture))
+            ArchiveCapture(in capture, "boss-encounter-completed", isAutomatic: true);
+    }
+
+    private ArchivedEncounterRecord? ArchiveCapture(in SceneArchiveCapture capture, string trigger, bool isAutomatic) =>
+        _encounterArchiveService.Archive(capture.Snapshot, capture.Payload, trigger, isAutomatic);
+
+    private void ResetLivePresentation()
+    {
+        _latestLiveSnapshot = new SceneCombatSnapshot();
+        _displayedSnapshot = new SceneCombatSnapshot();
+        _latestLiveFrame = new SceneReadModelFrame();
+        Combatants.Clear();
+        CombatantDetails.Clear();
+        BossFocuses.Clear();
+        CombatantColumns.Update(hasBossColumn: false, SettingsFlyout.CombatantSortMetric);
+        SelectedCombatant = null;
+        SelectedEncounterHistory = null;
+        IsViewingArchivedEncounter = false;
+        ApplyLocalizedUiText();
     }
 
     private void RefreshCombatantDetails(bool forceRefresh = false)

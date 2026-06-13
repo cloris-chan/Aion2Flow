@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
@@ -7,9 +8,11 @@ public sealed class SceneCombatSnapshot
 {
     private static readonly CombatantSnapshotEntry[] EmptyCombatants = [];
     private static readonly SceneBossFocusSnapshot[] EmptyBossFocuses = [];
+    private static readonly int[] EmptyBossNpcCodes = [];
 
     public static SceneCombatSnapshot Empty { get; } = new(
         encounterId: Guid.Empty,
+        kind: SceneKind.Standard,
         readModelRevision: 0,
         sceneTransitionRevision: 0,
         mapId: 0,
@@ -20,11 +23,13 @@ public sealed class SceneCombatSnapshot
         combatants: EmptyCombatants,
         targetObservation: null,
         encounter: EncounterSummarySnapshot.Empty,
-        bossFocuses: EmptyBossFocuses);
+        bossFocuses: EmptyBossFocuses,
+        bossNpcCodes: EmptyBossNpcCodes);
 
     public SceneCombatSnapshot()
         : this(
             encounterId: Guid.NewGuid(),
+            kind: SceneKind.Standard,
             readModelRevision: 0,
             sceneTransitionRevision: 0,
             mapId: 0,
@@ -35,12 +40,14 @@ public sealed class SceneCombatSnapshot
             combatants: EmptyCombatants,
             targetObservation: null,
             encounter: EncounterSummarySnapshot.Empty,
-            bossFocuses: EmptyBossFocuses)
+            bossFocuses: EmptyBossFocuses,
+            bossNpcCodes: EmptyBossNpcCodes)
     {
     }
 
     internal SceneCombatSnapshot(
         Guid encounterId,
+        SceneKind kind,
         long readModelRevision,
         long sceneTransitionRevision,
         uint mapId,
@@ -51,9 +58,11 @@ public sealed class SceneCombatSnapshot
         CombatantSnapshotEntry[] combatants,
         NpcRuntimeObservationSnapshot? targetObservation,
         EncounterSummarySnapshot encounter,
-        SceneBossFocusSnapshot[] bossFocuses)
+        SceneBossFocusSnapshot[] bossFocuses,
+        int[] bossNpcCodes)
     {
         EncounterId = encounterId;
+        Kind = kind;
         ReadModelRevision = readModelRevision;
         SceneTransitionRevision = sceneTransitionRevision;
         MapId = mapId;
@@ -65,9 +74,12 @@ public sealed class SceneCombatSnapshot
         TargetObservation = targetObservation;
         Encounter = encounter;
         BossFocuses = new SnapshotList<SceneBossFocusSnapshot>(bossFocuses);
+        BossNpcCodes = new SnapshotList<int>(bossNpcCodes);
     }
 
     public Guid EncounterId { get; }
+
+    public SceneKind Kind { get; }
 
     public long ReadModelRevision { get; }
 
@@ -90,6 +102,8 @@ public sealed class SceneCombatSnapshot
     public EncounterSummarySnapshot Encounter { get; }
 
     public SnapshotList<SceneBossFocusSnapshot> BossFocuses { get; }
+
+    public SnapshotList<int> BossNpcCodes { get; }
 
     public SceneCombatSnapshot DeepClone()
     {

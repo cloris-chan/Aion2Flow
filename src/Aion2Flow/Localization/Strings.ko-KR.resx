@@ -25,6 +25,9 @@
   <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>게임 활성 시</value></data>
   <data name="Settings_Topmost_Always" xml:space="preserve"><value>항상</value></data>
   <data name="Settings_Topmost_Never" xml:space="preserve"><value>안 함</value></data>
+  <data name="Settings_SceneKind" xml:space="preserve"><value>장면 모드</value></data>
+  <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>표준</value></data>
+  <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>보스 전투만</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>표시 행 수</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>언어</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>전투 초기화 단축키</value></data>

@@ -25,6 +25,9 @@
                 <MenuItem x:Name="CombatantSortMetricMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="CombatantSortMetricMenuItemLoaded" />
+                <MenuItem x:Name="SceneKindMenuItem"
+                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Loaded="SceneKindMenuItemLoaded" />
                 <MenuItem x:Name="LanguageMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="LanguageMenuItemLoaded" />

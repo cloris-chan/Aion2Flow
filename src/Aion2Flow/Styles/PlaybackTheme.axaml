@@ -62,7 +62,7 @@
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
-    <Style Selector="controls|MapDisplay.PlaybackSceneTitle TextBlock#PART_Text">
+    <Style Selector="TextBlock.PlaybackSceneTitle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
         <Setter Property="FontSize" Value="17" />
         <Setter Property="FontWeight" Value="SemiBold" />

@@ -25,6 +25,9 @@
   <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>僅遊戲前台時</value></data>
   <data name="Settings_Topmost_Always" xml:space="preserve"><value>始終</value></data>
   <data name="Settings_Topmost_Never" xml:space="preserve"><value>從不</value></data>
+  <data name="Settings_SceneKind" xml:space="preserve"><value>場景模式</value></data>
+  <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>標準</value></data>
+  <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>僅 Boss 戰</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>顯示行數</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戰鬥重置快捷鍵</value></data>

@@ -3,6 +3,7 @@ using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -22,6 +23,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
     private SceneCombatSnapshotAdapter? _adapter;
+    private long _lastAppliedBatchOrdinal = -1;
     private long _appliedBatchOrdinal = -1;
     private SnapshotCacheKey _snapshotCacheKey;
     private SceneCombatSnapshot? _snapshotCache;
@@ -67,6 +69,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public DomainEventApplier Applier => _applier;
     public BossFocusStore BossFocus => _applier.BossFocus;
     public Guid EncounterId { get; private set; } = encounterId;
+    public SceneKind Kind { get; private set; } = SceneKind.Standard;
     public DateTimeOffset SceneStarted { get; private set; } = sceneStarted;
     public long SceneStartObservationOrdinal { get; private set; } = journal.FirstObservationOrdinal;
     public long AppliedObservationOrdinal { get; private set; }
@@ -137,12 +140,24 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     }
 
     public SceneArchiveCapture CreateArchiveCapture()
+        => CreateArchiveCapture(long.MaxValue);
+
+    internal SceneArchiveCapture CreateArchiveCapture(long endObservationOrdinalExclusive)
     {
         lock (_gate)
         {
-            RefreshCore();
+            if (endObservationOrdinalExclusive == long.MaxValue)
+            {
+                RefreshCore();
+            }
+            else
+            {
+                if (endObservationOrdinalExclusive < _cursor.NextObservationOrdinal)
+                    throw new InvalidOperationException("Cannot create an archive capture before the applied journal cursor.");
+                RefreshCore(endObservationOrdinalExclusive, completeBatches: true);
+            }
             var snapshot = CreateSnapshotCore();
-            var payload = SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, boundary, metadataRegistry, _applier.BossFocus, CreateAdapter(), CreateTimelineSegment(isLiveGrowing: false));
+            var payload = SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, boundary, metadataRegistry, _applier.BossFocus, CreateAdapter(), CreateTimelineSegment(isLiveGrowing: false, endObservationOrdinalExclusive));
             return new SceneArchiveCapture(snapshot, payload);
         }
     }
@@ -192,10 +207,43 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
+    public int GetActiveBossFocusCount()
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            return _applier.BossFocus.GetObservedBosses(GetSceneNowMilliseconds(), BossFocusVisibilityTimeoutMilliseconds).Count;
+        }
+    }
+
+    public void SetBossFocusTracking(bool enabled)
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            _applier.TrackBossFocus = enabled;
+            _snapshotCache = null;
+            _snapshotCacheValidUntilMilliseconds = -1;
+        }
+    }
+
+    public void ObserveBossCombatTrigger(int bossInstanceId, long observedAtMilliseconds)
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            if (_applier.TrackBossFocus)
+                _applier.BossFocus.ApplyCombatActivity(bossInstanceId, observedAtMilliseconds, observedAtMilliseconds);
+            _snapshotCache = null;
+            _snapshotCacheValidUntilMilliseconds = -1;
+        }
+    }
+
     private void RefreshCore() => RefreshCore(long.MaxValue, completeBatches: true);
 
     private void RefreshCore(long stopBeforeObservationOrdinal, bool completeBatches)
     {
+        var lastAppliedBatchOrdinal = _lastAppliedBatchOrdinal;
         while (true)
         {
             if (_cursor.NextObservationOrdinal >= stopBeforeObservationOrdinal)
@@ -214,6 +262,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
                 _applier.ApplyEntry(in entry);
                 AppliedObservationOrdinal++;
+                lastAppliedBatchOrdinal = Math.Max(lastAppliedBatchOrdinal, entry.Stamp.BatchOrdinal);
                 applied++;
             }
 
@@ -223,10 +272,11 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _cursor = applied == result.Count ? result.Cursor : journal.CreateCursor(entries[applied - 1].Stamp.ObservationOrdinal + 1);
         }
 
+        _lastAppliedBatchOrdinal = lastAppliedBatchOrdinal;
         if (!completeBatches)
             return;
 
-        var completedBatch = journal.LastCompletedBatchOrdinal;
+        var completedBatch = Math.Min(journal.LastCompletedBatchOrdinal, _lastAppliedBatchOrdinal);
         if (completedBatch > _appliedBatchOrdinal)
         {
             _applier.CompleteBatch(completedBatch);
@@ -279,9 +329,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
 
         var adapter = CreateAdapter();
-        _snapshotBuilder.Reset(EncounterId, combat.Combatants.Count, 0);
+        _snapshotBuilder.Reset(EncounterId, Kind, combat.Combatants.Count, 0);
         adapter.BuildSnapshot(_snapshotBuilder);
         ApplyBossFocusSnapshots(_snapshotBuilder, now);
+        ApplyBossNpcCodes(_snapshotBuilder);
         var snapshot = _snapshotBuilder.ToSnapshot(combat.Revision);
         _snapshotCacheKey = SnapshotCacheKey.From(EncounterId, entities, boundary, combat, _applier.BossFocus);
         _snapshotCache = snapshot;
@@ -292,8 +343,11 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
     private SceneCombatSnapshotAdapter CreateAdapter() => _adapter ??= new(entities, combat, boundary, _applier.BossFocus, EncounterId);
 
-    private SceneJournalSegment CreateTimelineSegment(bool isLiveGrowing) =>
-        new(journal, SceneStartObservationOrdinal, AppliedNextObservationOrdinal, isLiveGrowing);
+    private SceneJournalSegment CreateTimelineSegment(bool isLiveGrowing, long? endObservationOrdinalExclusive = null)
+    {
+        var end = Math.Clamp(endObservationOrdinalExclusive ?? AppliedNextObservationOrdinal, SceneStartObservationOrdinal, AppliedNextObservationOrdinal);
+        return new SceneJournalSegment(journal, SceneStartObservationOrdinal, end, isLiveGrowing);
+    }
 
     private BossDamageContribution[] CreateBossDamageContributions(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
     {
@@ -402,6 +456,23 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
+    private void ApplyBossNpcCodes(SceneCombatSnapshotBuilder builder)
+    {
+        var bosses = _applier.BossFocus.GetEncounterBosses();
+        for (var i = 0; i < bosses.Count; i++)
+        {
+            var instanceId = bosses[i].InstanceId;
+            if (entities.TryGet(instanceId, out var entity) && entity.NpcCode is int npcCode)
+            {
+                builder.AddBossNpcCode(npcCode);
+                continue;
+            }
+
+            if (metadataRegistry.TryGetNpcCode(instanceId, out var metadataNpcCode))
+                builder.AddBossNpcCode(metadataNpcCode);
+        }
+    }
+
     private CombatDetailSubscription GetDetailSubscription(int combatantId)
     {
         if (!_detailSubscriptions.TryGetValue(combatantId, out var subscription))
@@ -416,21 +487,27 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public void ResetCombat(Guid encounterId, long startOrdinal) => ResetCombat(encounterId, startOrdinal, DateTimeOffset.Now);
 
     public void ResetCombat(Guid encounterId, long startOrdinal, DateTimeOffset sceneStarted)
+        => ResetCombat(encounterId, startOrdinal, sceneStarted, SceneKind.Standard, trackBossFocus: true);
+
+    public void ResetCombat(Guid encounterId, long startOrdinal, DateTimeOffset sceneStarted, SceneKind kind, bool trackBossFocus)
     {
         lock (_gate)
         {
             RefreshCore(startOrdinal, completeBatches: false);
             EncounterId = encounterId;
+            Kind = kind;
             SceneStarted = sceneStarted;
             SceneStartObservationOrdinal = startOrdinal;
             combat.Clear();
             _applier = new DomainEventApplier(entities, boundary, metadataRegistry, combat);
+            _applier.TrackBossFocus = trackBossFocus;
             _adapter = null;
             _detailSubscriptions.Clear();
             _lastDetailDeltas.Clear();
             _cursor = journal.CreateCursor(startOrdinal);
             AppliedObservationOrdinal = 0;
             _appliedBatchOrdinal = journal.LastCompletedBatchOrdinal;
+            _lastAppliedBatchOrdinal = _appliedBatchOrdinal;
             _snapshotCache = null;
             _snapshotCacheKey = default;
             _snapshotCacheValidUntilMilliseconds = -1;

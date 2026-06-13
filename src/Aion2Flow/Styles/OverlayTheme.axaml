@@ -97,7 +97,7 @@
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
-    <Style Selector="controls|MapDisplay.OverlayHeaderScene TextBlock#PART_Text">
+    <Style Selector="TextBlock.OverlayHeaderScene">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />

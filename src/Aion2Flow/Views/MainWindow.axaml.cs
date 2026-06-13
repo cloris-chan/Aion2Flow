@@ -199,10 +199,9 @@ public partial class MainWindow : Window
                 VerticalAlignment = VerticalAlignment.Center
             };
             DisplayContextProvider.SetDisplayContext(header, item.DisplayContext);
-            header.Children.Add(new MapDisplay
+            header.Children.Add(new TextBlock
             {
-                MapId = item.MapId,
-                UseBrackets = true,
+                Text = $"[{item.SceneName}]",
                 VerticalAlignment = VerticalAlignment.Center
             });
             header.Children.Add(new TextBlock

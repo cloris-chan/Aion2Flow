@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia.Threading;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
@@ -39,6 +40,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             TopmostMode = persisted.TopmostMode;
             MaxVisibleCombatantRows = persisted.MaxVisibleCombatantRows;
             CombatantSortMetric = persisted.CombatantSortMetric;
+            SceneKind = persisted.SceneKind;
             if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
             {
                 BattleResetHotkey = new HotkeyDefinition((HotkeyModifiers)mods, vk);
@@ -70,6 +72,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public IReadOnlyList<CombatantSortMetric> CombatantSortMetricOptions { get; } = [CombatantSortMetric.DamagePerSecond, CombatantSortMetric.TotalDamage];
 
+    public IReadOnlyList<SceneKind> SceneKindOptions { get; } = [SceneKind.Standard, SceneKind.Boss];
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAlwaysOnTop))]
     [NotifyPropertyChangedFor(nameof(TopmostModeDisplay))]
@@ -86,6 +90,10 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CombatantSortMetricDisplay))]
     public partial CombatantSortMetric CombatantSortMetric { get; set; } = CombatantSortMetric.DamagePerSecond;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SceneKindDisplay))]
+    public partial SceneKind SceneKind { get; set; } = SceneKind.Standard;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
@@ -126,6 +134,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public string MaxVisibleCombatantRowsDisplay => MaxVisibleCombatantRows.ToString();
 
     public string CombatantSortMetricDisplay => Localization[$"Settings_CombatantSortMetric_{CombatantSortMetric}"];
+
+    public string SceneKindDisplay => Localization[$"Settings_SceneKind_{SceneKind}"];
 
     public string LanguageDisplay => SelectedLanguage?.DisplayName ?? string.Empty;
 
@@ -182,6 +192,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     partial void OnCombatantSortMetricChanged(CombatantSortMetric value) => PersistSettings();
 
+    partial void OnSceneKindChanged(SceneKind value) => PersistSettings();
+
     partial void OnSelectedLanguageChanged(LanguageOption? value)
     {
         if (value is not null)
@@ -228,6 +240,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.TopmostMode = TopmostMode;
             s.MaxVisibleCombatantRows = MaxVisibleCombatantRows;
             s.CombatantSortMetric = CombatantSortMetric;
+            s.SceneKind = SceneKind;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
             s.BattleResetHotkeyVirtualKey = BattleResetHotkey?.VirtualKey;
@@ -248,6 +261,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(TopmostModeDisplay));
         OnPropertyChanged(nameof(CombatantSortMetricDisplay));
+        OnPropertyChanged(nameof(SceneKindDisplay));
         OnPropertyChanged(nameof(LanguageDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(CurrentVersionText));

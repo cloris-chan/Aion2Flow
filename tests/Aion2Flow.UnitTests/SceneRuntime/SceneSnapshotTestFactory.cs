@@ -6,6 +6,7 @@ internal static class SceneSnapshotTestFactory
 {
     public static SceneCombatSnapshot Create(
         Guid? encounterId = null,
+        SceneKind kind = SceneKind.Standard,
         long readModelRevision = 0,
         long sceneTransitionRevision = 0,
         uint mapId = 0,
@@ -25,6 +26,7 @@ internal static class SceneSnapshotTestFactory
 
         return new SceneCombatSnapshot(
             encounterId ?? Guid.NewGuid(),
+            kind,
             readModelRevision,
             sceneTransitionRevision,
             mapId,
@@ -35,7 +37,8 @@ internal static class SceneSnapshotTestFactory
             combatantEntries,
             targetObservation,
             encounter ?? EncounterSummarySnapshot.Empty,
-            bossFocusEntries);
+            bossFocusEntries,
+            []);
     }
 
     public static CombatantSnapshotEntry Combatant(int id, SceneCombatantMetrics metrics)

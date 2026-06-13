@@ -66,10 +66,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             _classEvidenceOwnerVersion);
     }
 
-    public SceneCombatSnapshot CreateSnapshot()
+    public SceneCombatSnapshot CreateSnapshot(SceneKind kind = SceneKind.Standard)
     {
         var builder = new SceneCombatSnapshotBuilder();
-        builder.Reset(encounterId, combat.Combatants.Count, 0);
+        builder.Reset(encounterId, kind, combat.Combatants.Count, 0);
         BuildSnapshot(builder);
         return builder.ToSnapshot(combat.Revision);
     }

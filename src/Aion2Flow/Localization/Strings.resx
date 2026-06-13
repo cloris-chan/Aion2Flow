@@ -25,6 +25,9 @@
   <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>While game is active</value></data>
   <data name="Settings_Topmost_Always" xml:space="preserve"><value>Always</value></data>
   <data name="Settings_Topmost_Never" xml:space="preserve"><value>Never</value></data>
+  <data name="Settings_SceneKind" xml:space="preserve"><value>Scene mode</value></data>
+  <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>Standard</value></data>
+  <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>Boss battles only</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>Visible rows</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>Language</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>Battle reset hotkey</value></data>
