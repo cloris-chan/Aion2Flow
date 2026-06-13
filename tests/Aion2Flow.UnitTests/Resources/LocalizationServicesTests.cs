@@ -73,7 +73,11 @@ public sealed class LocalizationServicesTests
     [InlineData(100034, "風之精靈：基本攻擊", "ICON_EL_SKILL_012.webp")]
     [InlineData(100048, "地之精靈：基本攻擊", "ICON_EL_SKILL_013.webp")]
     [InlineData(17040257, "審判之電", "ICON_CL_SKILL_004.webp")]
+    [InlineData(17440047, "高潔氣息", "ICON_CL_SKILL_044.webp")]
     [InlineData(17730001, "主神恩寵", "ICON_CL_SKILL_Passive_012.webp")]
+    [InlineData(3001110, "神石：海格黛的束縛", "Icon_Item_Usable_Godstone_WP_r_004.webp")]
+    [InlineData(30011101, "神石：海格黛的束縛", "Icon_Item_Usable_Godstone_WP_r_004.webp")]
+    [InlineData(3000122, "神石：海格黛的聰明", "Icon_Item_Usable_Godstone_WP_r_016.webp")]
     public void GameResourceService_Resolves_Display_Resources_For_Packet_Variants(int skillCode, string expectedName, string expectedIcon)
     {
         try

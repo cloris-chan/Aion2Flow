@@ -76,6 +76,12 @@ public sealed class ResourceDatabaseTests
     [InlineData(1, "ICON_TE_SKILL_001.webp")]
     [InlineData(12240010, "ICON_TE_SKILL_004.webp")]
     [InlineData(16300243, "ICON_EL_SKILL_030.webp")]
+    [InlineData(17440000, "ICON_CL_SKILL_044.webp")]
+    [InlineData(17440047, "ICON_CL_SKILL_044.webp")]
+    [InlineData(3001110, "Icon_Item_Usable_Godstone_WP_r_004.webp")]
+    [InlineData(30011101, "Icon_Item_Usable_Godstone_WP_r_004.webp")]
+    [InlineData(3000122, "Icon_Item_Usable_Godstone_WP_r_016.webp")]
+    [InlineData(30001221, "Icon_Item_Usable_Godstone_WP_r_016.webp")]
     public void Generated_SkillIconCatalog_Resolves_Asset_Outside_Database(int skillCode, string expectedAssetName)
     {
         var assetName = SkillIconCatalog.ResolveAssetName(skillCode);
