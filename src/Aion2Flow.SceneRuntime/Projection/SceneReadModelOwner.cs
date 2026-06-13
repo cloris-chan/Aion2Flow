@@ -10,7 +10,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
 public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, TimeProvider? timeProvider = null)
 {
-    private const long BossFocusVisibilityTimeoutMilliseconds = 2_000;
+    private const long BossFocusVisibilityTimeoutMilliseconds = 10_000;
     private readonly Lock _gate = new();
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private DomainEventApplier _applier = new(entities, boundary, metadataRegistry, combat);

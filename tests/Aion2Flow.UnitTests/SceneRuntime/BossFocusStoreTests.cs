@@ -310,7 +310,7 @@ public sealed class BossFocusStoreTests
 
         Assert.Single(owner.CreateSnapshot().BossFocuses);
 
-        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(2_301));
+        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(10_301));
 
         Assert.Empty(owner.CreateSnapshot().BossFocuses);
         Assert.True(owner.Entities.TryGet(3518, out var entity));

@@ -1388,7 +1388,7 @@ public class SceneReadModelOwnerTests
         Assert.Same(first, second);
         Assert.Single(second.BossFocuses);
 
-        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(3_001));
+        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(11_001));
         var expired = scene.Owner.CreateSnapshot();
 
         Assert.NotSame(second, expired);
