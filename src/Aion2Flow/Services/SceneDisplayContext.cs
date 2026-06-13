@@ -46,20 +46,14 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
             : entityId.ToString(CultureInfo.InvariantCulture);
     }
 
-    public bool HasPcMetadata(int entityId)
-        => entityId > 0 && TryGetPcMetadata(entityId, out _);
+    public bool HasPcMetadata(int entityId) => entityId > 0 && TryGetPcMetadata(entityId, out _);
 
     public CharacterClass? ResolvePcClass(int entityId)
         => Snapshot.Combatants.TryGetValue(entityId, out var combatant)
             ? combatant.CharacterClass
-            : TryGetPcMetadata(entityId, out var pc)
-                ? pc.CharacterClass
-                : null;
+            : TryGetPcMetadata(entityId, out var pc) ? pc.CharacterClass : null;
 
-    public Faction ResolveFaction(int entityId)
-        => TryGetPcMetadata(entityId, out var pc)
-            ? pc.Faction
-            : Faction.Unknown;
+    public Faction ResolveFaction(int entityId) => TryGetPcMetadata(entityId, out var pc) ? pc.Faction : Faction.Unknown;
 
     public string ResolveNpcName(int instanceId)
     {
@@ -73,16 +67,11 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
             : instanceId.ToString(CultureInfo.InvariantCulture);
     }
 
-    public bool HasNpcCode(int instanceId)
-        => instanceId > 0 && TryGetNpcCode(instanceId, out _);
+    public bool HasNpcCode(int instanceId) => instanceId > 0 && TryGetNpcCode(instanceId, out _);
 
-    public string ResolveNpcCodeName(int npcCode)
-        => npcCode > 0 ? Resources.ResolveNpcName(npcCode) : string.Empty;
+    public string ResolveNpcCodeName(int npcCode) => npcCode > 0 ? Resources.ResolveNpcName(npcCode) : string.Empty;
 
-    public NpcCatalogEntry? ResolveNpcCodeCatalogEntry(int npcCode)
-        => npcCode > 0 && Resources.TryResolveNpcCatalogEntry(npcCode, out var entry)
-            ? entry
-            : null;
+    public NpcCatalogEntry? ResolveNpcCodeCatalogEntry(int npcCode) => npcCode > 0 && Resources.TryResolveNpcCatalogEntry(npcCode, out var entry) ? entry : null;
 
     public NpcCatalogEntry? ResolveNpcCatalogEntry(int instanceId)
     {
@@ -94,11 +83,11 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
         return ResolveNpcCodeCatalogEntry(npcCode);
     }
 
-    public string ResolveSkillName(int skillCode)
-        => skillCode > 0 ? Resources.ResolveSkillName(skillCode) : string.Empty;
+    public string ResolveSkillName(int skillCode) => skillCode > 0 ? Resources.ResolveSkillName(skillCode) : string.Empty;
 
-    public string? ResolveSkillIconAssetName(int skillCode)
-        => skillCode > 0 ? Resources.ResolveSkillIconAssetName(skillCode) : null;
+    public bool ContainsSkill(int skillCode) => Resources.ContainsSkill(skillCode);
+
+    public string? ResolveSkillIconAssetName(int skillCode) => skillCode > 0 ? Resources.ResolveSkillIconAssetName(skillCode) : null;
 
     public string ResolveMapName(uint mapId)
     {
@@ -106,11 +95,9 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
         return string.IsNullOrWhiteSpace(mapName) ? UnknownSceneName : mapName;
     }
 
-    public string GetEntitySortKey(int entityId)
-        => ResolveEntityName(entityId);
+    public string GetEntitySortKey(int entityId) => ResolveEntityName(entityId);
 
-    public string GetSkillSortKey(int skillCode)
-        => ResolveSkillName(skillCode);
+    public string GetSkillSortKey(int skillCode) => ResolveSkillName(skillCode);
 
     private bool TryGetPcMetadata(int entityId, out PcMetadata metadata)
     {

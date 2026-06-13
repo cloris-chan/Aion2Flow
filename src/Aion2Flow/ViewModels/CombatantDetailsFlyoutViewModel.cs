@@ -744,13 +744,12 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
                 continue;
             }
 
-            var displayName = ResolveActionDisplayName(skill.ActionKey, displayContext, localization);
+            var presentation = ResolveSkillPresentation(skill.ActionKey, displayContext, localization);
             var row = new SkillDetailRowData
             {
-                PresentationKey = new SkillPresentationKey(displayName, displayContext?.ResolveSkillIconAssetName(skill.SkillCode)),
-                ActionKey = skill.ActionKey,
-                SkillCode = skill.SkillCode,
-                DisplayName = displayName,
+                PresentationKey = presentation.Key,
+                SkillCode = presentation.SkillCode,
+                DisplayName = presentation.DisplayName,
                 TotalAmount = totalAmount,
                 DirectAmount = skill.DamageAmount,
                 PeriodicAmount = skill.PeriodicDamageAmount,
@@ -820,13 +819,12 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
                 continue;
             }
 
-            var displayName = ResolveActionDisplayName(skill.ActionKey, displayContext, localization);
+            var presentation = ResolveSkillPresentation(skill.ActionKey, displayContext, localization);
             var row = new SkillDetailRowData
             {
-                PresentationKey = new SkillPresentationKey(displayName, displayContext?.ResolveSkillIconAssetName(skill.SkillCode)),
-                ActionKey = skill.ActionKey,
-                SkillCode = skill.SkillCode,
-                DisplayName = displayName,
+                PresentationKey = presentation.Key,
+                SkillCode = presentation.SkillCode,
+                DisplayName = presentation.DisplayName,
                 TotalAmount = totalAmount,
                 DirectAmount = directHealingAmount,
                 PeriodicAmount = skill.PeriodicHealingAmount,
@@ -879,13 +877,12 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
                 continue;
             }
 
-            var displayName = ResolveActionDisplayName(skill.ActionKey, displayContext, localization);
+            var presentation = ResolveSkillPresentation(skill.ActionKey, displayContext, localization);
             var row = new SkillDetailRowData
             {
-                PresentationKey = new SkillPresentationKey(displayName, displayContext?.ResolveSkillIconAssetName(skill.SkillCode)),
-                ActionKey = skill.ActionKey,
-                SkillCode = skill.SkillCode,
-                DisplayName = displayName,
+                PresentationKey = presentation.Key,
+                SkillCode = presentation.SkillCode,
+                DisplayName = presentation.DisplayName,
                 TotalAmount = skill.ShieldAmount,
                 ShieldAmount = skill.ShieldAmount,
                 ShieldAbsorbedAmount = skill.ShieldAbsorbedAmount,
@@ -920,6 +917,18 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     }
 
+    private static SkillPresentation ResolveSkillPresentation(CombatActionKey actionKey, SceneDisplayContext? displayContext, LocalizationService localization)
+    {
+        var key = SkillPresentationKey.FromActionKey(actionKey);
+        var skillCode = key.SkillCode == actionKey.SkillCode || displayContext?.ContainsSkill(key.SkillCode) == true
+            ? key.SkillCode
+            : actionKey.SkillCode;
+        var displayActionKey = new CombatActionKey(skillCode, actionKey.BodyResourceEffectRef, actionKey.DetailResourceEffectRef);
+        return new SkillPresentation(key, skillCode, ResolveActionDisplayName(displayActionKey, displayContext, localization));
+    }
+
+    private readonly record struct SkillPresentation(SkillPresentationKey Key, int SkillCode, string DisplayName);
+
     private static string ResolveActionDisplayName(CombatActionKey actionKey, SceneDisplayContext? displayContext, LocalizationService localization)
     {
         if (actionKey.SkillCode > 0)
@@ -931,7 +940,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     private static int ComparePresentationRows(in SkillDetailRowData left, in SkillDetailRowData right)
     {
         var comparison = StringComparer.CurrentCulture.Compare(left.DisplayName, right.DisplayName);
-        return comparison != 0 ? comparison : left.ActionKey.CompareTo(right.ActionKey);
+        return comparison != 0 ? comparison : left.PresentationKey.CompareTo(right.PresentationKey);
     }
 
     private void RefreshSectionRatesOnly()

@@ -55,6 +55,14 @@ public sealed class GameResourceService : IDisposable
         return skillCode.ToString(CultureInfo.InvariantCulture);
     }
 
+    public bool ContainsSkill(int skillCode)
+    {
+        lock (_lock)
+        {
+            return skillCode > 0 && Skills.Contains(skillCode);
+        }
+    }
+
     public string? ResolveSkillIconAssetName(int skillCode)
     {
         var assetName = SkillIconCatalog.ResolveAssetName(skillCode);

@@ -5,7 +5,6 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
     public SkillPresentationKey PresentationKey { get; set; }
-    public CombatActionKey ActionKey { get; set; }
     public int SkillCode { get; set; }
     public string DisplayName { get; set => SetFrameProperty(ref field, value); } = string.Empty;
 
@@ -67,7 +66,6 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         var invincibleRate = data.Attempts > 0 ? data.Invincible / (double)data.Attempts : 0d;
 
         PresentationKey = data.PresentationKey;
-        ActionKey = data.ActionKey;
         SkillCode = data.SkillCode;
         DisplayName = data.DisplayName;
         TotalAmount = data.TotalAmount;
@@ -110,7 +108,44 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
     }
 }
 
-public readonly record struct SkillPresentationKey(string DisplayName, string? IconAssetName);
+public readonly record struct SkillPresentationKey(CombatActionKey ActionKey) : IComparable<SkillPresentationKey>
+{
+    private const int FirstClassSkillCode = 11_000_000;
+    private const int LastClassSkillCodeExclusive = 19_000_000;
+    private const int SkillFamilyScale = 10_000;
+    private const int ClassGroupScale = 100;
+
+    public int SkillCode => ActionKey.SkillCode;
+
+    public static SkillPresentationKey FromActionKey(CombatActionKey actionKey)
+    {
+        if (!TryGetStandardClassSkillBaseCode(actionKey.SkillCode, out var baseSkillCode))
+            return new SkillPresentationKey(actionKey);
+
+        return new SkillPresentationKey(new CombatActionKey(baseSkillCode, default, default));
+    }
+
+    public int CompareTo(SkillPresentationKey other) => ActionKey.CompareTo(other.ActionKey);
+
+    private static bool TryGetStandardClassSkillBaseCode(int skillCode, out int baseSkillCode)
+    {
+        if (skillCode is < FirstClassSkillCode or >= LastClassSkillCodeExclusive)
+        {
+            baseSkillCode = 0;
+            return false;
+        }
+
+        var familyCode = skillCode / SkillFamilyScale;
+        if (familyCode % ClassGroupScale == 0)
+        {
+            baseSkillCode = 0;
+            return false;
+        }
+
+        baseSkillCode = familyCode * SkillFamilyScale;
+        return true;
+    }
+}
 
 internal static class SkillDetailPresentationAggregator
 {
@@ -133,7 +168,6 @@ internal static class SkillDetailPresentationAggregator
 public struct SkillDetailRowData
 {
     public SkillPresentationKey PresentationKey;
-    public CombatActionKey ActionKey;
     public int SkillCode;
     public string DisplayName;
     public long TotalAmount;
@@ -163,10 +197,11 @@ public struct SkillDetailRowData
 
     public void Merge(in SkillDetailRowData other)
     {
-        if (other.ActionKey.CompareTo(ActionKey) < 0)
+        if (other.SkillCode == PresentationKey.SkillCode ||
+            SkillCode != PresentationKey.SkillCode && other.SkillCode < SkillCode)
         {
-            ActionKey = other.ActionKey;
             SkillCode = other.SkillCode;
+            DisplayName = other.DisplayName;
         }
 
         TotalAmount += other.TotalAmount;
