@@ -30,7 +30,9 @@ public sealed class BossFocusStoreTests
 
         h.Battle(3518, false, 1_300);
 
-        Assert.False(h.Focus.TryGetObservedBoss(1_400, 2_000, out _));
+        Assert.True(h.Focus.TryGetObservedBoss(3_300, 2_000, out var stopped));
+        Assert.Equal(1_300, stopped.LastObservedAtMilliseconds);
+        Assert.False(h.Focus.TryGetObservedBoss(3_301, 2_000, out _));
     }
 
     [Fact]
@@ -137,7 +139,7 @@ public sealed class BossFocusStoreTests
     }
 
     [Fact]
-    public void ScenePath_ExitClearsAndIgnoresLaterHpUntilReentered()
+    public void ScenePath_ExitRetainsFocusAndRefreshesUntilTimeout()
     {
         var h = new Harness();
 
@@ -147,17 +149,21 @@ public sealed class BossFocusStoreTests
         h.Battle(3518, false, 1_050);
         h.Hp(3518, 166_500, 1_100);
 
-        Assert.False(h.Focus.TryGetObservedBoss(1_200, 2_000, out _));
+        Assert.True(h.Focus.TryGetObservedBoss(1_200, 2_000, out var retained));
+        Assert.Equal(166_500, retained.Hp);
+        Assert.Equal(1_100, retained.LastObservedAtMilliseconds);
+        Assert.False(h.Focus.TryGetObservedBoss(3_101, 2_000, out _));
 
-        h.Battle(3518, true, 1_300);
+        h.Battle(3518, true, 3_200);
 
-        Assert.True(h.Focus.TryGetObservedBoss(1_350, 2_000, out var boss));
+        Assert.True(h.Focus.TryGetObservedBoss(3_250, 2_000, out var boss));
         Assert.True(boss.HasHp);
         Assert.Equal(166_500, boss.Hp);
+        Assert.Equal(3_200, boss.LastObservedAtMilliseconds);
     }
 
     [Fact]
-    public void ScenePath_ClearsWhenHpReachesZero()
+    public void ScenePath_DeathRetainsFocusUntilTimeout()
     {
         var h = new Harness();
 
@@ -171,7 +177,10 @@ public sealed class BossFocusStoreTests
         h.Battle(3518, true, 1_200);
         h.Toggle(3518, 1_260);
 
-        Assert.False(h.Focus.TryGetObservedBoss(1_300, 2_000, out _));
+        Assert.True(h.Focus.TryGetObservedBoss(3_260, 2_000, out var boss));
+        Assert.Equal(0, boss.Hp);
+        Assert.Equal(1_260, boss.LastObservedAtMilliseconds);
+        Assert.False(h.Focus.TryGetObservedBoss(3_261, 2_000, out _));
         Assert.True(h.Entities.TryGet(3518, out var entity));
         Assert.Equal(0, entity!.CurrentHp);
         Assert.False(entity.NpcCombatActive);
@@ -206,7 +215,9 @@ public sealed class BossFocusStoreTests
 
         h.Toggle(3518, 1_200);
 
-        Assert.False(h.Focus.TryGetObservedBoss(1_300, 2_000, out _));
+        Assert.True(h.Focus.TryGetObservedBoss(1_300, 2_000, out var stopped));
+        Assert.Equal(1_200, stopped.LastObservedAtMilliseconds);
+        Assert.False(h.Focus.TryGetObservedBoss(3_201, 2_000, out _));
         Assert.False(entity.NpcCombatActive);
     }
 
@@ -257,29 +268,47 @@ public sealed class BossFocusStoreTests
     }
 
     [Fact]
-    public void ReadModel_DoesNotRestoreClearedBossFocusFromPreviousCombatActivity()
+    public void ReadModel_DoesNotRestoreExpiredBossFocusFromPreviousCombatActivity()
     {
-        using var scene = new SceneTestHarness();
-
-        scene.AppendNpcKind(3518, NpcKind.Boss);
-        scene.AppendNpcHp(3518, 156_500, 167_000, 1_000);
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var sceneStarted = new DateTimeOffset(2026, 6, 14, 13, 30, 8, TimeSpan.Zero);
+        var timeProvider = new MutableTimeProvider(sceneStarted);
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(sceneStarted.ToUnixTimeMilliseconds());
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), sceneStarted, new RuntimeMetadataRegistry(), timeProvider);
+        var kindSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 100, 0, 0, 0, 0, 0, default);
+        var hpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 200, 0, 0, 0, 0, 0, default);
+        var combatSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 300, 0, 1, 0, 0, 0, default);
+        var deathSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 1_200, 0, 2, 0, 0, 0, default);
+        var restoredHpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 12_500, 0, 3, 0, 0, 0, default);
+        var combat = new CombatObservation
         {
-            SourceId = 100,
-            TargetId = 3518,
             Damage = 500,
-            HitContribution = 1,
-            AttemptContribution = 1,
+            HitCount = 1,
+            AttemptCount = 1,
             EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage,
-            Timestamp = 1_100
-        });
-        Assert.Single(scene.CreateSnapshot().BossFocuses);
+            ValueKind = CombatValueKind.Damage
+        };
 
-        scene.AppendNpcHp(3518, 0, 167_000, 1_200);
-        scene.AppendNpcHp(3518, 167_000, 167_000, 1_300);
+        sink.AppendNpcKind(in kindSource, 3518, NpcKind.Boss);
+        sink.AppendNpcHp(in hpSource, 3518, 156_500, 167_000);
+        sink.AppendCombatObservation(in combatSource, 100, 3518, in combat);
+        sink.CompleteBatch(1);
+        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(300));
+        Assert.Single(owner.CreateSnapshot().BossFocuses);
 
-        Assert.Empty(scene.CreateSnapshot().BossFocuses);
+        sink.AppendNpcHp(in deathSource, 3518, 0, 167_000);
+        sink.CompleteBatch(2);
+        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(1_200));
+        Assert.Single(owner.CreateSnapshot().BossFocuses);
+
+        timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(11_201));
+        Assert.Empty(owner.CreateSnapshot().BossFocuses);
+
+        sink.AppendNpcHp(in restoredHpSource, 3518, 167_000, 167_000);
+        sink.CompleteBatch(3);
+
+        Assert.Empty(owner.CreateSnapshot().BossFocuses);
     }
 
     [Fact]

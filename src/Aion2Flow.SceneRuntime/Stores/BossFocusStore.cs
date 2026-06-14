@@ -50,7 +50,11 @@ public sealed class BossFocusStore(EntityStore entities)
         if (expired is not null)
         {
             foreach (var id in expired)
+            {
+                if (_observed.TryGetValue(id, out var snapshot))
+                    _lastClearedAtMilliseconds[id] = Math.Max(nowMilliseconds, snapshot.LastObservedAtMilliseconds);
                 _observed.Remove(id);
+            }
             _revision++;
         }
 
@@ -85,7 +89,8 @@ public sealed class BossFocusStore(EntityStore entities)
     {
         if (hp == 0)
         {
-            Clear(instanceId, observedAtMilliseconds);
+            if (_observed.ContainsKey(instanceId))
+                Remember(instanceId, hp, ResolveMaxHp(instanceId, hp, maxHp), observedAtMilliseconds);
             return;
         }
 
@@ -95,16 +100,14 @@ public sealed class BossFocusStore(EntityStore entities)
 
     public bool ApplyBattle(int instanceId, bool isActive, long observedAtMilliseconds)
     {
-        if (isActive && IsBossInstance(instanceId) && !IsObservedDead(instanceId))
+        if (isActive && IsBossInstance(instanceId))
         {
             RememberActivity(instanceId, observedAtMilliseconds);
             return true;
         }
 
-        var removed = _observed.Remove(instanceId);
-        if (removed)
-            _revision++;
-        _lastClearedAtMilliseconds[instanceId] = Math.Max(0, observedAtMilliseconds);
+        if (_observed.ContainsKey(instanceId))
+            RememberActivity(instanceId, observedAtMilliseconds);
         return false;
     }
 
@@ -113,7 +116,6 @@ public sealed class BossFocusStore(EntityStore entities)
     public void ApplyCombatActivity(int instanceId, long activityObservedAtMilliseconds, long observedAtMilliseconds)
     {
         if (!IsBossInstance(instanceId) ||
-            IsObservedDead(instanceId) ||
             !IsAfterLastClear(instanceId, activityObservedAtMilliseconds))
         {
             return;

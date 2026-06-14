@@ -107,7 +107,7 @@ public sealed class BossSceneCollectionTests
     [Fact]
     public void EmptyBossFocusFreezesSceneAndDropsFollowingCombat()
     {
-        var scene = CreateBossScene();
+        var scene = CreateBossScene(out var timeProvider);
         var sink = SceneSinkFactory.CreateForLive(scene)();
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 200, 2_100_001, NpcKind.Monster, 20);
@@ -118,7 +118,15 @@ public sealed class BossSceneCollectionTests
         _ = scene.CreateFrame();
 
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
+        var deathFrame = scene.CreateFrame();
 
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        var deadBoss = Assert.Single(deathFrame.BossFocuses.AsSpan().ToArray());
+        Assert.True(deadBoss.HasHp);
+        Assert.Equal(0, deadBoss.Hp);
+
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        _ = scene.CreateFrame();
         Assert.Equal(BossSceneState.Frozen, scene.BossState);
         var frozenCount = scene.Journal.Count;
         sink.SetNpcBattle(Source(2_500), 300, false);
@@ -133,9 +141,34 @@ public sealed class BossSceneCollectionTests
     }
 
     [Fact]
+    public void DeadBossSceneKeepsFocusUntilTimeoutAndDoesNotArchiveImmediately()
+    {
+        var scene = CreateBossScene(out var timeProvider);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteBatch(1);
+        _ = scene.CreateFrame();
+
+        sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
+        var deadFrame = scene.CreateFrame();
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Single(deadFrame.BossFocuses.AsSpan().ToArray());
+        Assert.False(scene.TryDequeuePendingArchive(out _));
+
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        var frozenFrame = scene.CreateFrame();
+
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
+        Assert.Empty(frozenFrame.BossFocuses);
+        Assert.False(scene.TryDequeuePendingArchive(out _));
+    }
+
+    [Fact]
     public void NextBossCombatArchivesFrozenSceneBeforeStartingNewScene()
     {
-        var scene = CreateBossScene();
+        var scene = CreateBossScene(out var timeProvider);
         var sink = SceneSinkFactory.CreateForLive(scene)();
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
@@ -144,6 +177,8 @@ public sealed class BossSceneCollectionTests
         sink.CompleteBatch(2);
         _ = scene.CreateFrame();
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        _ = scene.CreateFrame();
         var frozenEnd = scene.Owner.AppliedNextObservationOrdinal;
 
         AppendNpc(sink, 301, 2_100_003, NpcKind.Boss, 3_000);
@@ -167,7 +202,7 @@ public sealed class BossSceneCollectionTests
     [Fact]
     public async Task FrozenBossSceneArchiveCanOpenPlayback()
     {
-        var scene = CreateBossScene();
+        var scene = CreateBossScene(out var timeProvider);
         var sink = SceneSinkFactory.CreateForLive(scene)();
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
@@ -176,6 +211,8 @@ public sealed class BossSceneCollectionTests
         sink.CompleteBatch(2);
         _ = scene.CreateFrame();
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        _ = scene.CreateFrame();
         var archive = scene.CreateArchiveCapture();
 
         await using var controller = new ScenePlaybackController(
@@ -196,9 +233,11 @@ public sealed class BossSceneCollectionTests
         Assert.Equal(BossSceneState.Frozen, scene.BossState);
     }
 
-    private static SceneLiveReadModel CreateBossScene()
+    private static SceneLiveReadModel CreateBossScene() => CreateBossScene(out _);
+
+    private static SceneLiveReadModel CreateBossScene(out MutableTimeProvider timeProvider)
     {
-        var timeProvider = new MutableTimeProvider(Started);
+        timeProvider = new MutableTimeProvider(Started);
         var scene = new SceneLiveReadModel(Started, timeProvider);
         scene.ChangeKind(SceneKind.Boss, Started, archiveCurrent: false);
         return scene;
@@ -243,7 +282,11 @@ public sealed class BossSceneCollectionTests
 
     private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => now;
+        private DateTimeOffset _now = now;
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void SetUtcNow(DateTimeOffset now) => _now = now;
     }
 
     private sealed class ManualTickSourceFactory : IScenePlaybackTickSourceFactory

@@ -40,7 +40,7 @@ public sealed class NpcRuntimeObservationStoreTests
     }
 
     [Fact]
-    public void Observed_Boss_Is_Cleared_When_Remain_Hp_Reaches_Zero()
+    public void Observed_Boss_Remains_Until_Timeout_When_Remain_Hp_Reaches_Zero()
     {
         using var scene = new SceneTestHarness();
 
@@ -52,11 +52,13 @@ public sealed class NpcRuntimeObservationStoreTests
         Assert.True(scene.Owner.BossFocus.TryGetObservedBoss(1_050, 2_000, out _));
 
         scene.AppendNpcHp(3518, 0, 1_100);
-        scene.SetNpcBattle(3518, true, 1_200);
-        scene.ToggleNpcBattle(3518);
+        scene.SetNpcBattle(3518, false, 1_260);
 
         scene.Owner.Refresh();
-        Assert.False(scene.Owner.BossFocus.TryGetObservedBoss(1_300, 2_000, out _));
+        Assert.True(scene.Owner.BossFocus.TryGetObservedBoss(3_260, 2_000, out var deadBoss));
+        Assert.True(deadBoss.HasHp);
+        Assert.Equal(0, deadBoss.Hp);
+        Assert.False(scene.Owner.BossFocus.TryGetObservedBoss(3_261, 2_000, out _));
         Assert.True(scene.TryGetNpcRuntimeState(3518, out var state));
         Assert.Equal(0, state.Hp);
         Assert.False(state.BattleToggledOn);
