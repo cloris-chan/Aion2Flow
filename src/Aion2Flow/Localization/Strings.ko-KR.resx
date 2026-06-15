@@ -28,6 +28,9 @@
   <data name="Settings_SceneKind" xml:space="preserve"><value>장면 모드</value></data>
   <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>표준</value></data>
   <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>보스 전투만</value></data>
+  <data name="Settings_HidePlayerNames" xml:space="preserve"><value>플레이어 이름 숨기기</value></data>
+  <data name="Settings_HidePlayerNames_On" xml:space="preserve"><value>켬</value></data>
+  <data name="Settings_HidePlayerNames_Off" xml:space="preserve"><value>끔</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>표시 행 수</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>언어</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>전투 초기화 단축키</value></data>
@@ -74,6 +77,15 @@
   <data name="Empty_Combatants" xml:space="preserve"><value>전투 데이터 없음</value></data>
   <data name="Empty_Skills" xml:space="preserve"><value>스킬 데이터 없음</value></data>
   <data name="Skill_UnknownEffect" xml:space="preserve"><value>알 수 없는 효과</value></data>
+  <data name="PlayerName_AnonymousPlayer" xml:space="preserve"><value>플레이어</value></data>
+  <data name="CharacterClass_Gladiator" xml:space="preserve"><value>검성</value></data>
+  <data name="CharacterClass_Templar" xml:space="preserve"><value>수호성</value></data>
+  <data name="CharacterClass_Assassin" xml:space="preserve"><value>살성</value></data>
+  <data name="CharacterClass_Ranger" xml:space="preserve"><value>궁성</value></data>
+  <data name="CharacterClass_Sorcerer" xml:space="preserve"><value>마도성</value></data>
+  <data name="CharacterClass_Elementalist" xml:space="preserve"><value>정령성</value></data>
+  <data name="CharacterClass_Cleric" xml:space="preserve"><value>치유성</value></data>
+  <data name="CharacterClass_Chanter" xml:space="preserve"><value>호법성</value></data>
 
   <!-- Aggregate metrics -->
   <data name="Metric_Total" xml:space="preserve"><value>총량</value></data>

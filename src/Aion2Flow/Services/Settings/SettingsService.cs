@@ -85,6 +85,7 @@ public sealed class SettingsService
         MaxVisibleCombatantRows = source.MaxVisibleCombatantRows,
         CombatantSortMetric = source.CombatantSortMetric,
         SceneKind = source.SceneKind,
+        HidePlayerNames = source.HidePlayerNames,
         Language = source.Language,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,
         BattleResetHotkeyVirtualKey = source.BattleResetHotkeyVirtualKey,

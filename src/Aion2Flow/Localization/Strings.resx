@@ -28,6 +28,9 @@
   <data name="Settings_SceneKind" xml:space="preserve"><value>Scene mode</value></data>
   <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>Standard</value></data>
   <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>Boss battles only</value></data>
+  <data name="Settings_HidePlayerNames" xml:space="preserve"><value>Hide player names</value></data>
+  <data name="Settings_HidePlayerNames_On" xml:space="preserve"><value>On</value></data>
+  <data name="Settings_HidePlayerNames_Off" xml:space="preserve"><value>Off</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>Visible rows</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>Language</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>Battle reset hotkey</value></data>
@@ -74,6 +77,15 @@
   <data name="Empty_Combatants" xml:space="preserve"><value>No combat data yet</value></data>
   <data name="Empty_Skills" xml:space="preserve"><value>No skill data</value></data>
   <data name="Skill_UnknownEffect" xml:space="preserve"><value>Unknown effect</value></data>
+  <data name="PlayerName_AnonymousPlayer" xml:space="preserve"><value>Player</value></data>
+  <data name="CharacterClass_Gladiator" xml:space="preserve"><value>Gladiator</value></data>
+  <data name="CharacterClass_Templar" xml:space="preserve"><value>Templar</value></data>
+  <data name="CharacterClass_Assassin" xml:space="preserve"><value>Assassin</value></data>
+  <data name="CharacterClass_Ranger" xml:space="preserve"><value>Ranger</value></data>
+  <data name="CharacterClass_Sorcerer" xml:space="preserve"><value>Sorcerer</value></data>
+  <data name="CharacterClass_Elementalist" xml:space="preserve"><value>Elementalist</value></data>
+  <data name="CharacterClass_Cleric" xml:space="preserve"><value>Cleric</value></data>
+  <data name="CharacterClass_Chanter" xml:space="preserve"><value>Chanter</value></data>
 
   <!-- Aggregate metrics (full names, used as labels and table headers) -->
   <data name="Metric_Total" xml:space="preserve"><value>Total</value></data>

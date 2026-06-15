@@ -793,7 +793,8 @@ public sealed class MainViewModelCombatantFilterTests
             var capture = new WinDivertCaptureService(ports);
             var frameBatch = new UiFrameBatchService();
             var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
-            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, new AppUpdateService(), new ProcessForegroundWatcher(ports), new GlobalHotkeyService());
+            var privacy = new PlayerNamePrivacyService(settings, localization);
+            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, privacy, new AppUpdateService(), new ProcessForegroundWatcher(ports), new GlobalHotkeyService());
             var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, settingsViewModel, frameBatch);
             return new MainViewModelFixture(viewModel, capture, archive, frameBatch);
         }

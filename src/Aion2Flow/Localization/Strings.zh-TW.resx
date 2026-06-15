@@ -28,6 +28,9 @@
   <data name="Settings_SceneKind" xml:space="preserve"><value>場景模式</value></data>
   <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>標準</value></data>
   <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>僅 Boss 戰</value></data>
+  <data name="Settings_HidePlayerNames" xml:space="preserve"><value>隱藏玩家名稱</value></data>
+  <data name="Settings_HidePlayerNames_On" xml:space="preserve"><value>開啟</value></data>
+  <data name="Settings_HidePlayerNames_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>顯示行數</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戰鬥重置快捷鍵</value></data>
@@ -74,6 +77,15 @@
   <data name="Empty_Combatants" xml:space="preserve"><value>暫無戰鬥數據</value></data>
   <data name="Empty_Skills" xml:space="preserve"><value>沒有技能資料</value></data>
   <data name="Skill_UnknownEffect" xml:space="preserve"><value>未知效果</value></data>
+  <data name="PlayerName_AnonymousPlayer" xml:space="preserve"><value>玩家</value></data>
+  <data name="CharacterClass_Gladiator" xml:space="preserve"><value>劍星</value></data>
+  <data name="CharacterClass_Templar" xml:space="preserve"><value>守護星</value></data>
+  <data name="CharacterClass_Assassin" xml:space="preserve"><value>殺星</value></data>
+  <data name="CharacterClass_Ranger" xml:space="preserve"><value>弓星</value></data>
+  <data name="CharacterClass_Sorcerer" xml:space="preserve"><value>魔道星</value></data>
+  <data name="CharacterClass_Elementalist" xml:space="preserve"><value>精靈星</value></data>
+  <data name="CharacterClass_Cleric" xml:space="preserve"><value>治癒星</value></data>
+  <data name="CharacterClass_Chanter" xml:space="preserve"><value>護法星</value></data>
 
   <!-- Aggregate metrics -->
   <data name="Metric_Total" xml:space="preserve"><value>總量</value></data>

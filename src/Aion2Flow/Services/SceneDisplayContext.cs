@@ -46,6 +46,64 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
             : entityId.ToString(CultureInfo.InvariantCulture);
     }
 
+    public int ResolvePcAnonymousOrdinal(int entityId)
+    {
+        if (entityId <= 0)
+        {
+            return 1;
+        }
+
+        var characterClass = ResolvePcClass(entityId);
+        var ordinal = 1;
+        var scoped = IdentityScope.PcMetadataSpan;
+        for (var i = 0; i < scoped.Length; i++)
+        {
+            var entry = scoped[i];
+            if (entry.EntityId >= entityId)
+            {
+                break;
+            }
+
+            if (ResolvePcClass(entry.EntityId) == characterClass)
+            {
+                ordinal++;
+            }
+        }
+
+        if (MetadataRegistry is not null)
+        {
+            foreach (var (candidateId, metadata) in MetadataRegistry.PcMetadataByEntityId)
+            {
+                if (candidateId < entityId &&
+                    !IdentityScope.TryGetPcMetadata(candidateId, out _) &&
+                    ResolvePcClass(candidateId) == characterClass)
+                {
+                    ordinal++;
+                }
+            }
+        }
+
+        var combatants = Snapshot.Combatants.AsSpan();
+        for (var i = 0; i < combatants.Length; i++)
+        {
+            ref readonly var entry = ref combatants[i];
+            if (entry.Id >= entityId)
+            {
+                break;
+            }
+
+            if (!IdentityScope.TryGetPcMetadata(entry.Id, out _) &&
+                MetadataRegistry?.TryGetPcMetadata(entry.Id, out _) != true &&
+                entry.Metrics.IsVisiblePlayerCombatant &&
+                ResolvePcClass(entry.Id) == characterClass)
+            {
+                ordinal++;
+            }
+        }
+
+        return ordinal;
+    }
+
     public bool HasPcMetadata(int entityId) => entityId > 0 && TryGetPcMetadata(entityId, out _);
 
     public CharacterClass? ResolvePcClass(int entityId)

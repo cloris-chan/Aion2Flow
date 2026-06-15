@@ -9,6 +9,7 @@ using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
+using CommunityToolkit.Mvvm.DependencyInjection;
 
 namespace Cloris.Aion2Flow.Controls;
 
@@ -178,7 +179,7 @@ public abstract class IconTextDisplay : UserControl
 
     protected static string FormatEntityId(int entityId) => entityId > 0 ? entityId.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
 
-    private void UpdateDisplay()
+    protected void UpdateDisplay()
     {
         var context = DisplayContextProvider.GetDisplayContext(this);
         var entityId = EntityId;
@@ -499,18 +500,76 @@ public sealed class CombatantDisplay : UserControl
 
 public sealed class PcDisplay : IconTextDisplay
 {
+    private PlayerNamePrivacyService? _privacy;
+    private bool _isPrivacySubscribed;
+
     protected override void UpdateStateCore(SceneDisplayContext? context, int entityId)
     {
         var faction = context?.ResolveFaction(entityId) ?? Faction.Unknown;
         SetTextForeground(ResolveFactionNameForeground(faction));
     }
 
-    protected override string ResolveTextCore(SceneDisplayContext? context, int entityId) => context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
+    protected override string ResolveTextCore(SceneDisplayContext? context, int entityId)
+    {
+        var privacy = TryResolvePrivacyService();
+        if (privacy is { HidePlayerNames: true })
+        {
+            var characterClass = context?.ResolvePcClass(entityId);
+            var ordinal = context?.ResolvePcAnonymousOrdinal(entityId) ?? 1;
+            return privacy.FormatAnonymousName(characterClass, ordinal);
+        }
+
+        return context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
+    }
 
     protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId)
     {
         var classIcon = context is null ? null : DisplayIconCache.ResolveClassIcon(context.ResolvePcClass(entityId));
         return classIcon is null ? null : new DisplayIcon(classIcon, UsesSpriteSheet: true);
+    }
+
+    protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToLogicalTree(e);
+        if (!_isPrivacySubscribed && TryResolvePrivacyService() is { } privacy)
+        {
+            privacy.DisplayChanged += OnPrivacyDisplayChanged;
+            _isPrivacySubscribed = true;
+        }
+    }
+
+    protected override void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
+    {
+        if (_isPrivacySubscribed && _privacy is not null)
+        {
+            _privacy.DisplayChanged -= OnPrivacyDisplayChanged;
+            _isPrivacySubscribed = false;
+        }
+
+        base.OnDetachedFromLogicalTree(e);
+    }
+
+    private PlayerNamePrivacyService? TryResolvePrivacyService()
+    {
+        if (_privacy is not null)
+        {
+            return _privacy;
+        }
+
+        try
+        {
+            _privacy = Ioc.Default.GetService<PlayerNamePrivacyService>();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        return _privacy;
+    }
+
+    private void OnPrivacyDisplayChanged(object? sender, EventArgs e)
+    {
+        UpdateDisplay();
     }
 }
 

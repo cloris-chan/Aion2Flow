@@ -14,16 +14,18 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 {
     private readonly LanguageService _languageService;
     private readonly SettingsService _settingsService;
+    private readonly PlayerNamePrivacyService _playerNamePrivacy;
     private readonly AppUpdateService _updateService;
     private readonly ProcessForegroundWatcher _processForegroundWatcher;
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly bool _isApplyingPersistedSettings;
 
-    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
+    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNamePrivacyService playerNamePrivacy, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
     {
         Localization = localization;
         _languageService = languageService;
         _settingsService = settingsService;
+        _playerNamePrivacy = playerNamePrivacy;
         _updateService = updateService;
         _processForegroundWatcher = processForegroundWatcher;
         _globalHotkeyService = globalHotkeyService;
@@ -41,6 +43,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             MaxVisibleCombatantRows = persisted.MaxVisibleCombatantRows;
             CombatantSortMetric = persisted.CombatantSortMetric;
             SceneKind = persisted.SceneKind;
+            HidePlayerNames = persisted.HidePlayerNames;
             if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
             {
                 BattleResetHotkey = new HotkeyDefinition((HotkeyModifiers)mods, vk);
@@ -96,6 +99,10 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public partial SceneKind SceneKind { get; set; } = SceneKind.Standard;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HidePlayerNamesDisplay))]
+    public partial bool HidePlayerNames { get; set; }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
     public partial LanguageOption? SelectedLanguage { get; set; }
 
@@ -136,6 +143,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public string CombatantSortMetricDisplay => Localization[$"Settings_CombatantSortMetric_{CombatantSortMetric}"];
 
     public string SceneKindDisplay => Localization[$"Settings_SceneKind_{SceneKind}"];
+
+    public string HidePlayerNamesDisplay => Localization[HidePlayerNames ? "Settings_HidePlayerNames_On" : "Settings_HidePlayerNames_Off"];
 
     public string LanguageDisplay => SelectedLanguage?.DisplayName ?? string.Empty;
 
@@ -194,6 +203,12 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     partial void OnSceneKindChanged(SceneKind value) => PersistSettings();
 
+    partial void OnHidePlayerNamesChanged(bool value)
+    {
+        _playerNamePrivacy.HidePlayerNames = value;
+        PersistSettings();
+    }
+
     partial void OnSelectedLanguageChanged(LanguageOption? value)
     {
         if (value is not null)
@@ -241,6 +256,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.MaxVisibleCombatantRows = MaxVisibleCombatantRows;
             s.CombatantSortMetric = CombatantSortMetric;
             s.SceneKind = SceneKind;
+            s.HidePlayerNames = HidePlayerNames;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
             s.BattleResetHotkeyVirtualKey = BattleResetHotkey?.VirtualKey;
@@ -262,6 +278,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(TopmostModeDisplay));
         OnPropertyChanged(nameof(CombatantSortMetricDisplay));
         OnPropertyChanged(nameof(SceneKindDisplay));
+        OnPropertyChanged(nameof(HidePlayerNamesDisplay));
         OnPropertyChanged(nameof(LanguageDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(CurrentVersionText));

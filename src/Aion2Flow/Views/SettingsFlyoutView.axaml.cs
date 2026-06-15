@@ -17,6 +17,7 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _visibleRowsMenuItem;
     private MenuItem? _combatantSortMetricMenuItem;
     private MenuItem? _sceneKindMenuItem;
+    private MenuItem? _hidePlayerNamesMenuItem;
     private MenuItem? _languageMenuItem;
     private SettingsFlyoutViewModel? _viewModel;
     private Services.LocalizationService? _localization;
@@ -52,6 +53,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildVisibleRowsMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
+        RefreshHidePlayerNamesMenuItem();
         RebuildLanguageMenuItems();
     }
 
@@ -61,6 +63,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildVisibleRowsMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
+        RefreshHidePlayerNamesMenuItem();
         RebuildLanguageMenuItems();
     }
 
@@ -88,6 +91,10 @@ public partial class SettingsFlyoutView : UserControl
                 RefreshSceneKindHeader();
                 RefreshSceneKindCheckmarks();
                 break;
+            case nameof(SettingsFlyoutViewModel.HidePlayerNames):
+            case nameof(SettingsFlyoutViewModel.HidePlayerNamesDisplay):
+                RefreshHidePlayerNamesMenuItem();
+                break;
             case nameof(SettingsFlyoutViewModel.SelectedLanguage):
             case nameof(SettingsFlyoutViewModel.LanguageDisplay):
                 RefreshLanguageHeader();
@@ -102,6 +109,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildTopmostMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
+        RefreshHidePlayerNamesMenuItem();
     }
 
     private void TopmostMenuItemLoaded(object? sender, RoutedEventArgs e)
@@ -146,6 +154,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _sceneKindMenuItem = mi;
             RebuildSceneKindMenuItems();
+        }
+    }
+
+    private void HidePlayerNamesMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _hidePlayerNamesMenuItem != mi)
+        {
+            _hidePlayerNamesMenuItem = mi;
+            RefreshHidePlayerNamesMenuItem();
         }
     }
 
@@ -311,6 +328,18 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
+    private void RefreshHidePlayerNamesMenuItem()
+    {
+        var vm = ViewModel;
+        if (_hidePlayerNamesMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        _hidePlayerNamesMenuItem.Header = CreateRowHeader(vm.Localization["Settings_HidePlayerNames"], vm.HidePlayerNamesDisplay);
+        _hidePlayerNamesMenuItem.Icon = CreateCheckmark(vm.HidePlayerNames);
+    }
+
     private void RebuildLanguageMenuItems()
     {
         RefreshLanguageHeader();
@@ -380,6 +409,14 @@ public partial class SettingsFlyoutView : UserControl
     {
         if (ViewModel is { } vm && sender is MenuItem { Tag: SceneKind kind })
             vm.SceneKind = kind;
+    }
+
+    private void HidePlayerNamesMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.HidePlayerNames = !vm.HidePlayerNames;
+        }
     }
 
     private void LanguageItemClicked(object? sender, RoutedEventArgs e)
