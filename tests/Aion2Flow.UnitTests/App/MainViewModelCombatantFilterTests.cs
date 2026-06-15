@@ -436,7 +436,7 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_BossColumn_ShowsMultipleBossSharesInBossOrder()
+    public void RefreshCombatStats_SceneMode_BossColumn_AggregatesMultipleBossShares()
     {
         var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneNickname(300, "First");
@@ -448,8 +448,9 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.Equal([900_002, 900_003], row.BossShares.Select(static share => share.DisplayKey));
-        Assert.Equal([0.1d, 0.1d], row.BossShares.Select(static share => Math.Round(share.Ratio, 6)));
+        var share = Assert.Single(row.BossShares);
+        Assert.Equal(0, share.DisplayKey);
+        Assert.Equal(0.1d, share.Ratio, 6);
     }
 
     [Fact]
