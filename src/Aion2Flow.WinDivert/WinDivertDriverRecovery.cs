@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Windows.Win32;
@@ -30,6 +31,7 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
     private const int ErrorInvalidHandle = 6;
     private const int ErrorGenFailure = 31;
     private const int ErrorInsufficientBuffer = 122;
+    private const int ErrorMoreData = 234;
     private const int ErrorOperationAborted = 995;
     private const int ErrorServiceAlreadyRunning = 1056;
     private const int ErrorServiceDoesNotExist = 1060;
@@ -46,6 +48,46 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
 
     private WinDivertDriverRecovery()
     {
+    }
+
+    public void Initialize()
+    {
+        var driverPath = ResolveDriverPath();
+        using var mutex = new Mutex(false, RecoveryMutexName);
+        var ownsMutex = false;
+        try
+        {
+            try
+            {
+                ownsMutex = mutex.WaitOne(TimeSpan.FromSeconds(15));
+            }
+            catch (AbandonedMutexException)
+            {
+                ownsMutex = true;
+                WinDivertLog.Write(WinDivertLogLevel.Warning, "Acquired abandoned WinDivert recovery mutex during startup cleanup.");
+            }
+
+            if (!ownsMutex)
+            {
+                WinDivertLog.Write(WinDivertLogLevel.Warning, "Timed out waiting for the WinDivert recovery mutex during startup cleanup.");
+                return;
+            }
+
+            lock (_sync)
+            {
+                if (!_shutdownRequested && _ownedService is not { IsInvalid: false, IsClosed: false })
+                    AdoptOrCleanupOrphanedRecoveryServices(driverPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            WinDivertLog.Write(WinDivertLogLevel.Warning, $"WinDivert startup cleanup failed: {ex}");
+        }
+        finally
+        {
+            if (ownsMutex)
+                mutex.ReleaseMutex();
+        }
     }
 
     public WinDivertRecoveryResult TryRecover(int openError)
@@ -90,6 +132,10 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
                 if (_ownedService is { IsInvalid: false, IsClosed: false })
                     return WinDivertRecoveryResult.Success($"Service '{_ownedServiceName}' is already owned by this process.");
 
+                AdoptOrCleanupOrphanedRecoveryServices(driverPath);
+                if (_ownedService is { IsInvalid: false, IsClosed: false })
+                    return WinDivertRecoveryResult.Success($"Adopted existing recovery service '{_ownedServiceName}'.");
+
                 var recoveryServiceName = $"{RecoveryServiceNamePrefix}_{Environment.ProcessId:X8}_{Interlocked.Increment(ref _nextRecoveryServiceId):X8}";
                 var startResult = StartRecoveryService(driverPath, recoveryServiceName);
                 if (!startResult.Recovery.Succeeded || startResult.Service is null)
@@ -118,6 +164,7 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
     {
         CloseServiceHandleSafeHandle? service;
         string serviceName;
+        var driverPath = ResolveDriverPath();
         lock (_sync)
         {
             _shutdownRequested = true;
@@ -127,31 +174,32 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
             _ownedServiceName = string.Empty;
         }
 
-        if (service is null)
-            return;
-
+        using var mutex = new Mutex(false, RecoveryMutexName);
+        var ownsMutex = false;
         try
         {
-            var beforeStop = QuerySnapshot(service);
-            LogSnapshot(serviceName, beforeStop, "shutdown-before-stop");
-            if (beforeStop.CurrentState != (uint)SERVICE_STATUS_CURRENT_STATE.SERVICE_STOPPED)
+            try
             {
-                if (!PInvoke.ControlService(service, PInvoke.SERVICE_CONTROL_STOP, out _))
-                {
-                    var error = Marshal.GetLastPInvokeError();
-                    if (error != ErrorServiceNotActive)
-                        WinDivertLog.Write(WinDivertLogLevel.Warning, $"ControlService('{serviceName}', STOP) failed: {FormatError(error)}.");
-                }
-                else
-                {
-                    WinDivertLog.Write(WinDivertLogLevel.Info, $"Stopped recovery service '{serviceName}'.");
-                    if (!WaitForStopped(service))
-                        WinDivertLog.Write(WinDivertLogLevel.Warning, $"Recovery service '{serviceName}' did not report STOPPED before shutdown timeout.");
-                }
+                ownsMutex = mutex.WaitOne(TimeSpan.FromSeconds(15));
+            }
+            catch (AbandonedMutexException)
+            {
+                ownsMutex = true;
+                WinDivertLog.Write(WinDivertLogLevel.Warning, "Acquired abandoned WinDivert recovery mutex during shutdown cleanup.");
             }
 
-            MarkRecoveryServiceForDeletion(service, serviceName);
-            LogSnapshot(serviceName, QuerySnapshot(service), "shutdown-after-stop");
+            if (!ownsMutex)
+            {
+                WinDivertLog.Write(WinDivertLogLevel.Warning, "Timed out waiting for the WinDivert recovery mutex during shutdown cleanup.");
+                if (service is not null)
+                    StopAndDeleteRecoveryService(service, serviceName, "shutdown");
+                return;
+            }
+
+            if (service is not null)
+                StopAndDeleteRecoveryService(service, serviceName, "shutdown");
+
+            CleanupWinDivertServicesForShutdown(driverPath, serviceName);
         }
         catch (Exception ex)
         {
@@ -159,8 +207,34 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         }
         finally
         {
-            service.Dispose();
+            service?.Dispose();
+            if (ownsMutex)
+                mutex.ReleaseMutex();
         }
+    }
+
+    private static void StopAndDeleteRecoveryService(CloseServiceHandleSafeHandle service, string serviceName, string phase)
+    {
+        var beforeStop = QuerySnapshot(service);
+        LogSnapshot(serviceName, beforeStop, $"{phase}-before-stop");
+        if (beforeStop.CurrentState != (uint)SERVICE_STATUS_CURRENT_STATE.SERVICE_STOPPED)
+        {
+            if (!PInvoke.ControlService(service, PInvoke.SERVICE_CONTROL_STOP, out _))
+            {
+                var error = Marshal.GetLastPInvokeError();
+                if (error != ErrorServiceNotActive)
+                    WinDivertLog.Write(WinDivertLogLevel.Warning, $"ControlService('{serviceName}', STOP) failed: {FormatError(error)}.");
+            }
+            else
+            {
+                WinDivertLog.Write(WinDivertLogLevel.Info, $"Stopped recovery service '{serviceName}'.");
+                if (!WaitForStopped(service))
+                    WinDivertLog.Write(WinDivertLogLevel.Warning, $"Recovery service '{serviceName}' did not report STOPPED before shutdown timeout.");
+            }
+        }
+
+        MarkRecoveryServiceForDeletion(service, serviceName);
+        LogSnapshot(serviceName, QuerySnapshot(service), $"{phase}-after-stop");
     }
 
     private static WinDivertServiceStartResult StartRecoveryService(string driverPath, string serviceName)
@@ -219,7 +293,6 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
 
             var runningSnapshot = QuerySnapshot(service);
             LogSnapshot(serviceName, runningSnapshot, "after-start");
-            MarkRecoveryServiceForDeletion(service, serviceName);
             retained = true;
             return new WinDivertServiceStartResult(
                 WinDivertRecoveryResult.Success($"Started '{serviceName}' from '{driverPath}'."),
@@ -266,13 +339,264 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         }
     }
 
+    private void AdoptOrCleanupOrphanedRecoveryServices(string driverPath)
+    {
+        using var manager = PInvoke.OpenSCManager(
+            null!,
+            null!,
+            PInvoke.SC_MANAGER_CONNECT | PInvoke.SC_MANAGER_ENUMERATE_SERVICE);
+        if (manager.IsInvalid)
+        {
+            var error = Marshal.GetLastPInvokeError();
+            WinDivertLog.Write(WinDivertLogLevel.Warning, $"Unable to enumerate recovery services: OpenSCManager failed: {FormatError(error)}.");
+            return;
+        }
+
+        var serviceNames = EnumerateServiceNames(manager, WinDivertServiceNameFilter.RecoveryPrefix);
+        for (var i = 0; i < serviceNames.Count; i++)
+        {
+            var serviceName = serviceNames[i];
+            if (string.Equals(serviceName, _ownedServiceName, StringComparison.Ordinal))
+                continue;
+
+            if (!TryGetRecoveryServiceOwnerProcessId(serviceName, out var ownerProcessId))
+            {
+                WinDivertLog.Write(WinDivertLogLevel.Warning, $"Ignoring recovery service '{serviceName}' because its owner process id cannot be parsed.");
+                continue;
+            }
+
+            if (IsProcessAlive(ownerProcessId))
+            {
+                WinDivertLog.Write(WinDivertLogLevel.Debug, $"Recovery service '{serviceName}' belongs to active process {ownerProcessId}.");
+                continue;
+            }
+
+            var service = PInvoke.OpenService(manager, serviceName, RecoveryServiceAccess);
+            if (service.IsInvalid)
+            {
+                var error = Marshal.GetLastPInvokeError();
+                service.Dispose();
+                WinDivertLog.Write(WinDivertLogLevel.Warning, $"Unable to open orphaned recovery service '{serviceName}': {FormatError(error)}.");
+                continue;
+            }
+
+            var snapshot = QuerySnapshot(service);
+            LogSnapshot(serviceName, snapshot, "orphan-detected");
+            if (_ownedService is null &&
+                snapshot.CurrentState != (uint)SERVICE_STATUS_CURRENT_STATE.SERVICE_STOPPED &&
+                PathsEqual(snapshot.BinaryPath, driverPath))
+            {
+                _ownedService = service;
+                _ownedServiceName = serviceName;
+                WinDivertLog.Write(WinDivertLogLevel.Info, $"Adopted orphaned recovery service '{serviceName}' from dead process {ownerProcessId}.");
+                continue;
+            }
+
+            StopAndDeleteRecoveryService(service, serviceName, "orphan-cleanup");
+            service.Dispose();
+        }
+    }
+
+    private static void CleanupWinDivertServicesForShutdown(string driverPath, string alreadyDeletedServiceName)
+    {
+        using var manager = PInvoke.OpenSCManager(
+            null!,
+            null!,
+            PInvoke.SC_MANAGER_CONNECT | PInvoke.SC_MANAGER_ENUMERATE_SERVICE);
+        if (manager.IsInvalid)
+        {
+            var error = Marshal.GetLastPInvokeError();
+            WinDivertLog.Write(WinDivertLogLevel.Warning, $"Unable to enumerate WinDivert services during shutdown: OpenSCManager failed: {FormatError(error)}.");
+            return;
+        }
+
+        var serviceNames = EnumerateServiceNames(manager, WinDivertServiceNameFilter.ContainsWinDivert);
+        for (var i = 0; i < serviceNames.Count; i++)
+        {
+            var serviceName = serviceNames[i];
+            if (string.Equals(serviceName, alreadyDeletedServiceName, StringComparison.Ordinal))
+                continue;
+
+            var service = PInvoke.OpenService(manager, serviceName, RecoveryServiceAccess);
+            if (service.IsInvalid)
+            {
+                var error = Marshal.GetLastPInvokeError();
+                service.Dispose();
+                WinDivertLog.Write(WinDivertLogLevel.Warning, $"Unable to open WinDivert shutdown cleanup service '{serviceName}': {FormatError(error)}.");
+                continue;
+            }
+
+            try
+            {
+                var snapshot = QuerySnapshot(service);
+                LogSnapshot(serviceName, snapshot, "shutdown-scan");
+                if (ShouldDeleteServiceDuringShutdown(serviceName, snapshot, driverPath))
+                    StopAndDeleteRecoveryService(service, serviceName, "shutdown-scan");
+                else
+                    WinDivertLog.Write(WinDivertLogLevel.Debug, $"Leaving WinDivert service '{serviceName}' untouched during shutdown.");
+            }
+            finally
+            {
+                service.Dispose();
+            }
+        }
+    }
+
+    private static bool ShouldDeleteServiceDuringShutdown(string serviceName, WinDivertServiceSnapshot snapshot, string driverPath)
+    {
+        if (IsRecoveryServiceName(serviceName))
+            return true;
+
+        return string.Equals(serviceName, StandardServiceName, StringComparison.OrdinalIgnoreCase) &&
+               snapshot.QueryError == 0 &&
+               IsAion2FlowBundledDriverPath(snapshot.BinaryPath, driverPath);
+    }
+
+    internal static bool IsAion2FlowBundledDriverPath(string binaryPath, string driverPath) =>
+        IsAion2FlowBundledDriverPath(binaryPath, driverPath, AppContext.BaseDirectory);
+
+    internal static bool IsAion2FlowBundledDriverPath(string binaryPath, string driverPath, string baseDirectory)
+    {
+        if (!TryResolveServiceBinaryPath(binaryPath, out var path))
+            return false;
+
+        try
+        {
+            var fullPath = Path.GetFullPath(path);
+            var fullDriverPath = Path.GetFullPath(driverPath);
+            if (string.Equals(fullPath, fullDriverPath, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return string.Equals(Path.GetExtension(fullPath), ".sys", StringComparison.OrdinalIgnoreCase) &&
+                   IsPathUnderDirectory(fullPath, baseDirectory);
+        }
+        catch (Exception ex)
+        {
+            WinDivertLog.Write(WinDivertLogLevel.Warning, $"Unable to classify WinDivert driver path '{binaryPath}': {ex}");
+            return false;
+        }
+    }
+
+    private static bool IsPathUnderDirectory(string path, string directory)
+    {
+        var normalizedPath = Path.GetFullPath(path);
+        var normalizedDirectory = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return normalizedPath.StartsWith(normalizedDirectory, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static List<string> EnumerateServiceNames(CloseServiceHandleSafeHandle manager, WinDivertServiceNameFilter filter)
+    {
+        var names = new List<string>();
+        var buffer = Array.Empty<byte>();
+        var resumeHandle = 0u;
+        while (true)
+        {
+            if (PInvoke.EnumServicesStatusEx(
+                    manager,
+                    SC_ENUM_TYPE.SC_ENUM_PROCESS_INFO,
+                    ENUM_SERVICE_TYPE.SERVICE_DRIVER,
+                    ENUM_SERVICE_STATE.SERVICE_STATE_ALL,
+                    buffer,
+                    out var bytesNeeded,
+                    out var servicesReturned,
+                    ref resumeHandle,
+                    null))
+            {
+                AppendServiceNames(buffer, servicesReturned, names, filter);
+                break;
+            }
+
+            var error = Marshal.GetLastPInvokeError();
+            if (error != ErrorMoreData && error != ErrorInsufficientBuffer)
+            {
+                WinDivertLog.Write(WinDivertLogLevel.Warning, $"EnumServicesStatusEx failed while searching recovery services: {FormatError(error)}.");
+                break;
+            }
+
+            if (servicesReturned != 0)
+                AppendServiceNames(buffer, servicesReturned, names, filter);
+
+            if (bytesNeeded == 0)
+                break;
+
+            buffer = GC.AllocateUninitializedArray<byte>((int)bytesNeeded);
+        }
+
+        return names;
+    }
+
+    private static void AppendServiceNames(byte[] buffer, uint servicesReturned, List<string> names, WinDivertServiceNameFilter filter)
+    {
+        var count = checked((int)servicesReturned);
+        var bytes = buffer.AsSpan(0, count * Unsafe.SizeOf<ENUM_SERVICE_STATUS_PROCESSW>());
+        var services = MemoryMarshal.Cast<byte, ENUM_SERVICE_STATUS_PROCESSW>(bytes);
+        for (var i = 0; i < services.Length; i++)
+        {
+            var name = services[i].lpServiceName.ToString();
+            if (ShouldIncludeServiceName(name, filter))
+                names.Add(name);
+        }
+    }
+
+    private static bool ShouldIncludeServiceName(string serviceName, WinDivertServiceNameFilter filter) => filter switch
+    {
+        WinDivertServiceNameFilter.RecoveryPrefix => IsRecoveryServiceName(serviceName),
+        WinDivertServiceNameFilter.ContainsWinDivert => serviceName.Contains("WinDivert", StringComparison.OrdinalIgnoreCase),
+        _ => false
+    };
+
+    private static bool IsRecoveryServiceName(string serviceName) => serviceName.StartsWith(RecoveryServiceNamePrefix + "_", StringComparison.Ordinal);
+
+    internal static bool TryGetRecoveryServiceOwnerProcessId(string serviceName, out int processId)
+    {
+        processId = 0;
+        const int processIdHexLength = 8;
+        var prefixLength = RecoveryServiceNamePrefix.Length + 1;
+        if (!IsRecoveryServiceName(serviceName) ||
+            serviceName.Length < prefixLength + processIdHexLength ||
+            (serviceName.Length > prefixLength + processIdHexLength && serviceName[prefixLength + processIdHexLength] != '_'))
+        {
+            return false;
+        }
+
+        if (!uint.TryParse(serviceName.AsSpan(prefixLength, processIdHexLength), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var value) ||
+            value == 0 ||
+            value > int.MaxValue)
+        {
+            return false;
+        }
+
+        processId = (int)value;
+        return true;
+    }
+
+    private static bool IsProcessAlive(int processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            WinDivertLog.Write(WinDivertLogLevel.Warning, $"Unable to inspect recovery service owner process {processId}: {ex}");
+            return true;
+        }
+    }
+
+    private static uint RecoveryServiceAccess => PInvoke.SERVICE_QUERY_CONFIG | PInvoke.SERVICE_CHANGE_CONFIG | PInvoke.SERVICE_QUERY_STATUS | PInvoke.SERVICE_START | PInvoke.SERVICE_STOP | (uint)FILE_ACCESS_RIGHTS.DELETE;
+
     private static CloseServiceHandleSafeHandle OpenOrCreateRecoveryService(
         CloseServiceHandleSafeHandle manager,
         string serviceName,
         string driverPath,
         out bool created)
     {
-        var access = PInvoke.SERVICE_QUERY_CONFIG | PInvoke.SERVICE_CHANGE_CONFIG | PInvoke.SERVICE_QUERY_STATUS | PInvoke.SERVICE_START | PInvoke.SERVICE_STOP | (uint)FILE_ACCESS_RIGHTS.DELETE;
+        var access = RecoveryServiceAccess;
         var service = PInvoke.OpenService(manager, serviceName, access);
         if (!service.IsInvalid)
         {
@@ -476,3 +800,9 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
 internal readonly record struct WinDivertServiceSnapshot(bool Exists, uint ServiceType, uint StartType, uint ErrorControl, string BinaryPath, uint CurrentState, int QueryError, uint Win32ExitCode, uint ServiceSpecificExitCode);
 
 internal readonly record struct WinDivertServiceStartResult(WinDivertRecoveryResult Recovery, CloseServiceHandleSafeHandle? Service);
+
+internal enum WinDivertServiceNameFilter
+{
+    RecoveryPrefix,
+    ContainsWinDivert
+}

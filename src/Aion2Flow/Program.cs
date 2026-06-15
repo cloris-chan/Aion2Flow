@@ -25,6 +25,10 @@ internal static class Program
     [STAThread]
     public static async Task Main(string[] args)
     {
+        using var appInstance = AppSingleInstance.TryAcquire();
+        if (!appInstance.IsPrimary)
+            return;
+
         VelopackApp.Build().Run();
 
         var serviceProvider = CreateServiceProvider();
@@ -57,6 +61,7 @@ internal static class Program
         AppLog.Initialize(logWriter);
         CaptureLog.Sink = static (level, message) => AppLog.Write(MapLogLevel(level), message);
         WinDivertLog.Sink = static (level, message) => AppLog.Write(MapLogLevel(level), $"[WinDivert] {message}");
+        WinDivertRuntime.Initialize();
         RawPacketDump.ConfigureLogDirectory(LogDirectoryResolver.GetDefaultLogDirectory());
 
         services.AddSingleton<SettingsService>();
