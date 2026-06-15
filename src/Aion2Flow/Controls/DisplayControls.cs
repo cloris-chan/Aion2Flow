@@ -36,8 +36,6 @@ public abstract class IconTextDisplay : UserControl
 
     public static readonly StyledProperty<bool> IsIconAlternateProperty = AvaloniaProperty.Register<IconTextDisplay, bool>(nameof(IsIconAlternate));
 
-    public static readonly StyledProperty<double> IconOverlayOpacityProperty = AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconOverlayOpacity));
-
     public static readonly StyledProperty<double> IconSizeProperty = AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconSize), 30);
 
     public static readonly StyledProperty<double> IconSpacingProperty = AvaloniaProperty.Register<IconTextDisplay, double>(nameof(IconSpacing), 4);
@@ -46,7 +44,6 @@ public abstract class IconTextDisplay : UserControl
     private readonly MarqueeTextPresenter _textPresenter;
     private readonly TextBlock _textBlock;
     private Image? _iconImage;
-    private Image? _overlayImage;
     private TranslateTransform? _iconImageTransform;
     private Panel? _iconHost;
     private Panel? _iconViewport;
@@ -103,12 +100,6 @@ public abstract class IconTextDisplay : UserControl
         set => SetValue(IsIconAlternateProperty, value);
     }
 
-    public double IconOverlayOpacity
-    {
-        get => GetValue(IconOverlayOpacityProperty);
-        set => SetValue(IconOverlayOpacityProperty, value);
-    }
-
     public double IconSize
     {
         get => GetValue(IconSizeProperty);
@@ -131,10 +122,6 @@ public abstract class IconTextDisplay : UserControl
         else if (change.Property == IsIconAlternateProperty)
         {
             UpdateIconTransform();
-        }
-        else if (change.Property == IconOverlayOpacityProperty)
-        {
-            UpdateIconOverlayOpacity();
         }
         else if (change.Property == IconSizeProperty)
         {
@@ -269,19 +256,6 @@ public abstract class IconTextDisplay : UserControl
         };
         _iconImage.Classes.Add("IconTextDisplayIcon");
 
-        _overlayImage = new Image
-        {
-            Name = "PART_IconOverlay",
-            Width = frameSize,
-            Height = frameSize,
-            Source = DisplayIconCache.OverlayIcon,
-            Opacity = IconOverlayOpacity,
-            ZIndex = 10,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        _overlayImage.Classes.Add("IconTextDisplayIconOverlay");
-
         _iconViewport = new Panel
         {
             Width = iconSize,
@@ -300,11 +274,7 @@ public abstract class IconTextDisplay : UserControl
             ClipToBounds = true,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            Children =
-            {
-                _iconViewport,
-                _overlayImage
-            }
+            Children = { _iconViewport }
         };
         _iconHost.Classes.Add("IconTextDisplayIconHost");
 
@@ -344,38 +314,25 @@ public abstract class IconTextDisplay : UserControl
             _iconViewport.Height = iconSize;
         }
 
-        if (_overlayImage is not null)
-        {
-            _overlayImage.Width = frameSize;
-            _overlayImage.Height = frameSize;
-        }
-
         if (_currentIconUsesSpriteSheet)
         {
             _iconImage.Width = iconSize;
             _iconImage.Height = iconSize * 2;
             _iconImage.Stretch = Stretch.Fill;
-            _overlayImage!.IsVisible = true;
         }
         else
         {
             _iconImage.Width = iconSize;
             _iconImage.Height = iconSize;
             _iconImage.Stretch = Stretch.Uniform;
-            _overlayImage!.IsVisible = false;
         }
 
         UpdateIconTransform();
     }
 
-    private void UpdateIconOverlayOpacity()
-    {
-        _overlayImage?.Opacity = IconOverlayOpacity;
-    }
-
     private double EffectiveIconSize => Math.Max(1, IconSize);
 
-    private double EffectiveIconFrameSize => EffectiveIconSize + 2;
+    private double EffectiveIconFrameSize => EffectiveIconSize;
 
     protected readonly record struct DisplayIcon(IImage Source, bool UsesSpriteSheet);
 }
@@ -387,8 +344,6 @@ public sealed class CombatantDisplay : UserControl
     public static readonly DirectProperty<CombatantDisplay, bool> ShowIconProperty = AvaloniaProperty.RegisterDirect<CombatantDisplay, bool>(nameof(ShowIcon), x => x.ShowIcon, (x, value) => x.ShowIcon = value);
 
     public static readonly StyledProperty<bool> IsIconAlternateProperty = AvaloniaProperty.Register<CombatantDisplay, bool>(nameof(IsIconAlternate));
-
-    public static readonly StyledProperty<double> IconOverlayOpacityProperty = AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconOverlayOpacity));
 
     public static readonly StyledProperty<double> IconSizeProperty = AvaloniaProperty.Register<CombatantDisplay, double>(nameof(IconSize), 30);
 
@@ -416,12 +371,6 @@ public sealed class CombatantDisplay : UserControl
         set => SetValue(IsIconAlternateProperty, value);
     }
 
-    public double IconOverlayOpacity
-    {
-        get => GetValue(IconOverlayOpacityProperty);
-        set => SetValue(IconOverlayOpacityProperty, value);
-    }
-
     public double IconSize
     {
         get => GetValue(IconSizeProperty);
@@ -444,7 +393,6 @@ public sealed class CombatantDisplay : UserControl
         }
         else if (change.Property == ShowIconProperty ||
                  change.Property == IsIconAlternateProperty ||
-                 change.Property == IconOverlayOpacityProperty ||
                  change.Property == IconSizeProperty ||
                  change.Property == IconSpacingProperty)
         {
@@ -519,7 +467,6 @@ public sealed class CombatantDisplay : UserControl
     {
         display.ShowIcon = ShowIcon;
         display.IsIconAlternate = IsIconAlternate;
-        display.IconOverlayOpacity = IconOverlayOpacity;
         display.IconSize = IconSize;
         display.IconSpacing = IconSpacing;
     }
@@ -679,7 +626,6 @@ internal static class DisplayIconCache
 {
     private static readonly Dictionary<string, IImage> SkillIcons = new(StringComparer.Ordinal);
     private static readonly Lock SkillIconsLock = new();
-    public static IImage OverlayIcon { get => field ??= Load("Overlay.webp"); }
     private static IImage NpcBossMarkerIcon { get => field ??= Load("UT_Marker_Monster_Boss.png"); }
     private static IImage NpcDefaultMarkerIcon { get => field ??= Load("UT_Marker_Default.png"); }
     private static IImage NpcMonsterMarkerIcon { get => field ??= Load("UT_Marker_SkillMaster.png"); }

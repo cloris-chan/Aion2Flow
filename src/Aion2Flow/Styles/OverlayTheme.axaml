@@ -111,14 +111,14 @@
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="Margin" Value="1,0,1,1" />
-        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="MinHeight" Value="28" />
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
     <Style Selector="controls|NpcDisplay.BossFocusName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="11" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
     <Style Selector="Border.BossFocusCountBadge">
@@ -142,33 +142,33 @@
 
     <Style Selector="TextBlock.BossFocusHp">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
     <Style Selector="controls|NumericBlock.BossFocusHp">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
     <Style Selector="TextBlock.BossFocusHpMuted">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.88" />
     </Style>
 
     <Style Selector="controls|NumericBlock.BossFocusHpMuted">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.88" />
     </Style>
 
     <Style Selector="TextBlock.BossFocusHpSlash">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.72" />
     </Style>
@@ -576,7 +576,6 @@
 
     <Style Selector="controls|PcDisplay">
         <Setter Property="IsIconAlternate" Value="False" />
-        <Setter Property="IconOverlayOpacity" Value="0" />
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem:pointerover Border#RowRoot controls|PcDisplay">
@@ -585,7 +584,6 @@
 
     <Style Selector="controls|AnimatedItemsViewItem:selected Border#RowRoot controls|PcDisplay">
         <Setter Property="IsIconAlternate" Value="True" />
-        <Setter Property="IconOverlayOpacity" Value="0.58" />
     </Style>
 
     <Style Selector="controls|AnimatedItemsViewItem Border.OverlayRowCard">
@@ -630,14 +628,14 @@
 
     <Style Selector="controls|PcDisplay.OverlayRowName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="11" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|NumericBlock.OverlayRowMetric">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.RowMetricText}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />
@@ -645,29 +643,15 @@
 
     <Style Selector="controls|NumericBlock.OverlayRowMetricStrong">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
-    <Style Selector="StackPanel.CombatantBossShareToken">
-        <Setter Property="MinHeight" Value="15" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="Border.CombatantBossShareMarker">
-        <Setter Property="Width" Value="8" />
-        <Setter Property="Height" Value="8" />
-        <Setter Property="BorderBrush" Value="#C8FFFFFF" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="999" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
     <Style Selector="controls|NumericBlock.CombatantBossShareValue">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />

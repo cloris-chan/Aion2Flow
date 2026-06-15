@@ -34,7 +34,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private const double BarColorLightnessRange = 0.12d;
     private const int BarHueGap = 40;
     private const int BarHueRingSize = 360 / BarHueGap;
-    private const long AggregateBossShareDisplayKey = 0;
 
     private readonly WinDivertCaptureService _captureService;
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService;
@@ -53,7 +52,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private readonly Dictionary<long, IBrush> _bossHpBarBrushes = [];
     private readonly List<ProgressSegment> _bossSegmentScratch = [];
     private readonly List<BossFocusDisplayGroup> _bossFocusDisplayGroups = [];
-    private readonly List<CombatantBossShareViewModel> _combatantBossShareScratch = [];
     private int _displayContextVersion;
     private int _displayContextBuiltVersion = -1;
     private bool _displayContextIsArchived;
@@ -485,7 +483,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         {
             _bossFocusDisplayGroups.Clear();
             BossFocuses.Clear();
-            RefreshCombatantBossShares(snapshot.EncounterId, default, EmptyBossDamageContributions);
+            RefreshCombatantBossShares(default, EmptyBossDamageContributions);
             return;
         }
 
@@ -493,7 +491,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         var damageContributions = liveFrame?.BossDamageContributions ?? EmptyBossDamageContributions;
         BuildBossFocusDisplayGroups(snapshots);
         SyncBossFocuses(snapshot.EncounterId, damageContributions);
-        RefreshCombatantBossShares(snapshot.EncounterId, snapshots, damageContributions);
+        RefreshCombatantBossShares(snapshots, damageContributions);
     }
 
     private void SyncBossFocuses(Guid encounterId, IReadOnlyList<BossDamageContribution> damageContributions)
@@ -673,7 +671,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         return -1;
     }
 
-    private void RefreshCombatantBossShares(Guid encounterId, SnapshotList<SceneBossFocusSnapshot> snapshots, IReadOnlyList<BossDamageContribution> damageContributions)
+    private void RefreshCombatantBossShares(SnapshotList<SceneBossFocusSnapshot> snapshots, IReadOnlyList<BossDamageContribution> damageContributions)
     {
         var scope = CreateCombatantBossShareScope();
         var hasBossColumn = scope.EffectiveHp > 0;
@@ -681,25 +679,15 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         if (!hasBossColumn)
         {
             for (var i = 0; i < Combatants.Count; i++)
-                Combatants[i].UpdateBossShares([]);
+                Combatants[i].UpdateBossShare(0);
             return;
         }
 
         for (var i = 0; i < Combatants.Count; i++)
         {
             var row = Combatants[i];
-            _combatantBossShareScratch.Clear();
             var damage = FindAggregateBossContributionAmount(snapshots, damageContributions, row.Id);
-            if (damage > 0)
-            {
-                var ratio = damage / (double)scope.EffectiveHp;
-                _combatantBossShareScratch.Add(new CombatantBossShareViewModel(
-                    AggregateBossShareDisplayKey,
-                    ResolveBossHpBrush(encounterId, AggregateBossShareDisplayKey),
-                    ratio));
-            }
-
-            row.UpdateBossShares(_combatantBossShareScratch);
+            row.UpdateBossShare(damage > 0 ? damage / (double)scope.EffectiveHp : 0);
         }
     }
 

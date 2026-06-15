@@ -222,9 +222,8 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        var share = Assert.Single(row.BossShares);
-        Assert.Equal(0, share.DisplayKey);
-        Assert.Equal(0.002d, share.Ratio, 6);
+        Assert.True(row.HasBossShare);
+        Assert.Equal(0.002d, row.BossShareRatio, 6);
     }
 
     [Fact]
@@ -373,7 +372,8 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
         Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.Empty(row.BossShares);
+        Assert.False(row.HasBossShare);
+        Assert.Equal(0d, row.BossShareRatio);
     }
 
     [Fact]
@@ -392,10 +392,8 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
         Assert.False(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        var share = Assert.Single(row.BossShares);
-        Assert.Equal(0, share.DisplayKey);
-        Assert.Equal(0.5d, share.Ratio, 6);
-        Assert.NotNull(share.Brush);
+        Assert.True(row.HasBossShare);
+        Assert.Equal(0.5d, row.BossShareRatio, 6);
     }
 
     [Fact]
@@ -415,7 +413,8 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.False(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.Equal(0.25d, Assert.Single(row.BossShares).Ratio, 6);
+        Assert.True(row.HasBossShare);
+        Assert.Equal(0.25d, row.BossShareRatio, 6);
     }
 
     [Fact]
@@ -432,7 +431,8 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.Equal(0.5d, Assert.Single(row.BossShares).Ratio, 6);
+        Assert.True(row.HasBossShare);
+        Assert.Equal(0.5d, row.BossShareRatio, 6);
     }
 
     [Fact]
@@ -448,9 +448,8 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        var share = Assert.Single(row.BossShares);
-        Assert.Equal(0, share.DisplayKey);
-        Assert.Equal(0.1d, share.Ratio, 6);
+        Assert.True(row.HasBossShare);
+        Assert.Equal(0.1d, row.BossShareRatio, 6);
     }
 
     [Fact]

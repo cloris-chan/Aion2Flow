@@ -7,7 +7,6 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService, CombatantColumnLayoutViewModel columns, int id, CharacterClass? characterClass, double damagePerSecond, double healingPerSecond, double damage, double healing) : FrameBatchedObservableObject(frameBatchService)
 {
     private static readonly ProgressSegment[] EmptySegments = [];
-    private static readonly CombatantBossShareViewModel[] EmptyBossShares = [];
 
     public CombatantColumnLayoutViewModel Columns { get; } = columns;
 
@@ -49,11 +48,17 @@ public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService,
         private set => SetFrameProperty(ref field, value);
     } = EmptySegments;
 
-    public IReadOnlyList<CombatantBossShareViewModel> BossShares
+    public bool HasBossShare
     {
         get;
         private set => SetFrameProperty(ref field, value);
-    } = EmptyBossShares;
+    }
+
+    public double BossShareRatio
+    {
+        get;
+        private set => SetFrameProperty(ref field, value);
+    }
 
     public void UpdateBar(double ratio, IBrush brush)
     {
@@ -72,29 +77,21 @@ public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService,
         BarSegments = [new ProgressSegment(resolvedRatio, brush)];
     }
 
-    public void UpdateBossShares(IReadOnlyList<CombatantBossShareViewModel> shares)
+    public void UpdateBossShare(double ratio)
     {
-        if (AreSameBossShares(BossShares, shares))
-            return;
-
-        BossShares = shares.Count == 0 ? EmptyBossShares : [.. shares];
-    }
-
-    private static bool AreSameBossShares(IReadOnlyList<CombatantBossShareViewModel> left, IReadOnlyList<CombatantBossShareViewModel> right)
-    {
-        if (left.Count != right.Count)
-            return false;
-
-        for (var i = 0; i < left.Count; i++)
+        var resolvedRatio = Math.Max(0d, ratio);
+        if (resolvedRatio <= 0.000_001)
         {
-            if (left[i].DisplayKey != right[i].DisplayKey ||
-                Math.Abs(left[i].Ratio - right[i].Ratio) > 0.000_001 ||
-                !ReferenceEquals(left[i].Brush, right[i].Brush))
-            {
-                return false;
-            }
+            if (BossShareRatio != 0)
+                BossShareRatio = 0;
+            if (HasBossShare)
+                HasBossShare = false;
+            return;
         }
 
-        return true;
+        if (Math.Abs(BossShareRatio - resolvedRatio) > 0.000_001)
+            BossShareRatio = resolvedRatio;
+        if (!HasBossShare)
+            HasBossShare = true;
     }
 }
