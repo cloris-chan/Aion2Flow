@@ -203,6 +203,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return ResolveCombatantIdCached(entityId);
     }
 
+    internal bool IsSummonDamageTarget(int sourceId, int targetId, long damage)
+    {
+        PrepareProjectionCaches();
+        return IsSummonDamageTargetCached(sourceId, targetId, damage);
+    }
+
     private bool ShouldIncludeDetailEvent(in CombatEventRecord e, int sourceId, int targetId, SceneCombatSnapshot snapshot)
     {
         if (IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
@@ -398,7 +404,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
                 return resolved;
             }
 
-            if (IsExplicitNonSummon(entity))
+            if (entity.Kind != NpcKind.Summon && IsExplicitNonSummon(entity))
             {
                 resolved = combatantId;
                 return resolved;
@@ -445,7 +451,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             if (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon)
                 return true;
 
-            if (IsExplicitNonSummon(entity))
+            if (entity.Kind != NpcKind.Summon && IsExplicitNonSummon(entity))
                 return false;
         }
 
@@ -453,7 +459,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     }
 
     private bool IsExplicitKnownSummonCore(int entityId) =>
-        entities.TryGet(entityId, out var entity) && (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon);
+        entities.TryGet(entityId, out var entity) && entity.OwnerEntityId.HasValue;
 
     private static bool IsExplicitNonSummon(EntityRecord entity) =>
         entity.IsPlayer ||
@@ -1033,10 +1039,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (!entities.TryGet(targetId, out var target))
             return true;
 
-        if (target.IsPlayer || !string.IsNullOrWhiteSpace(target.Nickname) || target.NpcCode.HasValue)
+        if (target.IsPlayer || !string.IsNullOrWhiteSpace(target.Nickname))
             return false;
 
-        return target.Kind is NpcKind.Unknown or NpcKind.Summon;
+        return target.Kind == NpcKind.Summon || (target.Kind == NpcKind.Unknown && !target.NpcCode.HasValue);
     }
 
     private static bool IsDirectSummonOwnerSupportEvidence(in CombatEventRecord e) =>

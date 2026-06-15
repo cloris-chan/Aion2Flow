@@ -180,6 +180,15 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
+    internal T ReadLocked<T>(Func<EntityStore, SceneBoundaryStore, RuntimeMetadataRegistry, CombatStore, SceneCombatSnapshotAdapter, T> reader)
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            return reader(entities, boundary, metadataRegistry, combat, CreateAdapter());
+        }
+    }
+
     public CombatDetailDelta CreateDetailDelta(SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false)
     {
         lock (_gate)

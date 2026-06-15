@@ -42,7 +42,7 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
         sink.AppendNpcName(in packet, npcCode, entry.Name);
 
         var kind = CombatResourceRegistry.ResolveNpcKind(entry.Kind);
-        if (kind != NpcKind.Unknown && kind != NpcKind.Summon)
+        if (kind != NpcKind.Unknown)
         {
             sink.AppendNpcKind(in packet, instanceId, kind);
         }

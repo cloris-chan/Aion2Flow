@@ -1,5 +1,7 @@
+using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
@@ -37,6 +39,28 @@ public sealed class NpcCatalogSceneTests
         Assert.Equal(NpcCatalogKind.TrainingDummy, scarecrow.Kind);
         Assert.Equal(NpcKind.TrainingDummy, CombatResourceRegistry.ResolveNpcKind(scarecrow.Kind));
         Assert.NotEqual(NpcKind.Boss, CombatResourceRegistry.ResolveNpcKind(scarecrow.Kind));
+    }
+
+    [Fact]
+    public void ApplyNpcCatalog_Applies_Summon_Kind_From_Catalog()
+    {
+        const int summonId = 81994;
+        const int summonNpcCode = 2920190;
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
+        {
+            [summonNpcCode] = new(summonNpcCode, "古代精靈", NpcCatalogKind.Summon)
+        });
+        using var scene = new SceneTestHarness();
+        var writer = new SceneObservationWriter(scene.Sink);
+
+        writer.ApplyNpcCatalog(Source(1_000), summonId, summonNpcCode, requireCatalogEntry: true);
+        scene.Owner.Refresh();
+
+        Assert.True(scene.Owner.Entities.TryGet(summonId, out var entity));
+        Assert.Equal(summonNpcCode, entity.NpcCode);
+        Assert.Equal(NpcKind.Summon, entity.Kind);
+        Assert.True(scene.Owner.MetadataRegistry.TryGetNpcCode(summonId, out var npcCode));
+        Assert.Equal(summonNpcCode, npcCode);
     }
 
     [Fact]
@@ -444,4 +468,7 @@ public sealed class NpcCatalogSceneTests
             new Skill(17730000, "Additional Strike", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];
     }
+
+    private static PacketObservationSource Source(long timestamp) =>
+        new(timestamp, 0, 1, 0, 0, 0, default);
 }

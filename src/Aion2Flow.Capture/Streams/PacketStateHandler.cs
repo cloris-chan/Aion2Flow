@@ -1,7 +1,6 @@
 using System.Buffers;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Protocol.Packets;
-using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
@@ -24,7 +23,6 @@ internal sealed class PacketStateHandler
                 context.Writer.ApplyNpcCatalog(in source, parsed.SummonId, parsed.NpcCode.Value);
             }
 
-            context.Sink.AppendNpcKind(in source, parsed.SummonId, NpcKind.Summon);
             context.Sink.AppendSummon(in source, parsed.OwnerId, parsed.SummonId);
             return context.MarkParsed();
         }

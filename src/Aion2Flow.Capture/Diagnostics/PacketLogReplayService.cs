@@ -5,7 +5,6 @@ using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
-using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
@@ -171,7 +170,7 @@ public sealed class PacketLogReplayService
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = owner.ReadLocked((entities, _, metadataRegistry, combat) => BuildCombatantSummaries(combat, entities, metadataRegistry, snapshot));
+        var summaries = owner.ReadLocked((entities, _, metadataRegistry, combat, adapter) => BuildCombatantSummaries(combat, entities, metadataRegistry, adapter, snapshot));
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
@@ -206,13 +205,13 @@ public sealed class PacketLogReplayService
         return new PacketLogReplayBaselineCounter(elapsed, Math.Max(0, allocatedBytes));
     }
 
-    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(CombatStore combat, EntityStore entities, RuntimeMetadataRegistry metadataRegistry, SceneCombatSnapshot snapshot)
+    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(CombatStore combat, EntityStore entities, RuntimeMetadataRegistry metadataRegistry, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
     {
         var summariesByCombatantId = new Dictionary<int, MutableCombatantSummary>();
 
-        foreach (ref readonly var e in EnumerateSummaryEvents(combat, entities, snapshot))
+        foreach (ref readonly var e in EnumerateSummaryEvents(combat, adapter, snapshot))
         {
-            var sourceId = ResolveCombatantId(entities, e.SourceId);
+            var sourceId = adapter.ResolveDetailCombatantId(e.SourceId);
             var targetId = e.TargetId;
 
             if (sourceId > 0)
@@ -228,7 +227,7 @@ public sealed class PacketLogReplayService
             var observation = e.Observation;
             if (e.ContributesDamage)
             {
-                if (!IsSummonDamageTarget(entities, in e))
+                if (!IsSummonDamageTarget(adapter, in e))
                 {
                     ApplyDamageSummary(summariesByCombatantId, sourceId, targetId, in observation);
                 }
@@ -251,7 +250,7 @@ public sealed class PacketLogReplayService
         return [.. summariesByCombatantId.OrderBy(static pair => pair.Key).Select(static pair => pair.Value.ToSummary())];
     }
 
-    private static CombatEventSpan EnumerateSummaryEvents(CombatStore combat, EntityStore entities, SceneCombatSnapshot snapshot)
+    private static CombatEventSpan EnumerateSummaryEvents(CombatStore combat, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
     {
         if (snapshot.EncounterEndTime < snapshot.EncounterStartTime)
             return new CombatEventSpan([], []);
@@ -265,7 +264,7 @@ public sealed class PacketLogReplayService
             if (!IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
                 continue;
 
-            var sourceId = ResolveCombatantId(entities, e.SourceId);
+            var sourceId = adapter.ResolveDetailCombatantId(e.SourceId);
             relevant.Add(sourceId);
             if (e.TargetId > 0)
                 relevant.Add(e.TargetId);
@@ -282,7 +281,7 @@ public sealed class PacketLogReplayService
             if (IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
                 continue;
 
-            var sourceId = ResolveCombatantId(entities, e.SourceId);
+            var sourceId = adapter.ResolveDetailCombatantId(e.SourceId);
             if (!IsRelevantRecoveryEvent(in e, sourceId, e.TargetId, relevant))
                 continue;
 
@@ -430,30 +429,16 @@ public sealed class PacketLogReplayService
         }
     }
 
-    private static int ResolveCombatantId(EntityStore entities, int entityId)
-    {
-        if (entityId <= 0)
-            return entityId;
-
-        return entities.TryGet(entityId, out var entity) && entity.OwnerEntityId is int ownerId ? ownerId : entityId;
-    }
-
     private static bool IsWithinEncounterWindow(in CombatEventRecord e, long start, long end) =>
         e.ObservedAtMilliseconds >= start && e.ObservedAtMilliseconds <= end;
 
-    private static bool IsSummonDamageTarget(EntityStore entities, in CombatEventRecord e)
+    private static bool IsSummonDamageTarget(SceneCombatSnapshotAdapter adapter, in CombatEventRecord e)
     {
         if (e.TargetId <= 0 || !e.ContributesDamage)
             return false;
 
-        if (IsKnownSummon(entities, e.TargetId))
-            return true;
-
-        return ResolveCombatantId(entities, e.SourceId) == ResolveCombatantId(entities, e.TargetId);
+        return adapter.IsSummonDamageTarget(e.SourceId, e.TargetId, e.Observation.Damage);
     }
-
-    private static bool IsKnownSummon(EntityStore entities, int entityId) =>
-        entities.TryGet(entityId, out var entity) && (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon);
 
     private static bool IsRelevantRecoveryEvent(in CombatEventRecord e, int sourceId, int targetId, HashSet<int> relevant)
     {

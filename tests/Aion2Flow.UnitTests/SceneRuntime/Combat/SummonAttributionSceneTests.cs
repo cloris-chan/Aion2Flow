@@ -1,4 +1,7 @@
+using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
@@ -147,6 +150,112 @@ public sealed class SummonAttributionSceneTests
         Assert.Equal(1610, owner.DamageAmount);
         Assert.Equal(777, other.DamageAmount);
         Assert.Equal(587, owner.HealingAmount);
+    }
+
+    [Fact]
+    public void Infers_Preexisting_Elementalist_Catalog_Summon_From_OwnerSupport_When_Class_Candidates_Are_Ambiguous()
+    {
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>
+        {
+            [2920115] = new(2920115, "火之精靈", NpcCatalogKind.Summon)
+        });
+
+        using var scene = new SceneTestHarness();
+        const int ownerId = 10389;
+        const int otherElementalistId = 9915;
+        const int summonId = 26765;
+        const int targetId = 163760;
+
+        scene.AppendNickname(ownerId, "Owner");
+        scene.AppendNickname(otherElementalistId, "Other");
+        scene.AppendNpcCode(summonId, 2920115);
+        scene.AppendNpcKind(summonId, NpcKind.Summon);
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = targetId,
+            SkillCode = 16010000,
+            Damage = 405,
+            Timestamp = 1_000
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = otherElementalistId,
+            TargetId = targetId,
+            SkillCode = 16010000,
+            Damage = 777,
+            Timestamp = 1_010
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = summonId,
+            SkillCode = 16770001,
+            Damage = 587,
+            EventKind = CombatEventKind.Healing,
+            ValueKind = CombatValueKind.Healing,
+            Timestamp = 1_020
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = targetId,
+            SkillCode = 16100004,
+            Damage = 1205,
+            Timestamp = 1_030
+        });
+
+        var snapshot = scene.CreateSnapshot();
+
+        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        Assert.True(snapshot.Combatants.TryGetValue(otherElementalistId, out var other));
+        Assert.False(snapshot.Combatants.ContainsKey(summonId));
+        Assert.Equal(1610, owner.DamageAmount);
+        Assert.Equal(777, other.DamageAmount);
+        Assert.Equal(587, owner.HealingAmount);
+    }
+
+    [Fact]
+    public void Infers_Preexisting_Elementalist_Catalog_Summon_With_NpcCode()
+    {
+        const int ownerId = 10389;
+        const int summonId = 153484;
+        const int targetId = 163760;
+        const int summonNpcCode = 2920115;
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>
+        {
+            [summonNpcCode] = new(summonNpcCode, "火之精靈", NpcCatalogKind.Summon)
+        });
+        using var scene = new SceneTestHarness();
+        var writer = new SceneObservationWriter(scene.Sink);
+
+        scene.AppendNickname(ownerId, "Owner");
+        writer.ApplyNpcCatalog(Source(1_005), summonId, summonNpcCode, requireCatalogEntry: true);
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = ownerId,
+            TargetId = targetId,
+            SkillCode = 16010000,
+            Damage = 405,
+            Timestamp = 1_000
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = summonId,
+            TargetId = targetId,
+            SkillCode = 16100004,
+            Damage = 1_205,
+            Timestamp = 1_030
+        });
+
+        var snapshot = scene.CreateSnapshot();
+
+        Assert.True(scene.Owner.Entities.TryGet(summonId, out var summon));
+        Assert.Equal(summonNpcCode, summon.NpcCode);
+        Assert.Equal(NpcKind.Summon, summon.Kind);
+        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
+        Assert.False(snapshot.Combatants.ContainsKey(summonId));
+        Assert.Equal(1_610, owner.DamageAmount);
     }
 
     [Fact]
@@ -465,4 +574,7 @@ public sealed class SummonAttributionSceneTests
             new Skill(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
         ];
     }
+
+    private static PacketObservationSource Source(long timestamp) =>
+        new(timestamp, 0, 1, 0, 0, 0, default);
 }
