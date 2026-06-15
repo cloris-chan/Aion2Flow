@@ -223,7 +223,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
         var share = Assert.Single(row.BossShares);
-        Assert.Equal(-dummyNpcCode, share.DisplayKey);
+        Assert.Equal(0, share.DisplayKey);
         Assert.Equal(0.002d, share.Ratio, 6);
     }
 
@@ -393,7 +393,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.False(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
         var share = Assert.Single(row.BossShares);
-        Assert.Equal(900_002, share.DisplayKey);
+        Assert.Equal(0, share.DisplayKey);
         Assert.Equal(0.5d, share.Ratio, 6);
         Assert.NotNull(share.Brush);
     }

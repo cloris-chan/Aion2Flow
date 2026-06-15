@@ -694,8 +694,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             {
                 var ratio = damage / (double)scope.EffectiveHp;
                 _combatantBossShareScratch.Add(new CombatantBossShareViewModel(
-                    scope.DisplayKey,
-                    ResolveBossHpBrush(encounterId, scope.DisplayKey),
+                    AggregateBossShareDisplayKey,
+                    ResolveBossHpBrush(encounterId, AggregateBossShareDisplayKey),
                     ratio));
             }
 
@@ -706,8 +706,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private CombatantBossShareScope CreateCombatantBossShareScope()
     {
         var effectiveHp = 0L;
-        var firstDisplayKey = AggregateBossShareDisplayKey;
-        var shareableGroupCount = 0;
         for (var i = 0; i < _bossFocusDisplayGroups.Count; i++)
         {
             var group = _bossFocusDisplayGroups[i];
@@ -715,13 +713,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                 continue;
 
             effectiveHp += group.EffectiveHp;
-            if (shareableGroupCount == 0)
-                firstDisplayKey = group.DisplayKey;
-            shareableGroupCount++;
         }
 
-        var displayKey = shareableGroupCount == 1 ? firstDisplayKey : AggregateBossShareDisplayKey;
-        return new CombatantBossShareScope(displayKey, effectiveHp);
+        return new CombatantBossShareScope(effectiveHp);
     }
 
     private static long FindAggregateBossContributionAmount(SnapshotList<SceneBossFocusSnapshot> snapshots, IReadOnlyList<BossDamageContribution> damageContributions, int combatantId)
@@ -1192,5 +1186,5 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private readonly record struct BossFocusDisplayGroup(long DisplayKey, SceneBossFocusSnapshot Representative, int NpcCode, int InstanceCount, long EffectiveHp);
 
-    private readonly record struct CombatantBossShareScope(long DisplayKey, long EffectiveHp);
+    private readonly record struct CombatantBossShareScope(long EffectiveHp);
 }
