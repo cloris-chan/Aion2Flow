@@ -32,7 +32,7 @@ public sealed class SceneTestHarness : IDisposable
 
     public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId) => Owner.CreateSkillBreakdown(snapshot, combatantId);
 
-    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null) => Sink.AppendNickname(NextSource(), uid, nickname, originServerId, faction, characterClass);
+    public void AppendNickname(int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false) => Sink.AppendNickname(NextSource(), uid, nickname, originServerId, faction, characterClass, isLocalPlayer);
 
     public void AppendNpcCode(int instanceId, int npcCode) => Sink.AppendNpcCode(NextSource(), instanceId, npcCode);
 
@@ -216,7 +216,7 @@ public sealed class SceneTestHarness : IDisposable
         public void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64) => inner.RegisterObservation2A38(in packet, entityId, mode, groupCode, instanceSequenceId, headCode, headValue, headMiddleRaw, timelineValue, stableValue, echoSourceId, stackValue, buffResourceEffectRef, tailLength, tailLow64, tailHigh64);
         public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int instanceSequenceId, ResourceEffectRef actionResourceEffectRef, int sequenceValue, int stateValue, int detailValue, int tailLength) => inner.RegisterObservation2B38(in packet, sourceId, sourceIdCopy, phase, instanceSequenceId, actionResourceEffectRef, sequenceValue, stateValue, detailValue, tailLength);
         public void RegisterObservation2C38(in PacketObservationSource packet, int entityId, scoped ReadOnlySpan<AuraResultRecord> results) => inner.RegisterObservation2C38(in packet, entityId, results);
-        public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null) => inner.AppendNickname(in packet, uid, nickname, originServerId, faction, characterClass);
+        public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false) => inner.AppendNickname(in packet, uid, nickname, originServerId, faction, characterClass, isLocalPlayer);
         public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode) => inner.AppendNpcCode(in packet, instanceId, npcCode);
         public void AppendNpcName(in PacketObservationSource packet, int npcCode, string name) => inner.AppendNpcName(in packet, npcCode, name);
         public void AppendNpcKind(in PacketObservationSource packet, int instanceId, NpcKind kind) => inner.AppendNpcKind(in packet, instanceId, kind);

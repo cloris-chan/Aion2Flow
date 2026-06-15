@@ -113,6 +113,8 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
 
     public Faction ResolveFaction(int entityId) => TryGetPcMetadata(entityId, out var pc) ? pc.Faction : Faction.Unknown;
 
+    public bool IsLocalPlayer(int entityId) => TryGetPcMetadata(entityId, out var pc) && pc.IsLocalPlayer;
+
     public string ResolveNpcName(int instanceId)
     {
         if (instanceId <= 0)

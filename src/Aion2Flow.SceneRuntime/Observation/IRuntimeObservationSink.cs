@@ -56,7 +56,7 @@ public interface IRuntimeObservationSink
 
     void RegisterObservation2C38(in PacketObservationSource packet, int entityId, scoped ReadOnlySpan<AuraResultRecord> results);
 
-    void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null);
+    void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false);
 
     void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode);
 

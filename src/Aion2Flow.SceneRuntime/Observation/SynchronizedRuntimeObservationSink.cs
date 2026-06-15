@@ -145,9 +145,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterObservation2C38(in packet, entityId, results);
     }
 
-    public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null)
+    public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, int? originServerId = null, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false)
     {
-        lock (gate) inner.AppendNickname(in packet, uid, nickname, originServerId, faction, characterClass);
+        lock (gate) inner.AppendNickname(in packet, uid, nickname, originServerId, faction, characterClass, isLocalPlayer);
     }
 
     public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode)

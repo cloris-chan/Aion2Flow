@@ -118,6 +118,7 @@ public class EntityStoreTests
         Assert.Equal("Perigee", metadata.Nickname);
         Assert.Equal(495, metadata.OriginServerId);
         Assert.Equal(Faction.Light, metadata.Faction);
+        Assert.False(metadata.IsLocalPlayer);
     }
 
     [Fact]
@@ -141,6 +142,33 @@ public class EntityStoreTests
 
         Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
         Assert.Equal(CharacterClass.Sorcerer, metadata.CharacterClass);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_UpsertPcMetadata_PreservesLocalPlayer_WhenGenericMetadataRefreshes()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(2007, "Perigee", 495, Faction.Light, CharacterClass.Elementalist, isLocalPlayer: true);
+        registry.UpsertPcMetadata(2007, "Perigee", null);
+
+        Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
+        Assert.True(metadata.IsLocalPlayer);
+        Assert.Equal(495, metadata.OriginServerId);
+        Assert.Equal(Faction.Light, metadata.Faction);
+        Assert.Equal(CharacterClass.Elementalist, metadata.CharacterClass);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_UpsertPcMetadata_KeepsSingleLocalPlayer()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(100, "First", null, characterClass: CharacterClass.Cleric, isLocalPlayer: true);
+        registry.UpsertPcMetadata(200, "Second", null, characterClass: CharacterClass.Elementalist, isLocalPlayer: true);
+
+        Assert.True(registry.TryGetPcMetadata(100, out var first));
+        Assert.True(registry.TryGetPcMetadata(200, out var second));
+        Assert.False(first.IsLocalPlayer);
+        Assert.True(second.IsLocalPlayer);
     }
 
     [Fact]

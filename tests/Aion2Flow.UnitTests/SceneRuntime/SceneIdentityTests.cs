@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Identity;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -85,6 +86,32 @@ public sealed class SceneIdentityTests
         Assert.Equal("Perigee", metadata.Nickname);
         Assert.Equal(495, metadata.OriginServerId);
         Assert.Equal(Faction.Light, metadata.Faction);
+    }
+
+    [Fact]
+    public void DomainEventApplier_PreservesLocalPlayerInRuntimeMetadataRegistry()
+    {
+        var entities = new EntityStore();
+        var boundary = new SceneBoundaryStore();
+        var registry = new RuntimeMetadataRegistry();
+        var applier = new DomainEventApplier(entities, boundary, registry, new CombatStore());
+
+        applier.ApplyEntry(new ObservedEventEnvelope
+        {
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 100,
+            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", 495, Faction.Light, CharacterClass.Elementalist, IsLocalPlayer: true)
+        });
+        applier.ApplyEntry(new ObservedEventEnvelope
+        {
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 100,
+            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", 495, Faction.Light)
+        });
+
+        Assert.True(registry.TryGetPcMetadata(100, out var metadata));
+        Assert.True(metadata.IsLocalPlayer);
+        Assert.Equal(CharacterClass.Elementalist, metadata.CharacterClass);
     }
 
     [Fact]

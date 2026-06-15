@@ -500,6 +500,7 @@ public sealed class CombatantDisplay : UserControl
 
 public sealed class PcDisplay : IconTextDisplay
 {
+    private const string LocalPlayerPrefix = "⭐";
     private PlayerNamePrivacyService? _privacy;
     private bool _isPrivacySubscribed;
 
@@ -516,11 +517,14 @@ public sealed class PcDisplay : IconTextDisplay
         {
             var characterClass = context?.ResolvePcClass(entityId);
             var ordinal = context?.ResolvePcAnonymousOrdinal(entityId) ?? 1;
-            return privacy.FormatAnonymousName(characterClass, ordinal);
+            return FormatLocalPlayerName(context, entityId, privacy.FormatAnonymousName(characterClass, ordinal));
         }
 
-        return context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
+        return FormatLocalPlayerName(context, entityId, context?.ResolvePcName(entityId) ?? FormatEntityId(entityId));
     }
+
+    private static string FormatLocalPlayerName(SceneDisplayContext? context, int entityId, string name)
+        => context?.IsLocalPlayer(entityId) == true ? LocalPlayerPrefix + name : name;
 
     protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId)
     {

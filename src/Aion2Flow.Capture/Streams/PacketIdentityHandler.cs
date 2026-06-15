@@ -11,7 +11,7 @@ internal static class PacketIdentityHandler
             return false;
         }
 
-        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, packet.Length), parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode));
+        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, packet.Length), parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true);
         return context.MarkParsed();
     }
 

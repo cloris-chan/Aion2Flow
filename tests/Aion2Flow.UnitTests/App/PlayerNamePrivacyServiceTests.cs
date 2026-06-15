@@ -54,6 +54,19 @@ public sealed class PlayerNamePrivacyServiceTests
         Assert.Equal(1, context.ResolvePcAnonymousOrdinal(200));
     }
 
+    [Fact]
+    public void SceneDisplayContext_ExposesLocalPlayerMetadata()
+    {
+        var builder = new SceneIdentityScopeBuilder();
+        builder.AddPcMetadata(new PcMetadata(100, "Perigee", null, CharacterClass: CharacterClass.Elementalist, IsLocalPlayer: true));
+        var language = new LanguageService();
+        using var resources = new GameResourceService(language);
+        var context = new SceneDisplayContext(builder.ToScope(), null, null, resources, "Unknown");
+
+        Assert.True(context.IsLocalPlayer(100));
+        Assert.False(context.IsLocalPlayer(200));
+    }
+
     private static SettingsService CreateSettings()
     {
         var path = Path.Combine(Path.GetTempPath(), "Aion2Flow.Tests", $"{Guid.NewGuid():N}.json");
