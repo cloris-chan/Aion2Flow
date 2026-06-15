@@ -1,3 +1,5 @@
+using Cloris.Aion2Flow.Capture.Streams;
+using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -82,6 +84,59 @@ public sealed class BossSceneCollectionTests
         Assert.True(scene.Owner.MetadataRegistry.TryGetPcMetadata(100, out var player));
         Assert.Equal("Player", player.Nickname);
         Assert.All(ReadJournal(scene).Where(entry => entry.Stamp.ObservationOrdinal >= scene.Owner.SceneStartObservationOrdinal), entry => Assert.Equal(scene.SessionId, entry.SceneSessionId));
+    }
+
+    [Fact]
+    public void FirstTrainingDummyCombatStartsBossModeSceneWithoutClassifyingAsBoss()
+    {
+        var scene = CreateBossScene();
+        var waitingEncounterId = scene.SessionId;
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_500_075, NpcKind.TrainingDummy, 20);
+
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        AppendDamage(sink, 100, 300, 200, 1_200, 2);
+        sink.CompleteBatch(2);
+        var snapshot = scene.CreateFrame().Snapshot;
+
+        Assert.NotEqual(waitingEncounterId, scene.SessionId);
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Equal(SceneKind.Boss, snapshot.Kind);
+        Assert.Equal(700, snapshot.Combatants[100].DamageAmount);
+        Assert.Equal([2_500_075], snapshot.BossNpcCodes.AsSpan().ToArray());
+        var focus = Assert.Single(snapshot.BossFocuses.AsSpan().ToArray());
+        Assert.Equal(300, focus.InstanceId);
+        Assert.True(scene.Owner.Entities.TryGet(300, out var entity));
+        Assert.Equal(NpcKind.TrainingDummy, entity.Kind);
+    }
+
+    [Fact]
+    public void FirstCatalogResolvedCityTrainingDummyCombatStartsBossModeScene()
+    {
+        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        CombatResourceRegistry.SetGameResources([], catalog);
+        var scene = CreateBossScene();
+        var waitingEncounterId = scene.SessionId;
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        var writer = new SceneObservationWriter(sink);
+        AppendPlayer(sink, 100, "Player", 10);
+        writer.ApplyNpcCatalog(Source(20), 300, 2_400_032, requireCatalogEntry: true);
+
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        AppendDamage(sink, 100, 300, 200, 1_200, 2);
+        sink.CompleteBatch(2);
+        var snapshot = scene.CreateFrame().Snapshot;
+
+        Assert.NotEqual(waitingEncounterId, scene.SessionId);
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Equal(SceneKind.Boss, snapshot.Kind);
+        Assert.Equal(700, snapshot.Combatants[100].DamageAmount);
+        Assert.Equal([2_400_032], snapshot.BossNpcCodes.AsSpan().ToArray());
+        var focus = Assert.Single(snapshot.BossFocuses.AsSpan().ToArray());
+        Assert.Equal(300, focus.InstanceId);
+        Assert.True(scene.Owner.Entities.TryGet(300, out var entity));
+        Assert.Equal(NpcKind.TrainingDummy, entity.Kind);
     }
 
     [Fact]

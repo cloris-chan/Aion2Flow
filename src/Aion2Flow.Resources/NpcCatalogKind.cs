@@ -7,5 +7,6 @@ public enum NpcCatalogKind : byte
     Boss = 2,
     Summon = 3,
     Friendly = 4,
-    Object = 5
+    TrainingDummy = 5,
+    Object = 6
 }

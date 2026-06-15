@@ -6,5 +6,6 @@ public enum NpcKind
     Monster,
     Boss,
     Summon,
-    Friendly
+    Friendly,
+    TrainingDummy
 }

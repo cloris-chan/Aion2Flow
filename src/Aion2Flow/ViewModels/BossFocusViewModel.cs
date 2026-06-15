@@ -6,14 +6,46 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
 {
     private static readonly ProgressSegment[] EmptySegments = [];
 
-    public BossFocusViewModel(UiFrameBatchService frameBatchService, int instanceId, int hp, int maxHp, bool hasHp)
+    public BossFocusViewModel(UiFrameBatchService frameBatchService, long displayKey, int instanceId, int npcCode, int instanceCount, int hp, int maxHp, bool hasHp)
         : base(frameBatchService)
     {
+        DisplayKey = displayKey;
         InstanceId = instanceId;
+        NpcCode = npcCode;
+        InstanceCount = instanceCount;
         Apply(hp, maxHp, hasHp);
     }
 
-    public int InstanceId { get; init; }
+    public long DisplayKey { get; }
+
+    public int InstanceId
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
+
+    public int NpcCode
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    }
+
+    public int InstanceCount
+    {
+        get;
+        set
+        {
+            if (SetFrameProperty(ref field, Math.Max(1, value)))
+            {
+                QueueFramePropertyChanged(nameof(HasMultipleInstances));
+                QueueFramePropertyChanged(nameof(InstanceCountText));
+            }
+        }
+    } = 1;
+
+    public bool HasMultipleInstances => InstanceCount > 1;
+
+    public string InstanceCountText => $"x{InstanceCount}";
 
     public double Hp
     {
@@ -53,17 +85,12 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         private set => SetFrameProperty(ref field, value);
     } = EmptySegments;
 
-    public void Update(int hp, int maxHp) => Update(hp, maxHp, hasHp: true);
-
-    public void Update(int hp, int maxHp, bool hasHp) => Apply(hp, maxHp, hasHp);
-
-    public void Clear()
+    public void Update(int instanceId, int npcCode, int instanceCount, int hp, int maxHp, bool hasHp)
     {
-        Hp = 0;
-        MaxHp = 1;
-        HpRatio = 0;
-        HasHp = false;
-        BarSegments = EmptySegments;
+        InstanceId = instanceId;
+        NpcCode = npcCode;
+        InstanceCount = instanceCount;
+        Apply(hp, maxHp, hasHp);
     }
 
     public void UpdateSegments(IReadOnlyList<ProgressSegment> segments)

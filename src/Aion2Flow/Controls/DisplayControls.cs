@@ -719,6 +719,7 @@ internal static class DisplayIconCache
             NpcCatalogKind.Summon => NpcSummonMarkerIcon,
             NpcCatalogKind.Boss => NpcBossMarkerIcon,
             NpcCatalogKind.Object => NpcObjectMarkerIcon,
+            NpcCatalogKind.TrainingDummy => NpcMonsterMarkerIcon,
             NpcCatalogKind.Monster => NpcMonsterMarkerIcon,
             _ => NpcDefaultMarkerIcon
         };
@@ -729,6 +730,7 @@ internal static class DisplayIconCache
             NpcCatalogKind.Summon => "UT_Marker_Summon_Common.png",
             NpcCatalogKind.Boss => "UT_Marker_Monster_Boss.png",
             NpcCatalogKind.Object => "UT_Marker_Envobj.png",
+            NpcCatalogKind.TrainingDummy => "UT_Marker_SkillMaster.png",
             NpcCatalogKind.Monster => "UT_Marker_SkillMaster.png",
             _ => "UT_Marker_Default.png"
         };

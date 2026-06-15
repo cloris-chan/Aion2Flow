@@ -121,6 +121,25 @@
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
+    <Style Selector="Border.BossFocusCountBadge">
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.Surface}" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="Padding" Value="4,1" />
+        <Setter Property="MinWidth" Value="22" />
+    </Style>
+
+    <Style Selector="TextBlock.BossFocusCountText">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Opacity" Value="0.88" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextAlignment" Value="Center" />
+    </Style>
+
     <Style Selector="TextBlock.BossFocusHp">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="10" />

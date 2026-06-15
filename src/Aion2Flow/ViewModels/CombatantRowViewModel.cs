@@ -87,7 +87,7 @@ public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService,
 
         for (var i = 0; i < left.Count; i++)
         {
-            if (left[i].BossId != right[i].BossId ||
+            if (left[i].DisplayKey != right[i].DisplayKey ||
                 Math.Abs(left[i].Ratio - right[i].Ratio) > 0.000_001 ||
                 !ReferenceEquals(left[i].Brush, right[i].Brush))
             {

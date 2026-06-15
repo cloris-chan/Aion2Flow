@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -325,7 +326,7 @@ public sealed class DomainEventApplier
         if (!TrackBossFocus ||
             instanceId <= 0 ||
             !_entities.TryGet(instanceId, out var entity) ||
-            entity.Kind != NpcKind.Boss ||
+            !BossModeFocusTargets.IsFocusTarget(entity.Kind) ||
             entity.CurrentHp == 0 ||
             !_combat.TryGetLastCombatActivityObservedAt(instanceId, out var activityObservedAtMilliseconds))
         {

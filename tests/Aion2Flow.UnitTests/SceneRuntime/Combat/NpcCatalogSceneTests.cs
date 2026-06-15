@@ -20,11 +20,23 @@ public sealed class NpcCatalogSceneTests
     [InlineData(NpcCatalogKind.Boss, NpcKind.Boss)]
     [InlineData(NpcCatalogKind.Summon, NpcKind.Summon)]
     [InlineData(NpcCatalogKind.Friendly, NpcKind.Friendly)]
+    [InlineData(NpcCatalogKind.TrainingDummy, NpcKind.TrainingDummy)]
     [InlineData(NpcCatalogKind.Unknown, NpcKind.Unknown)]
     [InlineData(NpcCatalogKind.Object, NpcKind.Unknown)]
     public void ResolveNpcKind_Maps_Catalog_Kind_Enum(NpcCatalogKind kind, NpcKind expected)
     {
         Assert.Equal(expected, CombatResourceRegistry.ResolveNpcKind(kind));
+    }
+
+    [Fact]
+    public void ResolveNpcKind_Maps_TrainingScarecrow_To_TrainingDummy_Not_Boss()
+    {
+        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+
+        Assert.True(catalog.TryGetValue(2500075, out var scarecrow));
+        Assert.Equal(NpcCatalogKind.TrainingDummy, scarecrow.Kind);
+        Assert.Equal(NpcKind.TrainingDummy, CombatResourceRegistry.ResolveNpcKind(scarecrow.Kind));
+        Assert.NotEqual(NpcKind.Boss, CombatResourceRegistry.ResolveNpcKind(scarecrow.Kind));
     }
 
     [Fact]

@@ -125,7 +125,7 @@ public static class ResourceDatabase
             var entry = new NpcCatalogEntry(
                 reader.GetInt32(0),
                 reader.GetString(1),
-                (NpcCatalogKind)reader.GetByte(2));
+                (NpcCatalogKind)reader.GetInt64(2));
             npcs[entry.Code] = entry;
         }
 

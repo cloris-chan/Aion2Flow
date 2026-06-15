@@ -458,10 +458,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private static bool IsExplicitNonSummon(EntityRecord entity) =>
         entity.IsPlayer ||
         entity.NpcCode.HasValue ||
-        entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly;
+        entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.TrainingDummy;
 
     private bool IsKnownNpcCombatant(int entityId) =>
-        entities.TryGet(entityId, out var entity) && (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
+        entities.TryGet(entityId, out var entity) && (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy);
 
     private bool ShouldDisplayCombatant(int entityId)
     {
@@ -471,7 +471,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (entity.NpcCode.HasValue)
             return false;
 
-        return entity.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon);
+        return entity.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy);
     }
 
     private static bool IsWithinEncounterWindow(in CombatEventRecord e, long start, long end) =>

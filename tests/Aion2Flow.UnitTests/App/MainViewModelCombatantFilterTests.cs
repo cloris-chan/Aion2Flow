@@ -183,6 +183,51 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_SceneMode_MergesTrainingDummyFocusDisplayByNpcCode()
+    {
+        const int dummyNpcCode = 2_400_032;
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneBossFocus(900_002, dummyNpcCode, NpcKind.TrainingDummy, 80_000, 100_000, 5_000);
+        fixture.AppendSceneBossFocus(900_003, dummyNpcCode, NpcKind.TrainingDummy, 60_000, 100_000, 5_500);
+        fixture.AppendSceneBossFocus(900_004, dummyNpcCode, NpcKind.TrainingDummy, 40_000, 100_000, 5_200);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var focus = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.Equal(-dummyNpcCode, focus.DisplayKey);
+        Assert.Equal(900_003, focus.InstanceId);
+        Assert.Equal(dummyNpcCode, focus.NpcCode);
+        Assert.Equal(3, focus.InstanceCount);
+        Assert.True(focus.HasMultipleInstances);
+        Assert.Equal("x3", focus.InstanceCountText);
+        Assert.Equal(60_000, focus.Hp);
+        Assert.Equal(100_000, focus.MaxHp);
+        Assert.Equal(3, fixture.ViewModel.DisplayContext!.Snapshot.BossFocuses.Count);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_MergesTrainingDummyBossSharesByNpcCode()
+    {
+        const int dummyNpcCode = 2_400_032;
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 100, 3_000, 1);
+        fixture.AppendSceneDamage(300, 900_003, 11000010, 200, 3_100, 2);
+        fixture.AppendSceneDamage(300, 900_004, 11000010, 300, 3_200, 3);
+        fixture.AppendSceneBossFocus(900_002, dummyNpcCode, NpcKind.TrainingDummy, 80_000, 100_000, 5_000);
+        fixture.AppendSceneBossFocus(900_003, dummyNpcCode, NpcKind.TrainingDummy, 60_000, 100_000, 5_500);
+        fixture.AppendSceneBossFocus(900_004, dummyNpcCode, NpcKind.TrainingDummy, 40_000, 100_000, 5_200);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        var share = Assert.Single(row.BossShares);
+        Assert.Equal(-dummyNpcCode, share.DisplayKey);
+        Assert.Equal(0.002d, share.Ratio, 6);
+    }
+
+    [Fact]
     public void RefreshCombatStats_SceneMode_CalculatesRelativeDpsBars()
     {
         var fixture = MainViewModelFixture.Create();
@@ -348,7 +393,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.False(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
         var share = Assert.Single(row.BossShares);
-        Assert.Equal(900_002, share.BossId);
+        Assert.Equal(900_002, share.DisplayKey);
         Assert.Equal(0.5d, share.Ratio, 6);
         Assert.NotNull(share.Brush);
     }
@@ -403,7 +448,7 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.Equal([900_002, 900_003], row.BossShares.Select(static share => share.BossId));
+        Assert.Equal([900_002, 900_003], row.BossShares.Select(static share => share.DisplayKey));
         Assert.Equal([0.1d, 0.1d], row.BossShares.Select(static share => Math.Round(share.Ratio, 6)));
     }
 
@@ -736,10 +781,11 @@ public sealed class MainViewModelCombatantFilterTests
 
         public static MainViewModelFixture Create()
         {
-            CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+            CombatResourceRegistry.SetGameResources(BuildSkillMap(), ResourceDatabase.LoadNpcCatalog(LanguageService.TraditionalChinese));
             var settingsPath = Path.Combine(Path.GetTempPath(), $"aion2flow-test-{Guid.NewGuid():N}.json");
             var settings = new SettingsService(settingsPath);
             var language = new LanguageService();
+            language.SetLanguage(LanguageService.TraditionalChinese);
             var localization = new LocalizationService(language);
             var resources = new GameResourceService(language);
             var archive = new EncounterArchiveService();
@@ -765,6 +811,8 @@ public sealed class MainViewModelCombatantFilterTests
         public void AppendSceneNpc(int instanceId, int npcCode, NpcKind kind) => MainViewModelCombatantFilterTests.AppendSceneNpc(_captureService.Scene, instanceId, npcCode, kind);
 
         public void AppendSceneBossFocus(int instanceId, string name, int hp, int maxHp, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocus(_captureService.Scene, instanceId, name, hp, maxHp, timestamp);
+
+        public void AppendSceneBossFocus(int instanceId, int npcCode, NpcKind kind, int hp, int maxHp, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocus(_captureService.Scene, instanceId, npcCode, kind, hp, maxHp, timestamp);
 
         public void AppendSceneBossFocusUnknownHp(int instanceId, string name, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocusUnknownHp(_captureService.Scene, instanceId, name, timestamp);
 
@@ -857,6 +905,16 @@ public sealed class MainViewModelCombatantFilterTests
         sink.AppendNpcName(2_100_351, name);
         sink.AppendNpcCode(instanceId, 2_100_351);
         sink.AppendNpcKind(instanceId, NpcKind.Boss);
+        sink.SetNpcBattle(instanceId, true, origin + timestamp - 100);
+        sink.AppendNpcHp(instanceId, hp, maxHp, origin + timestamp);
+    }
+
+    private static void AppendSceneBossFocus(SceneLiveReadModel scene, int instanceId, int npcCode, NpcKind kind, int hp, int maxHp, long timestamp)
+    {
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var origin = scene.SessionStarted.ToUnixTimeMilliseconds();
+        sink.AppendNpcCode(instanceId, npcCode);
+        sink.AppendNpcKind(instanceId, kind);
         sink.SetNpcBattle(instanceId, true, origin + timestamp - 100);
         sink.AppendNpcHp(instanceId, hp, maxHp, origin + timestamp);
     }

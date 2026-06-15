@@ -46,6 +46,19 @@ public sealed class ResourceDatabaseTests
         Assert.Equal(NpcCatalogKind.Summon, npc.Kind);
     }
 
+    [Fact]
+    public void LoadNpcCatalog_Classifies_TrainingScarecrow_As_TrainingDummy()
+    {
+        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+
+        Assert.True(catalog.TryGetValue(2500075, out var npc));
+        Assert.Equal("訓練用稻草人", npc.Name);
+        Assert.Equal(NpcCatalogKind.TrainingDummy, npc.Kind);
+        Assert.True(catalog.TryGetValue(2400032, out var cityDummy));
+        Assert.Equal("訓練用稻草人", cityDummy.Name);
+        Assert.Equal(NpcCatalogKind.TrainingDummy, cityDummy.Kind);
+    }
+
     [Theory]
     [InlineData("en-US", 12240010, "Judgment")]
     [InlineData("zh-TW", 17121450, "痊癒光輝")]

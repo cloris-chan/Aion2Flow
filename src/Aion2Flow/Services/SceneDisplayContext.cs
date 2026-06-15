@@ -67,7 +67,18 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
             : instanceId.ToString(CultureInfo.InvariantCulture);
     }
 
-    public bool HasNpcCode(int instanceId) => instanceId > 0 && TryGetNpcCode(instanceId, out _);
+    public bool HasNpcCode(int instanceId) => instanceId > 0 && TryResolveNpcCode(instanceId, out _);
+
+    public bool TryResolveNpcCode(int instanceId, out int npcCode)
+    {
+        if (instanceId <= 0)
+        {
+            npcCode = 0;
+            return false;
+        }
+
+        return TryGetNpcCode(instanceId, out npcCode);
+    }
 
     public string ResolveNpcCodeName(int npcCode) => npcCode > 0 ? Resources.ResolveNpcName(npcCode) : string.Empty;
 

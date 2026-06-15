@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -75,7 +76,7 @@ public sealed class BossFocusStore(EntityStore entities)
 
     public void ApplyNpcKind(int instanceId, NpcKind kind, long observedAtMilliseconds)
     {
-        if (kind != NpcKind.Boss)
+        if (!IsFocusTargetKind(kind))
         {
             Clear(instanceId, observedAtMilliseconds);
             return;
@@ -94,13 +95,13 @@ public sealed class BossFocusStore(EntityStore entities)
             return;
         }
 
-        if (_observed.ContainsKey(instanceId) || IsActiveBossInstance(instanceId))
+        if (_observed.ContainsKey(instanceId) || IsActiveFocusTargetInstance(instanceId))
             Remember(instanceId, hp, ResolveMaxHp(instanceId, hp, maxHp), observedAtMilliseconds);
     }
 
     public bool ApplyBattle(int instanceId, bool isActive, long observedAtMilliseconds)
     {
-        if (isActive && IsBossInstance(instanceId))
+        if (isActive && IsFocusTargetInstance(instanceId))
         {
             RememberActivity(instanceId, observedAtMilliseconds);
             return true;
@@ -115,7 +116,7 @@ public sealed class BossFocusStore(EntityStore entities)
 
     public void ApplyCombatActivity(int instanceId, long activityObservedAtMilliseconds, long observedAtMilliseconds)
     {
-        if (!IsBossInstance(instanceId) ||
+        if (!IsFocusTargetInstance(instanceId) ||
             !IsAfterLastClear(instanceId, activityObservedAtMilliseconds))
         {
             return;
@@ -169,7 +170,7 @@ public sealed class BossFocusStore(EntityStore entities)
     private void Clear(int instanceId, long observedAtMilliseconds)
     {
         var changed = _observed.Remove(instanceId);
-        if (changed || IsBossInstance(instanceId) || _lastClearedAtMilliseconds.ContainsKey(instanceId))
+        if (changed || IsFocusTargetInstance(instanceId) || _lastClearedAtMilliseconds.ContainsKey(instanceId))
             _lastClearedAtMilliseconds[instanceId] = Math.Max(0, observedAtMilliseconds);
         if (changed)
             _revision++;
@@ -256,9 +257,11 @@ public sealed class BossFocusStore(EntityStore entities)
         return resolved;
     }
 
-    private bool IsBossInstance(int instanceId) => entities.TryGet(instanceId, out var entity) && entity.Kind == NpcKind.Boss;
+    private bool IsFocusTargetInstance(int instanceId) => entities.TryGet(instanceId, out var entity) && IsFocusTargetKind(entity.Kind);
 
-    private bool IsActiveBossInstance(int instanceId) => IsBossInstance(instanceId) && IsNpcCombatActive(instanceId);
+    private bool IsActiveFocusTargetInstance(int instanceId) => IsFocusTargetInstance(instanceId) && IsNpcCombatActive(instanceId);
+
+    private static bool IsFocusTargetKind(NpcKind kind) => BossModeFocusTargets.IsFocusTarget(kind);
 
     private bool IsNpcCombatActive(int instanceId) => entities.TryGet(instanceId, out var entity) && entity.NpcCombatActive && !IsObservedDead(instanceId);
 

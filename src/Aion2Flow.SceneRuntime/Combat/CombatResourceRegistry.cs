@@ -98,6 +98,7 @@ public static class CombatResourceRegistry
             NpcCatalogKind.Boss => NpcKind.Boss,
             NpcCatalogKind.Summon => NpcKind.Summon,
             NpcCatalogKind.Friendly => NpcKind.Friendly,
+            NpcCatalogKind.TrainingDummy => NpcKind.TrainingDummy,
             _ => NpcKind.Unknown
         };
 

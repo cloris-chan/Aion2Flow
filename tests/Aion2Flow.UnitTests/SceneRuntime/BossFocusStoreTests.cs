@@ -36,6 +36,22 @@ public sealed class BossFocusStoreTests
     }
 
     [Fact]
+    public void ScenePath_TracksTrainingDummyFocusWithBattleAndHp()
+    {
+        var h = new Harness();
+
+        h.Kind(3518, NpcKind.TrainingDummy);
+        h.Battle(3518, true, 900);
+        h.Hp(3518, 156_500, 1_000);
+
+        Assert.True(h.Focus.TryGetObservedBoss(1_100, 2_000, out var focus));
+        Assert.True(focus.HasHp);
+        Assert.Equal(3518, focus.InstanceId);
+        Assert.Equal(156_500, focus.Hp);
+        Assert.Equal(156_500, focus.MaxHp);
+    }
+
+    [Fact]
     public void ScenePath_IgnoresSpawnOnlyBossUntilBattleActive()
     {
         var h = new Harness();

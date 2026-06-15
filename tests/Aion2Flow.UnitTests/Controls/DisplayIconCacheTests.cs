@@ -10,6 +10,7 @@ public sealed class DisplayIconCacheTests
     [InlineData(NpcCatalogKind.Summon, "UT_Marker_Summon_Common.png")]
     [InlineData(NpcCatalogKind.Boss, "UT_Marker_Monster_Boss.png")]
     [InlineData(NpcCatalogKind.Object, "UT_Marker_Envobj.png")]
+    [InlineData(NpcCatalogKind.TrainingDummy, "UT_Marker_SkillMaster.png")]
     [InlineData(NpcCatalogKind.Monster, "UT_Marker_SkillMaster.png")]
     [InlineData(NpcCatalogKind.Unknown, "UT_Marker_Default.png")]
     public void NpcKind_Resolves_Configured_Marker_Asset(NpcCatalogKind kind, string expectedAssetName)

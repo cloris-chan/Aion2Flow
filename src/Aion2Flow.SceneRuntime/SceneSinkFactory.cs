@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -223,13 +224,13 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         RefreshBossStateCore();
         if (_bossState == BossSceneState.Recording)
         {
-            if (TryResolveBossPlayerCombat(sourceId, targetId, out var activeBossId))
-                Owner.ObserveBossCombatTrigger(activeBossId, ResolveObservedAtMilliseconds(in packet));
+            if (TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var activeTargetId))
+                Owner.ObserveBossCombatTrigger(activeTargetId, ResolveObservedAtMilliseconds(in packet));
             return true;
         }
 
         Owner.Refresh();
-        if (!TryResolveBossPlayerCombat(sourceId, targetId, out var bossId))
+        if (!TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var focusTargetId))
             return false;
 
         if (_bossState == BossSceneState.Frozen)
@@ -243,7 +244,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         ResetCore(started, SceneKind.Boss);
         _bossState = BossSceneState.Recording;
         Owner.SetBossFocusTracking(true);
-        Owner.ObserveBossCombatTrigger(bossId, 0);
+        Owner.ObserveBossCombatTrigger(focusTargetId, 0);
         return true;
     }
 
@@ -306,23 +307,23 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private SceneArchiveCapture GetFrozenArchiveCore() =>
         _frozenArchive ?? throw new InvalidOperationException("Frozen boss scene has no archive capture.");
 
-    private bool TryResolveBossPlayerCombat(int sourceId, int targetId, out int bossId)
+    private bool TryResolveFocusTargetPlayerCombat(int sourceId, int targetId, out int focusTargetId)
     {
-        var sourceIsBoss = IsBoss(sourceId);
-        var targetIsBoss = IsBoss(targetId);
-        if (sourceIsBoss && IsPlayerSide(targetId))
+        var sourceIsFocusTarget = IsFocusTarget(sourceId);
+        var targetIsFocusTarget = IsFocusTarget(targetId);
+        if (sourceIsFocusTarget && IsPlayerSide(targetId))
         {
-            bossId = sourceId;
+            focusTargetId = sourceId;
             return true;
         }
 
-        if (targetIsBoss && IsPlayerSide(sourceId))
+        if (targetIsFocusTarget && IsPlayerSide(sourceId))
         {
-            bossId = targetId;
+            focusTargetId = targetId;
             return true;
         }
 
-        bossId = 0;
+        focusTargetId = 0;
         return false;
     }
 
@@ -331,10 +332,10 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             ? Math.Max(0, packet.CaptureTimestampMilliseconds - SessionStarted.ToUnixTimeMilliseconds())
             : 0;
 
-    private bool IsBoss(int entityId) =>
+    private bool IsFocusTarget(int entityId) =>
         entityId > 0 &&
         Owner.Entities.TryGet(entityId, out var entity) &&
-        entity.Kind == NpcKind.Boss;
+        BossModeFocusTargets.IsFocusTarget(entity.Kind);
 
     private bool IsPlayerSide(int entityId)
     {

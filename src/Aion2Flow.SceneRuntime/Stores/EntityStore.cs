@@ -68,7 +68,7 @@ public sealed class EntityStore
             return false;
 
         var entity = GetOrAdd(entityId);
-        if (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon)
+        if (entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy)
             return false;
 
         if (entity.CharacterClass is not null and not CharacterClass.None)
