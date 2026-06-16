@@ -520,7 +520,7 @@ public sealed class PcDisplay : IconTextDisplay
             return FormatLocalPlayerName(context, entityId, privacy.FormatAnonymousName(characterClass, ordinal));
         }
 
-        return FormatLocalPlayerName(context, entityId, context?.ResolvePcName(entityId) ?? FormatEntityId(entityId));
+        return context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
     }
 
     private static string FormatLocalPlayerName(SceneDisplayContext? context, int entityId, string name)
