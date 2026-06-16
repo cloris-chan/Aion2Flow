@@ -116,8 +116,31 @@ public sealed class ScenePlaybackTests
         Assert.Equal(300, target.Events.Sum(static entry => entry.Amount));
         Assert.Equal(2_500, completed.PositionMilliseconds);
         Assert.Equal(5, completed.EndObservationOrdinalExclusive);
-        Assert.False(completed.Update.IsFullSnapshot);
-        Assert.Equal(300, completed.Events.Sum(static entry => entry.Amount));
+        Assert.True(completed.Update.IsFullSnapshot);
+        Assert.Equal(600, completed.Events.Sum(static entry => entry.Amount));
+    }
+
+    [Fact]
+    public void Session_CreateCombatantDetail_UsesCurrentFrameScopeForEventsOutsideEncounterWindow()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        const int combatantId = 100;
+        const int bossId = 200;
+        AppendCombat(journal, sceneId, combatantId, 0, 400, 1, 500);
+        AppendCombat(journal, sceneId, combatantId, bossId, 600, 2, 1_000);
+        AppendCombat(journal, sceneId, combatantId, bossId, 300, 3, 1_400);
+        AppendCombat(journal, sceneId, combatantId, bossId, 1_000, 4, 2_000);
+        var record = CreateArchiveRecord(journal, sceneId);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+
+        var frame = session.Seek(1_500);
+        var projection = session.CreateCombatantDetail(combatantId);
+
+        Assert.True(frame.Snapshot.Combatants.TryGetValue(combatantId, out var metrics));
+        Assert.Equal(1_300, metrics.DamageAmount);
+        Assert.Equal(metrics.DamageAmount, projection.Events.Where(static entry => entry.SourceId == combatantId).Sum(static entry => entry.Amount));
+        Assert.True(projection.Update.IsFullSnapshot);
     }
 
     [Fact]
@@ -244,6 +267,30 @@ public sealed class ScenePlaybackTests
 
         int ResolveBucket(long position)
             => Math.Clamp((int)(position / (double)Math.Max(1, timeRange.DurationMilliseconds) * 32), 0, 31);
+    }
+
+    [Fact]
+    public void TrackReader_CombatantSampledRead_PreservesSparseCombatantMarkersInsideBusyGlobalBuckets()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        long ordinal = 1;
+        for (var i = 0; i < 80; i++)
+            AppendCombat(journal, sceneId, 100, 200, 10_000 + i, ordinal++, 1_000 + i * 5);
+
+        var sparseOrdinal = ordinal;
+        AppendCombat(journal, sceneId, 300, 400, 1, ordinal++, 1_200);
+        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
+        var snapshot = owner.CreateSnapshot();
+        var segment = owner.CreateArchivePayload(snapshot).TimelineSegment;
+        var timeRange = ScenePlaybackTimeline.ResolveTimeRange(segment, snapshot);
+
+        var read = ScenePlaybackTrackReader.ReadCombatantSampled(segment, 0, timeRange.DurationMilliseconds, 4);
+
+        var source = Assert.Single(read.Combatants, static combatant => combatant.CombatantId == 300);
+        var target = Assert.Single(read.Combatants, static combatant => combatant.CombatantId == 400);
+        Assert.Contains(source.Samples, sample => sample.Marker.ObservationOrdinal == sparseOrdinal - 1);
+        Assert.Contains(target.Samples, sample => sample.Marker.ObservationOrdinal == sparseOrdinal - 1);
     }
 
     [Fact]
@@ -640,6 +687,31 @@ public sealed class ScenePlaybackTests
         Assert.Equal(controller.PositionMilliseconds, projection.PositionMilliseconds);
         Assert.Equal(controller.CurrentFrame.AppliedSegment.EndObservationOrdinalExclusive, projection.EndObservationOrdinalExclusive);
         Assert.Equal(300, projection.Events.Sum(static entry => entry.Amount));
+
+        await controller.SeekAsync(2_500, TestContext.Current.CancellationToken);
+        var completed = await controller.CreateCombatantDetailAsync(100, TestContext.Current.CancellationToken);
+
+        Assert.True(completed.Update.IsFullSnapshot);
+        Assert.Equal(600, completed.Events.Sum(static entry => entry.Amount));
+    }
+
+    [Fact]
+    public async Task Controller_CreateCombatantDetailAsync_RebuildsCurrentFrameAfterCheckpointIndexing()
+    {
+        var record = CreateArchiveRecordWithLongCombatTimeline();
+        await using var controller = new ScenePlaybackController(
+            new ArchivedScenePlaybackSource(record),
+            new ManualTickSourceFactory(),
+            new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
+        await controller.RebuildCheckpointsAsync(TestContext.Current.CancellationToken);
+
+        var frame = await controller.SeekAsync(3_500, TestContext.Current.CancellationToken);
+        var projection = await controller.CreateCombatantDetailAsync(100, TestContext.Current.CancellationToken);
+
+        Assert.True(frame.Snapshot.Combatants.TryGetValue(100, out var metrics));
+        Assert.Equal(1_000, metrics.DamageAmount);
+        Assert.Equal(metrics.DamageAmount, projection.Events.Where(static entry => entry.SourceId == 100).Sum(static entry => entry.Amount));
+        Assert.Equal(frame.AppliedSegment.EndObservationOrdinalExclusive, projection.EndObservationOrdinalExclusive);
     }
 
     [Fact]
@@ -749,7 +821,7 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
-    public async Task Controller_SeekFromCheckpoint_ContinuesFromLiveJournalCursor()
+    public async Task Controller_SeekAfterCheckpointIndexing_ReplaysLiveJournalEntries()
     {
         var scene = new SceneLiveReadModel();
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 100, 1, 1_000);
@@ -871,6 +943,18 @@ public sealed class ScenePlaybackTests
         return CreateArchiveRecord(journal, sceneId);
     }
 
+    private static ArchivedEncounterRecord CreateArchiveRecordWithLongCombatTimeline()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendCombat(journal, sceneId, 100, 200, 100, 1, 500);
+        AppendCombat(journal, sceneId, 100, 200, 200, 2, 1_500);
+        AppendCombat(journal, sceneId, 100, 200, 300, 3, 2_500);
+        AppendCombat(journal, sceneId, 100, 200, 400, 4, 3_500);
+        journal.CompleteBatch(1);
+        return CreateArchiveRecord(journal, sceneId);
+    }
+
     private static ArchivedEncounterRecord CreateArchiveRecord(ObservedEventJournal journal, Guid sceneId)
     {
         var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
@@ -912,7 +996,7 @@ public sealed class ScenePlaybackTests
         });
     }
 
-    private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int damage, long ordinal, long observedAt)
+    private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int damage, long ordinal, long observedAt, CombatValueKind valueKind = CombatValueKind.Damage)
     {
         journal.Append(new ObservedEventEnvelope
         {
@@ -929,7 +1013,7 @@ public sealed class ScenePlaybackTests
                 HitCount = 1,
                 AttemptCount = 1,
                 EventKind = CombatEventKind.Damage,
-                ValueKind = CombatValueKind.Damage
+                ValueKind = valueKind
             }
         });
     }

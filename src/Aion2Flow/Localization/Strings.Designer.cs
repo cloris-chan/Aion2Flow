@@ -745,15 +745,6 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Timeline Tracks.
-        /// </summary>
-        internal static string Playback_TimelineTracks {
-            get {
-                return ResourceManager.GetString("Playback_TimelineTracks", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Action.
         /// </summary>
         internal static string Playback_Track_Action {

@@ -257,13 +257,16 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         foreach (var (combatantId, revision) in _detailRevisionByCombatant)
             detailRevisions[index++] = new CombatantDetailRevisionSnapshot(combatantId, revision);
 
-        return new CombatStoreSnapshot(pairs, combatants, detailRevisions, _revision);
+        var events = _events.ToArray();
+        return new CombatStoreSnapshot(pairs, combatants, events, detailRevisions, _revision);
     }
 
     internal static CombatStore FromSnapshot(CombatStoreSnapshot snapshot)
     {
-        var store = new CombatStore(0, snapshot.Combatants.Length, snapshot.Pairs.Length);
-        store._revision = snapshot.Revision;
+        var store = new CombatStore(snapshot.Events.Length, snapshot.Combatants.Length, snapshot.Pairs.Length)
+        {
+            _revision = snapshot.Revision
+        };
 
         for (var i = 0; i < snapshot.Pairs.Length; i++)
         {
@@ -278,6 +281,9 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             var combatant = snapshot.Combatants[i].ToRecord();
             store._combatants[combatant.CombatantId] = combatant;
         }
+
+        for (var i = 0; i < snapshot.Events.Length; i++)
+            store._events.Add(snapshot.Events[i]);
 
         for (var i = 0; i < snapshot.DetailRevisions.Length; i++)
         {
@@ -426,6 +432,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
 internal sealed record CombatStoreSnapshot(
     CombatPairRecordSnapshot[] Pairs,
     CombatantRecordSnapshot[] Combatants,
+    CombatEventRecord[] Events,
     CombatantDetailRevisionSnapshot[] DetailRevisions,
     long Revision);
 

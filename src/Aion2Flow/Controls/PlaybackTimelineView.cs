@@ -106,7 +106,7 @@ public sealed class PlaybackTimelineView : Control
         if (duration <= 0)
             return;
 
-        var playheadX = TimeToX(PositionMilliseconds, duration, bounds.Width);
+        var playheadX = PlaybackTimelineGeometry.PositionToX(PositionMilliseconds, duration, bounds.Width);
         var progress = ProgressBrush;
         if (progress is not null && playheadX > 0)
             context.FillRectangle(progress, new Rect(0, 0, playheadX, bounds.Height));
@@ -161,7 +161,7 @@ public sealed class PlaybackTimelineView : Control
     private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, double duration, Rect bounds)
     {
         var markerWidth = marker.IsApplication ? Math.Clamp(bounds.Height - 6d, 10d, 16d) : Math.Clamp(marker.Weight, 3d, 12d);
-        var x = Math.Clamp(TimeToX(marker.PositionMilliseconds, duration, bounds.Width) - markerWidth * 0.5d, 0d, Math.Max(0d, bounds.Width - markerWidth));
+        var x = Math.Clamp(PlaybackTimelineGeometry.PositionToX(marker.PositionMilliseconds, duration, bounds.Width) - markerWidth * 0.5d, 0d, Math.Max(0d, bounds.Width - markerWidth));
         var height = marker.IsApplication ? markerWidth : Math.Max(8d, bounds.Height - 8d);
         var y = (bounds.Height - height) * 0.5d;
         context.FillRectangle(marker.Brush, new Rect(x, y, markerWidth, height));
@@ -169,8 +169,8 @@ public sealed class PlaybackTimelineView : Control
 
     private static void DrawSpan(DrawingContext context, PlaybackTimelineSpan span, double duration, Rect bounds)
     {
-        var start = TimeToX(span.StartMilliseconds, duration, bounds.Width);
-        var end = TimeToX(span.EndMilliseconds, duration, bounds.Width);
+        var start = PlaybackTimelineGeometry.PositionToX(span.StartMilliseconds, duration, bounds.Width);
+        var end = PlaybackTimelineGeometry.PositionToX(span.EndMilliseconds, duration, bounds.Width);
         var width = Math.Max(1d, end - start);
         var rect = new Rect(start, 3d, width, Math.Max(1d, bounds.Height - 6d));
         context.FillRectangle(span.FillBrush, rect);
@@ -184,13 +184,6 @@ public sealed class PlaybackTimelineView : Control
         if (width <= 0 || duration <= 0)
             return;
 
-        var ratio = Math.Clamp(x / width, 0d, 1d);
-        SeekRequested?.Invoke(this, new PlaybackSeekRequestedEventArgs(ratio * duration));
-    }
-
-    private static double TimeToX(double positionMilliseconds, double durationMilliseconds, double width)
-    {
-        var ratio = Math.Clamp(positionMilliseconds / durationMilliseconds, 0d, 1d);
-        return Math.Clamp(ratio * width, 0d, width);
+        SeekRequested?.Invoke(this, new PlaybackSeekRequestedEventArgs(PlaybackTimelineGeometry.XToPosition(x, duration, width)));
     }
 }

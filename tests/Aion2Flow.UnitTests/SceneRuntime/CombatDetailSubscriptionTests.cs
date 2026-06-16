@@ -205,6 +205,34 @@ public class CombatDetailSubscriptionTests
         Assert.Equal(2, writer.Events.Count);
     }
 
+    [Fact]
+    public void Subscription_Update_FromSnapshotKeepsHistoryWithoutReplayingHistoricalChanges()
+    {
+        var (store, adapter, snapshot) = CreateProjection();
+        var restored = CombatStore.FromSnapshot(store.CreateSnapshot());
+        adapter = CreateAdapter(restored);
+        snapshot = adapter.CreateSnapshot();
+        var writer = new TestDetailWriter();
+        var sub = new CombatDetailSubscription(restored, 100);
+
+        var full = sub.Update(adapter, snapshot, forceRefresh: false, writer);
+
+        Assert.True(full.IsFullSnapshot);
+        Assert.Equal(2, full.AddedEventCount);
+        Assert.Equal(2, writer.Events.Count);
+        Assert.False(sub.Update(adapter, snapshot, forceRefresh: false, writer).HasChanges);
+
+        restored.ApplyCombat(100, 200, 300, 1, 1, 3000);
+        adapter = CreateAdapter(restored);
+        snapshot = adapter.CreateSnapshot();
+        var warm = sub.Update(adapter, snapshot, forceRefresh: false, writer);
+
+        Assert.False(warm.IsFullSnapshot);
+        Assert.True(warm.HasChanges);
+        Assert.Equal(1, warm.AddedEventCount);
+        Assert.Equal(3, writer.Events.Count);
+    }
+
     private static (CombatStore Store, SceneCombatSnapshotAdapter Adapter, SceneCombatSnapshot Snapshot) CreateProjection(Guid? encounterId = null)
     {
         var store = new CombatStore();

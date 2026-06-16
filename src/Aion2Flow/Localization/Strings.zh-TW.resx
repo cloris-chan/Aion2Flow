@@ -146,7 +146,6 @@
   <data name="Playback_NextSecond" xml:space="preserve"><value>前進 1 秒</value></data>
   <data name="Playback_NextEvent" xml:space="preserve"><value>下一個事件</value></data>
   <data name="Playback_Label_Speed" xml:space="preserve"><value>速率</value></data>
-  <data name="Playback_TimelineTracks" xml:space="preserve"><value>時間軸軌道</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>戰鬥對象</value></data>
   <data name="Playback_CombatantDetails" xml:space="preserve"><value>戰鬥對象詳情</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>事件窗口</value></data>

@@ -25,19 +25,22 @@ public readonly record struct CombatDetailUpdateResult
     };
 }
 
-internal readonly record struct CombatDetailContextKey(
-    int CombatantId,
-    Guid EncounterId,
-    long EncounterStartTime,
-    int TrackingTargetId,
-    int TargetObservationId)
+internal readonly record struct CombatDetailContextKey(int CombatantId, Guid EncounterId, long EncounterStartTime, int TrackingTargetId, int TargetObservationId)
 {
-    public static CombatDetailContextKey From(SceneCombatSnapshot snapshot, int combatantId) => new(
-        combatantId,
-        snapshot.EncounterId,
-        snapshot.EncounterStartTime,
-        snapshot.Encounter.TrackingTargetId,
-        snapshot.TargetObservation?.InstanceId ?? 0);
+    public static CombatDetailContextKey From(SceneCombatSnapshot snapshot, int combatantId) => new()
+    {
+        CombatantId = combatantId,
+        EncounterId = snapshot.EncounterId,
+        EncounterStartTime = snapshot.EncounterStartTime,
+        TrackingTargetId = snapshot.Encounter.TrackingTargetId,
+        TargetObservationId = snapshot.TargetObservation?.InstanceId ?? 0
+    };
+}
+
+internal enum CombatDetailProjectionScope
+{
+    EncounterWindow,
+    CurrentFrame
 }
 
 internal readonly record struct CombatDetailWriteResult(int Count, long Revision);

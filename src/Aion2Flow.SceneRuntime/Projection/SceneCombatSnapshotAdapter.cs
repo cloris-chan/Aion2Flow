@@ -127,6 +127,9 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     }
 
     internal CombatDetailWriteResult WriteDetailEvents(SceneCombatSnapshot snapshot, int combatantId, ICombatDetailEventWriter writer)
+        => WriteDetailEvents(snapshot, combatantId, writer, CombatDetailProjectionScope.EncounterWindow);
+
+    internal CombatDetailWriteResult WriteDetailEvents(SceneCombatSnapshot snapshot, int combatantId, ICombatDetailEventWriter writer, CombatDetailProjectionScope scope)
     {
         if (!CanProjectDetailCombatant(snapshot, combatantId))
             return default;
@@ -138,7 +141,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         var records = combat.EventSpan;
         foreach (ref readonly var record in records)
         {
-            if (!TryCreateDetailEventCached(snapshot, combatantId, in record, out var detailEvent))
+            if (!TryCreateDetailEventCached(snapshot, combatantId, in record, scope, out var detailEvent))
                 continue;
 
             writer.Add(in detailEvent);
@@ -152,10 +155,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     internal bool TryCreateDetailEvent(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, out CombatDetailEvent detailEvent)
     {
         PrepareProjectionCaches();
-        return TryCreateDetailEventCached(snapshot, combatantId, in record, out detailEvent);
+        return TryCreateDetailEventCached(snapshot, combatantId, in record, CombatDetailProjectionScope.EncounterWindow, out detailEvent);
     }
 
-    private bool TryCreateDetailEventCached(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, out CombatDetailEvent detailEvent)
+    private bool TryCreateDetailEventCached(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, CombatDetailProjectionScope scope, out CombatDetailEvent detailEvent)
     {
         var eventSourceId = ResolveCombatantIdCached(record.SourceId);
         if (eventSourceId != combatantId && record.TargetId != combatantId)
@@ -164,7 +167,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return false;
         }
 
-        if (!ShouldIncludeDetailEvent(in record, eventSourceId, record.TargetId, snapshot))
+        if (!ShouldIncludeDetailEvent(in record, eventSourceId, record.TargetId, snapshot, scope))
         {
             detailEvent = default;
             return false;
@@ -209,8 +212,11 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return IsSummonDamageTargetCached(sourceId, targetId, damage);
     }
 
-    private bool ShouldIncludeDetailEvent(in CombatEventRecord e, int sourceId, int targetId, SceneCombatSnapshot snapshot)
+    private bool ShouldIncludeDetailEvent(in CombatEventRecord e, int sourceId, int targetId, SceneCombatSnapshot snapshot, CombatDetailProjectionScope scope)
     {
+        if (scope == CombatDetailProjectionScope.CurrentFrame)
+            return !IsSummonDamageTargetCached(in e);
+
         if (IsWithinEncounterWindow(in e, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
             return !IsSummonDamageTargetCached(in e);
 

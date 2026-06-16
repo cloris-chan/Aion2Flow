@@ -7,6 +7,11 @@ public sealed record PlaybackTimelineMarker(double PositionMilliseconds, double 
 
 public sealed record PlaybackTimelineSpan(double StartMilliseconds, double EndMilliseconds, IBrush FillBrush, IBrush BorderBrush);
 
-public sealed record PlaybackTimelineLane(string Name, ScenePlaybackTrack Track, IBrush AccentBrush, IReadOnlyList<PlaybackTimelineMarker> Markers, double DurationMilliseconds, double PositionMilliseconds, int Count);
+public sealed record PlaybackTimelineBand(ScenePlaybackTrack Track, IBrush Brush, IReadOnlyList<PlaybackTimelineMarker> Markers, int Count);
 
-public sealed record PlaybackAuraTimelineLane(int SkillCode, string FallbackText, IBrush AccentBrush, IReadOnlyList<PlaybackTimelineMarker> Markers, IReadOnlyList<PlaybackTimelineSpan> Spans, double DurationMilliseconds, double PositionMilliseconds, int Count);
+public sealed record PlaybackTimelineStrip(IReadOnlyList<PlaybackTimelineBand> Bands, int Count)
+{
+    public static PlaybackTimelineStrip Empty { get; } = new([], 0);
+}
+
+public sealed record PlaybackAuraTimelineLane(int SkillCode, string FallbackText, IBrush AccentBrush, IReadOnlyList<PlaybackTimelineMarker> Markers, IReadOnlyList<PlaybackTimelineSpan> Spans, int Count);

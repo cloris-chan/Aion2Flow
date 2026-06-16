@@ -181,6 +181,41 @@ public sealed class DetailProjectionAllocationGuardTests
         Assert.DoesNotContain("NpcNamesByCode", archivePayload, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PlaybackCheckpoints_DoNotStoreProjectionOrStoreSnapshots()
+    {
+        var root = FindRepositoryRoot();
+        var checkpoint = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Playback", "ScenePlaybackCheckpoint.cs"));
+        var session = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Playback", "ScenePlaybackSession.cs"));
+        var forbiddenTerms = new[]
+        {
+            "ScenePlaybackProjectionSnapshot",
+            "EntityStoreSnapshot",
+            "SceneBoundaryStoreSnapshot",
+            "RuntimeMetadataRegistrySnapshot",
+            "CombatStoreSnapshot",
+            "DomainEventApplierSnapshot",
+            "SceneCombatSnapshotAdapterSnapshot",
+            "checkpoint.Projection"
+        };
+
+        foreach (var term in forbiddenTerms)
+        {
+            Assert.DoesNotContain(term, checkpoint, StringComparison.Ordinal);
+            Assert.DoesNotContain(term, session, StringComparison.Ordinal);
+        }
+
+        var checkpointType = typeof(Cloris.Aion2Flow.SceneRuntime.Playback.ScenePlaybackCheckpoint);
+        var propertyNames = checkpointType.GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.DeclaredOnly)
+            .Select(static property => property.Name)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+        var fieldCount = checkpointType.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly).Length;
+
+        Assert.Equal(["JournalCursor", "PositionMilliseconds"], propertyNames);
+        Assert.Equal(2, fieldCount);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

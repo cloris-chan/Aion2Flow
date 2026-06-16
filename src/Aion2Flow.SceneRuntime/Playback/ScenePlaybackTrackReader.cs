@@ -5,6 +5,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 public static class ScenePlaybackTrackReader
 {
     private static readonly ScenePlaybackTrack[] Tracks = Enum.GetValues<ScenePlaybackTrack>();
+    private static readonly int TrackBucketCount = ResolveTrackBucketCount();
 
     public static ScenePlaybackTrackReadResult Read(SceneJournalSegment segment, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkers)
         => Read(segment, startPositionMilliseconds, endPositionMilliseconds, maxMarkers, segment.CreateCursor());
@@ -64,8 +65,8 @@ public static class ScenePlaybackTrackReader
         if (segment.IsEmpty || endPositionMilliseconds < startPositionMilliseconds)
             return ScenePlaybackTrackSampledReadResult.Empty;
 
-        var buckets = new SampleBucket[checked(Tracks.Length * maxMarkersPerTrack)];
-        var trackCounts = new int[Tracks.Length];
+        var buckets = new SampleBucket[checked(TrackBucketCount * maxMarkersPerTrack)];
+        var trackCounts = new int[TrackBucketCount];
         var windowDuration = Math.Max(1, endPositionMilliseconds - startPositionMilliseconds);
         var cursor = segment.CreateCursor();
         var lifecycle = new ScenePlaybackLifecycleTrackState();
@@ -89,7 +90,7 @@ public static class ScenePlaybackTrackReader
                         continue;
 
                     var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, lifecycleEventKind);
-                    var trackIndex = (int)marker.Track;
+                    var trackIndex = ToTrackIndex(marker.Track);
                     trackCounts[trackIndex]++;
                     var ratio = (position - startPositionMilliseconds) / (double)windowDuration;
                     var bucketIndex = Math.Clamp((int)(ratio * maxMarkersPerTrack), 0, maxMarkersPerTrack - 1);
@@ -105,13 +106,15 @@ public static class ScenePlaybackTrackReader
 
         var samples = new List<ScenePlaybackTrackSample>(Math.Min(buckets.Length, 256));
         var counts = new List<ScenePlaybackTrackCount>(Tracks.Length);
-        for (var trackIndex = 0; trackIndex < Tracks.Length; trackIndex++)
+        for (var trackOrdinal = 0; trackOrdinal < Tracks.Length; trackOrdinal++)
         {
+            var track = Tracks[trackOrdinal];
+            var trackIndex = ToTrackIndex(track);
             var count = trackCounts[trackIndex];
             if (count == 0)
                 continue;
 
-            counts.Add(new ScenePlaybackTrackCount(Tracks[trackIndex], count));
+            counts.Add(new ScenePlaybackTrackCount(track, count));
             var offset = trackIndex * maxMarkersPerTrack;
             for (var bucketIndex = 0; bucketIndex < maxMarkersPerTrack; bucketIndex++)
             {
@@ -122,6 +125,72 @@ public static class ScenePlaybackTrackReader
         }
 
         return new ScenePlaybackTrackSampledReadResult(samples.ToArray(), counts.ToArray());
+    }
+
+    public static ScenePlaybackCombatantTrackSampledReadResult ReadCombatantSampled(SceneJournalSegment segment, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkersPerCombatantTrack)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxMarkersPerCombatantTrack);
+        if (segment.IsEmpty || endPositionMilliseconds < startPositionMilliseconds)
+            return ScenePlaybackCombatantTrackSampledReadResult.Empty;
+
+        var combatants = new Dictionary<int, CombatantSampleAccumulator>();
+        var windowDuration = Math.Max(1, endPositionMilliseconds - startPositionMilliseconds);
+        var cursor = segment.CreateCursor();
+        var lifecycle = new ScenePlaybackLifecycleTrackState();
+        var stopWindow = false;
+        while (!stopWindow)
+        {
+            var result = segment.ReadEntries(cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
+            {
+                foreach (ref readonly var entry in entries)
+                {
+                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                    var position = Math.Max(0, offset);
+                    if (position > endPositionMilliseconds)
+                    {
+                        stopWindow = true;
+                        return;
+                    }
+
+                    var lifecycleEventKind = lifecycle.Apply(in entry);
+                    if (position < startPositionMilliseconds)
+                        continue;
+
+                    var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, lifecycleEventKind);
+                    AddCombatantSample(combatants, marker.SourceEntityId, in marker, startPositionMilliseconds, windowDuration, maxMarkersPerCombatantTrack);
+                    if (marker.TargetEntityId != marker.SourceEntityId)
+                        AddCombatantSample(combatants, marker.TargetEntityId, in marker, startPositionMilliseconds, windowDuration, maxMarkersPerCombatantTrack);
+                }
+            });
+
+            if (result.Count == 0)
+                break;
+
+            cursor = result.Cursor;
+        }
+
+        if (combatants.Count == 0)
+            return ScenePlaybackCombatantTrackSampledReadResult.Empty;
+
+        var results = new List<ScenePlaybackCombatantTrackSamples>(combatants.Count);
+        foreach (var (combatantId, accumulator) in combatants)
+            results.Add(accumulator.CreateSamples(combatantId));
+        return new ScenePlaybackCombatantTrackSampledReadResult(results.ToArray());
+    }
+
+    private static void AddCombatantSample(Dictionary<int, CombatantSampleAccumulator> combatants, int combatantId, in ScenePlaybackTrackMarker marker, long startPositionMilliseconds, long windowDuration, int maxMarkersPerCombatantTrack)
+    {
+        if (combatantId <= 0)
+            return;
+
+        if (!combatants.TryGetValue(combatantId, out var accumulator))
+        {
+            accumulator = new CombatantSampleAccumulator(maxMarkersPerCombatantTrack);
+            combatants.Add(combatantId, accumulator);
+        }
+
+        var bucketIndex = Math.Clamp((int)((marker.PositionMilliseconds - startPositionMilliseconds) / (double)windowDuration * maxMarkersPerCombatantTrack), 0, maxMarkersPerCombatantTrack - 1);
+        accumulator.Add(in marker, bucketIndex);
     }
 
     private static ScenePlaybackLifecycleTrackState CreateLifecycleState(SceneJournalSegment segment, JournalCursor cursor)
@@ -169,6 +238,75 @@ public static class ScenePlaybackTrackReader
         private static ulong AbsoluteMagnitude(long value)
             => value >= 0 ? (ulong)value : (ulong)(-(value + 1)) + 1;
     }
+
+    private sealed class CombatantSampleAccumulator
+    {
+        private readonly SampleBucket[] _buckets;
+        private readonly int[] _trackCounts = new int[TrackBucketCount];
+        private readonly int _maxMarkersPerTrack;
+
+        public CombatantSampleAccumulator(int maxMarkersPerCombatantTrack)
+        {
+            _maxMarkersPerTrack = maxMarkersPerCombatantTrack;
+            _buckets = new SampleBucket[checked(TrackBucketCount * maxMarkersPerCombatantTrack)];
+        }
+
+        public void Add(in ScenePlaybackTrackMarker marker, int bucketIndex)
+        {
+            var trackIndex = ToTrackIndex(marker.Track);
+            _trackCounts[trackIndex]++;
+            _buckets[trackIndex * _maxMarkersPerTrack + bucketIndex].Add(in marker);
+        }
+
+        public ScenePlaybackCombatantTrackSamples CreateSamples(int combatantId)
+        {
+            var samples = new List<ScenePlaybackTrackSample>(Math.Min(_buckets.Length, 64));
+            var counts = new List<ScenePlaybackTrackCount>(Tracks.Length);
+            for (var trackOrdinal = 0; trackOrdinal < Tracks.Length; trackOrdinal++)
+            {
+                var track = Tracks[trackOrdinal];
+                var trackIndex = ToTrackIndex(track);
+                var count = _trackCounts[trackIndex];
+                if (count == 0)
+                    continue;
+
+                counts.Add(new ScenePlaybackTrackCount(track, count));
+                var offset = trackIndex * _maxMarkersPerTrack;
+                for (var bucketIndex = 0; bucketIndex < _maxMarkersPerTrack; bucketIndex++)
+                {
+                    ref readonly var bucket = ref _buckets[offset + bucketIndex];
+                    if (bucket.Count > 0)
+                        samples.Add(bucket.CreateSample());
+                }
+            }
+
+            return new ScenePlaybackCombatantTrackSamples(combatantId, samples.ToArray(), counts.ToArray());
+        }
+    }
+
+    private static int ToTrackIndex(ScenePlaybackTrack track)
+    {
+        var index = (int)track;
+        if ((uint)index >= (uint)TrackBucketCount)
+            throw new InvalidOperationException($"Unknown playback track: {track}.");
+
+        return index;
+    }
+
+    private static int ResolveTrackBucketCount()
+    {
+        var max = -1;
+        for (var i = 0; i < Tracks.Length; i++)
+        {
+            var index = (int)Tracks[i];
+            if (index < 0)
+                throw new InvalidOperationException($"Playback track cannot be negative: {Tracks[i]}.");
+
+            max = Math.Max(max, index);
+        }
+
+        return checked(max + 1);
+    }
 }
 
 public enum ScenePlaybackLifecycleEventKind : byte
@@ -206,4 +344,11 @@ public readonly record struct ScenePlaybackTrackCount(ScenePlaybackTrack Track, 
 public readonly record struct ScenePlaybackTrackSampledReadResult(IReadOnlyList<ScenePlaybackTrackSample> Samples, IReadOnlyList<ScenePlaybackTrackCount> TrackCounts)
 {
     public static ScenePlaybackTrackSampledReadResult Empty { get; } = new([], []);
+}
+
+public readonly record struct ScenePlaybackCombatantTrackSamples(int CombatantId, IReadOnlyList<ScenePlaybackTrackSample> Samples, IReadOnlyList<ScenePlaybackTrackCount> TrackCounts);
+
+public readonly record struct ScenePlaybackCombatantTrackSampledReadResult(IReadOnlyList<ScenePlaybackCombatantTrackSamples> Combatants)
+{
+    public static ScenePlaybackCombatantTrackSampledReadResult Empty { get; } = new([]);
 }

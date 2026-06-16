@@ -77,11 +77,20 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
         return PollUpdate(adapter, snapshot, writer);
     }
 
+    public CombatDetailUpdateResult CreateSnapshotUpdate(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, ICombatDetailEventWriter writer)
+        => CreateSnapshotUpdate(adapter, snapshot, CombatDetailContextKey.From(snapshot, combatantId), writer);
+
+    internal CombatDetailUpdateResult CreateSnapshotUpdate(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, CombatDetailProjectionScope scope, ICombatDetailEventWriter writer)
+        => CreateSnapshotUpdate(adapter, snapshot, CombatDetailContextKey.From(snapshot, combatantId), scope, writer);
+
     private CombatDetailUpdateResult CreateSnapshotUpdate(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, CombatDetailContextKey context, ICombatDetailEventWriter writer)
+        => CreateSnapshotUpdate(adapter, snapshot, context, CombatDetailProjectionScope.EncounterWindow, writer);
+
+    private CombatDetailUpdateResult CreateSnapshotUpdate(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, CombatDetailContextKey context, CombatDetailProjectionScope scope, ICombatDetailEventWriter writer)
     {
         writer.Clear();
         var detailRevision = store.GetCombatantDetailRevision(combatantId);
-        var write = adapter.WriteDetailEvents(snapshot, combatantId, writer);
+        var write = adapter.WriteDetailEvents(snapshot, combatantId, writer, scope);
         detailRevision = Math.Max(detailRevision, write.Revision);
         _cursor = store.CreateCursor(store.Revision);
         _lastAppliedRevision = detailRevision;

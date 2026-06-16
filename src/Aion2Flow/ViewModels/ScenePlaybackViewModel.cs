@@ -18,6 +18,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     [
         ScenePlaybackTrack.Combat,
         ScenePlaybackTrack.Resource,
+        ScenePlaybackTrack.Aura,
         ScenePlaybackTrack.State,
         ScenePlaybackTrack.Scene,
         ScenePlaybackTrack.Action,
@@ -26,6 +27,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     ];
 
     private const int MaxTimelineMarkersPerTrack = 256;
+    private const int MaxCombatantTimelineMarkersPerTrack = 96;
     private const int MaxEventWindowMarkers = 96;
     private const long EventWindowRadiusMilliseconds = 4_000;
     private const long StepMilliseconds = 1_000;
@@ -69,7 +71,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private Task? _auraTimelineTask;
     private ScenePlaybackFrame _currentFrame;
     private ScenePlaybackFrameChangedEventArgs? _pendingFrameChanged;
-    private IReadOnlyList<PlaybackTimelineLane> _timelineMarkerTracks = [];
+    private PlaybackTimelineStrip _globalTimeline = PlaybackTimelineStrip.Empty;
+    private Dictionary<int, PlaybackTimelineStrip> _combatantTimelines = [];
     private IReadOnlyList<PlaybackAuraTimelineLane> _auraTimelineTracks = [];
     private double _timelineMarkerDuration = -1;
     private long _lastDetailProjectionTick;
@@ -124,7 +127,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     public CombatantDetailsFlyoutViewModel CombatantDetails { get; }
 
-    public bool IsCombatantDetailsVisible => SelectedCombatantId > 0;
+    public bool IsCombatantDetailsVisible => IsDetailsInspectorOpen && SelectedCombatantId > 0;
 
     public bool IsAuraTimelineVisible => SelectedCombatantId > 0 && AuraTimelineTracks.Count > 0;
 
@@ -174,7 +177,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     public partial string CheckpointText { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial IReadOnlyList<PlaybackTimelineLane> TimelineTracks { get; set; } = [];
+    public partial PlaybackTimelineStrip GlobalTimeline { get; set; } = PlaybackTimelineStrip.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAuraTimelineVisible))]
@@ -189,6 +192,13 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     public partial int SelectedCombatantId { get; set; }
 
     [ObservableProperty]
+    public partial int ExpandedCombatantId { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCombatantDetailsVisible))]
+    public partial bool IsDetailsInspectorOpen { get; set; }
+
+    [ObservableProperty]
     public partial IReadOnlyList<PlaybackEventRowViewModel> EventWindow { get; set; } = [];
 
     partial void OnPositionMillisecondsChanged(double value)
@@ -200,7 +210,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     partial void OnSelectedCombatantIdChanged(int value)
     {
-        Combatants = ApplyCombatantSelection(Combatants, value);
         _detailCancellation?.Cancel();
         _auraTimelineCancellation?.Cancel();
         _detailRequestGeneration++;
@@ -208,6 +217,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         AuraTimelineTracks = [];
         if (value <= 0)
         {
+            IsDetailsInspectorOpen = false;
+            Combatants = ApplyCombatantState(Combatants, value, ExpandedCombatantId);
             _detailRefreshQueued = false;
             CombatantDetails.Deactivate();
             return;
@@ -215,19 +226,60 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
         _forceNextDetailProjection = true;
         _detailRefreshQueued = true;
+        Combatants = ApplyCombatantState(Combatants, value, ExpandedCombatantId);
         RequestAuraTimeline(value);
+        IsDetailsInspectorOpen = true;
         if (!_detailRequestPending)
             RequestCombatantDetail(_currentFrame);
+    }
+
+    partial void OnIsDetailsInspectorOpenChanged(bool value)
+    {
+        if (!value)
+        {
+            _detailCancellation?.Cancel();
+            _detailRefreshQueued = false;
+            CombatantDetails.Deactivate();
+            return;
+        }
+
+        if (SelectedCombatantId <= 0)
+            return;
+
+        _forceNextDetailProjection = true;
+        _detailRefreshQueued = true;
+        if (!_detailRequestPending)
+            RequestCombatantDetail(_currentFrame);
+    }
+
+    partial void OnExpandedCombatantIdChanged(int value)
+    {
+        Combatants = ApplyCombatantState(Combatants, SelectedCombatantId, value);
     }
 
     public void SelectCombatant(PlaybackCombatantRowViewModel combatant)
     {
         if (combatant.EntityId > 0)
+        {
+            IsDetailsInspectorOpen = true;
+            if (ExpandedCombatantId != 0 && ExpandedCombatantId != combatant.EntityId)
+                ExpandedCombatantId = 0;
             SelectedCombatantId = combatant.EntityId;
+        }
+    }
+
+    public void ToggleCombatantExpansion(PlaybackCombatantRowViewModel combatant)
+    {
+        if (combatant.EntityId <= 0)
+            return;
+
+        IsDetailsInspectorOpen = true;
+        SelectedCombatantId = combatant.EntityId;
+        ExpandedCombatantId = ExpandedCombatantId == combatant.EntityId ? 0 : combatant.EntityId;
     }
 
     [RelayCommand]
-    private void ClearCombatantDetails() => SelectedCombatantId = 0;
+    private void CloseDetailsInspector() => IsDetailsInspectorOpen = false;
 
     public void RequestSeek(double positionMilliseconds)
     {
@@ -377,13 +429,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return;
 
         _currentFrame = frame;
+        var duration = frame.TimeRange.DurationMilliseconds;
         _isApplyingFrame = true;
         PositionMilliseconds = frame.PositionMilliseconds;
-        DurationMilliseconds = frame.TimeRange.DurationMilliseconds;
+        DurationMilliseconds = duration;
         _isApplyingFrame = false;
 
         PositionText = FormatTime(frame.PositionMilliseconds);
-        DurationText = FormatTime(frame.TimeRange.DurationMilliseconds);
+        DurationText = FormatTime(duration);
         Speed = state.Speed;
         SpeedText = FormatSpeed(state.Speed);
         IsPlaying = state.IsPlaying;
@@ -447,6 +500,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         for (var i = 0; i < frame.Resources.Count; i++)
             resources[frame.Resources[i].EntityId] = frame.Resources[i];
 
+        var timelines = _combatantTimelines;
         var added = new HashSet<int>();
         var result = new List<PlaybackCombatantRowViewModel>(Math.Max(combatants.Length, frame.Resources.Count));
         for (var i = 0; i < combatants.Length; i++)
@@ -457,7 +511,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
             result.Add(new PlaybackCombatantRowViewModel(
                 entry.Id,
-                DisplayContext.ResolveEntityName(entry.Id), FormatNumber(metrics.DamageAmount), FormatNumber(metrics.DamagePerSecond), FormatNumber(metrics.HealingAmount), FormatNumber(metrics.HealingPerSecond), CreateHpText(in resource), CreateHpSegments(in resource), entry.Id == SelectedCombatantId));
+                DisplayContext.ResolveEntityName(entry.Id),
+                FormatNumber(metrics.DamageAmount),
+                FormatNumber(metrics.DamagePerSecond),
+                FormatNumber(metrics.HealingAmount),
+                FormatNumber(metrics.HealingPerSecond),
+                CreateHpText(in resource),
+                CreateHpSegments(in resource),
+                ResolveCombatantTimeline(timelines, entry.Id),
+                entry.Id == SelectedCombatantId,
+                entry.Id == ExpandedCombatantId));
             added.Add(entry.Id);
         }
 
@@ -469,7 +532,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
             result.Add(new PlaybackCombatantRowViewModel(
                 resource.EntityId,
-                DisplayContext.ResolveEntityName(resource.EntityId), "0", "0", "0", "0", CreateHpText(in resource), CreateHpSegments(in resource), resource.EntityId == SelectedCombatantId));
+                DisplayContext.ResolveEntityName(resource.EntityId),
+                "0",
+                "0",
+                "0",
+                "0",
+                CreateHpText(in resource),
+                CreateHpSegments(in resource),
+                ResolveCombatantTimeline(timelines, resource.EntityId),
+                resource.EntityId == SelectedCombatantId,
+                resource.EntityId == ExpandedCombatantId));
         }
 
         result.Sort(static (left, right) =>
@@ -480,7 +552,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         return result;
     }
 
-    private static IReadOnlyList<PlaybackCombatantRowViewModel> ApplyCombatantSelection(IReadOnlyList<PlaybackCombatantRowViewModel> combatants, int selectedCombatantId)
+    private static IReadOnlyList<PlaybackCombatantRowViewModel> ApplyCombatantState(IReadOnlyList<PlaybackCombatantRowViewModel> combatants, int selectedCombatantId, int expandedCombatantId)
     {
         if (combatants.Count == 0)
             return combatants;
@@ -491,8 +563,9 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         {
             var combatant = combatants[i];
             var isSelected = combatant.EntityId == selectedCombatantId;
-            result[i] = combatant with { IsSelected = isSelected };
-            changed |= combatant.IsSelected != isSelected;
+            var isExpanded = combatant.EntityId == expandedCombatantId;
+            result[i] = combatant with { IsSelected = isSelected, IsExpanded = isExpanded };
+            changed |= combatant.IsSelected != isSelected || combatant.IsExpanded != isExpanded;
         }
 
         return changed ? result : combatants;
@@ -507,6 +580,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (_detailRequestPending)
         {
             _detailRefreshQueued = true;
+            _detailRequestGeneration++;
+            _detailCancellation?.Cancel();
             return;
         }
 
@@ -515,18 +590,24 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _detailRequestPending = true;
         _detailRefreshQueued = false;
         var generation = ++_detailRequestGeneration;
-        _detailTask = ProjectCombatantDetailAsync(frame.EncounterId, combatantId, generation, cancellation);
+        _detailTask = ProjectCombatantDetailAsync(frame.EncounterId, combatantId, frame.AppliedSegment.EndObservationOrdinalExclusive, generation, cancellation);
     }
 
-    private async Task ProjectCombatantDetailAsync(Guid encounterId, int combatantId, long generation, CancellationTokenSource cancellation)
+    private async Task ProjectCombatantDetailAsync(Guid encounterId, int combatantId, long expectedEndObservationOrdinalExclusive, long generation, CancellationTokenSource cancellation)
     {
         try
         {
             var projection = await _controller.CreateCombatantDetailAsync(combatantId, cancellation.Token).ConfigureAwait(false);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (_isDisposed || generation != _detailRequestGeneration || combatantId != SelectedCombatantId)
+                if (_isDisposed ||
+                    cancellation.IsCancellationRequested ||
+                    generation != _detailRequestGeneration ||
+                    combatantId != SelectedCombatantId ||
+                    projection.EndObservationOrdinalExclusive != expectedEndObservationOrdinalExclusive)
+                {
                     return;
+                }
 
                 CombatantDetails.SelectPlaybackSceneEncounterCombatant(encounterId, combatantId, projection.Snapshot, projection.Update, projection.Events);
             });
@@ -560,35 +641,36 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         var duration = frame.TimeRange.DurationMilliseconds;
         if (!_timelineMarkersInitialized || Math.Abs(_timelineMarkerDuration - duration) > double.Epsilon)
         {
-            _timelineMarkerTracks = CreateTimelineTracks(frame);
+            var timelines = CreateTimelineStrips(frame);
+            _globalTimeline = timelines.Global;
+            _combatantTimelines = timelines.Combatants;
             _timelineMarkerDuration = duration;
             _timelineMarkersInitialized = true;
+            Combatants = ApplyCombatantTimelines(Combatants, _combatantTimelines);
         }
 
-        TimelineTracks = ApplyTimelinePosition(_timelineMarkerTracks, frame.PositionMilliseconds, duration);
-        AuraTimelineTracks = ApplyAuraTimelinePosition(_auraTimelineTracks, frame.PositionMilliseconds, duration);
+        GlobalTimeline = _globalTimeline;
     }
 
-    private static PlaybackTimelineLane[] ApplyTimelinePosition(IReadOnlyList<PlaybackTimelineLane> lanes, double positionMilliseconds, double durationMilliseconds)
+    private static PlaybackTimelineStrip ResolveCombatantTimeline(Dictionary<int, PlaybackTimelineStrip> timelines, int combatantId)
+        => combatantId > 0 && timelines.TryGetValue(combatantId, out var timeline) ? timeline : PlaybackTimelineStrip.Empty;
+
+    private static IReadOnlyList<PlaybackCombatantRowViewModel> ApplyCombatantTimelines(IReadOnlyList<PlaybackCombatantRowViewModel> combatants, Dictionary<int, PlaybackTimelineStrip> timelines)
     {
-        if (lanes.Count == 0)
-            return [];
+        if (combatants.Count == 0)
+            return combatants;
 
-        var result = new PlaybackTimelineLane[lanes.Count];
-        for (var i = 0; i < lanes.Count; i++)
-            result[i] = lanes[i] with { PositionMilliseconds = positionMilliseconds, DurationMilliseconds = durationMilliseconds };
-        return result;
-    }
+        var changed = false;
+        var result = new PlaybackCombatantRowViewModel[combatants.Count];
+        for (var i = 0; i < combatants.Count; i++)
+        {
+            var combatant = combatants[i];
+            var timeline = ResolveCombatantTimeline(timelines, combatant.EntityId);
+            result[i] = combatant with { Timeline = timeline };
+            changed |= !ReferenceEquals(timeline, combatant.Timeline);
+        }
 
-    private static PlaybackAuraTimelineLane[] ApplyAuraTimelinePosition(IReadOnlyList<PlaybackAuraTimelineLane> lanes, double positionMilliseconds, double durationMilliseconds)
-    {
-        if (lanes.Count == 0)
-            return [];
-
-        var result = new PlaybackAuraTimelineLane[lanes.Count];
-        for (var i = 0; i < lanes.Count; i++)
-            result[i] = lanes[i] with { PositionMilliseconds = positionMilliseconds, DurationMilliseconds = durationMilliseconds };
-        return result;
+        return changed ? result : combatants;
     }
 
     private static string CreateHpText(in ScenePlaybackResourceState resource)
@@ -617,40 +699,66 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         return ratio > 0 ? [new ProgressSegment(ratio, ResourceBrush)] : EmptySegments;
     }
 
-    private IReadOnlyList<PlaybackTimelineLane> CreateTimelineTracks(ScenePlaybackFrame frame)
+    private PlaybackTimelineBuildResult CreateTimelineStrips(ScenePlaybackFrame frame)
     {
         var segment = _controller.CreateTimelineSegment();
         var duration = frame.TimeRange.DurationMilliseconds;
         if (segment.IsEmpty || duration <= 0)
-            return [];
+            return new PlaybackTimelineBuildResult(PlaybackTimelineStrip.Empty, []);
 
         var read = ScenePlaybackTrackReader.ReadSampled(segment, 0, duration, MaxTimelineMarkersPerTrack);
-        var groups = new Dictionary<ScenePlaybackTrack, List<PlaybackTimelineMarker>>();
-        for (var i = 0; i < read.Samples.Count; i++)
+        var combatantRead = ScenePlaybackTrackReader.ReadCombatantSampled(segment, 0, duration, MaxCombatantTimelineMarkersPerTrack);
+        var global = CreateTimelineStrip(CreateTimelineGroups(read.Samples), read.TrackCounts);
+        var combatants = new Dictionary<int, PlaybackTimelineStrip>(combatantRead.Combatants.Count);
+        for (var i = 0; i < combatantRead.Combatants.Count; i++)
         {
-            var sample = read.Samples[i];
-            var marker = sample.Marker;
-            var track = marker.Track;
-            if (!groups.TryGetValue(track, out var list))
-            {
-                list = [];
-                groups.Add(track, list);
-            }
-
-            list.Add(new PlaybackTimelineMarker(marker.PositionMilliseconds, ResolveMarkerWeight(marker, sample.EventCount), ResolveTrackBrush(track), CreateMarkerText(marker)));
+            var samples = combatantRead.Combatants[i];
+            var strip = CreateTimelineStrip(CreateTimelineGroups(samples.Samples), samples.TrackCounts);
+            if (strip.Bands.Count > 0)
+                combatants[samples.CombatantId] = strip;
         }
 
-        var lanes = new List<PlaybackTimelineLane>(TrackOrder.Length);
+        return new PlaybackTimelineBuildResult(global, combatants);
+    }
+
+    private Dictionary<ScenePlaybackTrack, List<PlaybackTimelineMarker>> CreateTimelineGroups(IReadOnlyList<ScenePlaybackTrackSample> samples)
+    {
+        var groups = new Dictionary<ScenePlaybackTrack, List<PlaybackTimelineMarker>>();
+        for (var i = 0; i < samples.Count; i++)
+        {
+            var sample = samples[i];
+            var marker = sample.Marker;
+            var track = marker.Track;
+            if (!groups.TryGetValue(track, out var markers))
+            {
+                markers = [];
+                groups.Add(track, markers);
+            }
+
+            markers.Add(new PlaybackTimelineMarker(marker.PositionMilliseconds, ResolveMarkerWeight(marker, sample.EventCount), ResolveTrackBrush(track), CreateMarkerText(marker)));
+        }
+
+        return groups;
+    }
+
+    private static PlaybackTimelineStrip CreateTimelineStrip(Dictionary<ScenePlaybackTrack, List<PlaybackTimelineMarker>> groups, IReadOnlyList<ScenePlaybackTrackCount> trackCounts)
+    {
+        var bands = new List<PlaybackTimelineBand>(TrackOrder.Length);
         foreach (var track in TrackOrder)
         {
             groups.TryGetValue(track, out var markers);
             if (markers is null || markers.Count == 0)
                 continue;
 
-            lanes.Add(new PlaybackTimelineLane(ResolveTrackName(track), track, ResolveTrackBrush(track), markers, duration, frame.PositionMilliseconds, ResolveTrackCount(read.TrackCounts, track)));
+            var trackCount = trackCounts.Count == 0 ? markers.Count : ResolveTrackCount(trackCounts, track);
+            bands.Add(new PlaybackTimelineBand(track, ResolveTrackBrush(track), markers, trackCount));
         }
 
-        return lanes;
+        var totalCount = 0;
+        for (var i = 0; i < bands.Count; i++)
+            totalCount += bands[i].Count;
+
+        return bands.Count == 0 ? PlaybackTimelineStrip.Empty : new PlaybackTimelineStrip(bands, totalCount);
     }
 
     private void RequestAuraTimeline(int targetEntityId)
@@ -676,8 +784,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                 if (_isDisposed || cancellation.IsCancellationRequested || targetEntityId != SelectedCombatantId)
                     return;
 
-                _auraTimelineTracks = CreateAuraTimelineTracks(timeline, durationMilliseconds);
-                AuraTimelineTracks = ApplyAuraTimelinePosition(_auraTimelineTracks, PositionMilliseconds, DurationMilliseconds);
+                _auraTimelineTracks = CreateAuraTimelineTracks(timeline);
+                AuraTimelineTracks = _auraTimelineTracks;
             });
         }
         catch (OperationCanceledException)
@@ -701,7 +809,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
     }
 
-    private PlaybackAuraTimelineLane[] CreateAuraTimelineTracks(ScenePlaybackAuraTimeline timeline, long durationMilliseconds)
+    private PlaybackAuraTimelineLane[] CreateAuraTimelineTracks(ScenePlaybackAuraTimeline timeline)
     {
         if (timeline.Coverages.Count == 0 && timeline.Applications.Count == 0)
             return [];
@@ -747,7 +855,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             }
 
             var spans = MergeAuraCoverages(builder.Coverages, fill, accent);
-            result.Add(new PlaybackAuraTimelineLane(skillCode, fallback, accent, markers, spans, durationMilliseconds, PositionMilliseconds, builder.Applications.Count));
+            result.Add(new PlaybackAuraTimelineLane(skillCode, fallback, accent, markers, spans, builder.Applications.Count));
         }
 
         result.Sort((left, right) =>
@@ -1014,7 +1122,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     }
 }
 
-public sealed record PlaybackCombatantRowViewModel(int EntityId, string Name, string DamageText, string DamagePerSecondText, string HealingText, string HealingPerSecondText, string HpText, IReadOnlyList<ProgressSegment> HpSegments, bool IsSelected);
+public sealed record PlaybackCombatantRowViewModel(int EntityId, string Name, string DamageText, string DamagePerSecondText, string HealingText, string HealingPerSecondText, string HpText, IReadOnlyList<ProgressSegment> HpSegments, PlaybackTimelineStrip Timeline, bool IsSelected, bool IsExpanded);
 
 public sealed record PlaybackEventRowViewModel(string TimeText, string TrackText, string SourceText, string TargetText, string SkillText, string AmountText);
 
@@ -1036,3 +1144,5 @@ internal sealed class AuraTimelineLaneBuilder(uint displayResourceEffectRefRaw, 
 
     public List<(long PositionMilliseconds, ScenePlaybackLifecycleEventKind Kind)> Applications { get; } = [];
 }
+
+internal readonly record struct PlaybackTimelineBuildResult(PlaybackTimelineStrip Global, Dictionary<int, PlaybackTimelineStrip> Combatants);

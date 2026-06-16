@@ -146,7 +146,6 @@
   <data name="Playback_NextSecond" xml:space="preserve"><value>Forward 1 second</value></data>
   <data name="Playback_NextEvent" xml:space="preserve"><value>Next event</value></data>
   <data name="Playback_Label_Speed" xml:space="preserve"><value>Speed</value></data>
-  <data name="Playback_TimelineTracks" xml:space="preserve"><value>Timeline Tracks</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>Combatants</value></data>
   <data name="Playback_CombatantDetails" xml:space="preserve"><value>Combatant Details</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>Event Window</value></data>

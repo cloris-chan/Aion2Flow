@@ -4,17 +4,15 @@ namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
 public sealed class ScenePlaybackCheckpoint
 {
-    internal ScenePlaybackCheckpoint(ScenePlaybackProjectionSnapshot projection, JournalCursor journalCursor)
+    internal ScenePlaybackCheckpoint(long positionMilliseconds, JournalCursor journalCursor)
     {
-        Projection = projection;
+        PositionMilliseconds = Math.Max(0, positionMilliseconds);
         JournalCursor = journalCursor;
     }
 
-    public long PositionMilliseconds => Projection.PositionMilliseconds;
+    public long PositionMilliseconds { get; }
 
     public JournalCursor JournalCursor { get; }
-
-    internal ScenePlaybackProjectionSnapshot Projection { get; }
 }
 
 internal sealed class ScenePlaybackCheckpointCache
@@ -25,23 +23,6 @@ internal sealed class ScenePlaybackCheckpointCache
     public int Count
     {
         get { lock (_gate) return _checkpoints.Count; }
-    }
-
-    public bool TryGetFloor(long positionMilliseconds, out ScenePlaybackCheckpoint? checkpoint)
-    {
-        lock (_gate)
-        {
-            checkpoint = null;
-            foreach (var candidate in _checkpoints.Values)
-            {
-                if (candidate.PositionMilliseconds > positionMilliseconds)
-                    break;
-
-                checkpoint = candidate;
-            }
-
-            return checkpoint is not null;
-        }
     }
 
     public bool TryGetCeiling(long positionMilliseconds, out ScenePlaybackCheckpoint? checkpoint)
@@ -59,25 +40,6 @@ internal sealed class ScenePlaybackCheckpointCache
 
             checkpoint = null;
             return false;
-        }
-    }
-
-    public bool TryGetOrdinalFloor(long endObservationOrdinalExclusive, out ScenePlaybackCheckpoint? checkpoint)
-    {
-        lock (_gate)
-        {
-            checkpoint = null;
-            foreach (var candidate in _checkpoints.Values)
-            {
-                if (candidate.JournalCursor.NextObservationOrdinal > endObservationOrdinalExclusive)
-                    continue;
-
-                if (checkpoint is null ||
-                    candidate.JournalCursor.NextObservationOrdinal > checkpoint.JournalCursor.NextObservationOrdinal)
-                    checkpoint = candidate;
-            }
-
-            return checkpoint is not null;
         }
     }
 

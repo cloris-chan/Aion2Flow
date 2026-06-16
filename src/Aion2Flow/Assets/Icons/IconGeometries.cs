@@ -24,6 +24,8 @@ internal sealed class IconGeometries : ResourceDictionary
         Add("square", Geometry("M5 5h14v14H5z"));
         Add("chevron-left", Geometry("M15 18l-6-6 6-6"));
         Add("chevron-right", Geometry("M9 18l6-6-6-6"));
+        Add("chevron-down", Geometry("M6 9l6 6 6-6"));
+        Add("chevron-up", Geometry("M18 15l-6-6-6 6"));
         Add("skip-back", Geometry("M19 20 9 12l10-8v16zM5 19V5"));
         Add("skip-forward", Geometry("M5 4l10 8-10 8V4zM19 5v14"));
     }

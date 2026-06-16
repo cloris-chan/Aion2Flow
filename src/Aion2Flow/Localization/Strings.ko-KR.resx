@@ -146,7 +146,6 @@
   <data name="Playback_NextSecond" xml:space="preserve"><value>1초 앞으로</value></data>
   <data name="Playback_NextEvent" xml:space="preserve"><value>다음 이벤트</value></data>
   <data name="Playback_Label_Speed" xml:space="preserve"><value>속도</value></data>
-  <data name="Playback_TimelineTracks" xml:space="preserve"><value>Timeline Tracks</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>전투 대상</value></data>
   <data name="Playback_CombatantDetails" xml:space="preserve"><value>전투 대상 상세</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>이벤트 창</value></data>

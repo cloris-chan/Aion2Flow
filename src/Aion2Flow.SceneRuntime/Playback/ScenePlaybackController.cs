@@ -448,12 +448,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
                 if (IsNavigationSuperseded(operation))
                     return CompleteSupersededNavigation(operation);
 
-                var checkpoint = direction < 0 ? ResolveOrdinalCheckpoint(target) : null;
-                operation.CallerCancellationToken.ThrowIfCancellationRequested();
-                if (IsNavigationSuperseded(operation))
-                    return CompleteSupersededNavigation(operation);
-
-                return Session.SeekObservationOrdinal(target, checkpoint);
+                return Session.SeekObservationOrdinal(target);
             }, operation.CallerCancellationToken).ConfigureAwait(false);
 
             operation.CallerCancellationToken.ThrowIfCancellationRequested();
@@ -493,12 +488,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
                 if (IsNavigationSuperseded(operation))
                     return CompleteSupersededNavigation(operation);
 
-                var checkpoint = ResolveSeekCheckpoint(positionMilliseconds);
-                operation.CallerCancellationToken.ThrowIfCancellationRequested();
-                if (IsNavigationSuperseded(operation))
-                    return CompleteSupersededNavigation(operation);
-
-                return Session.Seek(positionMilliseconds, checkpoint);
+                return Session.Seek(positionMilliseconds);
             }, operation.CallerCancellationToken).ConfigureAwait(false);
 
             operation.CallerCancellationToken.ThrowIfCancellationRequested();
@@ -611,24 +601,6 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             if (publishFinished)
                 PublishCurrentFrameChanged();
         }
-    }
-
-    private ScenePlaybackCheckpoint? ResolveSeekCheckpoint(long positionMilliseconds)
-    {
-        if (!_checkpoints.TryGetFloor(positionMilliseconds, out var checkpoint) || checkpoint is null)
-            return null;
-
-        var currentEnd = Source.CreateTimelineSegment().CurrentEndObservationOrdinalExclusive;
-        return checkpoint.JournalCursor.NextObservationOrdinal <= currentEnd ? checkpoint : null;
-    }
-
-    private ScenePlaybackCheckpoint? ResolveOrdinalCheckpoint(long endObservationOrdinalExclusive)
-    {
-        if (!_checkpoints.TryGetOrdinalFloor(endObservationOrdinalExclusive, out var checkpoint) || checkpoint is null)
-            return null;
-
-        var currentEnd = Source.CreateTimelineSegment().CurrentEndObservationOrdinalExclusive;
-        return checkpoint.JournalCursor.NextObservationOrdinal <= currentEnd ? checkpoint : null;
     }
 
     private IReadOnlyList<ScenePlaybackCheckpoint> BuildCheckpoints(CancellationToken cancellationToken)
