@@ -460,7 +460,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 MaxHp = boss.MaxHp,
                 CumulativeLostHp = boss.CumulativeLostHp,
                 LastObservedAtMilliseconds = boss.LastObservedAtMilliseconds,
-                HasHp = boss.HasHp
+                HasHp = boss.HasHp,
+                HasMaxHp = boss.HasMaxHp
             });
         }
     }

@@ -68,6 +68,79 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         return false;
     }
 
+    public void SeedNpcRuntimeState(in PacketObservationSource packet, int instanceId, in RuntimeNpcStateSnapshot state)
+    {
+        instanceId = ResolveLifecycleId(instanceId);
+        _npcStates.TryGetValue(instanceId, out var cached);
+        AddKnownEntity(instanceId);
+
+        if (state.NpcCode is int npcCode)
+        {
+            var stamp = CreateStamp(in packet);
+            journal.Append(new ObservedEventEnvelope
+            {
+                SceneSessionId = sceneSessionId(),
+                Stamp = stamp,
+                Domain = ObservedEventDomain.State,
+                SourceEntityId = instanceId,
+                TargetEntityId = 0,
+                Raw = cached?.NpcCodeRaw ?? packet.Raw,
+                State = new StateObservation
+                {
+                    EntityId = instanceId,
+                    StateCode = npcCode,
+                    Value0 = 0,
+                    Value1 = 0,
+                    DetailRaw = 0
+                }
+            });
+        }
+
+        if (state.Kind is NpcKind kind)
+        {
+            var stamp = CreateStamp(in packet);
+            journal.Append(new ObservedEventEnvelope
+            {
+                SceneSessionId = sceneSessionId(),
+                Stamp = stamp,
+                Domain = ObservedEventDomain.State,
+                SourceEntityId = instanceId,
+                TargetEntityId = 0,
+                Raw = cached?.KindRaw ?? packet.Raw,
+                State = new StateObservation
+                {
+                    EntityId = instanceId,
+                    StateCode = StateCodes.NpcKind,
+                    Value0 = (int)kind,
+                    Value1 = 0,
+                    DetailRaw = 0
+                }
+            });
+        }
+
+        if (state.Hp is int hp)
+        {
+            var stamp = CreateStamp(in packet);
+            journal.Append(new ObservedEventEnvelope
+            {
+                SceneSessionId = sceneSessionId(),
+                Stamp = stamp,
+                Domain = ObservedEventDomain.Resource,
+                SourceEntityId = instanceId,
+                TargetEntityId = 0,
+                Raw = cached?.HpRaw ?? packet.Raw,
+                Resource = new ResourceObservation
+                {
+                    EntityId = instanceId,
+                    CurrentValue = hp,
+                    MaximumValue = state.MaxHp,
+                    Delta = null,
+                    ResourceKind = 0
+                }
+            });
+        }
+    }
+
     public int ResolveNpcObservationSource() => _lifecycle.CurrentTarget > 0 ? _lifecycle.CurrentTarget : _lifecycle.LastObservedNpcSource;
 
     public void RememberNpcObservationSource(int instanceId)
@@ -200,7 +273,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         var normalized = CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
         sourceId = ResolveLifecycleId(sourceId);
         targetId = ResolveLifecycleId(targetId);
-        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId))
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
             return;
         AddKnownEntity(sourceId);
         AddKnownEntity(targetId);
@@ -223,7 +296,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
-        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId))
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
             return;
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
@@ -252,7 +325,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
-        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId))
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
             return;
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
@@ -477,6 +550,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.NpcCode = npcCode;
+        state.NpcCodeRaw = packet.Raw;
         AddKnownEntity(instanceId);
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
@@ -526,6 +600,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.Kind = kind;
+        state.KindRaw = packet.Raw;
         AddKnownEntity(instanceId);
         var stamp = CreateStamp(in packet);
         journal.Append(new ObservedEventEnvelope
@@ -553,7 +628,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.Hp = hp;
-        state.MaxHp = Math.Max(state.MaxHp ?? 0, hp);
+        state.HpRaw = packet.Raw;
         state.HpObservedAtMilliseconds = ResolvePacketOffsetMilliseconds(in packet);
         if (hp == 0)
             state.BattleToggledOn = false;
@@ -587,7 +662,8 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
         state.Hp = hp;
-        state.MaxHp = Math.Max(maxHp, hp);
+        state.MaxHp = maxHp;
+        state.HpRaw = packet.Raw;
         state.HpObservedAtMilliseconds = ResolvePacketOffsetMilliseconds(in packet);
         if (hp == 0)
             state.BattleToggledOn = false;
@@ -849,6 +925,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         public int? NpcCode { get; set; }
         public int? Hp { get; set; }
         public int? MaxHp { get; set; }
+        public RawPacketReference? NpcCodeRaw { get; set; }
+        public RawPacketReference? KindRaw { get; set; }
+        public RawPacketReference? HpRaw { get; set; }
         public long? HpObservedAtMilliseconds { get; set; }
         public bool? BattleToggledOn { get; set; }
         public NpcKind? Kind { get; set; }

@@ -18,6 +18,8 @@ public interface IRuntimeObservationSink
 
     bool TryGetNpcRuntimeState(int instanceId, out RuntimeNpcStateSnapshot state);
 
+    void SeedNpcRuntimeState(in PacketObservationSource packet, int instanceId, in RuntimeNpcStateSnapshot state);
+
     int ResolveNpcObservationSource();
 
     void RememberNpcObservationSource(int instanceId);

@@ -57,6 +57,18 @@ public class EntityStoreTests
     }
 
     [Fact]
+    public void EntityStore_ApplyNpcHp_DoesNotInferMaxFromRemainHp()
+    {
+        var store = new EntityStore();
+
+        store.ApplyNpcHp(56688, 22_847, 0);
+
+        Assert.True(store.TryGet(56688, out var entity));
+        Assert.Equal(22_847, entity!.CurrentHp);
+        Assert.Null(entity.MaxHp);
+    }
+
+    [Fact]
     public void EntityStore_ApplyNpcHp_PreservesKnownMaxWhenRemainHpOmitsMax()
     {
         var store = new EntityStore();

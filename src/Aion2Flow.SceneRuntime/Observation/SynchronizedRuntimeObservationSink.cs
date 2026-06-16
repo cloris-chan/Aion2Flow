@@ -50,6 +50,11 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) return inner.TryGetNpcRuntimeState(instanceId, out state);
     }
 
+    public void SeedNpcRuntimeState(in PacketObservationSource packet, int instanceId, in RuntimeNpcStateSnapshot state)
+    {
+        lock (gate) inner.SeedNpcRuntimeState(in packet, instanceId, in state);
+    }
+
     public int ResolveNpcObservationSource()
     {
         lock (gate) return inner.ResolveNpcObservationSource();

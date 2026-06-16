@@ -356,7 +356,8 @@ public sealed class SceneArchivePayload
                 MaxHp = boss.MaxHp,
                 CumulativeLostHp = boss.CumulativeLostHp,
                 LastObservedAtMilliseconds = boss.LastObservedAtMilliseconds,
-                HasHp = boss.HasHp
+                HasHp = boss.HasHp,
+                HasMaxHp = boss.HasMaxHp
             };
         }
 
@@ -841,6 +842,7 @@ public sealed class SceneArchiveBossFocus
     public long CumulativeLostHp { get; init; }
     public long LastObservedAtMilliseconds { get; init; }
     public bool HasHp { get; init; }
+    public bool HasMaxHp { get; init; }
 
     public SceneArchiveBossFocus DeepClone() => new()
     {
@@ -849,6 +851,7 @@ public sealed class SceneArchiveBossFocus
         MaxHp = MaxHp,
         CumulativeLostHp = CumulativeLostHp,
         LastObservedAtMilliseconds = LastObservedAtMilliseconds,
-        HasHp = HasHp
+        HasHp = HasHp,
+        HasMaxHp = HasMaxHp
     };
 }

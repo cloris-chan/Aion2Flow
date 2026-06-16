@@ -185,6 +185,7 @@ public sealed class SceneTestHarness : IDisposable
         public bool IsKnownEntity(int id) => inner.IsKnownEntity(id);
         public bool HasSummonOwner(int instanceId) => inner.HasSummonOwner(instanceId);
         public bool TryGetNpcRuntimeState(int instanceId, out RuntimeNpcStateSnapshot state) => inner.TryGetNpcRuntimeState(instanceId, out state);
+        public void SeedNpcRuntimeState(in PacketObservationSource packet, int instanceId, in RuntimeNpcStateSnapshot state) => inner.SeedNpcRuntimeState(in packet, instanceId, in state);
         public int ResolveNpcObservationSource() => inner.ResolveNpcObservationSource();
         public void RememberNpcObservationSource(int instanceId) => inner.RememberNpcObservationSource(instanceId);
         public void StageDestinationMap(in PacketObservationSource packet, uint mapId) => inner.StageDestinationMap(in packet, mapId);

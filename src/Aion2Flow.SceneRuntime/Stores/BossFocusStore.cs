@@ -88,15 +88,17 @@ public sealed class BossFocusStore(EntityStore entities)
 
     public void ApplyNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
     {
+        var resolvedMaxHp = ResolveMaxHp(instanceId, maxHp);
+        var hasMaxHp = resolvedMaxHp > 0;
         if (hp == 0)
         {
             if (_observed.ContainsKey(instanceId))
-                Remember(instanceId, hp, ResolveMaxHp(instanceId, hp, maxHp), observedAtMilliseconds);
+                Remember(instanceId, hp, resolvedMaxHp, hasMaxHp, observedAtMilliseconds);
             return;
         }
 
         if (_observed.ContainsKey(instanceId) || IsActiveFocusTargetInstance(instanceId))
-            Remember(instanceId, hp, ResolveMaxHp(instanceId, hp, maxHp), observedAtMilliseconds);
+            Remember(instanceId, hp, resolvedMaxHp, hasMaxHp, observedAtMilliseconds);
     }
 
     public bool ApplyBattle(int instanceId, bool isActive, long observedAtMilliseconds)
@@ -181,7 +183,7 @@ public sealed class BossFocusStore(EntityStore entities)
         var observedAt = Math.Max(0, observedAtMilliseconds);
         if (entities.TryGet(instanceId, out var entity) && entity.CurrentHp is int hp)
         {
-            Remember(instanceId, hp, Math.Max(entity.MaxHp ?? hp, hp), observedAt);
+            Remember(instanceId, hp, entity.MaxHp ?? 0, entity.MaxHp.HasValue, observedAt);
             return;
         }
 
@@ -203,7 +205,8 @@ public sealed class BossFocusStore(EntityStore entities)
             Hp = 0,
             MaxHp = 1,
             LastObservedAtMilliseconds = observedAt,
-            HasHp = false
+            HasHp = false,
+            HasMaxHp = false
         };
         if (!_observed.TryGetValue(instanceId, out var previous) || !previous.Equals(snapshot))
         {
@@ -213,10 +216,10 @@ public sealed class BossFocusStore(EntityStore entities)
         }
     }
 
-    private void Remember(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
+    private void Remember(int instanceId, int hp, int maxHp, bool hasMaxHp, long observedAtMilliseconds)
     {
         var resolvedHp = Math.Max(0, hp);
-        var resolvedMaxHp = Math.Max(1, maxHp);
+        var resolvedMaxHp = hasMaxHp ? Math.Max(1, maxHp) : 0;
         var cumulativeLostHp = 0L;
         if (_observed.TryGetValue(instanceId, out var previous) && previous.HasHp)
         {
@@ -232,7 +235,8 @@ public sealed class BossFocusStore(EntityStore entities)
             MaxHp = resolvedMaxHp,
             CumulativeLostHp = cumulativeLostHp,
             LastObservedAtMilliseconds = Math.Max(0, observedAtMilliseconds),
-            HasHp = true
+            HasHp = true,
+            HasMaxHp = hasMaxHp
         };
         if (!_observed.TryGetValue(instanceId, out var current) || !current.Equals(snapshot))
         {
@@ -249,9 +253,9 @@ public sealed class BossFocusStore(EntityStore entities)
         _encounterBosses[instanceId] = snapshot;
     }
 
-    private int ResolveMaxHp(int instanceId, int hp, int maxHp)
+    private int ResolveMaxHp(int instanceId, int maxHp)
     {
-        var resolved = Math.Max(maxHp, hp);
+        var resolved = maxHp;
         if (entities.TryGet(instanceId, out var entity) && entity.MaxHp is int entityMaxHp)
             resolved = Math.Max(resolved, entityMaxHp);
         return resolved;
@@ -279,6 +283,7 @@ public sealed class BossFocusStore(EntityStore entities)
         public long CumulativeLostHp { get; init; }
         public long LastObservedAtMilliseconds { get; init; }
         public bool HasHp { get; init; }
+        public bool HasMaxHp { get; init; }
     }
 }
 

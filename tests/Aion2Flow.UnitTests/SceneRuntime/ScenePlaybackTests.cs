@@ -173,6 +173,34 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void Seek_ResourceMaximum_DoesNotPromoteCurrentValue()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        const int bossId = 200;
+        AppendResource(journal, sceneId, bossId, 50_000, 30_000, 1, 1_000);
+        journal.CompleteBatch(1);
+        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
+        var snapshot = owner.CreateSnapshot();
+        var record = new ArchivedEncounterRecord
+        {
+            EncounterId = sceneId,
+            Snapshot = snapshot,
+            ScenePayload = owner.CreateArchivePayload(snapshot)
+        };
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+
+        var frame = session.Seek(1_000);
+
+        var resource = Assert.Single(frame.Resources);
+        Assert.Equal(50_000, resource.CurrentValue);
+        Assert.Equal(30_000, resource.MaximumValue);
+        var marker = Assert.Single(frame.RecentMarkers, static marker => marker.Track == ScenePlaybackTrack.Resource);
+        Assert.Equal(50_000, marker.CurrentValue);
+        Assert.Equal(30_000, marker.MaximumValue);
+    }
+
+    [Fact]
     public void Seek_TrackWindows_PreserveFirstAndLastOrdinals()
     {
         var record = CreateArchiveRecord();

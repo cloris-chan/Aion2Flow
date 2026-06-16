@@ -8,6 +8,8 @@ internal readonly record struct PacketNpcHpPair(int CurrentHp, int MaxHp);
 internal static class PacketNpcStateFields
 {
     public const int HpPairOffsetFromNpcCodeEnd = 21;
+    public const int StateHpPairOffsetFromNpcCodeStart = sizeof(int) + HpPairOffsetFromNpcCodeEnd;
+    public const int ExtendedStateHpPairOffsetFromNpcCodeStart = StateHpPairOffsetFromNpcCodeStart + 12;
 
     public static bool IsNpcCatalogCode(int value) => value is >= 2_000_000 and <= 2_999_999;
 
@@ -29,9 +31,9 @@ internal static class PacketNpcStateFields
         return true;
     }
 
-    public static bool TryReadPositiveHpPair(ReadOnlySpan<byte> packet, int offset, out PacketNpcHpPair hp) => TryReadHpPair(packet, offset, allowZeroCurrentHp: false, requireCurrentWithinMax: false, requirePercentGaugePair: false, out hp);
-
     public static bool TryReadSpawnHpPair(ReadOnlySpan<byte> packet, int offset, out PacketNpcHpPair hp) => TryReadHpPair(packet, offset, allowZeroCurrentHp: true, requireCurrentWithinMax: true, requirePercentGaugePair: true, out hp);
+
+    public static bool TryReadStateHpPair(ReadOnlySpan<byte> packet, int offset, out PacketNpcHpPair hp) => TryReadHpPair(packet, offset, allowZeroCurrentHp: true, requireCurrentWithinMax: true, requirePercentGaugePair: true, out hp);
 
     private static bool TryReadHpPair(ReadOnlySpan<byte> packet, int offset, bool allowZeroCurrentHp, bool requireCurrentWithinMax, bool requirePercentGaugePair, out PacketNpcHpPair hp)
     {

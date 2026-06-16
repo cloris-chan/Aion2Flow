@@ -487,6 +487,9 @@ public readonly record struct SceneBossFocusSnapshot
     {
         get
         {
+            if (!HasMaxHp)
+                return 0;
+
             var maxHp = Math.Max(1L, MaxHp);
             return HasHp ? Math.Max(maxHp, Math.Max(0, Hp) + CumulativeLostHp) : maxHp;
         }
@@ -495,4 +498,6 @@ public readonly record struct SceneBossFocusSnapshot
     public long LastObservedAtMilliseconds { get; init; }
 
     public bool HasHp { get; init; }
+
+    public bool HasMaxHp { get; init; }
 }

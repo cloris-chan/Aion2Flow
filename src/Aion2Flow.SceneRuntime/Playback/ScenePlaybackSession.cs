@@ -421,9 +421,6 @@ public sealed class ScenePlaybackSession
             if (_entities.TryGet(resource.EntityId, out var entity) && entity.MaxHp is int entityMaxHp)
                 maximumValue = maximumValue.HasValue ? Math.Max(maximumValue.Value, entityMaxHp) : entityMaxHp;
 
-            if (maximumValue.HasValue && resource.CurrentValue.HasValue)
-                return Math.Max(maximumValue.Value, resource.CurrentValue.Value);
-
             return maximumValue;
         }
 

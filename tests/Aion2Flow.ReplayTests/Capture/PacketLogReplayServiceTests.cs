@@ -325,6 +325,32 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_Parses_Extended_4136_State_Hp_Layout()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SplitTransportFrameRecovery}"));
+
+        AssertNoInvalidNpcResourceMaximums(replay);
+        Assert.True(replay.SceneOwner.Entities.TryGet(26100, out var entity));
+        Assert.Equal(2910001, entity.NpcCode);
+        Assert.Equal(4655, entity.MaxHp);
+    }
+
+    [Theory]
+    [InlineData(ReplayScenarioCatalog.SplitTransportFrameRecovery)]
+    [InlineData(ReplayScenarioCatalog.BossFocusWithoutBattleToggle)]
+    [InlineData(ReplayScenarioCatalog.BossFocusExpiresAfterLeavingRange)]
+    public void Replay_NpcResourceMaximums_DoNot_ReadAcrossPacketFields(string fileName)
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
+
+        AssertNoInvalidNpcResourceMaximums(replay);
+    }
+
+    [Fact]
     public void Replay_Recovers_BossCatalog_From_4136_State_Packets()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
@@ -372,7 +398,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.Contains(replay.Combatants, static combatant => combatant.CombatantId == bossId && combatant.IncomingDamage > 7_500_000);
         Assert.True(replay.SceneOwner.Entities.TryGet(bossId, out var entity));
         Assert.Equal(243_750_000, entity.MaxHp);
-        Assert.Equal(98_050_877, entity.CurrentHp);
+        Assert.Equal(0, entity.CurrentHp);
     }
 
     [Fact]
@@ -865,6 +891,26 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(expectedName, combatant.DisplayName);
         Assert.Equal(0, combatant.OutgoingDamage);
         Assert.Equal(0, combatant.IncomingDamage);
+    }
+
+    private static void AssertNoInvalidNpcResourceMaximums(PacketLogReplayResult replay)
+    {
+        List<string>? failures = null;
+        for (var ordinal = replay.SceneJournal.FirstObservationOrdinal; ordinal < replay.SceneJournal.NextObservationOrdinal; ordinal++)
+        {
+            var entry = replay.SceneJournal.Read(ordinal);
+            if (entry.Resource is not { } resource ||
+                resource.CurrentValue is not long current ||
+                resource.MaximumValue is not long maximum ||
+                current <= maximum)
+            {
+                continue;
+            }
+
+            (failures ??= []).Add($"ordinal={ordinal} entity={resource.EntityId} current={current} max={maximum}");
+        }
+
+        Assert.True(failures is null, failures is null ? string.Empty : string.Join(Environment.NewLine, failures));
     }
 
     private static void AssertNpcNameAndNotBoss(PacketLogReplayResult replay, int combatantId, string expectedName, string summaryDump)

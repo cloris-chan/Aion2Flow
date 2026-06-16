@@ -6,14 +6,14 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
 {
     private static readonly ProgressSegment[] EmptySegments = [];
 
-    public BossFocusViewModel(UiFrameBatchService frameBatchService, long displayKey, int instanceId, int npcCode, int instanceCount, int hp, int maxHp, bool hasHp)
+    public BossFocusViewModel(UiFrameBatchService frameBatchService, long displayKey, int instanceId, int npcCode, int instanceCount, int hp, int maxHp, bool hasHp, bool hasMaxHp)
         : base(frameBatchService)
     {
         DisplayKey = displayKey;
         InstanceId = instanceId;
         NpcCode = npcCode;
         InstanceCount = instanceCount;
-        Apply(hp, maxHp, hasHp);
+        Apply(hp, maxHp, hasHp, hasMaxHp);
     }
 
     public long DisplayKey { get; }
@@ -66,6 +66,23 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         {
             if (SetFrameProperty(ref field, value))
             {
+                QueueFramePropertyChanged(nameof(IsHpVisible));
+                QueueFramePropertyChanged(nameof(IsMaxHpVisible));
+                QueueFramePropertyChanged(nameof(IsMaxHpUnknown));
+                QueueFramePropertyChanged(nameof(IsHpUnknown));
+            }
+        }
+    }
+
+    public bool HasMaxHp
+    {
+        get;
+        set
+        {
+            if (SetFrameProperty(ref field, value))
+            {
+                QueueFramePropertyChanged(nameof(IsMaxHpVisible));
+                QueueFramePropertyChanged(nameof(IsMaxHpUnknown));
                 QueueFramePropertyChanged(nameof(IsHpUnknown));
             }
         }
@@ -77,6 +94,12 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         set => SetFrameProperty(ref field, value);
     }
 
+    public bool IsHpVisible => HasHp;
+
+    public bool IsMaxHpVisible => HasHp && HasMaxHp;
+
+    public bool IsMaxHpUnknown => HasHp && !HasMaxHp;
+
     public bool IsHpUnknown => !HasHp;
 
     public IReadOnlyList<ProgressSegment> BarSegments
@@ -85,12 +108,12 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         private set => SetFrameProperty(ref field, value);
     } = EmptySegments;
 
-    public void Update(int instanceId, int npcCode, int instanceCount, int hp, int maxHp, bool hasHp)
+    public void Update(int instanceId, int npcCode, int instanceCount, int hp, int maxHp, bool hasHp, bool hasMaxHp)
     {
         InstanceId = instanceId;
         NpcCode = npcCode;
         InstanceCount = instanceCount;
-        Apply(hp, maxHp, hasHp);
+        Apply(hp, maxHp, hasHp, hasMaxHp);
     }
 
     public void UpdateSegments(IReadOnlyList<ProgressSegment> segments)
@@ -99,26 +122,31 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
             BarSegments = segments.Count == 0 ? EmptySegments : [.. segments];
     }
 
-    private void Apply(int hp, int maxHp, bool hasHp)
+    private void Apply(int hp, int maxHp, bool hasHp, bool hasMaxHp)
     {
         var resolvedMaxHp = Math.Max(1, maxHp);
-        if (hasHp)
+        if (hasHp && hasMaxHp)
         {
             var resolvedHp = Math.Max(0, hp);
             var resolvedHpRatio = Math.Clamp(resolvedHp / (double)resolvedMaxHp, 0d, 1d);
-            ApplyValues(resolvedHp, resolvedMaxHp, hasHp: true, resolvedHpRatio);
+            ApplyValues(resolvedHp, resolvedMaxHp, hasHp: true, hasMaxHp: true, resolvedHpRatio);
+        }
+        else if (hasHp)
+        {
+            ApplyValues(Math.Max(0, hp), 1, hasHp: true, hasMaxHp: false, 0);
         }
         else
         {
-            ApplyValues(0, 1, hasHp: false, 0);
+            ApplyValues(0, 1, hasHp: false, hasMaxHp: false, 0);
         }
     }
 
-    private void ApplyValues(double hp, double maxHp, bool hasHp, double hpRatio)
+    private void ApplyValues(double hp, double maxHp, bool hasHp, bool hasMaxHp, double hpRatio)
     {
         Hp = hp;
         MaxHp = maxHp;
         HasHp = hasHp;
+        HasMaxHp = hasMaxHp;
         HpRatio = hpRatio;
     }
 

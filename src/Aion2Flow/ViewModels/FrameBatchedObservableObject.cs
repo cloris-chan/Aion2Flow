@@ -1,9 +1,6 @@
 using System.Collections.Concurrent;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using Avalonia;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
@@ -24,7 +21,6 @@ public abstract class FrameBatchedObservableObject(UiFrameBatchService frameBatc
         }
 
         propertyName = RequirePropertyName(propertyName);
-        VerifyUiThreadAccess();
         OnPropertyChanging(GetChangingEventArgs(propertyName));
         field = value;
         QueueFramePropertyChanged(propertyName);
@@ -34,7 +30,6 @@ public abstract class FrameBatchedObservableObject(UiFrameBatchService frameBatc
     protected void QueueFramePropertyChanged([CallerMemberName] string? propertyName = null)
     {
         propertyName = RequirePropertyName(propertyName);
-        VerifyUiThreadAccess();
         var pending = _pendingPropertyNames ??= [];
         if (!pending.Contains(propertyName))
         {
@@ -50,14 +45,11 @@ public abstract class FrameBatchedObservableObject(UiFrameBatchService frameBatc
 
     internal void PrepareFrameFlush()
     {
-        VerifyUiThreadAccess();
         _isQueuedForFrame = false;
     }
 
     internal void FlushPendingPropertyChanges()
     {
-        VerifyUiThreadAccess();
-
         var pending = _pendingPropertyNames;
         if (pending is null || pending.Count == 0)
         {
@@ -96,13 +88,4 @@ public abstract class FrameBatchedObservableObject(UiFrameBatchService frameBatc
 
     private static PropertyChangedEventArgs GetChangedEventArgs(string propertyName)
         => ChangedEventArgsCache.GetOrAdd(propertyName, static name => new PropertyChangedEventArgs(name));
-
-    [Conditional("DEBUG")]
-    private static void VerifyUiThreadAccess()
-    {
-        if (Application.Current?.ApplicationLifetime is not null)
-        {
-            Debug.Assert(Dispatcher.UIThread.CheckAccess(), "Frame-batched view models must be updated on the UI thread.");
-        }
-    }
 }

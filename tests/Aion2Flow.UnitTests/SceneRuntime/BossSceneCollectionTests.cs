@@ -87,6 +87,30 @@ public sealed class BossSceneCollectionTests
     }
 
     [Fact]
+    public void FirstBossCombatSeedsWaitingBossHpMaximum()
+    {
+        var scene = CreateBossScene();
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        sink.AppendNpcHp(Source(30), 300, 243_719_813, 243_750_000);
+
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteBatch(1);
+        var snapshot = scene.CreateFrame().Snapshot;
+
+        var focus = Assert.Single(snapshot.BossFocuses.AsSpan().ToArray());
+        Assert.True(focus.HasHp);
+        Assert.True(focus.HasMaxHp);
+        Assert.Equal(243_750_000, focus.MaxHp);
+        Assert.True(scene.Owner.Entities.TryGet(300, out var entity));
+        Assert.Equal(243_750_000, entity.MaxHp);
+        Assert.Contains(
+            ReadJournal(scene).Where(entry => entry.Stamp.ObservationOrdinal >= scene.Owner.SceneStartObservationOrdinal),
+            static entry => entry.Resource is { EntityId: 300, CurrentValue: 243_719_813, MaximumValue: 243_750_000 });
+    }
+
+    [Fact]
     public void FirstTrainingDummyCombatStartsBossModeSceneWithoutClassifyingAsBoss()
     {
         var scene = CreateBossScene();

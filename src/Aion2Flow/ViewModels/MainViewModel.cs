@@ -529,12 +529,12 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
             if (row is null)
             {
-                row = new BossFocusViewModel(_frameBatchService, group.DisplayKey, group.Representative.InstanceId, group.NpcCode, group.InstanceCount, group.Representative.Hp, group.Representative.MaxHp, group.Representative.HasHp);
+                row = new BossFocusViewModel(_frameBatchService, group.DisplayKey, group.Representative.InstanceId, group.NpcCode, group.InstanceCount, group.Representative.Hp, group.Representative.MaxHp, group.Representative.HasHp, group.Representative.HasMaxHp);
                 BossFocuses.Add(row);
             }
             else
             {
-                row.Update(group.Representative.InstanceId, group.NpcCode, group.InstanceCount, group.Representative.Hp, group.Representative.MaxHp, group.Representative.HasHp);
+                row.Update(group.Representative.InstanceId, group.NpcCode, group.InstanceCount, group.Representative.Hp, group.Representative.MaxHp, group.Representative.HasHp, group.Representative.HasMaxHp);
             }
 
             var hpBrush = ResolveBossHpBrush(encounterId, group.DisplayKey);
@@ -602,7 +602,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private List<ProgressSegment> CreateBossSegments(SceneBossFocusSnapshot boss, IReadOnlyList<BossDamageContribution> damageContributions, IBrush hpBrush, Guid encounterId)
     {
         _bossSegmentScratch.Clear();
-        if (!boss.HasHp)
+        if (!boss.HasHp || !boss.HasMaxHp)
             return _bossSegmentScratch;
 
         var maxHp = Math.Max(1, boss.MaxHp);
@@ -712,7 +712,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         for (var i = 0; i < snapshots.Count; i++)
         {
             var boss = snapshots[i];
-            if (!boss.HasHp || boss.EffectiveHp <= 0)
+            if (!boss.HasHp || !boss.HasMaxHp || boss.EffectiveHp <= 0)
                 continue;
 
             damage += FindBossContributionAmount(damageContributions, boss.InstanceId, combatantId);
@@ -721,7 +721,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         return damage;
     }
 
-    private static long ResolveBossShareEffectiveHp(SceneBossFocusSnapshot boss) => boss.HasHp && boss.EffectiveHp > 0 ? boss.EffectiveHp : 0;
+    private static long ResolveBossShareEffectiveHp(SceneBossFocusSnapshot boss) => boss.HasHp && boss.HasMaxHp && boss.EffectiveHp > 0 ? boss.EffectiveHp : 0;
 
     private static long FindBossContributionAmount(IReadOnlyList<BossDamageContribution> damageContributions, int bossId, int sourceCombatantId)
     {

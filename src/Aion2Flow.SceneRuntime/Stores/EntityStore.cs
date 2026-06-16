@@ -120,7 +120,7 @@ public sealed class EntityStore
     public void ApplyNpcHp(int instanceId, int hp, int maxHp)
     {
         var entity = GetOrAdd(instanceId);
-        var resolvedMaxHp = maxHp > 0 ? Math.Max(maxHp, hp) : Math.Max(entity.MaxHp ?? 0, hp);
+        var resolvedMaxHp = maxHp > 0 ? maxHp : entity.MaxHp;
         var combatActive = hp != 0 && entity.NpcCombatActive;
         if (entity.CurrentHp == hp && entity.MaxHp == resolvedMaxHp && entity.NpcCombatActive == combatActive)
             return;

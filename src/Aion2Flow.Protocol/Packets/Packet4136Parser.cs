@@ -8,6 +8,8 @@ internal static class Packet4136Parser
 {
     private const int NpcCodeOffsetFromModes = 3;
     private const int SummonCreateNpcCodeOffsetFromModes = 16;
+    private const int ExtendedStateBodyLength = 104;
+    private const int ExtendedNpcStateBodyLength = 114;
 
     private static ReadOnlySpan<byte> OwnerSectionSentinel => [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
 
@@ -49,8 +51,8 @@ internal static class Packet4136Parser
             if (PacketNpcStateFields.TryReadNpcCatalogCode(packet, npcCodeOffset, out var parsedNpcCode))
             {
                 npcCode = parsedNpcCode;
-                var hpOffset = npcCodeOffset + sizeof(int) + PacketNpcStateFields.HpPairOffsetFromNpcCodeEnd;
-                if (PacketNpcStateFields.TryReadPositiveHpPair(packet, hpOffset, out var hp))
+                var hpOffset = npcCodeOffset + ResolveHpPairOffsetFromNpcCodeStart(packet.Length - tailStart, mode0, mode1, mode2);
+                if (PacketNpcStateFields.TryReadStateHpPair(packet, hpOffset, out var hp))
                 {
                     currentHp = hp.CurrentHp;
                     maxHp = hp.MaxHp;
@@ -60,6 +62,18 @@ internal static class Packet4136Parser
 
         result = new Packet4136State(entityId, mode0, mode1, mode2, npcCode, currentHp, maxHp, ownerId, reader.Remaining);
         return true;
+    }
+
+    private static int ResolveHpPairOffsetFromNpcCodeStart(int bodyLength, byte mode0, byte mode1, byte mode2)
+    {
+        if (mode2 == 0x00 &&
+            ((mode0 == 0x85 && mode1 == 0x21 && bodyLength == ExtendedNpcStateBodyLength) ||
+             (mode0 == 0x05 && mode1 == 0x20 && bodyLength == ExtendedStateBodyLength)))
+        {
+            return PacketNpcStateFields.ExtendedStateHpPairOffsetFromNpcCodeStart;
+        }
+
+        return PacketNpcStateFields.StateHpPairOffsetFromNpcCodeStart;
     }
 
     private static bool TryReadSummonCreateNpcCode(ReadOnlySpan<byte> packet, int tailStart, byte mode0, byte mode1, byte mode2, out int npcCode)

@@ -34,6 +34,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private const int LivePairInitialCapacity = 512;
     private readonly Lock _gate = new();
     private readonly Queue<SceneArchiveCapture> _pendingArchives = [];
+    private readonly HashSet<int> _seededBossSceneRuntimeStates = [];
     private long _nextBatchOrdinal;
     private SceneKind _kind;
     private BossSceneState _bossState;
@@ -208,6 +209,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         _bossState = BossSceneState.Waiting;
         _frozenEndObservationOrdinalExclusive = -1;
         _frozenArchive = null;
+        _seededBossSceneRuntimeStates.Clear();
         Owner.ResetCombat(
             SessionId,
             Clock.NextObservationOrdinal,
@@ -216,7 +218,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             trackBossFocus: kind == SceneKind.Standard);
     }
 
-    bool ILiveSceneCollectionPolicy.ShouldAppendCombat(in PacketObservationSource packet, int sourceId, int targetId)
+    bool ILiveSceneCollectionPolicy.ShouldAppendCombat(in PacketObservationSource packet, int sourceId, int targetId, IRuntimeObservationSink sink)
     {
         if (_kind == SceneKind.Standard)
             return true;
@@ -225,7 +227,10 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         if (_bossState == BossSceneState.Recording)
         {
             if (TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var activeTargetId))
+            {
+                SeedBossSceneRuntimeState(in packet, activeTargetId, sink);
                 Owner.ObserveBossCombatTrigger(activeTargetId, ResolveObservedAtMilliseconds(in packet));
+            }
             return true;
         }
 
@@ -243,9 +248,23 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             : DateTimeOffset.Now;
         ResetCore(started, SceneKind.Boss);
         _bossState = BossSceneState.Recording;
+        SeedBossSceneRuntimeState(in packet, focusTargetId, sink);
         Owner.SetBossFocusTracking(true);
         Owner.ObserveBossCombatTrigger(focusTargetId, 0);
         return true;
+    }
+
+    private void SeedBossSceneRuntimeState(in PacketObservationSource packet, int instanceId, IRuntimeObservationSink sink)
+    {
+        if (instanceId <= 0 ||
+            _seededBossSceneRuntimeStates.Contains(instanceId) ||
+            !sink.TryGetNpcRuntimeState(instanceId, out var state))
+        {
+            return;
+        }
+
+        _seededBossSceneRuntimeStates.Add(instanceId);
+        sink.SeedNpcRuntimeState(in packet, instanceId, in state);
     }
 
     bool ILiveSceneCollectionPolicy.ShouldAppendExtendedObservation() =>

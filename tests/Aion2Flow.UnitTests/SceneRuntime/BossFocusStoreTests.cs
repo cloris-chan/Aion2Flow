@@ -23,9 +23,9 @@ public sealed class BossFocusStoreTests
 
         Assert.True(h.Focus.TryGetObservedBoss(1_400, 2_000, out var boss));
         Assert.True(boss.HasHp);
+        Assert.False(boss.HasMaxHp);
         Assert.Equal(3518, boss.InstanceId);
         Assert.Equal(152_000, boss.Hp);
-        Assert.Equal(167_000, boss.MaxHp);
         Assert.Equal(1_200, boss.LastObservedAtMilliseconds);
 
         h.Battle(3518, false, 1_300);
@@ -46,9 +46,9 @@ public sealed class BossFocusStoreTests
 
         Assert.True(h.Focus.TryGetObservedBoss(1_100, 2_000, out var focus));
         Assert.True(focus.HasHp);
+        Assert.False(focus.HasMaxHp);
         Assert.Equal(3518, focus.InstanceId);
         Assert.Equal(156_500, focus.Hp);
-        Assert.Equal(156_500, focus.MaxHp);
     }
 
     [Fact]
@@ -85,6 +85,7 @@ public sealed class BossFocusStoreTests
 
         Assert.True(h.Focus.TryGetObservedBoss(1_100, 2_000, out var boss));
         Assert.True(boss.HasHp);
+        Assert.False(boss.HasMaxHp);
         Assert.Equal(157_000, boss.Hp);
     }
 
@@ -150,8 +151,8 @@ public sealed class BossFocusStoreTests
 
         Assert.True(h.Focus.TryGetObservedBoss(1_500, 2_000, out var boss));
         Assert.True(boss.HasHp);
+        Assert.False(boss.HasMaxHp);
         Assert.Equal(156_500, boss.Hp);
-        Assert.Equal(156_500, boss.MaxHp);
     }
 
     [Fact]
@@ -174,6 +175,7 @@ public sealed class BossFocusStoreTests
 
         Assert.True(h.Focus.TryGetObservedBoss(3_250, 2_000, out var boss));
         Assert.True(boss.HasHp);
+        Assert.False(boss.HasMaxHp);
         Assert.Equal(166_500, boss.Hp);
         Assert.Equal(3_200, boss.LastObservedAtMilliseconds);
     }
