@@ -979,6 +979,33 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Compact main numbers.
+        /// </summary>
+        internal static string Settings_MainMetricsCompact {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricsCompact", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Off.
+        /// </summary>
+        internal static string Settings_MainMetricsCompact_Off {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricsCompact_Off", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to On.
+        /// </summary>
+        internal static string Settings_MainMetricsCompact_On {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricsCompact_On", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Scene mode.
         /// </summary>
         internal static string Settings_SceneKind {

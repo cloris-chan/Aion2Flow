@@ -195,7 +195,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         SettingsFlyout = settingsFlyout;
         if (_captureService.Scene.Kind != SettingsFlyout.SceneKind)
             _captureService.Scene.ChangeKind(SettingsFlyout.SceneKind, _captureService.Scene.SessionStarted, archiveCurrent: false);
-        CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService);
+        CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService)
+        {
+            UseCompactMainMetrics = SettingsFlyout.UseCompactMainMetrics
+        };
         DisplayContext = CreateLiveDisplayContext(_displayedSnapshot);
         _combatantDetails.DisplayContext = DisplayContext;
 
@@ -260,6 +263,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
         else if (e.PropertyName == nameof(SettingsFlyoutViewModel.SceneKind))
             Dispatcher.UIThread.Post(ChangeSceneKind);
+        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.UseCompactMainMetrics))
+            Dispatcher.UIThread.Post(() => CombatantColumns.UseCompactMainMetrics = SettingsFlyout.UseCompactMainMetrics);
     }
 
     [RelayCommand]

@@ -43,6 +43,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             MaxVisibleCombatantRows = persisted.MaxVisibleCombatantRows;
             CombatantSortMetric = persisted.CombatantSortMetric;
             SceneKind = persisted.SceneKind;
+            UseCompactMainMetrics = persisted.UseCompactMainMetrics;
             HidePlayerNames = persisted.HidePlayerNames;
             if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
             {
@@ -99,6 +100,10 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public partial SceneKind SceneKind { get; set; } = SceneKind.Standard;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UseCompactMainMetricsDisplay))]
+    public partial bool UseCompactMainMetrics { get; set; } = true;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HidePlayerNamesDisplay))]
     public partial bool HidePlayerNames { get; set; }
 
@@ -143,6 +148,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public string CombatantSortMetricDisplay => Localization[$"Settings_CombatantSortMetric_{CombatantSortMetric}"];
 
     public string SceneKindDisplay => Localization[$"Settings_SceneKind_{SceneKind}"];
+
+    public string UseCompactMainMetricsDisplay => Localization[UseCompactMainMetrics ? "Settings_MainMetricsCompact_On" : "Settings_MainMetricsCompact_Off"];
 
     public string HidePlayerNamesDisplay => Localization[HidePlayerNames ? "Settings_HidePlayerNames_On" : "Settings_HidePlayerNames_Off"];
 
@@ -203,6 +210,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     partial void OnSceneKindChanged(SceneKind value) => PersistSettings();
 
+    partial void OnUseCompactMainMetricsChanged(bool value) => PersistSettings();
+
     partial void OnHidePlayerNamesChanged(bool value)
     {
         _playerNamePrivacy.HidePlayerNames = value;
@@ -256,6 +265,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.MaxVisibleCombatantRows = MaxVisibleCombatantRows;
             s.CombatantSortMetric = CombatantSortMetric;
             s.SceneKind = SceneKind;
+            s.UseCompactMainMetrics = UseCompactMainMetrics;
             s.HidePlayerNames = HidePlayerNames;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
@@ -278,6 +288,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(TopmostModeDisplay));
         OnPropertyChanged(nameof(CombatantSortMetricDisplay));
         OnPropertyChanged(nameof(SceneKindDisplay));
+        OnPropertyChanged(nameof(UseCompactMainMetricsDisplay));
         OnPropertyChanged(nameof(HidePlayerNamesDisplay));
         OnPropertyChanged(nameof(LanguageDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));

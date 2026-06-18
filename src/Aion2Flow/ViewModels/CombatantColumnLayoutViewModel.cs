@@ -20,6 +20,12 @@ public sealed class CombatantColumnLayoutViewModel(UiFrameBatchService frameBatc
         private set => SetFrameProperty(ref field, value);
     }
 
+    public bool UseCompactMainMetrics
+    {
+        get;
+        set => SetFrameProperty(ref field, value);
+    } = true;
+
     public void Update(bool hasBossColumn, CombatantSortMetric sortMetric)
     {
         ShowDamagePerSecondColumn = !hasBossColumn || sortMetric == CombatantSortMetric.DamagePerSecond;

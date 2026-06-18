@@ -14,6 +14,8 @@ public sealed class AppSettings
 
     public SceneKind SceneKind { get; set; } = SceneKind.Standard;
 
+    public bool UseCompactMainMetrics { get; set; } = true;
+
     public bool HidePlayerNames { get; set; }
 
     public string? Language { get; set; }

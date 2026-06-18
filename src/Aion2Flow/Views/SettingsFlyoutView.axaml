@@ -28,6 +28,10 @@
                 <MenuItem x:Name="SceneKindMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="SceneKindMenuItemLoaded" />
+                <MenuItem x:Name="CompactMainMetricsMenuItem"
+                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Loaded="CompactMainMetricsMenuItemLoaded"
+                          Click="CompactMainMetricsMenuItemClicked" />
                 <MenuItem x:Name="HidePlayerNamesMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="HidePlayerNamesMenuItemLoaded"

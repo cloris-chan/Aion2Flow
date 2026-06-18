@@ -17,6 +17,7 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _visibleRowsMenuItem;
     private MenuItem? _combatantSortMetricMenuItem;
     private MenuItem? _sceneKindMenuItem;
+    private MenuItem? _compactMainMetricsMenuItem;
     private MenuItem? _hidePlayerNamesMenuItem;
     private MenuItem? _languageMenuItem;
     private SettingsFlyoutViewModel? _viewModel;
@@ -53,6 +54,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildVisibleRowsMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
+        RefreshCompactMainMetricsMenuItem();
         RefreshHidePlayerNamesMenuItem();
         RebuildLanguageMenuItems();
     }
@@ -63,6 +65,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildVisibleRowsMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
+        RefreshCompactMainMetricsMenuItem();
         RefreshHidePlayerNamesMenuItem();
         RebuildLanguageMenuItems();
     }
@@ -91,6 +94,10 @@ public partial class SettingsFlyoutView : UserControl
                 RefreshSceneKindHeader();
                 RefreshSceneKindCheckmarks();
                 break;
+            case nameof(SettingsFlyoutViewModel.UseCompactMainMetrics):
+            case nameof(SettingsFlyoutViewModel.UseCompactMainMetricsDisplay):
+                RefreshCompactMainMetricsMenuItem();
+                break;
             case nameof(SettingsFlyoutViewModel.HidePlayerNames):
             case nameof(SettingsFlyoutViewModel.HidePlayerNamesDisplay):
                 RefreshHidePlayerNamesMenuItem();
@@ -109,6 +116,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildTopmostMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
+        RefreshCompactMainMetricsMenuItem();
         RefreshHidePlayerNamesMenuItem();
     }
 
@@ -163,6 +171,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _hidePlayerNamesMenuItem = mi;
             RefreshHidePlayerNamesMenuItem();
+        }
+    }
+
+    private void CompactMainMetricsMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _compactMainMetricsMenuItem != mi)
+        {
+            _compactMainMetricsMenuItem = mi;
+            RefreshCompactMainMetricsMenuItem();
         }
     }
 
@@ -340,6 +357,18 @@ public partial class SettingsFlyoutView : UserControl
         _hidePlayerNamesMenuItem.Icon = CreateCheckmark(vm.HidePlayerNames);
     }
 
+    private void RefreshCompactMainMetricsMenuItem()
+    {
+        var vm = ViewModel;
+        if (_compactMainMetricsMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        _compactMainMetricsMenuItem.Header = CreateRowHeader(vm.Localization["Settings_MainMetricsCompact"], vm.UseCompactMainMetricsDisplay);
+        _compactMainMetricsMenuItem.Icon = CreateCheckmark(vm.UseCompactMainMetrics);
+    }
+
     private void RebuildLanguageMenuItems()
     {
         RefreshLanguageHeader();
@@ -416,6 +445,14 @@ public partial class SettingsFlyoutView : UserControl
         if (ViewModel is { } vm)
         {
             vm.HidePlayerNames = !vm.HidePlayerNames;
+        }
+    }
+
+    private void CompactMainMetricsMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.UseCompactMainMetrics = !vm.UseCompactMainMetrics;
         }
     }
 

@@ -197,7 +197,8 @@
                                                        HorizontalAlignment="Stretch"
                                                        TextAlignment="Right"
                                                        StableWidthScopeKey="{Binding Id}"
-                                                       UseCompactNotation="True"
+                                                       UseCompactNotation="{Binding Columns.UseCompactMainMetrics}"
+                                                       UseGrouping="True"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3" />
 
@@ -210,7 +211,8 @@
                                                        HorizontalAlignment="Stretch"
                                                        TextAlignment="Right"
                                                        StableWidthScopeKey="{Binding Id}"
-                                                       UseCompactNotation="True"
+                                                       UseCompactNotation="{Binding Columns.UseCompactMainMetrics}"
+                                                       UseGrouping="True"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3" />
 

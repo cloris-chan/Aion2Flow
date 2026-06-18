@@ -28,6 +28,9 @@
   <data name="Settings_SceneKind" xml:space="preserve"><value>장면 모드</value></data>
   <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>표준</value></data>
   <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>보스 전투만</value></data>
+  <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>주요 수치 축약 표시</value></data>
+  <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>켬</value></data>
+  <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>끔</value></data>
   <data name="Settings_HidePlayerNames" xml:space="preserve"><value>플레이어 이름 숨기기</value></data>
   <data name="Settings_HidePlayerNames_On" xml:space="preserve"><value>켬</value></data>
   <data name="Settings_HidePlayerNames_Off" xml:space="preserve"><value>끔</value></data>
