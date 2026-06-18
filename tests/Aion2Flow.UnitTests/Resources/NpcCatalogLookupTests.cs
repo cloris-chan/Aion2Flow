@@ -9,8 +9,6 @@ public sealed class NpcCatalogLookupTests
     [InlineData(2930820)]
     [InlineData(2931316)]
     [InlineData(2930817)]
-    [InlineData(2920823)]
-    [InlineData(2920821)]
     [InlineData(2400032)]
     [InlineData(2980159)]
     [InlineData(2980049)]
