@@ -18,6 +18,7 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _combatantSortMetricMenuItem;
     private MenuItem? _sceneKindMenuItem;
     private MenuItem? _compactMainMetricsMenuItem;
+    private MenuItem? _focusStatusBarMenuItem;
     private MenuItem? _hidePlayerNamesMenuItem;
     private MenuItem? _languageMenuItem;
     private SettingsFlyoutViewModel? _viewModel;
@@ -55,6 +56,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
+        RefreshFocusStatusBarMenuItem();
         RefreshHidePlayerNamesMenuItem();
         RebuildLanguageMenuItems();
     }
@@ -66,6 +68,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
+        RefreshFocusStatusBarMenuItem();
         RefreshHidePlayerNamesMenuItem();
         RebuildLanguageMenuItems();
     }
@@ -98,6 +101,10 @@ public partial class SettingsFlyoutView : UserControl
             case nameof(SettingsFlyoutViewModel.UseCompactMainMetricsDisplay):
                 RefreshCompactMainMetricsMenuItem();
                 break;
+            case nameof(SettingsFlyoutViewModel.ShowFocusStatusBar):
+            case nameof(SettingsFlyoutViewModel.ShowFocusStatusBarDisplay):
+                RefreshFocusStatusBarMenuItem();
+                break;
             case nameof(SettingsFlyoutViewModel.HidePlayerNames):
             case nameof(SettingsFlyoutViewModel.HidePlayerNamesDisplay):
                 RefreshHidePlayerNamesMenuItem();
@@ -117,6 +124,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
+        RefreshFocusStatusBarMenuItem();
         RefreshHidePlayerNamesMenuItem();
     }
 
@@ -180,6 +188,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _compactMainMetricsMenuItem = mi;
             RefreshCompactMainMetricsMenuItem();
+        }
+    }
+
+    private void FocusStatusBarMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _focusStatusBarMenuItem != mi)
+        {
+            _focusStatusBarMenuItem = mi;
+            RefreshFocusStatusBarMenuItem();
         }
     }
 
@@ -369,6 +386,18 @@ public partial class SettingsFlyoutView : UserControl
         _compactMainMetricsMenuItem.Icon = CreateCheckmark(vm.UseCompactMainMetrics);
     }
 
+    private void RefreshFocusStatusBarMenuItem()
+    {
+        var vm = ViewModel;
+        if (_focusStatusBarMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        _focusStatusBarMenuItem.Header = CreateRowHeader(vm.Localization["Settings_FocusStatusBar"], vm.ShowFocusStatusBarDisplay);
+        _focusStatusBarMenuItem.Icon = CreateCheckmark(vm.ShowFocusStatusBar);
+    }
+
     private void RebuildLanguageMenuItems()
     {
         RefreshLanguageHeader();
@@ -453,6 +482,14 @@ public partial class SettingsFlyoutView : UserControl
         if (ViewModel is { } vm)
         {
             vm.UseCompactMainMetrics = !vm.UseCompactMainMetrics;
+        }
+    }
+
+    private void FocusStatusBarMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.ShowFocusStatusBar = !vm.ShowFocusStatusBar;
         }
     }
 

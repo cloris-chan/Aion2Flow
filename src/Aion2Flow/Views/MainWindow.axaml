@@ -94,7 +94,7 @@
 
                             <Grid ColumnDefinitions="*,Auto"
                                   ColumnSpacing="8"
-                                  Margin="6,2">
+                                  Margin="14,2,8,2">
                                 <Grid Grid.Column="0"
                                       ColumnDefinitions="*,Auto"
                                       ColumnSpacing="4"
@@ -115,33 +115,65 @@
                                     </Border>
                                 </Grid>
 
-                                <StackPanel Grid.Column="1"
-                                            Orientation="Horizontal"
-                                            Spacing="2"
-                                            VerticalAlignment="Center">
+                                <Grid Grid.Column="1"
+                                      ColumnDefinitions="Auto,Auto,Auto"
+                                      ColumnSpacing="2"
+                                      MinWidth="100"
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Center">
                                     <controls:NumericBlock Classes="BossFocusHp"
+                                                           Grid.Column="0"
+                                                           MinWidth="44"
                                                            Value="{Binding Hp}"
                                                            UseGrouping="True"
+                                                           HorizontalAlignment="Right"
+                                                           TextAlignment="Right"
                                                            IsVisible="{Binding IsHpVisible}"
                                                            VerticalAlignment="Center" />
+                                    <TextBlock Classes="BossFocusHpMuted"
+                                               Grid.Column="0"
+                                               MinWidth="44"
+                                               Text="--"
+                                               HorizontalAlignment="Right"
+                                               TextAlignment="Right"
+                                               IsVisible="{Binding IsHpUnknown}"
+                                               VerticalAlignment="Center" />
                                     <TextBlock Classes="BossFocusHpSlash"
+                                               Grid.Column="1"
                                                Text="/"
                                                IsVisible="{Binding IsHpVisible}"
                                                VerticalAlignment="Center" />
+                                    <TextBlock Classes="BossFocusHpSlash"
+                                               Grid.Column="1"
+                                               Text="/"
+                                               IsVisible="{Binding IsHpUnknown}"
+                                               VerticalAlignment="Center" />
                                     <controls:NumericBlock Classes="BossFocusHpMuted"
+                                                           Grid.Column="2"
+                                                           MinWidth="52"
                                                            Value="{Binding MaxHp}"
                                                            UseGrouping="True"
+                                                           HorizontalAlignment="Right"
+                                                           TextAlignment="Right"
                                                            IsVisible="{Binding IsMaxHpVisible}"
                                                            VerticalAlignment="Center" />
                                     <TextBlock Classes="BossFocusHpMuted"
+                                               Grid.Column="2"
+                                               MinWidth="52"
                                                Text="--"
+                                               HorizontalAlignment="Right"
+                                               TextAlignment="Right"
                                                IsVisible="{Binding IsMaxHpUnknown}"
-                                                           VerticalAlignment="Center" />
+                                               VerticalAlignment="Center" />
                                     <TextBlock Classes="BossFocusHpMuted"
-                                               Text="-- / --"
+                                               Grid.Column="2"
+                                               MinWidth="52"
+                                               Text="--"
+                                               HorizontalAlignment="Right"
+                                               TextAlignment="Right"
                                                IsVisible="{Binding IsHpUnknown}"
                                                VerticalAlignment="Center" />
-                                </StackPanel>
+                                </Grid>
                             </Grid>
                         </Grid>
                     </Border>

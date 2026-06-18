@@ -907,6 +907,33 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Target status bar.
+        /// </summary>
+        internal static string Settings_FocusStatusBar {
+            get {
+                return ResourceManager.GetString("Settings_FocusStatusBar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Off.
+        /// </summary>
+        internal static string Settings_FocusStatusBar_Off {
+            get {
+                return ResourceManager.GetString("Settings_FocusStatusBar_Off", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to On.
+        /// </summary>
+        internal static string Settings_FocusStatusBar_On {
+            get {
+                return ResourceManager.GetString("Settings_FocusStatusBar_On", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Hide player names.
         /// </summary>
         internal static string Settings_HidePlayerNames {

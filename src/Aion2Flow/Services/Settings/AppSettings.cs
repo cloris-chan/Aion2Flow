@@ -16,6 +16,8 @@ public sealed class AppSettings
 
     public bool UseCompactMainMetrics { get; set; } = true;
 
+    public bool ShowFocusStatusBar { get; set; } = true;
+
     public bool HidePlayerNames { get; set; }
 
     public string? Language { get; set; }

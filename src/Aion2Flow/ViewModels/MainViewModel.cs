@@ -265,6 +265,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             Dispatcher.UIThread.Post(ChangeSceneKind);
         else if (e.PropertyName == nameof(SettingsFlyoutViewModel.UseCompactMainMetrics))
             Dispatcher.UIThread.Post(() => CombatantColumns.UseCompactMainMetrics = SettingsFlyout.UseCompactMainMetrics);
+        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.ShowFocusStatusBar))
+            Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
     }
 
     [RelayCommand]
@@ -495,7 +497,14 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         var snapshots = liveFrame?.BossFocuses ?? snapshot.BossFocuses;
         var damageContributions = liveFrame?.BossDamageContributions ?? EmptyBossDamageContributions;
         BuildBossFocusDisplayGroups(snapshots);
-        SyncBossFocuses(snapshot.EncounterId, damageContributions);
+        if (SettingsFlyout.ShowFocusStatusBar)
+        {
+            SyncBossFocuses(snapshot.EncounterId, damageContributions);
+        }
+        else
+        {
+            BossFocuses.Clear();
+        }
         RefreshCombatantBossShares(snapshots, damageContributions);
     }
 

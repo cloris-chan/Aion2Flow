@@ -11,9 +11,11 @@ public sealed class SegmentedProgressBar : Control
 
     public static readonly StyledProperty<IBrush?> BackgroundProperty = AvaloniaProperty.Register<SegmentedProgressBar, IBrush?>(nameof(Background));
 
+    public static readonly StyledProperty<CornerRadius> CornerRadiusProperty = AvaloniaProperty.Register<SegmentedProgressBar, CornerRadius>(nameof(CornerRadius));
+
     static SegmentedProgressBar()
     {
-        AffectsRender<SegmentedProgressBar>(SegmentsProperty, BackgroundProperty);
+        AffectsRender<SegmentedProgressBar>(SegmentsProperty, BackgroundProperty, CornerRadiusProperty);
     }
 
     public IReadOnlyList<ProgressSegment>? Segments
@@ -28,15 +30,23 @@ public sealed class SegmentedProgressBar : Control
         set => SetValue(BackgroundProperty, value);
     }
 
+    public CornerRadius CornerRadius
+    {
+        get => GetValue(CornerRadiusProperty);
+        set => SetValue(CornerRadiusProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         var bounds = new Rect(Bounds.Size);
         if (bounds.Width <= 0 || bounds.Height <= 0)
             return;
 
+        var roundedRect = new RoundedRect(bounds, CornerRadius);
+        using var clip = context.PushClip(roundedRect);
         var background = Background;
         if (background is not null)
-            context.FillRectangle(background, bounds);
+            context.DrawRectangle(background, null, roundedRect);
 
         var segments = Segments;
         if (segments is null || segments.Count == 0)

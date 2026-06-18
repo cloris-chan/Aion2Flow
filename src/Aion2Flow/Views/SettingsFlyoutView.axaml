@@ -32,6 +32,10 @@
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="CompactMainMetricsMenuItemLoaded"
                           Click="CompactMainMetricsMenuItemClicked" />
+                <MenuItem x:Name="FocusStatusBarMenuItem"
+                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Loaded="FocusStatusBarMenuItemLoaded"
+                          Click="FocusStatusBarMenuItemClicked" />
                 <MenuItem x:Name="HidePlayerNamesMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="HidePlayerNamesMenuItemLoaded"

@@ -183,6 +183,30 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_FocusStatusSetting_HidesOnlyFocusRows()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 25_000, 50_000, 5_500);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.True(Assert.Single(fixture.ViewModel.Combatants).HasBossShare);
+
+        fixture.Settings.ShowFocusStatusBar = false;
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Empty(fixture.ViewModel.BossFocuses);
+        Assert.True(Assert.Single(fixture.ViewModel.Combatants).HasBossShare);
+
+        fixture.Settings.ShowFocusStatusBar = true;
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.True(Assert.Single(fixture.ViewModel.Combatants).HasBossShare);
+    }
+
+    [Fact]
     public void RefreshCombatStats_SceneMode_MergesTrainingDummyFocusDisplayByNpcCode()
     {
         const int dummyNpcCode = 2_400_032;

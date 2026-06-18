@@ -86,6 +86,7 @@ public sealed class SettingsService
         CombatantSortMetric = source.CombatantSortMetric,
         SceneKind = source.SceneKind,
         UseCompactMainMetrics = source.UseCompactMainMetrics,
+        ShowFocusStatusBar = source.ShowFocusStatusBar,
         HidePlayerNames = source.HidePlayerNames,
         Language = source.Language,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,

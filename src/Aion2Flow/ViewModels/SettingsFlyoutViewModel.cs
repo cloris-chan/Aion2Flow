@@ -44,6 +44,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             CombatantSortMetric = persisted.CombatantSortMetric;
             SceneKind = persisted.SceneKind;
             UseCompactMainMetrics = persisted.UseCompactMainMetrics;
+            ShowFocusStatusBar = persisted.ShowFocusStatusBar;
             HidePlayerNames = persisted.HidePlayerNames;
             if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
             {
@@ -104,6 +105,10 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public partial bool UseCompactMainMetrics { get; set; } = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowFocusStatusBarDisplay))]
+    public partial bool ShowFocusStatusBar { get; set; } = true;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HidePlayerNamesDisplay))]
     public partial bool HidePlayerNames { get; set; }
 
@@ -150,6 +155,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public string SceneKindDisplay => Localization[$"Settings_SceneKind_{SceneKind}"];
 
     public string UseCompactMainMetricsDisplay => Localization[UseCompactMainMetrics ? "Settings_MainMetricsCompact_On" : "Settings_MainMetricsCompact_Off"];
+
+    public string ShowFocusStatusBarDisplay => Localization[ShowFocusStatusBar ? "Settings_FocusStatusBar_On" : "Settings_FocusStatusBar_Off"];
 
     public string HidePlayerNamesDisplay => Localization[HidePlayerNames ? "Settings_HidePlayerNames_On" : "Settings_HidePlayerNames_Off"];
 
@@ -212,6 +219,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     partial void OnUseCompactMainMetricsChanged(bool value) => PersistSettings();
 
+    partial void OnShowFocusStatusBarChanged(bool value) => PersistSettings();
+
     partial void OnHidePlayerNamesChanged(bool value)
     {
         _playerNamePrivacy.HidePlayerNames = value;
@@ -266,6 +275,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.CombatantSortMetric = CombatantSortMetric;
             s.SceneKind = SceneKind;
             s.UseCompactMainMetrics = UseCompactMainMetrics;
+            s.ShowFocusStatusBar = ShowFocusStatusBar;
             s.HidePlayerNames = HidePlayerNames;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
@@ -289,6 +299,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(CombatantSortMetricDisplay));
         OnPropertyChanged(nameof(SceneKindDisplay));
         OnPropertyChanged(nameof(UseCompactMainMetricsDisplay));
+        OnPropertyChanged(nameof(ShowFocusStatusBarDisplay));
         OnPropertyChanged(nameof(HidePlayerNamesDisplay));
         OnPropertyChanged(nameof(LanguageDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));
