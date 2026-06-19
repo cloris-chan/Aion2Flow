@@ -231,7 +231,7 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_MergesTrainingDummyBossSharesByNpcCode()
+    public void RefreshCombatStats_SceneMode_TrainingDummyFocusDoesNotShowBossShareColumn()
     {
         const int dummyNpcCode = 2_400_032;
         var fixture = MainViewModelFixture.Create();
@@ -246,8 +246,9 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.True(row.HasBossShare);
-        Assert.Equal(0.002d, row.BossShareRatio, 6);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        Assert.False(row.HasBossShare);
+        Assert.Equal(0d, row.BossShareRatio);
     }
 
     [Fact]
@@ -401,7 +402,7 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_BossColumn_DpsSortShowsDpsAndBossShare()
+    public void RefreshCombatStats_SceneMode_BossColumn_DpsSortShowsDpsTotalAndBossShare()
     {
         var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneNickname(300, "First");
@@ -414,14 +415,14 @@ public sealed class MainViewModelCombatantFilterTests
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Same(fixture.ViewModel.CombatantColumns, row.Columns);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
-        Assert.False(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
         Assert.True(row.HasBossShare);
         Assert.Equal(0.5d, row.BossShareRatio, 6);
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_BossColumn_TotalDamageSortShowsTotalAndBossShare()
+    public void RefreshCombatStats_SceneMode_BossColumn_TotalDamageSortShowsDpsTotalAndBossShare()
     {
         var fixture = MainViewModelFixture.Create();
         fixture.Settings.CombatantSortMetric = CombatantSortMetric.TotalDamage;
@@ -434,11 +435,29 @@ public sealed class MainViewModelCombatantFilterTests
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Same(fixture.ViewModel.CombatantColumns, row.Columns);
-        Assert.False(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
         Assert.True(row.HasBossShare);
         Assert.Equal(0.25d, row.BossShareRatio, 6);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SceneMode_BossColumn_ShowsZeroShareRows()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneNickname(300, "First");
+        fixture.AppendSceneNickname(301, "Second");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 500, 3_000, 1);
+        fixture.AppendSceneDamage(301, 900_900, 11000010, 250, 3_100, 2);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 700, 1_000, 3_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        var zeroShareRow = fixture.ViewModel.Combatants.Single(static row => row.Id == 301);
+        Assert.True(zeroShareRow.HasBossShare);
+        Assert.Equal(0d, zeroShareRow.BossShareRatio);
     }
 
     [Fact]

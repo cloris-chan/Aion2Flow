@@ -456,6 +456,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             builder.AddBossFocus(new SceneBossFocusSnapshot
             {
                 InstanceId = boss.InstanceId,
+                Kind = ResolveBossFocusKind(boss.InstanceId),
                 Hp = boss.Hp,
                 MaxHp = boss.MaxHp,
                 CumulativeLostHp = boss.CumulativeLostHp,
@@ -465,6 +466,9 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             });
         }
     }
+
+    private NpcKind ResolveBossFocusKind(int instanceId) =>
+        entities.TryGet(instanceId, out var entity) ? entity.Kind : NpcKind.Unknown;
 
     private void ApplyBossNpcCodes(SceneCombatSnapshotBuilder builder)
     {

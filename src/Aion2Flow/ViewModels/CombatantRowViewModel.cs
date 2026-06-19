@@ -77,10 +77,10 @@ public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService,
         BarSegments = [new ProgressSegment(resolvedRatio, brush)];
     }
 
-    public void UpdateBossShare(double ratio)
+    public void UpdateBossShare(double ratio, bool isVisible)
     {
         var resolvedRatio = Math.Max(0d, ratio);
-        if (resolvedRatio <= 0.000_001)
+        if (!isVisible)
         {
             if (BossShareRatio != 0)
                 BossShareRatio = 0;

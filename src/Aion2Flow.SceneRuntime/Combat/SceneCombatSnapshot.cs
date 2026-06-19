@@ -477,6 +477,8 @@ public readonly record struct SceneBossFocusSnapshot
 {
     public int InstanceId { get; init; }
 
+    public NpcKind Kind { get; init; }
+
     public int Hp { get; init; }
 
     public int MaxHp { get; init; }

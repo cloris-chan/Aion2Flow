@@ -26,10 +26,10 @@ public sealed class CombatantColumnLayoutViewModel(UiFrameBatchService frameBatc
         set => SetFrameProperty(ref field, value);
     } = true;
 
-    public void Update(bool hasBossColumn, CombatantSortMetric sortMetric)
+    public void Update(bool hasBossColumn)
     {
-        ShowDamagePerSecondColumn = !hasBossColumn || sortMetric == CombatantSortMetric.DamagePerSecond;
-        ShowDamageColumn = !hasBossColumn || sortMetric == CombatantSortMetric.TotalDamage;
+        ShowDamagePerSecondColumn = true;
+        ShowDamageColumn = true;
         ShowBossColumn = hasBossColumn;
     }
 }

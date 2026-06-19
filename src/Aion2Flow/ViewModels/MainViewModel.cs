@@ -687,13 +687,13 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private void RefreshCombatantBossShares(SnapshotList<SceneBossFocusSnapshot> snapshots, IReadOnlyList<BossDamageContribution> damageContributions)
     {
-        var scope = CreateCombatantBossShareScope();
+        var scope = CreateCombatantBossShareScope(snapshots);
         var hasBossColumn = scope.EffectiveHp > 0;
-        CombatantColumns.Update(hasBossColumn, SettingsFlyout.CombatantSortMetric);
+        CombatantColumns.Update(hasBossColumn);
         if (!hasBossColumn)
         {
             for (var i = 0; i < Combatants.Count; i++)
-                Combatants[i].UpdateBossShare(0);
+                Combatants[i].UpdateBossShare(0, isVisible: false);
             return;
         }
 
@@ -701,20 +701,20 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         {
             var row = Combatants[i];
             var damage = FindAggregateBossContributionAmount(snapshots, damageContributions, row.Id);
-            row.UpdateBossShare(damage > 0 ? damage / (double)scope.EffectiveHp : 0);
+            row.UpdateBossShare(damage > 0 ? damage / (double)scope.EffectiveHp : 0, isVisible: true);
         }
     }
 
-    private CombatantBossShareScope CreateCombatantBossShareScope()
+    private static CombatantBossShareScope CreateCombatantBossShareScope(SnapshotList<SceneBossFocusSnapshot> snapshots)
     {
         var effectiveHp = 0L;
-        for (var i = 0; i < _bossFocusDisplayGroups.Count; i++)
+        for (var i = 0; i < snapshots.Count; i++)
         {
-            var group = _bossFocusDisplayGroups[i];
-            if (group.EffectiveHp <= 0)
+            var boss = snapshots[i];
+            if (boss.Kind != NpcKind.Boss || boss.EffectiveHp <= 0)
                 continue;
 
-            effectiveHp += group.EffectiveHp;
+            effectiveHp += boss.EffectiveHp;
         }
 
         return new CombatantBossShareScope(effectiveHp);
@@ -726,7 +726,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         for (var i = 0; i < snapshots.Count; i++)
         {
             var boss = snapshots[i];
-            if (!boss.HasHp || !boss.HasMaxHp || boss.EffectiveHp <= 0)
+            if (boss.Kind != NpcKind.Boss || !boss.HasHp || !boss.HasMaxHp || boss.EffectiveHp <= 0)
                 continue;
 
             damage += FindBossContributionAmount(damageContributions, boss.InstanceId, combatantId);
@@ -1069,7 +1069,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         Combatants.Clear();
         CombatantDetails.Clear();
         BossFocuses.Clear();
-        CombatantColumns.Update(hasBossColumn: false, SettingsFlyout.CombatantSortMetric);
+        CombatantColumns.Update(hasBossColumn: false);
         SelectedCombatant = null;
         SelectedEncounterHistory = null;
         IsViewingArchivedEncounter = false;
