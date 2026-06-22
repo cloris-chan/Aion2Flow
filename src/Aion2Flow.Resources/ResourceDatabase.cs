@@ -156,6 +156,40 @@ public static class ResourceDatabase
         return maps;
     }
 
+    public static IReadOnlyDictionary<int, ServerNameCatalogEntry> LoadServerNames(string lang = "en-US")
+    {
+        using var connection = CreateConnection();
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        var serverNameColumn = GetLocalizedColumn("ServerName", lang);
+        var shortServerNameColumn = GetLocalizedColumn("ShortServerName", lang);
+        cmd.CommandText = $"""
+            SELECT Code, {serverNameColumn}, {shortServerNameColumn}
+            FROM ServerNames
+            WHERE {serverNameColumn} IS NOT NULL
+            """;
+
+        var servers = new Dictionary<int, ServerNameCatalogEntry>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(0) || reader.IsDBNull(1))
+            {
+                continue;
+            }
+
+            var serverName = reader.GetString(1);
+            var entry = new ServerNameCatalogEntry(
+                reader.GetInt32(0),
+                serverName,
+                reader.IsDBNull(2) ? serverName : reader.GetString(2));
+            servers[entry.Code] = entry;
+        }
+
+        return servers;
+    }
+
     public static string ResolveMapName(uint mapId, IReadOnlyDictionary<uint, string> mapNames)
     {
         if (mapId == 0)
@@ -164,6 +198,18 @@ public static class ResourceDatabase
         }
 
         return mapNames.TryGetValue(mapId, out var name) ? name : mapId.ToString(CultureInfo.InvariantCulture);
+    }
+
+    public static string ResolveServerName(int code, IReadOnlyDictionary<int, ServerNameCatalogEntry> serverNames)
+    {
+        if (code <= 0)
+        {
+            return string.Empty;
+        }
+
+        return serverNames.TryGetValue(code, out var entry) && !string.IsNullOrWhiteSpace(entry.ServerName)
+            ? entry.ServerName
+            : code.ToString(CultureInfo.InvariantCulture);
     }
 
     private static string GetLocalizedColumn(string baseName, string lang) => lang switch

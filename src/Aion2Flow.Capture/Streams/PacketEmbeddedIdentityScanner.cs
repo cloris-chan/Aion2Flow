@@ -54,7 +54,7 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.TailOffset;
-        context.Sink.AppendNickname(context.CreateObservationSource(0x048D, consumed), parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
+        context.Sink.AppendNickname(context.CreateObservationSource(0x048D, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId);
         return context.MarkParsed();
     }
 
@@ -69,7 +69,7 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.TailOffset;
-        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, consumed), parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true, originServerId: parsed.OriginServerId);
         return context.MarkParsed();
     }
 
@@ -84,7 +84,7 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.Delta + parsed.NicknameLength + 2;
-        context.Sink.AppendNickname(context.CreateObservationSource(0x4436, consumed), parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode));
+        context.Sink.AppendNickname(context.CreateObservationSource(0x4436, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), originServerId: parsed.OriginServerId);
         return context.MarkParsed();
     }
 }

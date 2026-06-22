@@ -285,7 +285,7 @@ public sealed class EncounterArchiveServiceTests
         const int playerId = 100;
         const int targetId = 200;
         var registry = new RuntimeMetadataRegistry();
-        registry.UpsertPcMetadata(playerId, "Global Tester", 495);
+        registry.UpsertPcMetadata(playerId, "Global Tester");
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         AppendCombat(journal, sceneId, playerId, targetId, 100, 1, 1_000);
@@ -298,7 +298,6 @@ public sealed class EncounterArchiveServiceTests
 
         Assert.True(payload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
         Assert.Equal("Global Tester", archivedPc.Nickname);
-        Assert.Equal(495, archivedPc.OriginServerId);
     }
 
     [Fact]

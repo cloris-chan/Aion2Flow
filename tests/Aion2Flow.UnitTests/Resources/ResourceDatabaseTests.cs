@@ -125,6 +125,21 @@ public sealed class ResourceDatabaseTests
         Assert.Equal(expectedName, ResourceDatabase.ResolveMapName(mapId, maps));
     }
 
+    [Theory]
+    [InlineData("en-US", 1001, "Siel", "SIE")]
+    [InlineData("zh-TW", 1001, "希埃爾", "希埃")]
+    [InlineData("zh-TW", 2001, "伊斯拉佩爾", "伊斯")]
+    public void LoadServerNames_Resolves_ServerName_Dat_Names(string language, int code, string expectedServerName, string expectedShortServerName)
+    {
+        var catalog = ResourceDatabase.LoadServerNames(language);
+
+        Assert.True(catalog.TryGetValue(code, out var server));
+        Assert.Equal(code, server.Code);
+        Assert.Equal(expectedServerName, server.ServerName);
+        Assert.Equal(expectedShortServerName, server.ShortServerName);
+        Assert.Equal(expectedServerName, ResourceDatabase.ResolveServerName(code, catalog));
+    }
+
     [Fact]
     public void Maps_Table_Uses_Numeric_Map_Id_As_Runtime_Key()
     {
@@ -148,6 +163,32 @@ public sealed class ResourceDatabaseTests
 
         Assert.Contains("MapId", columns);
         Assert.DoesNotContain("MapKey", columns);
+    }
+
+    [Fact]
+    public void Servers_Table_Uses_ServerName_Dat_Fields_Only()
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = ResolveDatabasePath(),
+            Mode = SqliteOpenMode.ReadOnly,
+            Cache = SqliteCacheMode.Shared
+        }.ConnectionString);
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info(ServerNames)";
+
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        Assert.Contains("Code", columns);
+        Assert.Contains("ServerNameZhTw", columns);
+        Assert.Contains("ShortServerNameZhTw", columns);
     }
 
     [Fact]

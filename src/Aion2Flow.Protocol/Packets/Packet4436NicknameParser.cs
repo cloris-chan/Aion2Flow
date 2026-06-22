@@ -2,14 +2,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet4436Nickname(
-    int PlayerId,
-    string Nickname,
-    int NicknameLength,
-    int Delta,
-    int? OriginServerId,
-    int? ClassCode,
-    byte FactionCode);
+internal readonly record struct Packet4436Nickname(int PlayerId, string Nickname, int NicknameLength, int Delta, int? ClassCode, int? OriginServerId, byte FactionCode);
 
 internal static class Packet4436NicknameParser
 {
@@ -44,12 +37,7 @@ internal static class Packet4436NicknameParser
         return TryParseWithMarker(payload, playerId, searchStart, 0x07, out result);
     }
 
-    private static bool TryParseWithMarker(
-        ReadOnlySpan<byte> packet,
-        int playerId,
-        int searchStart,
-        byte marker,
-        out Packet4436Nickname result)
+    private static bool TryParseWithMarker(ReadOnlySpan<byte> packet, int playerId, int searchStart, byte marker, out Packet4436Nickname result)
     {
         result = default;
 
@@ -62,28 +50,14 @@ internal static class Packet4436NicknameParser
                 continue;
             }
 
-            if (!NicknameParserUtil.TryReadLengthPrefixedNickname(
-                    packet,
-                    markerOffset + 1,
-                    strict: true,
-                    out var sanitizedName,
-                    out var nicknameLength,
-                    out var tailOffset))
+            if (!NicknameParserUtil.TryReadLengthPrefixedNickname(packet, markerOffset + 1, strict: true, out var sanitizedName, out var nicknameLength, out var tailOffset))
             {
                 continue;
             }
 
-            var originServerId = NicknameParserUtil.TryReadPossibleOriginServerBefore(packet, markerOffset);
             var classCode = NicknameParserUtil.TryReadClassCode(packet, tailOffset);
-            var factionCode = NicknameParserUtil.TryReadFactionCode(packet, tailOffset + 4);
-            result = new Packet4436Nickname(
-                playerId,
-                sanitizedName,
-                nicknameLength,
-                markerOffset - searchStart,
-                originServerId,
-                classCode,
-                factionCode);
+            var factionCode = NicknameParserUtil.TryReadFactionCode(packet, tailOffset + sizeof(int));
+            result = new Packet4436Nickname(playerId, sanitizedName, nicknameLength, markerOffset - searchStart, classCode, OriginServerId: null, factionCode);
             return true;
         }
 

@@ -246,8 +246,8 @@ public sealed class DomainEventApplier
                 if (metadataClass is { } characterClass)
                     _entities.ApplyMetadataCharacterClass(entry.SourceEntityId, characterClass);
 
-                if (!string.IsNullOrWhiteSpace(nickname) || metadataClass is not null || state.IsLocalPlayer)
-                    _metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.OriginServerId, state.Faction, metadataClass, state.IsLocalPlayer);
+                if (!string.IsNullOrWhiteSpace(nickname) || metadataClass is not null || state.IsLocalPlayer || state.OriginServerId is not null)
+                    _metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.Faction, metadataClass, state.IsLocalPlayer, state.OriginServerId);
             }
             return;
         }

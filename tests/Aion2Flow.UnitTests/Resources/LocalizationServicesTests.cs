@@ -35,6 +35,8 @@ public sealed class LocalizationServicesTests
             var enSkills = ResourceDatabase.LoadSkills(LanguageService.English);
             var zhCatalog = ResourceDatabase.LoadNpcCatalog(LanguageService.TraditionalChinese);
             var enCatalog = ResourceDatabase.LoadNpcCatalog(LanguageService.English);
+            var zhServerNames = ResourceDatabase.LoadServerNames(LanguageService.TraditionalChinese);
+            var enServerNames = ResourceDatabase.LoadServerNames(LanguageService.English);
 
             Assert.True(zhSkills.TryGetValue(2011101, out var zhSkill));
             Assert.True(enSkills.TryGetValue(2011101, out var enSkill));
@@ -44,9 +46,14 @@ public sealed class LocalizationServicesTests
             Assert.True(enCatalog.TryGetValue(2000002, out var enNpc));
             Assert.NotEqual(zhNpc.Name, enNpc.Name);
 
+            Assert.True(zhServerNames.TryGetValue(1001, out var zhServer));
+            Assert.True(enServerNames.TryGetValue(1001, out var enServer));
+            Assert.NotEqual(zhServer.ServerName, enServer.ServerName);
+
             Assert.Equal(zhSkill.Name, resources.ResolveSkillName(2011101));
             Assert.True(resources.TryResolveNpcCatalogEntry(2000002, out var initialNpc));
             Assert.Equal(zhNpc.Name, initialNpc.Name);
+            Assert.Equal(zhServer.ServerName, resources.ResolveServerName(1001));
 
             string? changedLanguage = null;
             resources.ResourcesChanged += (_, language) => changedLanguage = language;
@@ -58,6 +65,7 @@ public sealed class LocalizationServicesTests
             Assert.Equal(enSkill.Name, resources.ResolveSkillName(2011101));
             Assert.True(resources.TryResolveNpcCatalogEntry(2000002, out var updatedNpc));
             Assert.Equal(enNpc.Name, updatedNpc.Name);
+            Assert.Equal(enServer.ServerName, resources.ResolveServerName(1001));
         }
         finally
         {

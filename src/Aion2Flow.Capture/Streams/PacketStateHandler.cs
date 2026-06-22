@@ -261,7 +261,9 @@ internal sealed class PacketStateHandler
                 context.CreateObservationSource(0x4536, packet.Length),
                 pcMetadata.EntityId,
                 pcMetadata.Nickname,
-                characterClass: PacketCharacterClassMapper.ToCharacterClass(pcMetadata.ClassCode));
+                PacketFactionMapper.ToFaction(pcMetadata.FactionCode),
+                characterClass: PacketCharacterClassMapper.ToCharacterClass(pcMetadata.ClassCode),
+                originServerId: pcMetadata.OriginServerId);
             return context.MarkParsed();
         }
 

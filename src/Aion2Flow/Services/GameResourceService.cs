@@ -17,6 +17,7 @@ public sealed class GameResourceService : IDisposable
     public IReadOnlyDictionary<int, NpcCatalogEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcCatalogEntry>();
     public IReadOnlyDictionary<string, NpcName> NpcNames { get; private set; } = new Dictionary<string, NpcName>(StringComparer.Ordinal);
     public IReadOnlyDictionary<uint, string> Maps { get; private set; } = new Dictionary<uint, string>();
+    public IReadOnlyDictionary<int, ServerNameCatalogEntry> ServerNames { get; private set; } = new Dictionary<int, ServerNameCatalogEntry>();
 
     public GameResourceService(LanguageService languageService)
     {
@@ -143,6 +144,22 @@ public sealed class GameResourceService : IDisposable
         return ResourceDatabase.ResolveMapName(mapId, snapshot);
     }
 
+    public string ResolveServerName(int code)
+    {
+        if (code <= 0)
+        {
+            return string.Empty;
+        }
+
+        IReadOnlyDictionary<int, ServerNameCatalogEntry> snapshot;
+        lock (_lock)
+        {
+            snapshot = ServerNames;
+        }
+
+        return ResourceDatabase.ResolveServerName(code, snapshot);
+    }
+
     private void OnLanguageChanged(object? sender, string language)
     {
         Reload(language);
@@ -154,6 +171,7 @@ public sealed class GameResourceService : IDisposable
         var npcCatalog = ResourceDatabase.LoadNpcCatalog(language);
         var npcNames = ResourceDatabase.LoadNpcNames(language);
         var maps = ResourceDatabase.LoadMaps(language);
+        var serverNames = ResourceDatabase.LoadServerNames(language);
 
         lock (_lock)
         {
@@ -162,6 +180,7 @@ public sealed class GameResourceService : IDisposable
             NpcCatalog = npcCatalog;
             NpcNames = npcNames;
             Maps = maps;
+            ServerNames = serverNames;
         }
 
         CombatResourceRegistry.UpdateDisplayResources(skills, npcCatalog);

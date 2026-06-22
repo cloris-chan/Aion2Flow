@@ -38,27 +38,25 @@ internal static class Packet048DNicknameParser
         if (!reader.TryAdvance(HeaderLengthBeforePlayerId)) return false;
         if (!reader.TryReadVarInt(out var playerId)) return false;
 
-        var nameLengthOffset = reader.Offset;
-        int? originServerId = null;
-        if (NicknameParserUtil.TryReadPossibleOriginServerAt(payload, nameLengthOffset, out var parsedOriginServerId, out var originLength))
+        if (NicknameParserUtil.TryReadOriginServerIdLe16(payload, reader.Offset, out var serverId) &&
+            TryParseNicknameAt(payload, reader.Offset + sizeof(ushort), serverId, playerId, out result))
         {
-            originServerId = parsedOriginServerId;
-            nameLengthOffset += originLength;
+            return true;
         }
 
-        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(
-                payload,
-                nameLengthOffset,
-                strict: true,
-                out var nickname,
-                out var nicknameLength,
-                out var tailOffset))
+        return TryParseNicknameAt(payload, reader.Offset, originServerId: null, playerId, out result);
+    }
+
+    private static bool TryParseNicknameAt(ReadOnlySpan<byte> payload, int nameLengthOffset, int? originServerId, int playerId, out Packet048DNickname result)
+    {
+        result = default;
+        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, nameLengthOffset, strict: true, out var nickname, out var nicknameLength, out var tailOffset))
         {
             return false;
         }
 
-        var factionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset + 7);
-        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, originServerId, factionCode);
+        var directFactionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset + 7);
+        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, originServerId, NicknameParserUtil.SelectFactionCode(directFactionCode, originServerId));
         return true;
     }
 }

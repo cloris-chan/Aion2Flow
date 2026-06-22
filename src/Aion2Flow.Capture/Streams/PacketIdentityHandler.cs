@@ -11,7 +11,7 @@ internal static class PacketIdentityHandler
             return false;
         }
 
-        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, packet.Length), parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true, originServerId: parsed.OriginServerId);
         return context.MarkParsed();
     }
 
@@ -19,7 +19,7 @@ internal static class PacketIdentityHandler
     {
         if (Packet4436NicknameParser.TryParse(packet, out var parsed))
         {
-            context.Sink.AppendNickname(context.CreateObservationSource(0x4436, packet.Length), parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode));
+            context.Sink.AppendNickname(context.CreateObservationSource(0x4436, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), originServerId: parsed.OriginServerId);
             return context.MarkParsed();
         }
 
@@ -44,7 +44,7 @@ internal static class PacketIdentityHandler
             return false;
         }
 
-        context.Sink.AppendNickname(context.CreateObservationSource(0x048D, packet.Length), parsed.PlayerId, parsed.Nickname, parsed.OriginServerId, PacketFactionMapper.ToFaction(parsed.FactionCode));
+        context.Sink.AppendNickname(context.CreateObservationSource(0x048D, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId);
         return context.MarkParsed();
     }
 }

@@ -42,9 +42,9 @@ public sealed class PlayerNamePrivacyServiceTests
     public void SceneDisplayContext_AnonymousOrdinal_GroupsByClassAndEntityOrder()
     {
         var builder = new SceneIdentityScopeBuilder();
-        builder.AddPcMetadata(new PcMetadata(300, "A", null, CharacterClass: CharacterClass.Elementalist));
-        builder.AddPcMetadata(new PcMetadata(100, "B", null, CharacterClass: CharacterClass.Elementalist));
-        builder.AddPcMetadata(new PcMetadata(200, "C", null, CharacterClass: CharacterClass.Cleric));
+        builder.AddPcMetadata(new PcMetadata(300, "A", CharacterClass: CharacterClass.Elementalist));
+        builder.AddPcMetadata(new PcMetadata(100, "B", CharacterClass: CharacterClass.Elementalist));
+        builder.AddPcMetadata(new PcMetadata(200, "C", CharacterClass: CharacterClass.Cleric));
         var language = new LanguageService();
         using var resources = new GameResourceService(language);
         var context = new SceneDisplayContext(builder.ToScope(), null, null, resources, "Unknown");
@@ -58,7 +58,7 @@ public sealed class PlayerNamePrivacyServiceTests
     public void SceneDisplayContext_ExposesLocalPlayerMetadata()
     {
         var builder = new SceneIdentityScopeBuilder();
-        builder.AddPcMetadata(new PcMetadata(100, "Perigee", null, CharacterClass: CharacterClass.Elementalist, IsLocalPlayer: true));
+        builder.AddPcMetadata(new PcMetadata(100, "Perigee", CharacterClass: CharacterClass.Elementalist, IsLocalPlayer: true));
         var language = new LanguageService();
         using var resources = new GameResourceService(language);
         var context = new SceneDisplayContext(builder.ToScope(), null, null, resources, "Unknown");

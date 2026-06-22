@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet3336Nickname(int PlayerId, string Nickname, int NicknameLength, int TailOffset, int? OriginServerId, int? ClassCode, byte FactionCode);
+internal readonly record struct Packet3336Nickname(int PlayerId, string Nickname, int NicknameLength, int TailOffset, int? ClassCode, int? OriginServerId, byte FactionCode);
 
 internal static class Packet3336NicknameParser
 {
@@ -38,12 +38,19 @@ internal static class Packet3336NicknameParser
                 continue;
             }
 
-            var originServerLength = NicknameParserUtil.TryReadPossibleOriginServerAt(payload, tailOffset, out var originServerId, out var originLength)
-                ? originLength
-                : 0;
-            var classCode = NicknameParserUtil.TryReadClassCode(payload, tailOffset + originServerLength);
-            var factionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset + originServerLength + 4);
-            result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, tailOffset, originServerLength == 0 ? null : originServerId, classCode, factionCode);
+            int? originServerId = null;
+            var classOffset = tailOffset;
+            var classCode = NicknameParserUtil.TryReadClassCode(payload, classOffset);
+            if (NicknameParserUtil.TryReadOriginServerIdLe16(payload, tailOffset, out var serverId) &&
+                NicknameParserUtil.TryReadClassCode(payload, tailOffset + sizeof(ushort)) is { } originClassCode)
+            {
+                originServerId = serverId;
+                classOffset = tailOffset + sizeof(ushort);
+                classCode = originClassCode;
+            }
+            var directFactionCode = NicknameParserUtil.TryReadFactionCode(payload, classOffset + sizeof(int));
+            var factionCode = NicknameParserUtil.SelectFactionCode(directFactionCode, originServerId);
+            result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, tailOffset, classCode, originServerId, factionCode);
             return true;
         }
 

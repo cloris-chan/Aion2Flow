@@ -12,8 +12,8 @@ public sealed class SceneIdentityTests
     {
         var builder = new SceneIdentityScopeBuilder();
         builder.Reset(2);
-        builder.AddPcMetadata(new PcMetadata(300, "Player B", 495, Faction.Light));
-        builder.AddPcMetadata(new PcMetadata(100, "Player A", null));
+        builder.AddPcMetadata(new PcMetadata(300, "Player B", Faction.Light));
+        builder.AddPcMetadata(new PcMetadata(100, "Player A"));
         builder.AddNpcCode(9002, 2_100_351);
         builder.AddNpcCode(9001, 2_100_350);
         builder.AddMapCode(515552, 200003);
@@ -23,7 +23,6 @@ public sealed class SceneIdentityTests
         Assert.Equal([100, 300], scope.PcMetadataAsSpan().ToArray().Select(static entry => entry.EntityId));
         Assert.True(scope.TryGetPcMetadata(300, out var pc));
         Assert.Equal("Player B", pc.Nickname);
-        Assert.Equal(495, pc.OriginServerId);
         Assert.Equal(Faction.Light, pc.Faction);
         Assert.True(scope.TryGetNpcCode(9001, out var npcCode));
         Assert.Equal(2_100_350, npcCode);
@@ -36,11 +35,11 @@ public sealed class SceneIdentityTests
     {
         const int entityId = 9002;
         var registry = new RuntimeMetadataRegistry();
-        registry.UpsertPcMetadata(100, "Global Player", 1, Faction.Dark);
+        registry.UpsertPcMetadata(100, "Global Player", Faction.Dark);
         registry.UpsertNpcCode(entityId, 2_100_350);
 
         var builder = new SceneIdentityScopeBuilder();
-        builder.AddPcMetadata(new PcMetadata(100, "Scoped Player", 2, Faction.Light));
+        builder.AddPcMetadata(new PcMetadata(100, "Scoped Player", Faction.Light));
         builder.AddNpcCode(entityId, 2_100_351);
         var resolver = new SceneIdentityResolver(builder.ToScope(), registry);
 
@@ -55,7 +54,7 @@ public sealed class SceneIdentityTests
     public void SceneIdentityResolver_FallsBackToGlobalRegistryForLiveEmptyScope()
     {
         var registry = new RuntimeMetadataRegistry();
-        registry.UpsertPcMetadata(100, "Live Player", 495, Faction.Light);
+        registry.UpsertPcMetadata(100, "Live Player", Faction.Light);
         registry.UpsertNpcCode(9001, 2_100_350);
 
         var resolver = new SceneIdentityResolver(SceneIdentityScope.Empty, registry);
@@ -68,7 +67,7 @@ public sealed class SceneIdentityTests
     }
 
     [Fact]
-    public void DomainEventApplier_PreservesOriginServerIdInRuntimeMetadataRegistry()
+    public void DomainEventApplier_PreservesFactionInRuntimeMetadataRegistry()
     {
         var entities = new EntityStore();
         var boundary = new SceneBoundaryStore();
@@ -79,12 +78,11 @@ public sealed class SceneIdentityTests
         {
             Domain = ObservedEventDomain.State,
             SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", 495, Faction.Light)
+            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light)
         });
 
         Assert.True(registry.TryGetPcMetadata(100, out var metadata));
         Assert.Equal("Perigee", metadata.Nickname);
-        Assert.Equal(495, metadata.OriginServerId);
         Assert.Equal(Faction.Light, metadata.Faction);
     }
 
@@ -100,13 +98,13 @@ public sealed class SceneIdentityTests
         {
             Domain = ObservedEventDomain.State,
             SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", 495, Faction.Light, CharacterClass.Elementalist, IsLocalPlayer: true)
+            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light, CharacterClass.Elementalist, IsLocalPlayer: true)
         });
         applier.ApplyEntry(new ObservedEventEnvelope
         {
             Domain = ObservedEventDomain.State,
             SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", 495, Faction.Light)
+            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light)
         });
 
         Assert.True(registry.TryGetPcMetadata(100, out var metadata));

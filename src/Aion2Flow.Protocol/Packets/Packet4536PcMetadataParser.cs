@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet4536PcMetadata(int EntityId, string Nickname, int NicknameLength, int TailOffset, int ClassCode);
+internal readonly record struct Packet4536PcMetadata(int EntityId, string Nickname, int NicknameLength, int TailOffset, int ClassCode, int? OriginServerId, byte FactionCode);
 
 internal static class Packet4536PcMetadataParser
 {
@@ -37,13 +37,7 @@ internal static class Packet4536PcMetadataParser
                 continue;
             }
 
-            if (!NicknameParserUtil.TryReadLengthPrefixedNickname(
-                    payload,
-                    markerOffset + 1,
-                    strict: true,
-                    out var sanitizedName,
-                    out var nicknameLength,
-                    out var tailOffset))
+            if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, markerOffset + 1, strict: true, out var sanitizedName, out var nicknameLength, out var tailOffset))
             {
                 continue;
             }
@@ -54,7 +48,7 @@ internal static class Packet4536PcMetadataParser
                 continue;
             }
 
-            result = new Packet4536PcMetadata(entityId, sanitizedName, nicknameLength, tailOffset, code);
+            result = new Packet4536PcMetadata(entityId, sanitizedName, nicknameLength, tailOffset, code, OriginServerId: null, NicknameParserUtil.TryReadFactionCode(payload, tailOffset + sizeof(int)));
             return true;
         }
 
