@@ -62,6 +62,17 @@ public sealed class EntityStore
         _revision++;
     }
 
+    public void ApplyPlayerIdentity(int entityId)
+    {
+        var entity = GetOrAdd(entityId);
+        if (entity.IsPlayer)
+            return;
+
+        entity.IsPlayer = true;
+        entity.LastObservedOrdinal++;
+        _revision++;
+    }
+
     public bool ApplyCharacterClassEvidence(int entityId, in CombatObservation observation)
     {
         if (entityId <= 0 || !CombatantClassEvidence.TryCreate(in observation, out var characterClass, out var score))

@@ -11,7 +11,7 @@ internal static class PacketIdentityHandler
             return false;
         }
 
-        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true, originServerId: parsed.OriginServerId);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true, originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
         return context.MarkParsed();
     }
 
@@ -19,7 +19,7 @@ internal static class PacketIdentityHandler
     {
         if (Packet4436NicknameParser.TryParse(packet, out var parsed))
         {
-            context.Sink.AppendNickname(context.CreateObservationSource(0x4436, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), originServerId: parsed.OriginServerId);
+            context.Sink.AppendNickname(context.CreateObservationSource(0x4436, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
             return context.MarkParsed();
         }
 
@@ -37,6 +37,17 @@ internal static class PacketIdentityHandler
         return context.MarkParsed();
     }
 
+    public static bool ParseLegionMetadataPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        if (!Packet2933LegionMetadataParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        context.Sink.AppendNickname(context.CreateObservationSource(0x2933, packet.Length), parsed.EntityId, string.Empty, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
+        return context.MarkParsed();
+    }
+
     public static bool ParseNicknamePacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (!Packet048DNicknameParser.TryParse(packet, out var parsed))
@@ -44,7 +55,7 @@ internal static class PacketIdentityHandler
             return false;
         }
 
-        context.Sink.AppendNickname(context.CreateObservationSource(0x048D, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x048D, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
         return context.MarkParsed();
     }
 }

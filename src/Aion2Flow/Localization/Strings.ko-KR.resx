@@ -34,9 +34,23 @@
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>대상 상태 바</value></data>
   <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>켬</value></data>
   <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>끔</value></data>
-  <data name="Settings_HidePlayerNames" xml:space="preserve"><value>플레이어 이름 숨기기</value></data>
-  <data name="Settings_HidePlayerNames_On" xml:space="preserve"><value>켬</value></data>
-  <data name="Settings_HidePlayerNames_Off" xml:space="preserve"><value>끔</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>이름 표시</value></data>
+  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>표시</value></data>
+  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>숨김</value></data>
+  <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>플레이어 이름</value></data>
+  <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>내 표시</value></data>
+  <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>표시 안 함</value></data>
+  <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>이름 숨김 시 표시</value></data>
+  <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>항상 표시</value></data>
+  <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>서버 이름</value></data>
+  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>표시</value></data>
+  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>숨김</value></data>
+  <data name="Settings_PlayerLegionName" xml:space="preserve"><value>레기온명</value></data>
+  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>표시</value></data>
+  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>숨김</value></data>
+  <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>종족 색상 표시</value></data>
+  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>켬</value></data>
+  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>끔</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>표시 행 수</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>언어</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>전투 초기화 단축키</value></data>

@@ -30,6 +30,7 @@ internal static class PacketOpcodeDispatcher
             (0x2a, 0x38) => PacketStateHandler.ParseAux2A38Packet(packet, ref context),
             (0x2b, 0x38) => PacketStateHandler.ParseAux2B38Packet(packet, ref context),
             (0x2c, 0x38) => PacketStateHandler.ParseAux2C38Packet(packet, ref context),
+            (0x29, 0x33) => PacketIdentityHandler.ParseLegionMetadataPacket(packet, ref context),
             (0x35, 0x38) => PacketCombatHandler.Parse3538SidecarPacket(packet, ref context),
             (0x1d, 0x37) => PacketStateHandler.ParseState1D37Packet(packet, ref context),
             (0x33, 0x36) => PacketIdentityHandler.ParseOwnNicknamePacket(packet, ref context),

@@ -14,18 +14,18 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 {
     private readonly LanguageService _languageService;
     private readonly SettingsService _settingsService;
-    private readonly PlayerNamePrivacyService _playerNamePrivacy;
+    private readonly PlayerNameDisplayService _playerNameDisplay;
     private readonly AppUpdateService _updateService;
     private readonly ProcessForegroundWatcher _processForegroundWatcher;
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly bool _isApplyingPersistedSettings;
 
-    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNamePrivacyService playerNamePrivacy, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
+    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNameDisplayService playerNameDisplay, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
     {
         Localization = localization;
         _languageService = languageService;
         _settingsService = settingsService;
-        _playerNamePrivacy = playerNamePrivacy;
+        _playerNameDisplay = playerNameDisplay;
         _updateService = updateService;
         _processForegroundWatcher = processForegroundWatcher;
         _globalHotkeyService = globalHotkeyService;
@@ -45,7 +45,11 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             SceneKind = persisted.SceneKind;
             UseCompactMainMetrics = persisted.UseCompactMainMetrics;
             ShowFocusStatusBar = persisted.ShowFocusStatusBar;
-            HidePlayerNames = persisted.HidePlayerNames;
+            ShowPlayerNames = persisted.ShowPlayerNames;
+            PlayerSelfMarkerDisplayMode = persisted.PlayerSelfMarkerDisplayMode;
+            ShowPlayerShortServerName = persisted.ShowPlayerShortServerName;
+            ShowPlayerLegionName = persisted.ShowPlayerLegionName;
+            TintPlayerNamesByFaction = persisted.TintPlayerNamesByFaction;
             if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
             {
                 BattleResetHotkey = new HotkeyDefinition((HotkeyModifiers)mods, vk);
@@ -79,6 +83,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public IReadOnlyList<SceneKind> SceneKindOptions { get; } = [SceneKind.Standard, SceneKind.Boss];
 
+    public IReadOnlyList<PlayerSelfMarkerDisplayMode> PlayerSelfMarkerDisplayModeOptions { get; } = [PlayerSelfMarkerDisplayMode.Always, PlayerSelfMarkerDisplayMode.WhenNamesHidden, PlayerSelfMarkerDisplayMode.Hidden];
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAlwaysOnTop))]
     [NotifyPropertyChangedFor(nameof(TopmostModeDisplay))]
@@ -109,8 +115,25 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public partial bool ShowFocusStatusBar { get; set; } = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HidePlayerNamesDisplay))]
-    public partial bool HidePlayerNames { get; set; }
+    [NotifyPropertyChangedFor(nameof(ShowPlayerNamesDisplay))]
+    [NotifyPropertyChangedFor(nameof(PlayerNameSettingsDisplay))]
+    public partial bool ShowPlayerNames { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PlayerSelfMarkerDisplayModeDisplay))]
+    public partial PlayerSelfMarkerDisplayMode PlayerSelfMarkerDisplayMode { get; set; } = PlayerSelfMarkerDisplayMode.WhenNamesHidden;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPlayerShortServerNameDisplay))]
+    public partial bool ShowPlayerShortServerName { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPlayerLegionNameDisplay))]
+    public partial bool ShowPlayerLegionName { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TintPlayerNamesByFactionDisplay))]
+    public partial bool TintPlayerNamesByFaction { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
@@ -158,7 +181,17 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public string ShowFocusStatusBarDisplay => Localization[ShowFocusStatusBar ? "Settings_FocusStatusBar_On" : "Settings_FocusStatusBar_Off"];
 
-    public string HidePlayerNamesDisplay => Localization[HidePlayerNames ? "Settings_HidePlayerNames_On" : "Settings_HidePlayerNames_Off"];
+    public string ShowPlayerNamesDisplay => Localization[ShowPlayerNames ? "Settings_ShowPlayerNames_On" : "Settings_ShowPlayerNames_Off"];
+
+    public string PlayerSelfMarkerDisplayModeDisplay => Localization[$"Settings_PlayerSelfMarker_{PlayerSelfMarkerDisplayMode}"];
+
+    public string ShowPlayerShortServerNameDisplay => Localization[ShowPlayerShortServerName ? "Settings_PlayerShortServerName_On" : "Settings_PlayerShortServerName_Off"];
+
+    public string ShowPlayerLegionNameDisplay => Localization[ShowPlayerLegionName ? "Settings_PlayerLegionName_On" : "Settings_PlayerLegionName_Off"];
+
+    public string TintPlayerNamesByFactionDisplay => Localization[TintPlayerNamesByFaction ? "Settings_PlayerFactionTint_On" : "Settings_PlayerFactionTint_Off"];
+
+    public string PlayerNameSettingsDisplay => ShowPlayerNamesDisplay;
 
     public string LanguageDisplay => SelectedLanguage?.DisplayName ?? string.Empty;
 
@@ -221,9 +254,33 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     partial void OnShowFocusStatusBarChanged(bool value) => PersistSettings();
 
-    partial void OnHidePlayerNamesChanged(bool value)
+    partial void OnShowPlayerNamesChanged(bool value)
     {
-        _playerNamePrivacy.HidePlayerNames = value;
+        _playerNameDisplay.ShowPlayerNames = value;
+        PersistSettings();
+    }
+
+    partial void OnPlayerSelfMarkerDisplayModeChanged(PlayerSelfMarkerDisplayMode value)
+    {
+        _playerNameDisplay.SelfMarkerDisplayMode = value;
+        PersistSettings();
+    }
+
+    partial void OnShowPlayerShortServerNameChanged(bool value)
+    {
+        _playerNameDisplay.ShowShortServerName = value;
+        PersistSettings();
+    }
+
+    partial void OnShowPlayerLegionNameChanged(bool value)
+    {
+        _playerNameDisplay.ShowLegionName = value;
+        PersistSettings();
+    }
+
+    partial void OnTintPlayerNamesByFactionChanged(bool value)
+    {
+        _playerNameDisplay.TintPlayerNamesByFaction = value;
         PersistSettings();
     }
 
@@ -276,7 +333,11 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.SceneKind = SceneKind;
             s.UseCompactMainMetrics = UseCompactMainMetrics;
             s.ShowFocusStatusBar = ShowFocusStatusBar;
-            s.HidePlayerNames = HidePlayerNames;
+            s.ShowPlayerNames = ShowPlayerNames;
+            s.PlayerSelfMarkerDisplayMode = PlayerSelfMarkerDisplayMode;
+            s.ShowPlayerShortServerName = ShowPlayerShortServerName;
+            s.ShowPlayerLegionName = ShowPlayerLegionName;
+            s.TintPlayerNamesByFaction = TintPlayerNamesByFaction;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
             s.BattleResetHotkeyVirtualKey = BattleResetHotkey?.VirtualKey;
@@ -300,7 +361,12 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(SceneKindDisplay));
         OnPropertyChanged(nameof(UseCompactMainMetricsDisplay));
         OnPropertyChanged(nameof(ShowFocusStatusBarDisplay));
-        OnPropertyChanged(nameof(HidePlayerNamesDisplay));
+        OnPropertyChanged(nameof(ShowPlayerNamesDisplay));
+        OnPropertyChanged(nameof(PlayerSelfMarkerDisplayModeDisplay));
+        OnPropertyChanged(nameof(ShowPlayerShortServerNameDisplay));
+        OnPropertyChanged(nameof(ShowPlayerLegionNameDisplay));
+        OnPropertyChanged(nameof(TintPlayerNamesByFactionDisplay));
+        OnPropertyChanged(nameof(PlayerNameSettingsDisplay));
         OnPropertyChanged(nameof(LanguageDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(CurrentVersionText));

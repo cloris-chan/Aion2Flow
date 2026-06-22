@@ -242,12 +242,16 @@ public sealed class DomainEventApplier
             {
                 var nickname = state.Text ?? string.Empty;
                 var metadataClass = state.CharacterClass is CharacterClass.None ? null : state.CharacterClass;
-                _entities.ApplyNickname(entry.SourceEntityId, nickname);
+                if (!string.IsNullOrWhiteSpace(nickname))
+                    _entities.ApplyNickname(entry.SourceEntityId, nickname);
+                else
+                    _entities.ApplyPlayerIdentity(entry.SourceEntityId);
                 if (metadataClass is { } characterClass)
                     _entities.ApplyMetadataCharacterClass(entry.SourceEntityId, characterClass);
 
-                if (!string.IsNullOrWhiteSpace(nickname) || metadataClass is not null || state.IsLocalPlayer || state.OriginServerId is not null)
-                    _metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.Faction, metadataClass, state.IsLocalPlayer, state.OriginServerId);
+                var legionName = state.LegionName ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(nickname) || metadataClass is not null || state.IsLocalPlayer || state.OriginServerId is not null || !string.IsNullOrWhiteSpace(legionName))
+                    _metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.Faction, metadataClass, state.IsLocalPlayer, state.OriginServerId, legionName);
             }
             return;
         }

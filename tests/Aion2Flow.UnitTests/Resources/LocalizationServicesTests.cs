@@ -54,6 +54,7 @@ public sealed class LocalizationServicesTests
             Assert.True(resources.TryResolveNpcCatalogEntry(2000002, out var initialNpc));
             Assert.Equal(zhNpc.Name, initialNpc.Name);
             Assert.Equal(zhServer.ServerName, resources.ResolveServerName(1001));
+            Assert.Equal(zhServer.ShortServerName, resources.ResolveShortServerName(1001));
 
             string? changedLanguage = null;
             resources.ResourcesChanged += (_, language) => changedLanguage = language;
@@ -66,6 +67,7 @@ public sealed class LocalizationServicesTests
             Assert.True(resources.TryResolveNpcCatalogEntry(2000002, out var updatedNpc));
             Assert.Equal(enNpc.Name, updatedNpc.Name);
             Assert.Equal(enServer.ServerName, resources.ResolveServerName(1001));
+            Assert.Equal(enServer.ShortServerName, resources.ResolveShortServerName(1001));
         }
         finally
         {

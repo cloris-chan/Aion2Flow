@@ -7,6 +7,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services.Hotkeys;
+using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Views;
@@ -19,7 +20,12 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _sceneKindMenuItem;
     private MenuItem? _compactMainMetricsMenuItem;
     private MenuItem? _focusStatusBarMenuItem;
-    private MenuItem? _hidePlayerNamesMenuItem;
+    private MenuItem? _playerNameSettingsMenuItem;
+    private MenuItem? _showPlayerNamesMenuItem;
+    private MenuItem? _playerSelfMarkerMenuItem;
+    private MenuItem? _showPlayerShortServerNameMenuItem;
+    private MenuItem? _showPlayerLegionNameMenuItem;
+    private MenuItem? _tintPlayerNamesByFactionMenuItem;
     private MenuItem? _languageMenuItem;
     private SettingsFlyoutViewModel? _viewModel;
     private Services.LocalizationService? _localization;
@@ -57,7 +63,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
-        RefreshHidePlayerNamesMenuItem();
+        RebuildPlayerNameSettingsMenuItems();
         RebuildLanguageMenuItems();
     }
 
@@ -69,7 +75,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
-        RefreshHidePlayerNamesMenuItem();
+        RebuildPlayerNameSettingsMenuItems();
         RebuildLanguageMenuItems();
     }
 
@@ -105,9 +111,18 @@ public partial class SettingsFlyoutView : UserControl
             case nameof(SettingsFlyoutViewModel.ShowFocusStatusBarDisplay):
                 RefreshFocusStatusBarMenuItem();
                 break;
-            case nameof(SettingsFlyoutViewModel.HidePlayerNames):
-            case nameof(SettingsFlyoutViewModel.HidePlayerNamesDisplay):
-                RefreshHidePlayerNamesMenuItem();
+            case nameof(SettingsFlyoutViewModel.ShowPlayerNames):
+            case nameof(SettingsFlyoutViewModel.ShowPlayerNamesDisplay):
+            case nameof(SettingsFlyoutViewModel.PlayerSelfMarkerDisplayMode):
+            case nameof(SettingsFlyoutViewModel.PlayerSelfMarkerDisplayModeDisplay):
+            case nameof(SettingsFlyoutViewModel.ShowPlayerShortServerName):
+            case nameof(SettingsFlyoutViewModel.ShowPlayerShortServerNameDisplay):
+            case nameof(SettingsFlyoutViewModel.ShowPlayerLegionName):
+            case nameof(SettingsFlyoutViewModel.ShowPlayerLegionNameDisplay):
+            case nameof(SettingsFlyoutViewModel.TintPlayerNamesByFaction):
+            case nameof(SettingsFlyoutViewModel.TintPlayerNamesByFactionDisplay):
+            case nameof(SettingsFlyoutViewModel.PlayerNameSettingsDisplay):
+                RefreshPlayerNameSettingsMenuItems();
                 break;
             case nameof(SettingsFlyoutViewModel.SelectedLanguage):
             case nameof(SettingsFlyoutViewModel.LanguageDisplay):
@@ -125,7 +140,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
-        RefreshHidePlayerNamesMenuItem();
+        RebuildPlayerNameSettingsMenuItems();
     }
 
     private void TopmostMenuItemLoaded(object? sender, RoutedEventArgs e)
@@ -173,12 +188,12 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
-    private void HidePlayerNamesMenuItemLoaded(object? sender, RoutedEventArgs e)
+    private void PlayerNameSettingsMenuItemLoaded(object? sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem mi && _hidePlayerNamesMenuItem != mi)
+        if (sender is MenuItem mi && _playerNameSettingsMenuItem != mi)
         {
-            _hidePlayerNamesMenuItem = mi;
-            RefreshHidePlayerNamesMenuItem();
+            _playerNameSettingsMenuItem = mi;
+            RebuildPlayerNameSettingsMenuItems();
         }
     }
 
@@ -362,16 +377,91 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
-    private void RefreshHidePlayerNamesMenuItem()
+    private void RebuildPlayerNameSettingsMenuItems()
     {
         var vm = ViewModel;
-        if (_hidePlayerNamesMenuItem is null || vm is null)
+        RefreshPlayerNameSettingsHeader();
+        if (_playerNameSettingsMenuItem is null || vm is null)
         {
             return;
         }
 
-        _hidePlayerNamesMenuItem.Header = CreateRowHeader(vm.Localization["Settings_HidePlayerNames"], vm.HidePlayerNamesDisplay);
-        _hidePlayerNamesMenuItem.Icon = CreateCheckmark(vm.HidePlayerNames);
+        _playerNameSettingsMenuItem.Items.Clear();
+        _showPlayerNamesMenuItem = CreateToggleMenuItem(vm.Localization["Settings_ShowPlayerNames"], vm.ShowPlayerNamesDisplay, vm.ShowPlayerNames, ShowPlayerNamesMenuItemClicked);
+        _playerSelfMarkerMenuItem = new MenuItem();
+        _playerSelfMarkerMenuItem.Classes.Add("FlyoutMenuItem");
+        _playerSelfMarkerMenuItem.Classes.Add("SettingsRowItem");
+        _playerSelfMarkerMenuItem.Items.Clear();
+        foreach (var mode in vm.PlayerSelfMarkerDisplayModeOptions)
+        {
+            var item = new MenuItem
+            {
+                Header = vm.Localization[$"Settings_PlayerSelfMarker_{mode}"],
+                Tag = mode,
+                StaysOpenOnClick = true
+            };
+            item.Classes.Add("FlyoutMenuItem");
+            item.Icon = CreateCheckmark(mode == vm.PlayerSelfMarkerDisplayMode);
+            item.Click += PlayerSelfMarkerDisplayModeItemClicked;
+            _playerSelfMarkerMenuItem.Items.Add(item);
+        }
+
+        _showPlayerShortServerNameMenuItem = CreateToggleMenuItem(vm.Localization["Settings_PlayerShortServerName"], vm.ShowPlayerShortServerNameDisplay, vm.ShowPlayerShortServerName, ShowPlayerShortServerNameMenuItemClicked);
+        _showPlayerLegionNameMenuItem = CreateToggleMenuItem(vm.Localization["Settings_PlayerLegionName"], vm.ShowPlayerLegionNameDisplay, vm.ShowPlayerLegionName, ShowPlayerLegionNameMenuItemClicked);
+        _tintPlayerNamesByFactionMenuItem = CreateToggleMenuItem(vm.Localization["Settings_PlayerFactionTint"], vm.TintPlayerNamesByFactionDisplay, vm.TintPlayerNamesByFaction, TintPlayerNamesByFactionMenuItemClicked);
+
+        _playerNameSettingsMenuItem.Items.Add(_showPlayerNamesMenuItem);
+        _playerNameSettingsMenuItem.Items.Add(_playerSelfMarkerMenuItem);
+        _playerNameSettingsMenuItem.Items.Add(_showPlayerShortServerNameMenuItem);
+        _playerNameSettingsMenuItem.Items.Add(_showPlayerLegionNameMenuItem);
+        _playerNameSettingsMenuItem.Items.Add(_tintPlayerNamesByFactionMenuItem);
+        RefreshPlayerNameSettingsMenuItems();
+    }
+
+    private void RefreshPlayerNameSettingsMenuItems()
+    {
+        RefreshPlayerNameSettingsHeader();
+        var vm = ViewModel;
+        if (vm is null)
+        {
+            return;
+        }
+
+        if (_showPlayerNamesMenuItem is not null)
+        {
+            _showPlayerNamesMenuItem.Header = CreateRowHeader(vm.Localization["Settings_ShowPlayerNames"], vm.ShowPlayerNamesDisplay);
+            _showPlayerNamesMenuItem.Icon = CreateCheckmark(vm.ShowPlayerNames);
+        }
+
+        if (_playerSelfMarkerMenuItem is not null)
+        {
+            _playerSelfMarkerMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerSelfMarker"], vm.PlayerSelfMarkerDisplayModeDisplay);
+            foreach (var child in _playerSelfMarkerMenuItem.Items)
+            {
+                if (child is MenuItem { Tag: PlayerSelfMarkerDisplayMode mode } mi)
+                {
+                    mi.Icon = CreateCheckmark(mode == vm.PlayerSelfMarkerDisplayMode);
+                }
+            }
+        }
+
+        if (_showPlayerShortServerNameMenuItem is not null)
+        {
+            _showPlayerShortServerNameMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerShortServerName"], vm.ShowPlayerShortServerNameDisplay);
+            _showPlayerShortServerNameMenuItem.Icon = CreateCheckmark(vm.ShowPlayerShortServerName);
+        }
+
+        if (_showPlayerLegionNameMenuItem is not null)
+        {
+            _showPlayerLegionNameMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerLegionName"], vm.ShowPlayerLegionNameDisplay);
+            _showPlayerLegionNameMenuItem.Icon = CreateCheckmark(vm.ShowPlayerLegionName);
+        }
+
+        if (_tintPlayerNamesByFactionMenuItem is not null)
+        {
+            _tintPlayerNamesByFactionMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerFactionTint"], vm.TintPlayerNamesByFactionDisplay);
+            _tintPlayerNamesByFactionMenuItem.Icon = CreateCheckmark(vm.TintPlayerNamesByFaction);
+        }
     }
 
     private void RefreshCompactMainMetricsMenuItem()
@@ -469,12 +559,54 @@ public partial class SettingsFlyoutView : UserControl
             vm.SceneKind = kind;
     }
 
-    private void HidePlayerNamesMenuItemClicked(object? sender, RoutedEventArgs e)
+    private void ShowPlayerNamesMenuItemClicked(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm)
         {
-            vm.HidePlayerNames = !vm.HidePlayerNames;
+            vm.ShowPlayerNames = !vm.ShowPlayerNames;
         }
+
+        e.Handled = true;
+    }
+
+    private void PlayerSelfMarkerDisplayModeItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && sender is MenuItem { Tag: PlayerSelfMarkerDisplayMode mode })
+        {
+            vm.PlayerSelfMarkerDisplayMode = mode;
+        }
+
+        e.Handled = true;
+    }
+
+    private void ShowPlayerShortServerNameMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.ShowPlayerShortServerName = !vm.ShowPlayerShortServerName;
+        }
+
+        e.Handled = true;
+    }
+
+    private void ShowPlayerLegionNameMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.ShowPlayerLegionName = !vm.ShowPlayerLegionName;
+        }
+
+        e.Handled = true;
+    }
+
+    private void TintPlayerNamesByFactionMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.TintPlayerNamesByFaction = !vm.TintPlayerNamesByFaction;
+        }
+
+        e.Handled = true;
     }
 
     private void CompactMainMetricsMenuItemClicked(object? sender, RoutedEventArgs e)
@@ -538,6 +670,27 @@ public partial class SettingsFlyoutView : UserControl
         var vm = ViewModel;
         if (_languageMenuItem is null || vm is null) return;
         _languageMenuItem.Header = CreateRowHeader(vm.Localization["Settings_Language"], vm.LanguageDisplay);
+    }
+
+    private void RefreshPlayerNameSettingsHeader()
+    {
+        var vm = ViewModel;
+        if (_playerNameSettingsMenuItem is null || vm is null) return;
+        _playerNameSettingsMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerNameSettings"], vm.PlayerNameSettingsDisplay);
+    }
+
+    private static MenuItem CreateToggleMenuItem(string label, string value, bool isChecked, EventHandler<RoutedEventArgs> click)
+    {
+        var item = new MenuItem
+        {
+            Header = CreateRowHeader(label, value),
+            Icon = CreateCheckmark(isChecked),
+            StaysOpenOnClick = true
+        };
+        item.Classes.Add("FlyoutMenuItem");
+        item.Classes.Add("SettingsRowItem");
+        item.Click += click;
+        return item;
     }
 
     private static Grid CreateRowHeader(string label, string value)

@@ -36,10 +36,9 @@
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="FocusStatusBarMenuItemLoaded"
                           Click="FocusStatusBarMenuItemClicked" />
-                <MenuItem x:Name="HidePlayerNamesMenuItem"
+                <MenuItem x:Name="PlayerNameSettingsMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
-                          Loaded="HidePlayerNamesMenuItemLoaded"
-                          Click="HidePlayerNamesMenuItemClicked" />
+                          Loaded="PlayerNameSettingsMenuItemLoaded" />
                 <MenuItem x:Name="LanguageMenuItem"
                           Classes="FlyoutMenuItem SettingsRowItem"
                           Loaded="LanguageMenuItemLoaded" />

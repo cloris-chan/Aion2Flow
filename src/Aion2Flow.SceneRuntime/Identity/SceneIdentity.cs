@@ -10,10 +10,12 @@ public enum Faction : byte
     Dark = 2
 }
 
-public readonly record struct PcMetadata(int EntityId, string Nickname, Faction Faction = Faction.Unknown, CharacterClass? CharacterClass = null, bool IsLocalPlayer = false, int? OriginServerId = null)
+public readonly record struct PcMetadata(int EntityId, string Nickname, Faction Faction = Faction.Unknown, CharacterClass? CharacterClass = null, bool IsLocalPlayer = false, int? OriginServerId = null, string LegionName = "")
 {
     public bool HasNickname => !string.IsNullOrWhiteSpace(Nickname);
     public bool HasFaction => Faction != Faction.Unknown;
+    public bool HasOriginServerId => OriginServerId is > 0;
+    public bool HasLegionName => !string.IsNullOrWhiteSpace(LegionName);
 }
 
 public readonly record struct PcMetadataEntry(int EntityId, PcMetadata Metadata);
@@ -34,12 +36,13 @@ public sealed class RuntimeMetadataRegistry
     public IReadOnlyDictionary<uint, uint> MapCodesByInstanceId => _mapCodesByInstanceId;
     public long Revision => _revision;
 
-    public bool UpsertPcMetadata(int entityId, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null)
+    public bool UpsertPcMetadata(int entityId, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null, string legionName = "")
     {
         if (entityId <= 0)
             return false;
 
         nickname ??= string.Empty;
+        legionName ??= string.Empty;
         var changed = false;
         if (isLocalPlayer)
         {
@@ -67,6 +70,11 @@ public sealed class RuntimeMetadataRegistry
 
         ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_pcMetadataByEntityId, entityId, out var exists);
         var incomingClass = characterClass is CharacterClass.None ? null : characterClass;
+        var resolvedNickname = !string.IsNullOrWhiteSpace(nickname)
+            ? nickname
+            : exists
+                ? current.Nickname
+                : string.Empty;
         var resolvedFaction = faction != Faction.Unknown
             ? faction
             : exists
@@ -75,7 +83,8 @@ public sealed class RuntimeMetadataRegistry
         var resolvedClass = incomingClass ?? (exists ? current.CharacterClass : null);
         var resolvedIsLocalPlayer = isLocalPlayer || exists && current.IsLocalPlayer;
         var resolvedOriginServerId = originServerId is > 0 ? originServerId : exists ? current.OriginServerId : null;
-        var next = new PcMetadata(entityId, nickname, resolvedFaction, resolvedClass, resolvedIsLocalPlayer, resolvedOriginServerId);
+        var resolvedLegionName = !string.IsNullOrWhiteSpace(legionName) ? legionName : exists ? current.LegionName : string.Empty;
+        var next = new PcMetadata(entityId, resolvedNickname, resolvedFaction, resolvedClass, resolvedIsLocalPlayer, resolvedOriginServerId, resolvedLegionName);
         if (exists && current.Equals(next))
         {
             if (changed)
@@ -315,7 +324,7 @@ public sealed class SceneIdentityScopeBuilder
 
     public void AddPcMetadata(PcMetadata metadata)
     {
-        if (metadata.EntityId <= 0 || !metadata.HasNickname && metadata.CharacterClass is null && !metadata.IsLocalPlayer && metadata.OriginServerId is null)
+        if (metadata.EntityId <= 0 || !metadata.HasNickname && metadata.CharacterClass is null && !metadata.IsLocalPlayer && metadata.OriginServerId is null && !metadata.HasLegionName)
             return;
 
         _pcMetadata[metadata.EntityId] = metadata;

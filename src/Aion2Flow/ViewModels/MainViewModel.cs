@@ -54,6 +54,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private readonly List<BossFocusDisplayGroup> _bossFocusDisplayGroups = [];
     private int _displayContextVersion;
     private int _displayContextBuiltVersion = -1;
+    private long _displayContextMetadataRevision = -1;
     private bool _displayContextIsArchived;
     private Guid _barBrushEncounterId;
     private uint _barBrushSeed;
@@ -937,9 +938,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         var isArchived = IsViewingArchivedEncounter && SelectedEncounterHistory is not null;
         var archivedRecord = isArchived ? SelectedEncounterHistory!.Record : null;
+        var metadataRevision = isArchived ? -1 : _captureService.Scene.Owner.MetadataRegistry.Revision;
         if (ReferenceEquals(_displayContextSnapshot, snapshot) &&
             ReferenceEquals(_displayContextArchivedRecord, archivedRecord) &&
             _displayContextBuiltVersion == _displayContextVersion &&
+            _displayContextMetadataRevision == metadataRevision &&
             _displayContextIsArchived == isArchived)
         {
             return;
@@ -948,6 +951,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _displayContextSnapshot = snapshot;
         _displayContextArchivedRecord = archivedRecord;
         _displayContextBuiltVersion = _displayContextVersion;
+        _displayContextMetadataRevision = metadataRevision;
         _displayContextIsArchived = isArchived;
         DisplayContext = isArchived
             ? CreateArchivedDisplayContext(archivedRecord!)

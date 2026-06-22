@@ -138,6 +138,7 @@ public sealed class ResourceDatabaseTests
         Assert.Equal(expectedServerName, server.ServerName);
         Assert.Equal(expectedShortServerName, server.ShortServerName);
         Assert.Equal(expectedServerName, ResourceDatabase.ResolveServerName(code, catalog));
+        Assert.Equal(expectedShortServerName, ResourceDatabase.ResolveShortServerName(code, catalog));
     }
 
     [Fact]

@@ -12,7 +12,7 @@ public sealed class SceneIdentityTests
     {
         var builder = new SceneIdentityScopeBuilder();
         builder.Reset(2);
-        builder.AddPcMetadata(new PcMetadata(300, "Player B", Faction.Light));
+        builder.AddPcMetadata(new PcMetadata(300, "Player B", Faction.Light, LegionName: "Aether"));
         builder.AddPcMetadata(new PcMetadata(100, "Player A"));
         builder.AddNpcCode(9002, 2_100_351);
         builder.AddNpcCode(9001, 2_100_350);
@@ -24,6 +24,7 @@ public sealed class SceneIdentityTests
         Assert.True(scope.TryGetPcMetadata(300, out var pc));
         Assert.Equal("Player B", pc.Nickname);
         Assert.Equal(Faction.Light, pc.Faction);
+        Assert.Equal("Aether", pc.LegionName);
         Assert.True(scope.TryGetNpcCode(9001, out var npcCode));
         Assert.Equal(2_100_350, npcCode);
         Assert.True(scope.TryGetMapCode(515552, out var mapCode));
@@ -110,6 +111,31 @@ public sealed class SceneIdentityTests
         Assert.True(registry.TryGetPcMetadata(100, out var metadata));
         Assert.True(metadata.IsLocalPlayer);
         Assert.Equal(CharacterClass.Elementalist, metadata.CharacterClass);
+    }
+
+    [Fact]
+    public void DomainEventApplier_PreservesLegionNameInRuntimeMetadataRegistry()
+    {
+        var entities = new EntityStore();
+        var boundary = new SceneBoundaryStore();
+        var registry = new RuntimeMetadataRegistry();
+        var applier = new DomainEventApplier(entities, boundary, registry, new CombatStore());
+
+        applier.ApplyEntry(new ObservedEventEnvelope
+        {
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 100,
+            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light, LegionName: "Aether")
+        });
+        applier.ApplyEntry(new ObservedEventEnvelope
+        {
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 100,
+            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light)
+        });
+
+        Assert.True(registry.TryGetPcMetadata(100, out var metadata));
+        Assert.Equal("Aether", metadata.LegionName);
     }
 
     [Fact]

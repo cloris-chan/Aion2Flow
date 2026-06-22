@@ -2,11 +2,13 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet4436Nickname(int PlayerId, string Nickname, int NicknameLength, int Delta, int? ClassCode, int? OriginServerId, byte FactionCode);
+internal readonly record struct Packet4436Nickname(int PlayerId, string Nickname, int NicknameLength, int Delta, int? ClassCode, int? OriginServerId, byte FactionCode, string LegionName);
 
 internal static class Packet4436NicknameParser
 {
     private const int MarkerSearchLimit = 12;
+    private const int LegionIdentityFirstServerOffsetFromTail = 94;
+    private const int LegionIdentityRepeatedServerDistance = 8;
 
     public static bool TryParse(ReadOnlySpan<byte> packet, out Packet4436Nickname result)
     {
@@ -57,7 +59,15 @@ internal static class Packet4436NicknameParser
 
             var classCode = NicknameParserUtil.TryReadClassCode(packet, tailOffset);
             var factionCode = NicknameParserUtil.TryReadFactionCode(packet, tailOffset + sizeof(int));
-            result = new Packet4436Nickname(playerId, sanitizedName, nicknameLength, markerOffset - searchStart, classCode, OriginServerId: null, factionCode);
+            int? originServerId = null;
+            var legionName = string.Empty;
+            if (NicknameParserUtil.TryReadServerLegionBlock(packet, tailOffset + LegionIdentityFirstServerOffsetFromTail, LegionIdentityRepeatedServerDistance, LegionIdentityTrailerKind.Legacy, out var parsedOriginServerId, out var parsedLegionName))
+            {
+                originServerId = parsedOriginServerId;
+                legionName = parsedLegionName;
+            }
+
+            result = new Packet4436Nickname(playerId, sanitizedName, nicknameLength, markerOffset - searchStart, classCode, originServerId, factionCode, legionName);
             return true;
         }
 

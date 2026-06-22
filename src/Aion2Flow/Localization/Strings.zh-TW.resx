@@ -34,9 +34,23 @@
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>目標狀態條</value></data>
   <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>開啟</value></data>
   <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>關閉</value></data>
-  <data name="Settings_HidePlayerNames" xml:space="preserve"><value>隱藏玩家名稱</value></data>
-  <data name="Settings_HidePlayerNames_On" xml:space="preserve"><value>開啟</value></data>
-  <data name="Settings_HidePlayerNames_Off" xml:space="preserve"><value>關閉</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>名稱顯示</value></data>
+  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>顯示</value></data>
+  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>隱藏</value></data>
+  <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>玩家名稱</value></data>
+  <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>自己標記</value></data>
+  <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>不顯示</value></data>
+  <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>隱藏名稱時顯示</value></data>
+  <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>始終顯示</value></data>
+  <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>伺服器名稱</value></data>
+  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>顯示</value></data>
+  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>隱藏</value></data>
+  <data name="Settings_PlayerLegionName" xml:space="preserve"><value>軍團名稱</value></data>
+  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>顯示</value></data>
+  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>隱藏</value></data>
+  <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>陣營著色</value></data>
+  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>開啟</value></data>
+  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>顯示行數</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戰鬥重置快捷鍵</value></data>

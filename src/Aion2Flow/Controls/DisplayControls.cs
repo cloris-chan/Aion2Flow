@@ -500,31 +500,20 @@ public sealed class CombatantDisplay : UserControl
 
 public sealed class PcDisplay : IconTextDisplay
 {
-    private const string LocalPlayerPrefix = "⭐";
-    private PlayerNamePrivacyService? _privacy;
-    private bool _isPrivacySubscribed;
+    private PlayerNameDisplayService? _nameDisplay;
+    private bool _isNameDisplaySubscribed;
 
     protected override void UpdateStateCore(SceneDisplayContext? context, int entityId)
     {
-        var faction = context?.ResolveFaction(entityId) ?? Faction.Unknown;
-        SetTextForeground(ResolveFactionNameForeground(faction));
+        var nameDisplay = TryResolveNameDisplayService();
+        SetTextForeground(nameDisplay is { TintPlayerNamesByFaction: true } ? ResolveFactionNameForeground(context?.ResolveFaction(entityId) ?? Faction.Unknown) : null);
     }
 
     protected override string ResolveTextCore(SceneDisplayContext? context, int entityId)
     {
-        var privacy = TryResolvePrivacyService();
-        if (privacy is { HidePlayerNames: true })
-        {
-            var characterClass = context?.ResolvePcClass(entityId);
-            var ordinal = context?.ResolvePcAnonymousOrdinal(entityId) ?? 1;
-            return FormatLocalPlayerName(context, entityId, privacy.FormatAnonymousName(characterClass, ordinal));
-        }
-
-        return context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
+        var nameDisplay = TryResolveNameDisplayService();
+        return nameDisplay?.FormatPcName(context, entityId) ?? context?.ResolvePcName(entityId) ?? FormatEntityId(entityId);
     }
-
-    private static string FormatLocalPlayerName(SceneDisplayContext? context, int entityId, string name)
-        => context?.IsLocalPlayer(entityId) == true ? LocalPlayerPrefix + name : name;
 
     protected override DisplayIcon? ResolveIconCore(SceneDisplayContext? context, int entityId)
     {
@@ -535,43 +524,43 @@ public sealed class PcDisplay : IconTextDisplay
     protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
     {
         base.OnAttachedToLogicalTree(e);
-        if (!_isPrivacySubscribed && TryResolvePrivacyService() is { } privacy)
+        if (!_isNameDisplaySubscribed && TryResolveNameDisplayService() is { } nameDisplay)
         {
-            privacy.DisplayChanged += OnPrivacyDisplayChanged;
-            _isPrivacySubscribed = true;
+            nameDisplay.DisplayChanged += OnNameDisplayChanged;
+            _isNameDisplaySubscribed = true;
         }
     }
 
     protected override void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
     {
-        if (_isPrivacySubscribed && _privacy is not null)
+        if (_isNameDisplaySubscribed && _nameDisplay is not null)
         {
-            _privacy.DisplayChanged -= OnPrivacyDisplayChanged;
-            _isPrivacySubscribed = false;
+            _nameDisplay.DisplayChanged -= OnNameDisplayChanged;
+            _isNameDisplaySubscribed = false;
         }
 
         base.OnDetachedFromLogicalTree(e);
     }
 
-    private PlayerNamePrivacyService? TryResolvePrivacyService()
+    private PlayerNameDisplayService? TryResolveNameDisplayService()
     {
-        if (_privacy is not null)
+        if (_nameDisplay is not null)
         {
-            return _privacy;
+            return _nameDisplay;
         }
 
         try
         {
-            _privacy = Ioc.Default.GetService<PlayerNamePrivacyService>();
+            _nameDisplay = Ioc.Default.GetService<PlayerNameDisplayService>();
         }
         catch (InvalidOperationException)
         {
         }
 
-        return _privacy;
+        return _nameDisplay;
     }
 
-    private void OnPrivacyDisplayChanged(object? sender, EventArgs e)
+    private void OnNameDisplayChanged(object? sender, EventArgs e)
     {
         UpdateDisplay();
     }

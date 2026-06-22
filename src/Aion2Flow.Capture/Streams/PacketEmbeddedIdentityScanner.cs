@@ -29,9 +29,27 @@ internal static class PacketEmbeddedIdentityScanner
                     continue;
                 }
             }
+            else if (packet[offset] == 0x45 && packet[offset + 1] == 0x36)
+            {
+                if (TryParsePcMetadataAt(packet, offset, ref context, out consumed))
+                {
+                    parsed = true;
+                    offset += Math.Max(consumed - 1, 1);
+                    continue;
+                }
+            }
             else if (packet[offset] == 0x04 && packet[offset + 1] == 0x8d)
             {
                 if (TryParseNicknameAt(packet, offset, ref context, out consumed))
+                {
+                    parsed = true;
+                    offset += Math.Max(consumed - 1, 1);
+                    continue;
+                }
+            }
+            else if (packet[offset] == 0x29 && packet[offset + 1] == 0x33)
+            {
+                if (TryParseLegionMetadataAt(packet, offset, ref context, out consumed))
                 {
                     parsed = true;
                     offset += Math.Max(consumed - 1, 1);
@@ -54,7 +72,22 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.TailOffset;
-        context.Sink.AppendNickname(context.CreateObservationSource(0x048D, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x048D, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
+        return context.MarkParsed();
+    }
+
+    private static bool TryParseLegionMetadataAt(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
+    {
+        consumed = 0;
+
+        var payload = packet[opcodeOffset..];
+        if (!Packet2933LegionMetadataParser.TryParsePayload(payload, out var parsed))
+        {
+            return false;
+        }
+
+        consumed = parsed.TailOffset;
+        context.Sink.AppendNickname(context.CreateObservationSource(0x2933, consumed), parsed.EntityId, string.Empty, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
         return context.MarkParsed();
     }
 
@@ -69,7 +102,7 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.TailOffset;
-        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true, originServerId: parsed.OriginServerId);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true, originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
         return context.MarkParsed();
     }
 
@@ -84,7 +117,29 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.Delta + parsed.NicknameLength + 2;
-        context.Sink.AppendNickname(context.CreateObservationSource(0x4436, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), originServerId: parsed.OriginServerId);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x4436, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
+        return context.MarkParsed();
+    }
+
+    private static bool TryParsePcMetadataAt(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
+    {
+        consumed = 0;
+
+        var payload = packet[opcodeOffset..];
+        if (!Packet4536PcMetadataParser.TryParsePayload(payload, out var parsed))
+        {
+            return false;
+        }
+
+        consumed = Math.Max(parsed.TailOffset, parsed.NicknameLength + 2);
+        context.Sink.AppendNickname(
+            context.CreateObservationSource(0x4536, consumed),
+            parsed.EntityId,
+            parsed.Nickname,
+            PacketFactionMapper.ToFaction(parsed.FactionCode),
+            PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode),
+            originServerId: null,
+            legionName: string.Empty);
         return context.MarkParsed();
     }
 }

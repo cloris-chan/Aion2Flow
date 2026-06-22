@@ -516,7 +516,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         }
     }
 
-    public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null)
+    public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null, string legionName = "")
     {
         uid = ResolveLifecycleId(uid);
         AddKnownEntity(uid);
@@ -540,7 +540,8 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 Faction = faction,
                 CharacterClass = characterClass,
                 IsLocalPlayer = isLocalPlayer,
-                OriginServerId = originServerId
+                OriginServerId = originServerId,
+                LegionName = legionName
             }
         });
     }

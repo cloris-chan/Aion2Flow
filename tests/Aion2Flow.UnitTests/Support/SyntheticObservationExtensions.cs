@@ -44,10 +44,10 @@ internal static class SyntheticObservationExtensions
         sink.StageDestinationMapInstance(in source, instanceId);
     }
 
-    public static void AppendNickname(this IRuntimeObservationSink sink, int uid, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null)
+    public static void AppendNickname(this IRuntimeObservationSink sink, int uid, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null, string legionName = "")
     {
         var source = Source();
-        sink.AppendNickname(in source, uid, nickname, faction, characterClass, isLocalPlayer, originServerId);
+        sink.AppendNickname(in source, uid, nickname, faction, characterClass, isLocalPlayer, originServerId, legionName);
     }
 
     public static void AppendNpcCode(this IRuntimeObservationSink sink, int instanceId, int npcCode)

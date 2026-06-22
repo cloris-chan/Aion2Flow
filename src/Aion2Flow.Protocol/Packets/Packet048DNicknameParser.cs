@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet048DNickname(int PlayerId, string Nickname, int NicknameLength, int TailOffset, int? OriginServerId, byte FactionCode);
+internal readonly record struct Packet048DNickname(int PlayerId, string Nickname, int NicknameLength, int TailOffset, int? OriginServerId, byte FactionCode, string LegionName);
 
 internal static class Packet048DNicknameParser
 {
@@ -56,7 +56,16 @@ internal static class Packet048DNicknameParser
         }
 
         var directFactionCode = NicknameParserUtil.TryReadFactionCode(payload, tailOffset + 7);
-        result = new Packet048DNickname(playerId, nickname, nicknameLength, tailOffset, originServerId, NicknameParserUtil.SelectFactionCode(directFactionCode, originServerId));
+        var legionName = string.Empty;
+        var identityTailOffset = tailOffset;
+        if (PacketIdentityTrailerParser.TryReadNicknameAdjacentLegionBlock(payload, tailOffset, out var parsedLegionName, out var parsedFactionCode, out var legionTailOffset))
+        {
+            legionName = parsedLegionName;
+            directFactionCode = parsedFactionCode;
+            identityTailOffset = legionTailOffset;
+        }
+
+        result = new Packet048DNickname(playerId, nickname, nicknameLength, identityTailOffset, originServerId, NicknameParserUtil.SelectFactionCode(directFactionCode, originServerId), legionName);
         return true;
     }
 }

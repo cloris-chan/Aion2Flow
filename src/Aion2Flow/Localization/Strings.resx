@@ -34,9 +34,23 @@
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>Target status bar</value></data>
   <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>On</value></data>
   <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>Off</value></data>
-  <data name="Settings_HidePlayerNames" xml:space="preserve"><value>Hide player names</value></data>
-  <data name="Settings_HidePlayerNames_On" xml:space="preserve"><value>On</value></data>
-  <data name="Settings_HidePlayerNames_Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>Name visibility</value></data>
+  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>Show</value></data>
+  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>Hide</value></data>
+  <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>Player names</value></data>
+  <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>Self marker</value></data>
+  <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>Off</value></data>
+  <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>When names are hidden</value></data>
+  <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>Always</value></data>
+  <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>Server name</value></data>
+  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>Show</value></data>
+  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>Hide</value></data>
+  <data name="Settings_PlayerLegionName" xml:space="preserve"><value>Legion name</value></data>
+  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>Show</value></data>
+  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>Hide</value></data>
+  <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>Faction tint</value></data>
+  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>On</value></data>
+  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>Off</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>Visible rows</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>Language</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>Battle reset hotkey</value></data>

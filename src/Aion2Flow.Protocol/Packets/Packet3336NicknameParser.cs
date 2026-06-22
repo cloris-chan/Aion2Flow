@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet3336Nickname(int PlayerId, string Nickname, int NicknameLength, int TailOffset, int? ClassCode, int? OriginServerId, byte FactionCode);
+internal readonly record struct Packet3336Nickname(int PlayerId, string Nickname, int NicknameLength, int TailOffset, int? ClassCode, int? OriginServerId, byte FactionCode, string LegionName);
 
 internal static class Packet3336NicknameParser
 {
@@ -38,19 +38,28 @@ internal static class Packet3336NicknameParser
                 continue;
             }
 
+            var legionName = string.Empty;
+            var identityTailOffset = tailOffset;
+            if (PacketIdentityTrailerParser.TryReadNicknameAdjacentLegionBlock(payload, tailOffset, out var parsedLegionName, out var parsedFactionCode, out var legionTailOffset))
+            {
+                legionName = parsedLegionName;
+                identityTailOffset = legionTailOffset;
+            }
+
             int? originServerId = null;
-            var classOffset = tailOffset;
+            var classOffset = identityTailOffset;
             var classCode = NicknameParserUtil.TryReadClassCode(payload, classOffset);
-            if (NicknameParserUtil.TryReadOriginServerIdLe16(payload, tailOffset, out var serverId) &&
-                NicknameParserUtil.TryReadClassCode(payload, tailOffset + sizeof(ushort)) is { } originClassCode)
+            if (NicknameParserUtil.TryReadOriginServerIdLe16(payload, identityTailOffset, out var serverId) &&
+                NicknameParserUtil.TryReadClassCode(payload, identityTailOffset + sizeof(ushort)) is { } originClassCode)
             {
                 originServerId = serverId;
-                classOffset = tailOffset + sizeof(ushort);
+                classOffset = identityTailOffset + sizeof(ushort);
                 classCode = originClassCode;
             }
+
             var directFactionCode = NicknameParserUtil.TryReadFactionCode(payload, classOffset + sizeof(int));
             var factionCode = NicknameParserUtil.SelectFactionCode(directFactionCode, originServerId);
-            result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, tailOffset, classCode, originServerId, factionCode);
+            result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, identityTailOffset, classCode, originServerId, factionCode, legionName);
             return true;
         }
 

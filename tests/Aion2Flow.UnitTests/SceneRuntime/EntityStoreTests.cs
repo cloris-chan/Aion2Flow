@@ -179,6 +179,31 @@ public class EntityStoreTests
     }
 
     [Fact]
+    public void RuntimeMetadataRegistry_UpsertPcMetadata_PreservesLegionName_WhenGenericMetadataRefreshes()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(2007, "Perigee", Faction.Light, CharacterClass.Elementalist, legionName: "Aether");
+        registry.UpsertPcMetadata(2007, "Perigee");
+
+        Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
+        Assert.Equal("Aether", metadata.LegionName);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_UpsertPcMetadata_PreservesNickname_WhenFieldMetadataArrivesLater()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(2007, "Perigee", Faction.Light);
+        registry.UpsertPcMetadata(2007, string.Empty, originServerId: 1007, legionName: "Aether");
+
+        Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
+        Assert.Equal("Perigee", metadata.Nickname);
+        Assert.Equal(1007, metadata.OriginServerId);
+        Assert.Equal("Aether", metadata.LegionName);
+        Assert.Equal(Faction.Light, metadata.Faction);
+    }
+
+    [Fact]
     public void RuntimeMetadataRegistry_UpsertPcMetadata_KeepsSingleLocalPlayer()
     {
         var registry = new RuntimeMetadataRegistry();

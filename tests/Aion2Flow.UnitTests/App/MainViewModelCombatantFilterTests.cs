@@ -154,6 +154,22 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_SceneMode_RebuildsDisplayContextWhenMetadataChanges()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        var contextBeforeMetadata = fixture.ViewModel.DisplayContext;
+
+        fixture.MetadataRegistry.UpsertPcMetadata(300, "Scene Player", legionName: "Aether");
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.NotSame(contextBeforeMetadata, fixture.ViewModel.DisplayContext);
+        Assert.True(fixture.ViewModel.DisplayContext!.TryResolvePcMetadata(300, out var metadata));
+        Assert.Equal("Aether", metadata.LegionName);
+    }
+
+    [Fact]
     public void RefreshCombatStats_SceneMode_FiltersNpcFromSceneStore()
     {
         var fixture = MainViewModelFixture.Create();
@@ -836,8 +852,8 @@ public sealed class MainViewModelCombatantFilterTests
             var capture = new WinDivertCaptureService(ports);
             var frameBatch = new UiFrameBatchService();
             var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
-            var privacy = new PlayerNamePrivacyService(settings, localization);
-            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, privacy, new AppUpdateService(), new ProcessForegroundWatcher(ports), new GlobalHotkeyService());
+            var playerNameDisplay = new PlayerNameDisplayService(settings, localization);
+            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, playerNameDisplay, new AppUpdateService(), new ProcessForegroundWatcher(ports), new GlobalHotkeyService());
             var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, settingsViewModel, frameBatch);
             return new MainViewModelFixture(viewModel, capture, archive, frameBatch);
         }

@@ -18,7 +18,15 @@ public sealed class AppSettings
 
     public bool ShowFocusStatusBar { get; set; } = true;
 
-    public bool HidePlayerNames { get; set; }
+    public bool ShowPlayerNames { get; set; } = true;
+
+    public PlayerSelfMarkerDisplayMode PlayerSelfMarkerDisplayMode { get; set; } = PlayerSelfMarkerDisplayMode.WhenNamesHidden;
+
+    public bool ShowPlayerShortServerName { get; set; }
+
+    public bool ShowPlayerLegionName { get; set; }
+
+    public bool TintPlayerNamesByFaction { get; set; } = true;
 
     public string? Language { get; set; }
 

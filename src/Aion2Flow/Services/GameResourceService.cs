@@ -160,6 +160,22 @@ public sealed class GameResourceService : IDisposable
         return ResourceDatabase.ResolveServerName(code, snapshot);
     }
 
+    public string ResolveShortServerName(int code)
+    {
+        if (code <= 0)
+        {
+            return string.Empty;
+        }
+
+        IReadOnlyDictionary<int, ServerNameCatalogEntry> snapshot;
+        lock (_lock)
+        {
+            snapshot = ServerNames;
+        }
+
+        return ResourceDatabase.ResolveShortServerName(code, snapshot);
+    }
+
     private void OnLanguageChanged(object? sender, string language)
     {
         Reload(language);

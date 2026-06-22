@@ -69,7 +69,7 @@ internal static class Program
         services.AddSingleton<LanguageService>();
         services.AddSingleton<GameResourceService>();
         services.AddSingleton<LocalizationService>();
-        services.AddSingleton<PlayerNamePrivacyService>();
+        services.AddSingleton<PlayerNameDisplayService>();
         services.AddSingleton<AppUpdateService>();
         services.AddSingleton<EncounterArchiveService>();
         services.AddSingleton<AvaloniaFrameClockService>();

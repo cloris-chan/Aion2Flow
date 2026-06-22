@@ -212,6 +212,18 @@ public static class ResourceDatabase
             : code.ToString(CultureInfo.InvariantCulture);
     }
 
+    public static string ResolveShortServerName(int code, IReadOnlyDictionary<int, ServerNameCatalogEntry> serverNames)
+    {
+        if (code <= 0)
+        {
+            return string.Empty;
+        }
+
+        return serverNames.TryGetValue(code, out var entry) && !string.IsNullOrWhiteSpace(entry.ShortServerName)
+            ? entry.ShortServerName
+            : ResolveServerName(code, serverNames);
+    }
+
     private static string GetLocalizedColumn(string baseName, string lang) => lang switch
     {
         "en-US" => $"{baseName}EnUs",

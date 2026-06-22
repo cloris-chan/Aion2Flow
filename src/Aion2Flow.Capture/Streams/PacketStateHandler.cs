@@ -263,7 +263,8 @@ internal sealed class PacketStateHandler
                 pcMetadata.Nickname,
                 PacketFactionMapper.ToFaction(pcMetadata.FactionCode),
                 characterClass: PacketCharacterClassMapper.ToCharacterClass(pcMetadata.ClassCode),
-                originServerId: pcMetadata.OriginServerId);
+                originServerId: null,
+                legionName: string.Empty);
             return context.MarkParsed();
         }
 

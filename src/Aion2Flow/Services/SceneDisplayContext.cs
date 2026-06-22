@@ -106,6 +106,17 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
 
     public bool HasPcMetadata(int entityId) => entityId > 0 && TryGetPcMetadata(entityId, out _);
 
+    public bool TryResolvePcMetadata(int entityId, out PcMetadata metadata)
+    {
+        if (entityId <= 0)
+        {
+            metadata = default;
+            return false;
+        }
+
+        return TryGetPcMetadata(entityId, out metadata);
+    }
+
     public CharacterClass? ResolvePcClass(int entityId)
         => Snapshot.Combatants.TryGetValue(entityId, out var combatant)
             ? combatant.CharacterClass
@@ -160,6 +171,8 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
 
     public string? ResolveSkillIconAssetName(int skillCode) => skillCode > 0 ? Resources.ResolveSkillIconAssetName(skillCode) : null;
 
+    public string ResolveShortServerName(int code) => code > 0 ? Resources.ResolveShortServerName(code) : string.Empty;
+
     public string ResolveMapName(uint mapId)
     {
         var mapName = mapId == 0 ? string.Empty : Resources.ResolveMapName(mapId);
@@ -186,12 +199,41 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
 
     private bool TryGetPcMetadata(int entityId, out PcMetadata metadata)
     {
-        if (IdentityScope.TryGetPcMetadata(entityId, out metadata))
+        var hasScoped = IdentityScope.TryGetPcMetadata(entityId, out var scoped);
+        var registered = default(PcMetadata);
+        var hasRegistry = MetadataRegistry is not null && MetadataRegistry.TryGetPcMetadata(entityId, out registered);
+        if (hasScoped && hasRegistry)
         {
+            metadata = MergePcMetadata(scoped, registered);
             return true;
         }
 
-        return MetadataRegistry is not null && MetadataRegistry.TryGetPcMetadata(entityId, out metadata);
+        if (hasScoped)
+        {
+            metadata = scoped;
+            return true;
+        }
+
+        if (hasRegistry)
+        {
+            metadata = registered;
+            return true;
+        }
+
+        metadata = default;
+        return false;
+    }
+
+    private static PcMetadata MergePcMetadata(PcMetadata scoped, PcMetadata registered)
+    {
+        var nickname = scoped.HasNickname ? scoped.Nickname : registered.Nickname;
+        var faction = scoped.HasFaction ? scoped.Faction : registered.Faction;
+        var characterClass = scoped.CharacterClass ?? registered.CharacterClass;
+        var isLocalPlayer = scoped.IsLocalPlayer || registered.IsLocalPlayer;
+        var originServerId = scoped.OriginServerId is > 0 ? scoped.OriginServerId : registered.OriginServerId;
+        var legionName = scoped.HasLegionName ? scoped.LegionName : registered.LegionName;
+        var entityId = scoped.EntityId > 0 ? scoped.EntityId : registered.EntityId;
+        return new PcMetadata(entityId, nickname, faction, characterClass, isLocalPlayer, originServerId, legionName);
     }
 
     private bool TryGetNpcCode(int instanceId, out int npcCode)
