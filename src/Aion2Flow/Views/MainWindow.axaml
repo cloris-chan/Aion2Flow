@@ -222,7 +222,7 @@
 
                                 <controls:NumericBlock Grid.Column="2"
                                                        Classes="OverlayRowMetricStrong"
-                                                       Width="46"
+                                                       MinWidth="46"
                                                        Value="{Binding DamagePerSecond}"
                                                        IsVisible="{Binding Columns.ShowDamagePerSecondColumn}"
                                                        VerticalAlignment="Center"
@@ -236,7 +236,7 @@
 
                                 <controls:NumericBlock Grid.Column="3"
                                                        Classes="OverlayRowMetric"
-                                                       Width="48"
+                                                       MinWidth="54"
                                                        Value="{Binding Damage}"
                                                        IsVisible="{Binding Columns.ShowDamageColumn}"
                                                        VerticalAlignment="Center"
