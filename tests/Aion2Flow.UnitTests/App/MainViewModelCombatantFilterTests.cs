@@ -853,7 +853,8 @@ public sealed class MainViewModelCombatantFilterTests
             var frameBatch = new UiFrameBatchService();
             var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
             var playerNameDisplay = new PlayerNameDisplayService(settings, localization);
-            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, playerNameDisplay, new AppUpdateService(), new ProcessForegroundWatcher(ports), new GlobalHotkeyService());
+            var uiScale = new UiScaleService(settings);
+            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, playerNameDisplay, uiScale, new AppUpdateService(), new ProcessForegroundWatcher(ports), new GlobalHotkeyService());
             var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, settingsViewModel, frameBatch);
             return new MainViewModelFixture(viewModel, capture, archive, frameBatch);
         }

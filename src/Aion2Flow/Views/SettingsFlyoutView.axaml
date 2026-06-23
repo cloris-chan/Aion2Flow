@@ -44,6 +44,27 @@
                           Loaded="LanguageMenuItemLoaded" />
             </Menu>
 
+            <Border Classes="SettingsScaleRow">
+                <Grid ColumnDefinitions="Auto,*,Auto"
+                      ColumnSpacing="10">
+                    <TextBlock Grid.Column="0"
+                               Classes="SettingsRowLabel"
+                               Text="{markups:Translate Settings_UiScale}" />
+                    <Slider x:Name="UiScaleSlider"
+                            Grid.Column="1"
+                            Classes="SettingsScaleSlider"
+                            Minimum="50"
+                            Maximum="200"
+                            TickFrequency="1"
+                            Value="{Binding UiScalePercent, Mode=OneWay}"
+                            Loaded="UiScaleSliderLoaded"
+                            KeyUp="UiScaleSliderKeyUp" />
+                    <TextBlock Grid.Column="2"
+                               Classes="SettingsScaleValue"
+                               Text="{Binding #UiScaleSlider.Value, StringFormat='{}{0:F0}%'}" />
+                </Grid>
+            </Border>
+
             <Border Classes="SettingsHotkeyRow"
                     Focusable="True"
                     PointerPressed="BattleResetHotkeyRowPressed"

@@ -15,17 +15,19 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     private readonly LanguageService _languageService;
     private readonly SettingsService _settingsService;
     private readonly PlayerNameDisplayService _playerNameDisplay;
+    private readonly UiScaleService _uiScale;
     private readonly AppUpdateService _updateService;
     private readonly ProcessForegroundWatcher _processForegroundWatcher;
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly bool _isApplyingPersistedSettings;
 
-    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNameDisplayService playerNameDisplay, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
+    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNameDisplayService playerNameDisplay, UiScaleService uiScale, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
     {
         Localization = localization;
         _languageService = languageService;
         _settingsService = settingsService;
         _playerNameDisplay = playerNameDisplay;
+        _uiScale = uiScale;
         _updateService = updateService;
         _processForegroundWatcher = processForegroundWatcher;
         _globalHotkeyService = globalHotkeyService;
@@ -50,6 +52,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             ShowPlayerShortServerName = persisted.ShowPlayerShortServerName;
             ShowPlayerLegionName = persisted.ShowPlayerLegionName;
             TintPlayerNamesByFaction = persisted.TintPlayerNamesByFaction;
+            UiScalePercent = persisted.UiScalePercent;
             if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
             {
                 BattleResetHotkey = new HotkeyDefinition((HotkeyModifiers)mods, vk);
@@ -134,6 +137,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TintPlayerNamesByFactionDisplay))]
     public partial bool TintPlayerNamesByFaction { get; set; }
+
+    [ObservableProperty]
+    public partial int UiScalePercent { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
@@ -284,6 +290,20 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         PersistSettings();
     }
 
+    partial void OnUiScalePercentChanged(int value)
+    {
+        _uiScale.SetScalePercent(value);
+        PersistSettings();
+    }
+
+    public void SetUiScalePercent(int percent)
+    {
+        if (UiScalePercent != percent)
+            UiScalePercent = percent;
+        else
+            _uiScale.SetScalePercent(percent);
+    }
+
     partial void OnSelectedLanguageChanged(LanguageOption? value)
     {
         if (value is not null)
@@ -338,6 +358,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.ShowPlayerShortServerName = ShowPlayerShortServerName;
             s.ShowPlayerLegionName = ShowPlayerLegionName;
             s.TintPlayerNamesByFaction = TintPlayerNamesByFaction;
+            s.UiScalePercent = UiScalePercent;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
             s.BattleResetHotkeyVirtualKey = BattleResetHotkey?.VirtualKey;

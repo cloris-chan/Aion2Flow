@@ -28,6 +28,8 @@ public sealed class AppSettings
 
     public bool TintPlayerNamesByFaction { get; set; } = true;
 
+    public int UiScalePercent { get; set => field = Math.Clamp(value, 50, 200); } = 100;
+
     public string? Language { get; set; }
 
     public uint? BattleResetHotkeyModifiers { get; set; }

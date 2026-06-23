@@ -92,6 +92,7 @@ public sealed class SettingsService
         ShowPlayerShortServerName = source.ShowPlayerShortServerName,
         ShowPlayerLegionName = source.ShowPlayerLegionName,
         TintPlayerNamesByFaction = source.TintPlayerNamesByFaction,
+        UiScalePercent = source.UiScalePercent,
         Language = source.Language,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,
         BattleResetHotkeyVirtualKey = source.BattleResetHotkeyVirtualKey,

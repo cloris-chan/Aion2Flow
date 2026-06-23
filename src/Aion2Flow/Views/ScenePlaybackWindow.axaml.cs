@@ -18,6 +18,7 @@ public partial class ScenePlaybackWindow : Window
     private const double OpenColumnSpacing = 10;
 
     private readonly AvaloniaFrameClockService _frameClock;
+    private readonly UiScaleService _uiScale;
     private Grid? _rootLayout;
     private ColumnDefinition? _detailsSplitterColumn;
     private ColumnDefinition? _detailsPanelColumn;
@@ -30,6 +31,7 @@ public partial class ScenePlaybackWindow : Window
     public ScenePlaybackWindow()
     {
         _frameClock = Ioc.Default.GetRequiredService<AvaloniaFrameClockService>();
+        _uiScale = Ioc.Default.GetRequiredService<UiScaleService>();
         AvaloniaXamlLoader.Load(this);
         _rootLayout = this.FindControl<Grid>("RootLayout");
         if (_rootLayout is { ColumnDefinitions.Count: >= 3 })
@@ -48,6 +50,7 @@ public partial class ScenePlaybackWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
+        _uiScale.RegisterWindow(this);
         if (_frameClockAttached)
             return;
 

@@ -175,6 +175,23 @@ public sealed class PlayerNameDisplayServiceTests
         Assert.True(loaded.TintPlayerNamesByFaction);
     }
 
+    [Fact]
+    public void SettingsService_PersistsAndClampsUiScalePercent()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "Aion2Flow.Tests", $"{Guid.NewGuid():N}.json");
+        var settings = new SettingsService(path);
+
+        Assert.Equal(100, settings.Current.UiScalePercent);
+
+        settings.Update(s => s.UiScalePercent = 225);
+        Assert.Equal(200, settings.Current.UiScalePercent);
+        Assert.Equal(200, new SettingsService(path).Current.UiScalePercent);
+
+        settings.Update(s => s.UiScalePercent = 25);
+        Assert.Equal(50, settings.Current.UiScalePercent);
+        Assert.Equal(50, new SettingsService(path).Current.UiScalePercent);
+    }
+
     private static SettingsService CreateSettings()
     {
         var path = Path.Combine(Path.GetTempPath(), "Aion2Flow.Tests", $"{Guid.NewGuid():N}.json");

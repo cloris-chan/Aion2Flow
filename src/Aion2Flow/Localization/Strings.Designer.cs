@@ -1231,6 +1231,15 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to UI scale.
+        /// </summary>
+        internal static string Settings_UiScale {
+            get {
+                return ResourceManager.GetString("Settings_UiScale", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Check for updates.
         /// </summary>
         internal static string Settings_Update_Check {

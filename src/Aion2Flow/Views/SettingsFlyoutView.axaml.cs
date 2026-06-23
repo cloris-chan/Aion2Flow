@@ -38,6 +38,29 @@ public partial class SettingsFlyoutView : UserControl
 
     private SettingsFlyoutViewModel? ViewModel => DataContext as SettingsFlyoutViewModel;
 
+    private void UiScaleSliderLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Slider slider)
+        {
+            slider.RemoveHandler(PointerReleasedEvent, UiScaleSliderPointerReleased);
+            slider.AddHandler(PointerReleasedEvent, UiScaleSliderPointerReleased, handledEventsToo: true);
+        }
+    }
+
+    private void UiScaleSliderPointerReleased(object? sender, PointerReleasedEventArgs e) => ApplyUiScaleFromSlider(sender);
+
+    private void UiScaleSliderKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End)
+            ApplyUiScaleFromSlider(sender);
+    }
+
+    private void ApplyUiScaleFromSlider(object? sender)
+    {
+        if (sender is Slider slider)
+            ViewModel?.SetUiScalePercent((int)Math.Round(slider.Value, MidpointRounding.AwayFromZero));
+    }
+
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (_viewModel is not null)

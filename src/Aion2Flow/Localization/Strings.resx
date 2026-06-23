@@ -53,6 +53,7 @@
   <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>Off</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>Visible rows</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>Language</value></data>
+  <data name="Settings_UiScale" xml:space="preserve"><value>UI scale</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>Battle reset hotkey</value></data>
   <data name="Settings_Hotkey_None" xml:space="preserve"><value>None</value></data>
   <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>Press keys…</value></data>

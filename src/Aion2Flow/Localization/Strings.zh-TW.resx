@@ -53,6 +53,7 @@
   <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>顯示行數</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
+  <data name="Settings_UiScale" xml:space="preserve"><value>介面縮放</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戰鬥重置快捷鍵</value></data>
   <data name="Settings_Hotkey_None" xml:space="preserve"><value>未設定</value></data>
   <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>請按下按鍵…</value></data>

@@ -53,6 +53,7 @@
   <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>끔</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>표시 행 수</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>언어</value></data>
+  <data name="Settings_UiScale" xml:space="preserve"><value>UI 배율</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>전투 초기화 단축키</value></data>
   <data name="Settings_Hotkey_None" xml:space="preserve"><value>없음</value></data>
   <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>키를 누르세요…</value></data>

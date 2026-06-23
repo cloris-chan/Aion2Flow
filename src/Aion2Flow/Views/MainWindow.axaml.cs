@@ -21,6 +21,8 @@ public partial class MainWindow : Window
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly SettingsService _settingsService;
     private readonly AvaloniaFrameClockService _frameClock;
+    private readonly UiScaleService _uiScale;
+    private readonly Control? _overlayRoot;
     private bool _hotkeyAttached;
     private bool _frameClockAttached;
 
@@ -32,8 +34,10 @@ public partial class MainWindow : Window
         _globalHotkeyService = Ioc.Default.GetRequiredService<GlobalHotkeyService>();
         _settingsService = Ioc.Default.GetRequiredService<SettingsService>();
         _frameClock = Ioc.Default.GetRequiredService<AvaloniaFrameClockService>();
+        _uiScale = Ioc.Default.GetRequiredService<UiScaleService>();
         DataContext.InitializeAsync().ConfigureAwait(false);
         AvaloniaXamlLoader.Load(this);
+        _overlayRoot = Content as Control;
         DataContext.EncounterHistory.CollectionChanged += OnEncounterHistoryCollectionChanged;
         RebuildEncounterHistoryMenuItems();
         _globalHotkeyService.Triggered += OnGlobalHotkeyTriggered;
@@ -46,6 +50,7 @@ public partial class MainWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
+        _uiScale.RegisterWindow(this);
         RebuildEncounterHistoryMenuItems();
         AttachGlobalHotkeyHook();
         AttachFrameClock();
@@ -154,7 +159,7 @@ public partial class MainWindow : Window
             if (TryGetCombatantDetailsFlyout(out var flyout, out var flyoutView))
             {
                 ConfigureCombatantDetailsFlyout(flyout, flyoutView);
-                flyout.ShowAt(this);
+                flyout.ShowAt(_overlayRoot ?? this);
             }
         }
     }
@@ -300,7 +305,7 @@ public partial class MainWindow : Window
             _ => PlacementMode.LeftEdgeAlignedBottom
         };
 
-        var renderScale = RenderScaling <= 0 ? 1d : RenderScaling;
+        var renderScale = (RenderScaling <= 0 ? 1d : RenderScaling) * _uiScale.Scale;
         var availableWidth = Math.Max(0d, (placeRight ? rightSpace : leftSpace) / renderScale - 16d);
         var availableHeight = Math.Max(
             0d,
