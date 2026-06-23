@@ -138,8 +138,8 @@ internal static class PacketEmbeddedIdentityScanner
             parsed.Nickname,
             PacketFactionMapper.ToFaction(parsed.FactionCode),
             PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode),
-            originServerId: null,
-            legionName: string.Empty);
+            originServerId: parsed.OriginServerId > 0 ? parsed.OriginServerId : null,
+            legionName: parsed.LegionName);
         return context.MarkParsed();
     }
 }
