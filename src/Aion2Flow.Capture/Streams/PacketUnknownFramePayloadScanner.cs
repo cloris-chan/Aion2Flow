@@ -22,7 +22,16 @@ internal static class PacketUnknownFramePayloadScanner
                 continue;
             }
 
-            if (payload[offset] == 0x04 && payload[offset + 1] == 0x38)
+            if (payload[offset] == 0x02 && payload[offset + 1] == 0x38)
+            {
+                if (PacketCombatHandler.TryParseCompactControl0238At(payload, offset, ref context, out consumed))
+                {
+                    parsed = true;
+                    offset += Math.Max(consumed - 1, 1);
+                    continue;
+                }
+            }
+            else if (payload[offset] == 0x04 && payload[offset + 1] == 0x38)
             {
                 if (PacketCombatHandler.TryParseDamageAt(payload, offset, ref context, out consumed))
                 {
@@ -34,6 +43,15 @@ internal static class PacketUnknownFramePayloadScanner
             else if (payload[offset] == 0x05 && payload[offset + 1] == 0x38)
             {
                 if (PacketCombatHandler.TryParsePeriodicValuePacketAt(payload, offset, ref context, out consumed))
+                {
+                    parsed = true;
+                    offset += Math.Max(consumed - 1, 1);
+                    continue;
+                }
+            }
+            else if (payload[offset] == 0x06 && payload[offset + 1] == 0x38)
+            {
+                if (PacketCombatHandler.TryParseCompactControl0638At(payload, offset, ref context, out consumed))
                 {
                     parsed = true;
                     offset += Math.Max(consumed - 1, 1);
@@ -90,7 +108,7 @@ internal static class PacketUnknownFramePayloadScanner
     }
 
     private static bool IsEmbeddedCombatFrame(byte opcode0, byte opcode1)
-        => (opcode0, opcode1) is (0x04, 0x38) or (0x05, 0x38);
+        => (opcode0, opcode1) is (0x02, 0x38) or (0x04, 0x38) or (0x05, 0x38) or (0x06, 0x38);
 
     private static bool TryParseSummonPacketAt(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
     {

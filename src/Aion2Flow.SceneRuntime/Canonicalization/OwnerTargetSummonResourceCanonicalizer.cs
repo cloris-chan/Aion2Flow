@@ -31,7 +31,7 @@ public sealed class OwnerTargetSummonResourceCanonicalizer(EntityStore entities)
             (observation.HitCount <= 0 && observation.AttemptCount <= 0))
             return false;
 
-        return entities.TryGet(sourceId, out var source) && source.OwnerEntityId == targetId ||
-               entities.TryGet(targetId, out var target) && target.OwnerEntityId == sourceId;
+        return entities.TryGet(sourceId, out var source) && source.OwnerKind == EntityOwnerKind.Summon && source.OwnerEntityId == targetId ||
+               entities.TryGet(targetId, out var target) && target.OwnerKind == EntityOwnerKind.Summon && target.OwnerEntityId == sourceId;
     }
 }

@@ -177,7 +177,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, packet.Length), parsed.SourceId, parsed.BodyResourceEffectRef, parsed.Marker);
+        context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, packet.Length), parsed.SourceId, parsed.BodySkillVariantRaw, parsed.BodyResourceEffectRef, parsed.Marker, parsed.EchoSourceId);
         RawPacketDump.ObserveParsedPacket("compact-0238", context.Connection);
         return context.MarkParsed();
     }
@@ -189,9 +189,77 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0638(context.CreateObservationSource(0x0638, packet.Length), parsed.SourceId, parsed.BodyResourceEffectRef, parsed.Marker, parsed.Flag);
+        context.Sink.RegisterCompactControl0638(context.CreateObservationSource(0x0638, packet.Length), parsed.SourceId, parsed.BodySkillVariantRaw, parsed.BodyResourceEffectRef, parsed.Marker, parsed.Flag);
         RawPacketDump.ObserveParsedPacket("compact-0638", context.Connection);
         return context.MarkParsed();
+    }
+
+    public static bool TryParseCompactControl0238At(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
+    {
+        consumed = 0;
+        var payload = packet[opcodeOffset..];
+        if (payload.Length < 2 || payload[0] != 0x02 || payload[1] != 0x38)
+            return false;
+
+        var reader = new PacketSpanReader(payload);
+        if (!reader.TryAdvance(2)) return false;
+        if (!reader.TryReadVarInt(out var sourceId)) return false;
+        if (!reader.TryReadVarInt(out _)) return false;
+        if (!reader.TryReadUInt32Le(out var bodySkillVariantRaw)) return false;
+        if (!reader.TryReadByte(out var marker)) return false;
+        if (!reader.TryReadByte(out _)) return false;
+        if (!reader.TryReadVarInt(out var echoSourceId)) return false;
+        if (sourceId <= 0 || bodySkillVariantRaw == 0) return false;
+
+        consumed = ResolveEmbedded0238Length(ref reader);
+        var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, opcodeOffset, consumed, 2, Math.Max(0, consumed - 2), 0);
+        try
+        {
+            context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, consumed), sourceId, unchecked((int)bodySkillVariantRaw), ResourceEffectRef.FromRaw(bodySkillVariantRaw), marker, echoSourceId);
+            return context.MarkParsed();
+        }
+        finally
+        {
+            context.RestoreStructure(previous);
+        }
+    }
+
+    private static int ResolveEmbedded0238Length(ref PacketSpanReader reader)
+    {
+        var consumed = reader.Offset;
+        var tail = reader;
+        if (tail.TryReadUInt32Le(out var zeroValue) && zeroValue == 0 && tail.TryReadUInt32Le(out _))
+            return tail.Offset;
+
+        return consumed;
+    }
+
+    public static bool TryParseCompactControl0638At(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
+    {
+        consumed = 0;
+        var payload = packet[opcodeOffset..];
+        if (payload.Length < 2 || payload[0] != 0x06 || payload[1] != 0x38)
+            return false;
+
+        var reader = new PacketSpanReader(payload);
+        if (!reader.TryAdvance(2)) return false;
+        if (!reader.TryReadVarInt(out var sourceId)) return false;
+        if (!reader.TryReadUInt32Le(out var bodySkillVariantRaw)) return false;
+        if (!reader.TryReadByte(out var marker)) return false;
+        if (!reader.TryReadByte(out var flag)) return false;
+        if (sourceId <= 0 || bodySkillVariantRaw == 0) return false;
+
+        consumed = reader.Offset;
+        var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, opcodeOffset, consumed, 2, Math.Max(0, consumed - 2), 0);
+        try
+        {
+            context.Sink.RegisterCompactControl0638(context.CreateObservationSource(0x0638, consumed), sourceId, unchecked((int)bodySkillVariantRaw), ResourceEffectRef.FromRaw(bodySkillVariantRaw), marker, flag);
+            return context.MarkParsed();
+        }
+        finally
+        {
+            context.RestoreStructure(previous);
+        }
     }
 
     public static bool Parse3538SidecarPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)

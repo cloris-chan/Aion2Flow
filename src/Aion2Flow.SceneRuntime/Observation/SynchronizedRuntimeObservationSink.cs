@@ -125,14 +125,14 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodyResourceEffectRef, marker, layoutTag, type, value);
     }
 
-    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker)
+    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int bodySkillVariantRaw, ResourceEffectRef bodyResourceEffectRef, int marker, int echoSourceId)
     {
-        lock (gate) inner.RegisterCompactControl0238(in packet, sourceId, bodyResourceEffectRef, marker);
+        lock (gate) inner.RegisterCompactControl0238(in packet, sourceId, bodySkillVariantRaw, bodyResourceEffectRef, marker, echoSourceId);
     }
 
-    public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
+    public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, int bodySkillVariantRaw, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
     {
-        lock (gate) inner.RegisterCompactControl0638(in packet, sourceId, bodyResourceEffectRef, marker, flag);
+        lock (gate) inner.RegisterCompactControl0638(in packet, sourceId, bodySkillVariantRaw, bodyResourceEffectRef, marker, flag);
     }
 
     public void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64)

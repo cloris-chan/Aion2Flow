@@ -18,10 +18,11 @@ public sealed class DomainEventApplier
     private readonly PeriodicPoolCanonicalizer _periodicPool;
     private readonly OwnerTargetSummonResourceCanonicalizer _ownerTargetSummonResource;
     private readonly CompactAvoidanceCanonicalizer _compactAvoidance;
+    private readonly TransientEffectOwnerTracker _transientEffectOwners;
     private readonly BossFocusStore _bossFocus;
 
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
-        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactAvoidanceCanonicalizer(), new BossFocusStore(entities))
+        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactAvoidanceCanonicalizer(), new TransientEffectOwnerTracker(), new BossFocusStore(entities))
     {
     }
 
@@ -30,7 +31,7 @@ public sealed class DomainEventApplier
     {
     }
 
-    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactAvoidanceCanonicalizer compactAvoidance, BossFocusStore bossFocus)
+    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactAvoidanceCanonicalizer compactAvoidance, TransientEffectOwnerTracker transientEffectOwners, BossFocusStore bossFocus)
     {
         _entities = entities;
         _boundary = boundary;
@@ -40,6 +41,7 @@ public sealed class DomainEventApplier
         _periodicPool = periodicPool;
         _ownerTargetSummonResource = new OwnerTargetSummonResourceCanonicalizer(entities);
         _compactAvoidance = compactAvoidance;
+        _transientEffectOwners = transientEffectOwners;
         _bossFocus = bossFocus;
     }
 
@@ -54,6 +56,7 @@ public sealed class DomainEventApplier
         _systemPeriodicRecovery.CreateSnapshot(),
         _periodicPool.CreateSnapshot(),
         _compactAvoidance.CreateSnapshot(),
+        _transientEffectOwners.CreateSnapshot(),
         _bossFocus.CreateSnapshot());
 
     internal static DomainEventApplier FromSnapshot(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, DomainEventApplierSnapshot snapshot)
@@ -65,6 +68,7 @@ public sealed class DomainEventApplier
             SystemPeriodicRecoveryCanonicalizer.FromSnapshot(snapshot.SystemPeriodicRecovery),
             PeriodicPoolCanonicalizer.FromSnapshot(snapshot.PeriodicPool),
             CompactAvoidanceCanonicalizer.FromSnapshot(snapshot.CompactAvoidance),
+            TransientEffectOwnerTracker.FromSnapshot(snapshot.TransientEffectOwners),
             BossFocusStore.FromSnapshot(entities, snapshot.BossFocus));
 
     public void ApplyJournal(ObservedEventJournal journal)
@@ -135,6 +139,7 @@ public sealed class DomainEventApplier
         var stamp = entry.Stamp;
         var structurePath = entry.Raw.StructurePath;
         var observedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
+        ObserveTransientEffectOwnerPacket(in entry, in combatObservation, observedAtMilliseconds);
         var rawResults = entry.Raw.Opcode switch
         {
             0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, observedAtMilliseconds),
@@ -155,6 +160,7 @@ public sealed class DomainEventApplier
     private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
     {
         var resultObservation = result.Observation;
+        TryApplyTransientEffectOwner(result.SourceId, result.TargetId, in resultObservation, observedAtMilliseconds);
         var ownerTargetSummonResourceResult = _ownerTargetSummonResource.Normalize(result.SourceId, result.TargetId, in resultObservation);
         var observation = ownerTargetSummonResourceResult.Observation;
         var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonResourceResult.SourceId, ownerTargetSummonResourceResult.TargetId, in stamp, in observation);
@@ -171,6 +177,60 @@ public sealed class DomainEventApplier
         _combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
         TryApplyBossCombatActivity(result.SourceId, observedAtMilliseconds);
         TryApplyBossCombatActivity(result.TargetId, observedAtMilliseconds);
+    }
+
+    private void ObserveTransientEffectOwnerPacket(in ObservedEventEnvelope entry, in CombatObservation observation, long observedAtMilliseconds)
+    {
+        if (entry.Raw.Opcode == 0x0238 && CanObserveTransientEffectOwnerSeed(entry.SourceEntityId))
+        {
+            _transientEffectOwners.ObserveOwnerSkill(entry.SourceEntityId, in observation, observedAtMilliseconds);
+            return;
+        }
+
+        if (entry.Raw.Opcode is 0x0238 or 0x0638)
+            TryApplyTransientEffectOwner(entry.SourceEntityId, observation.ChainId, in observation, observedAtMilliseconds);
+    }
+
+    private void TryApplyTransientEffectOwner(int sourceId, int targetId, in CombatObservation observation, long observedAtMilliseconds)
+    {
+        if (!CanApplyTransientEffectOwner(sourceId))
+            return;
+
+        var ownerId = _transientEffectOwners.ResolveOwner(sourceId, targetId, in observation, observedAtMilliseconds);
+        if (CanOwnTransientEffect(ownerId, sourceId))
+            _entities.ApplyTransientEffectOwner(ownerId, sourceId);
+    }
+
+    private bool CanObserveTransientEffectOwnerSeed(int sourceId) => CanOwnTransientEffect(sourceId, 0);
+
+    private bool CanApplyTransientEffectOwner(int sourceId)
+    {
+        if (sourceId <= 0)
+            return false;
+
+        if (!_entities.TryGet(sourceId, out var entity))
+            return true;
+
+        return !entity.IsPlayer &&
+               !entity.NpcCode.HasValue &&
+               entity.OwnerKind != EntityOwnerKind.Summon &&
+               entity.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy);
+    }
+
+    private bool CanOwnTransientEffect(int ownerId, int effectSourceId)
+    {
+        if (ownerId <= 0 || ownerId == effectSourceId)
+            return false;
+
+        if (_metadataRegistry.TryGetPcMetadata(ownerId, out _))
+            return true;
+
+        if (!_entities.TryGet(ownerId, out var entity))
+            return true;
+
+        return !entity.NpcCode.HasValue &&
+               entity.OwnerEntityId is null &&
+               entity.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy);
     }
 
     private void ApplyAura(in AuraObservation aura)
@@ -345,4 +405,5 @@ internal sealed record DomainEventApplierSnapshot(
     SystemPeriodicRecoveryCanonicalizerSnapshot SystemPeriodicRecovery,
     PeriodicPoolCanonicalizerSnapshot PeriodicPool,
     CompactAvoidanceCanonicalizerSnapshot CompactAvoidance,
+    TransientEffectOwnerTrackerSnapshot TransientEffectOwners,
     BossFocusStoreSnapshot BossFocus);

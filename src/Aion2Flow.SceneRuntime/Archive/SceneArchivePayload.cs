@@ -786,6 +786,7 @@ public sealed class SceneArchiveEntityIdentity
     public int? NpcCode { get; init; }
     public NpcKind Kind { get; init; }
     public int? OwnerEntityId { get; init; }
+    public EntityOwnerKind OwnerKind { get; init; }
     public int? CurrentHp { get; init; }
     public int? MaxHp { get; init; }
     public bool NpcCombatActive { get; init; }
@@ -803,6 +804,7 @@ public sealed class SceneArchiveEntityIdentity
         NpcCode = e.NpcCode,
         Kind = e.Kind,
         OwnerEntityId = e.OwnerEntityId,
+        OwnerKind = e.OwnerKind,
         CurrentHp = e.CurrentHp,
         MaxHp = e.MaxHp,
         NpcCombatActive = e.NpcCombatActive,
@@ -821,6 +823,7 @@ public sealed class SceneArchiveEntityIdentity
         NpcCode = NpcCode,
         Kind = Kind,
         OwnerEntityId = OwnerEntityId,
+        OwnerKind = OwnerKind,
         CurrentHp = CurrentHp,
         MaxHp = MaxHp,
         NpcCombatActive = NpcCombatActive,

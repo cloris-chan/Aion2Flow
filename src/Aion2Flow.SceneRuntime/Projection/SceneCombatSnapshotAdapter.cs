@@ -431,10 +431,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (targetId <= 0 || damage <= 0)
             return false;
 
-        if (IsKnownSummonCached(targetId))
+        var sourceIsSummon = IsKnownSummonCached(sourceId);
+        var targetIsSummon = IsKnownSummonCached(targetId);
+        if (targetIsSummon)
             return true;
 
-        return ResolveCombatantIdCached(sourceId) == ResolveCombatantIdCached(targetId);
+        return (sourceIsSummon || targetIsSummon) && ResolveCombatantIdCached(sourceId) == ResolveCombatantIdCached(targetId);
     }
 
     private bool IsKnownSummonCached(int entityId)
@@ -454,7 +456,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     {
         if (entities.TryGet(entityId, out var entity))
         {
-            if (entity.OwnerEntityId.HasValue || entity.Kind == NpcKind.Summon)
+            if (entity.OwnerKind == EntityOwnerKind.Summon || entity.Kind == NpcKind.Summon)
                 return true;
 
             if (entity.Kind != NpcKind.Summon && IsExplicitNonSummon(entity))
@@ -465,7 +467,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     }
 
     private bool IsExplicitKnownSummonCore(int entityId) =>
-        entities.TryGet(entityId, out var entity) && entity.OwnerEntityId.HasValue;
+        entities.TryGet(entityId, out var entity) && entity.OwnerKind == EntityOwnerKind.Summon;
 
     private static bool IsExplicitNonSummon(EntityRecord entity) =>
         entity.IsPlayer ||

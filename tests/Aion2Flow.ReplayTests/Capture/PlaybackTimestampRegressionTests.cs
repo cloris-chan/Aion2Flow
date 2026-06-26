@@ -25,7 +25,7 @@ public sealed class PlaybackTimestampRegressionTests
                 summonOffsets.Add(offset);
         }
 
-        Assert.Equal(327, compactControlOffsets.Count);
+        Assert.Equal(1133, compactControlOffsets.Count);
         Assert.Equal(104, summonOffsets.Count);
         Assert.Contains(compactControlOffsets, static offset => offset > 0);
         Assert.Contains(summonOffsets, static offset => offset > 0);

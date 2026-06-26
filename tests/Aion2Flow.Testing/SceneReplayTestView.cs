@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.Tests;
 
@@ -59,7 +60,7 @@ public static class SceneReplayTestView
 
     public static Dictionary<int, int> SummonOwnerByInstance(PacketLogReplayResult replay) =>
         replay.SceneOwner.Entities.Entities.Values
-            .Where(static entity => entity.OwnerEntityId.HasValue)
+            .Where(static entity => entity.OwnerKind == EntityOwnerKind.Summon && entity.OwnerEntityId.HasValue)
             .ToDictionary(static entity => entity.EntityId, static entity => entity.OwnerEntityId!.Value);
 
     public static int ResolveCombatantId(PacketLogReplayResult replay, int entityId) =>
