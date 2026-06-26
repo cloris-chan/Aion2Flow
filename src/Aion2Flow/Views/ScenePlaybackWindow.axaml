@@ -289,7 +289,7 @@
                                                                                 Classes="PlaybackTimelineStrip PlaybackCombatantTimelineStrip"
                                                                                 Bands="{Binding Timeline.Bands}"
                                                                                 DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
-                                                                                PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}"
+                                                                                IsPlayheadVisible="False"
                                                                                 SeekRequested="TimelineSeekRequested" />
                                             <TextBlock Grid.Column="3"
                                                        Classes="PlaybackTrackCount"

@@ -23,9 +23,11 @@ public sealed class PlaybackTimelineStripView : Control
 
     public static readonly StyledProperty<double> PlayheadThicknessProperty = AvaloniaProperty.Register<PlaybackTimelineStripView, double>(nameof(PlayheadThickness), 2d);
 
+    public static readonly StyledProperty<bool> IsPlayheadVisibleProperty = AvaloniaProperty.Register<PlaybackTimelineStripView, bool>(nameof(IsPlayheadVisible), true);
+
     static PlaybackTimelineStripView()
     {
-        AffectsRender<PlaybackTimelineStripView>(BandsProperty, DurationMillisecondsProperty, PositionMillisecondsProperty, TrackBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty);
+        AffectsRender<PlaybackTimelineStripView>(BandsProperty, DurationMillisecondsProperty, PositionMillisecondsProperty, TrackBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty, IsPlayheadVisibleProperty);
     }
 
     private IReadOnlyList<PlaybackTimelineBand>? _bands;
@@ -70,6 +72,12 @@ public sealed class PlaybackTimelineStripView : Control
         set => SetValue(PlayheadThicknessProperty, value);
     }
 
+    public bool IsPlayheadVisible
+    {
+        get => GetValue(IsPlayheadVisibleProperty);
+        set => SetValue(IsPlayheadVisibleProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         var bounds = new Rect(Bounds.Size);
@@ -86,6 +94,9 @@ public sealed class PlaybackTimelineStripView : Control
         var bands = Bands;
         if (bands is not null && bands.Count > 0)
             DrawBands(context, bands, duration, bounds);
+
+        if (!IsPlayheadVisible)
+            return;
 
         var playheadX = PlaybackTimelineGeometry.PositionToX(PositionMilliseconds, duration, bounds.Width);
         var playhead = PlayheadBrush ?? Brushes.White;
