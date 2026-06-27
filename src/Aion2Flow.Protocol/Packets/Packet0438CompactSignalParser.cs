@@ -1,9 +1,8 @@
-using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0438CompactSignal(int TargetId, int LayoutTag, int Flag, int SourceId, ResourceEffectRef BodyResourceEffectRef, int Marker, int Type, int TailLength);
+internal readonly record struct Packet0438CompactSignal(int TargetId, int LayoutTag, int Flag, int SourceId, int BodySkillVariantRaw, int Marker, int Type, int TailLength);
 
 internal static class Packet0438CompactSignalParser
 {
@@ -25,12 +24,12 @@ internal static class Packet0438CompactSignalParser
         if (targetId <= 0 || sourceId <= 0) return false;
         if (layoutTag != 2 || reader.Remaining < 5) return false;
 
-        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
+        if (!reader.TryReadUInt32Le(out var bodySkillVariantRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadVarInt(out var type)) return false;
         if (reader.Remaining == 0) return false;
 
-        result = new Packet0438CompactSignal(targetId, layoutTag, flag, sourceId, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), marker, type, reader.Remaining);
+        result = new Packet0438CompactSignal(targetId, layoutTag, flag, sourceId, unchecked((int)bodySkillVariantRaw), marker, type, reader.Remaining);
         return true;
     }
 }

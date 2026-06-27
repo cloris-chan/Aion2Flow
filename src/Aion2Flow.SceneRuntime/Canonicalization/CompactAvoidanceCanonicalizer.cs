@@ -9,7 +9,7 @@ public sealed class CompactAvoidanceCanonicalizer
 {
     private const int MaxPendingAvoidances = 32;
 
-    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, ResourceEffectRef BodyResourceEffectRef, int Marker, long BatchOrdinal, int ScopeId, TimelineStamp Stamp, long ObservedAtMilliseconds);
+    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker, long BatchOrdinal, int ScopeId, TimelineStamp Stamp, long ObservedAtMilliseconds);
 
     private readonly List<PendingCompactAvoidance> _pendingCompact = new(MaxPendingAvoidances);
     private long _currentBatchOrdinal;
@@ -69,7 +69,7 @@ public sealed class CompactAvoidanceCanonicalizer
         if (!IsCompactEvadeSignal(sourceId, targetId, in observation) || observation.Marker <= 0)
             return false;
 
-        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.BodyResourceEffectRef, observation.Marker, _currentBatchOrdinal, ResolveAssociationScope(in structurePath), stamp, observedAtMilliseconds));
+        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker, _currentBatchOrdinal, ResolveAssociationScope(in structurePath), stamp, observedAtMilliseconds));
         TrimPending();
         return true;
     }
@@ -174,7 +174,8 @@ public sealed class CompactAvoidanceCanonicalizer
     {
         var observation = new CombatObservation
         {
-            BodyResourceEffectRef = pending.BodyResourceEffectRef,
+            SkillCode = pending.BodySkillVariantRaw,
+            BodySkillVariantRaw = pending.BodySkillVariantRaw,
             Damage = 0,
             HitCount = 0,
             AttemptCount = 1,

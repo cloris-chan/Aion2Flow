@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 
 namespace Cloris.Aion2Flow.ViewModels;
@@ -110,41 +111,17 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
 
 public readonly record struct SkillPresentationKey(CombatActionKey ActionKey) : IComparable<SkillPresentationKey>
 {
-    private const int FirstClassSkillCode = 11_000_000;
-    private const int LastClassSkillCodeExclusive = 19_000_000;
-    private const int SkillFamilyScale = 10_000;
-    private const int ClassGroupScale = 100;
-
     public int SkillCode => ActionKey.SkillCode;
 
     public static SkillPresentationKey FromActionKey(CombatActionKey actionKey)
     {
-        if (!TryGetStandardClassSkillBaseCode(actionKey.SkillCode, out var baseSkillCode))
+        if (!SkillVariantInfo.TryGetStandardPlayerSkillBaseCode(actionKey.SkillCode, out var baseSkillCode))
             return new SkillPresentationKey(actionKey);
 
         return new SkillPresentationKey(new CombatActionKey(baseSkillCode, default, default));
     }
 
     public int CompareTo(SkillPresentationKey other) => ActionKey.CompareTo(other.ActionKey);
-
-    private static bool TryGetStandardClassSkillBaseCode(int skillCode, out int baseSkillCode)
-    {
-        if (skillCode is < FirstClassSkillCode or >= LastClassSkillCodeExclusive)
-        {
-            baseSkillCode = 0;
-            return false;
-        }
-
-        var familyCode = skillCode / SkillFamilyScale;
-        if (familyCode % ClassGroupScale == 0)
-        {
-            baseSkillCode = 0;
-            return false;
-        }
-
-        baseSkillCode = familyCode * SkillFamilyScale;
-        return true;
-    }
 }
 
 internal static class SkillDetailPresentationAggregator

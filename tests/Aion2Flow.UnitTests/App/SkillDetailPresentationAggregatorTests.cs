@@ -44,6 +44,7 @@ public sealed class SkillDetailPresentationAggregatorTests
     [InlineData(16330027, 16330000)]
     [InlineData(16990002, 16990000)]
     [InlineData(18091243, 18090000)]
+    [InlineData(1218810, 1218810)]
     [InlineData(11000001, 11000001)]
     [InlineData(16000047, 16000047)]
     [InlineData(10_010_047, 10_010_047)]

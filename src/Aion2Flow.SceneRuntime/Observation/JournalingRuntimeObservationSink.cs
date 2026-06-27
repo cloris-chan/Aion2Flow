@@ -292,7 +292,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
 
     public void CompleteBatch(long batchOrdinal) => journal.CompleteBatch(MapBatchOrdinal(batchOrdinal));
 
-    public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type)
+    public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
@@ -309,7 +309,8 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             Raw = packet.Raw,
             Combat = new CombatObservation
             {
-                BodyResourceEffectRef = bodyResourceEffectRef,
+                SkillCode = bodySkillVariantRaw,
+                BodySkillVariantRaw = bodySkillVariantRaw,
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
@@ -321,7 +322,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         });
     }
 
-    public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, int value)
+    public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type, int value)
     {
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
@@ -338,7 +339,8 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             Raw = packet.Raw,
             Combat = new CombatObservation
             {
-                BodyResourceEffectRef = bodyResourceEffectRef,
+                SkillCode = bodySkillVariantRaw,
+                BodySkillVariantRaw = bodySkillVariantRaw,
                 Damage = value,
                 HitCount = 0,
                 AttemptCount = 0,

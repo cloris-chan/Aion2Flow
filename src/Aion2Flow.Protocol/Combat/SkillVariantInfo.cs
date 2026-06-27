@@ -2,6 +2,12 @@ namespace Cloris.Aion2Flow.Protocol.Combat;
 
 public readonly record struct SkillVariantInfo(int SkillCode, int BaseSkillCode, int SpecializationDigits, int SpecializationMask, int VariantState)
 {
+    private const int FirstStandardPlayerSkillCode = 11_000_000;
+    private const int LastStandardPlayerSkillCodeExclusive = 19_000_000;
+    private const int SkillFamilyScale = 10_000;
+    private const int SpecialSkillGroupScale = 100;
+
+    public bool IsStandardPlayerSkill => IsStandardPlayerSkillCode(SkillCode);
     public bool HasSpecialization => SpecializationMask != 0;
     public bool HasVariantState => VariantState != 0;
     public int SpecializationSkillCode => BaseSkillCode + EncodeVariantSuffix(SpecializationMask, 0);
@@ -12,6 +18,12 @@ public readonly record struct SkillVariantInfo(int SkillCode, int BaseSkillCode,
         if (destination.Length < 3)
             throw new ArgumentException("Destination must contain at least three elements.", nameof(destination));
 
+        if (!IsStandardPlayerSkill)
+        {
+            destination[..3].Clear();
+            return;
+        }
+
         destination[0] = SpecializationSkillCode;
         destination[1] = BaseSkillCode;
         destination[2] = BaseVariantSkillCode;
@@ -21,6 +33,9 @@ public readonly record struct SkillVariantInfo(int SkillCode, int BaseSkillCode,
     {
         if (skillCode <= 0)
             return default;
+
+        if (!TryGetStandardPlayerSkillBaseCode(skillCode, out var baseSkillCode))
+            return new SkillVariantInfo(skillCode, skillCode, 0, 0, 0);
 
         var variantState = skillCode % 10;
         var specializationDigits = (skillCode / 10) % 1000;
@@ -35,8 +50,27 @@ public readonly record struct SkillVariantInfo(int SkillCode, int BaseSkillCode,
                 specializationMask |= 1 << (digit - 1);
         }
 
-        var baseSkillCode = skillCode - (skillCode % 10000);
         return new SkillVariantInfo(skillCode, baseSkillCode, specializationDigits, specializationMask, variantState);
+    }
+
+    public static bool TryGetStandardPlayerSkillBaseCode(int skillCode, out int baseSkillCode)
+    {
+        if (!IsStandardPlayerSkillCode(skillCode))
+        {
+            baseSkillCode = 0;
+            return false;
+        }
+
+        baseSkillCode = skillCode / SkillFamilyScale * SkillFamilyScale;
+        return baseSkillCode != skillCode;
+    }
+
+    public static bool IsStandardPlayerSkillCode(int skillCode)
+    {
+        if (skillCode is < FirstStandardPlayerSkillCode or >= LastStandardPlayerSkillCodeExclusive)
+            return false;
+
+        return skillCode / SkillFamilyScale % SpecialSkillGroupScale != 0;
     }
 
     private static int EncodeVariantSuffix(int specializationMask, int variantState)

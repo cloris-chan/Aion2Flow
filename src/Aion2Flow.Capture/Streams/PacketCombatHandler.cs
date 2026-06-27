@@ -77,7 +77,7 @@ internal static class PacketCombatHandler
 
         if (Packet0438CompactValueParser.TryParse(packet, out var compact))
         {
-            context.Sink.RegisterCompactValue0438(context.CreateObservationSource(0x0438, packet.Length), compact.TargetId, compact.SourceId, compact.BodyResourceEffectRef, compact.Marker, compact.LayoutTag, compact.Type, compact.Value);
+            context.Sink.RegisterCompactValue0438(context.CreateObservationSource(0x0438, packet.Length), compact.TargetId, compact.SourceId, compact.BodySkillVariantRaw, compact.Marker, compact.LayoutTag, compact.Type, compact.Value);
             RawPacketDump.ObserveParsedPacket("compact-value", context.Connection);
             return context.MarkParsed();
         }
@@ -87,7 +87,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactValue0438(context.CreateObservationSource(0x0438, packet.Length), compactSignal.TargetId, compactSignal.SourceId, compactSignal.BodyResourceEffectRef, compactSignal.Marker, compactSignal.LayoutTag, compactSignal.Type);
+        context.Sink.RegisterCompactValue0438(context.CreateObservationSource(0x0438, packet.Length), compactSignal.TargetId, compactSignal.SourceId, compactSignal.BodySkillVariantRaw, compactSignal.Marker, compactSignal.LayoutTag, compactSignal.Type);
         return context.MarkParsed();
     }
 

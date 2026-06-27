@@ -1,4 +1,7 @@
 using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
@@ -312,5 +315,31 @@ public sealed class SkillIdentitySceneTests
         Assert.Equal(0, entry.Metrics.SkillCode);
         Assert.Equal(2000, entry.Metrics.DamageAmount);
         Assert.Equal("Unknown effect B:1700000011 D:1700000012", entry.ActionKey.FormatFallbackLabel());
+    }
+
+    [Fact]
+    public void Compact0438_Body_Code_Is_Stored_As_Skill_Code()
+    {
+        CombatResourceRegistry.SetGameResources(
+        [
+            new Skill(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ItemSkill, "npc", null)
+        ], new Dictionary<int, NpcCatalogEntry>());
+
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        const int sourceId = 100;
+        const int targetId = 200;
+        var source = new PacketObservationSource(1_000, 0, 1, 0x0438, 16, 0, default);
+
+        sink.RegisterCompactValue0438(in source, targetId, sourceId, 1218810, 3, 0, 1);
+
+        var entry = journal.Read(0);
+        Assert.True(entry.Combat.HasValue);
+        var combat = entry.Combat.Value;
+        Assert.Equal(sourceId, entry.SourceEntityId);
+        Assert.Equal(targetId, entry.TargetEntityId);
+        Assert.Equal(1218810, combat.SkillCode);
+        Assert.Equal(1218810, combat.BodySkillVariantRaw);
+        Assert.Equal(0u, combat.BodyResourceEffectRef.RawId);
     }
 }

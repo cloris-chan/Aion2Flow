@@ -44,9 +44,9 @@ public interface IRuntimeObservationSink
 
     void CompleteBatch(long batchOrdinal);
 
-    void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type);
+    void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type);
 
-    void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int layoutTag, int type, int value);
+    void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type, int value);
 
     void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int bodySkillVariantRaw, ResourceEffectRef bodyResourceEffectRef, int marker, int echoSourceId);
 
