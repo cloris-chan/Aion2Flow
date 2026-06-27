@@ -171,11 +171,32 @@
                 <Border Classes="DetailTableCard">
                     <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                         <StackPanel Orientation="Vertical"
-                                    MinWidth="1828"
-                                    Spacing="6">
+                                    Spacing="6"
+                                    Grid.IsSharedSizeScope="True">
                             <Border Classes="DetailTableHeaderBand">
-                                <Grid ColumnDefinitions="240,82,82,90,96,72,86,86,86,86,86,86,90,86,90,86,86,86,86,60"
-                                      ColumnSpacing="4">
+                                <Grid ColumnSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="DamageSkillName" />
+                                        <ColumnDefinition Width="82" />
+                                        <ColumnDefinition Width="82" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="96" />
+                                        <ColumnDefinition Width="72" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="60" />
+                                    </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
                                                Classes="DetailTableHeaderLeft"
                                                Text="{markups:Translate Column_Skill}" />
@@ -243,17 +264,38 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
                                         <Border Classes="DetailTableRow">
-                                            <Grid ColumnDefinitions="240,82,82,90,96,72,86,86,86,86,86,86,90,86,90,86,86,86,86,60"
-                                                  ColumnSpacing="4">
-                                            <controls:SkillDisplay Grid.Column="0"
-                                                                   Classes="DetailRowText"
-                                                                   SkillCode="{Binding SkillCode}"
-                                                                   FallbackText="{Binding DisplayName}"
-                                                                   IconSize="22"
-                                                                   VerticalAlignment="Center" />
-                                            <controls:NumericBlock Grid.Column="1"
-                                                                   Classes="DetailRowValue"
-                                                                   Value="{Binding TotalAmount}" />
+                                            <Grid ColumnSpacing="4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="DamageSkillName" />
+                                                    <ColumnDefinition Width="82" />
+                                                    <ColumnDefinition Width="82" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="96" />
+                                                    <ColumnDefinition Width="72" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="60" />
+                                                </Grid.ColumnDefinitions>
+                                                <controls:SkillDisplay Grid.Column="0"
+                                                                       Classes="DetailRowText"
+                                                                       SkillCode="{Binding SkillCode}"
+                                                                       FallbackText="{Binding DisplayName}"
+                                                                       IconSize="22"
+                                                                       VerticalAlignment="Center" />
+                                                <controls:NumericBlock Grid.Column="1"
+                                                                       Classes="DetailRowValue"
+                                                                       Value="{Binding TotalAmount}" />
                                             <controls:NumericBlock Grid.Column="2"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding DirectAmount}" />
@@ -549,11 +591,20 @@
                     <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                             <StackPanel Orientation="Vertical"
-                                        MinWidth="874"
-                                        Spacing="6">
+                                        Spacing="6"
+                                        Grid.IsSharedSizeScope="True">
                                 <Border Classes="DetailTableHeaderBand">
-                                    <Grid ColumnDefinitions="240,96,86,96,96,96,80,56"
-                                          ColumnSpacing="4">
+                                    <Grid ColumnSpacing="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="HealingSkillName" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="86" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="56" />
+                                        </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0"
                                                    Classes="DetailTableHeaderLeft"
                                                    Text="{markups:Translate Column_Skill}" />
@@ -585,17 +636,26 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
                                             <Border Classes="DetailTableRow">
-                                                <Grid ColumnDefinitions="240,96,86,96,96,96,80,56"
-                                                      ColumnSpacing="4">
-                                            <controls:SkillDisplay Grid.Column="0"
-                                                                   Classes="DetailRowText"
-                                                                   SkillCode="{Binding SkillCode}"
-                                                                   FallbackText="{Binding DisplayName}"
-                                                                   IconSize="22"
-                                                                   VerticalAlignment="Center" />
-                                            <controls:NumericBlock Grid.Column="1"
-                                                                   Classes="DetailRowValue"
-                                                                   Value="{Binding TotalAmount}" />
+                                                <Grid ColumnSpacing="4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="HealingSkillName" />
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="86" />
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="56" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <controls:SkillDisplay Grid.Column="0"
+                                                                           Classes="DetailRowText"
+                                                                           SkillCode="{Binding SkillCode}"
+                                                                           FallbackText="{Binding DisplayName}"
+                                                                           IconSize="22"
+                                                                           VerticalAlignment="Center" />
+                                                    <controls:NumericBlock Grid.Column="1"
+                                                                           Classes="DetailRowValue"
+                                                                           Value="{Binding TotalAmount}" />
                                             <controls:NumericBlock Grid.Column="2"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding DirectAmount}" />
@@ -634,11 +694,17 @@
                     <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                             <StackPanel Orientation="Vertical"
-                                        MinWidth="584"
-                                        Spacing="6">
+                                        Spacing="6"
+                                        Grid.IsSharedSizeScope="True">
                                 <Border Classes="DetailTableHeaderBand">
-                                    <Grid ColumnDefinitions="240,96,96,80,56"
-                                          ColumnSpacing="4">
+                                    <Grid ColumnSpacing="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="ShieldSkillName" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="56" />
+                                        </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0"
                                                    Classes="DetailTableHeaderLeft"
                                                    Text="{markups:Translate Column_Skill}" />
@@ -661,17 +727,23 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
                                             <Border Classes="DetailTableRow">
-                                                <Grid ColumnDefinitions="240,96,96,80,56"
-                                                      ColumnSpacing="4">
-                                            <controls:SkillDisplay Grid.Column="0"
-                                                                   Classes="DetailRowText"
-                                                                   SkillCode="{Binding SkillCode}"
-                                                                   FallbackText="{Binding DisplayName}"
-                                                                   IconSize="22"
-                                                                   VerticalAlignment="Center" />
-                                            <controls:NumericBlock Grid.Column="1"
-                                                                   Classes="DetailRowValue"
-                                                                   Value="{Binding TotalAmount}" />
+                                                <Grid ColumnSpacing="4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="ShieldSkillName" />
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="56" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <controls:SkillDisplay Grid.Column="0"
+                                                                           Classes="DetailRowText"
+                                                                           SkillCode="{Binding SkillCode}"
+                                                                           FallbackText="{Binding DisplayName}"
+                                                                           IconSize="22"
+                                                                           VerticalAlignment="Center" />
+                                                    <controls:NumericBlock Grid.Column="1"
+                                                                           Classes="DetailRowValue"
+                                                                           Value="{Binding TotalAmount}" />
                                             <controls:NumericBlock Grid.Column="2"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding ShieldAbsorbedAmount}" />
