@@ -41,10 +41,9 @@ public sealed class GameResourceService : IDisposable
                 return name;
             }
 
-            var variant = SkillVariantInfo.Parse(skillCode);
-            Span<int> fallbackCodes = stackalloc int[3];
-            variant.WriteDisplayFallbackCodes(fallbackCodes);
-            foreach (var fallbackCode in fallbackCodes)
+            Span<int> fallbackCodes = stackalloc int[SkillDisplayCodeFallbacks.MaxFallbackCount];
+            var fallbackCount = SkillDisplayCodeFallbacks.WriteFallbackCodes(skillCode, fallbackCodes);
+            foreach (var fallbackCode in fallbackCodes[..fallbackCount])
             {
                 if (fallbackCode != skillCode && TryResolveSkillName(Skills, fallbackCode, out name))
                 {
@@ -72,19 +71,32 @@ public sealed class GameResourceService : IDisposable
             return assetName;
         }
 
-        var variant = SkillVariantInfo.Parse(skillCode);
-        Span<int> fallbackCodes = stackalloc int[3];
-        variant.WriteDisplayFallbackCodes(fallbackCodes);
-        foreach (var fallbackCode in fallbackCodes)
+        var isStandardPlayerSkill = SkillVariantInfo.Parse(skillCode).IsStandardPlayerSkill;
+        Span<int> fallbackCodes = stackalloc int[SkillDisplayCodeFallbacks.MaxFallbackCount];
+        var fallbackCount = SkillDisplayCodeFallbacks.WriteFallbackCodes(skillCode, fallbackCodes);
+        lock (_lock)
         {
-            assetName = ResolveSkillIconFallback(fallbackCode, skillCode);
-            if (assetName is not null)
+            if (!isStandardPlayerSkill && TryResolveSkillName(Skills, skillCode, out _))
             {
-                return assetName;
+                return null;
+            }
+
+            foreach (var fallbackCode in fallbackCodes[..fallbackCount])
+            {
+                assetName = ResolveSkillIconFallback(fallbackCode, skillCode);
+                if (assetName is not null)
+                {
+                    return assetName;
+                }
+
+                if (!isStandardPlayerSkill && TryResolveSkillName(Skills, fallbackCode, out _))
+                {
+                    return null;
+                }
             }
         }
 
-        return assetName;
+        return null;
     }
 
     private static bool TryResolveSkillName(SkillCollection skills, int skillCode, out string name)

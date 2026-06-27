@@ -72,11 +72,10 @@ public static class CombatResourceRegistry
         if (SkillMap.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name))
             return skill.Name;
 
-        var variant = SkillVariantInfo.Parse(skillCode);
-        Span<int> fallbackCodes = stackalloc int[3];
-        variant.WriteDisplayFallbackCodes(fallbackCodes);
+        Span<int> fallbackCodes = stackalloc int[SkillDisplayCodeFallbacks.MaxFallbackCount];
+        var fallbackCount = SkillDisplayCodeFallbacks.WriteFallbackCodes(skillCode, fallbackCodes);
 
-        foreach (var fallbackCode in fallbackCodes)
+        foreach (var fallbackCode in fallbackCodes[..fallbackCount])
         {
             if (fallbackCode <= 0 || fallbackCode == skillCode)
                 continue;

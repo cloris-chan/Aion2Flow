@@ -35,6 +35,39 @@ public sealed class CombatLocalizationSceneTests
         }
     }
 
+    [Theory]
+    [InlineData(1227237, "冤魂球")]
+    public void CombatResourceRegistry_DisplaySkillName_Resolves_Seven_Digit_Fallbacks(int skillCode, string expectedName)
+    {
+        try
+        {
+            CombatResourceRegistry.LoadSkillMap("zh-TW");
+
+            Assert.Equal(expectedName, CombatResourceRegistry.DisplaySkillNameFor(skillCode));
+        }
+        finally
+        {
+            CombatResourceRegistry.LoadSkillMap("zh-TW");
+        }
+    }
+
+    [Theory]
+    [InlineData(1607415)]
+    [InlineData(1607400)]
+    public void CombatResourceRegistry_DisplaySkillName_Does_Not_Resolve_Npc_Code_To_Player_Family_Fallback(int skillCode)
+    {
+        try
+        {
+            CombatResourceRegistry.LoadSkillMap("zh-TW");
+
+            Assert.Empty(CombatResourceRegistry.DisplaySkillNameFor(skillCode));
+        }
+        finally
+        {
+            CombatResourceRegistry.LoadSkillMap("zh-TW");
+        }
+    }
+
     [Fact]
     public void CreateBattleSnapshot_Keeps_Combat_Totals_Stable_When_Language_Changes()
     {

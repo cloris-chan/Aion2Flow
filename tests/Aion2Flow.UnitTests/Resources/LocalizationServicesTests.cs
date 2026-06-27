@@ -105,4 +105,46 @@ public sealed class LocalizationServicesTests
             CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
         }
     }
+
+    [Theory]
+    [InlineData(1227237, "冤魂球", null)]
+    [InlineData(1227265, "亡靈迅殺", null)]
+    public void GameResourceService_Resolves_Seven_Digit_Combat_Display_Fallbacks(int skillCode, string expectedName, string? expectedIcon)
+    {
+        try
+        {
+            var languageService = new LanguageService();
+            languageService.SetLanguage(LanguageService.English);
+            languageService.SetLanguage(LanguageService.TraditionalChinese);
+            using var resources = new GameResourceService(languageService);
+
+            Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
+            Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
+        }
+        finally
+        {
+            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
+        }
+    }
+
+    [Theory]
+    [InlineData(1607415)]
+    [InlineData(1607400)]
+    public void GameResourceService_Does_Not_Resolve_Npc_Code_To_Player_Family_Fallback(int skillCode)
+    {
+        try
+        {
+            var languageService = new LanguageService();
+            languageService.SetLanguage(LanguageService.English);
+            languageService.SetLanguage(LanguageService.TraditionalChinese);
+            using var resources = new GameResourceService(languageService);
+
+            Assert.Equal(skillCode.ToString(System.Globalization.CultureInfo.InvariantCulture), resources.ResolveSkillName(skillCode));
+            Assert.Null(resources.ResolveSkillIconAssetName(skillCode));
+        }
+        finally
+        {
+            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
+        }
+    }
 }
