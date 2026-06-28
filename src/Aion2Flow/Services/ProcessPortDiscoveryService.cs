@@ -16,12 +16,12 @@ namespace Cloris.Aion2Flow.Services;
 public sealed class ProcessPortDiscoveryService : IAsyncDisposable
 {
     private enum PortEventType { Add, Remove }
-    private readonly record struct PortPair(ushort LocalPort, ushort RemotePort);
+    internal readonly record struct PortPair(ushort LocalPort, ushort RemotePort);
     private readonly record struct QueueEventItem(long ExpiredAt, PortEventType Type, uint ProcessId, PortPair PortPair);
 
     private const string ProcessName = "Aion2";
     private const int SearchPollInterval = 1000;
-    private const int KnownProcessPollInterval = 5000;
+    private const int KnownProcessPollInterval = 1000;
     private const int QueueExpiration = 10_000;
 
     private readonly ConcurrentDictionary<uint, HashSet<PortPair>> _processPorts = new();
@@ -167,23 +167,22 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
 
                         foreach (var pid in currentPids)
                         {
-                            if (!knownPids.Add(pid)) continue;
-
-                            _processPorts.TryAdd(pid, []);
+                            var isNewProcess = knownPids.Add(pid);
+                            EnsureProcessTracked(pid);
 
                             currentConnections.Clear();
-                            if (!TryGetTcpPortsForPid(pid, currentConnections))
-                                continue;
-
-                            foreach (var portPair in currentConnections)
+                            if (TryGetTcpPortsForPid(pid, currentConnections))
                             {
-                                UpdatePortState(pid, portPair, PortEventType.Add);
+                                SynchronizeProcessPorts(pid, currentConnections);
                             }
 
-                            foreach (var item in _eventQueue)
+                            if (isNewProcess)
                             {
-                                if (item.ProcessId == pid)
-                                    UpdatePortState(pid, item.PortPair, item.Type);
+                                foreach (var item in _eventQueue)
+                                {
+                                    if (item.ProcessId == pid)
+                                        UpdatePortState(pid, item.PortPair, item.Type);
+                                }
                             }
                         }
 
@@ -228,6 +227,93 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
             }
         }, TaskCreationOptions.LongRunning).Unwrap();
     }
+
+    internal void SynchronizeProcessPorts(uint pid, HashSet<PortPair> currentPorts)
+    {
+        EnsureProcessTracked(pid);
+
+        if (!_processPorts.TryGetValue(pid, out var portSet))
+            return;
+
+        List<PortPair>? stalePorts = null;
+        List<ushort>? discoveredPorts = null;
+        List<ushort>? removedPorts = null;
+        var changed = false;
+
+        lock (portSet)
+        {
+            foreach (var portPair in currentPorts)
+            {
+                var alreadyHasLocal = HasLocalPort(portSet, portPair.LocalPort);
+                if (portSet.Add(portPair))
+                {
+                    changed = true;
+                    if (!alreadyHasLocal)
+                    {
+                        discoveredPorts ??= [];
+                        discoveredPorts.Add(portPair.LocalPort);
+                    }
+                }
+            }
+
+            foreach (var portPair in portSet)
+            {
+                if (!currentPorts.Contains(portPair))
+                {
+                    stalePorts ??= [];
+                    stalePorts.Add(portPair);
+                }
+            }
+
+            if (stalePorts is not null)
+            {
+                foreach (var portPair in stalePorts)
+                {
+                    if (portSet.Remove(portPair))
+                    {
+                        changed = true;
+                        if (!HasLocalPort(portSet, portPair.LocalPort))
+                        {
+                            removedPorts ??= [];
+                            removedPorts.Add(portPair.LocalPort);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        _snapshotDirty = true;
+
+        if (discoveredPorts is not null)
+        {
+            foreach (var localPort in discoveredPorts)
+            {
+                Discovered?.Invoke(pid, localPort);
+            }
+        }
+
+        if (removedPorts is not null)
+        {
+            foreach (var localPort in removedPorts)
+            {
+                Removed?.Invoke(pid, localPort);
+            }
+        }
+    }
+
+    private void EnsureProcessTracked(uint pid)
+    {
+        if (_processPorts.TryAdd(pid, []))
+        {
+            _snapshotDirty = true;
+        }
+    }
+
     private void UpdatePortState(uint pid, PortPair portPair, PortEventType type)
     {
         if (!_processPorts.TryGetValue(pid, out var portSet)) return;

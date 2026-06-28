@@ -7,10 +7,12 @@ public sealed class WinDivertSession : IDisposable
 {
     private const int ERROR_INVALID_HANDLE = 6;
     private const int ERROR_INSUFFICIENT_BUFFER = 122;
+    private const int ERROR_NO_DATA = 232;
     private const int ERROR_OPERATION_ABORTED = 995;
 
     private readonly WinDivertSafeHandle _handle;
     private readonly long _sessionId;
+    private volatile bool _receiveShutdownRequested;
     private bool _disposed;
     private static long _nextSessionId;
 
@@ -56,7 +58,8 @@ public sealed class WinDivertSession : IDisposable
         int error = Marshal.GetLastPInvokeError();
 
         if (_handle.IsClosed || _handle.IsInvalid ||
-            error == ERROR_OPERATION_ABORTED || error == ERROR_INVALID_HANDLE)
+            error == ERROR_OPERATION_ABORTED || error == ERROR_INVALID_HANDLE ||
+            (error == ERROR_NO_DATA && _receiveShutdownRequested))
         {
             throw new OperationCanceledException("WinDivert session closed.");
         }
@@ -74,6 +77,8 @@ public sealed class WinDivertSession : IDisposable
     {
         if (_disposed || _handle.IsClosed || _handle.IsInvalid)
             return;
+
+        _receiveShutdownRequested = true;
 
         if (WinDivertInterop.WinDivertShutdown(_handle, WinDivertShutdownMode.Receive))
         {
