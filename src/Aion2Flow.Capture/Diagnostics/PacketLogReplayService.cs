@@ -133,13 +133,31 @@ public sealed class PacketLogReplayService
                 inboundProcessors[entry.Connection] = inboundProcessor;
             }
 
-            var parsed = inboundProcessor.Processor.AppendAndProcess(
-                entry.Payload,
-                entry.Connection,
-                entry.Timestamp.ToUnixTimeMilliseconds());
+            var result = inboundProcessor.Classify(entry.Payload);
+            if (result.Kind != TcpConnectionStartKind.Game)
+            {
+                IncrementCount(skippedEventCounts, result.Kind == TcpConnectionStartKind.Pending ? "connection-start-pending" : "non-game-connection");
+                skippedLines++;
+                continue;
+            }
+
+            bool parsed;
+            try
+            {
+                var acceptedPayload = result.ResolveAcceptedPayload(entry.Payload);
+                parsed = inboundProcessor.Processor.AppendAndProcess(
+                    acceptedPayload,
+                    entry.Connection,
+                    entry.Timestamp.ToUnixTimeMilliseconds());
+            }
+            finally
+            {
+                result.Return();
+            }
 
             if (parsed)
             {
+                inboundProcessor.MarkGameStream();
                 var connection = entry.Connection;
                 if (hasLastParsedConnection && !lastParsedConnection.IsSameConnection(in connection, out _))
                 {
@@ -161,7 +179,7 @@ public sealed class PacketLogReplayService
 
         journal.CompleteBatch(long.MaxValue);
         foreach (var processor in inboundProcessors.Values)
-            processor.Processor.Dispose();
+            processor.Dispose();
 
         var ingestCounter = CaptureBaselineCounter(ingestStart);
 
@@ -667,9 +685,26 @@ public sealed class PacketLogReplayService
         TcpConnection Connection,
         byte[] Payload);
 
-    private readonly record struct ReplayConnectionProcessor(
-        IRuntimeObservationSink Sink,
-        PacketStreamProcessor Processor);
+    private sealed class ReplayConnectionProcessor(IRuntimeObservationSink sink, PacketStreamProcessor processor) : IDisposable
+    {
+        private readonly TcpConnectionStartClassifier _classifier = new();
+
+        public IRuntimeObservationSink Sink { get; } = sink;
+
+        public PacketStreamProcessor Processor { get; } = processor;
+
+        public TcpConnectionStartResult Classify(ReadOnlySpan<byte> payload) => _classifier.Classify(payload);
+
+        public void MarkGameStream()
+        {
+            _classifier.MarkGameStream();
+        }
+
+        public void Dispose()
+        {
+            Processor.Dispose();
+        }
+    }
 
     private enum ReplayLogKind
     {

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 
@@ -9,6 +8,8 @@ public sealed class GameResourceService : IDisposable
 {
     private readonly LanguageService _languageService;
     private readonly Lock _lock = new();
+    private readonly IReadOnlyDictionary<int, SkillPresentation> _skillPresentations;
+    private readonly IReadOnlyDictionary<uint, int> _effectSkillIds;
 
     public event EventHandler<string>? ResourcesChanged;
 
@@ -22,6 +23,8 @@ public sealed class GameResourceService : IDisposable
     public GameResourceService(LanguageService languageService)
     {
         _languageService = languageService;
+        _skillPresentations = ResourceDatabase.LoadSkillPresentations();
+        _effectSkillIds = SkillEffectRelationIndex.Build(ResourceDatabase.LoadSkillEffectRelations());
         _languageService.LanguageChanged += OnLanguageChanged;
         CurrentLanguage = _languageService.CurrentLanguage;
         Reload(CurrentLanguage);
@@ -41,13 +44,13 @@ public sealed class GameResourceService : IDisposable
                 return name;
             }
 
-            if (CombatResourceRegistry.TryResolveSkillIdByEffectRef(ResourceEffectRef.FromRaw(unchecked((uint)skillCode)), out var ownerSkillId) &&
+            if (TryResolveSkillIdByEffectRef(unchecked((uint)skillCode), out var ownerSkillId) &&
                 TryResolveSkillName(Skills, ownerSkillId, out name))
             {
                 return name;
             }
 
-            var displaySkillId = CombatResourceRegistry.ResolveDisplaySkillIdForCode(skillCode);
+            var displaySkillId = ResolveDisplaySkillIdForCode(skillCode);
             if (displaySkillId != skillCode && TryResolveSkillName(Skills, displaySkillId, out name))
             {
                 return name;
@@ -73,7 +76,7 @@ public sealed class GameResourceService : IDisposable
             return assetName;
         }
 
-        if (CombatResourceRegistry.TryResolveSkillIdByEffectRef(ResourceEffectRef.FromRaw(unchecked((uint)skillCode)), out var ownerSkillId))
+        if (TryResolveSkillIdByEffectRef(unchecked((uint)skillCode), out var ownerSkillId))
         {
             assetName = SkillIconCatalog.ResolveAssetName(ownerSkillId);
             if (assetName is not null)
@@ -82,7 +85,7 @@ public sealed class GameResourceService : IDisposable
             }
         }
 
-        var displaySkillId = CombatResourceRegistry.ResolveDisplaySkillIdForCode(skillCode);
+        var displaySkillId = ResolveDisplaySkillIdForCode(skillCode);
         if (displaySkillId != skillCode)
         {
             assetName = SkillIconCatalog.ResolveAssetName(displaySkillId);
@@ -93,6 +96,29 @@ public sealed class GameResourceService : IDisposable
         }
 
         return null;
+    }
+
+    private int ResolveDisplaySkillIdForCode(int skillCode)
+    {
+        if (skillCode <= 0)
+        {
+            return 0;
+        }
+
+        return _skillPresentations.TryGetValue(skillCode, out var presentation) && presentation.DisplaySkillId > 0
+            ? presentation.DisplaySkillId
+            : skillCode;
+    }
+
+    private bool TryResolveSkillIdByEffectRef(uint rawId, out int skillId)
+    {
+        if (rawId != 0 && _effectSkillIds.TryGetValue(rawId, out skillId))
+        {
+            return true;
+        }
+
+        skillId = 0;
+        return false;
     }
 
     private static bool TryResolveSkillName(SkillCollection skills, int skillCode, out string name)

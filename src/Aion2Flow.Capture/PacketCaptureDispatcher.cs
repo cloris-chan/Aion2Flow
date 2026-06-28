@@ -108,12 +108,27 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
 
     private static void HandleReassembledChunk(uint sequenceNumber, ReadOnlySpan<byte> chunk, long captureTimestampMilliseconds, ref DispatchContext context)
     {
-        RawPacketDump.AppendReassembled("inbound", context.Connection, sequenceNumber, captureTimestampMilliseconds, chunk);
-
-        if (context.Stream.Processor.AppendAndProcess(chunk, context.Connection, captureTimestampMilliseconds))
+        var result = context.Stream.ClassifyReassembledChunk(chunk);
+        if (result.Kind != TcpConnectionStartKind.Game)
         {
-            context.HasParsed = true;
-            context.LastParsedTimestampMilliseconds = captureTimestampMilliseconds;
+            return;
+        }
+
+        try
+        {
+            var acceptedChunk = result.ResolveAcceptedPayload(chunk);
+            RawPacketDump.AppendReassembled("inbound", context.Connection, sequenceNumber, captureTimestampMilliseconds, acceptedChunk);
+
+            if (context.Stream.Processor.AppendAndProcess(acceptedChunk, context.Connection, captureTimestampMilliseconds))
+            {
+                context.Stream.MarkGameStream();
+                context.HasParsed = true;
+                context.LastParsedTimestampMilliseconds = captureTimestampMilliseconds;
+            }
+        }
+        finally
+        {
+            result.Return();
         }
     }
 
@@ -172,11 +187,20 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
 
     private sealed class TcpCaptureStreamState(TcpStreamReassembler reassembler, PacketStreamProcessor processor, IRuntimeObservationSink sink) : IDisposable
     {
+        private readonly TcpConnectionStartClassifier _classifier = new();
+
         public TcpStreamReassembler Reassembler { get; } = reassembler;
 
         public PacketStreamProcessor Processor { get; } = processor;
 
         public IRuntimeObservationSink Sink { get; } = sink;
+
+        public TcpConnectionStartResult ClassifyReassembledChunk(ReadOnlySpan<byte> chunk) => _classifier.Classify(chunk);
+
+        public void MarkGameStream()
+        {
+            _classifier.MarkGameStream();
+        }
 
         public void Dispose()
         {

@@ -2,31 +2,30 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 
 internal static class CapturedNonAionPayload
 {
-    private const int TlsHeaderLength = 5;
     private const int MaxTlsCiphertextLength = 18_432;
 
-    public static bool TryReadSkippableLength(ReadOnlySpan<byte> bytes, out int recordLength)
+    public const int TlsHeaderLength = 5;
+
+    public static bool IsNonGameConnectionStart(ReadOnlySpan<byte> bytes) => TryReadTlsLength(bytes, out _);
+
+    public static bool IsPotentialNonGameConnectionStart(ReadOnlySpan<byte> bytes)
     {
-        recordLength = 0;
-        if (!TryReadTlsLength(bytes, out var tlsLength))
+        if (bytes.IsEmpty || bytes.Length >= TlsHeaderLength)
         {
             return false;
         }
 
-        recordLength = tlsLength;
-        return true;
-    }
-
-    public static bool IsPotentialSkippablePrefix(ReadOnlySpan<byte> bytes)
-    {
-        if (bytes.Length is 0 or >= TlsHeaderLength)
+        if (!IsTlsContentType(bytes[0]))
         {
             return false;
         }
 
-        return IsTlsContentType(bytes[0]) &&
-               (bytes.Length < 2 || bytes[1] == 0x03) &&
-               (bytes.Length < 3 || bytes[2] is >= 0x01 and <= 0x04);
+        if (bytes.Length >= 2 && bytes[1] != 0x03)
+        {
+            return false;
+        }
+
+        return bytes.Length < 3 || bytes[2] is >= 0x01 and <= 0x04;
     }
 
     private static bool TryReadTlsLength(ReadOnlySpan<byte> bytes, out int recordLength)
@@ -52,6 +51,5 @@ internal static class CapturedNonAionPayload
         return true;
     }
 
-    private static bool IsTlsContentType(byte value)
-        => value is 0x14 or 0x15 or 0x16 or 0x17;
+    private static bool IsTlsContentType(byte value) => value is 0x14 or 0x15 or 0x16 or 0x17;
 }

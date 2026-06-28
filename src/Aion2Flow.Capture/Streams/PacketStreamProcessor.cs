@@ -79,11 +79,6 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
     {
         while (true)
         {
-            if (TryConsumeBufferedNonAionPayload())
-            {
-                continue;
-            }
-
             if (!TryDequeuePacketLength(out var packetLength))
             {
                 return;
@@ -107,39 +102,12 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
         _tail.Append(data);
     }
 
-    private bool TryConsumeBufferedNonAionPayload()
-    {
-        var buffer = _tail.Data;
-        if (!CapturedNonAionPayload.TryReadSkippableLength(buffer, out var recordLength))
-        {
-            return false;
-        }
-
-        if (recordLength > buffer.Length)
-        {
-            return false;
-        }
-
-        _tail.Consume(recordLength);
-        return true;
-    }
-
     private bool TryDequeuePacketLength(out int packetLength)
     {
         packetLength = 0;
 
         var buffer = _tail.Data;
         if (buffer.IsEmpty)
-        {
-            return false;
-        }
-
-        if (CapturedNonAionPayload.TryReadSkippableLength(buffer, out _))
-        {
-            return false;
-        }
-
-        if (CapturedNonAionPayload.IsPotentialSkippablePrefix(buffer))
         {
             return false;
         }
@@ -171,22 +139,6 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
         while (true)
         {
             if (buffer.IsEmpty)
-            {
-                return false;
-            }
-
-            if (CapturedNonAionPayload.TryReadSkippableLength(buffer, out var nonAionLength))
-            {
-                if (nonAionLength > buffer.Length)
-                {
-                    return false;
-                }
-
-                buffer = buffer[nonAionLength..];
-                continue;
-            }
-
-            if (CapturedNonAionPayload.IsPotentialSkippablePrefix(buffer))
             {
                 return false;
             }
