@@ -11,7 +11,7 @@ internal static class Packet0438DamageParser
     {
         result = default;
 
-        if (packet.IsEmpty || packet[0] == 0x20)
+        if (packet.IsEmpty)
         {
             return false;
         }
@@ -41,11 +41,13 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadVarInt(out var layoutTag)) return false;
         if (!reader.TryReadVarInt(out var flag)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
-        if (targetId == 0 || sourceId == 0) return false;
+        if (targetId <= 0 || sourceId <= 0) return false;
+        if (!IsByteControlField(layoutTag) || !IsByteControlField(flag)) return false;
         if (reader.Remaining < 5) return false;
         if (!reader.TryReadUInt32Le(out var bodyRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadVarInt(out var type)) return false;
+        if (!IsByteControlField(type)) return false;
 
         if (!Packet0438Layout.TryGetDetailLength(layoutTag, out var detailLength) || reader.Remaining < detailLength)
         {
@@ -62,6 +64,7 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadVarInt(out var unknown)) return false;
         if (!reader.TryReadVarInt(out var damage)) return false;
         if (!reader.TryReadVarInt(out var loop)) return false;
+        if (loop < 0) return false;
 
         if (unknown == 0 && damage == 10000)
         {
@@ -83,6 +86,8 @@ internal static class Packet0438DamageParser
         result = new Packet0438Damage(targetId, layoutTag, flag, sourceId, Math.Max(0, bodyRaw), marker, type, modifiers, unknown, damage, loop, payload.Length - consumed, multiHitCount, drainHealAmount, regenAmount, detailRaw, detailResourceEffectRef, resourceKind);
         return true;
     }
+
+    private static bool IsByteControlField(int value) => value is >= 0 and <= byte.MaxValue;
 
     private static int ParseTail(ref PacketSpanReader reader, int layoutTag, int loop, out int multiHitAmounts)
     {

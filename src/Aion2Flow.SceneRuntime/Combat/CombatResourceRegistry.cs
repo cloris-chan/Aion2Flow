@@ -8,6 +8,9 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 public static class CombatResourceRegistry
 {
     private static SkillCollection _skillMap = [];
+    private static IReadOnlyDictionary<int, SkillAnalysis> _skillAnalysis = new Dictionary<int, SkillAnalysis>();
+    private static IReadOnlyDictionary<int, SkillPresentation> _skillPresentations = new Dictionary<int, SkillPresentation>();
+    private static IReadOnlyDictionary<uint, int> _effectSkillIds = new Dictionary<uint, int>();
 
     public static SkillCollection SkillMap
     {
@@ -15,12 +18,15 @@ public static class CombatResourceRegistry
         set
         {
             _skillMap = value;
+            SetSkillDatResources(new Dictionary<int, SkillAnalysis>(), new Dictionary<int, SkillPresentation>(), []);
             SkillDisplayMap = _skillMap;
             SkillMapRevision++;
         }
     }
 
     public static SkillCollection SkillDisplayMap { get; private set; } = [];
+    public static IReadOnlyDictionary<int, SkillAnalysis> SkillAnalysis => _skillAnalysis;
+    public static IReadOnlyDictionary<int, SkillPresentation> SkillPresentations => _skillPresentations;
     public static long SkillMapRevision { get; private set; }
     public static IReadOnlyDictionary<int, NpcCatalogEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcCatalogEntry>();
 
@@ -30,17 +36,44 @@ public static class CombatResourceRegistry
             return;
 
         SkillMap = ResourceDatabase.LoadCombatSkills();
+        SetSkillDatResources(ResourceDatabase.LoadSkillAnalysis(), ResourceDatabase.LoadSkillPresentations(), ResourceDatabase.LoadSkillEffectRelations());
     }
 
     public static void LoadSkillMap(string lang)
     {
         SkillMap = ResourceDatabase.LoadCombatSkills();
+        SetSkillDatResources(ResourceDatabase.LoadSkillAnalysis(), ResourceDatabase.LoadSkillPresentations(), ResourceDatabase.LoadSkillEffectRelations());
         UpdateDisplayResources(ResourceDatabase.LoadSkills(lang), ResourceDatabase.LoadNpcCatalog(lang));
     }
 
     public static void SetGameResources(SkillCollection skillMap, IReadOnlyDictionary<int, NpcCatalogEntry> npcCatalog)
     {
         SkillMap = skillMap;
+        SetSkillDatResources(new Dictionary<int, SkillAnalysis>(), new Dictionary<int, SkillPresentation>(), []);
+        SkillDisplayMap = skillMap;
+        NpcCatalog = npcCatalog;
+    }
+
+    public static void SetGameResources(
+        SkillCollection skillMap,
+        IReadOnlyDictionary<int, NpcCatalogEntry> npcCatalog,
+        IReadOnlyDictionary<int, SkillAnalysis> skillAnalysis,
+        IReadOnlyDictionary<int, SkillPresentation> skillPresentations,
+        IReadOnlyList<SkillEffectRelation> skillEffectRelations)
+    {
+        SkillMap = skillMap;
+        SetSkillDatResources(skillAnalysis, skillPresentations, skillEffectRelations);
+        SkillDisplayMap = skillMap;
+        NpcCatalog = npcCatalog;
+    }
+
+    public static void SetGameResources(
+        SkillCollection skillMap,
+        IReadOnlyDictionary<int, NpcCatalogEntry> npcCatalog,
+        IReadOnlyDictionary<int, SkillPresentation> skillPresentations)
+    {
+        SkillMap = skillMap;
+        SetSkillDatResources(new Dictionary<int, SkillAnalysis>(), skillPresentations, []);
         SkillDisplayMap = skillMap;
         NpcCatalog = npcCatalog;
     }
@@ -61,6 +94,81 @@ public static class CombatResourceRegistry
         return false;
     }
 
+    public static bool TryResolveSkillIdByEffectRef(ResourceEffectRef effectRef, out int skillId)
+    {
+        if (effectRef.IsEmpty || !_effectSkillIds.TryGetValue(effectRef.RawId, out skillId))
+        {
+            skillId = 0;
+            return false;
+        }
+
+        return true;
+    }
+
+    public static int ResolveDisplaySkillIdForCode(int skillCode)
+    {
+        if (skillCode <= 0)
+        {
+            return 0;
+        }
+
+        return TryResolveDisplaySkillIdForCode(skillCode, out var displaySkillId) ? displaySkillId : skillCode;
+    }
+
+    public static int ResolvePresentationSkillIdForCode(int skillCode)
+    {
+        if (skillCode <= 0)
+        {
+            return 0;
+        }
+
+        return TryResolvePresentationSkillIdForCode(skillCode, out var presentationSkillId) ? presentationSkillId : skillCode;
+    }
+
+    private static bool TryResolveDisplaySkillIdForCode(int skillCode, out int displaySkillId)
+    {
+        if (_skillPresentations.TryGetValue(skillCode, out var presentation))
+        {
+            displaySkillId = presentation.DisplaySkillId > 0 ? presentation.DisplaySkillId : skillCode;
+            return true;
+        }
+
+        displaySkillId = 0;
+        return false;
+    }
+
+    private static bool TryResolvePresentationSkillIdForCode(int skillCode, out int presentationSkillId)
+    {
+        if (_skillPresentations.TryGetValue(skillCode, out var presentation))
+        {
+            presentationSkillId = presentation.PresentationSkillId > 0 ? presentation.PresentationSkillId : skillCode;
+            return true;
+        }
+
+        presentationSkillId = 0;
+        return false;
+    }
+
+    public static bool TryResolveSkillByEffectRef(ResourceEffectRef effectRef, out Skill skill)
+    {
+        if (TryResolveSkillIdByEffectRef(effectRef, out var skillId) &&
+            SkillDisplayMap.TryGetValue(skillId, out skill) &&
+            !string.IsNullOrWhiteSpace(skill.Name))
+        {
+            return true;
+        }
+
+        if (TryResolveSkillIdByEffectRef(effectRef, out skillId) &&
+            SkillMap.TryGetValue(skillId, out skill) &&
+            !string.IsNullOrWhiteSpace(skill.Name))
+        {
+            return true;
+        }
+
+        skill = default;
+        return false;
+    }
+
     public static string DisplaySkillNameFor(int skillCode)
     {
         if (skillCode <= 0)
@@ -72,22 +180,80 @@ public static class CombatResourceRegistry
         if (SkillMap.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name))
             return skill.Name;
 
-        Span<int> fallbackCodes = stackalloc int[SkillDisplayCodeFallbacks.MaxFallbackCount];
-        var fallbackCount = SkillDisplayCodeFallbacks.WriteFallbackCodes(skillCode, fallbackCodes);
+        if (TryResolveSkillByEffectRef(ResourceEffectRef.FromRaw(unchecked((uint)skillCode)), out var effectSkill))
+            return effectSkill.Name;
 
-        foreach (var fallbackCode in fallbackCodes[..fallbackCount])
+        var displaySkillId = ResolveDisplaySkillIdForCode(skillCode);
+        if (displaySkillId != skillCode)
         {
-            if (fallbackCode <= 0 || fallbackCode == skillCode)
-                continue;
-
-            if (SkillDisplayMap.TryGetValue(fallbackCode, out displaySkill) && !string.IsNullOrWhiteSpace(displaySkill.Name))
+            if (SkillDisplayMap.TryGetValue(displaySkillId, out displaySkill) && !string.IsNullOrWhiteSpace(displaySkill.Name))
                 return displaySkill.Name;
 
-            if (SkillMap.TryGetValue(fallbackCode, out skill) && !string.IsNullOrWhiteSpace(skill.Name))
+            if (SkillMap.TryGetValue(displaySkillId, out skill) && !string.IsNullOrWhiteSpace(skill.Name))
                 return skill.Name;
         }
 
         return string.Empty;
+    }
+
+    private static void SetSkillDatResources(
+        IReadOnlyDictionary<int, SkillAnalysis> skillAnalysis,
+        IReadOnlyDictionary<int, SkillPresentation> skillPresentations,
+        IReadOnlyList<SkillEffectRelation> skillEffectRelations)
+    {
+        _skillAnalysis = skillAnalysis;
+        _skillPresentations = skillPresentations;
+        _effectSkillIds = BuildEffectSkillIndex(skillEffectRelations);
+    }
+
+    private static IReadOnlyDictionary<uint, int> BuildEffectSkillIndex(IReadOnlyList<SkillEffectRelation> relations)
+    {
+        if (relations.Count == 0)
+        {
+            return new Dictionary<uint, int>();
+        }
+
+        var candidates = new Dictionary<uint, int>();
+        var ambiguous = new HashSet<uint>();
+        foreach (var relation in relations)
+        {
+            AddEffectCode(candidates, ambiguous, relation.EffectId, relation.SkillId);
+            AddEffectCode(candidates, ambiguous, relation.EffectDataId, relation.SkillId);
+            AddEffectCode(candidates, ambiguous, relation.AuxEffectId, relation.SkillId);
+        }
+
+        foreach (var code in ambiguous)
+        {
+            candidates.Remove(code);
+        }
+
+        return candidates;
+    }
+
+    private static void AddEffectCode(Dictionary<uint, int> candidates, HashSet<uint> ambiguous, int code, int skillId)
+    {
+        if (code <= 0)
+        {
+            return;
+        }
+
+        var key = unchecked((uint)code);
+        if (ambiguous.Contains(key))
+        {
+            return;
+        }
+
+        if (candidates.TryGetValue(key, out var existingSkillId))
+        {
+            if (existingSkillId != skillId)
+            {
+                ambiguous.Add(key);
+            }
+
+            return;
+        }
+
+        candidates[key] = skillId;
     }
 
     public static NpcKind ResolveNpcKind(NpcCatalogKind kind) =>

@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
@@ -5,8 +6,12 @@ namespace Cloris.Aion2Flow.Tests.App;
 public sealed class SkillDetailPresentationAggregatorTests
 {
     [Fact]
-    public void AddOrMerge_Merges_Standard_Class_Skill_Family()
+    public void AddOrMerge_Merges_Generated_Presentation_Group()
     {
+        SetSkillPresentations(
+            new SkillPresentation(16300243, 16300000, 16300240, 16300000, 0b01010, 3, false),
+            new SkillPresentation(16300027, 16300000, 16300020, 16300000, 0, 7, false));
+
         var rows = new List<SkillDetailRowData>();
         var indexes = new Dictionary<SkillPresentationKey, int>();
         var main = CreateRow(16300243, 140141, 2);
@@ -25,6 +30,10 @@ public sealed class SkillDetailPresentationAggregatorTests
     [Fact]
     public void AddOrMerge_Merges_Derived_Skill_With_Different_Display_Name()
     {
+        SetSkillPresentations(
+            new SkillPresentation(16330020, 16330000, 16330020, 16330000, 0, 0, false),
+            new SkillPresentation(16330027, 16330000, 16330020, 16330000, 0, 7, false));
+
         var rows = new List<SkillDetailRowData>();
         var indexes = new Dictionary<SkillPresentationKey, int>();
         var main = CreateRow(16330020, 60361, 7);
@@ -42,23 +51,37 @@ public sealed class SkillDetailPresentationAggregatorTests
     [Theory]
     [InlineData(11010047, 11010000)]
     [InlineData(16330027, 16330000)]
-    [InlineData(16990002, 16990000)]
-    [InlineData(18091243, 18090000)]
-    [InlineData(1218810, 1218810)]
-    [InlineData(11000001, 11000001)]
-    [InlineData(16000047, 16000047)]
-    [InlineData(10_010_047, 10_010_047)]
-    [InlineData(19_010_047, 19_010_047)]
-    public void FromActionKey_Normalizes_Only_Standard_Class_Skill_Families(int skillCode, int expectedPresentationSkillCode)
+    public void FromActionKey_Uses_Generated_Presentation_Relations(int skillCode, int expectedPresentationSkillCode)
     {
+        SetSkillPresentations(
+            new SkillPresentation(11010047, 11010000, 11010040, 11010000, 0b01000, 7, false),
+            new SkillPresentation(16330027, 16330000, 16330020, 16330000, 0, 7, false));
+
         var key = SkillPresentationKey.FromActionKey(new CombatActionKey(skillCode, default, default));
 
         Assert.Equal(expectedPresentationSkillCode, key.SkillCode);
     }
 
+    [Theory]
+    [InlineData(1218810)]
+    [InlineData(11000001)]
+    [InlineData(16000047)]
+    [InlineData(10_010_047)]
+    [InlineData(19_010_047)]
+    public void FromActionKey_Preserves_Skills_Without_Presentation_Relation(int skillCode)
+    {
+        SetSkillPresentations();
+
+        var key = SkillPresentationKey.FromActionKey(new CombatActionKey(skillCode, default, default));
+
+        Assert.Equal(skillCode, key.SkillCode);
+    }
+
     [Fact]
     public void FromActionKey_Preserves_Effect_Reference_Identity()
     {
+        SetSkillPresentations();
+
         var actionKey = new CombatActionKey(0, ResourceEffectRef.FromRaw(1234), ResourceEffectRef.FromRaw(5678));
 
         var key = SkillPresentationKey.FromActionKey(actionKey);
@@ -79,5 +102,13 @@ public sealed class SkillDetailPresentationAggregatorTests
             Hits = hits,
             Attempts = hits
         };
+    }
+
+    private static void SetSkillPresentations(params SkillPresentation[] presentations)
+    {
+        CombatResourceRegistry.SetGameResources(
+            [],
+            new Dictionary<int, NpcCatalogEntry>(),
+            presentations.ToDictionary(static presentation => presentation.SkillCode));
     }
 }

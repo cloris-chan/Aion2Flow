@@ -36,8 +36,9 @@ public sealed class CombatLocalizationSceneTests
     }
 
     [Theory]
-    [InlineData(1227237, "冤魂球")]
-    public void CombatResourceRegistry_DisplaySkillName_Resolves_Seven_Digit_Fallbacks(int skillCode, string expectedName)
+    [InlineData(1227237, "攻擊")]
+    [InlineData(1227265, "亡靈迅殺")]
+    public void CombatResourceRegistry_DisplaySkillName_Resolves_Client_SkillDat_Entries(int skillCode, string expectedName)
     {
         try
         {
@@ -52,15 +53,15 @@ public sealed class CombatLocalizationSceneTests
     }
 
     [Theory]
-    [InlineData(1607415)]
-    [InlineData(1607400)]
-    public void CombatResourceRegistry_DisplaySkillName_Does_Not_Resolve_Npc_Code_To_Player_Family_Fallback(int skillCode)
+    [InlineData(1607415, "攻擊")]
+    [InlineData(1607400, "攻擊")]
+    public void CombatResourceRegistry_DisplaySkillName_Uses_Exact_Client_SkillDat_Entries(int skillCode, string expectedName)
     {
         try
         {
             CombatResourceRegistry.LoadSkillMap("zh-TW");
 
-            Assert.Empty(CombatResourceRegistry.DisplaySkillNameFor(skillCode));
+            Assert.Equal(expectedName, CombatResourceRegistry.DisplaySkillNameFor(skillCode));
         }
         finally
         {

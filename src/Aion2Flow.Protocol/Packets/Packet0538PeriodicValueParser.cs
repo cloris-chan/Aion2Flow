@@ -20,12 +20,27 @@ internal static class Packet0538PeriodicValueParser
         if (!reader.TryReadVarInt(out var length)) return false;
         if (length <= 3 || length > packet.Length + 3) return false;
         if (reader.Remaining < 2) return false;
-        if (packet[reader.Offset] != 0x05 || packet[reader.Offset + 1] != 0x38) return false;
+        var payloadLength = length - 3 - reader.Offset;
+        if (payloadLength < 2 || payloadLength > reader.Remaining) return false;
+        return TryParsePayload(packet.Slice(reader.Offset, payloadLength), out result);
+    }
+
+    internal static bool TryParsePayload(ReadOnlySpan<byte> payload, out Packet0538PeriodicValue result)
+    {
+        result = default;
+
+        if (payload.Length < 2 || payload[0] != 0x05 || payload[1] != 0x38)
+        {
+            return false;
+        }
+
+        var reader = new PacketSpanReader(payload);
         if (!reader.TryAdvance(2)) return false;
 
         if (!reader.TryReadVarInt(out var targetId)) return false;
         if (!reader.TryReadVarInt(out var mode)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
+        if (targetId <= 0 || sourceId <= 0) return false;
         if (!reader.TryReadVarInt(out var unknown)) return false;
         if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
         if (!reader.TryReadVarInt(out var damage)) return false;
@@ -33,7 +48,7 @@ internal static class Packet0538PeriodicValueParser
         var tailRaw = 0;
         var tailSkillCodeRaw = 0;
         var tailPrefixValue = 0;
-        if (tailLength >= 4)
+        if (tailLength == 4)
         {
             var tail = reader.RemainingSpan;
             var tailSkillReader = new PacketSpanReader(tail[^4..]);
@@ -42,18 +57,22 @@ internal static class Packet0538PeriodicValueParser
                 return false;
             }
 
-            if (tailLength == 4)
+            tailRaw = tailSkillCodeRaw;
+        }
+        else if (tailLength > 4)
+        {
+            var tail = reader.RemainingSpan;
+            var tailPrefixReader = new PacketSpanReader(tail[..^4]);
+            if (tailPrefixReader.TryReadVarInt(out var parsedTailPrefixValue) &&
+                tailPrefixReader.Remaining == 0)
             {
-                tailRaw = tailSkillCodeRaw;
-            }
-            else
-            {
-                var tailPrefixReader = new PacketSpanReader(tail[..^4]);
-                if (tailPrefixReader.TryReadVarInt(out var parsedTailPrefixValue) &&
-                    tailPrefixReader.Remaining == 0)
+                var tailSkillReader = new PacketSpanReader(tail[^4..]);
+                if (!tailSkillReader.TryReadUInt32Le(out tailSkillCodeRaw))
                 {
-                    tailPrefixValue = parsedTailPrefixValue;
+                    return false;
                 }
+
+                tailPrefixValue = parsedTailPrefixValue;
             }
         }
 

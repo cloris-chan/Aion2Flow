@@ -3,7 +3,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0638CompactControl(int SourceId, int BodySkillVariantRaw, ResourceEffectRef BodyResourceEffectRef, int Marker, int Flag);
+internal readonly record struct Packet0638CompactControl(int SourceId, ResourceEffectRef BodyResourceEffectRef, int Marker, int Flag);
 
 internal static class Packet0638CompactControlParser
 {
@@ -19,12 +19,12 @@ internal static class Packet0638CompactControlParser
         if (!reader.TryAdvance(2)) return false;
 
         if (!reader.TryReadVarInt(out var sourceId)) return false;
-        if (!reader.TryReadUInt32Le(out var bodySkillVariantRaw)) return false;
+        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadByte(out var flag)) return false;
         if (reader.Remaining != 0) return false;
 
-        result = new Packet0638CompactControl(sourceId, unchecked((int)bodySkillVariantRaw), ResourceEffectRef.FromRaw(bodySkillVariantRaw), marker, flag);
+        result = new Packet0638CompactControl(sourceId, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), marker, flag);
         return true;
     }
 }

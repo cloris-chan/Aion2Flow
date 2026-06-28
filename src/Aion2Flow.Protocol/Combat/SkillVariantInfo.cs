@@ -13,22 +13,6 @@ public readonly record struct SkillVariantInfo(int SkillCode, int BaseSkillCode,
     public int SpecializationSkillCode => BaseSkillCode + EncodeVariantSuffix(SpecializationMask, 0);
     public int BaseVariantSkillCode => BaseSkillCode + VariantState;
 
-    public void WriteDisplayFallbackCodes(Span<int> destination)
-    {
-        if (destination.Length < 3)
-            throw new ArgumentException("Destination must contain at least three elements.", nameof(destination));
-
-        if (!IsStandardPlayerSkill)
-        {
-            destination[..3].Clear();
-            return;
-        }
-
-        destination[0] = SpecializationSkillCode;
-        destination[1] = BaseSkillCode;
-        destination[2] = BaseVariantSkillCode;
-    }
-
     public static SkillVariantInfo Parse(int skillCode)
     {
         if (skillCode <= 0)

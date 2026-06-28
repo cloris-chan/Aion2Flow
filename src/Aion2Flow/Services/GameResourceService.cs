@@ -41,14 +41,16 @@ public sealed class GameResourceService : IDisposable
                 return name;
             }
 
-            Span<int> fallbackCodes = stackalloc int[SkillDisplayCodeFallbacks.MaxFallbackCount];
-            var fallbackCount = SkillDisplayCodeFallbacks.WriteFallbackCodes(skillCode, fallbackCodes);
-            foreach (var fallbackCode in fallbackCodes[..fallbackCount])
+            if (CombatResourceRegistry.TryResolveSkillIdByEffectRef(ResourceEffectRef.FromRaw(unchecked((uint)skillCode)), out var ownerSkillId) &&
+                TryResolveSkillName(Skills, ownerSkillId, out name))
             {
-                if (fallbackCode != skillCode && TryResolveSkillName(Skills, fallbackCode, out name))
-                {
-                    return name;
-                }
+                return name;
+            }
+
+            var displaySkillId = CombatResourceRegistry.ResolveDisplaySkillIdForCode(skillCode);
+            if (displaySkillId != skillCode && TryResolveSkillName(Skills, displaySkillId, out name))
+            {
+                return name;
             }
         }
 
@@ -71,28 +73,22 @@ public sealed class GameResourceService : IDisposable
             return assetName;
         }
 
-        var isStandardPlayerSkill = SkillVariantInfo.Parse(skillCode).IsStandardPlayerSkill;
-        Span<int> fallbackCodes = stackalloc int[SkillDisplayCodeFallbacks.MaxFallbackCount];
-        var fallbackCount = SkillDisplayCodeFallbacks.WriteFallbackCodes(skillCode, fallbackCodes);
-        lock (_lock)
+        if (CombatResourceRegistry.TryResolveSkillIdByEffectRef(ResourceEffectRef.FromRaw(unchecked((uint)skillCode)), out var ownerSkillId))
         {
-            if (!isStandardPlayerSkill && TryResolveSkillName(Skills, skillCode, out _))
+            assetName = SkillIconCatalog.ResolveAssetName(ownerSkillId);
+            if (assetName is not null)
             {
-                return null;
+                return assetName;
             }
+        }
 
-            foreach (var fallbackCode in fallbackCodes[..fallbackCount])
+        var displaySkillId = CombatResourceRegistry.ResolveDisplaySkillIdForCode(skillCode);
+        if (displaySkillId != skillCode)
+        {
+            assetName = SkillIconCatalog.ResolveAssetName(displaySkillId);
+            if (assetName is not null)
             {
-                assetName = ResolveSkillIconFallback(fallbackCode, skillCode);
-                if (assetName is not null)
-                {
-                    return assetName;
-                }
-
-                if (!isStandardPlayerSkill && TryResolveSkillName(Skills, fallbackCode, out _))
-                {
-                    return null;
-                }
+                return assetName;
             }
         }
 
@@ -110,9 +106,6 @@ public sealed class GameResourceService : IDisposable
         name = string.Empty;
         return false;
     }
-
-    private static string? ResolveSkillIconFallback(int fallbackCode, int skillCode)
-        => fallbackCode > 0 && fallbackCode != skillCode ? SkillIconCatalog.ResolveAssetName(fallbackCode) : null;
 
     public bool TryResolveNpcCatalogEntry(int npcCode, out NpcCatalogEntry entry)
     {

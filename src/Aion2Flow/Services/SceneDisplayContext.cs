@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -166,6 +167,11 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
     }
 
     public string ResolveSkillName(int skillCode) => skillCode > 0 ? Resources.ResolveSkillName(skillCode) : string.Empty;
+
+    public string ResolveSkillName(ResourceEffectRef effectRef)
+        => CombatResourceRegistry.TryResolveSkillIdByEffectRef(effectRef, out var skillId)
+            ? Resources.ResolveSkillName(skillId)
+            : string.Empty;
 
     public bool ContainsSkill(int skillCode) => Resources.ContainsSkill(skillCode);
 

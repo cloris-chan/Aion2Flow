@@ -352,7 +352,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         });
     }
 
-    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int bodySkillVariantRaw, ResourceEffectRef bodyResourceEffectRef, int marker, int echoSourceId)
+    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int echoSourceId)
     {
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
             return;
@@ -368,8 +368,8 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             Raw = packet.Raw,
             Combat = new CombatObservation
             {
-                SkillCode = bodySkillVariantRaw,
-                BodySkillVariantRaw = bodySkillVariantRaw,
+                SkillCode = 0,
+                BodySkillVariantRaw = 0,
                 BodyResourceEffectRef = bodyResourceEffectRef,
                 Damage = 0,
                 HitCount = 0,
@@ -383,7 +383,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         });
     }
 
-    public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, int bodySkillVariantRaw, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
+    public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
     {
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
             return;
@@ -399,8 +399,8 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             Raw = packet.Raw,
             Combat = new CombatObservation
             {
-                SkillCode = bodySkillVariantRaw,
-                BodySkillVariantRaw = bodySkillVariantRaw,
+                SkillCode = 0,
+                BodySkillVariantRaw = 0,
                 BodyResourceEffectRef = bodyResourceEffectRef,
                 Damage = 0,
                 HitCount = 0,

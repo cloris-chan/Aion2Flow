@@ -13,7 +13,7 @@ public static class ResourceDatabase
         using var cmd = connection.CreateCommand();
         var nameColumn = GetLocalizedColumn("Name", lang);
         cmd.CommandText = $"""
-            SELECT Id, {nameColumn}, Category, SourceType, SourceKey, TriggeredSkillIdsCsv
+            SELECT SkillId, {nameColumn}, Category, SourceType, SourceKey, TriggeredSkillIdsCsv
             FROM Skills
             WHERE {nameColumn} IS NOT NULL
             """;
@@ -28,22 +28,122 @@ public static class ResourceDatabase
 
         using var cmd = connection.CreateCommand();
         cmd.CommandText = """
-            SELECT Id,
-                   COALESCE(NameEnUs, NameZhTw, NameKoKr, CAST(Id AS TEXT)),
+            SELECT SkillId,
+                   COALESCE(NameEnUs, NameZhTw, NameKoKr, CAST(SkillId AS TEXT)),
                    Category,
                    SourceType,
                    SourceKey,
                    TriggeredSkillIdsCsv
             FROM Skills
-            WHERE Id IS NOT NULL
+            WHERE SkillId IS NOT NULL
             """;
 
         return ReadSkills(cmd);
     }
 
+    public static IReadOnlyDictionary<int, SkillPresentation> LoadSkillPresentations()
+    {
+        using var connection = CreateConnection();
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT SkillCode,
+                   PresentationSkillId,
+                   DisplaySkillId,
+                   BaseSkillId,
+                   SpecializationMask,
+                   VariantState,
+                   IsChargeSkill
+            FROM SkillPresentations
+            """;
+
+        var presentationsBySkillCode = new Dictionary<int, SkillPresentation>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var presentation = new SkillPresentation(
+                reader.GetInt32(0),
+                reader.GetInt32(1),
+                reader.GetInt32(2),
+                reader.GetInt32(3),
+                reader.GetInt32(4),
+                reader.GetInt32(5),
+                reader.GetByte(6) != 0);
+            presentationsBySkillCode[presentation.SkillCode] = presentation;
+        }
+
+        return presentationsBySkillCode;
+    }
+
+    public static IReadOnlyDictionary<int, SkillAnalysis> LoadSkillAnalysis()
+    {
+        using var connection = CreateConnection();
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT SkillId,
+                   ActionType,
+                   SubType,
+                   OverlapType,
+                   DispositionType,
+                   DamageType,
+                   TargetProcessType,
+                   AttributeType,
+                   ClientCategoryType
+            FROM SkillAnalysis
+            """;
+
+        var analysisBySkillId = new Dictionary<int, SkillAnalysis>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var analysis = new SkillAnalysis(
+                reader.GetInt32(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.GetString(6),
+                reader.GetString(7),
+                reader.GetString(8));
+            analysisBySkillId[analysis.SkillId] = analysis;
+        }
+
+        return analysisBySkillId;
+    }
+
+    public static IReadOnlyList<SkillEffectRelation> LoadSkillEffectRelations()
+    {
+        using var connection = CreateConnection();
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT SkillId, Slot, EffectId, EffectDataId, AuxEffectId
+            FROM SkillEffectRelations
+            ORDER BY SkillId, Slot
+            """;
+
+        var relations = new List<SkillEffectRelation>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            relations.Add(new SkillEffectRelation(
+                reader.GetInt32(0),
+                reader.GetInt32(1),
+                reader.GetInt32(2),
+                reader.GetInt32(3),
+                reader.GetInt32(4)));
+        }
+
+        return relations;
+    }
+
     private static SkillCollection ReadSkills(SqliteCommand cmd)
     {
-
         var skills = new SkillCollection();
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
@@ -276,5 +376,4 @@ public static class ResourceDatabase
             yield return current;
         }
     }
-
 }

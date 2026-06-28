@@ -4,5 +4,5 @@ namespace Cloris.Aion2Flow.Resources;
 
 public class SkillCollection : KeyedCollection<int, Skill>
 {
-    protected override int GetKeyForItem(Skill item) => item.Id;
+    protected override int GetKeyForItem(Skill item) => item.SkillId;
 }

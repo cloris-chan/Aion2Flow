@@ -77,8 +77,18 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
 
     private void ProcessBufferedPackets(ref bool hasParsed, in TcpConnection connection, long captureTimestampMilliseconds)
     {
-        while (TryDequeuePacketLength(out var packetLength))
+        while (true)
         {
+            if (TryConsumeBufferedNonAionPayload())
+            {
+                continue;
+            }
+
+            if (!TryDequeuePacketLength(out var packetLength))
+            {
+                return;
+            }
+
             var packet = _tail.Data[..packetLength];
             if (EmitPacket(packet, in connection, captureTimestampMilliseconds))
             {
@@ -97,12 +107,39 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
         _tail.Append(data);
     }
 
+    private bool TryConsumeBufferedNonAionPayload()
+    {
+        var buffer = _tail.Data;
+        if (!CapturedNonAionPayload.TryReadSkippableLength(buffer, out var recordLength))
+        {
+            return false;
+        }
+
+        if (recordLength > buffer.Length)
+        {
+            return false;
+        }
+
+        _tail.Consume(recordLength);
+        return true;
+    }
+
     private bool TryDequeuePacketLength(out int packetLength)
     {
         packetLength = 0;
 
         var buffer = _tail.Data;
         if (buffer.IsEmpty)
+        {
+            return false;
+        }
+
+        if (CapturedNonAionPayload.TryReadSkippableLength(buffer, out _))
+        {
+            return false;
+        }
+
+        if (CapturedNonAionPayload.IsPotentialSkippablePrefix(buffer))
         {
             return false;
         }
@@ -131,9 +168,30 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
     private static bool TryTakePacket(ref ReadOnlySpan<byte> buffer, out ReadOnlySpan<byte> packet)
     {
         packet = default;
-        if (buffer.IsEmpty)
+        while (true)
         {
-            return false;
+            if (buffer.IsEmpty)
+            {
+                return false;
+            }
+
+            if (CapturedNonAionPayload.TryReadSkippableLength(buffer, out var nonAionLength))
+            {
+                if (nonAionLength > buffer.Length)
+                {
+                    return false;
+                }
+
+                buffer = buffer[nonAionLength..];
+                continue;
+            }
+
+            if (CapturedNonAionPayload.IsPotentialSkippablePrefix(buffer))
+            {
+                return false;
+            }
+
+            break;
         }
 
         if (PacketTransportCodec.TryReadTransportLength(buffer, 0, out var packetLength))

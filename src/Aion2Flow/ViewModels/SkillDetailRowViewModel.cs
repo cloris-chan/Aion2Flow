@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 
 namespace Cloris.Aion2Flow.ViewModels;
@@ -115,10 +114,11 @@ public readonly record struct SkillPresentationKey(CombatActionKey ActionKey) : 
 
     public static SkillPresentationKey FromActionKey(CombatActionKey actionKey)
     {
-        if (!SkillVariantInfo.TryGetStandardPlayerSkillBaseCode(actionKey.SkillCode, out var baseSkillCode))
+        var presentationSkillId = CombatResourceRegistry.ResolvePresentationSkillIdForCode(actionKey.SkillCode);
+        if (presentationSkillId <= 0 || presentationSkillId == actionKey.SkillCode)
             return new SkillPresentationKey(actionKey);
 
-        return new SkillPresentationKey(new CombatActionKey(baseSkillCode, default, default));
+        return new SkillPresentationKey(new CombatActionKey(presentationSkillId, default, default));
     }
 
     public int CompareTo(SkillPresentationKey other) => ActionKey.CompareTo(other.ActionKey);

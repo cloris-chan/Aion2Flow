@@ -82,7 +82,7 @@ public sealed class LocalizationServicesTests
     [InlineData(100028, "水之精靈：基本攻擊", "ICON_EL_SKILL_011.webp")]
     [InlineData(100034, "風之精靈：基本攻擊", "ICON_EL_SKILL_012.webp")]
     [InlineData(100048, "地之精靈：基本攻擊", "ICON_EL_SKILL_013.webp")]
-    [InlineData(17040257, "審判之電", "ICON_CL_SKILL_004.webp")]
+    [InlineData(17040257, "天罰", "ICON_CL_SKILL_005.webp")]
     [InlineData(17440047, "高潔氣息", "ICON_CL_SKILL_046.webp")]
     [InlineData(17730001, "主神恩寵", "ICON_CL_SKILL_Passive_012.webp")]
     [InlineData(3001110, "神石：海格黛的束縛", "Icon_Item_Usable_Godstone_WP_r_004.webp")]
@@ -107,9 +107,9 @@ public sealed class LocalizationServicesTests
     }
 
     [Theory]
-    [InlineData(1227237, "冤魂球", null)]
+    [InlineData(1227237, "攻擊", null)]
     [InlineData(1227265, "亡靈迅殺", null)]
-    public void GameResourceService_Resolves_Seven_Digit_Combat_Display_Fallbacks(int skillCode, string expectedName, string? expectedIcon)
+    public void GameResourceService_Resolves_Client_SkillDat_Display_Names(int skillCode, string expectedName, string? expectedIcon)
     {
         try
         {
@@ -127,10 +127,8 @@ public sealed class LocalizationServicesTests
         }
     }
 
-    [Theory]
-    [InlineData(1607415)]
-    [InlineData(1607400)]
-    public void GameResourceService_Does_Not_Resolve_Npc_Code_To_Player_Family_Fallback(int skillCode)
+    [Fact]
+    public void GameResourceService_Uses_SkillDat_Alias_Display_Id()
     {
         try
         {
@@ -139,7 +137,28 @@ public sealed class LocalizationServicesTests
             languageService.SetLanguage(LanguageService.TraditionalChinese);
             using var resources = new GameResourceService(languageService);
 
-            Assert.Equal(skillCode.ToString(System.Globalization.CultureInfo.InvariantCulture), resources.ResolveSkillName(skillCode));
+            Assert.Equal("天罰", resources.ResolveSkillName(17040257));
+            Assert.Equal("ICON_CL_SKILL_005.webp", resources.ResolveSkillIconAssetName(17040257));
+        }
+        finally
+        {
+            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
+        }
+    }
+
+    [Theory]
+    [InlineData(1607415, "攻擊")]
+    [InlineData(1607400, "攻擊")]
+    public void GameResourceService_Resolves_Exact_Client_Skills_Without_Player_Family_Fallback(int skillCode, string expectedName)
+    {
+        try
+        {
+            var languageService = new LanguageService();
+            languageService.SetLanguage(LanguageService.English);
+            languageService.SetLanguage(LanguageService.TraditionalChinese);
+            using var resources = new GameResourceService(languageService);
+
+            Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
             Assert.Null(resources.ResolveSkillIconAssetName(skillCode));
         }
         finally

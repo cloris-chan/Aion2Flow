@@ -177,7 +177,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, packet.Length), parsed.SourceId, parsed.BodySkillVariantRaw, parsed.BodyResourceEffectRef, parsed.Marker, parsed.EchoSourceId);
+        context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, packet.Length), parsed.SourceId, parsed.BodyResourceEffectRef, parsed.Marker, parsed.EchoSourceId);
         RawPacketDump.ObserveParsedPacket("compact-0238", context.Connection);
         return context.MarkParsed();
     }
@@ -189,7 +189,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0638(context.CreateObservationSource(0x0638, packet.Length), parsed.SourceId, parsed.BodySkillVariantRaw, parsed.BodyResourceEffectRef, parsed.Marker, parsed.Flag);
+        context.Sink.RegisterCompactControl0638(context.CreateObservationSource(0x0638, packet.Length), parsed.SourceId, parsed.BodyResourceEffectRef, parsed.Marker, parsed.Flag);
         RawPacketDump.ObserveParsedPacket("compact-0638", context.Connection);
         return context.MarkParsed();
     }
@@ -205,17 +205,17 @@ internal static class PacketCombatHandler
         if (!reader.TryAdvance(2)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (!reader.TryReadVarInt(out _)) return false;
-        if (!reader.TryReadUInt32Le(out var bodySkillVariantRaw)) return false;
+        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadByte(out _)) return false;
         if (!reader.TryReadVarInt(out var echoSourceId)) return false;
-        if (sourceId <= 0 || bodySkillVariantRaw == 0) return false;
+        if (sourceId <= 0 || bodyResourceEffectRefRaw == 0) return false;
 
         consumed = ResolveEmbedded0238Length(ref reader);
         var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, opcodeOffset, consumed, 2, Math.Max(0, consumed - 2), 0);
         try
         {
-            context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, consumed), sourceId, unchecked((int)bodySkillVariantRaw), ResourceEffectRef.FromRaw(bodySkillVariantRaw), marker, echoSourceId);
+            context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, consumed), sourceId, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), marker, echoSourceId);
             return context.MarkParsed();
         }
         finally
@@ -244,16 +244,16 @@ internal static class PacketCombatHandler
         var reader = new PacketSpanReader(payload);
         if (!reader.TryAdvance(2)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
-        if (!reader.TryReadUInt32Le(out var bodySkillVariantRaw)) return false;
+        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadByte(out var flag)) return false;
-        if (sourceId <= 0 || bodySkillVariantRaw == 0) return false;
+        if (sourceId <= 0 || bodyResourceEffectRefRaw == 0) return false;
 
         consumed = reader.Offset;
         var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, opcodeOffset, consumed, 2, Math.Max(0, consumed - 2), 0);
         try
         {
-            context.Sink.RegisterCompactControl0638(context.CreateObservationSource(0x0638, consumed), sourceId, unchecked((int)bodySkillVariantRaw), ResourceEffectRef.FromRaw(bodySkillVariantRaw), marker, flag);
+            context.Sink.RegisterCompactControl0638(context.CreateObservationSource(0x0638, consumed), sourceId, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), marker, flag);
             return context.MarkParsed();
         }
         finally

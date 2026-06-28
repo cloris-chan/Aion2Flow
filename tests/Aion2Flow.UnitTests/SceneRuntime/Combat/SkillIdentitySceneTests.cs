@@ -83,7 +83,7 @@ public sealed class SkillIdentitySceneTests
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out _));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         Assert.True(skills.TryGetBySkillCode(17040257, out var skill));
-        Assert.Equal("審判之電", CombatResourceRegistry.DisplaySkillNameFor(skill.SkillCode));
+        Assert.Equal("天罰", CombatResourceRegistry.DisplaySkillNameFor(skill.SkillCode));
         Assert.Equal(77282, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
     }
@@ -130,7 +130,10 @@ public sealed class SkillIdentitySceneTests
             new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
             new Skill(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
             new Skill(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+        ], new Dictionary<int, NpcCatalogEntry>(), new Dictionary<int, SkillPresentation>
+        {
+            [12240039] = new(12240039, 12240000, 12240030, 12240000, 0, 9, false)
+        });
 
         using var scene = new SceneTestHarness();
         const int sourceId = 3038;
@@ -322,7 +325,7 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ItemSkill, "npc", null)
+            new Skill(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ClientSkill, "npc", null)
         ], new Dictionary<int, NpcCatalogEntry>());
 
         var journal = new ObservedEventJournal();
@@ -341,5 +344,41 @@ public sealed class SkillIdentitySceneTests
         Assert.Equal(1218810, combat.SkillCode);
         Assert.Equal(1218810, combat.BodySkillVariantRaw);
         Assert.Equal(0u, combat.BodyResourceEffectRef.RawId);
+    }
+
+    [Fact]
+    public void Compact0238_Body_Code_Is_Stored_As_ResourceEffectRef_Not_Skill_Code()
+    {
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        var source = new PacketObservationSource(1_000, 0, 1, 0x0238, 16, 0, default);
+        var effectRef = ResourceEffectRef.FromRaw(30011101);
+
+        sink.RegisterCompactControl0238(in source, 100, effectRef, 3, 100);
+
+        var entry = journal.Read(0);
+        Assert.True(entry.Combat.HasValue);
+        var combat = entry.Combat.Value;
+        Assert.Equal(0, combat.SkillCode);
+        Assert.Equal(0, combat.BodySkillVariantRaw);
+        Assert.Equal(30011101u, combat.BodyResourceEffectRef.RawId);
+    }
+
+    [Fact]
+    public void Compact0638_Body_Code_Is_Stored_As_ResourceEffectRef_Not_Skill_Code()
+    {
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        var source = new PacketObservationSource(1_000, 0, 1, 0x0638, 16, 0, default);
+        var effectRef = ResourceEffectRef.FromRaw(30011101);
+
+        sink.RegisterCompactControl0638(in source, 100, effectRef, 3, 0);
+
+        var entry = journal.Read(0);
+        Assert.True(entry.Combat.HasValue);
+        var combat = entry.Combat.Value;
+        Assert.Equal(0, combat.SkillCode);
+        Assert.Equal(0, combat.BodySkillVariantRaw);
+        Assert.Equal(30011101u, combat.BodyResourceEffectRef.RawId);
     }
 }

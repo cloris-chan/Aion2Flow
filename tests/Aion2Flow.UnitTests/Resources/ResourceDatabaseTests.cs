@@ -60,20 +60,25 @@ public sealed class ResourceDatabaseTests
     }
 
     [Theory]
-    [InlineData("en-US", 12240010, "Judgment")]
-    [InlineData("zh-TW", 17121450, "痊癒光輝")]
-    [InlineData("en-US", 11800008, "Murderous Burst")]
-    public void LoadSkills_Exposes_Localized_Skill_Identity_Without_Runtime_Semantics(
+    [InlineData("en-US", 12240010, "Judgment", SkillCategory.Templar, SkillSourceType.PcSkill, "STR_SKILL_PC_TEMPLAR_12240010")]
+    [InlineData("zh-TW", 17121450, "痊癒光輝", SkillCategory.Cleric, SkillSourceType.PcSkill, "STR_SKILL_PC_CLERIC_17121450")]
+    [InlineData("en-US", 11800008, "Murderous Burst", SkillCategory.Gladiator, SkillSourceType.PcSkill, "STR_SKILL_PC_GLADIATOR_11800008")]
+    [InlineData("zh-TW", 3001110, "神石：海格黛的束縛", SkillCategory.Item, SkillSourceType.ClientSkill, "SkillString_ITEM_3001110")]
+    public void LoadSkills_Exposes_SkillDat_Based_Identity_With_Localized_Text(
         string language,
         int skillId,
-        string expectedName)
+        string expectedName,
+        SkillCategory expectedCategory,
+        SkillSourceType expectedSourceType,
+        string expectedSourceKey)
     {
         var skills = ResourceDatabase.LoadSkills(language);
 
         Assert.True(skills.TryGetValue(skillId, out var skill));
         Assert.Equal(expectedName, skill.Name);
-        Assert.NotEqual(SkillCategory.Unknown, skill.Category);
-        Assert.NotEqual(SkillSourceType.Unknown, skill.SourceType);
+        Assert.Equal(expectedCategory, skill.Category);
+        Assert.Equal(expectedSourceType, skill.SourceType);
+        Assert.Equal(expectedSourceKey, skill.SourceKey);
     }
 
     [Fact]
@@ -83,6 +88,103 @@ public sealed class ResourceDatabaseTests
 
         Assert.True(skills.TryGetValue(17040250, out var judgmentLightning));
         Assert.Contains(17050250, judgmentLightning.EnumerateTriggeredSkillIds());
+    }
+
+    [Fact]
+    public void LoadSkills_Exposes_Full_SkillDat_Client_Record_Set()
+    {
+        var skills = ResourceDatabase.LoadCombatSkills();
+
+        Assert.True(skills.Count > 13_000);
+        Assert.True(skills.TryGetValue(1227237, out var npcAttack));
+        Assert.Equal("Attack", npcAttack.Name);
+        Assert.Equal(SkillCategory.Npc, npcAttack.Category);
+        Assert.Equal(SkillSourceType.ClientSkill, npcAttack.SourceType);
+        Assert.Equal("SkillString_NPC_Attack", npcAttack.SourceKey);
+
+        Assert.True(skills.TryGetValue(1227265, out var namedNpcSkill));
+        Assert.Equal("Wraith Surge", namedNpcSkill.Name);
+        Assert.Equal("SkillString_NPC_1227260", namedNpcSkill.SourceKey);
+    }
+
+    [Fact]
+    public void LoadSkillAnalysis_Exposes_SkillDat_Runtime_Metadata()
+    {
+        var analysis = ResourceDatabase.LoadSkillAnalysis();
+
+        Assert.True(analysis.TryGetValue(17050250, out var clericSkill));
+        Assert.Equal("Active", clericSkill.ActionType);
+        Assert.Equal("Negative", clericSkill.DispositionType);
+        Assert.Equal("Magic", clericSkill.DamageType);
+        Assert.Equal("MainTarget", clericSkill.TargetProcessType);
+        Assert.Equal("Attack", clericSkill.ClientCategoryType);
+
+        Assert.True(analysis.TryGetValue(1227265, out var npcSkill));
+        Assert.Equal("System", npcSkill.ActionType);
+        Assert.Equal("Negative", npcSkill.DispositionType);
+        Assert.Equal("Magic", npcSkill.DamageType);
+        Assert.Equal("Self", npcSkill.TargetProcessType);
+    }
+
+    [Theory]
+    [InlineData(17040250, 17040000, 17040250, 17040000, 0b10010, 0, false)]
+    [InlineData(1227237, 1227237, 1227237, 1227237, 0, 0, false)]
+    [InlineData(12090230, 12090000, 12090230, 12090000, 0b00110, 0, true)]
+    public void LoadSkillPresentations_Exposes_Resource_Display_Projection(
+        int skillCode,
+        int expectedPresentationSkillId,
+        int expectedDisplaySkillId,
+        int expectedBaseSkillId,
+        int expectedSpecializationMask,
+        int expectedVariantState,
+        bool expectedIsChargeSkill)
+    {
+        var presentations = ResourceDatabase.LoadSkillPresentations();
+
+        Assert.True(presentations.TryGetValue(skillCode, out var presentation));
+        Assert.Equal(skillCode, presentation.SkillCode);
+        Assert.Equal(expectedPresentationSkillId, presentation.PresentationSkillId);
+        Assert.Equal(expectedDisplaySkillId, presentation.DisplaySkillId);
+        Assert.Equal(expectedBaseSkillId, presentation.BaseSkillId);
+        Assert.Equal(expectedSpecializationMask, presentation.SpecializationMask);
+        Assert.Equal(expectedVariantState, presentation.VariantState);
+        Assert.Equal(expectedIsChargeSkill, presentation.IsChargeSkill);
+    }
+
+    [Theory]
+    [InlineData(17040257, 17050000, 17050000, 17040000, 0b10010, 7)]
+    [InlineData(16030047, 16030000, 16030040, 16030000, 0b01000, 7)]
+    [InlineData(16257000, 16107000, 16107000, 16250000, 0, 0)]
+    [InlineData(18370047, 18370000, 18370000, 18370000, 0b01000, 7)]
+    public void LoadSkillPresentations_Exposes_Packet_Display_Projection(
+        int skillCode,
+        int expectedPresentationSkillId,
+        int expectedDisplaySkillId,
+        int expectedBaseSkillId,
+        int expectedSpecializationMask,
+        int expectedVariantState)
+    {
+        var skills = ResourceDatabase.LoadCombatSkills();
+        var presentations = ResourceDatabase.LoadSkillPresentations();
+
+        Assert.DoesNotContain(skills, skill => skill.SkillId == skillCode);
+        Assert.True(presentations.TryGetValue(skillCode, out var presentation));
+        Assert.Equal(skillCode, presentation.SkillCode);
+        Assert.Equal(expectedPresentationSkillId, presentation.PresentationSkillId);
+        Assert.Equal(expectedDisplaySkillId, presentation.DisplaySkillId);
+        Assert.Equal(expectedBaseSkillId, presentation.BaseSkillId);
+        Assert.Equal(expectedSpecializationMask, presentation.SpecializationMask);
+        Assert.Equal(expectedVariantState, presentation.VariantState);
+    }
+
+    [Theory]
+    [InlineData(30011101, 3001110)]
+    [InlineData(12272651, 1227265)]
+    public void LoadSkillEffectRelations_Maps_Effect_Ids_Back_To_Owner_Skills(int effectId, int expectedSkillId)
+    {
+        var relations = ResourceDatabase.LoadSkillEffectRelations();
+
+        Assert.Contains(relations, relation => relation.SkillId == expectedSkillId && relation.References(effectId));
     }
 
     [Theory]
@@ -213,7 +315,8 @@ public sealed class ResourceDatabaseTests
             columns.Add(reader.GetString(1));
         }
 
-        Assert.Contains("Id", columns);
+        Assert.Contains("SkillId", columns);
+        Assert.DoesNotContain("Id", columns);
         Assert.Contains("Category", columns);
         Assert.Contains("SourceType", columns);
         Assert.Contains("SourceKey", columns);

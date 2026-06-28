@@ -934,6 +934,17 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         if (actionKey.SkillCode > 0)
             return displayContext?.ResolveSkillName(actionKey.SkillCode) ?? actionKey.SkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
+        if (displayContext is not null)
+        {
+            var bodyName = displayContext.ResolveSkillName(actionKey.BodyResourceEffectRef);
+            if (!string.IsNullOrWhiteSpace(bodyName))
+                return bodyName;
+
+            var detailName = displayContext.ResolveSkillName(actionKey.DetailResourceEffectRef);
+            if (!string.IsNullOrWhiteSpace(detailName))
+                return detailName;
+        }
+
         return actionKey.FormatFallbackLabel(localization["Skill_UnknownEffect"]);
     }
 
