@@ -32,8 +32,7 @@ public sealed class EntityStore
     public void ApplyNpcCode(int instanceId, int npcCode)
     {
         var entity = GetOrAdd(instanceId);
-        var ownershipChanged = ClearTransientOwner(entity);
-        if (entity.NpcCode == npcCode && !ownershipChanged)
+        if (entity.NpcCode == npcCode)
             return;
 
         entity.NpcCode = npcCode;
@@ -140,7 +139,7 @@ public sealed class EntityStore
             return false;
 
         var entity = GetOrAdd(effectInstanceId);
-        if (entity.IsPlayer || entity.NpcCode.HasValue || entity.OwnerKind == EntityOwnerKind.Summon || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy)
+        if (entity.IsPlayer || entity.OwnerKind == EntityOwnerKind.Summon || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy)
             return false;
 
         if (entity.OwnerEntityId == ownerId && entity.OwnerKind == EntityOwnerKind.TransientEffect)

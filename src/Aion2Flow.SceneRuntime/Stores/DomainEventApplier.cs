@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -204,7 +205,7 @@ public sealed class DomainEventApplier
 
     private void ObserveTransientEffectOwnerPacket(in ObservedEventEnvelope entry, in CombatObservation observation, long observedAtMilliseconds)
     {
-        if (entry.Raw.Opcode == 0x0238 && CanObserveTransientEffectOwnerSeed(entry.SourceEntityId))
+        if (IsTransientEffectOwnerSeed(in entry, in observation) && CanObserveTransientEffectOwnerSeed(entry.SourceEntityId))
         {
             _transientEffectOwners.ObserveOwnerSkill(entry.SourceEntityId, in observation, observedAtMilliseconds);
             return;
@@ -226,6 +227,27 @@ public sealed class DomainEventApplier
 
     private bool CanObserveTransientEffectOwnerSeed(int sourceId) => CanOwnTransientEffect(sourceId, 0);
 
+    private static bool IsTransientEffectOwnerSeed(in ObservedEventEnvelope entry, in CombatObservation observation)
+    {
+        if (entry.Raw.Opcode == 0x0238)
+            return true;
+
+        return entry.Raw.Opcode == 0x0438 &&
+               observation.Damage == 0 &&
+               observation.HitCount == 0 &&
+               observation.AttemptCount == 0 &&
+               observation.ResourceKind == CombatResourceKind.Unknown &&
+               observation.PeriodicRelation == PeriodicEffectRelation.None &&
+               observation.EffectTag == PacketEffectTag.None &&
+               observation.EventKind == CombatEventKind.Unknown &&
+               observation.ValueKind == CombatValueKind.Unknown &&
+               observation.LayoutTag == 0 &&
+               observation.Flag == 0 &&
+               observation.ChainId == 0 &&
+               observation.Type is 2 or 3 &&
+               observation.Marker > 0;
+    }
+
     private bool CanApplyTransientEffectOwner(int sourceId)
     {
         if (sourceId <= 0)
@@ -235,7 +257,6 @@ public sealed class DomainEventApplier
             return true;
 
         return !entity.IsPlayer &&
-               !entity.NpcCode.HasValue &&
                entity.OwnerKind != EntityOwnerKind.Summon &&
                entity.Kind is not (NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy);
     }
@@ -244,9 +265,6 @@ public sealed class DomainEventApplier
     {
         if (ownerId <= 0 || ownerId == effectSourceId)
             return false;
-
-        if (_metadataRegistry.TryGetPcMetadata(ownerId, out _))
-            return true;
 
         if (!_entities.TryGet(ownerId, out var entity))
             return true;

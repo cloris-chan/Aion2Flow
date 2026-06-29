@@ -441,6 +441,112 @@ public class DomainEventApplierTests
     }
 
     [Fact]
+    public void Applier_TransientEffect0438Control_AttributesNpcCodedEffectDamageToOwner()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        var owner = new SceneReadModelOwner(journal);
+        const int ownerId = 7206;
+        const int effectSourceId = 73942;
+        const int targetId = 180015;
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { OffsetTicks = 900 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = ownerId,
+            State = new StateObservation { EntityId = ownerId, StateCode = StateCodes.PlayerIdentity, Text = "Owner" }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { OffsetTicks = 950 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = effectSourceId,
+            State = new StateObservation { EntityId = effectSourceId, StateCode = 2_920_658 }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, BatchOrdinal = 1 },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = ownerId,
+            TargetEntityId = targetId,
+            Raw = new RawPacketReference { Opcode = 0x0438 },
+            Combat = new CombatObservation
+            {
+                SkillCode = 15281240,
+                BodySkillVariantRaw = 15281240,
+                Marker = 29,
+                Type = 3
+            }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { OffsetTicks = 1_240 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, BatchOrdinal = 2 },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = effectSourceId,
+            TargetEntityId = targetId,
+            Raw = new RawPacketReference { Opcode = 0x0438 },
+            Combat = new CombatObservation
+            {
+                SkillCode = 15281243,
+                BodySkillVariantRaw = 15281243,
+                Damage = 12_000,
+                HitCount = 1,
+                AttemptCount = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, BatchOrdinal = 3 },
+            Domain = ObservedEventDomain.Combat,
+            SourceEntityId = effectSourceId,
+            TargetEntityId = targetId,
+            Raw = new RawPacketReference { Opcode = 0x0438 },
+            Combat = new CombatObservation
+            {
+                SkillCode = 15281243,
+                BodySkillVariantRaw = 15281243,
+                Damage = 345,
+                HitCount = 1,
+                AttemptCount = 1,
+                EventKind = CombatEventKind.Damage,
+                ValueKind = CombatValueKind.Damage
+            }
+        });
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { OffsetTicks = 1_400 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 5, BatchOrdinal = 4 },
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = effectSourceId,
+            State = new StateObservation { EntityId = effectSourceId, StateCode = 2_920_658 }
+        });
+
+        owner.Refresh();
+        var snapshot = owner.CreateSnapshot();
+
+        Assert.True(owner.Entities.TryGet(effectSourceId, out var effectEntity));
+        Assert.Equal(2_920_658, effectEntity!.NpcCode);
+        Assert.Equal(ownerId, effectEntity.OwnerEntityId);
+        Assert.Equal(EntityOwnerKind.TransientEffect, effectEntity.OwnerKind);
+        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var ownerCombatant));
+        Assert.Equal(12_345, ownerCombatant.DamageAmount);
+        Assert.False(snapshot.Combatants.ContainsKey(effectSourceId));
+    }
+
+    [Fact]
     public void Applier_TransientEffectControl_DoesNotUseKnownNpcOwnerSeed()
     {
         var journal = new ObservedEventJournal();

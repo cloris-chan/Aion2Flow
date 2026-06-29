@@ -2,6 +2,7 @@ using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
@@ -409,6 +410,48 @@ public sealed class PacketLogReplayServiceTests
 
         Assert.True(replay.Snapshot.Combatants.TryGetValue(ownerId, out var ownerMetrics), summaryDump);
         Assert.Equal(486_287, ownerMetrics.DamageAmount);
+    }
+
+    [Fact]
+    public void Replay_20260629212808_Folds_Ranger_Ground_Effects_To_PacketOwner()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.RangerGroundEffectOwnerAttribution}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        AssertGroundEffectOwner(replay, sourceId: 44_742, ownerId: 14_777, expectedSourceDamage: 91_338, summaryDump);
+        AssertGroundEffectOwner(replay, sourceId: 29_291, ownerId: 14_777, expectedSourceDamage: 89_798, summaryDump);
+
+        var ownerSummary = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == 14_777);
+        Assert.Equal(7_904_992, ownerSummary.OutgoingDamage);
+        Assert.True(replay.Snapshot.Combatants.TryGetValue(14_777, out var ownerMetrics), summaryDump);
+        Assert.Equal(7_904_992, ownerMetrics.DamageAmount);
+    }
+
+    [Fact]
+    public void Replay_20260629212454_Folds_Sorcerer_Ground_Effects_To_PacketOwner()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SorcererGroundEffectOwnerAttribution}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+        var summaryDump = BuildSummaryDump(replay.Combatants);
+        AssertGroundEffectOwner(replay, sourceId: 136_494, ownerId: 14_937, expectedSourceDamage: 324_062, summaryDump);
+        AssertGroundEffectOwner(replay, sourceId: 135_673, ownerId: 14_937, expectedSourceDamage: 239_955, summaryDump);
+        AssertGroundEffectOwner(replay, sourceId: 169_382, ownerId: 14_937, expectedSourceDamage: 169_676, summaryDump);
+        AssertGroundEffectOwner(replay, sourceId: 62_309, ownerId: 14_937, expectedSourceDamage: 164_993, summaryDump);
+        AssertGroundEffectOwner(replay, sourceId: 152_498, ownerId: 14_937, expectedSourceDamage: 116_484, summaryDump);
+        AssertGroundEffectOwner(replay, sourceId: 177_761, ownerId: 14_937, expectedSourceDamage: 87_458, summaryDump);
+        AssertGroundEffectOwner(replay, sourceId: 140_547, ownerId: 14_937, expectedSourceDamage: 52_181, summaryDump);
+        AssertGroundEffectOwner(replay, sourceId: 131_640, ownerId: 14_937, expectedSourceDamage: 30_574, summaryDump);
+
+        var ownerSummary = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == 14_937);
+        Assert.Equal(5_685_581, ownerSummary.OutgoingDamage);
+        Assert.True(replay.Snapshot.Combatants.TryGetValue(14_937, out var ownerMetrics), summaryDump);
+        Assert.Equal(5_685_581, ownerMetrics.DamageAmount);
     }
 
     [Fact]
@@ -844,6 +887,21 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry), summaryDump);
         Assert.Equal(expectedName, entry.Name);
         Assert.Equal(NpcKind.Summon, CombatResourceRegistry.ResolveNpcKind(entry.Kind));
+    }
+
+    private static void AssertGroundEffectOwner(PacketLogReplayResult replay, int sourceId, int ownerId, long expectedSourceDamage, string summaryDump)
+    {
+        Assert.True(replay.SceneOwner.Entities.TryGet(sourceId, out var entity), summaryDump);
+        Assert.Equal(ownerId, entity.OwnerEntityId);
+        Assert.Equal(EntityOwnerKind.TransientEffect, entity.OwnerKind);
+        Assert.Equal(ownerId, SceneReplayTestView.ResolveCombatantId(replay, sourceId));
+        Assert.DoesNotContain(replay.Combatants, combatant => combatant.CombatantId == sourceId);
+        Assert.False(replay.Snapshot.Combatants.ContainsKey(sourceId));
+
+        var sourceDamage = replay.SceneOwner.Combat.Events
+            .Where(e => e.SourceId == sourceId && e.ContributesDamage)
+            .Sum(e => e.Observation.Damage);
+        Assert.Equal(expectedSourceDamage, sourceDamage);
     }
 
     private static void AssertNpcIdentity(PacketLogReplayResult replay, int entityId, int expectedNpcCode, string expectedName, string summaryDump)

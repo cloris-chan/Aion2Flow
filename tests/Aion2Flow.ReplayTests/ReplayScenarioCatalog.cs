@@ -29,6 +29,8 @@ public static class ReplayScenarioCatalog
     public const string BossFocusExpiresAfterLeavingRange = "aion2flow.stream.20260612213724.log";
     public const string ClericSelfHealingGlow = "aion2flow.stream.20260629175523.log";
     public const string GroupDirectHealing = "aion2flow.stream.20260629001019.log";
+    public const string RangerGroundEffectOwnerAttribution = "aion2flow.stream.20260629212808.log";
+    public const string SorcererGroundEffectOwnerAttribution = "aion2flow.stream.20260629212454.log";
 
     public static IEnumerable<object[]> April11IncomingAvoidance =>
     [
