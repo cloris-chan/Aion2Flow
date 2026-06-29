@@ -850,6 +850,7 @@ public sealed class MainViewModelCombatantFilterTests
             var archive = new EncounterArchiveService();
             var ports = new ProcessPortDiscoveryService();
             var capture = new WinDivertCaptureService(ports);
+            capture.Scene.Reset(DateTimeOffset.Now);
             var frameBatch = new UiFrameBatchService();
             var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
             var playerNameDisplay = new PlayerNameDisplayService(settings, localization);
