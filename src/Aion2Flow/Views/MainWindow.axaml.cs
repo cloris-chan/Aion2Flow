@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using Cloris.Aion2Flow.Assets.Icons;
 using Cloris.Aion2Flow.Controls;
 using Cloris.Aion2Flow.Services;
@@ -18,6 +19,9 @@ namespace Cloris.Aion2Flow.Views;
 
 public partial class MainWindow : Window
 {
+    private const uint WmEnterSizeMove = 0x0231;
+    private const uint WmExitSizeMove = 0x0232;
+
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly SettingsService _settingsService;
     private readonly AvaloniaFrameClockService _frameClock;
@@ -25,6 +29,8 @@ public partial class MainWindow : Window
     private readonly Control? _overlayRoot;
     private bool _hotkeyAttached;
     private bool _frameClockAttached;
+    private bool _isNativeSizeMoveActive;
+    private bool _autoHeightRefreshQueued;
 
     public new MainViewModel DataContext { get => (MainViewModel)base.DataContext!; set => base.DataContext = value; }
 
@@ -97,6 +103,16 @@ public partial class MainWindow : Window
         {
             _globalHotkeyService.HandleWindowMessage(msg, wParam);
         }
+        else if (msg == WmEnterSizeMove)
+        {
+            _isNativeSizeMoveActive = true;
+        }
+        else if (msg == WmExitSizeMove)
+        {
+            _isNativeSizeMoveActive = false;
+            ScheduleOverlayAutoHeightRefresh();
+        }
+
         return default;
     }
 
@@ -130,6 +146,12 @@ public partial class MainWindow : Window
             _frameClockAttached = false;
         }
 
+        if (_hotkeyAttached)
+        {
+            Win32Properties.RemoveWndProcHookCallback(this, WndProcHook);
+            _hotkeyAttached = false;
+        }
+
         base.OnClosed(e);
     }
 
@@ -148,6 +170,104 @@ public partial class MainWindow : Window
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             BeginMoveDrag(e);
+            ScheduleOverlayAutoHeightRefresh();
+        }
+    }
+
+    private void ScheduleOverlayAutoHeightRefresh()
+    {
+        if (_autoHeightRefreshQueued || WindowState == WindowState.Minimized)
+        {
+            return;
+        }
+
+        _autoHeightRefreshQueued = true;
+        Dispatcher.UIThread.Post(RefreshOverlayAutoHeight, DispatcherPriority.Loaded);
+    }
+
+    private void RefreshOverlayAutoHeight()
+    {
+        _autoHeightRefreshQueued = false;
+        if (_isNativeSizeMoveActive || WindowState == WindowState.Minimized || PlatformImpl is null)
+        {
+            return;
+        }
+
+        InvalidateOverlayLayout();
+
+        if (TryMeasureOverlayContentHeight(out var contentHeight)
+            && Math.Abs(Bounds.Height - contentHeight) > 0.5d)
+        {
+            SizeToContent = Avalonia.Controls.SizeToContent.Manual;
+            Height = contentHeight;
+        }
+
+        SizeToContent = Avalonia.Controls.SizeToContent.Height;
+    }
+
+    private bool TryMeasureOverlayContentHeight(out double height)
+    {
+        height = 0;
+
+        if (Content is not Control content)
+        {
+            return TryUseFiniteHeight(_overlayRoot?.DesiredSize.Height * _uiScale.Scale, out height);
+        }
+
+        var availableWidth = Bounds.Width > 0
+            ? Bounds.Width
+            : Width;
+        if (!double.IsFinite(availableWidth) || availableWidth <= 0)
+        {
+            availableWidth = double.PositiveInfinity;
+        }
+
+        content.Measure(new Size(availableWidth, double.PositiveInfinity));
+        if (!TryUseFiniteHeight(content.DesiredSize.Height, out height))
+        {
+            return TryUseFiniteHeight(content.Bounds.Height, out height);
+        }
+
+        return true;
+    }
+
+    private bool TryUseFiniteHeight(double? candidate, out double height)
+    {
+        height = 0;
+        if (candidate is not { } value || !double.IsFinite(value) || value <= 0)
+        {
+            return false;
+        }
+
+        if (double.IsFinite(MinHeight) && MinHeight > 0)
+        {
+            value = Math.Max(MinHeight, value);
+        }
+
+        if (double.IsFinite(MaxHeight) && MaxHeight > 0)
+        {
+            value = Math.Min(MaxHeight, value);
+        }
+
+        height = value;
+        return true;
+    }
+
+    private void InvalidateOverlayLayout()
+    {
+        InvalidateMeasure();
+        InvalidateArrange();
+
+        if (Content is Control content)
+        {
+            content.InvalidateMeasure();
+            content.InvalidateArrange();
+        }
+
+        if (_overlayRoot is not null && !ReferenceEquals(Content, _overlayRoot))
+        {
+            _overlayRoot.InvalidateMeasure();
+            _overlayRoot.InvalidateArrange();
         }
     }
 
