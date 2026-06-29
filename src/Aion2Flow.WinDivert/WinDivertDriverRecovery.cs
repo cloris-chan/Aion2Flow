@@ -25,7 +25,7 @@ internal readonly record struct WinDivertRecoveryResult(bool Succeeded, int Erro
 internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
 {
     private const string StandardServiceName = "WinDivert";
-    private const string RecoveryServiceName = "Aion2FlowWinDivert";
+    private const string LegacyRecoveryServiceNamePrefix = "Aion2FlowWinDivert";
     private const int ErrorAccessDenied = 5;
     private const int ErrorInvalidHandle = 6;
     private const int ErrorGenFailure = 31;
@@ -37,7 +37,7 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
     private const int ErrorServiceNotActive = 1062;
     private const int ErrorServiceMarkedForDelete = 1072;
     private const int ErrorServiceExists = 1073;
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
     private CloseServiceHandleSafeHandle? _ownedService;
     private string _ownedServiceName = string.Empty;
     private bool _shutdownRequested;
@@ -56,7 +56,7 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
             lock (_sync)
             {
                 if (!_shutdownRequested && _ownedService is not { IsInvalid: false, IsClosed: false })
-                    CleanupRecoveryServices(driverPath, keepFixedService: true, "startup-cleanup");
+                    CleanupRecoveryServices("startup-cleanup");
             }
         }
         catch (Exception ex)
@@ -89,15 +89,15 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
                     return WinDivertRecoveryResult.Success($"Service '{_ownedServiceName}' is already owned by this process.");
 
                 CleanupBlockingStandardServiceForRecovery(driverPath);
-                CleanupRecoveryServices(driverPath, keepFixedService: true, "recovery-cleanup");
+                CleanupRecoveryServices("recovery-cleanup");
 
-                const string recoveryServiceName = RecoveryServiceName;
-                var startResult = StartRecoveryService(driverPath, recoveryServiceName);
+                const string serviceName = StandardServiceName;
+                var startResult = StartDriverService(driverPath, serviceName);
                 if (!startResult.Recovery.Succeeded || startResult.Service is null)
                     return startResult.Recovery;
 
                 _ownedService = startResult.Service;
-                _ownedServiceName = recoveryServiceName;
+                _ownedServiceName = serviceName;
                 return startResult.Recovery;
             }
         }
@@ -147,17 +147,32 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         LogSnapshot(serviceName, beforeStop, $"{phase}-before-stop");
         if (beforeStop.CurrentState != (uint)SERVICE_STATUS_CURRENT_STATE.SERVICE_STOPPED)
         {
+            var stopped = false;
             if (!PInvoke.ControlService(service, PInvoke.SERVICE_CONTROL_STOP, out _))
             {
                 var error = Marshal.GetLastPInvokeError();
                 if (error != ErrorServiceNotActive)
                     WinDivertLog.Write(WinDivertLogLevel.Warning, $"ControlService('{serviceName}', STOP) failed: {FormatError(error)}.");
+                else
+                    stopped = true;
             }
             else
             {
                 WinDivertLog.Write(WinDivertLogLevel.Info, $"Stopped service '{serviceName}'.");
-                if (!WaitForStopped(service))
+                stopped = WaitForStopped(service);
+                if (!stopped)
                     WinDivertLog.Write(WinDivertLogLevel.Warning, $"Service '{serviceName}' did not report STOPPED before shutdown timeout.");
+            }
+
+            if (!stopped)
+            {
+                var afterStopAttempt = QuerySnapshot(service);
+                if (afterStopAttempt.CurrentState != (uint)SERVICE_STATUS_CURRENT_STATE.SERVICE_STOPPED)
+                {
+                    LogSnapshot(serviceName, afterStopAttempt, $"{phase}-stop-incomplete");
+                    WinDivertLog.Write(WinDivertLogLevel.Warning, $"Leaving service '{serviceName}' registered because it is still running; marking a running driver service for deletion can leave it disabled until reboot.");
+                    return;
+                }
             }
         }
 
@@ -165,7 +180,7 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         LogSnapshot(serviceName, QuerySnapshot(service), $"{phase}-after-stop");
     }
 
-    private static WinDivertServiceStartResult StartRecoveryService(string driverPath, string serviceName)
+    private static WinDivertServiceStartResult StartDriverService(string driverPath, string serviceName)
     {
         using var manager = PInvoke.OpenSCManager(
             null!,
@@ -174,17 +189,18 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         if (manager.IsInvalid)
             return new WinDivertServiceStartResult(Failure("OpenSCManager", Marshal.GetLastPInvokeError()), null);
 
-        WinDivertLog.Write(WinDivertLogLevel.Debug, "Opened Service Control Manager for WinDivert recovery.");
+        WinDivertLog.Write(WinDivertLogLevel.Debug, "Opened Service Control Manager for WinDivert driver service recovery.");
 
-        var service = OpenOrCreateRecoveryService(manager, serviceName, driverPath, out var created);
+        var service = OpenOrCreateDriverService(manager, serviceName, driverPath, out var created);
         if (service.IsInvalid)
         {
             var error = Marshal.GetLastPInvokeError();
             service.Dispose();
-            return new WinDivertServiceStartResult(Failure("OpenOrCreateRecoveryService", error), null);
+            return new WinDivertServiceStartResult(Failure("OpenOrCreateDriverService", error), null);
         }
 
         var retained = false;
+        var deleteOnFailure = created;
         try
         {
             var snapshot = QuerySnapshot(service);
@@ -193,17 +209,22 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
             if (!created &&
                 snapshot.Exists &&
                 snapshot.CurrentState == (uint)SERVICE_STATUS_CURRENT_STATE.SERVICE_STOPPED &&
-                !PathsEqual(snapshot.BinaryPath, driverPath))
+                ShouldReplaceStoppedStandardServiceBinary(snapshot, driverPath))
             {
                 if (!PInvoke.ChangeServiceConfig(service, ENUM_SERVICE_TYPE.SERVICE_NO_CHANGE, SERVICE_START_TYPE.SERVICE_DEMAND_START, SERVICE_ERROR.SERVICE_NO_CHANGE, driverPath, null!, null!, null!, null!, serviceName))
                 {
                     return new WinDivertServiceStartResult(Failure("ChangeServiceConfig", Marshal.GetLastPInvokeError()), null);
                 }
 
-                WinDivertLog.Write(WinDivertLogLevel.Info, $"Updated recovery service binary path to '{driverPath}'.");
+                WinDivertLog.Write(WinDivertLogLevel.Info, $"Updated WinDivert service binary path to '{driverPath}'.");
+                deleteOnFailure = true;
             }
 
-            if (!PInvoke.StartService(service, ReadOnlySpan<string>.Empty))
+            if (snapshot.CurrentState == (uint)SERVICE_STATUS_CURRENT_STATE.SERVICE_RUNNING)
+            {
+                WinDivertLog.Write(WinDivertLogLevel.Info, $"WinDivert service '{serviceName}' is already running.");
+            }
+            else if (!PInvoke.StartService(service, ReadOnlySpan<string>.Empty))
             {
                 var error = Marshal.GetLastPInvokeError();
                 if (error != ErrorServiceAlreadyRunning)
@@ -212,11 +233,11 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
                     return new WinDivertServiceStartResult(Failure("StartService", error), null);
                 }
 
-                WinDivertLog.Write(WinDivertLogLevel.Info, "WinDivert recovery service was already running.");
+                WinDivertLog.Write(WinDivertLogLevel.Info, "WinDivert service was already running.");
             }
             else
             {
-                WinDivertLog.Write(WinDivertLogLevel.Info, "Started WinDivert recovery service.");
+                WinDivertLog.Write(WinDivertLogLevel.Info, "Started WinDivert service.");
             }
 
             var runningSnapshot = QuerySnapshot(service);
@@ -230,7 +251,9 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         {
             if (!retained)
             {
-                MarkServiceForDeletion(service, serviceName);
+                if (deleteOnFailure)
+                    MarkServiceForDeletion(service, serviceName);
+
                 service.Dispose();
             }
         }
@@ -305,7 +328,7 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         }
     }
 
-    private void CleanupRecoveryServices(string driverPath, bool keepFixedService, string phase)
+    private void CleanupRecoveryServices(string phase)
     {
         using var manager = PInvoke.OpenSCManager(
             null!,
@@ -336,16 +359,7 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
 
             var snapshot = QuerySnapshot(service);
             LogSnapshot(serviceName, snapshot, phase);
-            if (keepFixedService &&
-                string.Equals(serviceName, RecoveryServiceName, StringComparison.Ordinal) &&
-                PathsEqual(snapshot.BinaryPath, driverPath))
-            {
-                WinDivertLog.Write(WinDivertLogLevel.Debug, $"Keeping fixed recovery service '{serviceName}' during {phase} because it already points to the bundled driver.");
-                service.Dispose();
-                continue;
-            }
-
-            WinDivertLog.Write(WinDivertLogLevel.Info, $"Removing Aion2Flow recovery service '{serviceName}' during {phase}.");
+            WinDivertLog.Write(WinDivertLogLevel.Info, $"Removing legacy Aion2Flow recovery service '{serviceName}' during {phase}.");
             StopAndDeleteService(service, serviceName, phase);
             service.Dispose();
         }
@@ -538,11 +552,11 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         _ => false
     };
 
-    internal static bool IsRecoveryServiceName(string serviceName) => serviceName.StartsWith(RecoveryServiceName, StringComparison.Ordinal);
+    internal static bool IsRecoveryServiceName(string serviceName) => serviceName.StartsWith(LegacyRecoveryServiceNamePrefix, StringComparison.Ordinal);
 
     private static uint RecoveryServiceAccess => PInvoke.SERVICE_QUERY_CONFIG | PInvoke.SERVICE_CHANGE_CONFIG | PInvoke.SERVICE_QUERY_STATUS | PInvoke.SERVICE_START | PInvoke.SERVICE_STOP | (uint)FILE_ACCESS_RIGHTS.DELETE;
 
-    private static CloseServiceHandleSafeHandle OpenOrCreateRecoveryService(
+    private static CloseServiceHandleSafeHandle OpenOrCreateDriverService(
         CloseServiceHandleSafeHandle manager,
         string serviceName,
         string driverPath,
@@ -569,7 +583,7 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         if (!service.IsInvalid)
         {
             created = true;
-            WinDivertLog.Write(WinDivertLogLevel.Info, $"Created recovery service '{serviceName}' for '{driverPath}'.");
+            WinDivertLog.Write(WinDivertLogLevel.Info, $"Created WinDivert service '{serviceName}' for '{driverPath}'.");
             return service;
         }
 
@@ -585,6 +599,14 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         created = false;
         Marshal.SetLastPInvokeError(createError);
         return new CloseServiceHandleSafeHandle();
+    }
+
+    private static bool ShouldReplaceStoppedStandardServiceBinary(in WinDivertServiceSnapshot snapshot, string driverPath)
+    {
+        if (PathsEqual(snapshot.BinaryPath, driverPath))
+            return false;
+
+        return ShouldDeleteStandardWinDivertService(snapshot, driverPath, AppContext.BaseDirectory, out _);
     }
 
     private static void LogEnvironment(int openError, string driverPath)

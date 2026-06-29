@@ -9,7 +9,7 @@ public sealed class WinDivertDriverRecoveryTests
     [InlineData("Aion2FlowWinDivert22")]
     [InlineData("Aion2FlowWinDivert22_00000001_00000002")]
     [InlineData("Aion2FlowWinDivert_legacy")]
-    public void IsRecoveryServiceName_AcceptsAion2FlowPrefix(string serviceName)
+    public void IsRecoveryServiceName_AcceptsLegacyAion2FlowPrefix(string serviceName)
     {
         Assert.True(WinDivertDriverRecovery.IsRecoveryServiceName(serviceName));
     }
@@ -19,7 +19,7 @@ public sealed class WinDivertDriverRecoveryTests
     [InlineData("WinDivert")]
     [InlineData("OtherAion2FlowWinDivert")]
     [InlineData("aion2flowwindivert")]
-    public void IsRecoveryServiceName_RejectsNonAion2FlowPrefix(string serviceName)
+    public void IsRecoveryServiceName_RejectsNonLegacyAion2FlowPrefix(string serviceName)
     {
         Assert.False(WinDivertDriverRecovery.IsRecoveryServiceName(serviceName));
     }
@@ -65,6 +65,16 @@ public sealed class WinDivertDriverRecoveryTests
         Assert.False(File.Exists(missingPath));
         Assert.True(WinDivertDriverRecovery.ShouldDeleteStandardWinDivertService($@"\??\{missingPath}", driverPath, baseDirectory, out var reason));
         Assert.Contains("missing driver", reason);
+    }
+
+    [Fact]
+    public void ShouldDeleteStandardWinDivertService_AcceptsBundledDriverPath()
+    {
+        var baseDirectory = Path.GetFullPath(@"C:\Apps\Aion2Flow\current");
+        var driverPath = Path.Combine(baseDirectory, "WinDivert64.sys");
+
+        Assert.True(WinDivertDriverRecovery.ShouldDeleteStandardWinDivertService($@"\??\{driverPath}", driverPath, baseDirectory, out var reason));
+        Assert.Contains("bundled driver", reason);
     }
 
     [Fact]
