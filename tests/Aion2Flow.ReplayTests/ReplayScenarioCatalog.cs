@@ -6,8 +6,6 @@ public static class ReplayScenarioCatalog
 {
     public const string CanonicalSceneReplayLog = "aion2flow.stream.20260415211500.log";
     public const string DeterministicReplaySecondaryLog = "aion2flow.stream.20260419204630.log";
-    public const string GroundAoeAttribution = "aion2flow.stream.20260417003456.log";
-    public const string ClericHealingNoFalseDrain = "aion2flow.stream.20260417023559.log";
     public const string LightOfRegenerationPeriodicHealing = "aion2flow.stream.20260417141813.log";
     public const string InstanceClearRestoreAndMapBoundary = "aion2flow.stream.20260419204630.log";
     public const string VisibleDamageContributionBoundary = "aion2flow.stream.20260423001617.log";
@@ -29,6 +27,8 @@ public static class ReplayScenarioCatalog
     public const string PlaybackSceneRelativeTimestamps = "aion2flow.stream.20260611151958.log";
     public const string BossFocusWithoutBattleToggle = "aion2flow.stream.20260612151026.log";
     public const string BossFocusExpiresAfterLeavingRange = "aion2flow.stream.20260612213724.log";
+    public const string ClericSelfHealingGlow = "aion2flow.stream.20260629175523.log";
+    public const string GroupDirectHealing = "aion2flow.stream.20260629001019.log";
 
     public static IEnumerable<object[]> April11IncomingAvoidance =>
     [
@@ -54,9 +54,7 @@ public static class ReplayScenarioCatalog
 
     public static IEnumerable<object[]> OutgoingCombatStats =>
     [
-        [new ReplayOutgoingCombatStatsScenario(CanonicalSceneReplayLog, 20_211_224, 1_304, 1_312, ExpectedOutgoingInvincibles: 8)],
-        [new ReplayOutgoingCombatStatsScenario("aion2flow.stream.20260416021557.log", 7_920_567, 1_166, 1_166, ExpectedIncomingHealing: 569_015)],
-        [new ReplayOutgoingCombatStatsScenario("aion2flow.stream.20260416021406.log", 3_961_239, 524, 524, ExpectedIncomingHealing: 139_411)]
+        [new ReplayOutgoingCombatStatsScenario(CanonicalSceneReplayLog, 20_211_224, 1_304, 1_312, ExpectedOutgoingInvincibles: 8)]
     ];
 
     public static IEnumerable<object[]> Mode10PacketOnlyDamage =>

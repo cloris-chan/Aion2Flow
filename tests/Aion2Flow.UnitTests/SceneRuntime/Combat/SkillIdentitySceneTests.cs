@@ -347,21 +347,21 @@ public sealed class SkillIdentitySceneTests
     }
 
     [Fact]
-    public void Compact0238_Body_Code_Is_Stored_As_ResourceEffectRef_Not_Skill_Code()
+    public void Compact0238_Body_Code_Is_Stored_As_Packet_Raw_Body_Code_Not_Skill_Code()
     {
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
         var source = new PacketObservationSource(1_000, 0, 1, 0x0238, 16, 0, default);
-        var effectRef = ResourceEffectRef.FromRaw(30011101);
 
-        sink.RegisterCompactControl0238(in source, 100, effectRef, 3, 100);
+        sink.RegisterCompactControl0238(in source, 100, 0, 30011101, 3, 0, 100);
 
         var entry = journal.Read(0);
         Assert.True(entry.Combat.HasValue);
         var combat = entry.Combat.Value;
         Assert.Equal(0, combat.SkillCode);
         Assert.Equal(0, combat.BodySkillVariantRaw);
-        Assert.Equal(30011101u, combat.BodyResourceEffectRef.RawId);
+        Assert.Equal(30011101u, combat.BodyCodeRaw);
+        Assert.Equal(0u, combat.BodyResourceEffectRef.RawId);
     }
 
     [Fact]

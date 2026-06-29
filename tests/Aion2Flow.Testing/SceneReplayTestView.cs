@@ -16,6 +16,7 @@ public static class SceneReplayTestView
                 TargetId = e.TargetId,
                 SkillCode = observation.SkillCode,
                 BodySkillVariantRaw = observation.BodySkillVariantRaw,
+                BodyCodeRaw = observation.BodyCodeRaw,
                 BodyResourceEffectRef = observation.BodyResourceEffectRef,
                 Damage = observation.Damage,
                 HitContribution = observation.HitCount,
@@ -100,6 +101,7 @@ public readonly record struct SceneReplayPacket
     public int TargetId { get; init; }
     public int SkillCode { get; init; }
     public int BodySkillVariantRaw { get; init; }
+    public uint BodyCodeRaw { get; init; }
     public ResourceEffectRef BodyResourceEffectRef { get; init; }
     public long Damage { get; init; }
     public int HitContribution { get; init; }

@@ -83,6 +83,7 @@ public readonly record struct CombatObservation
 {
     public int SkillCode { get; init; }
     public int BodySkillVariantRaw { get; init; }
+    public uint BodyCodeRaw { get; init; }
     public ResourceEffectRef BodyResourceEffectRef { get; init; }
     public long Damage { get; init; }
     public int HitCount { get; init; }

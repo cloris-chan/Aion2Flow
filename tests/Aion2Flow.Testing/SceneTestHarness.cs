@@ -136,6 +136,7 @@ public sealed class SceneTestHarness : IDisposable
             Damage = packet.Damage,
             SkillCode = packet.SkillCode,
             BodySkillVariantRaw = packet.BodySkillVariantRaw,
+            BodyCodeRaw = packet.BodyCodeRaw,
             BodyResourceEffectRef = packet.BodyResourceEffectRef,
             Marker = packet.Marker,
             Type = packet.Type,
@@ -212,7 +213,7 @@ public sealed class SceneTestHarness : IDisposable
         public void CompleteBatch(long batchOrdinal) => owner.CompleteBatch(batchOrdinal);
         public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type) => inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodySkillVariantRaw, marker, layoutTag, type);
         public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type, int value) => inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodySkillVariantRaw, marker, layoutTag, type, value);
-        public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int echoSourceId) => inner.RegisterCompactControl0238(in packet, sourceId, bodyResourceEffectRef, marker, echoSourceId);
+        public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId) => inner.RegisterCompactControl0238(in packet, sourceId, mode, bodyCodeRaw, marker, flag, echoSourceId);
         public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag) => inner.RegisterCompactControl0638(in packet, sourceId, bodyResourceEffectRef, marker, flag);
         public void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64) => inner.RegisterObservation2A38(in packet, entityId, mode, groupCode, instanceSequenceId, headCode, headValue, headMiddleRaw, timelineValue, stableValue, echoSourceId, stackValue, buffResourceEffectRef, tailLength, tailLow64, tailHigh64);
         public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int instanceSequenceId, ResourceEffectRef actionResourceEffectRef, int sequenceValue, int stateValue, int detailValue, int tailLength) => inner.RegisterObservation2B38(in packet, sourceId, sourceIdCopy, phase, instanceSequenceId, actionResourceEffectRef, sequenceValue, stateValue, detailValue, tailLength);

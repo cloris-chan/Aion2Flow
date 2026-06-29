@@ -1,9 +1,18 @@
-using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0238CompactControl(int SourceId, int Mode, ResourceEffectRef BodyResourceEffectRef, int Marker, int Flag, int EchoSourceId, int ZeroValue, int TailValue);
+internal readonly record struct Packet0238CompactControl(
+    int SourceId,
+    int Mode,
+    uint BodyCodeRaw,
+    int Marker,
+    int Flag,
+    int EchoSourceId,
+    int TailLength,
+    int TailFirstValue,
+    int TailSecondValue,
+    int TailThirdValue);
 
 internal static class Packet0238CompactControlParser
 {
@@ -20,15 +29,70 @@ internal static class Packet0238CompactControlParser
 
         if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (!reader.TryReadVarInt(out var mode)) return false;
-        if (!reader.TryReadUInt32Le(out var bodyResourceEffectRefRaw)) return false;
+        if (!reader.TryReadUInt32Le(out var bodyCodeRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadByte(out var flag)) return false;
         if (!reader.TryReadVarInt(out var echoSourceId)) return false;
-        if (!reader.TryReadUInt32Le(out var zeroValue)) return false;
-        if (!reader.TryReadUInt32Le(out var tailValue)) return false;
-        if (reader.Remaining != 0) return false;
+        var tailLength = reader.Remaining;
+        ParseZeroPrefixedTail(reader.RemainingSpan, out var tailFirstValue, out var tailSecondValue, out var tailThirdValue);
+        if (!reader.TryAdvance(reader.Remaining)) return false;
 
-        result = new Packet0238CompactControl(sourceId, mode, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), marker, flag, echoSourceId, zeroValue, tailValue);
+        result = new Packet0238CompactControl(
+            sourceId,
+            mode,
+            unchecked((uint)bodyCodeRaw),
+            marker,
+            flag,
+            echoSourceId,
+            tailLength,
+            tailFirstValue,
+            tailSecondValue,
+            tailThirdValue);
+        return true;
+    }
+
+    public static int ResolveZeroPrefixedTailLength(ReadOnlySpan<byte> tail)
+    {
+        if (!TryParseZeroPrefixedTail(tail, requireFullConsumption: false, out var length, out _, out _, out _))
+            return 0;
+
+        return length;
+    }
+
+    private static void ParseZeroPrefixedTail(ReadOnlySpan<byte> tail, out int firstValue, out int secondValue, out int thirdValue)
+    {
+        if (!TryParseZeroPrefixedTail(tail, requireFullConsumption: true, out _, out firstValue, out secondValue, out thirdValue))
+        {
+            firstValue = 0;
+            secondValue = 0;
+            thirdValue = 0;
+        }
+    }
+
+    private static bool TryParseZeroPrefixedTail(
+        ReadOnlySpan<byte> tail,
+        bool requireFullConsumption,
+        out int consumed,
+        out int firstValue,
+        out int secondValue,
+        out int thirdValue)
+    {
+        consumed = 0;
+        firstValue = 0;
+        secondValue = 0;
+        thirdValue = 0;
+
+        var reader = new PacketSpanReader(tail);
+        if (!reader.TryReadUInt32Le(out var zeroValue) || zeroValue != 0)
+            return false;
+
+        if (!reader.TryReadVarInt(out firstValue) || !reader.TryReadVarInt(out secondValue) || !reader.TryReadVarInt(out thirdValue))
+            return false;
+
+        if (requireFullConsumption && reader.Remaining != 0)
+            return false;
+
+        consumed = reader.Offset;
         return true;
     }
 }

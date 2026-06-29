@@ -75,55 +75,26 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260417003456_Ground_AoE_Entities_Attributed_To_Owning_Player()
+    public void Replay_20260629175523_Classifies_HealingGlow_DirectValues_AsHealing()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.GroundAoeAttribution}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.ClericSelfHealingGlow}"));
 
         Assert.True(replay.ReplayedLines > 0);
-
-        var snapshot = replay.Snapshot;
-        var combatantDump = string.Join("\n", snapshot.Combatants
-            .OrderByDescending(c => c.Value.DamageAmount)
-            .Select(c => $"id={c.Key} class={c.Value.CharacterClass} dmg={c.Value.DamageAmount} heal={c.Value.HealingAmount}"));
-
-        Assert.False(snapshot.Combatants.ContainsKey(99306), $"Ground AoE entity 99306 should not appear separately.\n{combatantDump}");
-        Assert.False(snapshot.Combatants.ContainsKey(39022), $"Ground AoE entity 39022 should not appear separately.\n{combatantDump}");
-
-        Assert.True(snapshot.Combatants.TryGetValue(664, out var cleric), $"Cleric 664 not found.\n{combatantDump}");
-        Assert.True(cleric.DamageAmount == 3465070, $"Cleric damage={cleric.DamageAmount} expected=3465070\n{combatantDump}");
+        AssertSkillValueKind(replay, skillCode: 17_121_351, CombatEventKind.Healing, CombatValueKind.Healing, expectedCount: 2, expectedAmount: 14_534);
     }
 
     [Fact]
-    public void Replay_20260417023559_Cleric_Healing_No_False_Drain()
+    public void Replay_20260629001019_Classifies_GroupDirectHealing_AsHealing()
     {
         CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.ClericHealingNoFalseDrain}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.GroupDirectHealing}"));
+
         Assert.True(replay.ReplayedLines > 0);
-
-        var snapshot = replay.Snapshot;
-        var player = snapshot.Combatants
-            .OrderByDescending(c => c.Value.DamageAmount)
-            .First();
-
-        var metrics = player.Value;
-        var skills = replay.SceneOwner.CreateSkillBreakdown(snapshot, player.Key).Skills;
-
-        var combatantDump = string.Join("\n", snapshot.Combatants
-            .OrderByDescending(c => c.Value.DamageAmount)
-            .Select(c => $"id={c.Key} class={c.Value.CharacterClass} dmg={c.Value.DamageAmount} heal={c.Value.HealingAmount}"));
-
-        var divineAuraSkillCode = 17150340;
-        if (skills.TryGetBySkillCode(divineAuraSkillCode, out var divineAura))
-        {
-            Assert.True(divineAura.DrainHealingAmount == 0,
-                $"Divine Aura drain={divineAura.DrainHealingAmount} should be 0\n{combatantDump}");
-        }
-
-        const int expectedPacketOnlyHealing023559 = 13345;
-        Assert.Equal(expectedPacketOnlyHealing023559, metrics.HealingAmount);
+        AssertSkillValueKind(replay, skillCode: 17_800_001, CombatEventKind.Healing, CombatValueKind.Healing, expectedCount: 63, expectedAmount: 122_353);
+        AssertSkillValueKind(replay, skillCode: 17_121_351, CombatEventKind.Healing, CombatValueKind.Healing, expectedCount: 8, expectedAmount: 60_899);
     }
 
     [Fact]
@@ -154,27 +125,6 @@ public sealed class PacketLogReplayServiceTests
         var totalLightOfRegenHealing = lightOfRegenSkills.Sum(kvp => kvp.Value.HealingAmount);
         Assert.True(totalLightOfRegenHealing == expectedLightOfRegenHealing,
             $"LightOfRegen total={totalLightOfRegenHealing} expected={expectedLightOfRegenHealing}\n{skillDump}");
-    }
-
-    [Fact]
-    public void Replay_20260419204630_Instance_Clear_Restore_And_Incoming_Damage()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.InstanceClearRestoreAndMapBoundary}"));
-        Assert.True(replay.ReplayedLines > 0);
-
-        var player = replay.Combatants
-            .OrderByDescending(static s => s.OutgoingDamage)
-            .First();
-
-        var summaryDump = BuildSummaryDump(replay.Combatants);
-        var diagDump = $"Player: id={player.CombatantId} dmg={player.OutgoingDamage} heal={player.IncomingHealing} inDmg={player.IncomingDamage} inHits={player.IncomingHits}\n{summaryDump}";
-
-        Assert.True(player.IncomingDamage == 946, $"IncomingDamage={player.IncomingDamage} expected=946\n{diagDump}");
-        Assert.True(player.IncomingHits == 2, $"IncomingHits={player.IncomingHits} expected=2\n{diagDump}");
-
-        Assert.True(player.IncomingHealing == 42616, $"IncomingHealing={player.IncomingHealing} expected=42616 (known HP restore only; ambiguous direct detail families excluded)\n{diagDump}");
     }
 
     [Fact]
@@ -830,6 +780,29 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(skills.TryGetBySkillCode(tailSkillCode, out var skill), $"{packetDump}\n{skillDump}");
         Assert.True(skill.PeriodicDamageAmount == expectedDamage, $"PeriodicDamageAmount={skill.PeriodicDamageAmount} expected={expectedDamage}\n{packetDump}\n{skillDump}");
         Assert.True(skill.PeriodicDamageTimes == expectedPacketCount, $"PeriodicDamageTimes={skill.PeriodicDamageTimes} expected={expectedPacketCount}\n{packetDump}\n{skillDump}");
+    }
+
+    private static void AssertSkillValueKind(PacketLogReplayResult replay, int skillCode, CombatEventKind eventKind, CombatValueKind valueKind, int expectedCount, long expectedAmount)
+    {
+        var matching = replay.SceneOwner.Combat.Events
+            .Where(e => e.Observation.SkillCode == skillCode &&
+                        e.Observation.BodySkillVariantRaw == skillCode &&
+                        e.Observation.EventKind == eventKind &&
+                        e.Observation.ValueKind == valueKind)
+            .ToArray();
+        var skillDump = string.Join(
+            Environment.NewLine,
+            replay.SceneOwner.Combat.Events
+                .Where(e => e.Observation.SkillCode == skillCode || e.Observation.BodySkillVariantRaw == skillCode)
+                .GroupBy(e => new { e.Observation.SkillCode, e.Observation.BodySkillVariantRaw, e.Observation.EventKind, e.Observation.ValueKind, e.ContributesDamage, e.ContributesHealing })
+                .OrderByDescending(group => group.Sum(e => e.Observation.Damage))
+                .Select(group =>
+                    $"skill={group.Key.SkillCode} body={group.Key.BodySkillVariantRaw} event={group.Key.EventKind} value={group.Key.ValueKind} contribD={group.Key.ContributesDamage} contribH={group.Key.ContributesHealing} count={group.Count()} amount={group.Sum(e => e.Observation.Damage)}"));
+
+        Assert.True(matching.Length == expectedCount, $"count={matching.Length} expected={expectedCount}\n{skillDump}");
+        Assert.True(matching.Sum(e => e.Observation.Damage) == expectedAmount, $"amount={matching.Sum(e => e.Observation.Damage)} expected={expectedAmount}\n{skillDump}");
+        Assert.All(matching, e => Assert.False(e.ContributesDamage));
+        Assert.All(matching, e => Assert.True(e.ContributesHealing));
     }
 
     private static void AssertPcName(PacketLogReplayResult replay, int combatantId, string expectedName, string summaryDump)

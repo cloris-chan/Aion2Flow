@@ -28,6 +28,7 @@ internal static class Packet0438CompactValueParser
         if (!reader.TryReadUInt32Le(out var bodySkillVariantRaw)) return false;
         if (!reader.TryReadByte(out var marker)) return false;
         if (!reader.TryReadVarInt(out var type)) return false;
+        if (Packet0438ImplicitDetailSidecarParser.TryParseRemainder(reader.RemainingSpan, out _, out _, out _, out _)) return false;
         if (!reader.TryReadVarInt(out var unknown)) return false;
         if (!reader.TryReadVarInt(out var value)) return false;
         if (!reader.TryReadVarInt(out var loop)) return false;

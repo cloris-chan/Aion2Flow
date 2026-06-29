@@ -125,9 +125,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodySkillVariantRaw, marker, layoutTag, type, value);
     }
 
-    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int echoSourceId)
+    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId)
     {
-        lock (gate) inner.RegisterCompactControl0238(in packet, sourceId, bodyResourceEffectRef, marker, echoSourceId);
+        lock (gate) inner.RegisterCompactControl0238(in packet, sourceId, mode, bodyCodeRaw, marker, flag, echoSourceId);
     }
 
     public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)

@@ -16,13 +16,14 @@ public sealed class DomainEventApplier
     private readonly CombatStore _combat;
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery;
     private readonly PeriodicPoolCanonicalizer _periodicPool;
+    private readonly CompactActionDirectValueCanonicalizer _compactActionDirectValue;
     private readonly OwnerTargetSummonResourceCanonicalizer _ownerTargetSummonResource;
     private readonly CompactAvoidanceCanonicalizer _compactAvoidance;
     private readonly TransientEffectOwnerTracker _transientEffectOwners;
     private readonly BossFocusStore _bossFocus;
 
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
-        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactAvoidanceCanonicalizer(), new TransientEffectOwnerTracker(), new BossFocusStore(entities))
+        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactActionDirectValueCanonicalizer(), new CompactAvoidanceCanonicalizer(), new TransientEffectOwnerTracker(), new BossFocusStore(entities))
     {
     }
 
@@ -31,7 +32,7 @@ public sealed class DomainEventApplier
     {
     }
 
-    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactAvoidanceCanonicalizer compactAvoidance, TransientEffectOwnerTracker transientEffectOwners, BossFocusStore bossFocus)
+    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactActionDirectValueCanonicalizer compactActionDirectValue, CompactAvoidanceCanonicalizer compactAvoidance, TransientEffectOwnerTracker transientEffectOwners, BossFocusStore bossFocus)
     {
         _entities = entities;
         _boundary = boundary;
@@ -39,6 +40,7 @@ public sealed class DomainEventApplier
         _combat = combat;
         _systemPeriodicRecovery = systemPeriodicRecovery;
         _periodicPool = periodicPool;
+        _compactActionDirectValue = compactActionDirectValue;
         _ownerTargetSummonResource = new OwnerTargetSummonResourceCanonicalizer(entities);
         _compactAvoidance = compactAvoidance;
         _transientEffectOwners = transientEffectOwners;
@@ -55,6 +57,7 @@ public sealed class DomainEventApplier
     internal DomainEventApplierSnapshot CreateSnapshot() => new(
         _systemPeriodicRecovery.CreateSnapshot(),
         _periodicPool.CreateSnapshot(),
+        _compactActionDirectValue.CreateSnapshot(),
         _compactAvoidance.CreateSnapshot(),
         _transientEffectOwners.CreateSnapshot(),
         _bossFocus.CreateSnapshot());
@@ -67,6 +70,7 @@ public sealed class DomainEventApplier
             combat,
             SystemPeriodicRecoveryCanonicalizer.FromSnapshot(snapshot.SystemPeriodicRecovery),
             PeriodicPoolCanonicalizer.FromSnapshot(snapshot.PeriodicPool),
+            CompactActionDirectValueCanonicalizer.FromSnapshot(snapshot.CompactActionDirectValue),
             CompactAvoidanceCanonicalizer.FromSnapshot(snapshot.CompactAvoidance),
             TransientEffectOwnerTracker.FromSnapshot(snapshot.TransientEffectOwners),
             BossFocusStore.FromSnapshot(entities, snapshot.BossFocus));
@@ -123,13 +127,11 @@ public sealed class DomainEventApplier
 
     public void CompleteBatch(long batchOrdinal)
     {
+        foreach (var result in _compactActionDirectValue.CompleteBatch(batchOrdinal))
+            ApplyStampedCombatResult(in result);
+
         foreach (var result in _compactAvoidance.CompleteBatch(batchOrdinal))
-        {
-            var stamp = result.Stamp;
-            var observation = result.Observation;
-            var canonicalized = new CombatCanonicalizationResult(result.SourceId, result.TargetId, observation);
-            ApplyCanonicalizedCombatResult(in stamp, in canonicalized, result.ObservedAtMilliseconds);
-        }
+            ApplyStampedCombatResult(in result);
     }
 
     public void FlushPendingOutcomeSidecars() => CompleteBatch(long.MaxValue);
@@ -140,6 +142,19 @@ public sealed class DomainEventApplier
         var structurePath = entry.Raw.StructurePath;
         var observedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         ObserveTransientEffectOwnerPacket(in entry, in combatObservation, observedAtMilliseconds);
+        if (entry.Raw.Opcode == 0x0238)
+            ApplyStampedCombatResults(_compactActionDirectValue.ObserveCompactControl0238(entry.SourceEntityId, in combatObservation, in stamp, in structurePath));
+
+        if (entry.Raw.Opcode == 0x0438)
+            ApplyStampedCombatResults(_compactActionDirectValue.ObserveCompactValueSidecar0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath));
+
+        if (entry.Raw.Opcode == 0x0438 &&
+            _compactActionDirectValue.TryObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, observedAtMilliseconds, out var actionResults))
+        {
+            ApplyStampedCombatResults(actionResults);
+            return;
+        }
+
         var rawResults = entry.Raw.Opcode switch
         {
             0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, observedAtMilliseconds),
@@ -148,13 +163,21 @@ public sealed class DomainEventApplier
             _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds)
         };
 
-        foreach (var rawResult in rawResults)
-        {
-            var observation = rawResult.Observation;
-            var resultStamp = rawResult.Stamp;
-            var result = new CombatCanonicalizationResult(rawResult.SourceId, rawResult.TargetId, observation);
-            ApplyCanonicalizedCombatResult(in resultStamp, in result, rawResult.ObservedAtMilliseconds);
-        }
+        ApplyStampedCombatResults(rawResults);
+    }
+
+    private void ApplyStampedCombatResults(StampedCombatCanonicalizationBatch results)
+    {
+        foreach (var result in results)
+            ApplyStampedCombatResult(in result);
+    }
+
+    private void ApplyStampedCombatResult(in StampedCombatCanonicalizationResult rawResult)
+    {
+        var observation = rawResult.Observation;
+        var resultStamp = rawResult.Stamp;
+        var result = new CombatCanonicalizationResult(rawResult.SourceId, rawResult.TargetId, observation);
+        ApplyCanonicalizedCombatResult(in resultStamp, in result, rawResult.ObservedAtMilliseconds);
     }
 
     private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
@@ -404,6 +427,7 @@ public sealed class DomainEventApplier
 internal sealed record DomainEventApplierSnapshot(
     SystemPeriodicRecoveryCanonicalizerSnapshot SystemPeriodicRecovery,
     PeriodicPoolCanonicalizerSnapshot PeriodicPool,
+    CompactActionDirectValueCanonicalizerSnapshot CompactActionDirectValue,
     CompactAvoidanceCanonicalizerSnapshot CompactAvoidance,
     TransientEffectOwnerTrackerSnapshot TransientEffectOwners,
     BossFocusStoreSnapshot BossFocus);

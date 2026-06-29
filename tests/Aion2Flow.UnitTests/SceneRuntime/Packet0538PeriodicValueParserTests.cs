@@ -45,6 +45,23 @@ public sealed class Packet0538PeriodicValueParserTests
         Assert.Equal(0, parsed.TailPrefixValue);
     }
 
+    [Fact]
+    public void TryParse_PreservesShortVarIntTailAsPrefixOnly()
+    {
+        var packet = Convert.FromHexString("150538E67C0390B70117EF3E2F0DA305DE02");
+
+        Assert.True(Packet0538PeriodicValueParser.TryParse(packet, out var parsed));
+        Assert.Equal(15974, parsed.TargetId);
+        Assert.Equal(3, parsed.Mode);
+        Assert.Equal(23440, parsed.SourceId);
+        Assert.Equal(23, parsed.Unknown);
+        Assert.Equal(221_200_111u, parsed.BodyResourceEffectRef.RawId);
+        Assert.Equal(675, parsed.Damage);
+        Assert.Equal(2, parsed.TailLength);
+        Assert.Equal(0, parsed.TailSkillCodeRaw);
+        Assert.Equal(350, parsed.TailPrefixValue);
+    }
+
     private static byte[] BuildFrame(int targetId, int mode, int sourceId, int chainId, int bodyResourceEffectRef, int damage, int tailSkillCode)
     {
         var tail = new List<byte>(4);

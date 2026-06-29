@@ -352,7 +352,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         });
     }
 
-    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int echoSourceId)
+    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId)
     {
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
             return;
@@ -370,14 +370,15 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 SkillCode = 0,
                 BodySkillVariantRaw = 0,
-                BodyResourceEffectRef = bodyResourceEffectRef,
+                BodyCodeRaw = bodyCodeRaw,
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,
                 DetailRaw = marker,
                 Marker = marker,
+                Flag = flag,
                 ChainId = echoSourceId,
-                Type = 0,
+                Type = mode,
                 LayoutTag = 0
             }
         });

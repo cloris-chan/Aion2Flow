@@ -48,7 +48,17 @@ internal static class Packet0538PeriodicValueParser
         var tailRaw = 0;
         var tailSkillCodeRaw = 0;
         var tailPrefixValue = 0;
-        if (tailLength == 4)
+        if (tailLength is > 0 and < 4)
+        {
+            var tailPrefixReader = new PacketSpanReader(reader.RemainingSpan);
+            if (tailPrefixReader.TryReadVarInt(out var parsedTailPrefixValue) &&
+                tailPrefixReader.Remaining == 0 &&
+                parsedTailPrefixValue > 0)
+            {
+                tailPrefixValue = parsedTailPrefixValue;
+            }
+        }
+        else if (tailLength == 4)
         {
             var tail = reader.RemainingSpan;
             var tailSkillReader = new PacketSpanReader(tail[^4..]);
