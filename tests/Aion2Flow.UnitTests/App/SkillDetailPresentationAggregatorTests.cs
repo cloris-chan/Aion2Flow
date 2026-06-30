@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
@@ -8,9 +8,9 @@ public sealed class SkillDetailPresentationAggregatorTests
     [Fact]
     public void AddOrMerge_Merges_Generated_Presentation_Group()
     {
-        SetSkillPresentations(
-            new SkillPresentation(16300243, 16300000, 16300240, 16300000, 0b01010, 3, false),
-            new SkillPresentation(16300027, 16300000, 16300020, 16300000, 0, 7, false));
+        SetSkillDisplayProjections(
+            new SkillDisplayProjection(16300243, 16300000, 16300240, 16300000, 0b01010, 3, false),
+            new SkillDisplayProjection(16300027, 16300000, 16300020, 16300000, 0, 7, false));
 
         var rows = new List<SkillDetailRowData>();
         var indexes = new Dictionary<SkillPresentationKey, int>();
@@ -30,9 +30,9 @@ public sealed class SkillDetailPresentationAggregatorTests
     [Fact]
     public void AddOrMerge_Merges_Derived_Skill_With_Different_Display_Name()
     {
-        SetSkillPresentations(
-            new SkillPresentation(16330020, 16330000, 16330020, 16330000, 0, 0, false),
-            new SkillPresentation(16330027, 16330000, 16330020, 16330000, 0, 7, false));
+        SetSkillDisplayProjections(
+            new SkillDisplayProjection(16330020, 16330000, 16330020, 16330000, 0, 0, false),
+            new SkillDisplayProjection(16330027, 16330000, 16330020, 16330000, 0, 7, false));
 
         var rows = new List<SkillDetailRowData>();
         var indexes = new Dictionary<SkillPresentationKey, int>();
@@ -53,9 +53,9 @@ public sealed class SkillDetailPresentationAggregatorTests
     [InlineData(16330027, 16330000)]
     public void FromActionKey_Uses_Generated_Presentation_Relations(int skillCode, int expectedPresentationSkillCode)
     {
-        SetSkillPresentations(
-            new SkillPresentation(11010047, 11010000, 11010040, 11010000, 0b01000, 7, false),
-            new SkillPresentation(16330027, 16330000, 16330020, 16330000, 0, 7, false));
+        SetSkillDisplayProjections(
+            new SkillDisplayProjection(11010047, 11010000, 11010040, 11010000, 0b01000, 7, false),
+            new SkillDisplayProjection(16330027, 16330000, 16330020, 16330000, 0, 7, false));
 
         var key = SkillPresentationKey.FromActionKey(new CombatActionKey(skillCode, default, default));
 
@@ -70,7 +70,7 @@ public sealed class SkillDetailPresentationAggregatorTests
     [InlineData(19_010_047)]
     public void FromActionKey_Preserves_Skills_Without_Presentation_Relation(int skillCode)
     {
-        SetSkillPresentations();
+        SetSkillDisplayProjections();
 
         var key = SkillPresentationKey.FromActionKey(new CombatActionKey(skillCode, default, default));
 
@@ -80,7 +80,7 @@ public sealed class SkillDetailPresentationAggregatorTests
     [Fact]
     public void FromActionKey_Preserves_Effect_Reference_Identity()
     {
-        SetSkillPresentations();
+        SetSkillDisplayProjections();
 
         var actionKey = new CombatActionKey(0, ResourceEffectRef.FromRaw(1234), ResourceEffectRef.FromRaw(5678));
 
@@ -104,11 +104,11 @@ public sealed class SkillDetailPresentationAggregatorTests
         };
     }
 
-    private static void SetSkillPresentations(params SkillPresentation[] presentations)
+    private static void SetSkillDisplayProjections(params SkillDisplayProjection[] presentations)
     {
         CombatResourceRegistry.SetGameResources(
             [],
-            new Dictionary<int, NpcCatalogEntry>(),
+            new Dictionary<int, NpcDisplayEntry>(),
             presentations.ToDictionary(static presentation => presentation.SkillCode));
     }
 }

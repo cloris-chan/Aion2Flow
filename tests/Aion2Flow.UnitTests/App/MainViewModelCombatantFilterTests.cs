@@ -1,6 +1,6 @@
 using Avalonia.Media;
 using Cloris.Aion2Flow.Capture;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -840,7 +840,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         public static MainViewModelFixture Create()
         {
-            CombatResourceRegistry.SetGameResources(BuildSkillMap(), ResourceDatabase.LoadNpcCatalog(LanguageService.TraditionalChinese));
+            CombatResourceRegistry.SetGameResources(BuildSkillMap(), ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
             var settingsPath = Path.Combine(Path.GetTempPath(), $"aion2flow-test-{Guid.NewGuid():N}.json");
             var settings = new SettingsService(settingsPath);
             var language = new LanguageService();
@@ -1044,11 +1044,11 @@ public sealed class MainViewModelCombatantFilterTests
         return (hue < 0 ? hue + 360d : hue, saturation, lightness);
     }
 
-    private static SkillCollection BuildSkillMap()
+    private static SkillDisplayCatalog BuildSkillMap()
     {
         return
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
         ];
     }
 }

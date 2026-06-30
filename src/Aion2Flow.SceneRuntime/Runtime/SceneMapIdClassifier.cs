@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Runtime;
 
@@ -14,15 +14,5 @@ internal static class SceneMapIdClassifier
             or (>= 200000 and < 300000)
             or (>= 500000 and < 700000);
 
-    private static HashSet<uint> LoadKnownResourceMapIds()
-    {
-        try
-        {
-            return [.. ResourceDatabase.LoadMaps().Keys];
-        }
-        catch
-        {
-            return [];
-        }
-    }
+    private static HashSet<uint> LoadKnownResourceMapIds() => [.. ResourceCatalog.LoadShared().KnownMapIds];
 }

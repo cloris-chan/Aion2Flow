@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Streams;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -138,7 +138,7 @@ public sealed class BossSceneCollectionTests
     [Fact]
     public void FirstCatalogResolvedCityTrainingDummyCombatStartsBossModeScene()
     {
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         CombatResourceRegistry.SetGameResources([], catalog);
         var scene = CreateBossScene();
         var waitingEncounterId = scene.SessionId;

@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
@@ -12,8 +12,8 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         var packet = new ParsedCombatPacket
         {
@@ -34,8 +34,8 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         var packet = new ParsedCombatPacket
         {
@@ -127,10 +127,10 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
-            new Skill(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
-            new Skill(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>(), new Dictionary<int, SkillPresentation>
+            new SkillDisplayEntry(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>(), new Dictionary<int, SkillDisplayProjection>
         {
             [12240039] = new(12240039, 12240000, 12240030, 12240000, 0, 9, false)
         });
@@ -176,8 +176,8 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int playerId = 3406;
@@ -229,7 +229,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void ResourceKind_Health_Classifies_Confirmed_Skill_As_Healing_Without_Damage_Total()
     {
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int playerId = 9024;
@@ -280,8 +280,8 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(17000000, "Should not be used", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(17000000, "Should not be used", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int sourceId = 100;
@@ -325,8 +325,8 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ClientSkill, "npc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ClientSkill, "npc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());

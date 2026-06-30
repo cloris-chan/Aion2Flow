@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Streams;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -33,7 +33,7 @@ public sealed class NpcCatalogSceneTests
     [Fact]
     public void ResolveNpcKind_Maps_TrainingScarecrow_To_TrainingDummy_Not_Boss()
     {
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
 
         Assert.True(catalog.TryGetValue(2500075, out var scarecrow));
         Assert.Equal(NpcCatalogKind.TrainingDummy, scarecrow.Kind);
@@ -46,7 +46,7 @@ public sealed class NpcCatalogSceneTests
     {
         const int summonId = 81994;
         const int summonNpcCode = 2920190;
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>
         {
             [summonNpcCode] = new(summonNpcCode, "古代精靈", NpcCatalogKind.Summon)
         });
@@ -69,7 +69,7 @@ public sealed class NpcCatalogSceneTests
         const int npcInstanceId = 29994;
         const int npcCode = 2400032;
         const int playerId = 2007;
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
@@ -109,7 +109,7 @@ public sealed class NpcCatalogSceneTests
         const int targetEntityId = 29994;
         const int targetNpcCode = 2400032;
         const int playerId = 2007;
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
@@ -149,7 +149,7 @@ public sealed class NpcCatalogSceneTests
         const int npcInstanceId = 5555;
         const int unknownNpcCode = 2999999;
         const int playerId = 2007;
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(npcInstanceId, unknownNpcCode);
@@ -185,7 +185,7 @@ public sealed class NpcCatalogSceneTests
         const int npcInstanceId = 29994;
         const int npcCode = 2400032;
         const int playerId = 2007;
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
@@ -223,8 +223,8 @@ public sealed class NpcCatalogSceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
         using var scene = new SceneTestHarness();
         const int npcInstanceId = 19945;
         const int targetId = 14037;
@@ -261,7 +261,7 @@ public sealed class NpcCatalogSceneTests
     [Fact]
     public void SceneSnapshot_Keeps_Combatant_Facts_Without_DisplayName()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
         using var scene = new SceneTestHarness();
         const int sourceId = 12345;
         const int targetId = 54321;
@@ -295,7 +295,7 @@ public sealed class NpcCatalogSceneTests
         const int npcEntityId = 16710;
         const int npcCode = 2980179;
         const int playerId = 9206;
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
@@ -342,7 +342,7 @@ public sealed class NpcCatalogSceneTests
         const int npcCode = 2980159;
         const int playerId = 11616;
         const int battle1Target = 33541;
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
@@ -406,7 +406,7 @@ public sealed class NpcCatalogSceneTests
         const int entityId = 4370;
         const int npcCode = 2980049;
         const int sceneStateValue = 200003;
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         Assert.True(catalog.ContainsKey(npcCode));
         Assert.False(catalog.ContainsKey(sceneStateValue));
         CombatResourceRegistry.SetGameResources([], catalog);
@@ -426,8 +426,8 @@ public sealed class NpcCatalogSceneTests
     [InlineData(17858, 2980049, 9849, 27_944)]
     public void Scene_NpcSpawn_And_Damage_Resolves_Npc_Identity(int entityId, int npcCode, int sourceId, int damage)
     {
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), catalog);
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, catalog);
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(entityId, npcCode);
@@ -460,12 +460,12 @@ public sealed class NpcCatalogSceneTests
         Assert.Equal(entityId, snapshot.TargetObservation?.InstanceId);
     }
 
-    private static SkillCollection BuildSkillMap()
+    private static SkillDisplayCatalog BuildSkillMap()
     {
         return
         [
-            new Skill(17070000, "Chain of Torment", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(17730000, "Additional Strike", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+            new SkillDisplayEntry(17070000, "Chain of Torment", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(17730000, "Additional Strike", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];
     }
 

@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -13,7 +13,7 @@ public sealed class PacketLogReplayServiceTests
     [MemberData(nameof(ReplayScenarioCatalog.April11IncomingAvoidance), MemberType = typeof(ReplayScenarioCatalog))]
     public void Replay_Reconstructs_April11_Incoming_Avoidance_Ground_Truth_From_Stream_Log(ReplayAvoidanceScenario scenario)
     {
-        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildReplaySkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{scenario.FileName}"));
 
@@ -33,7 +33,7 @@ public sealed class PacketLogReplayServiceTests
     [MemberData(nameof(ReplayScenarioCatalog.ReportedMultiSourceInvincibles), MemberType = typeof(ReplayScenarioCatalog))]
     public void Replay_Reconstructs_Reported_MultiSource_Invincibles_With_Full_Skill_Map(ReplayAvoidanceScenario scenario)
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{scenario.FileName}"));
 
@@ -53,7 +53,7 @@ public sealed class PacketLogReplayServiceTests
     [MemberData(nameof(ReplayScenarioCatalog.OutgoingCombatStats), MemberType = typeof(ReplayScenarioCatalog))]
     public void Replay_Outgoing_Combat_Stats_Match_PacketOnly_GroundTruth(ReplayOutgoingCombatStatsScenario scenario)
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{scenario.FileName}"));
 
@@ -78,7 +78,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260629175523_Classifies_HealingGlow_DirectValues_AsHealing()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.ClericSelfHealingGlow}"));
 
@@ -89,7 +89,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260629001019_Classifies_GroupDirectHealing_AsHealing()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.GroupDirectHealing}"));
 
@@ -101,7 +101,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260417141813_Light_Of_Regeneration_Periodic_Healing()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.LightOfRegenerationPeriodicHealing}"));
         Assert.True(replay.ReplayedLines > 0);
@@ -131,7 +131,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260423001617_Visible_Combatant_Damage_Contribution_Does_Not_Exceed_One_Hundred_Percent()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.VisibleDamageContributionBoundary}"));
         Assert.True(replay.ReplayedLines > 0);
@@ -155,7 +155,7 @@ public sealed class PacketLogReplayServiceTests
     [MemberData(nameof(ReplayScenarioCatalog.Mode10PacketOnlyDamage), MemberType = typeof(ReplayScenarioCatalog))]
     public void Replay_Counts_PacketOnly_Mode10_TargetDamage(ReplayMode10DamageScenario scenario)
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{scenario.FileName}"));
 
@@ -174,7 +174,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Recovers_After_Split_Transport_Frames()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SplitTransportFrameRecovery}"));
 
@@ -192,7 +192,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Recovers_PcMetadata_From_048D_Metadata_Packets()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.PcMetadata048D}"));
 
@@ -209,7 +209,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Recovers_PcMetadata_From_4536_Metadata_Packets()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.PcMetadata4536}"));
 
@@ -228,7 +228,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Uses_Direct0438_Body_As_SkillVariant_For_ActionGrouping()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.Direct0438BodySkillVariant}"));
 
@@ -263,7 +263,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Recovers_NpcCatalog_From_4136_State_Packets()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.NpcCatalogState4136}"));
 
@@ -278,7 +278,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Parses_Extended_4136_State_Hp_Layout()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SplitTransportFrameRecovery}"));
 
@@ -294,7 +294,7 @@ public sealed class PacketLogReplayServiceTests
     [InlineData(ReplayScenarioCatalog.BossFocusExpiresAfterLeavingRange)]
     public void Replay_NpcResourceMaximums_DoNot_ReadAcrossPacketFields(string fileName)
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{fileName}"));
 
@@ -304,7 +304,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Recovers_BossCatalog_From_4136_State_Packets()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.BossCatalogState4136}"));
 
@@ -318,7 +318,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Promotes_BossFocus_From_CombatActivity_When_BattleToggle_Is_Missing()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.BossFocusWithoutBattleToggle}"));
 
@@ -337,7 +337,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Expires_BossFocus_When_BossPackets_Stop_After_Leaving_Range()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.BossFocusExpiresAfterLeavingRange}"));
 
@@ -355,7 +355,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Recovers_SummonOwner_And_Catalog_From_4136_Create_State()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SummonCreateState4136}"));
 
@@ -375,7 +375,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Folds_Elementalist_Summon_Boss_Damage_To_Owner()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.ElementalistSummonBossDamageAttribution}"));
 
@@ -415,7 +415,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260629212808_Folds_Ranger_Ground_Effects_To_PacketOwner()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.RangerGroundEffectOwnerAttribution}"));
 
@@ -433,7 +433,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260629212454_Folds_Sorcerer_Ground_Effects_To_PacketOwner()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SorcererGroundEffectOwnerAttribution}"));
 
@@ -457,7 +457,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260426140354_SummonRestores_And_TargetSupport_Are_Classified_From_PacketShape()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), ResourceDatabase.LoadNpcCatalog("zh-TW"));
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.SummonRestoresAndTargetSupport}"));
 
@@ -596,7 +596,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260512223507_CompactType2SidecarsCancelPendingEvadesByPacketStructure()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CompactSidecarCancellation}"));
         var expected = new[]
         {
@@ -638,7 +638,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260426031332_EnhanceSpiritBenediction_Self_And_Summon_Healing_Match_Game_Ground_Truth()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.EnhanceSpiritBenedictionSelfAndSummonHealing}"));
 
@@ -705,7 +705,7 @@ public sealed class PacketLogReplayServiceTests
     [MemberData(nameof(ReplayScenarioCatalog.DeterministicReplayLogs), MemberType = typeof(ReplayScenarioCatalog))]
     public void SceneReplay_VendoredLog_IsDeterministic(string fileName)
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var path = FixtureHelper.GetPath($"logs/{fileName}");
         var first = PacketLogReplayService.Replay(path);
         var second = PacketLogReplayService.Replay(path);
@@ -718,7 +718,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void SceneReplay_JournalOrdinals_AreMonotonicallyIncreasing()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var path = FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CanonicalSceneReplayLog}");
         var replay = PacketLogReplayService.Replay(path);
 
@@ -737,7 +737,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void SceneReplay_BaselineCounters_AreRecorded()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CanonicalSceneReplayLog}"));
 
@@ -750,7 +750,7 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void SceneReplay_AlwaysExposesSceneJournal()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CanonicalSceneReplayLog}"));
 
@@ -997,14 +997,14 @@ public sealed class PacketLogReplayServiceTests
                     $"id={summary.CombatantId} incoming(evade={summary.IncomingEvades}, invincible={summary.IncomingInvincibles}, damage={summary.IncomingDamage}, hits={summary.IncomingHits}, attempts={summary.IncomingAttempts}) outgoing(damage={summary.OutgoingDamage}, hits={summary.OutgoingHits}, attempts={summary.OutgoingAttempts})"));
     }
 
-    private static SkillCollection BuildReplaySkillMap()
+    private static SkillDisplayCatalog BuildReplaySkillMap()
     {
         return
         [
-            new Skill(1230000, "Fangs", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
-            new Skill(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(17010230, "Earth's Retribution", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+            new SkillDisplayEntry(1230000, "Fangs", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null),
+            new SkillDisplayEntry(17000100, "Dodge", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(17010230, "Earth's Retribution", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
         ];
     }
 

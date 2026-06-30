@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Controls;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 
 namespace Cloris.Aion2Flow.Tests.Controls;
 

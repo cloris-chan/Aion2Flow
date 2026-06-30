@@ -477,15 +477,15 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
             var detailObservation = detailPacket.Observation;
             var actionKey = CombatActionKey.FromObservation(in detailObservation);
-            ref var skill = ref CollectionsMarshal.GetValueRefOrAddDefault(metrics, actionKey, out var exists);
+            ref var skillMetrics = ref CollectionsMarshal.GetValueRefOrAddDefault(metrics, actionKey, out var exists);
             if (!exists)
             {
                 var observation = detailPacket.Observation;
-                skill = new SkillMetrics(in observation);
+                skillMetrics = new SkillMetrics(in observation);
             }
 
             var skillObservation = detailPacket.Observation;
-            skill.ProcessObservation(in skillObservation);
+            skillMetrics.ProcessObservation(in skillObservation);
         }
 
         _sectionRows.Clear();
@@ -744,7 +744,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
                 continue;
             }
 
-            var presentation = ResolveSkillPresentation(skill.ActionKey, displayContext, localization);
+            var presentation = ResolveSkillDisplayProjection(skill.ActionKey, displayContext, localization);
             var row = new SkillDetailRowData
             {
                 PresentationKey = presentation.Key,
@@ -819,7 +819,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
                 continue;
             }
 
-            var presentation = ResolveSkillPresentation(skill.ActionKey, displayContext, localization);
+            var presentation = ResolveSkillDisplayProjection(skill.ActionKey, displayContext, localization);
             var row = new SkillDetailRowData
             {
                 PresentationKey = presentation.Key,
@@ -877,7 +877,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
                 continue;
             }
 
-            var presentation = ResolveSkillPresentation(skill.ActionKey, displayContext, localization);
+            var presentation = ResolveSkillDisplayProjection(skill.ActionKey, displayContext, localization);
             var row = new SkillDetailRowData
             {
                 PresentationKey = presentation.Key,
@@ -917,17 +917,17 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     }
 
-    private static SkillPresentation ResolveSkillPresentation(CombatActionKey actionKey, SceneDisplayContext? displayContext, LocalizationService localization)
+    private static DetailSkillDisplayProjection ResolveSkillDisplayProjection(CombatActionKey actionKey, SceneDisplayContext? displayContext, LocalizationService localization)
     {
         var key = SkillPresentationKey.FromActionKey(actionKey);
         var skillCode = key.SkillCode == actionKey.SkillCode || displayContext?.ContainsSkill(key.SkillCode) == true
             ? key.SkillCode
             : actionKey.SkillCode;
         var displayActionKey = new CombatActionKey(skillCode, actionKey.BodyResourceEffectRef, actionKey.DetailResourceEffectRef);
-        return new SkillPresentation(key, skillCode, ResolveActionDisplayName(displayActionKey, displayContext, localization));
+        return new DetailSkillDisplayProjection(key, skillCode, ResolveActionDisplayName(displayActionKey, displayContext, localization));
     }
 
-    private readonly record struct SkillPresentation(SkillPresentationKey Key, int SkillCode, string DisplayName);
+    private readonly record struct DetailSkillDisplayProjection(SkillPresentationKey Key, int SkillCode, string DisplayName);
 
     private static string ResolveActionDisplayName(CombatActionKey actionKey, SceneDisplayContext? displayContext, LocalizationService localization)
     {

@@ -1037,11 +1037,11 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private string CreateMarkerText(ScenePlaybackTrackMarker marker)
     {
         var amount = CreateAmountText(marker);
-        var skill = marker.SkillCode > 0 ? DisplayContext.ResolveSkillName(marker.SkillCode) : string.Empty;
-        if (!string.IsNullOrWhiteSpace(skill) && !string.IsNullOrWhiteSpace(amount))
-            return $"{FormatTime(marker.PositionMilliseconds)} {skill} {amount}";
-        if (!string.IsNullOrWhiteSpace(skill))
-            return $"{FormatTime(marker.PositionMilliseconds)} {skill}";
+        var skillName = marker.SkillCode > 0 ? DisplayContext.ResolveSkillName(marker.SkillCode) : string.Empty;
+        if (!string.IsNullOrWhiteSpace(skillName) && !string.IsNullOrWhiteSpace(amount))
+            return $"{FormatTime(marker.PositionMilliseconds)} {skillName} {amount}";
+        if (!string.IsNullOrWhiteSpace(skillName))
+            return $"{FormatTime(marker.PositionMilliseconds)} {skillName}";
         if (!string.IsNullOrWhiteSpace(amount))
             return $"{FormatTime(marker.PositionMilliseconds)} {amount}";
         return FormatTime(marker.PositionMilliseconds);

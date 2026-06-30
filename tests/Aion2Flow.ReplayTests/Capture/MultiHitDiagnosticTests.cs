@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
@@ -10,7 +10,7 @@ public sealed class MultiHitDiagnosticTests
     [MemberData(nameof(ReplayScenarioCatalog.MultiHitDiagnostics), MemberType = typeof(ReplayScenarioCatalog))]
     public void Replay_Detects_Correct_MultiHit_Count_From_Stream_Log(ReplayMultiHitScenario scenario)
     {
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>());
 
         var path = FixtureHelper.GetPath($"logs/{scenario.FileName}");
         var replay = PacketLogReplayService.Replay(path);

@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
@@ -308,7 +308,7 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void ScenePath_PeriodicPoolKeyUsesTailEffectToAvoidSameChainCollision()
     {
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>());
 
         const int casterA = 100;
         const int casterB = 101;
@@ -602,7 +602,7 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void ScenePath_Replay_EnhanceSpiritBenedictionPeriodicHealing_MatchesGroundTruth()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426031332.log"));
 

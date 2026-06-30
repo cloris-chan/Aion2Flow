@@ -1,6 +1,6 @@
 using System.Globalization;
 using Cloris.Aion2Flow.Capture.Streams;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -13,7 +13,7 @@ public sealed class LiveClassInferenceSceneTests
     [Fact]
     public void LiveReplay_20260423002750_Does_Not_Drop_Combatant_Class_After_It_Is_Inferred()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var entries = ReadStreamLogEntries("aion2flow.stream.20260423002750.log")
             .Where(static entry => entry.IsInbound)

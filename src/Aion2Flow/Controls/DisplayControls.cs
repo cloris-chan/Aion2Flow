@@ -5,7 +5,7 @@ using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
@@ -708,7 +708,7 @@ internal static class DisplayIconCache
         };
     }
 
-    public static IImage? ResolveNpcMarkerIcon(NpcCatalogEntry? entry)
+    public static IImage? ResolveNpcMarkerIcon(NpcDisplayEntry? entry)
         => entry is null ? null : ResolveNpcMarkerIcon(entry.Value.Kind);
 
     public static IImage ResolveNpcMarkerIcon(NpcCatalogKind kind)

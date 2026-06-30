@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
@@ -324,7 +324,7 @@ public sealed class EncounterArchiveServiceTests
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId, DateTimeOffset sceneStarted)
     {
         const int bossCode = 2_999_997;
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>
         {
             [bossCode] = new(bossCode, "Archive Boss", NpcCatalogKind.Boss)
         });
@@ -333,7 +333,7 @@ public sealed class EncounterArchiveServiceTests
         var sceneId = Guid.NewGuid();
         AppendState(journal, sceneId, playerId, 0, StateCodes.PlayerIdentity, 0, 0, "Tester", 1, 1_000);
         AppendState(journal, sceneId, bossId, 0, bossCode, 0, 0, null, 2, 1_001);
-        AppendState(journal, sceneId, bossCode, 0, StateCodes.NpcName, 0, 0, "Archive Boss", 3, 1_002);
+        AppendState(journal, sceneId, bossCode, 0, StateCodes.LocalizedNpcName, 0, 0, "Archive Boss", 3, 1_002);
         AppendState(journal, sceneId, bossId, 0, StateCodes.NpcKind, (int)NpcKind.Boss, 0, null, 4, 1_003);
         AppendResource(journal, sceneId, bossId, 50_000, 100_000, 5, 1_004);
         AppendState(journal, sceneId, bossId, 0, StateCodes.NpcBattle, 1, 0, null, 6, 1_005);

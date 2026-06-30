@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.Services;
 
 namespace Cloris.Aion2Flow.Tests.Resources;
@@ -31,12 +31,12 @@ public sealed class LocalizationServicesTests
             languageService.SetLanguage(LanguageService.TraditionalChinese);
             using var resources = new GameResourceService(languageService);
 
-            var zhSkills = ResourceDatabase.LoadSkills(LanguageService.TraditionalChinese);
-            var enSkills = ResourceDatabase.LoadSkills(LanguageService.English);
-            var zhCatalog = ResourceDatabase.LoadNpcCatalog(LanguageService.TraditionalChinese);
-            var enCatalog = ResourceDatabase.LoadNpcCatalog(LanguageService.English);
-            var zhServerNames = ResourceDatabase.LoadServerNames(LanguageService.TraditionalChinese);
-            var enServerNames = ResourceDatabase.LoadServerNames(LanguageService.English);
+            var zhSkills = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills;
+            var enSkills = ResourceCatalog.Load(ResourceLanguage.English).Skills;
+            var zhCatalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
+            var enCatalog = ResourceCatalog.Load(ResourceLanguage.English).NpcCatalog;
+            var zhServerNames = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).ServerNames;
+            var enServerNames = ResourceCatalog.Load(ResourceLanguage.English).ServerNames;
 
             Assert.True(zhSkills.TryGetValue(2011101, out var zhSkill));
             Assert.True(enSkills.TryGetValue(2011101, out var enSkill));

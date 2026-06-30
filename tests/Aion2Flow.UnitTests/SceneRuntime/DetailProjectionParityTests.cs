@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
@@ -11,7 +11,7 @@ public class DetailProjectionParityTests
     [Fact]
     public void SceneProjection_TopDealer_MatchesBaseline()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var journal = replay.SceneJournal;
@@ -34,7 +34,7 @@ public class DetailProjectionParityTests
     [Fact]
     public void Subscription_DeltaReflectsCombatStoreState()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var journal = replay.SceneJournal;
@@ -60,7 +60,7 @@ public class DetailProjectionParityTests
     [Fact]
     public void SceneProjection_CombatantCount_MatchesBaseline()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260415211500.log"));
 
         var journal = replay.SceneJournal;

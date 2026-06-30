@@ -1,5 +1,6 @@
 using System.Globalization;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.Resources.Generated;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 
 namespace Cloris.Aion2Flow.Services;
@@ -8,23 +9,20 @@ public sealed class GameResourceService : IDisposable
 {
     private readonly LanguageService _languageService;
     private readonly Lock _lock = new();
-    private readonly IReadOnlyDictionary<int, SkillPresentation> _skillPresentations;
-    private readonly IReadOnlyDictionary<uint, int> _effectSkillIds;
+    private ResourceCatalogSnapshot _catalog = null!;
 
     public event EventHandler<string>? ResourcesChanged;
 
     public string CurrentLanguage { get; private set; }
-    public SkillCollection Skills { get; private set; } = [];
-    public IReadOnlyDictionary<int, NpcCatalogEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcCatalogEntry>();
-    public IReadOnlyDictionary<string, NpcName> NpcNames { get; private set; } = new Dictionary<string, NpcName>(StringComparer.Ordinal);
+    public SkillDisplayCatalog Skills { get; private set; } = [];
+    public IReadOnlyDictionary<int, NpcDisplayEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcDisplayEntry>();
+    public IReadOnlyDictionary<string, LocalizedNpcName> NpcNames { get; private set; } = new Dictionary<string, LocalizedNpcName>(StringComparer.Ordinal);
     public IReadOnlyDictionary<uint, string> Maps { get; private set; } = new Dictionary<uint, string>();
-    public IReadOnlyDictionary<int, ServerNameCatalogEntry> ServerNames { get; private set; } = new Dictionary<int, ServerNameCatalogEntry>();
+    public IReadOnlyDictionary<int, ServerNameEntry> ServerNames { get; private set; } = new Dictionary<int, ServerNameEntry>();
 
     public GameResourceService(LanguageService languageService)
     {
         _languageService = languageService;
-        _skillPresentations = ResourceDatabase.LoadSkillPresentations();
-        _effectSkillIds = SkillEffectRelationIndex.Build(ResourceDatabase.LoadSkillEffectRelations());
         _languageService.LanguageChanged += OnLanguageChanged;
         CurrentLanguage = _languageService.CurrentLanguage;
         Reload(CurrentLanguage);
@@ -39,18 +37,19 @@ public sealed class GameResourceService : IDisposable
     {
         lock (_lock)
         {
+            var catalog = _catalog;
             if (TryResolveSkillName(Skills, skillCode, out var name))
             {
                 return name;
             }
 
-            if (TryResolveSkillIdByEffectRef(unchecked((uint)skillCode), out var ownerSkillId) &&
+            if (TryResolveSkillIdByEffectRef(catalog, unchecked((uint)skillCode), out var ownerSkillId) &&
                 TryResolveSkillName(Skills, ownerSkillId, out name))
             {
                 return name;
             }
 
-            var displaySkillId = ResolveDisplaySkillIdForCode(skillCode);
+            var displaySkillId = ResolveDisplaySkillIdForCode(catalog, skillCode);
             if (displaySkillId != skillCode && TryResolveSkillName(Skills, displaySkillId, out name))
             {
                 return name;
@@ -76,7 +75,13 @@ public sealed class GameResourceService : IDisposable
             return assetName;
         }
 
-        if (TryResolveSkillIdByEffectRef(unchecked((uint)skillCode), out var ownerSkillId))
+        ResourceCatalogSnapshot snapshot;
+        lock (_lock)
+        {
+            snapshot = _catalog;
+        }
+
+        if (TryResolveSkillIdByEffectRef(snapshot, unchecked((uint)skillCode), out var ownerSkillId))
         {
             assetName = SkillIconCatalog.ResolveAssetName(ownerSkillId);
             if (assetName is not null)
@@ -85,7 +90,7 @@ public sealed class GameResourceService : IDisposable
             }
         }
 
-        var displaySkillId = ResolveDisplaySkillIdForCode(skillCode);
+        var displaySkillId = ResolveDisplaySkillIdForCode(snapshot, skillCode);
         if (displaySkillId != skillCode)
         {
             assetName = SkillIconCatalog.ResolveAssetName(displaySkillId);
@@ -98,21 +103,21 @@ public sealed class GameResourceService : IDisposable
         return null;
     }
 
-    private int ResolveDisplaySkillIdForCode(int skillCode)
+    private static int ResolveDisplaySkillIdForCode(ResourceCatalogSnapshot snapshot, int skillCode)
     {
         if (skillCode <= 0)
         {
             return 0;
         }
 
-        return _skillPresentations.TryGetValue(skillCode, out var presentation) && presentation.DisplaySkillId > 0
+        return snapshot.SkillDisplayProjections.TryGetValue(skillCode, out var presentation) && presentation.DisplaySkillId > 0
             ? presentation.DisplaySkillId
             : skillCode;
     }
 
-    private bool TryResolveSkillIdByEffectRef(uint rawId, out int skillId)
+    private static bool TryResolveSkillIdByEffectRef(ResourceCatalogSnapshot snapshot, uint rawId, out int skillId)
     {
-        if (rawId != 0 && _effectSkillIds.TryGetValue(rawId, out skillId))
+        if (rawId != 0 && snapshot.EffectSkillIds.TryGetValue(rawId, out skillId))
         {
             return true;
         }
@@ -121,11 +126,11 @@ public sealed class GameResourceService : IDisposable
         return false;
     }
 
-    private static bool TryResolveSkillName(SkillCollection skills, int skillCode, out string name)
+    private static bool TryResolveSkillName(SkillDisplayCatalog skills, int skillCode, out string name)
     {
-        if (skills.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name))
+        if (skills.TryGetValue(skillCode, out var skillDisplayEntry) && !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
         {
-            name = skill.Name;
+            name = skillDisplayEntry.Name;
             return true;
         }
 
@@ -133,7 +138,7 @@ public sealed class GameResourceService : IDisposable
         return false;
     }
 
-    public bool TryResolveNpcCatalogEntry(int npcCode, out NpcCatalogEntry entry)
+    public bool TryResolveNpcCatalogEntry(int npcCode, out NpcDisplayEntry entry)
     {
         lock (_lock)
         {
@@ -166,13 +171,13 @@ public sealed class GameResourceService : IDisposable
             return string.Empty;
         }
 
-        IReadOnlyDictionary<uint, string> snapshot;
+        ResourceCatalogSnapshot snapshot;
         lock (_lock)
         {
-            snapshot = Maps;
+            snapshot = _catalog;
         }
 
-        return ResourceDatabase.ResolveMapName(mapId, snapshot);
+        return snapshot.ResolveMapName(mapId);
     }
 
     public string ResolveServerName(int code)
@@ -182,13 +187,13 @@ public sealed class GameResourceService : IDisposable
             return string.Empty;
         }
 
-        IReadOnlyDictionary<int, ServerNameCatalogEntry> snapshot;
+        ResourceCatalogSnapshot snapshot;
         lock (_lock)
         {
-            snapshot = ServerNames;
+            snapshot = _catalog;
         }
 
-        return ResourceDatabase.ResolveServerName(code, snapshot);
+        return snapshot.ResolveServerName(code);
     }
 
     public string ResolveShortServerName(int code)
@@ -198,13 +203,13 @@ public sealed class GameResourceService : IDisposable
             return string.Empty;
         }
 
-        IReadOnlyDictionary<int, ServerNameCatalogEntry> snapshot;
+        ResourceCatalogSnapshot snapshot;
         lock (_lock)
         {
-            snapshot = ServerNames;
+            snapshot = _catalog;
         }
 
-        return ResourceDatabase.ResolveShortServerName(code, snapshot);
+        return snapshot.ResolveShortServerName(code);
     }
 
     private void OnLanguageChanged(object? sender, string language)
@@ -214,23 +219,20 @@ public sealed class GameResourceService : IDisposable
 
     private void Reload(string language)
     {
-        var skills = ResourceDatabase.LoadSkills(language);
-        var npcCatalog = ResourceDatabase.LoadNpcCatalog(language);
-        var npcNames = ResourceDatabase.LoadNpcNames(language);
-        var maps = ResourceDatabase.LoadMaps(language);
-        var serverNames = ResourceDatabase.LoadServerNames(language);
+        var catalog = ResourceCatalog.Load(language);
 
         lock (_lock)
         {
             CurrentLanguage = language;
-            Skills = skills;
-            NpcCatalog = npcCatalog;
-            NpcNames = npcNames;
-            Maps = maps;
-            ServerNames = serverNames;
+            _catalog = catalog;
+            Skills = catalog.Skills;
+            NpcCatalog = catalog.NpcCatalog;
+            NpcNames = catalog.NpcNames;
+            Maps = catalog.Maps;
+            ServerNames = catalog.ServerNames;
         }
 
-        CombatResourceRegistry.UpdateDisplayResources(skills, npcCatalog);
+        CombatResourceRegistry.UpdateDisplayResources(catalog.Skills, catalog.NpcCatalog);
         ResourcesChanged?.Invoke(this, language);
     }
 }

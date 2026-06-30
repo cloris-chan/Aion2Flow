@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Protocol.Combat;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -7,85 +7,90 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
 public static class CombatResourceRegistry
 {
-    private static SkillCollection _skillMap = [];
-    private static IReadOnlyDictionary<int, SkillAnalysis> _skillAnalysis = new Dictionary<int, SkillAnalysis>();
-    private static IReadOnlyDictionary<int, SkillPresentation> _skillPresentations = new Dictionary<int, SkillPresentation>();
+    private static SkillDisplayCatalog _skillMap = [];
+    private static IReadOnlyDictionary<int, SkillClientMetadata> _skillClientMetadata = new Dictionary<int, SkillClientMetadata>();
+    private static IReadOnlyDictionary<int, SkillDisplayProjection> _skillDisplayProjections = new Dictionary<int, SkillDisplayProjection>();
     private static IReadOnlyDictionary<uint, int> _effectSkillIds = new Dictionary<uint, int>();
 
-    public static SkillCollection SkillMap
+    public static SkillDisplayCatalog SkillMap
     {
         get => _skillMap;
         set
         {
             _skillMap = value;
-            SetSkillDatResources(new Dictionary<int, SkillAnalysis>(), new Dictionary<int, SkillPresentation>(), []);
+            SetSkillDisplayResources(new Dictionary<int, SkillClientMetadata>(), new Dictionary<int, SkillDisplayProjection>(), []);
             SkillDisplayMap = _skillMap;
             SkillMapRevision++;
         }
     }
 
-    public static SkillCollection SkillDisplayMap { get; private set; } = [];
-    public static IReadOnlyDictionary<int, SkillAnalysis> SkillAnalysis => _skillAnalysis;
-    public static IReadOnlyDictionary<int, SkillPresentation> SkillPresentations => _skillPresentations;
+    public static SkillDisplayCatalog SkillDisplayMap { get; private set; } = [];
+    public static IReadOnlyDictionary<int, SkillClientMetadata> SkillClientMetadata => _skillClientMetadata;
+    public static IReadOnlyDictionary<int, SkillDisplayProjection> SkillDisplayProjections => _skillDisplayProjections;
     public static long SkillMapRevision { get; private set; }
-    public static IReadOnlyDictionary<int, NpcCatalogEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcCatalogEntry>();
+    public static IReadOnlyDictionary<int, NpcDisplayEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcDisplayEntry>();
 
     public static void EnsureCombatResources()
     {
         if (SkillMap.Count != 0)
             return;
 
-        SkillMap = ResourceDatabase.LoadCombatSkills();
-        SetSkillDatResources(ResourceDatabase.LoadSkillAnalysis(), ResourceDatabase.LoadSkillPresentations(), ResourceDatabase.LoadSkillEffectRelations());
+        SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
     }
 
     public static void LoadSkillMap(string lang)
     {
-        SkillMap = ResourceDatabase.LoadCombatSkills();
-        SetSkillDatResources(ResourceDatabase.LoadSkillAnalysis(), ResourceDatabase.LoadSkillPresentations(), ResourceDatabase.LoadSkillEffectRelations());
-        UpdateDisplayResources(ResourceDatabase.LoadSkills(lang), ResourceDatabase.LoadNpcCatalog(lang));
+        SetGameResources(ResourceCatalog.Load(lang));
     }
 
-    public static void SetGameResources(SkillCollection skillMap, IReadOnlyDictionary<int, NpcCatalogEntry> npcCatalog)
+    public static void SetGameResources(SkillDisplayCatalog skillMap, IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog)
     {
         SkillMap = skillMap;
-        SetSkillDatResources(new Dictionary<int, SkillAnalysis>(), new Dictionary<int, SkillPresentation>(), []);
+        SetSkillDisplayResources(new Dictionary<int, SkillClientMetadata>(), new Dictionary<int, SkillDisplayProjection>(), []);
+        SkillDisplayMap = skillMap;
+        NpcCatalog = npcCatalog;
+    }
+
+    public static void SetGameResources(ResourceCatalogSnapshot snapshot)
+    {
+        SkillMap = snapshot.Skills;
+        SetSkillDisplayResources(snapshot.SkillClientMetadata, snapshot.SkillDisplayProjections, snapshot.SkillEffectReferences);
+        SkillDisplayMap = snapshot.Skills;
+        NpcCatalog = snapshot.NpcCatalog;
+    }
+
+    public static void SetGameResources(
+        SkillDisplayCatalog skillMap,
+        IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog,
+        IReadOnlyDictionary<int, SkillClientMetadata> skillClientMetadata,
+        IReadOnlyDictionary<int, SkillDisplayProjection> skillDisplayProjections,
+        IReadOnlyList<SkillEffectReference> skillEffectReferences)
+    {
+        SkillMap = skillMap;
+        SetSkillDisplayResources(skillClientMetadata, skillDisplayProjections, skillEffectReferences);
         SkillDisplayMap = skillMap;
         NpcCatalog = npcCatalog;
     }
 
     public static void SetGameResources(
-        SkillCollection skillMap,
-        IReadOnlyDictionary<int, NpcCatalogEntry> npcCatalog,
-        IReadOnlyDictionary<int, SkillAnalysis> skillAnalysis,
-        IReadOnlyDictionary<int, SkillPresentation> skillPresentations,
-        IReadOnlyList<SkillEffectRelation> skillEffectRelations)
+        SkillDisplayCatalog skillMap,
+        IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog,
+        IReadOnlyDictionary<int, SkillDisplayProjection> skillDisplayProjections)
     {
         SkillMap = skillMap;
-        SetSkillDatResources(skillAnalysis, skillPresentations, skillEffectRelations);
+        SetSkillDisplayResources(new Dictionary<int, SkillClientMetadata>(), skillDisplayProjections, []);
         SkillDisplayMap = skillMap;
         NpcCatalog = npcCatalog;
     }
 
-    public static void SetGameResources(
-        SkillCollection skillMap,
-        IReadOnlyDictionary<int, NpcCatalogEntry> npcCatalog,
-        IReadOnlyDictionary<int, SkillPresentation> skillPresentations)
-    {
-        SkillMap = skillMap;
-        SetSkillDatResources(new Dictionary<int, SkillAnalysis>(), skillPresentations, []);
-        SkillDisplayMap = skillMap;
-        NpcCatalog = npcCatalog;
-    }
-
-    public static void UpdateDisplayResources(SkillCollection skillMap, IReadOnlyDictionary<int, NpcCatalogEntry> npcCatalog)
+    public static void UpdateDisplayResources(SkillDisplayCatalog skillMap, IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog)
     {
         EnsureCombatResources();
         SkillDisplayMap = skillMap;
         NpcCatalog = npcCatalog;
     }
 
-    public static bool TryResolveNpcCatalogEntry(int npcCode, out NpcCatalogEntry entry)
+    public static bool TryResolveNpcCatalogEntry(int npcCode, out NpcDisplayEntry entry)
     {
         if (NpcCatalog.TryGetValue(npcCode, out entry))
             return true;
@@ -127,7 +132,7 @@ public static class CombatResourceRegistry
 
     private static bool TryResolveDisplaySkillIdForCode(int skillCode, out int displaySkillId)
     {
-        if (_skillPresentations.TryGetValue(skillCode, out var presentation))
+        if (_skillDisplayProjections.TryGetValue(skillCode, out var presentation))
         {
             displaySkillId = presentation.DisplaySkillId > 0 ? presentation.DisplaySkillId : skillCode;
             return true;
@@ -139,7 +144,7 @@ public static class CombatResourceRegistry
 
     private static bool TryResolvePresentationSkillIdForCode(int skillCode, out int presentationSkillId)
     {
-        if (_skillPresentations.TryGetValue(skillCode, out var presentation))
+        if (_skillDisplayProjections.TryGetValue(skillCode, out var presentation))
         {
             presentationSkillId = presentation.PresentationSkillId > 0 ? presentation.PresentationSkillId : skillCode;
             return true;
@@ -149,23 +154,23 @@ public static class CombatResourceRegistry
         return false;
     }
 
-    public static bool TryResolveSkillByEffectRef(ResourceEffectRef effectRef, out Skill skill)
+    public static bool TryResolveSkillByEffectRef(ResourceEffectRef effectRef, out SkillDisplayEntry skillDisplayEntry)
     {
         if (TryResolveSkillIdByEffectRef(effectRef, out var skillId) &&
-            SkillDisplayMap.TryGetValue(skillId, out skill) &&
-            !string.IsNullOrWhiteSpace(skill.Name))
+            SkillDisplayMap.TryGetValue(skillId, out skillDisplayEntry) &&
+            !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
         {
             return true;
         }
 
         if (TryResolveSkillIdByEffectRef(effectRef, out skillId) &&
-            SkillMap.TryGetValue(skillId, out skill) &&
-            !string.IsNullOrWhiteSpace(skill.Name))
+            SkillMap.TryGetValue(skillId, out skillDisplayEntry) &&
+            !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
         {
             return true;
         }
 
-        skill = default;
+        skillDisplayEntry = default;
         return false;
     }
 
@@ -177,8 +182,8 @@ public static class CombatResourceRegistry
         if (SkillDisplayMap.TryGetValue(skillCode, out var displaySkill) && !string.IsNullOrWhiteSpace(displaySkill.Name))
             return displaySkill.Name;
 
-        if (SkillMap.TryGetValue(skillCode, out var skill) && !string.IsNullOrWhiteSpace(skill.Name))
-            return skill.Name;
+        if (SkillMap.TryGetValue(skillCode, out var skillDisplayEntry) && !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
+            return skillDisplayEntry.Name;
 
         if (TryResolveSkillByEffectRef(ResourceEffectRef.FromRaw(unchecked((uint)skillCode)), out var effectSkill))
             return effectSkill.Name;
@@ -189,21 +194,21 @@ public static class CombatResourceRegistry
             if (SkillDisplayMap.TryGetValue(displaySkillId, out displaySkill) && !string.IsNullOrWhiteSpace(displaySkill.Name))
                 return displaySkill.Name;
 
-            if (SkillMap.TryGetValue(displaySkillId, out skill) && !string.IsNullOrWhiteSpace(skill.Name))
-                return skill.Name;
+            if (SkillMap.TryGetValue(displaySkillId, out skillDisplayEntry) && !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
+                return skillDisplayEntry.Name;
         }
 
         return string.Empty;
     }
 
-    private static void SetSkillDatResources(
-        IReadOnlyDictionary<int, SkillAnalysis> skillAnalysis,
-        IReadOnlyDictionary<int, SkillPresentation> skillPresentations,
-        IReadOnlyList<SkillEffectRelation> skillEffectRelations)
+    private static void SetSkillDisplayResources(
+        IReadOnlyDictionary<int, SkillClientMetadata> skillClientMetadata,
+        IReadOnlyDictionary<int, SkillDisplayProjection> skillDisplayProjections,
+        IReadOnlyList<SkillEffectReference> skillEffectReferences)
     {
-        _skillAnalysis = skillAnalysis;
-        _skillPresentations = skillPresentations;
-        _effectSkillIds = SkillEffectRelationIndex.Build(skillEffectRelations);
+        _skillClientMetadata = skillClientMetadata;
+        _skillDisplayProjections = skillDisplayProjections;
+        _effectSkillIds = SkillEffectReferenceIndex.Build(skillEffectReferences);
     }
 
     public static NpcKind ResolveNpcKind(NpcCatalogKind kind) =>

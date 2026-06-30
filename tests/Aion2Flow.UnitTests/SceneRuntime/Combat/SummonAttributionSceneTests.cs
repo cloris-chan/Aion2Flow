@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Streams;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -60,7 +60,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Infers_Preexisting_Elementalist_Summon_From_Signature_Skills()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 1734;
@@ -96,7 +96,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Infers_Preexisting_Elementalist_Summon_From_OwnerSupport_When_Class_Candidates_Are_Ambiguous()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 10389;
@@ -155,7 +155,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Infers_Preexisting_Elementalist_Catalog_Summon_From_OwnerSupport_When_Class_Candidates_Are_Ambiguous()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>
         {
             [2920115] = new(2920115, "火之精靈", NpcCatalogKind.Summon)
         });
@@ -222,7 +222,7 @@ public sealed class SummonAttributionSceneTests
         const int summonId = 153484;
         const int targetId = 163760;
         const int summonNpcCode = 2920115;
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>
         {
             [summonNpcCode] = new(summonNpcCode, "火之精靈", NpcCatalogKind.Summon)
         });
@@ -261,7 +261,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Does_Not_Infer_Preexisting_Summon_Owner_When_DirectSupport_Has_Multiple_SameClass_Candidates()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int firstElementalistId = 10389;
@@ -324,7 +324,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Treats_Spirit_Descent_Summon_Restore_As_Support()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 1734;
@@ -438,7 +438,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Treats_Repeated_Spirit_Descent_Summon_Restore_As_Support()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 314;
@@ -510,7 +510,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Treats_Wind_Spirit_Descent_Restore_As_Support()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 314;
@@ -563,15 +563,15 @@ public sealed class SummonAttributionSceneTests
         });
     }
 
-    private static SkillCollection BuildElementalistSummonSkillMap()
+    private static SkillDisplayCatalog BuildElementalistSummonSkillMap()
     {
         return
         [
-            new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new Skill(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
-            new Skill(16100004, "Fire Spirit: Strike", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
-            new Skill(16770001, "Spirit Recovery", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new Skill(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
+            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
+            new SkillDisplayEntry(16100004, "Fire Spirit: Strike", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
+            new SkillDisplayEntry(16770001, "Spirit Recovery", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
         ];
     }
 

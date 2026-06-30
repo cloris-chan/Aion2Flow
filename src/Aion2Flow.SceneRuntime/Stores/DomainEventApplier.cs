@@ -357,7 +357,7 @@ public sealed class DomainEventApplier
             return;
         }
 
-        if (state.StateCode == StateCodes.NpcName)
+        if (state.StateCode == StateCodes.LocalizedNpcName)
         {
             return;
         }

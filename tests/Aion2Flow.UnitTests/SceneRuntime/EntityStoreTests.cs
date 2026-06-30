@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
@@ -821,7 +821,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_VendoredReplay_PopulatesEntities()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var journal = replay.SceneJournal;
@@ -839,7 +839,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_VendoredReplay_ReconstructsConfirmedMapIdentity()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var entities = new EntityStore();
@@ -1161,7 +1161,7 @@ public class SceneCombatSnapshotAdapterTests
     [Fact]
     public void Adapter_CreateSnapshot_ProjectsSceneTotalsAndWindow()
     {
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcCatalogEntry>
+        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>
         {
             [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss)
         });
@@ -1221,9 +1221,9 @@ public class SceneCombatSnapshotAdapterTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new Skill(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>
         {
             [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss)
         });
@@ -1270,10 +1270,10 @@ public class SceneCombatSnapshotAdapterTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new Skill(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
-            new Skill(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
+            new SkillDisplayEntry(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         var entities = new EntityStore();
         var combat = new CombatStore();
@@ -1320,9 +1320,9 @@ public class SceneCombatSnapshotAdapterTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         var entities = new EntityStore();
         var combat = new CombatStore();
@@ -1406,7 +1406,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_ReusesProjectionUntilInputRevisionChanges()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         scene.AppendNickname(100, "Player");
@@ -1456,7 +1456,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_Uses_Metadata_Class_Over_Skill_Evidence()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         scene.AppendNickname(100, "Player", characterClass: CharacterClass.Cleric);
@@ -1497,7 +1497,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_Metadata_Class_Overrides_Previous_Skill_Evidence()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         scene.AppendNickname(100, "Player");
@@ -1540,7 +1540,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_DoesNotInvalidateCacheForNpcNameEventButInvalidatesForEntityAndBossFocusChanges()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         scene.AppendNickname(100, "Player");
@@ -1604,7 +1604,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_CacheHit_ReturnsFrozenInstance_WithoutAllocation()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         scene.AppendNickname(100, "Player");
@@ -1647,7 +1647,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_ActiveMiss_DoesNotAllocatePerEventPacketDtos()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var journal = new ObservedEventJournal();
         var entities = new EntityStore();
@@ -1686,7 +1686,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSkillBreakdown_UsesCompactProjectionAllocation()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var journal = new ObservedEventJournal();
         var entities = new EntityStore();
@@ -1856,7 +1856,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_ReusesWarmSubscriptionForIrrelevantCombat()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -1883,7 +1883,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_UpdatesWarmSubscriptionForRelevantCombat()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -1910,7 +1910,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_UsesSeparateSubscriptionForSelectionSwitch()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -1934,7 +1934,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_TreatsSummonDamageAsOwnerRelevantOnWarmPoll()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
@@ -1964,7 +1964,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public async Task Owner_CreateFrame_KeepsSnapshotDetailAndArchiveOnOneReadModelRevisionUnderConcurrentAppendAndReset()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
         var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -2289,11 +2289,11 @@ public class SceneReadModelOwnerTests
         }
     }
 
-    private static SkillCollection BuildSkillMap()
+    private static SkillDisplayCatalog BuildSkillMap()
     {
         return
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
         ];
     }
 
@@ -2328,7 +2328,7 @@ public class DualReadParityTests
     [Fact]
     public void M2_06_ScenePath_CapturesSameCombatantIds_AsBaselinePath()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var journal = replay.SceneJournal;
@@ -2361,7 +2361,7 @@ public class DualReadParityTests
     [Fact]
     public void M2_06_CombatStore_DamageTotals_MatchBaseline_OutgoingDamage()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
 
         var journal = replay.SceneJournal;

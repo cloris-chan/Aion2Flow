@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 
 namespace Cloris.Aion2Flow.Tests.Resources;
 
@@ -14,7 +14,7 @@ public sealed class NpcCatalogLookupTests
     [InlineData(2980049)]
     public void NpcCatalog_Contains_Session_NpcCodes(int npcCode)
     {
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         Assert.True(catalog.ContainsKey(npcCode), $"NPC code {npcCode} not found in catalog");
         Assert.False(string.IsNullOrWhiteSpace(catalog[npcCode].Name), $"NPC code {npcCode} has no name");
     }
@@ -25,7 +25,7 @@ public sealed class NpcCatalogLookupTests
     [InlineData("zh-TW")]
     public void NpcCatalog_Contains_2980179_In_All_Languages(string lang)
     {
-        var catalog = ResourceDatabase.LoadNpcCatalog(lang);
+        var catalog = ResourceCatalog.Load(lang).NpcCatalog;
         Assert.True(catalog.ContainsKey(2980179), $"NPC code 2980179 not found in {lang} catalog");
         Assert.False(string.IsNullOrWhiteSpace(catalog[2980179].Name), $"NPC code 2980179 has no name in {lang}");
     }

@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
@@ -115,11 +115,11 @@ public sealed class CharacterClassInferenceSceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(13352450, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null),
-            new Skill(16790001, "Revitalization Contract", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new Skill(16200130, "Defiance", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new Skill(16190040, "Enhance: Spirit's Benediction", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(13352450, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(16790001, "Revitalization Contract", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(16200130, "Defiance", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(16190040, "Enhance: Spirit's Benediction", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int assassinId = 9942;

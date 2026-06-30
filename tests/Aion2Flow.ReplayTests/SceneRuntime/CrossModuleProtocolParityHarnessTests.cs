@@ -1,5 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -13,7 +13,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
     [Fact]
     public void M4_12_VendoredStreamCorpus_ContainsProtocolEvidenceForMigratedModules()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var evidence = new ProtocolEvidence();
 
         foreach (var fileName in ReplayScenarioCatalog.VendoredStreamLogNames())
@@ -29,7 +29,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
     [Fact]
     public void M4_12_SelectedReplays_MigratedModuleFactsMatchSceneCorpusExpectations()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var diffs = new List<string>();
 
         AssertSystemRecoverySceneInvariant(diffs, ReplayScenarioCatalog.SummonRestoresAndTargetSupport);
@@ -45,7 +45,7 @@ public sealed class CrossModuleProtocolParityHarnessTests
     [Fact]
     public void M4_12_FullAggregateDiffHarness_ReportsNoSceneReplayOwnerDrift()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var unexpected = new List<string>();
 
         foreach (var fileName in ReplayScenarioCatalog.VendoredStreamLogNames())

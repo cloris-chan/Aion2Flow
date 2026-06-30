@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -1024,7 +1024,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private static bool TryResolveSkill(in CombatObservation observation, out Skill skill)
+    private static bool TryResolveSkill(in CombatObservation observation, out SkillDisplayEntry skill)
     {
         if (observation.SkillCode > 0 && CombatResourceRegistry.SkillMap.TryGetValue(observation.SkillCode, out skill))
             return true;
@@ -1033,10 +1033,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return false;
     }
 
-    private static bool IsSummonOwnerCandidateSkill(Skill skill) =>
+    private static bool IsSummonOwnerCandidateSkill(SkillDisplayEntry skill) =>
         skill.SourceType == SkillSourceType.PcSkill && CombatantClassEvidence.MapSkillCategoryToClass(skill.Category) is not null;
 
-    private static bool IsPreexistingSummonSignatureSkill(Skill skill) =>
+    private static bool IsPreexistingSummonSignatureSkill(SkillDisplayEntry skill) =>
         skill.Category == SkillCategory.Elementalist && skill.Name.Contains("Spirit:", StringComparison.OrdinalIgnoreCase);
 
     private bool IsPotentialImplicitSummonTarget(int sourceId, int targetId)

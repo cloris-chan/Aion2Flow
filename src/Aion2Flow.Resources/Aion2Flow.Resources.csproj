@@ -3,16 +3,15 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsAotCompatible>true</IsAotCompatible>
+    <RootNamespace>Cloris.Aion2Flow.Resources</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="K4os.Compression.LZ4" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="resources.db">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <EmbeddedResource Include="Packs\*.bin" />
   </ItemGroup>
 
 </Project>

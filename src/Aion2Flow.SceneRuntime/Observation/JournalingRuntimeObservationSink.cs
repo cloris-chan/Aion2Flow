@@ -595,7 +595,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             State = new StateObservation
             {
                 EntityId = npcCode,
-                StateCode = StateCodes.NpcName,
+                StateCode = StateCodes.LocalizedNpcName,
                 Value0 = 0,
                 Value1 = 0,
                 DetailRaw = 0,

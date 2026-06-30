@@ -1,4 +1,4 @@
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
@@ -19,12 +19,12 @@ public sealed class CombatLocalizationSceneTests
             };
 
             CombatResourceRegistry.LoadSkillMap("zh-TW");
-            var zhName = ResourceDatabase.LoadSkills("zh-TW")[2011101].Name;
+            var zhName = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills[2011101].Name;
 
             Assert.Equal(zhName, CombatResourceRegistry.DisplaySkillNameFor(observation.SkillCode));
 
             CombatResourceRegistry.LoadSkillMap("en-US");
-            var enName = ResourceDatabase.LoadSkills("en-US")[2011101].Name;
+            var enName = ResourceCatalog.Load(ResourceLanguage.English).Skills[2011101].Name;
 
             Assert.Equal(enName, CombatResourceRegistry.DisplaySkillNameFor(observation.SkillCode));
             Assert.NotEqual(zhName, enName);

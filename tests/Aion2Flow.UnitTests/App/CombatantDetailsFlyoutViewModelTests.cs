@@ -1,7 +1,7 @@
 using System.Globalization;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Capture.Streams;
-using Cloris.Aion2Flow.Resources;
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -19,7 +19,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Builds_Live_Battle_Sections_And_Filters_By_Target()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -64,7 +64,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Uses_Filtered_Damage_Duration_For_Subset_Counterparts()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -106,7 +106,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Uses_Filtered_Support_Duration_For_Subset_Counterparts()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -174,7 +174,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Uses_One_Second_Minimum_For_Single_Filtered_Damage_Event()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -203,7 +203,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Uses_One_Second_Minimum_For_Subsecond_Filtered_Support_Events()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -238,7 +238,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Builds_Live_Detail_From_Scene_Projection()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
@@ -289,7 +289,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Includes_Summon_Detail_Folded_To_Owner()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
@@ -321,7 +321,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Uses_Archived_EncounterId_Context()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
@@ -357,7 +357,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Uses_Archived_ScenePayload()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
@@ -394,7 +394,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Keeps_Selected_Combatant_Healing_Details_Outside_Damage_Window()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -426,7 +426,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Uses_Archived_ScenePayload_For_Summon_Attribution()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
@@ -463,7 +463,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Splits_Healing_And_Shield_Sections_And_Shares_Recovery_Scope()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -503,7 +503,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Does_Not_Treat_Hostile_Shield_Absorption_As_Support_Source()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -533,7 +533,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Does_Not_Count_DamageTagged_Periodic_Support_On_Allies_As_Outgoing_Damage()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -591,7 +591,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Does_Not_Count_DamageTagged_Self_Support_As_Outgoing_Damage()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -630,7 +630,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Preserves_Live_Scope_Filter_Across_Refreshes()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -660,7 +660,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Preserves_Counterpart_ViewModel_Identity_Across_Relevant_Refreshes()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -699,7 +699,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Builds_PerSkill_Damage_Modifier_Summaries()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -745,8 +745,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(13060250, "突襲", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(13060250, "突襲", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -791,9 +791,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(17010230, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(17730000, "主神恩寵", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(17010230, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(17730000, "主神恩寵", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -872,7 +872,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Keeps_Very_Large_Periodic_Damage_Totals_Consistent()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -910,10 +910,10 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(17010010, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(17020010, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(17010010, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(17020010, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -978,9 +978,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new Skill(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -1035,8 +1035,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -1080,9 +1080,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
-        ], new Dictionary<int, NpcCatalogEntry>());
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         var language = new LanguageService();
@@ -1124,7 +1124,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412103519_Stream_Log()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = ReplayWithScene(FixtureHelper.GetPath("logs/aion2flow.stream.20260412103519.log"));
         var language = new LanguageService();
@@ -1147,7 +1147,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412110721_Stream_Log()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var replay = ReplayWithScene(FixtureHelper.GetPath("logs/aion2flow.stream.20260412110721.log"));
         var language = new LanguageService();
@@ -1174,7 +1174,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_20260422222104_Does_Not_Show_Ally_Targets_In_Outgoing_Damage()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
         var logPath = FixtureHelper.GetPath("logs/aion2flow.stream.20260422222104.log");
         var replay = ReplayWithScene(logPath);
         var language = new LanguageService();
@@ -1250,7 +1250,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Reconstructs_MultiSource_Invincibles_From_20260412103519_Live_Stream_Path()
     {
-        CombatResourceRegistry.SetGameResources(ResourceDatabase.LoadCombatSkills(), new Dictionary<int, NpcCatalogEntry>());
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
 
         var entries = ReadStreamLogEntries("aion2flow.stream.20260412103519.log")
             .Where(static entry => entry.IsInbound)
@@ -1290,16 +1290,16 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AssertModifierValues(viewModel.IncomingDamage.Invincible, viewModel.IncomingDamage.InvincibleRate, 7, viewModel.IncomingDamage.Attempts);
     }
 
-    private static SkillCollection BuildSkillMap()
+    private static SkillDisplayCatalog BuildSkillMap()
     {
         return
         [
-            new Skill(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new Skill(12000010, "Second Wind", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new Skill(13000010, "Support Heal", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(14000010, "Barrier Ward", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
-            new Skill(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(12000010, "Second Wind", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(13000010, "Support Heal", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(14000010, "Barrier Ward", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null),
+            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
         ];
     }
 
@@ -1568,7 +1568,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void ScopeOptions_Resolve_Npc_Name_From_Catalog_When_NpcCode_Set()
     {
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
 
         using var scene = new SceneTestHarness();
@@ -1602,7 +1602,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void ScopeOptions_Resolve_Npc_Name_From_Archived_ScenePayload()
     {
-        var catalog = ResourceDatabase.LoadNpcCatalog("zh-TW");
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
 
         var language = new LanguageService();
