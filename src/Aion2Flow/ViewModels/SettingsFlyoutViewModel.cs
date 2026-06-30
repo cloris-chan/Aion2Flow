@@ -80,7 +80,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public IReadOnlyList<TopmostMode> TopmostModeOptions { get; } = [TopmostMode.GameForeground, TopmostMode.Always, TopmostMode.Never];
 
-    public IReadOnlyList<int> RowCountOptions { get; } = [3, 4, 5, 6];
+    public IReadOnlyList<int> RowCountOptions { get; } = [5, 6, 7, 8, 9, 10];
 
     public IReadOnlyList<CombatantSortMetric> CombatantSortMetricOptions { get; } = [CombatantSortMetric.DamagePerSecond, CombatantSortMetric.TotalDamage];
 
@@ -99,7 +99,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MaxVisibleCombatantRowsDisplay))]
-    public partial int MaxVisibleCombatantRows { get; set; } = 4;
+    public partial int MaxVisibleCombatantRows { get; set; } = 5;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CombatantSortMetricDisplay))]

@@ -8,7 +8,7 @@ public sealed class AppSettings
 {
     public TopmostMode TopmostMode { get; set; } = TopmostMode.GameForeground;
 
-    public int MaxVisibleCombatantRows { get; set; } = 4;
+    public int MaxVisibleCombatantRows { get; set => field = Math.Clamp(value, 5, 10); } = 5;
 
     public CombatantSortMetric CombatantSortMetric { get; set; } = CombatantSortMetric.DamagePerSecond;
 
