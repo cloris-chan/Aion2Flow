@@ -691,6 +691,7 @@ internal static class DisplayIconCache
     private static IImage ElementalistIcon { get => field ??= Load("Elementalist.webp"); }
     private static IImage ClericIcon { get => field ??= Load("Cleric.webp"); }
     private static IImage ChanterIcon { get => field ??= Load("Chanter.webp"); }
+    private static IImage BrawlerIcon { get => field ??= Load("Brawler.webp"); }
 
     public static IImage? ResolveClassIcon(CharacterClass? characterClass)
     {
@@ -704,6 +705,7 @@ internal static class DisplayIconCache
             CharacterClass.Elementalist => ElementalistIcon,
             CharacterClass.Cleric => ClericIcon,
             CharacterClass.Chanter => ChanterIcon,
+            CharacterClass.Brawler => BrawlerIcon,
             _ => null,
         };
     }
