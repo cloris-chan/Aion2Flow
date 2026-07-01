@@ -84,6 +84,55 @@ public sealed class Packet0438DamageParserTests
     }
 
     [Fact]
+    public void TryParse_MapsCurrentDetailLayoutDefensiveFlags()
+    {
+        var packet = BuildFrame(
+            targetId: 200,
+            sourceId: 100,
+            layoutTag: 6,
+            flag: 0,
+            type: 2,
+            detail: [0x13, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            unknown: 0,
+            damage: 17154,
+            loop: 4321);
+
+        Assert.True(Packet0438DamageParser.TryParse(packet, out var parsed));
+        Assert.Equal(4321, parsed.Damage);
+        Assert.Equal(DamageModifiers.Parry | DamageModifiers.Block | DamageModifiers.Endurance, parsed.Modifiers & (DamageModifiers.Parry | DamageModifiers.Block | DamageModifiers.Endurance));
+    }
+
+    [Fact]
+    public void TryParse_UsesTailDamageForCurrentDetailLayoutDefensiveDamageResult()
+    {
+        var packet = Convert.FromHexString("2A0438DD104600EAF401807618001A02228102020B4A8E0901000000904EE30C01EF3E2F0D0100");
+
+        Assert.True(Packet0438DamageParser.TryParse(packet, out var parsed));
+        Assert.Equal(1_603_200, parsed.BodySkillVariantRaw);
+        Assert.Equal(0x46, parsed.LayoutTag);
+        Assert.Equal(0, parsed.Unknown);
+        Assert.Equal(1_635, parsed.Damage);
+        Assert.Equal(10_000, parsed.Loop);
+        Assert.Equal(257, parsed.RegenerationAmount);
+        Assert.Equal(DamageModifiers.Block | DamageModifiers.Regeneration | DamageModifiers.Front, parsed.Modifiers & (DamageModifiers.Parry | DamageModifiers.Block | DamageModifiers.Endurance | DamageModifiers.Regeneration | DamageModifiers.Front | DamageModifiers.Back));
+    }
+
+    [Fact]
+    public void TryParse_UsesShiftedDirectionForCurrentDetailLayoutRegenerationResult()
+    {
+        var packet = Convert.FromHexString("250438DD100600EAF4018B7618001D0220B80702F34D8E0901000000904E99250100");
+
+        Assert.True(Packet0438DamageParser.TryParse(packet, out var parsed));
+        Assert.Equal(1_603_211, parsed.BodySkillVariantRaw);
+        Assert.Equal(0x06, parsed.LayoutTag);
+        Assert.Equal(0, parsed.Unknown);
+        Assert.Equal(4_761, parsed.Damage);
+        Assert.Equal(10_000, parsed.Loop);
+        Assert.Equal(952, parsed.RegenerationAmount);
+        Assert.Equal(DamageModifiers.Regeneration | DamageModifiers.Front, parsed.Modifiers & (DamageModifiers.Regeneration | DamageModifiers.Front | DamageModifiers.Back));
+    }
+
+    [Fact]
     public void TryParse_KeepsDamageFieldForLegacyDetailLayout()
     {
         var packet = BuildFrame(targetId: 200, sourceId: 100, layoutTag: 4, loop: 777);

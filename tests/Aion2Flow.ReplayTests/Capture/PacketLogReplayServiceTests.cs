@@ -102,6 +102,39 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260702054027_Parses_Current0438_Regeneration_And_InlineRecovery()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.Post20260701BrawlerRegenerationRecovery}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        const int playerId = 2141;
+        var player = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == playerId);
+        Assert.Equal(4_960_083, player.OutgoingDamage);
+        Assert.Equal(489, player.OutgoingHits);
+        Assert.Equal(489, player.OutgoingAttempts);
+        Assert.Equal(329_163, player.OutgoingHealing);
+        Assert.Equal(43_170, player.IncomingDamage);
+        Assert.Equal(17, player.IncomingHits);
+        Assert.Equal(24, player.IncomingAttempts);
+        Assert.Equal(3, player.IncomingEvades);
+        Assert.Equal(4, player.IncomingInvincibles);
+
+        var packets = SceneReplayTestView.Packets(replay);
+        var regenerationHealing = packets
+            .Where(static packet => packet.SourceId == playerId && packet.TargetId == playerId && packet.EffectTag == PacketEffectTag.RegenerationHealing)
+            .ToArray();
+        Assert.Equal(2, regenerationHealing.Length);
+        Assert.Equal(1_209, regenerationHealing.Sum(static packet => packet.Damage));
+
+        AssertSkillValueKind(replay, skillCode: 12_350_150, CombatEventKind.Healing, CombatValueKind.Healing, expectedCount: 3, expectedAmount: 7_808);
+        Assert.Equal(48_912, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911 && packet.ValueKind == CombatValueKind.Healing).Sum(static packet => packet.Damage));
+        Assert.Equal(6_329, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911 && packet.ValueKind == CombatValueKind.Support).Sum(static packet => packet.Damage));
+    }
+
+    [Fact]
     public void Replay_20260629175523_Classifies_HealingGlow_DirectValues_AsHealing()
     {
         CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());

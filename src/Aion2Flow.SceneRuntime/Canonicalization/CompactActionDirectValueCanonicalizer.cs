@@ -35,6 +35,9 @@ public sealed class CompactActionDirectValueCanonicalizer
         var scopeId = ResolveAssociationScope(in structurePath);
         if (TryFindActionOpener(sourceId, bodyCodeRaw, observation.Marker, stamp.BatchOrdinal, scopeId, stamp.ObservationOrdinal, out var opener))
         {
+            if (!MatchesRecoveryOpener(in opener, sourceId) && targetId == sourceId)
+                return ObservePendingCompactValue(sourceId, targetId, bodyCodeRaw, in stamp, in observation, scopeId, observedAtMilliseconds, out results);
+
             var normalized = MatchesRecoveryOpener(in opener, sourceId) ? NormalizeAsHealing(in observation) : observation;
             results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, normalized));
             return true;
@@ -46,6 +49,11 @@ public sealed class CompactActionDirectValueCanonicalizer
             return true;
         }
 
+        return ObservePendingCompactValue(sourceId, targetId, bodyCodeRaw, in stamp, in observation, scopeId, observedAtMilliseconds, out results);
+    }
+
+    private bool ObservePendingCompactValue(int sourceId, int targetId, uint bodyCodeRaw, in TimelineStamp stamp, in CombatObservation observation, int scopeId, long observedAtMilliseconds, out StampedCombatCanonicalizationBatch results)
+    {
         var pending = new PendingCompactActionValue(sourceId, targetId, bodyCodeRaw, observation.Marker, stamp.BatchOrdinal, scopeId, stamp.ObservationOrdinal, stamp, observedAtMilliseconds, observation);
         _pendingValues.Add(pending);
         results = targetId == sourceId && TryConfirmInlineRecoveryGroupFromSelfValue(in pending, out var group)

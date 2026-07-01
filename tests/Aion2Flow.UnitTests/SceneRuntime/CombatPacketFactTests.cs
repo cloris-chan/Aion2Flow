@@ -172,6 +172,30 @@ public class CombatPacketFactTests
     }
 
     [Fact]
+    public void ScenePath_ClassifiesInlineSelfRecoveryAfterNonRecoveryActionOpenerAsHealing()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateCompactActionOpener(sceneId, 0, sourceId: 2141, bodyCodeRaw: 12350150, marker: 29, mode: 0, flag: 2, echoSourceId: 30058));
+        journal.Append(CreateDirectValue(sceneId, 1, sourceId: 2141, targetId: 2141, bodyCodeRaw: 12350150, marker: 29, layoutTag: 4, flag: 0, type: 2, chainId: 16959, damage: 2673, loop: 2));
+        journal.Append(CreateInlineSidecar(sceneId, 2, sourceId: 2141, targetId: 2141, bodyCodeRaw: 12350150, marker: 29, type: 2));
+        journal.Append(CreateInlineSidecar(sceneId, 3, sourceId: 2141, targetId: 2141, bodyCodeRaw: 12350150, marker: 29, type: 2));
+        journal.Append(CreateDirectValue(sceneId, 4, sourceId: 2141, targetId: 30058, bodyCodeRaw: 12350150, marker: 29, layoutTag: 22, flag: 0, type: 3, chainId: 16959, damage: 10_000, loop: 10_000));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(2141, 2141, out var self));
+        Assert.Equal(0, self!.TotalDamage);
+        Assert.Equal(2673, self.TotalHealing);
+        Assert.True(combat.TryGetPair(2141, 30058, out var target));
+        Assert.Equal(10_000, target!.TotalDamage);
+        Assert.Equal(0, target.TotalHealing);
+        Assert.True(combat.TryGetCombatant(2141, out var source));
+        Assert.Equal(10_000, source!.OutgoingDamage);
+        Assert.Equal(2673, source.OutgoingHealing);
+    }
+
+    [Fact]
     public void ScenePath_DoesNotClassifyInlineSidecarDirectDamageWithoutSelfEvidenceAsHealing()
     {
         var journal = new ObservedEventJournal();

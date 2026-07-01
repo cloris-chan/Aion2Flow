@@ -57,7 +57,7 @@ internal static class Packet0438DamageParser
         var detailSlice = payload.Slice(reader.Offset, detailLength);
         var detailLayoutKey = Packet0438Layout.GetDetailLayoutKey(layoutTag);
         var modifiers = ParseDamageModifiers(detailSlice, detailLayoutKey, type);
-        var (regenAmount, detailRaw) = ExtractRegenerationAmount(detailSlice, modifiers);
+        var (regenAmount, detailRaw) = ExtractRegenerationAmount(detailSlice, detailLayoutKey, modifiers);
         var detailResourceEffectRef = ResourceEffectRef.FromDetail(detailSlice);
         var resourceKind = ExtractResourceKind(detailSlice);
         if (!reader.TryAdvance(detailLength)) return false;
@@ -67,7 +67,10 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadVarInt(out var loop)) return false;
         if (loop < 0) return false;
 
-        damage = ResolveDamageValue(detailLayoutKey, unknown, damage, loop);
+        if (TryReadCurrentDetailDefensiveDamage(ref reader, detailSlice, detailLayoutKey, unknown, damage, loop, out var resolvedDamage))
+            damage = resolvedDamage;
+        else
+            damage = ResolveDamageValue(detailLayoutKey, unknown, damage, loop);
 
         var multiHitCount = 0;
         var drainHealAmount = ParseTail(ref reader, layoutTag, loop, out var multiHitAmounts);
@@ -200,7 +203,7 @@ internal static class Packet0438DamageParser
         return reader.Remaining >= 2;
     }
 
-    private static (int RegenAmount, long DetailRaw) ExtractRegenerationAmount(ReadOnlySpan<byte> detail, DamageModifiers modifiers)
+    private static (int RegenAmount, long DetailRaw) ExtractRegenerationAmount(ReadOnlySpan<byte> detail, int detailLayoutKey, DamageModifiers modifiers)
     {
         long raw = 0;
         for (var i = 0; i < Math.Min(detail.Length, 8); i++)
@@ -208,6 +211,9 @@ internal static class Packet0438DamageParser
 
         if ((modifiers & DamageModifiers.Regeneration) == 0)
             return (0, raw);
+
+        if (detailLayoutKey == 0x06)
+            return TryReadCurrentDetailRegenerationAmount(detail, out var currentRegenAmount) ? (currentRegenAmount, raw) : (0, raw);
 
         if (detail.Length > 1)
         {
@@ -254,10 +260,15 @@ internal static class Packet0438DamageParser
         if (detailLayoutKey == 0x06)
         {
             var actionFlags = detail[0];
+            if ((actionFlags & 0x01) != 0) modifiers |= DamageModifiers.Parry;
+            if ((actionFlags & 0x02) != 0) modifiers |= DamageModifiers.Block;
             if ((actionFlags & 0x04) != 0) modifiers |= DamageModifiers.Perfect;
             if ((actionFlags & 0x08) != 0) modifiers |= DamageModifiers.Smite;
+            if ((actionFlags & 0x10) != 0) modifiers |= DamageModifiers.Endurance;
+            if ((actionFlags & 0x20) != 0) modifiers |= DamageModifiers.Regeneration;
 
-            var directionFlags = detail[2];
+            var directionOffset = GetCurrentDetailDirectionOffset(actionFlags, detail);
+            var directionFlags = detail[directionOffset];
             if ((directionFlags & 0x01) != 0) modifiers |= DamageModifiers.Back;
             if ((directionFlags & 0x02) != 0) modifiers |= DamageModifiers.Front;
             return modifiers;
@@ -273,5 +284,50 @@ internal static class Packet0438DamageParser
         if ((flagByte & 0x40) != 0) modifiers |= DamageModifiers.Regeneration;
         if ((flagByte & 0x80) != 0) modifiers |= DamageModifiers.DefensivePerfect;
         return modifiers;
+    }
+
+    private static int GetCurrentDetailDirectionOffset(byte actionFlags, ReadOnlySpan<byte> detail)
+    {
+        if ((actionFlags & 0x20) == 0 || detail.Length <= 2)
+            return 2;
+
+        var reader = new PacketSpanReader(detail[1..]);
+        if (!reader.TryReadVarInt(out _))
+            return 2;
+
+        var offset = 1 + reader.Offset;
+        return offset < detail.Length ? offset : 2;
+    }
+
+    private static bool TryReadCurrentDetailRegenerationAmount(ReadOnlySpan<byte> detail, out int amount)
+    {
+        amount = 0;
+        if (detail.Length <= 1 || (detail[0] & 0x20) == 0)
+            return false;
+
+        var reader = new PacketSpanReader(detail[1..]);
+        return reader.TryReadVarInt(out amount) && amount >= 0;
+    }
+
+    private static bool TryReadCurrentDetailDefensiveDamage(ref PacketSpanReader reader, ReadOnlySpan<byte> detail, int detailLayoutKey, int unknown, int damage, int loop, out int resolvedDamage)
+    {
+        resolvedDamage = 0;
+        if (detailLayoutKey != 0x06 ||
+            detail.IsEmpty ||
+            (detail[0] & 0x20) == 0 ||
+            unknown != 0 ||
+            damage != 0 ||
+            loop <= 0)
+        {
+            return false;
+        }
+
+        var probe = reader;
+        if (!probe.TryReadVarInt(out var tailDamage) || tailDamage <= 0)
+            return false;
+
+        reader = probe;
+        resolvedDamage = tailDamage;
+        return true;
     }
 }

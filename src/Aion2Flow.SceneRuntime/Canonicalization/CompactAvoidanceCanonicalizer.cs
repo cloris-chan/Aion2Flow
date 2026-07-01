@@ -69,9 +69,32 @@ public sealed class CompactAvoidanceCanonicalizer
         if (!IsCompactEvadeSignal(sourceId, targetId, in observation) || observation.Marker <= 0)
             return false;
 
-        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker, _currentBatchOrdinal, ResolveAssociationScope(in structurePath), stamp, observedAtMilliseconds));
+        var scopeId = ResolveAssociationScope(in structurePath);
+        if (HasPendingCompactAvoidance(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker, _currentBatchOrdinal, scopeId))
+            return true;
+
+        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker, _currentBatchOrdinal, scopeId, stamp, observedAtMilliseconds));
         TrimPending();
         return true;
+    }
+
+    private bool HasPendingCompactAvoidance(int sourceId, int targetId, int bodySkillVariantRaw, int marker, long batchOrdinal, int scopeId)
+    {
+        for (var i = _pendingCompact.Count - 1; i >= 0; i--)
+        {
+            var pending = _pendingCompact[i];
+            if (pending.SourceId == sourceId &&
+                pending.TargetId == targetId &&
+                pending.BodySkillVariantRaw == bodySkillVariantRaw &&
+                pending.Marker == marker &&
+                pending.BatchOrdinal == batchOrdinal &&
+                pending.ScopeId == scopeId)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private StampedCombatCanonicalizationBatch FinalizeBatch()
