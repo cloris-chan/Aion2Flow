@@ -99,6 +99,7 @@ public sealed class ResourcePackTests
     [InlineData(ResourceLanguage.English, 12240010, "Judgment", SkillCategory.Templar, SkillSourceType.PcSkill, "STR_SKILL_PC_TEMPLAR_12240010")]
     [InlineData(ResourceLanguage.TraditionalChinese, 17121450, "痊癒光輝", SkillCategory.Cleric, SkillSourceType.PcSkill, "STR_SKILL_PC_CLERIC_17121450")]
     [InlineData(ResourceLanguage.English, 11800008, "Murderous Burst", SkillCategory.Gladiator, SkillSourceType.PcSkill, "STR_SKILL_PC_GLADIATOR_11800008")]
+    [InlineData(ResourceLanguage.English, 19010000, "Flurry", SkillCategory.Brawler, SkillSourceType.PcSkill, "STR_SKILL_PC_FIGHTER_19010000")]
     [InlineData(ResourceLanguage.TraditionalChinese, 3001110, "神石：海格黛的束縛", SkillCategory.Item, SkillSourceType.ClientSkill, "SkillString_ITEM_3001110")]
     public void Skills_Expose_SkillDat_Based_Identity_With_Localized_Text(
         string language,
@@ -164,6 +165,7 @@ public sealed class ResourcePackTests
 
     [Theory]
     [InlineData(17040250, 17040000, 17040250, 17040000, 0b10010, 0, false)]
+    [InlineData(19010040, 19010000, 19010040, 19010000, 0b01000, 0, false)]
     [InlineData(1227237, 1227237, 1227237, 1227237, 0, 0, false)]
     [InlineData(12090230, 12090000, 12090230, 12090000, 0b00110, 0, true)]
     public void SkillDisplayProjections_Expose_Resource_Display_Projection(
@@ -192,6 +194,7 @@ public sealed class ResourcePackTests
     [InlineData(16030047, 16030000, 16030040, 16030000, 0b01000, 7)]
     [InlineData(16257000, 16107000, 16107000, 16250000, 0, 0)]
     [InlineData(18370047, 18370000, 18370000, 18370000, 0b01000, 7)]
+    [InlineData(19010047, 19010000, 19010040, 19010000, 0b01000, 7)]
     public void SkillDisplayProjections_Expose_Packet_Display_Projection(
         int skillCode,
         int expectedPresentationSkillId,

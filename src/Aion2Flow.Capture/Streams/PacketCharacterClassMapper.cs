@@ -6,7 +6,7 @@ internal static class PacketCharacterClassMapper
 {
     public static CharacterClass? ToCharacterClass(int? classCode)
     {
-        if (classCode is not { } code || code is < 5 or > 36)
+        if (classCode is not { } code || code is < 5 or > 40)
             return null;
 
         return ((code - 5) >> 2) switch
@@ -19,6 +19,7 @@ internal static class PacketCharacterClassMapper
             5 => CharacterClass.Sorcerer,
             6 => CharacterClass.Cleric,
             7 => CharacterClass.Chanter,
+            8 => CharacterClass.Brawler,
             _ => null
         };
     }

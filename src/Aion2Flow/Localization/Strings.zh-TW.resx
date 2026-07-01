@@ -107,6 +107,7 @@
   <data name="CharacterClass_Elementalist" xml:space="preserve"><value>精靈星</value></data>
   <data name="CharacterClass_Cleric" xml:space="preserve"><value>治癒星</value></data>
   <data name="CharacterClass_Chanter" xml:space="preserve"><value>護法星</value></data>
+  <data name="CharacterClass_Brawler" xml:space="preserve"><value>拳星</value></data>
 
   <!-- Aggregate metrics -->
   <data name="Metric_Total" xml:space="preserve"><value>總量</value></data>

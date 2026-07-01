@@ -107,6 +107,7 @@
   <data name="CharacterClass_Elementalist" xml:space="preserve"><value>Elementalist</value></data>
   <data name="CharacterClass_Cleric" xml:space="preserve"><value>Cleric</value></data>
   <data name="CharacterClass_Chanter" xml:space="preserve"><value>Chanter</value></data>
+  <data name="CharacterClass_Brawler" xml:space="preserve"><value>Brawler</value></data>
 
   <!-- Aggregate metrics (full names, used as labels and table headers) -->
   <data name="Metric_Total" xml:space="preserve"><value>Total</value></data>

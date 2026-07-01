@@ -1,5 +1,3 @@
-#nullable enable
-
 namespace Cloris.Aion2Flow.Resources.Generated;
 
 internal static class ResourcePackDecoder
@@ -9,5 +7,5 @@ internal static class ResourcePackDecoder
     public const ushort FormatVersion = 1;
     public const byte SharedPackKind = 1;
     public const byte LocalePackKind = 2;
-    public const byte StringMask = 0xCB;
+    public const byte StringMask = 0x70;
 }

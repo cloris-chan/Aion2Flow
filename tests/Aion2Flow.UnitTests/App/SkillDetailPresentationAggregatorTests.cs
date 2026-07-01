@@ -51,11 +51,13 @@ public sealed class SkillDetailPresentationAggregatorTests
     [Theory]
     [InlineData(11010047, 11010000)]
     [InlineData(16330027, 16330000)]
+    [InlineData(19010047, 19010000)]
     public void FromActionKey_Uses_Generated_Presentation_Relations(int skillCode, int expectedPresentationSkillCode)
     {
         SetSkillDisplayProjections(
             new SkillDisplayProjection(11010047, 11010000, 11010040, 11010000, 0b01000, 7, false),
-            new SkillDisplayProjection(16330027, 16330000, 16330020, 16330000, 0, 7, false));
+            new SkillDisplayProjection(16330027, 16330000, 16330020, 16330000, 0, 7, false),
+            new SkillDisplayProjection(19010047, 19010000, 19010040, 19010000, 0b01000, 7, false));
 
         var key = SkillPresentationKey.FromActionKey(new CombatActionKey(skillCode, default, default));
 
@@ -67,7 +69,7 @@ public sealed class SkillDetailPresentationAggregatorTests
     [InlineData(11000001)]
     [InlineData(16000047)]
     [InlineData(10_010_047)]
-    [InlineData(19_010_047)]
+    [InlineData(20_010_047)]
     public void FromActionKey_Preserves_Skills_Without_Presentation_Relation(int skillCode)
     {
         SetSkillDisplayProjections();

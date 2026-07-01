@@ -3,7 +3,7 @@ namespace Cloris.Aion2Flow.Protocol.Combat;
 public readonly record struct SkillVariantInfo(int SkillCode, int BaseSkillCode, int SpecializationDigits, int SpecializationMask, int VariantState)
 {
     private const int FirstStandardPlayerSkillCode = 11_000_000;
-    private const int LastStandardPlayerSkillCodeExclusive = 19_000_000;
+    private const int LastStandardPlayerSkillCodeExclusive = 20_000_000;
     private const int SkillFamilyScale = 10_000;
     private const int SpecialSkillGroupScale = 100;
 

@@ -11,4 +11,5 @@ public enum CharacterClass
     Elementalist,
     Cleric,
     Chanter,
+    Brawler,
 }

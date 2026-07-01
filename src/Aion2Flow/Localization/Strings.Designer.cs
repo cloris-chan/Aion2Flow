@@ -142,6 +142,15 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Brawler.
+        /// </summary>
+        internal static string CharacterClass_Brawler {
+            get {
+                return ResourceManager.GetString("CharacterClass_Brawler", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Chanter.
         /// </summary>
         internal static string CharacterClass_Chanter {

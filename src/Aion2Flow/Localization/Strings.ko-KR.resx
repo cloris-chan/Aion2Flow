@@ -107,6 +107,7 @@
   <data name="CharacterClass_Elementalist" xml:space="preserve"><value>정령성</value></data>
   <data name="CharacterClass_Cleric" xml:space="preserve"><value>치유성</value></data>
   <data name="CharacterClass_Chanter" xml:space="preserve"><value>호법성</value></data>
+  <data name="CharacterClass_Brawler" xml:space="preserve"><value>권성</value></data>
 
   <!-- Aggregate metrics -->
   <data name="Metric_Total" xml:space="preserve"><value>총량</value></data>

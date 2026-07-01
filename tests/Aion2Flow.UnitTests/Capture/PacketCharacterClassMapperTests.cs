@@ -22,6 +22,8 @@ public sealed class PacketCharacterClassMapperTests
     [InlineData(32, CharacterClass.Cleric)]
     [InlineData(33, CharacterClass.Chanter)]
     [InlineData(36, CharacterClass.Chanter)]
+    [InlineData(37, CharacterClass.Brawler)]
+    [InlineData(40, CharacterClass.Brawler)]
     public void Maps_PcMetadata_Class_Code_Bands(int code, CharacterClass expected)
     {
         Assert.Equal(expected, PacketCharacterClassMapper.ToCharacterClass(code));
@@ -30,7 +32,7 @@ public sealed class PacketCharacterClassMapperTests
     [Theory]
     [InlineData(null)]
     [InlineData(4)]
-    [InlineData(37)]
+    [InlineData(41)]
     public void Rejects_Out_Of_Band_Codes(int? code)
     {
         Assert.Null(PacketCharacterClassMapper.ToCharacterClass(code));

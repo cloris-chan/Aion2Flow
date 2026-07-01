@@ -14,6 +14,7 @@ public struct CombatantClassEvidence
     private int _elementalist;
     private int _cleric;
     private int _chanter;
+    private int _brawler;
 
     public void Add(CharacterClass characterClass, int score)
     {
@@ -46,6 +47,9 @@ public struct CombatantClassEvidence
             case CharacterClass.Chanter:
                 _chanter += score;
                 break;
+            case CharacterClass.Brawler:
+                _brawler += score;
+                break;
         }
     }
 
@@ -63,6 +67,7 @@ public struct CombatantClassEvidence
         Consider(CharacterClass.Elementalist, _elementalist, ref topClass, ref topScore, ref secondScore);
         Consider(CharacterClass.Cleric, _cleric, ref topClass, ref topScore, ref secondScore);
         Consider(CharacterClass.Chanter, _chanter, ref topClass, ref topScore, ref secondScore);
+        Consider(CharacterClass.Brawler, _brawler, ref topClass, ref topScore, ref secondScore);
 
         if (topClass is null || topScore < 4)
             return null;
@@ -127,6 +132,7 @@ public struct CombatantClassEvidence
             SkillCategory.Cleric => CharacterClass.Cleric,
             SkillCategory.Elementalist => CharacterClass.Elementalist,
             SkillCategory.Chanter => CharacterClass.Chanter,
+            SkillCategory.Brawler => CharacterClass.Brawler,
             _ => null,
         };
 }

@@ -8,6 +8,7 @@ public sealed class SkillVariantInfoTests
     [InlineData(16301450, 16300000, 145, 0b11001, 0)]
     [InlineData(17060003, 17060000, 0, 0, 3)]
     [InlineData(17440047, 17440000, 4, 0b01000, 7)]
+    [InlineData(19010047, 19010000, 4, 0b01000, 7)]
     public void Parses_Packet_Skill_Variant_Without_Resource_Data(int skillCode, int baseSkillCode, int specializationDigits, int specializationMask, int variantState)
     {
         var variant = SkillVariantInfo.Parse(skillCode);
@@ -37,8 +38,9 @@ public sealed class SkillVariantInfoTests
 
     [Theory]
     [InlineData(1218810)]
+    [InlineData(1901001)]
     [InlineData(11000001)]
-    [InlineData(19010047)]
+    [InlineData(20010047)]
     public void Parse_Preserves_NonStandard_Skill_Code_As_Opaque(int skillCode)
     {
         var variant = SkillVariantInfo.Parse(skillCode);
