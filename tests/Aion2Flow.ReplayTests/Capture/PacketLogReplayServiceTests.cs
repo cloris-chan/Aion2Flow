@@ -76,6 +76,32 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260702031011_Parses_Current0438_Damage_And_Modifier_Layout()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.Post20260701AssassinDirectDamage}"));
+
+        Assert.True(replay.ReplayedLines > 0);
+
+        const int playerId = 6455;
+        var player = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == playerId);
+        Assert.Equal(4_636_957, player.OutgoingDamage);
+        Assert.Equal(246, player.OutgoingHits);
+        Assert.Equal(246, player.OutgoingAttempts);
+        Assert.Equal(215, player.OutgoingCriticals);
+        Assert.Equal(38_083, player.OutgoingHealing);
+
+        var packets = SceneReplayTestView.Packets(replay);
+        AssertDamageSkill(packets, playerId, 13_040_250, 878_254, 64, 64, 13, 24, 0, 64, 20);
+        AssertDamageSkill(packets, playerId, 13_030_250, 759_018, 48, 48, 15, 20, 0, 48, 14);
+        AssertDamageSkill(packets, playerId, 13_800_007, 749_727, 28, 18, 11, 17, 0, 28, 0);
+        AssertDamageSkill(packets, playerId, 13_010_250, 748_340, 34, 34, 6, 16, 0, 34, 10);
+        AssertDamageSkill(packets, playerId, 13_351_450, 401_454, 4, 4, 0, 1, 0, 4, 4);
+        AssertDamageSkill(packets, playerId, 13_730_007, 22_706, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    [Fact]
     public void Replay_20260629175523_Classifies_HealingGlow_DirectValues_AsHealing()
     {
         CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
@@ -762,6 +788,43 @@ public sealed class PacketLogReplayServiceTests
     {
         Assert.True(counter.Elapsed >= TimeSpan.Zero);
         Assert.True(counter.AllocatedBytes >= 0);
+    }
+
+    private static void AssertDamageSkill(
+        IReadOnlyList<SceneReplayPacket> packets,
+        int sourceId,
+        int skillCode,
+        long expectedDamage,
+        int expectedHits,
+        int expectedCriticals,
+        int expectedPerfects,
+        int expectedSmites,
+        int expectedFronts,
+        int expectedBacks,
+        int expectedMultiHits)
+    {
+        var matching = packets
+            .Where(packet => packet.SourceId == sourceId && packet.SkillCode == skillCode && packet.ContributesDamage)
+            .ToArray();
+        var dump = string.Join(
+            Environment.NewLine,
+            matching.Select(static packet =>
+                $"t={packet.Timestamp} skill={packet.SkillCode} damage={packet.Damage} hits={packet.HitContribution} mods={packet.Modifiers} multi={packet.MultiHitCount} layout={packet.LayoutTag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16}"));
+
+        AssertMetric(matching.Sum(static packet => packet.Damage), expectedDamage, "damage", dump);
+        AssertMetric(matching.Sum(static packet => packet.HitContribution), expectedHits, "hits", dump);
+        AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.Critical)), expectedCriticals, "criticals", dump);
+        AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.Perfect)), expectedPerfects, "perfects", dump);
+        AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.Smite)), expectedSmites, "smites", dump);
+        AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.Front)), expectedFronts, "fronts", dump);
+        AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.Back)), expectedBacks, "backs", dump);
+        AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.MultiHit)), expectedMultiHits, "multiHits", dump);
+
+        static int CountHitsWith(SceneReplayPacket packet, DamageModifiers modifier)
+            => (packet.Modifiers & modifier) != 0 ? packet.HitContribution : 0;
+
+        static void AssertMetric(long actual, long expected, string name, string dump)
+            => Assert.True(actual == expected, $"{name}={actual} expected={expected}\n{dump}");
     }
 
     private static void AssertSnapshotParity(SceneCombatSnapshot expected, SceneCombatSnapshot actual)

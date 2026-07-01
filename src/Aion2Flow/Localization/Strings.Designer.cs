@@ -1384,6 +1384,15 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Front Attack.
+        /// </summary>
+        internal static string Stat_Front {
+            get {
+                return ResourceManager.GetString("Stat_Front", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Invincible.
         /// </summary>
         internal static string Stat_Invincible {

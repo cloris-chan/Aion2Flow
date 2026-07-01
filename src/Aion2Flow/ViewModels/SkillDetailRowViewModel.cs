@@ -27,6 +27,7 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
     public int Perfect { get; set => SetFrameProperty(ref field, value); }
     public int Smite { get; set => SetFrameProperty(ref field, value); }
     public int MultiHit { get; set => SetFrameProperty(ref field, value); }
+    public int Front { get; set => SetFrameProperty(ref field, value); }
     public int Endurance { get; set => SetFrameProperty(ref field, value); }
     public int Regeneration { get; set => SetFrameProperty(ref field, value); }
     public int Block { get; set => SetFrameProperty(ref field, value); }
@@ -39,6 +40,7 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
     public double PerfectRate { get; set => SetFrameProperty(ref field, value); }
     public double SmiteRate { get; set => SetFrameProperty(ref field, value); }
     public double MultiHitRate { get; set => SetFrameProperty(ref field, value); }
+    public double FrontRate { get; set => SetFrameProperty(ref field, value); }
     public double EnduranceRate { get; set => SetFrameProperty(ref field, value); }
     public double RegenerationRate { get; set => SetFrameProperty(ref field, value); }
     public double BlockRate { get; set => SetFrameProperty(ref field, value); }
@@ -58,6 +60,7 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         var perfectRate = data.Hits > 0 ? data.Perfect / (double)data.Hits : 0d;
         var smiteRate = data.Hits > 0 ? data.Smite / (double)data.Hits : 0d;
         var multiHitRate = data.Hits > 0 ? data.MultiHit / (double)data.Hits : 0d;
+        var frontRate = data.Hits > 0 ? data.Front / (double)data.Hits : 0d;
         var enduranceRate = data.Hits > 0 ? data.Endurance / (double)data.Hits : 0d;
         var regenerationRate = data.Hits > 0 ? data.Regeneration / (double)data.Hits : 0d;
         var blockRate = data.Hits > 0 ? data.Block / (double)data.Hits : 0d;
@@ -87,6 +90,7 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         Perfect = data.Perfect;
         Smite = data.Smite;
         MultiHit = data.MultiHit;
+        Front = data.Front;
         Endurance = data.Endurance;
         Regeneration = data.Regeneration;
         Block = data.Block;
@@ -99,6 +103,7 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         PerfectRate = perfectRate;
         SmiteRate = smiteRate;
         MultiHitRate = multiHitRate;
+        FrontRate = frontRate;
         EnduranceRate = enduranceRate;
         RegenerationRate = regenerationRate;
         BlockRate = blockRate;
@@ -166,6 +171,7 @@ public struct SkillDetailRowData
     public int Perfect;
     public int Smite;
     public int MultiHit;
+    public int Front;
     public int Endurance;
     public int Regeneration;
     public int Block;
@@ -200,6 +206,7 @@ public struct SkillDetailRowData
         Perfect += other.Perfect;
         Smite += other.Smite;
         MultiHit += other.MultiHit;
+        Front += other.Front;
         Endurance += other.Endurance;
         Regeneration += other.Regeneration;
         Block += other.Block;

@@ -36,6 +36,7 @@ public struct SkillMetrics(in CombatObservation observation)
     public int EvadeTimes { get; set; }
     public int InvincibleTimes { get; set; }
     public int MultiHitTimes { get; set; }
+    public int FrontTimes { get; set; }
     public int BackTimes { get; set; }
     public int PerfectTimes { get; set; }
     public int SmiteTimes { get; set; }
@@ -78,6 +79,7 @@ public struct SkillMetrics(in CombatObservation observation)
             EvadeTimes = EvadeTimes,
             InvincibleTimes = InvincibleTimes,
             MultiHitTimes = MultiHitTimes,
+            FrontTimes = FrontTimes,
             BackTimes = BackTimes,
             PerfectTimes = PerfectTimes,
             SmiteTimes = SmiteTimes,
@@ -102,6 +104,7 @@ public struct SkillMetrics(in CombatObservation observation)
         MultiHitTimes += contribution.MultiHitCount;
 
         if (hitContribution > 0 && (modifiers & DamageModifiers.Critical) != 0) CriticalTimes += hitContribution;
+        if (hitContribution > 0 && (modifiers & DamageModifiers.Front) != 0) FrontTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Back) != 0) BackTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Parry) != 0) ParryTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Smite) != 0) SmiteTimes += hitContribution;
@@ -293,6 +296,7 @@ public readonly record struct SkillMetricsSnapshot(
     int EvadeTimes,
     int InvincibleTimes,
     int MultiHitTimes,
+    int FrontTimes,
     int BackTimes,
     int PerfectTimes,
     int SmiteTimes,

@@ -136,6 +136,7 @@
   <data name="Stat_Perfect" xml:space="preserve"><value>완벽</value></data>
   <data name="Stat_Smite" xml:space="preserve"><value>강타</value></data>
   <data name="Stat_MultiHit" xml:space="preserve"><value>다단타격</value></data>
+  <data name="Stat_Front" xml:space="preserve"><value>전방 공격</value></data>
   <data name="Stat_Parry" xml:space="preserve"><value>무기막기</value></data>
   <data name="Stat_PerfectParry" xml:space="preserve"><value>완벽 무기 막기</value></data>
   <data name="Stat_Endurance" xml:space="preserve"><value>철벽</value></data>

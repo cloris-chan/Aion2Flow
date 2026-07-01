@@ -5,15 +5,16 @@ public enum DamageModifiers : ushort
 {
     None = 0,
     Back = 1 << 0,
-    Block = 1 << 1,
-    Parry = 1 << 2,
-    Perfect = 1 << 3,
-    Smite = 1 << 4,
-    Endurance = 1 << 5,
-    Regeneration = 1 << 6,
-    DefensivePerfect = 1 << 7,
-    MultiHit = 1 << 8,
-    Critical = 1 << 9,
-    Evade = 1 << 10,
-    Invincible = 1 << 11
+    Front = 1 << 1,
+    Block = 1 << 2,
+    Parry = 1 << 3,
+    Perfect = 1 << 4,
+    Smite = 1 << 5,
+    Endurance = 1 << 6,
+    Regeneration = 1 << 7,
+    DefensivePerfect = 1 << 8,
+    MultiHit = 1 << 9,
+    Critical = 1 << 10,
+    Evade = 1 << 11,
+    Invincible = 1 << 12
 }

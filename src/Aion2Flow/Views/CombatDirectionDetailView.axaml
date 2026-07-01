@@ -70,6 +70,10 @@
                                                       PrimaryValue="{Binding DamageSection.MultiHitCount}"
                                                       SecondaryValue="{Binding DamageSection.MultiHitRate}"
                                                       SecondaryUsePercentageNotation="True" />
+                            <controls:MetricSplitTile Label="{markups:Translate Stat_Front}"
+                                                      PrimaryValue="{Binding DamageSection.FrontCount}"
+                                                      SecondaryValue="{Binding DamageSection.FrontRate}"
+                                                      SecondaryUsePercentageNotation="True" />
                             <controls:MetricSplitTile Label="{markups:Translate Stat_Back}"
                                                       PrimaryValue="{Binding DamageSection.BackCount}"
                                                       SecondaryValue="{Binding DamageSection.BackRate}"
@@ -188,6 +192,7 @@
                                         <ColumnDefinition Width="86" />
                                         <ColumnDefinition Width="86" />
                                         <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="86" />
                                         <ColumnDefinition Width="90" />
                                         <ColumnDefinition Width="86" />
                                         <ColumnDefinition Width="90" />
@@ -229,32 +234,35 @@
                                                Text="{markups:Translate Stat_MultiHit}" />
                                     <TextBlock Grid.Column="10"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_Back}" />
+                                               Text="{markups:Translate Stat_Front}" />
                                     <TextBlock Grid.Column="11"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_Parry}" />
+                                               Text="{markups:Translate Stat_Back}" />
                                     <TextBlock Grid.Column="12"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_PerfectParry}" />
+                                               Text="{markups:Translate Stat_Parry}" />
                                     <TextBlock Grid.Column="13"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_Block}" />
+                                               Text="{markups:Translate Stat_PerfectParry}" />
                                     <TextBlock Grid.Column="14"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_PerfectBlock}" />
+                                               Text="{markups:Translate Stat_Block}" />
                                     <TextBlock Grid.Column="15"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_Endurance}" />
+                                               Text="{markups:Translate Stat_PerfectBlock}" />
                                     <TextBlock Grid.Column="16"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_Regeneration}" />
+                                               Text="{markups:Translate Stat_Endurance}" />
                                     <TextBlock Grid.Column="17"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_Evade}" />
+                                               Text="{markups:Translate Stat_Regeneration}" />
                                     <TextBlock Grid.Column="18"
                                                Classes="DetailTableHeader"
-                                               Text="{markups:Translate Stat_Invincible}" />
+                                               Text="{markups:Translate Stat_Evade}" />
                                     <TextBlock Grid.Column="19"
+                                               Classes="DetailTableHeader"
+                                               Text="{markups:Translate Stat_Invincible}" />
+                                    <TextBlock Grid.Column="20"
                                                Classes="DetailTableHeader"
                                                Text="{markups:Translate Column_Share}" />
                                 </Grid>
@@ -272,6 +280,7 @@
                                                     <ColumnDefinition Width="90" />
                                                     <ColumnDefinition Width="96" />
                                                     <ColumnDefinition Width="72" />
+                                                    <ColumnDefinition Width="86" />
                                                     <ColumnDefinition Width="86" />
                                                     <ColumnDefinition Width="86" />
                                                     <ColumnDefinition Width="86" />
@@ -352,13 +361,23 @@
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
+                                                                       Value="{Binding Front}" />
+                                                <TextBlock Classes="DetailMetricSlash"
+                                                           Text="/" />
+                                                <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
+                                                                       Value="{Binding FrontRate}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="11"
+                                                        Classes="DetailMetricPair"
+                                                        Margin="0,2">
+                                                <controls:NumericBlock Classes="DetailMetricValue"
                                                                        Value="{Binding Back}" />
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding BackRate}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="11"
+                                            <StackPanel Grid.Column="12"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
@@ -368,7 +387,7 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding ParryRate}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="12"
+                                            <StackPanel Grid.Column="13"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
@@ -378,7 +397,7 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding PerfectParryRate}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="13"
+                                            <StackPanel Grid.Column="14"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
@@ -388,7 +407,7 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding BlockRate}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="14"
+                                            <StackPanel Grid.Column="15"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
@@ -398,7 +417,7 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding PerfectBlockRate}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="15"
+                                            <StackPanel Grid.Column="16"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
@@ -408,7 +427,7 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding EnduranceRate}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="16"
+                                            <StackPanel Grid.Column="17"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
@@ -418,7 +437,7 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding RegenerationRate}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="17"
+                                            <StackPanel Grid.Column="18"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
@@ -428,7 +447,7 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding EvadeRate}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="18"
+                                            <StackPanel Grid.Column="19"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
                                                 <controls:NumericBlock Classes="DetailMetricValue"
@@ -438,7 +457,7 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding InvincibleRate}" />
                                             </StackPanel>
-                                            <controls:NumericBlock Grid.Column="19"
+                                            <controls:NumericBlock Grid.Column="20"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding SharePercent}"
                                                                    FractionDigits="1"

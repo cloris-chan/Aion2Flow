@@ -33,7 +33,70 @@ public sealed class Packet0438DamageParserTests
         Assert.Equal(2, parsed.Type);
     }
 
-    private static byte[] BuildFrame(int targetId, int sourceId, int layoutTag = 4, int flag = 0, int type = 2, int loop = 1)
+    [Fact]
+    public void TryParse_UsesLoopAsDamageForCurrentDetailLayout()
+    {
+        var packet = Convert.FromHexString("270438DFDF011604B7324A85C600F003840001F3108C4D01000000828601A56E0100B902");
+
+        Assert.True(Packet0438DamageParser.TryParse(packet, out var parsed));
+        Assert.Equal(13010250, parsed.BodySkillVariantRaw);
+        Assert.Equal(0x16, parsed.LayoutTag);
+        Assert.Equal(3, parsed.Type);
+        Assert.Equal(0, parsed.Unknown);
+        Assert.Equal(14117, parsed.Damage);
+        Assert.Equal(14117, parsed.Loop);
+        Assert.Equal(DamageModifiers.Critical | DamageModifiers.Perfect | DamageModifiers.Back, parsed.Modifiers & (DamageModifiers.Critical | DamageModifiers.Perfect | DamageModifiers.Smite | DamageModifiers.Back | DamageModifiers.Front));
+    }
+
+    [Fact]
+    public void TryParse_MapsCurrentDetailLayoutSmiteBackFlags()
+    {
+        var packet = Convert.FromHexString("240438DFDF010600B732C559D100F402080001C711C75101000000904EEB2F0100");
+
+        Assert.True(Packet0438DamageParser.TryParse(packet, out var parsed));
+        Assert.Equal(13720005, parsed.BodySkillVariantRaw);
+        Assert.Equal(0x06, parsed.LayoutTag);
+        Assert.Equal(2, parsed.Type);
+        Assert.Equal(0, parsed.Unknown);
+        Assert.Equal(6123, parsed.Damage);
+        Assert.Equal(6123, parsed.Loop);
+        Assert.Equal(DamageModifiers.Smite | DamageModifiers.Back, parsed.Modifiers & (DamageModifiers.Critical | DamageModifiers.Perfect | DamageModifiers.Smite | DamageModifiers.Back | DamageModifiers.Front));
+    }
+
+    [Fact]
+    public void TryParse_MapsCurrentDetailLayoutFrontFlag()
+    {
+        var packet = BuildFrame(
+            targetId: 200,
+            sourceId: 100,
+            layoutTag: 6,
+            flag: 0,
+            type: 3,
+            detail: [0x0c, 0, 0x02, 0, 0, 0, 0, 0, 0, 0],
+            unknown: 0,
+            damage: 17154,
+            loop: 4321);
+
+        Assert.True(Packet0438DamageParser.TryParse(packet, out var parsed));
+        Assert.Equal(4321, parsed.Damage);
+        Assert.Equal(4321, parsed.Loop);
+        Assert.Equal(DamageModifiers.Critical | DamageModifiers.Perfect | DamageModifiers.Smite | DamageModifiers.Front, parsed.Modifiers & (DamageModifiers.Critical | DamageModifiers.Perfect | DamageModifiers.Smite | DamageModifiers.Back | DamageModifiers.Front));
+    }
+
+    [Fact]
+    public void TryParse_KeepsDamageFieldForLegacyDetailLayout()
+    {
+        var packet = BuildFrame(targetId: 200, sourceId: 100, layoutTag: 4, loop: 777);
+
+        Assert.True(Packet0438DamageParser.TryParse(packet, out var parsed));
+        Assert.Equal(1395, parsed.Damage);
+        Assert.Equal(777, parsed.Loop);
+    }
+
+    private static byte[] BuildFrame(int targetId, int sourceId, int layoutTag = 4, int flag = 0, int type = 2, int loop = 1, int unknown = 1)
+        => BuildFrame(targetId, sourceId, layoutTag, flag, type, [0x57, 0, 0, 0, 0, 0, 0, 0], unknown, 1395, loop);
+
+    private static byte[] BuildFrame(int targetId, int sourceId, int layoutTag, int flag, int type, byte[] detail, int unknown, int damage, int loop)
     {
         var payload = new List<byte>
         {
@@ -47,9 +110,9 @@ public sealed class Packet0438DamageParserTests
         AppendUInt32Le(payload, 16_140_000);
         payload.Add(1);
         AppendVarInt(payload, type);
-        payload.AddRange([0x57, 0, 0, 0, 0, 0, 0, 0]);
-        AppendVarInt(payload, 1);
-        AppendVarInt(payload, 1395);
+        payload.AddRange(detail);
+        AppendVarInt(payload, unknown);
+        AppendVarInt(payload, damage);
         AppendVarInt(payload, loop);
 
         var frame = new List<byte>(payload.Count + 1);

@@ -34,6 +34,7 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
     public int PerfectCount { get; set => SetFrameProperty(ref field, value); }
     public int SmiteCount { get; set => SetFrameProperty(ref field, value); }
     public int MultiHitCount { get; set => SetFrameProperty(ref field, value); }
+    public int FrontCount { get; set => SetFrameProperty(ref field, value); }
     public int BackCount { get; set => SetFrameProperty(ref field, value); }
     public int ParryCount { get; set => SetFrameProperty(ref field, value); }
     public int BlockCount { get; set => SetFrameProperty(ref field, value); }
@@ -54,6 +55,7 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
     public double CriticalRate { get; set => SetFrameProperty(ref field, value); }
     public double SmiteRate { get; set => SetFrameProperty(ref field, value); }
     public double MultiHitRate { get; set => SetFrameProperty(ref field, value); }
+    public double FrontRate { get; set => SetFrameProperty(ref field, value); }
     public double ParryRate { get; set => SetFrameProperty(ref field, value); }
     public double PerfectRate { get; set => SetFrameProperty(ref field, value); }
     public double PerfectParryRate { get; set => SetFrameProperty(ref field, value); }
@@ -150,6 +152,7 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         PerfectCount = 0;
         SmiteCount = 0;
         MultiHitCount = 0;
+        FrontCount = 0;
         BackCount = 0;
         ParryCount = 0;
         BlockCount = 0;
@@ -168,6 +171,7 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         CriticalRate = 0d;
         SmiteRate = 0d;
         MultiHitRate = 0d;
+        FrontRate = 0d;
         ParryRate = 0d;
         PerfectRate = 0d;
         PerfectParryRate = 0d;

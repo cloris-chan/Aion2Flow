@@ -136,6 +136,7 @@
   <data name="Stat_Perfect" xml:space="preserve"><value>完美</value></data>
   <data name="Stat_Smite" xml:space="preserve"><value>強擊</value></data>
   <data name="Stat_MultiHit" xml:space="preserve"><value>多段打擊</value></data>
+  <data name="Stat_Front" xml:space="preserve"><value>前方</value></data>
   <data name="Stat_Parry" xml:space="preserve"><value>武器格擋</value></data>
   <data name="Stat_PerfectParry" xml:space="preserve"><value>完美武器格擋</value></data>
   <data name="Stat_Endurance" xml:space="preserve"><value>鐵壁</value></data>

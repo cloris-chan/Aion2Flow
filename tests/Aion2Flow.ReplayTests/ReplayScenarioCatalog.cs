@@ -31,6 +31,7 @@ public static class ReplayScenarioCatalog
     public const string GroupDirectHealing = "aion2flow.stream.20260629001019.log";
     public const string RangerGroundEffectOwnerAttribution = "aion2flow.stream.20260629212808.log";
     public const string SorcererGroundEffectOwnerAttribution = "aion2flow.stream.20260629212454.log";
+    public const string Post20260701AssassinDirectDamage = "aion2flow.stream.20260702031011.log";
 
     public static IEnumerable<object[]> April11IncomingAvoidance =>
     [

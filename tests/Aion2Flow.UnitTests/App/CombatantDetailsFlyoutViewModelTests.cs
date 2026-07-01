@@ -711,7 +711,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
 
         scene.AppendNickname(playerId, "Perigee");
 
-        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3, modifiers: DamageModifiers.Back | DamageModifiers.Smite);
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 500, 1_000, CombatEventKind.Damage, CombatValueKind.Damage, type: 3, modifiers: DamageModifiers.Front | DamageModifiers.Back | DamageModifiers.Smite);
         AppendPacket(scene.Sink, playerId, bossId, 11000010, 400, 2_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.Perfect);
         AppendPacket(scene.Sink, playerId, bossId, 11000010, 300, 3_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Endurance);
         AppendPacket(scene.Sink, playerId, bossId, 11000010, 200, 4_000, CombatEventKind.Damage, CombatValueKind.Damage, modifiers: DamageModifiers.Parry | DamageModifiers.DefensivePerfect);
@@ -730,12 +730,14 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AssertModifierValues(row.Parry, row.ParryRate, 2, 6);
         AssertModifierValues(row.PerfectParry, row.PerfectParryRate, 1, 6);
         AssertModifierValues(row.Endurance, row.EnduranceRate, 1, 6);
+        AssertModifierValues(row.Front, row.FrontRate, 1, 6);
         AssertModifierValues(row.Back, row.BackRate, 1, 6);
         AssertModifierValues(row.Block, row.BlockRate, 2, 6);
         AssertModifierValues(row.PerfectBlock, row.PerfectBlockRate, 1, 6);
         AssertModifierValues(row.Evades, row.EvadeRate, 0, 6);
         AssertModifierValues(viewModel.OutgoingDamage.ParryCount, viewModel.OutgoingDamage.ParryRate, 2, 6);
         AssertModifierValues(viewModel.OutgoingDamage.PerfectParryCount, viewModel.OutgoingDamage.PerfectParryRate, 1, 6);
+        AssertModifierValues(viewModel.OutgoingDamage.FrontCount, viewModel.OutgoingDamage.FrontRate, 1, 6);
         AssertModifierValues(viewModel.OutgoingDamage.BlockCount, viewModel.OutgoingDamage.BlockRate, 2, 6);
         AssertModifierValues(viewModel.OutgoingDamage.PerfectBlockCount, viewModel.OutgoingDamage.PerfectBlockRate, 1, 6);
     }

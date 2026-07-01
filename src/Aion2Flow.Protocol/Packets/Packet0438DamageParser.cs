@@ -55,7 +55,8 @@ internal static class Packet0438DamageParser
         }
 
         var detailSlice = payload.Slice(reader.Offset, detailLength);
-        var modifiers = ParseDamageModifiers(detailSlice, type);
+        var detailLayoutKey = Packet0438Layout.GetDetailLayoutKey(layoutTag);
+        var modifiers = ParseDamageModifiers(detailSlice, detailLayoutKey, type);
         var (regenAmount, detailRaw) = ExtractRegenerationAmount(detailSlice, modifiers);
         var detailResourceEffectRef = ResourceEffectRef.FromDetail(detailSlice);
         var resourceKind = ExtractResourceKind(detailSlice);
@@ -66,11 +67,7 @@ internal static class Packet0438DamageParser
         if (!reader.TryReadVarInt(out var loop)) return false;
         if (loop < 0) return false;
 
-        if (unknown == 0 && damage == 10000)
-        {
-            damage = loop;
-            loop = 0;
-        }
+        damage = ResolveDamageValue(detailLayoutKey, unknown, damage, loop);
 
         var multiHitCount = 0;
         var drainHealAmount = ParseTail(ref reader, layoutTag, loop, out var multiHitAmounts);
@@ -235,7 +232,15 @@ internal static class Packet0438DamageParser
         };
     }
 
-    private static DamageModifiers ParseDamageModifiers(ReadOnlySpan<byte> detail, int type)
+    private static int ResolveDamageValue(int detailLayoutKey, int unknown, int damage, int loop)
+    {
+        if (unknown == 0 && loop > 0 && detailLayoutKey == 0x06)
+            return loop;
+
+        return damage;
+    }
+
+    private static DamageModifiers ParseDamageModifiers(ReadOnlySpan<byte> detail, int detailLayoutKey, int type)
     {
         DamageModifiers modifiers = DamageModifiers.None;
         if (type == 3)
@@ -245,6 +250,18 @@ internal static class Packet0438DamageParser
 
         if (detail.Length == 8) return modifiers;
         if (detail.Length < 10) return modifiers;
+
+        if (detailLayoutKey == 0x06)
+        {
+            var actionFlags = detail[0];
+            if ((actionFlags & 0x04) != 0) modifiers |= DamageModifiers.Perfect;
+            if ((actionFlags & 0x08) != 0) modifiers |= DamageModifiers.Smite;
+
+            var directionFlags = detail[2];
+            if ((directionFlags & 0x01) != 0) modifiers |= DamageModifiers.Back;
+            if ((directionFlags & 0x02) != 0) modifiers |= DamageModifiers.Front;
+            return modifiers;
+        }
 
         var flagByte = detail[0];
         if ((flagByte & 0x01) != 0) modifiers |= DamageModifiers.Back;

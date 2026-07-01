@@ -560,6 +560,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         section.PerfectCount = 0;
         section.SmiteCount = 0;
         section.MultiHitCount = 0;
+        section.FrontCount = 0;
         section.BackCount = 0;
         section.ParryCount = 0;
         section.BlockCount = 0;
@@ -574,6 +575,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         section.CriticalRate = 0d;
         section.SmiteRate = 0d;
         section.MultiHitRate = 0d;
+        section.FrontRate = 0d;
         section.ParryRate = 0d;
         section.PerfectRate = 0d;
         section.PerfectParryRate = 0d;
@@ -590,7 +592,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     {
         long total = 0, directTotal = 0, periodicTotal = 0;
         int totalHits = 0, totalAttempts = 0, totalPeriodicHits = 0;
-        int critical = 0, perfect = 0, smite = 0, multiHit = 0;
+        int critical = 0, perfect = 0, smite = 0, multiHit = 0, front = 0;
         int parry = 0, block = 0, endurance = 0, regeneration = 0, back = 0;
         int perfectParry = 0, perfectBlock = 0;
         int evades = 0, invincible = 0;
@@ -609,6 +611,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             perfect += skill.PerfectTimes;
             smite += skill.SmiteTimes;
             multiHit += skill.MultiHitTimes;
+            front += skill.FrontTimes;
             parry += skill.ParryTimes;
             block += skill.BlockTimes;
             perfectParry += skill.PerfectParryTimes;
@@ -631,6 +634,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         section.PerfectCount = perfect;
         section.SmiteCount = smite;
         section.MultiHitCount = multiHit;
+        section.FrontCount = front;
         section.BackCount = back;
         section.ParryCount = parry;
         section.BlockCount = block;
@@ -646,6 +650,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         section.PerfectRate = totalHits > 0 ? perfect / (double)totalHits : 0d;
         section.SmiteRate = totalHits > 0 ? smite / (double)totalHits : 0d;
         section.MultiHitRate = totalHits > 0 ? multiHit / (double)totalHits : 0d;
+        section.FrontRate = totalHits > 0 ? front / (double)totalHits : 0d;
         section.ParryRate = totalHits > 0 ? parry / (double)totalHits : 0d;
         section.BlockRate = totalHits > 0 ? block / (double)totalHits : 0d;
         section.PerfectParryRate = totalHits > 0 ? perfectParry / (double)totalHits : 0d;
@@ -765,6 +770,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
                 Perfect = skill.PerfectTimes,
                 Smite = skill.SmiteTimes,
                 MultiHit = skill.MultiHitTimes,
+                Front = skill.FrontTimes,
                 Endurance = skill.EnduranceTimes,
                 Regeneration = skill.RegenerationTimes,
                 Block = skill.BlockTimes,

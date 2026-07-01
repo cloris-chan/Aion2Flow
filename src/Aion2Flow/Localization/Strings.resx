@@ -136,6 +136,7 @@
   <data name="Stat_Perfect" xml:space="preserve"><value>Perfect</value></data>
   <data name="Stat_Smite" xml:space="preserve"><value>Smite</value></data>
   <data name="Stat_MultiHit" xml:space="preserve"><value>Multi-Hit</value></data>
+  <data name="Stat_Front" xml:space="preserve"><value>Front Attack</value></data>
   <data name="Stat_Parry" xml:space="preserve"><value>Weapon Parry</value></data>
   <data name="Stat_PerfectParry" xml:space="preserve"><value>Perfect Weapon Parry</value></data>
   <data name="Stat_Endurance" xml:space="preserve"><value>Endurance</value></data>
