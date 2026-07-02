@@ -46,7 +46,7 @@ internal static class Packet2933LegionMetadataParser
         }
 
         reader.TryAdvance(sizeof(ushort));
-        if (!NicknameParserUtil.TryReadLengthPrefixedIdentityText(payload, reader.Offset, strict: true, out var legionName, out _, out var tailOffset))
+        if (!NicknameParserUtil.TryReadLengthPrefixedIdentityText(payload, reader.Offset, out var legionName, out _, out var tailOffset))
         {
             return false;
         }

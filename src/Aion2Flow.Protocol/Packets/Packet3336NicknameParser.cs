@@ -30,7 +30,7 @@ internal static class Packet3336NicknameParser
 
         if (!reader.TryReadVarInt(out var playerId)) return false;
         if (!TryReadNamePreamble(ref reader)) return false;
-        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, reader.Offset, strict: true, out var sanitizedName, out var nicknameLength, out var tailOffset)) return false;
+        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, reader.Offset, out var sanitizedName, out var nicknameLength, out var tailOffset)) return false;
         if (!NicknameParserUtil.TryReadOriginServerIdLe16(payload, tailOffset, out var originServerId)) return false;
 
         var postServerOffset = tailOffset + sizeof(ushort);

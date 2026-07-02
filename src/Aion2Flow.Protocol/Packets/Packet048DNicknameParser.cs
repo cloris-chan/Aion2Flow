@@ -50,7 +50,7 @@ internal static class Packet048DNicknameParser
     private static bool TryParseNicknameAt(ReadOnlySpan<byte> payload, int nameLengthOffset, int? originServerId, int playerId, out Packet048DNickname result)
     {
         result = default;
-        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, nameLengthOffset, strict: true, out var nickname, out var nicknameLength, out var tailOffset))
+        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, nameLengthOffset, out var nickname, out var nicknameLength, out var tailOffset))
         {
             return false;
         }

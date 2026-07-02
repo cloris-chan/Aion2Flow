@@ -8,7 +8,7 @@ internal static class PacketIdentityTrailerParser
         factionCode = 0;
         tailOffset = 0;
 
-        if (!NicknameParserUtil.TryReadLengthPrefixedIdentityText(payload, offset, strict: true, out var parsedLegionName, out _, out var legionTail) ||
+        if (!NicknameParserUtil.TryReadLengthPrefixedIdentityText(payload, offset, out var parsedLegionName, out _, out var legionTail) ||
             legionTail + 1 >= payload.Length ||
             payload[legionTail + 1] != 0x00)
         {

@@ -7,10 +7,10 @@ internal static class NicknameParserUtil
 {
     public const int MaxNicknameLength = 72;
 
-    public static bool TryReadLengthPrefixedNickname(ReadOnlySpan<byte> packet, int lengthOffset, bool strict, out string nickname, out int nicknameLength, out int tailOffset)
-        => TryReadLengthPrefixedIdentityText(packet, lengthOffset, strict, out nickname, out nicknameLength, out tailOffset);
+    public static bool TryReadLengthPrefixedNickname(ReadOnlySpan<byte> packet, int lengthOffset, out string nickname, out int nicknameLength, out int tailOffset)
+        => TryReadLengthPrefixedIdentityText(packet, lengthOffset, out nickname, out nicknameLength, out tailOffset);
 
-    public static bool TryReadLengthPrefixedIdentityText(ReadOnlySpan<byte> packet, int lengthOffset, bool strict, out string text, out int textLength, out int tailOffset)
+    public static bool TryReadLengthPrefixedIdentityText(ReadOnlySpan<byte> packet, int lengthOffset, out string text, out int textLength, out int tailOffset)
     {
         text = string.Empty;
         textLength = 0;
@@ -34,7 +34,7 @@ internal static class NicknameParserUtil
         }
 
         var decoded = Encoding.UTF8.GetString(packet.Slice(textOffset, textLength));
-        var sanitized = strict ? NicknameSanitizer.SanitizeStrict(decoded) : NicknameSanitizer.Sanitize(decoded);
+        var sanitized = NicknameSanitizer.SanitizeExact(decoded);
         if (sanitized is null)
         {
             return false;
@@ -70,7 +70,7 @@ internal static class NicknameParserUtil
         }
 
         var legionNameLengthOffset = repeatedServerOffset + sizeof(ushort);
-        if (!TryReadLengthPrefixedIdentityText(packet, legionNameLengthOffset, strict: true, out var parsedLegionName, out _, out var tailOffset) ||
+        if (!TryReadLengthPrefixedIdentityText(packet, legionNameLengthOffset, out var parsedLegionName, out _, out var tailOffset) ||
             !IsLegionIdentityTrailer(packet, tailOffset, trailerKind))
         {
             originServerId = 0;

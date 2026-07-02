@@ -31,7 +31,7 @@ internal static class Packet4536PcMetadataParser
             return false;
         }
 
-        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, reader.Offset, strict: true, out var sanitizedName, out var nicknameLength, out var tailOffset))
+        if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, reader.Offset, out var sanitizedName, out var nicknameLength, out var tailOffset))
         {
             return false;
         }
@@ -54,7 +54,7 @@ internal static class Packet4536PcMetadataParser
         while (reader.Remaining > 0)
         {
             if (reader.RemainingSpan[0] == 0x07 &&
-                NicknameParserUtil.TryReadLengthPrefixedNickname(payload, reader.Offset + 1, strict: true, out _, out _, out var tailOffset) &&
+                NicknameParserUtil.TryReadLengthPrefixedNickname(payload, reader.Offset + 1, out _, out _, out var tailOffset) &&
                 NicknameParserUtil.TryReadClassCode(payload, tailOffset) is not null)
             {
                 return reader.TryAdvance(1);
@@ -164,7 +164,7 @@ internal static class Packet4536PcMetadataParser
             return false;
         }
 
-        if (!NicknameParserUtil.TryReadLengthPrefixedIdentityText(payload, offset + reader.Offset, strict: true, out var parsedLegionName, out _, out var textTailOffset))
+        if (!NicknameParserUtil.TryReadLengthPrefixedIdentityText(payload, offset + reader.Offset, out var parsedLegionName, out _, out var textTailOffset))
         {
             return false;
         }

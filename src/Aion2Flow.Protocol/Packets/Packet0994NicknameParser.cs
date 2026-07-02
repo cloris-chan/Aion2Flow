@@ -112,7 +112,7 @@ internal static class Packet0994NicknameParser
         if (nameOffset + nicknameLength > packet.Length) return false;
 
         var nicknameSpan = packet.Slice(nameOffset, nicknameLength);
-        var sanitizedName = NicknameSanitizer.SanitizeStrict(Encoding.UTF8.GetString(nicknameSpan));
+        var sanitizedName = NicknameSanitizer.SanitizeExact(Encoding.UTF8.GetString(nicknameSpan));
         if (sanitizedName is null) return false;
 
         nickname = sanitizedName;
