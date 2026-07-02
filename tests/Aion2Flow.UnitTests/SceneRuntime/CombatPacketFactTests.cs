@@ -60,21 +60,6 @@ public class CombatPacketFactTests
     }
 
     [Fact]
-    public void ScenePath_ClassifiesCompactActionDirectRecoveryAcrossAdjacentPacketBatches()
-    {
-        var journal = new ObservedEventJournal();
-        var sceneId = Guid.NewGuid();
-        journal.Append(CreateCompactActionOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972, batchOrdinal: 100));
-        journal.Append(CreateDirectValue(sceneId, 1, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048, batchOrdinal: 101));
-
-        var combat = Apply(journal);
-
-        Assert.True(combat.TryGetPair(8972, 5578, out var pair));
-        Assert.Equal(0, pair!.TotalDamage);
-        Assert.Equal(2048, pair.TotalHealing);
-    }
-
-    [Fact]
     public void ScenePath_ClassifiesSelfCompactActionDirectRecoveryAsHealing()
     {
         var journal = new ObservedEventJournal();

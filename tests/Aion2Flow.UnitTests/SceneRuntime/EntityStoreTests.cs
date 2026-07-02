@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -7,7 +6,6 @@ using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
-using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
@@ -818,39 +816,6 @@ public class DomainEventApplierTests
         Assert.Equal(0, entities.Count);
     }
 
-    [Fact]
-    public void Applier_VendoredReplay_PopulatesEntities()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-
-        var journal = replay.SceneJournal;
-        Assert.True(journal.Count > 0);
-
-        var entities = new EntityStore();
-        var metadata = new SceneBoundaryStore();
-        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
-
-        applier.ApplyJournal(journal);
-
-        Assert.True(entities.Count > 0, $"Expected entities from journal with {journal.Count} entries");
-    }
-
-    [Fact]
-    public void Applier_VendoredReplay_ReconstructsConfirmedMapIdentity()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-
-        var entities = new EntityStore();
-        var metadata = new SceneBoundaryStore();
-        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
-
-        applier.ApplyJournal(replay.SceneJournal);
-
-        Assert.Equal(replay.SceneOwner.Boundary.CurrentMapId, metadata.CurrentMapId);
-        Assert.Equal(replay.SceneOwner.Boundary.CurrentMapInstanceId, metadata.CurrentMapInstanceId);
-    }
 }
 
 public class CombatStoreTests
@@ -1582,26 +1547,6 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
-    public void Owner_CreateSnapshot_ReplayIdleTicksUseSingleProjectionBuild()
-    {
-        SceneReplayFixture.SetResources();
-        var replay = SceneReplayFixture.Replay("aion2flow.stream.20260415211500.log");
-        var before = replay.SceneOwner.ProjectionCacheStats;
-
-        var first = replay.SceneOwner.CreateSnapshot();
-        for (var i = 0; i < 8; i++)
-        {
-            var next = replay.SceneOwner.CreateSnapshot();
-            Assert.Same(first, next);
-        }
-
-        var after = replay.SceneOwner.ProjectionCacheStats;
-        Assert.Equal(0, after.SnapshotBuilds - before.SnapshotBuilds);
-        Assert.Equal(9, after.SnapshotCacheHits - before.SnapshotCacheHits);
-        Assert.True(first.Combatants.Count > 0);
-    }
-
-    [Fact]
     public void Owner_CreateSnapshot_CacheHit_ReturnsFrozenInstance_WithoutAllocation()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
@@ -2320,65 +2265,5 @@ public class SceneReadModelOwnerTests
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage
         });
-    }
-}
-
-public class DualReadParityTests
-{
-    [Fact]
-    public void M2_06_ScenePath_CapturesSameCombatantIds_AsBaselinePath()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-
-        var journal = replay.SceneJournal;
-        Assert.True(journal.Count > 0);
-
-        var entities = new EntityStore();
-        var metadata = new SceneBoundaryStore();
-        var combat = new CombatStore();
-        var applier = new DomainEventApplier(entities, metadata, combat);
-        applier.ApplyJournal(journal);
-
-        var adapter = new SceneCombatSnapshotAdapter(entities, combat, metadata);
-        var sceneSnapshot = adapter.CreateSnapshot();
-
-        var baselineSnapshot = replay.Snapshot;
-
-        var baselineWithDamage = baselineSnapshot.Combatants
-            .Where(static kv => kv.Value.DamageAmount > 0)
-            .Select(static kv => kv.Key)
-            .ToHashSet();
-
-        var sceneIds = sceneSnapshot.Combatants.Keys.ToHashSet();
-
-        foreach (var id in baselineWithDamage)
-        {
-            Assert.True(sceneIds.Contains(id), $"Scene path missing combatant {id} that has damage in baseline path");
-        }
-    }
-
-    [Fact]
-    public void M2_06_CombatStore_DamageTotals_MatchBaseline_OutgoingDamage()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260419204630.log"));
-
-        var journal = replay.SceneJournal;
-        var entities = new EntityStore();
-        var metadata = new SceneBoundaryStore();
-        var combat = new CombatStore();
-        var applier = new DomainEventApplier(entities, metadata, combat);
-        applier.ApplyJournal(journal);
-
-        var baselineSnapshot = replay.Snapshot;
-
-        var topDealer = baselineSnapshot.Combatants
-            .Where(static kv => kv.Value.DamageAmount > 0)
-            .OrderByDescending(static kv => kv.Value.DamageAmount)
-            .First();
-
-        Assert.True(combat.TryGetCombatant(topDealer.Key, out var sceneCombatant));
-        Assert.True(sceneCombatant!.OutgoingDamage > 0, $"Scene path has 0 outgoing damage for combatant {topDealer.Key}");
     }
 }

@@ -133,7 +133,7 @@ public sealed class Packet0438DamageParserTests
     }
 
     [Fact]
-    public void TryParse_KeepsDamageFieldForLegacyDetailLayout()
+    public void TryParse_UsesDamageFieldForEightByteDetailLayout()
     {
         var packet = BuildFrame(targetId: 200, sourceId: 100, layoutTag: 4, loop: 777);
 

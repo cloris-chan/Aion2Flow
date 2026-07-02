@@ -138,26 +138,26 @@ public sealed class CompactAvoidanceCanonicalizer
 
     private void CancelPendingCompactEvade(int sourceId, int targetId, int marker, int scopeId)
     {
-        var fallbackBatchOrdinal = _currentBatchOrdinal;
+        var currentBatchOrdinal = _currentBatchOrdinal;
         for (var i = _pendingCompact.Count - 1; i >= 0; i--)
         {
             var pending = _pendingCompact[i];
             if (pending.SourceId == sourceId &&
                 pending.TargetId == targetId &&
                 pending.Marker == marker &&
-                MatchesScopeOrFallbackBatch(in pending, scopeId, fallbackBatchOrdinal))
+                MatchesScopeOrCurrentBatch(in pending, scopeId, currentBatchOrdinal))
             {
                 _pendingCompact.RemoveAt(i);
             }
         }
     }
 
-    private static bool MatchesScopeOrFallbackBatch(in PendingCompactAvoidance pending, int scopeId, long fallbackBatchOrdinal)
+    private static bool MatchesScopeOrCurrentBatch(in PendingCompactAvoidance pending, int scopeId, long currentBatchOrdinal)
     {
         if (pending.ScopeId > 0 && scopeId > 0)
             return pending.ScopeId == scopeId;
 
-        return fallbackBatchOrdinal > 0 && pending.BatchOrdinal == fallbackBatchOrdinal;
+        return currentBatchOrdinal > 0 && pending.BatchOrdinal == currentBatchOrdinal;
     }
 
     private void TrimPending()

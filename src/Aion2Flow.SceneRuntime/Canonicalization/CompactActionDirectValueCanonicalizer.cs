@@ -11,12 +11,11 @@ public sealed class CompactActionDirectValueCanonicalizer
     private const int MaxPendingValues = 256;
     private const int MaxPendingSidecars = 256;
     private const int MaxConfirmedInlineRecoveryGroups = 128;
-    private const long MaxLooseAssociationOrdinalDistance = 128;
 
-    internal readonly record struct PendingCompactActionOpener(int SourceId, uint BodyCodeRaw, int Marker, int Mode, int Flag, int EchoSourceId, long BatchOrdinal, int ScopeId, long ObservationOrdinal);
-    internal readonly record struct PendingCompactActionValue(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, long BatchOrdinal, int ScopeId, long ObservationOrdinal, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
-    internal readonly record struct PendingCompactActionSidecar(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, long BatchOrdinal, int ScopeId, long ObservationOrdinal);
-    internal readonly record struct PendingCompactActionInlineRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, long BatchOrdinal, int ScopeId, long ObservationOrdinal);
+    internal readonly record struct PendingCompactActionOpener(int SourceId, uint BodyCodeRaw, int Marker, int Mode, int Flag, int EchoSourceId, long BatchOrdinal, int ScopeId);
+    internal readonly record struct PendingCompactActionValue(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, long BatchOrdinal, int ScopeId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
+    internal readonly record struct PendingCompactActionSidecar(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, long BatchOrdinal, int ScopeId);
+    internal readonly record struct PendingCompactActionInlineRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, long BatchOrdinal, int ScopeId);
 
     private readonly List<PendingCompactActionOpener> _pendingOpeners = new(MaxPendingOpeners);
     private readonly List<PendingCompactActionValue> _pendingValues = new(MaxPendingValues);
@@ -33,7 +32,7 @@ public sealed class CompactActionDirectValueCanonicalizer
 
         var bodyCodeRaw = unchecked((uint)observation.BodySkillVariantRaw);
         var scopeId = ResolveAssociationScope(in structurePath);
-        if (TryFindActionOpener(sourceId, bodyCodeRaw, observation.Marker, stamp.BatchOrdinal, scopeId, stamp.ObservationOrdinal, out var opener))
+        if (TryFindActionOpener(sourceId, bodyCodeRaw, observation.Marker, stamp.BatchOrdinal, scopeId, out var opener))
         {
             if (!MatchesRecoveryOpener(in opener, sourceId) && targetId == sourceId)
                 return ObservePendingCompactValue(sourceId, targetId, bodyCodeRaw, in stamp, in observation, scopeId, observedAtMilliseconds, out results);
@@ -43,7 +42,7 @@ public sealed class CompactActionDirectValueCanonicalizer
             return true;
         }
 
-        if (TryFindInlineRecoveryGroup(sourceId, bodyCodeRaw, observation.Marker, stamp.BatchOrdinal, scopeId, stamp.ObservationOrdinal, out _))
+        if (TryFindInlineRecoveryGroup(sourceId, bodyCodeRaw, observation.Marker, stamp.BatchOrdinal, scopeId, out _))
         {
             results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, NormalizeAsHealing(in observation)));
             return true;
@@ -54,7 +53,7 @@ public sealed class CompactActionDirectValueCanonicalizer
 
     private bool ObservePendingCompactValue(int sourceId, int targetId, uint bodyCodeRaw, in TimelineStamp stamp, in CombatObservation observation, int scopeId, long observedAtMilliseconds, out StampedCombatCanonicalizationBatch results)
     {
-        var pending = new PendingCompactActionValue(sourceId, targetId, bodyCodeRaw, observation.Marker, stamp.BatchOrdinal, scopeId, stamp.ObservationOrdinal, stamp, observedAtMilliseconds, observation);
+        var pending = new PendingCompactActionValue(sourceId, targetId, bodyCodeRaw, observation.Marker, stamp.BatchOrdinal, scopeId, stamp, observedAtMilliseconds, observation);
         _pendingValues.Add(pending);
         results = targetId == sourceId && TryConfirmInlineRecoveryGroupFromSelfValue(in pending, out var group)
             ? FlushValuesMatchedBy(in group)
@@ -68,7 +67,7 @@ public sealed class CompactActionDirectValueCanonicalizer
         if (!IsInlineDirectActionSidecarShape(in observation))
             return StampedCombatCanonicalizationBatch.Empty;
 
-        var sidecar = new PendingCompactActionSidecar(sourceId, targetId, unchecked((uint)observation.BodySkillVariantRaw), observation.Marker, stamp.BatchOrdinal, ResolveAssociationScope(in structurePath), stamp.ObservationOrdinal);
+        var sidecar = new PendingCompactActionSidecar(sourceId, targetId, unchecked((uint)observation.BodySkillVariantRaw), observation.Marker, stamp.BatchOrdinal, ResolveAssociationScope(in structurePath));
         _pendingSidecars.Add(sidecar);
         TrimPendingSidecars();
         return targetId == sourceId && TryConfirmInlineRecoveryGroupFromSelfSidecar(in sidecar, out var group)
@@ -81,7 +80,7 @@ public sealed class CompactActionDirectValueCanonicalizer
         if (!IsCompactActionOpener(sourceId, in observation))
             return StampedCombatCanonicalizationBatch.Empty;
 
-        var opener = new PendingCompactActionOpener(sourceId, observation.BodyCodeRaw, observation.Marker, observation.Type, observation.Flag, observation.ChainId, stamp.BatchOrdinal, ResolveAssociationScope(in structurePath), stamp.ObservationOrdinal);
+        var opener = new PendingCompactActionOpener(sourceId, observation.BodyCodeRaw, observation.Marker, observation.Type, observation.Flag, observation.ChainId, stamp.BatchOrdinal, ResolveAssociationScope(in structurePath));
         _pendingOpeners.Add(opener);
         TrimPendingOpeners();
         return FlushValuesMatchedBy(in opener);
@@ -134,7 +133,7 @@ public sealed class CompactActionDirectValueCanonicalizer
         for (var i = 0; i < _pendingValues.Count;)
         {
             var pending = _pendingValues[i];
-            if (!MatchesAction(in opener, pending.SourceId, pending.BodyCodeRaw, pending.Marker, pending.BatchOrdinal, pending.ScopeId, pending.ObservationOrdinal))
+            if (!MatchesAction(in opener, pending.SourceId, pending.BodyCodeRaw, pending.Marker, pending.BatchOrdinal, pending.ScopeId))
             {
                 i++;
                 continue;
@@ -156,7 +155,7 @@ public sealed class CompactActionDirectValueCanonicalizer
         for (var i = 0; i < _pendingValues.Count;)
         {
             var pending = _pendingValues[i];
-            if (!MatchesInlineRecoveryGroup(in group, pending.SourceId, pending.BodyCodeRaw, pending.Marker, pending.BatchOrdinal, pending.ScopeId, pending.ObservationOrdinal))
+            if (!MatchesInlineRecoveryGroup(in group, pending.SourceId, pending.BodyCodeRaw, pending.Marker, pending.BatchOrdinal, pending.ScopeId))
             {
                 i++;
                 continue;
@@ -169,12 +168,12 @@ public sealed class CompactActionDirectValueCanonicalizer
         return results.ToBatch();
     }
 
-    private bool TryFindActionOpener(int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId, long observationOrdinal, out PendingCompactActionOpener opener)
+    private bool TryFindActionOpener(int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId, out PendingCompactActionOpener opener)
     {
         for (var i = _pendingOpeners.Count - 1; i >= 0; i--)
         {
             var pending = _pendingOpeners[i];
-            if (MatchesAction(in pending, sourceId, bodyCodeRaw, marker, batchOrdinal, scopeId, observationOrdinal))
+            if (MatchesAction(in pending, sourceId, bodyCodeRaw, marker, batchOrdinal, scopeId))
             {
                 opener = pending;
                 return true;
@@ -185,12 +184,12 @@ public sealed class CompactActionDirectValueCanonicalizer
         return false;
     }
 
-    private bool TryFindInlineRecoveryGroup(int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId, long observationOrdinal, out PendingCompactActionInlineRecoveryGroup group)
+    private bool TryFindInlineRecoveryGroup(int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId, out PendingCompactActionInlineRecoveryGroup group)
     {
         for (var i = _inlineRecoveryGroups.Count - 1; i >= 0; i--)
         {
             var pending = _inlineRecoveryGroups[i];
-            if (MatchesInlineRecoveryGroup(in pending, sourceId, bodyCodeRaw, marker, batchOrdinal, scopeId, observationOrdinal))
+            if (MatchesInlineRecoveryGroup(in pending, sourceId, bodyCodeRaw, marker, batchOrdinal, scopeId))
             {
                 group = pending;
                 return true;
@@ -209,7 +208,7 @@ public sealed class CompactActionDirectValueCanonicalizer
             return false;
         }
 
-        group = new PendingCompactActionInlineRecoveryGroup(value.SourceId, value.BodyCodeRaw, value.Marker, value.BatchOrdinal, value.ScopeId, value.ObservationOrdinal);
+        group = new PendingCompactActionInlineRecoveryGroup(value.SourceId, value.BodyCodeRaw, value.Marker, value.BatchOrdinal, value.ScopeId);
         ConfirmInlineRecoveryGroup(in group);
         return true;
     }
@@ -222,14 +221,14 @@ public sealed class CompactActionDirectValueCanonicalizer
             return false;
         }
 
-        group = new PendingCompactActionInlineRecoveryGroup(sidecar.SourceId, sidecar.BodyCodeRaw, sidecar.Marker, sidecar.BatchOrdinal, sidecar.ScopeId, sidecar.ObservationOrdinal);
+        group = new PendingCompactActionInlineRecoveryGroup(sidecar.SourceId, sidecar.BodyCodeRaw, sidecar.Marker, sidecar.BatchOrdinal, sidecar.ScopeId);
         ConfirmInlineRecoveryGroup(in group);
         return true;
     }
 
     private void ConfirmInlineRecoveryGroup(in PendingCompactActionInlineRecoveryGroup group)
     {
-        if (TryFindInlineRecoveryGroup(group.SourceId, group.BodyCodeRaw, group.Marker, group.BatchOrdinal, group.ScopeId, group.ObservationOrdinal, out _))
+        if (TryFindInlineRecoveryGroup(group.SourceId, group.BodyCodeRaw, group.Marker, group.BatchOrdinal, group.ScopeId, out _))
             return;
 
         _inlineRecoveryGroups.Add(group);
@@ -243,7 +242,7 @@ public sealed class CompactActionDirectValueCanonicalizer
             var sidecar = _pendingSidecars[i];
             if (sidecar.SourceId == sidecar.TargetId &&
                 sidecar.TargetId == value.SourceId &&
-                MatchesInlineRecoveryGroup(sidecar.SourceId, sidecar.BodyCodeRaw, sidecar.Marker, sidecar.BatchOrdinal, sidecar.ScopeId, sidecar.ObservationOrdinal, value.SourceId, value.BodyCodeRaw, value.Marker, value.BatchOrdinal, value.ScopeId, value.ObservationOrdinal))
+                MatchesInlineRecoveryGroup(sidecar.SourceId, sidecar.BodyCodeRaw, sidecar.Marker, sidecar.BatchOrdinal, sidecar.ScopeId, value.SourceId, value.BodyCodeRaw, value.Marker, value.BatchOrdinal, value.ScopeId))
             {
                 return true;
             }
@@ -259,7 +258,7 @@ public sealed class CompactActionDirectValueCanonicalizer
             var value = _pendingValues[i];
             if (value.SourceId == value.TargetId &&
                 value.TargetId == sidecar.SourceId &&
-                MatchesInlineRecoveryGroup(value.SourceId, value.BodyCodeRaw, value.Marker, value.BatchOrdinal, value.ScopeId, value.ObservationOrdinal, sidecar.SourceId, sidecar.BodyCodeRaw, sidecar.Marker, sidecar.BatchOrdinal, sidecar.ScopeId, sidecar.ObservationOrdinal))
+                MatchesInlineRecoveryGroup(value.SourceId, value.BodyCodeRaw, value.Marker, value.BatchOrdinal, value.ScopeId, sidecar.SourceId, sidecar.BodyCodeRaw, sidecar.Marker, sidecar.BatchOrdinal, sidecar.ScopeId))
             {
                 return true;
             }
@@ -281,14 +280,14 @@ public sealed class CompactActionDirectValueCanonicalizer
         ValueKind = CombatValueKind.Healing
     };
 
-    private static bool MatchesAction(in PendingCompactActionOpener pending, int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId, long observationOrdinal) =>
+    private static bool MatchesAction(in PendingCompactActionOpener pending, int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId) =>
         pending.SourceId == sourceId &&
         pending.BodyCodeRaw == bodyCodeRaw &&
         pending.Marker == marker &&
-        MatchesAssociation(pending.BatchOrdinal, pending.ScopeId, pending.ObservationOrdinal, batchOrdinal, scopeId, observationOrdinal);
+        MatchesAssociation(pending.BatchOrdinal, pending.ScopeId, batchOrdinal, scopeId);
 
-    private static bool MatchesInlineRecoveryGroup(in PendingCompactActionInlineRecoveryGroup pending, int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId, long observationOrdinal) =>
-        MatchesInlineRecoveryGroup(pending.SourceId, pending.BodyCodeRaw, pending.Marker, pending.BatchOrdinal, pending.ScopeId, pending.ObservationOrdinal, sourceId, bodyCodeRaw, marker, batchOrdinal, scopeId, observationOrdinal);
+    private static bool MatchesInlineRecoveryGroup(in PendingCompactActionInlineRecoveryGroup pending, int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId) =>
+        MatchesInlineRecoveryGroup(pending.SourceId, pending.BodyCodeRaw, pending.Marker, pending.BatchOrdinal, pending.ScopeId, sourceId, bodyCodeRaw, marker, batchOrdinal, scopeId);
 
     private static bool MatchesInlineRecoveryGroup(
         int pendingSourceId,
@@ -296,17 +295,15 @@ public sealed class CompactActionDirectValueCanonicalizer
         int pendingMarker,
         long pendingBatchOrdinal,
         int pendingScopeId,
-        long pendingObservationOrdinal,
         int sourceId,
         uint bodyCodeRaw,
         int marker,
         long batchOrdinal,
-        int scopeId,
-        long observationOrdinal) =>
+        int scopeId) =>
         pendingSourceId == sourceId &&
         pendingBodyCodeRaw == bodyCodeRaw &&
         pendingMarker == marker &&
-        MatchesAssociation(pendingBatchOrdinal, pendingScopeId, pendingObservationOrdinal, batchOrdinal, scopeId, observationOrdinal);
+        MatchesAssociation(pendingBatchOrdinal, pendingScopeId, batchOrdinal, scopeId);
 
     private static bool MatchesRecoveryOpener(in PendingCompactActionOpener pending, int sourceId) =>
         pending.Mode is 0 or 12 &&
@@ -355,10 +352,9 @@ public sealed class CompactActionDirectValueCanonicalizer
         observation.EventKind == CombatEventKind.Unknown &&
         observation.ValueKind == CombatValueKind.Unknown;
 
-    private static bool MatchesAssociation(long leftBatchOrdinal, int leftScopeId, long leftObservationOrdinal, long rightBatchOrdinal, int rightScopeId, long rightObservationOrdinal) =>
+    private static bool MatchesAssociation(long leftBatchOrdinal, int leftScopeId, long rightBatchOrdinal, int rightScopeId) =>
         leftBatchOrdinal > 0 && rightBatchOrdinal > 0 && leftBatchOrdinal == rightBatchOrdinal ||
-        leftScopeId > 0 && rightScopeId > 0 && leftScopeId == rightScopeId ||
-        leftObservationOrdinal >= 0 && rightObservationOrdinal >= 0 && Math.Abs(leftObservationOrdinal - rightObservationOrdinal) <= MaxLooseAssociationOrdinalDistance;
+        leftScopeId > 0 && rightScopeId > 0 && leftScopeId == rightScopeId;
 
     private static bool IsBatchComplete(in PendingCompactActionValue pending, long batchOrdinal)
     {

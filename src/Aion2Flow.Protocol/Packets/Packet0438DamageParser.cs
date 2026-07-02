@@ -215,13 +215,6 @@ internal static class Packet0438DamageParser
         if (detailLayoutKey == 0x06)
             return TryReadCurrentDetailRegenerationAmount(detail, out var currentRegenAmount) ? (currentRegenAmount, raw) : (0, raw);
 
-        if (detail.Length > 1)
-        {
-            var reader = new PacketSpanReader(detail[1..]);
-            if (reader.TryReadVarInt(out var val) && val > 0)
-                return (val, raw);
-        }
-
         return (0, raw);
     }
 
@@ -274,15 +267,6 @@ internal static class Packet0438DamageParser
             return modifiers;
         }
 
-        var flagByte = detail[0];
-        if ((flagByte & 0x01) != 0) modifiers |= DamageModifiers.Back;
-        if ((flagByte & 0x02) != 0) modifiers |= DamageModifiers.Block;
-        if ((flagByte & 0x04) != 0) modifiers |= DamageModifiers.Parry;
-        if ((flagByte & 0x08) != 0) modifiers |= DamageModifiers.Perfect;
-        if ((flagByte & 0x10) != 0) modifiers |= DamageModifiers.Smite;
-        if ((flagByte & 0x20) != 0) modifiers |= DamageModifiers.Endurance;
-        if ((flagByte & 0x40) != 0) modifiers |= DamageModifiers.Regeneration;
-        if ((flagByte & 0x80) != 0) modifiers |= DamageModifiers.DefensivePerfect;
         return modifiers;
     }
 

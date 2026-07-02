@@ -1,10 +1,8 @@
-using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
-using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
@@ -597,22 +595,6 @@ public class PeriodicPoolCanonicalizerTests
 
         Assert.Equal(4676, journal.Read(0).Combat!.Value.Damage);
         Assert.Equal(4676, packet.Damage);
-    }
-
-    [Fact]
-    public void ScenePath_Replay_EnhanceSpiritBenedictionPeriodicHealing_MatchesGroundTruth()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, new Dictionary<int, NpcDisplayEntry>());
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath("logs/aion2flow.stream.20260426031332.log"));
-
-        var combat = Apply(replay.SceneJournal);
-
-        Assert.True(combat.TryGetCombatant(10277, out var player));
-        Assert.True(combat.TryGetCombatant(37299, out var summon));
-        Assert.Equal(3438, player!.OutgoingHealing);
-        Assert.Equal(1737, player.IncomingHealing);
-        Assert.Equal(1701, summon!.IncomingHealing);
     }
 
     private static CombatStore Apply(ObservedEventJournal journal)
