@@ -537,10 +537,10 @@ public readonly record struct BossDamageContribution(int BossId, int SourceComba
 
 internal readonly record struct BossDamageContributionKey(int BossId, int SourceCombatantId);
 
-internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long EntityRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision)
+internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long EntityRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision, long SkillMapRevision)
 {
     public static SnapshotCacheKey From(Guid encounterId, EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, BossFocusStore bossFocus) =>
-        new(encounterId, combat.Revision, entities.Revision, boundary.Revision, boundary.SceneTransitionRevision, bossFocus.Revision);
+        new(encounterId, combat.Revision, entities.Revision, boundary.Revision, boundary.SceneTransitionRevision, bossFocus.Revision, CombatResourceRegistry.SkillMapRevision);
 }
 
 public readonly record struct ProjectionCacheStats(long SnapshotBuilds, long SnapshotCacheHits)

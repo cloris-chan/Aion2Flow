@@ -7,6 +7,19 @@ internal readonly record struct Packet0438Damage(int TargetId, int LayoutTag, in
 
 internal static class Packet0438DamageParser
 {
+    private const int CurrentModifierDetailLayoutKey = 0x06;
+    private const int DefensiveResultLayoutFlag = 0x40;
+    private const int DefensiveResultFlag = 0x10;
+    private const byte ShieldBlockActionFlag = 0x01;
+    private const byte WeaponParryActionFlag = 0x02;
+    private const byte PerfectActionFlag = 0x04;
+    private const byte SmiteActionFlag = 0x08;
+    private const byte EnduranceActionFlag = 0x10;
+    private const byte RegenerationActionFlag = 0x20;
+    private const byte DefensivePerfectActionFlag = 0x40;
+    private const byte BackDirectionFlag = 0x01;
+    private const byte FrontDirectionFlag = 0x02;
+
     public static bool TryParse(ReadOnlySpan<byte> packet, out Packet0438Damage result)
     {
         result = default;
@@ -56,7 +69,7 @@ internal static class Packet0438DamageParser
 
         var detailSlice = payload.Slice(reader.Offset, detailLength);
         var detailLayoutKey = Packet0438Layout.GetDetailLayoutKey(layoutTag);
-        var modifiers = ParseDamageModifiers(detailSlice, detailLayoutKey, type);
+        var modifiers = ParseDamageModifiers(detailSlice, layoutTag, flag, type);
         var (regenAmount, detailRaw) = ExtractRegenerationAmount(detailSlice, detailLayoutKey, modifiers);
         var detailResourceEffectRef = ResourceEffectRef.FromDetail(detailSlice);
         var resourceKind = ExtractResourceKind(detailSlice);
@@ -212,7 +225,7 @@ internal static class Packet0438DamageParser
         if ((modifiers & DamageModifiers.Regeneration) == 0)
             return (0, raw);
 
-        if (detailLayoutKey == 0x06)
+        if (detailLayoutKey == CurrentModifierDetailLayoutKey)
             return TryReadCurrentDetailRegenerationAmount(detail, out var currentRegenAmount) ? (currentRegenAmount, raw) : (0, raw);
 
         return (0, raw);
@@ -233,46 +246,43 @@ internal static class Packet0438DamageParser
 
     private static int ResolveDamageValue(int detailLayoutKey, int unknown, int damage, int loop)
     {
-        if (unknown == 0 && loop > 0 && detailLayoutKey == 0x06)
+        if (unknown == 0 && loop > 0 && detailLayoutKey == CurrentModifierDetailLayoutKey)
             return loop;
 
         return damage;
     }
 
-    private static DamageModifiers ParseDamageModifiers(ReadOnlySpan<byte> detail, int detailLayoutKey, int type)
+    private static DamageModifiers ParseDamageModifiers(ReadOnlySpan<byte> detail, int layoutTag, int flag, int type)
     {
-        DamageModifiers modifiers = DamageModifiers.None;
-        if (type == 3)
-        {
-            modifiers |= DamageModifiers.Critical;
-        }
-
-        if (detail.Length == 8) return modifiers;
-        if (detail.Length < 10) return modifiers;
-
-        if (detailLayoutKey == 0x06)
-        {
-            var actionFlags = detail[0];
-            if ((actionFlags & 0x01) != 0) modifiers |= DamageModifiers.Parry;
-            if ((actionFlags & 0x02) != 0) modifiers |= DamageModifiers.Block;
-            if ((actionFlags & 0x04) != 0) modifiers |= DamageModifiers.Perfect;
-            if ((actionFlags & 0x08) != 0) modifiers |= DamageModifiers.Smite;
-            if ((actionFlags & 0x10) != 0) modifiers |= DamageModifiers.Endurance;
-            if ((actionFlags & 0x20) != 0) modifiers |= DamageModifiers.Regeneration;
-
-            var directionOffset = GetCurrentDetailDirectionOffset(actionFlags, detail);
-            var directionFlags = detail[directionOffset];
-            if ((directionFlags & 0x01) != 0) modifiers |= DamageModifiers.Back;
-            if ((directionFlags & 0x02) != 0) modifiers |= DamageModifiers.Front;
+        var modifiers = type == 3 ? DamageModifiers.Critical : DamageModifiers.None;
+        if (Packet0438Layout.GetDetailLayoutKey(layoutTag) != CurrentModifierDetailLayoutKey || detail.Length < 10)
             return modifiers;
+
+        var actionFlags = detail[0];
+        if ((actionFlags & EnduranceActionFlag) != 0) modifiers |= DamageModifiers.Endurance;
+        if ((actionFlags & RegenerationActionFlag) != 0) modifiers |= DamageModifiers.Regeneration;
+
+        if ((layoutTag & DefensiveResultLayoutFlag) != 0 && flag == DefensiveResultFlag)
+        {
+            if ((actionFlags & ShieldBlockActionFlag) != 0) modifiers |= DamageModifiers.Block;
+            if ((actionFlags & WeaponParryActionFlag) != 0) modifiers |= DamageModifiers.Parry;
+            if ((actionFlags & DefensivePerfectActionFlag) != 0 && (modifiers & (DamageModifiers.Block | DamageModifiers.Parry)) != 0) modifiers |= DamageModifiers.DefensivePerfect;
+        }
+        else
+        {
+            if ((actionFlags & PerfectActionFlag) != 0) modifiers |= DamageModifiers.Perfect;
+            if ((actionFlags & SmiteActionFlag) != 0) modifiers |= DamageModifiers.Smite;
         }
 
+        var directionFlags = detail[GetCurrentDetailDirectionOffset(actionFlags, detail)];
+        if ((directionFlags & BackDirectionFlag) != 0) modifiers |= DamageModifiers.Back;
+        if ((directionFlags & FrontDirectionFlag) != 0) modifiers |= DamageModifiers.Front;
         return modifiers;
     }
 
     private static int GetCurrentDetailDirectionOffset(byte actionFlags, ReadOnlySpan<byte> detail)
     {
-        if ((actionFlags & 0x20) == 0 || detail.Length <= 2)
+        if ((actionFlags & RegenerationActionFlag) == 0 || detail.Length <= 2)
             return 2;
 
         var reader = new PacketSpanReader(detail[1..]);
@@ -286,7 +296,7 @@ internal static class Packet0438DamageParser
     private static bool TryReadCurrentDetailRegenerationAmount(ReadOnlySpan<byte> detail, out int amount)
     {
         amount = 0;
-        if (detail.Length <= 1 || (detail[0] & 0x20) == 0)
+        if (detail.Length <= 1 || (detail[0] & RegenerationActionFlag) == 0)
             return false;
 
         var reader = new PacketSpanReader(detail[1..]);
@@ -296,9 +306,9 @@ internal static class Packet0438DamageParser
     private static bool TryReadCurrentDetailDefensiveDamage(ref PacketSpanReader reader, ReadOnlySpan<byte> detail, int detailLayoutKey, int unknown, int damage, int loop, out int resolvedDamage)
     {
         resolvedDamage = 0;
-        if (detailLayoutKey != 0x06 ||
+        if (detailLayoutKey != CurrentModifierDetailLayoutKey ||
             detail.IsEmpty ||
-            (detail[0] & 0x20) == 0 ||
+            (detail[0] & RegenerationActionFlag) == 0 ||
             unknown != 0 ||
             damage != 0 ||
             loop <= 0)

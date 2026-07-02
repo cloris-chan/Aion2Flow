@@ -111,6 +111,52 @@ public sealed class CharacterClassInferenceSceneTests
     }
 
     [Fact]
+    public void CharacterClassEvidence_Rebuilds_When_SkillMap_Arrives_After_Combat()
+    {
+        CombatResourceRegistry.SkillMap = [];
+        using var scene = new SceneTestHarness();
+        const int playerId = 10408;
+        const int targetId = 9004;
+
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = targetId,
+            SkillCode = 17060233,
+            Damage = 281_041,
+            Timestamp = 1_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+        scene.AppendCombatPacket(new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = targetId,
+            SkillCode = 17060233,
+            Damage = 532_761,
+            Timestamp = 2_000,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        });
+
+        var snapshotBeforeResources = scene.CreateSnapshot();
+
+        Assert.True(snapshotBeforeResources.Combatants.TryGetValue(playerId, out var beforeResources));
+        Assert.Null(beforeResources.CharacterClass);
+
+        CombatResourceRegistry.SetGameResources(
+        [
+            new SkillDisplayEntry(17060233, "Thunderbolt MAX", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+        ], new Dictionary<int, NpcDisplayEntry>());
+
+        var snapshotAfterResources = scene.CreateSnapshot();
+
+        Assert.True(snapshotAfterResources.Combatants.TryGetValue(playerId, out var afterResources));
+        Assert.Equal(CharacterClass.Cleric, afterResources.CharacterClass);
+        Assert.Equal(813_802, afterResources.DamageAmount);
+    }
+
+    [Fact]
     public void Ignores_Derived_RegenerationHealing_ClassEvidence_And_Uses_SourceSupportEvidence()
     {
         CombatResourceRegistry.SetGameResources(

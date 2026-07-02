@@ -29,6 +29,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private long _classEvidenceCombatRevision = -1;
     private long _classEvidenceEntityRevision = -1;
     private long _classEvidenceOwnerVersion = -1;
+    private long _classEvidenceSkillMapRevision = -1;
     private int _classEvidenceScannedEventCount;
     private long _resolveCacheEntityRevision = -1;
     private long _resolveCacheOwnerVersion = -1;
@@ -63,7 +64,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             _ownerInferenceReady,
             _classEvidenceCombatRevision,
             _classEvidenceEntityRevision,
-            _classEvidenceOwnerVersion);
+            _classEvidenceOwnerVersion,
+            _classEvidenceSkillMapRevision);
     }
 
     public SceneCombatSnapshot CreateSnapshot(SceneKind kind = SceneKind.Standard)
@@ -753,6 +755,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         _classEvidenceCombatRevision = snapshot.ClassEvidenceCombatRevision;
         _classEvidenceEntityRevision = snapshot.ClassEvidenceEntityRevision;
         _classEvidenceOwnerVersion = snapshot.ClassEvidenceOwnerVersion;
+        _classEvidenceSkillMapRevision = snapshot.ClassEvidenceSkillMapRevision;
         _classEvidenceScannedEventCount = 0;
         _hasProjectionBaseline = true;
     }
@@ -776,11 +779,13 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         var combatRevision = combat.Revision;
         var entityRevision = entities.Revision;
         var ownerVersion = _ownerInferenceVersion;
+        var skillMapRevision = CombatResourceRegistry.SkillMapRevision;
         var events = combat.EventSpan;
         var rebuildFromStart = combatRevision < _classEvidenceCombatRevision ||
                                (!_hasProjectionBaseline &&
                                 (_classEvidenceEntityRevision != entityRevision ||
                                  _classEvidenceOwnerVersion != ownerVersion ||
+                                 _classEvidenceSkillMapRevision != skillMapRevision ||
                                  _classEvidenceScannedEventCount > events.Length));
 
         if (rebuildFromStart)
@@ -798,6 +803,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         _classEvidenceCombatRevision = combatRevision;
         _classEvidenceEntityRevision = entityRevision;
         _classEvidenceOwnerVersion = ownerVersion;
+        _classEvidenceSkillMapRevision = skillMapRevision;
     }
 
     private void EnsureOwnerInference()
@@ -1256,7 +1262,8 @@ internal sealed record SceneCombatSnapshotAdapterSnapshot(
     bool OwnerInferenceReady,
     long ClassEvidenceCombatRevision,
     long ClassEvidenceEntityRevision,
-    long ClassEvidenceOwnerVersion);
+    long ClassEvidenceOwnerVersion,
+    long ClassEvidenceSkillMapRevision);
 
 internal readonly record struct SceneCombatSnapshotClassEvidenceEntry(int EntityId, CombatantClassEvidence Evidence);
 

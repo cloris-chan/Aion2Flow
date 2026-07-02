@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.Tests.Protocol;
 
@@ -85,6 +86,113 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(Faction.Light, metadata.Faction);
     }
 
+    [Fact]
+    public void Replay_20260702181554_Parses_Current0438_Defensive_Result_Modifiers()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentClericDefensiveModifiers}"));
+
+        const int playerId = 11190;
+        var player = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == playerId);
+        Assert.Equal(6, player.IncomingDamage);
+        Assert.Equal(6, player.IncomingHits);
+        Assert.Equal(14, player.IncomingAttempts);
+        Assert.Equal(8, player.IncomingEvades);
+
+        var packets = SceneReplayTestView.Packets(replay);
+        var incomingHits = packets
+            .Where(static packet => packet.SourceId == 18722 && packet.TargetId == playerId && packet.SkillCode == 1_100_020 && packet.LayoutTag == 0x46 && packet.HitContribution > 0)
+            .OrderBy(static packet => packet.Timestamp)
+            .ThenBy(static packet => packet.Marker)
+            .ToArray();
+
+        Assert.Equal(6, incomingHits.Length);
+        AssertDefensiveHit(incomingHits[0], 1_526_857_856, DamageModifiers.Front, DamageModifiers.Block | DamageModifiers.Parry | DamageModifiers.DefensivePerfect | DamageModifiers.Endurance);
+        AssertDefensiveHit(incomingHits[1], 1_526_857_858, DamageModifiers.Front | DamageModifiers.Parry, DamageModifiers.Block | DamageModifiers.DefensivePerfect | DamageModifiers.Endurance);
+        AssertDefensiveHit(incomingHits[2], 1_526_857_938, DamageModifiers.Front | DamageModifiers.Parry | DamageModifiers.DefensivePerfect | DamageModifiers.Endurance, DamageModifiers.Block);
+        AssertDefensiveHit(incomingHits[3], 1_526_857_857, DamageModifiers.Front | DamageModifiers.Block, DamageModifiers.Parry | DamageModifiers.DefensivePerfect | DamageModifiers.Endurance);
+        AssertDefensiveHit(incomingHits[4], 1_526_857_922, DamageModifiers.Front | DamageModifiers.Parry | DamageModifiers.DefensivePerfect, DamageModifiers.Block | DamageModifiers.Endurance);
+        AssertDefensiveHit(incomingHits[5], 1_526_857_888, DamageModifiers.Front, DamageModifiers.Block | DamageModifiers.Parry | DamageModifiers.DefensivePerfect | DamageModifiers.Endurance);
+    }
+
+    [Fact]
+    public void Replay_20260702183936_Parses_Current0438_Defensive_Modifier_Totals()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentClericDefensiveModifierTotals}"));
+
+        const int playerId = 10408;
+        var player = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == playerId);
+        Assert.Equal(32, player.IncomingDamage);
+        Assert.Equal(32, player.IncomingHits);
+        Assert.Equal(61, player.IncomingAttempts);
+        Assert.Equal(29, player.IncomingEvades);
+        Assert.Equal(0, player.IncomingInvincibles);
+
+        var incomingHits = SceneReplayTestView.Packets(replay)
+            .Where(static packet => packet.TargetId == playerId && packet.LayoutTag == 0x46 && packet.HitContribution > 0)
+            .ToArray();
+        var dump = string.Join(
+            Environment.NewLine,
+            incomingHits.Select(static packet => $"t={packet.Timestamp} detailRef={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} mods={packet.Modifiers}"));
+
+        AssertMetric(incomingHits.Sum(static packet => packet.HitContribution), 32, "hits", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Front)), 32, "fronts", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Back)), 0, "backs", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWithAny(packet, DamageModifiers.Block | DamageModifiers.Parry)), 23, "defensiveBlocks", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Block)), 17, "shieldBlocks", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Parry)), 6, "weaponParries", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.DefensivePerfect)), 2, "defensivePerfects", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Endurance)), 4, "endurance", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Regeneration)), 6, "regeneration", dump);
+    }
+
+    [Fact]
+    public void Replay_20260702190835_Parses_Current0438_Damage_Without_Identity_Metadata()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentClericDamageWithoutIdentity}"));
+
+        const int playerId = 10408;
+        var player = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == playerId);
+        Assert.Equal(813_802, player.OutgoingDamage);
+        Assert.Equal(2, player.OutgoingHits);
+        Assert.Equal(2, player.OutgoingAttempts);
+        Assert.Equal(6_565, player.OutgoingHealing);
+        Assert.Equal(1_025, player.OutgoingShield);
+        Assert.Equal(7, player.IncomingDamage);
+        Assert.Equal(7, player.IncomingHits);
+        Assert.Equal(15, player.IncomingAttempts);
+        Assert.Equal(8, player.IncomingEvades);
+        Assert.Equal(0, player.IncomingInvincibles);
+
+        Assert.False(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(playerId, out _));
+        Assert.True(replay.SceneOwner.Entities.TryGet(playerId, out var entity));
+        Assert.Equal(CharacterClass.Cleric, entity.CharacterClass);
+
+        var packets = SceneReplayTestView.Packets(replay);
+        Assert.Equal(813_802, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_060_233 && packet.ContributesDamage).Sum(static packet => packet.Damage));
+
+        var incomingHits = packets
+            .Where(static packet => packet.TargetId == playerId && packet.LayoutTag == 0x46 && packet.HitContribution > 0)
+            .ToArray();
+        var dump = string.Join(
+            Environment.NewLine,
+            incomingHits.Select(static packet => $"t={packet.Timestamp} detailRef={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} mods={packet.Modifiers}"));
+
+        AssertMetric(incomingHits.Sum(static packet => packet.HitContribution), 7, "hits", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Front)), 6, "fronts", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWithAny(packet, DamageModifiers.Block | DamageModifiers.Parry)), 6, "defensiveBlocks", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Block)), 4, "shieldBlocks", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Parry)), 2, "weaponParries", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.DefensivePerfect)), 1, "defensivePerfects", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Endurance)), 4, "endurance", dump);
+        AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Regeneration)), 1, "regeneration", dump);
+    }
+
     private static void SetResources() => CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese));
 
     private static IReadOnlyList<ObservedEventEnvelope> ReadAllJournalEntries(PacketLogReplayResult replay)
@@ -166,6 +274,17 @@ public sealed class PacketLogReplayServiceTests
 
     private static int CountHitsWith(SceneReplayPacket packet, DamageModifiers modifier)
         => (packet.Modifiers & modifier) != 0 ? packet.HitContribution : 0;
+
+    private static int CountHitsWithAny(SceneReplayPacket packet, DamageModifiers modifiers)
+        => (packet.Modifiers & modifiers) != 0 ? packet.HitContribution : 0;
+
+    private static void AssertDefensiveHit(SceneReplayPacket packet, uint expectedDetailRef, DamageModifiers expectedPresent, DamageModifiers expectedAbsent)
+    {
+        var dump = $"detailRef={packet.DetailResourceEffectRef.RawId} marker={packet.Marker} mods={packet.Modifiers} layout={packet.LayoutTag} flag={packet.Flag} type={packet.Type} detail=0x{packet.DetailRaw:X16}";
+        Assert.Equal(expectedDetailRef, packet.DetailResourceEffectRef.RawId);
+        Assert.True((packet.Modifiers & expectedPresent) == expectedPresent, $"missing expected modifiers {expectedPresent}\n{dump}");
+        Assert.True((packet.Modifiers & expectedAbsent) == 0, $"unexpected modifiers {packet.Modifiers & expectedAbsent}\n{dump}");
+    }
 
     private static void AssertMetric(long actual, long expected, string name, string dump)
         => Assert.True(actual == expected, $"{name}={actual} expected={expected}\n{dump}");
