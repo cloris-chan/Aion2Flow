@@ -139,6 +139,34 @@ public sealed class SceneIdentityTests
     }
 
     [Fact]
+    public void RuntimeMetadataRegistry_PlayerGroupMembership_ComputesLocalRelations()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(100, "Self", isLocalPlayer: true);
+        registry.UpsertPcMetadata(200, "Same Party");
+        registry.UpsertPcMetadata(300, "Other Squad");
+
+        registry.UpsertPlayerGroupMembership(100, PlayerGroupMembership.Force(7, 1, 1));
+        registry.UpsertPlayerGroupMembership(200, PlayerGroupMembership.Force(7, 1, 2));
+        registry.UpsertPlayerGroupMembership(300, PlayerGroupMembership.Force(7, 3, 1));
+
+        Assert.True(registry.TryGetPcMetadata(100, out var self));
+        Assert.True(registry.TryGetPcMetadata(200, out var sameParty));
+        Assert.True(registry.TryGetPcMetadata(300, out var otherSquad));
+        Assert.Equal(PlayerGroupRelation.Unknown, self.GroupRelation);
+        Assert.Equal(PlayerGroupRelation.PartyMember, sameParty.GroupRelation);
+        Assert.Equal(PlayerGroupRelation.ForceMember, otherSquad.GroupRelation);
+
+        registry.UpsertPlayerGroupMembership(300, PlayerGroupMembership.Party(4));
+        Assert.True(registry.TryGetPcMetadata(300, out otherSquad));
+        Assert.Equal(PlayerGroupRelation.PartyMember, otherSquad.GroupRelation);
+
+        registry.UpsertPlayerGroupMembership(300, PlayerGroupMembership.Force(7, 3, 1));
+        Assert.True(registry.TryGetPcMetadata(300, out otherSquad));
+        Assert.Equal(PlayerGroupRelation.ForceMember, otherSquad.GroupRelation);
+    }
+
+    [Fact]
     public void DomainEventApplier_RecordsMapInstanceCodeInRuntimeMetadataRegistry()
     {
         var boundary = new SceneBoundaryStore();

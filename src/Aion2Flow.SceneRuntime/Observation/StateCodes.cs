@@ -7,4 +7,5 @@ public static class StateCodes
     public const int NpcKind = -100;
     public const int NpcBattle = -101;
     public const int NpcBattleToggle = -102;
+    public const int PlayerGroupMembership = -103;
 }

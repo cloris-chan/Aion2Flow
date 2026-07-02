@@ -155,6 +155,11 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.AppendNickname(in packet, uid, nickname, faction, characterClass, isLocalPlayer, originServerId, legionName);
     }
 
+    public void AppendPlayerGroupMember(in PacketObservationSource packet, int uid, in PlayerGroupMembership membership)
+    {
+        lock (gate) inner.AppendPlayerGroupMember(in packet, uid, in membership);
+    }
+
     public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode)
     {
         lock (gate) inner.AppendNpcCode(in packet, instanceId, npcCode);

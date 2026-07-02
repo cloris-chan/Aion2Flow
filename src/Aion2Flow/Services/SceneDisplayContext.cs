@@ -239,7 +239,8 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
         var originServerId = scoped.OriginServerId is > 0 ? scoped.OriginServerId : registered.OriginServerId;
         var legionName = scoped.HasLegionName ? scoped.LegionName : registered.LegionName;
         var entityId = scoped.EntityId > 0 ? scoped.EntityId : registered.EntityId;
-        return new PcMetadata(entityId, nickname, faction, characterClass, isLocalPlayer, originServerId, legionName);
+        var groupRelation = scoped.HasGroupRelation ? scoped.GroupRelation : registered.GroupRelation;
+        return new PcMetadata(entityId, nickname, faction, characterClass, isLocalPlayer, originServerId, legionName, groupRelation);
     }
 
     private bool TryGetNpcCode(int instanceId, out int npcCode)

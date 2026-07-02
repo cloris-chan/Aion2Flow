@@ -357,6 +357,13 @@ public sealed class DomainEventApplier
             return;
         }
 
+        if (state.StateCode == StateCodes.PlayerGroupMembership)
+        {
+            if (entry.SourceEntityId > 0 && state.GroupMembership.IsKnown)
+                _metadataRegistry.UpsertPlayerGroupMembership(entry.SourceEntityId, state.GroupMembership);
+            return;
+        }
+
         if (state.StateCode == StateCodes.LocalizedNpcName)
         {
             return;

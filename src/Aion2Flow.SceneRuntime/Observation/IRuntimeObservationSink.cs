@@ -60,6 +60,8 @@ public interface IRuntimeObservationSink
 
     void AppendNickname(in PacketObservationSource packet, int uid, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null, string legionName = "");
 
+    void AppendPlayerGroupMember(in PacketObservationSource packet, int uid, in PlayerGroupMembership membership);
+
     void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode);
 
     void AppendNpcName(in PacketObservationSource packet, int npcCode, string name);

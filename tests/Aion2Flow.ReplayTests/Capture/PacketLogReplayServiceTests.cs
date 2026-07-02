@@ -87,6 +87,43 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260702200648_Parses_CurrentPartyAndForceMemberRelations()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentPartyForceRelation}"));
+
+        const int selfId = 11531;
+        const int targetId = 5515;
+        const uint forceGroupId = 690_480_796;
+        var entries = ReadAllJournalEntries(replay);
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x3336 &&
+                            entry.State is { EntityId: selfId, StateCode: StateCodes.PlayerIdentity, IsLocalPlayer: true, Text: "謝謝惠顧" });
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x0D92 &&
+                            entry.State is { EntityId: targetId, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party, GroupMembership.SubPartyIndex: 0, GroupMembership.MemberSlotIndex: 2 });
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x1E96 &&
+                            entry.State is { EntityId: selfId, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Force, GroupMembership.GroupId: forceGroupId, GroupMembership.SubPartyIndex: 1, GroupMembership.MemberSlotIndex: 1 });
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x1D96 &&
+                            entry.State is { EntityId: targetId, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Force, GroupMembership.GroupId: forceGroupId, GroupMembership.SubPartyIndex: 4 });
+
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(targetId, out var targetMetadata));
+        Assert.Equal("星昂", targetMetadata.Nickname);
+        Assert.Equal(PlayerGroupRelation.PartyMember, targetMetadata.GroupRelation);
+    }
+
+    [Fact]
     public void Replay_20260702181554_Parses_Current0438_Defensive_Result_Modifiers()
     {
         SetResources();

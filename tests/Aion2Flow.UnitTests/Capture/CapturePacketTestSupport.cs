@@ -185,6 +185,10 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
     {
     }
 
+    public void AppendPlayerGroupMember(in PacketObservationSource packet, int uid, in PlayerGroupMembership membership)
+    {
+    }
+
     public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode)
     {
     }
