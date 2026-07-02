@@ -3,27 +3,37 @@ namespace Cloris.Aion2Flow.Tests;
 public sealed class ReplayFixturePolicyTests
 {
     [Fact]
-    public void ReplayTests_DoNotDependOnFragmentFixtures()
+    public void RuntimeParsingTests_UseCurrentCompleteReplayFixtures()
     {
         var root = FindSolutionRoot();
-        var replayTestsRoot = Path.Combine(root, "tests", "Aion2Flow.ReplayTests");
+        var testsRoot = Path.Combine(root, "tests");
+        var replayFixturesRoot = Path.Combine(root, "tests", "Aion2Flow.ReplayTests", "Fixtures");
         var forbiddenTerms = new[]
         {
             ".he" + "x",
             "Hex" + "Helper",
             "Fixture" + "Catalog",
-            "From" + "Fixture"
+            "From" + "Fixture",
+            "Convert." + "FromHexString"
         };
 
-        var violations = Directory
-            .EnumerateFiles(replayTestsRoot, "*.cs", SearchOption.AllDirectories)
+        var sourceViolations = Directory
+            .EnumerateFiles(testsRoot, "*.cs", SearchOption.AllDirectories)
             .Where(static path => !HasBuildOutputSegment(path))
+            .Where(static path => !string.Equals(Path.GetFileName(path), "ReplayFixturePolicyTests.cs", StringComparison.Ordinal))
             .SelectMany(path => FindViolations(path, forbiddenTerms))
             .ToArray();
+        var fixtureViolations = Directory
+            .EnumerateFiles(replayFixturesRoot, "*", SearchOption.AllDirectories)
+            .Where(static path => !HasBuildOutputSegment(path))
+            .Where(path => !IsCurrentStreamLogFixture(replayFixturesRoot, path))
+            .Select(path => $"{Path.GetRelativePath(root, path)} is not a 20260701+ complete stream log fixture.")
+            .ToArray();
+        var violations = sourceViolations.Concat(fixtureViolations).ToArray();
 
         Assert.True(
             violations.Length == 0,
-            "Replay tests must use complete stream logs as runtime truth." +
+            "Runtime parsing tests must use 20260701+ complete stream logs as protocol truth." +
             Environment.NewLine +
             string.Join(Environment.NewLine, violations));
     }
@@ -54,6 +64,30 @@ public sealed class ReplayFixturePolicyTests
         }
 
         throw new DirectoryNotFoundException("Could not locate Aion2Flow.slnx.");
+    }
+
+    private static bool IsCurrentStreamLogFixture(string fixtureRoot, string path)
+    {
+        var relative = Path.GetRelativePath(fixtureRoot, path);
+        var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (segments.Length != 2 || !string.Equals(segments[0], "logs", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        const string Prefix = "aion2flow.stream.";
+        const string Suffix = ".log";
+        var fileName = segments[1];
+        if (!fileName.StartsWith(Prefix, StringComparison.Ordinal) ||
+            !fileName.EndsWith(Suffix, StringComparison.Ordinal) ||
+            fileName.Length != Prefix.Length + 14 + Suffix.Length)
+        {
+            return false;
+        }
+
+        var timestamp = fileName.Substring(Prefix.Length, 14);
+        return timestamp.All(static c => c >= '0' && c <= '9') &&
+               string.CompareOrdinal(timestamp, "20260701000000") >= 0;
     }
 
     private static bool HasBuildOutputSegment(string path)
