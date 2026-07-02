@@ -1,5 +1,7 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
@@ -65,7 +67,48 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(6_329, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911 && packet.ValueKind == CombatValueKind.Support).Sum(static packet => packet.Damage));
     }
 
+    [Fact]
+    public void Replay_20260702054027_Applies_Current3336_SelfIdentity()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentBrawlerRegenerationRecovery}"));
+
+        const int playerId = 2141;
+        Assert.Contains(
+            ReadAllJournalEntries(replay),
+            static entry => entry.Raw.Opcode == 0x3336 &&
+                            entry.State is { EntityId: playerId, StateCode: StateCodes.PlayerIdentity, Text: "綠豆冰糕", IsLocalPlayer: true, OriginServerId: 1007, Faction: Faction.Light });
+
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(playerId, out var metadata));
+        Assert.Equal("綠豆冰糕", metadata.Nickname);
+        Assert.Equal(Faction.Light, metadata.Faction);
+    }
+
     private static void SetResources() => CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese));
+
+    private static IReadOnlyList<ObservedEventEnvelope> ReadAllJournalEntries(PacketLogReplayResult replay)
+    {
+        var entries = new List<ObservedEventEnvelope>(replay.SceneJournal.Count);
+        var cursor = replay.SceneJournal.CreateCursor(0);
+        while (true)
+        {
+            var result = replay.SceneJournal.ReadEntries(cursor, 1024, batch =>
+            {
+                foreach (var entry in batch)
+                {
+                    entries.Add(entry);
+                }
+            });
+
+            if (result.Count == 0)
+            {
+                return entries;
+            }
+
+            cursor = result.Cursor;
+        }
+    }
 
     private static void AssertDamageSkill(
         IReadOnlyList<SceneReplayPacket> packets,

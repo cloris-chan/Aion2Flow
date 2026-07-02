@@ -20,15 +20,6 @@ internal static class PacketEmbeddedIdentityScanner
                     continue;
                 }
             }
-            else if (packet[offset] == 0x44 && packet[offset + 1] == 0x36)
-            {
-                if (TryParseOtherNicknameAt(packet, offset, ref context, out consumed))
-                {
-                    parsed = true;
-                    offset += Math.Max(consumed - 1, 1);
-                    continue;
-                }
-            }
             else if (packet[offset] == 0x45 && packet[offset + 1] == 0x36)
             {
                 if (TryParsePcMetadataAt(packet, offset, ref context, out consumed))
@@ -102,22 +93,7 @@ internal static class PacketEmbeddedIdentityScanner
         }
 
         consumed = parsed.TailOffset;
-        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true, originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
-        return context.MarkParsed();
-    }
-
-    private static bool TryParseOtherNicknameAt(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
-    {
-        consumed = 0;
-
-        var payload = packet[opcodeOffset..];
-        if (!Packet4436NicknameParser.TryParsePayload(payload, out var parsed))
-        {
-            return false;
-        }
-
-        consumed = parsed.Delta + parsed.NicknameLength + 2;
-        context.Sink.AppendNickname(context.CreateObservationSource(0x4436, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, consumed), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), isLocalPlayer: true, originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
         return context.MarkParsed();
     }
 

@@ -11,19 +11,8 @@ internal static class PacketIdentityHandler
             return false;
         }
 
-        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), isLocalPlayer: true, originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
+        context.Sink.AppendNickname(context.CreateObservationSource(0x3336, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), isLocalPlayer: true, originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
         return context.MarkParsed();
-    }
-
-    public static bool ParseOtherNicknamePacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
-    {
-        if (Packet4436NicknameParser.TryParse(packet, out var parsed))
-        {
-            context.Sink.AppendNickname(context.CreateObservationSource(0x4436, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), PacketCharacterClassMapper.ToCharacterClass(parsed.ClassCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
-            return context.MarkParsed();
-        }
-
-        return false;
     }
 
     public static bool Parse0994NicknamePacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)

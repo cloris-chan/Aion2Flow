@@ -140,7 +140,7 @@ internal static class NicknameParserUtil
         if (offset < 0 || offset + sizeof(int) > packet.Length)
             return null;
 
-        return BinaryPrimitives.TryReadInt32LittleEndian(packet.Slice(offset, sizeof(int)), out var value) && value is >= 5 and <= 36 ? value : null;
+        return BinaryPrimitives.TryReadInt32LittleEndian(packet.Slice(offset, sizeof(int)), out var value) && value is >= 5 and <= 40 ? value : null;
     }
 }
 
