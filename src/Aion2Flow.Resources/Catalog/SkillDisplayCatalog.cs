@@ -2,21 +2,10 @@ using System.Collections;
 
 namespace Cloris.Aion2Flow.Resources.Catalog;
 
-public sealed class SkillDisplayCatalog : IReadOnlyCollection<SkillDisplayEntry>
+public sealed class SkillDisplayCatalog(int capacity = 0) : IReadOnlyCollection<SkillDisplayEntry>
 {
-    private readonly List<SkillDisplayEntry> _items;
-    private readonly Dictionary<int, SkillDisplayEntry> _bySkillId;
-
-    public SkillDisplayCatalog()
-        : this(0)
-    {
-    }
-
-    public SkillDisplayCatalog(int capacity)
-    {
-        _items = capacity > 0 ? new List<SkillDisplayEntry>(capacity) : [];
-        _bySkillId = capacity > 0 ? new Dictionary<int, SkillDisplayEntry>(capacity) : [];
-    }
+    private readonly List<SkillDisplayEntry> _items = capacity > 0 ? new List<SkillDisplayEntry>(capacity) : [];
+    private readonly Dictionary<int, SkillDisplayEntry> _bySkillId = capacity > 0 ? new Dictionary<int, SkillDisplayEntry>(capacity) : [];
 
     public int Count => _items.Count;
 

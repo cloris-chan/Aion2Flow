@@ -19,9 +19,9 @@ public partial class ScenePlaybackWindow : Window
 
     private readonly AvaloniaFrameClockService _frameClock;
     private readonly UiScaleService _uiScale;
-    private Grid? _rootLayout;
-    private ColumnDefinition? _detailsSplitterColumn;
-    private ColumnDefinition? _detailsPanelColumn;
+    private readonly Grid? _rootLayout;
+    private readonly ColumnDefinition? _detailsSplitterColumn;
+    private readonly ColumnDefinition? _detailsPanelColumn;
     private ScenePlaybackViewModel? _observedViewModel;
     private double _detailsWidth = DefaultDetailsWidth;
     private bool _frameClockAttached;

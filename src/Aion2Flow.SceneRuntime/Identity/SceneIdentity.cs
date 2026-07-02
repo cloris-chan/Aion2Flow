@@ -156,8 +156,10 @@ public sealed class RuntimeMetadataRegistry
 
     internal static RuntimeMetadataRegistry FromSnapshot(RuntimeMetadataRegistrySnapshot snapshot)
     {
-        var registry = new RuntimeMetadataRegistry();
-        registry._revision = snapshot.Revision;
+        var registry = new RuntimeMetadataRegistry
+        {
+            _revision = snapshot.Revision
+        };
         for (var i = 0; i < snapshot.PcMetadata.Length; i++)
         {
             var entry = snapshot.PcMetadata[i];

@@ -305,7 +305,7 @@ public sealed class ResourcePackTests
         var resourceNames = assembly.GetManifestResourceNames().ToHashSet(StringComparer.Ordinal);
         var manifestType = ResolveGeneratedType("ResourcePackManifest");
         var sharedResourceName = Assert.IsType<string>(manifestType.GetField("SharedResourceName", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-        var locales = Assert.IsAssignableFrom<IEnumerable>(manifestType.GetProperty("Locales", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
+        var locales = Assert.IsType<IEnumerable>(manifestType.GetProperty("Locales", BindingFlags.Public | BindingFlags.Static)!.GetValue(null), exactMatch: false);
         var localeResourceNames = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var locale in locales)
         {

@@ -4,6 +4,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <RootNamespace>Cloris.Aion2Flow.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

@@ -239,17 +239,11 @@ public static class ScenePlaybackTrackReader
             => value >= 0 ? (ulong)value : (ulong)(-(value + 1)) + 1;
     }
 
-    private sealed class CombatantSampleAccumulator
+    private sealed class CombatantSampleAccumulator(int maxMarkersPerCombatantTrack)
     {
-        private readonly SampleBucket[] _buckets;
+        private readonly SampleBucket[] _buckets = new SampleBucket[checked(TrackBucketCount * maxMarkersPerCombatantTrack)];
         private readonly int[] _trackCounts = new int[TrackBucketCount];
-        private readonly int _maxMarkersPerTrack;
-
-        public CombatantSampleAccumulator(int maxMarkersPerCombatantTrack)
-        {
-            _maxMarkersPerTrack = maxMarkersPerCombatantTrack;
-            _buckets = new SampleBucket[checked(TrackBucketCount * maxMarkersPerCombatantTrack)];
-        }
+        private readonly int _maxMarkersPerTrack = maxMarkersPerCombatantTrack;
 
         public void Add(in ScenePlaybackTrackMarker marker, int bucketIndex)
         {

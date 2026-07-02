@@ -64,7 +64,7 @@ internal sealed class AvaloniaScenePlaybackTickSource : IScenePlaybackTickSource
         if (elapsed <= TimeSpan.Zero)
             return;
 
-        ScenePlaybackTick? tick = null;
+        ScenePlaybackTick tick;
         lock (_gate)
         {
             if (_disposed)
@@ -79,12 +79,12 @@ internal sealed class AvaloniaScenePlaybackTickSource : IScenePlaybackTickSource
             _pendingElapsedMilliseconds = 0;
         }
 
-        if (_ticks.Writer.TryWrite(tick.Value))
+        if (_ticks.Writer.TryWrite(tick))
             return;
 
         lock (_gate)
         {
-            _pendingElapsedMilliseconds += tick.Value.Elapsed.TotalMilliseconds;
+            _pendingElapsedMilliseconds += tick.Elapsed.TotalMilliseconds;
             _tickQueued = false;
         }
     }

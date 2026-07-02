@@ -208,10 +208,10 @@ public class CombatDetailSubscriptionTests
     [Fact]
     public void Subscription_Update_FromSnapshotKeepsHistoryWithoutReplayingHistoricalChanges()
     {
-        var (store, adapter, snapshot) = CreateProjection();
+        var (store, _, _) = CreateProjection();
         var restored = CombatStore.FromSnapshot(store.CreateSnapshot());
-        adapter = CreateAdapter(restored);
-        snapshot = adapter.CreateSnapshot();
+        var adapter = CreateAdapter(restored);
+        var snapshot = adapter.CreateSnapshot();
         var writer = new TestDetailWriter();
         var sub = new CombatDetailSubscription(restored, 100);
 

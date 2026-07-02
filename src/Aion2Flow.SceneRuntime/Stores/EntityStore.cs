@@ -43,7 +43,7 @@ public sealed class EntityStore
     public void ApplyNpcKind(int instanceId, NpcKind kind)
     {
         var entity = GetOrAdd(instanceId);
-        var ownershipChanged = kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.TrainingDummy ? ClearTransientOwner(entity) : false;
+        var ownershipChanged = kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.TrainingDummy && ClearTransientOwner(entity);
         if (entity.Kind == kind && !ownershipChanged)
             return;
 
@@ -244,8 +244,10 @@ public sealed class EntityStore
 
     internal static EntityStore FromSnapshot(EntityStoreSnapshot snapshot)
     {
-        var store = new EntityStore();
-        store._revision = snapshot.Revision;
+        var store = new EntityStore
+        {
+            _revision = snapshot.Revision
+        };
         for (var i = 0; i < snapshot.Records.Length; i++)
         {
             var record = snapshot.Records[i].ToRecord();

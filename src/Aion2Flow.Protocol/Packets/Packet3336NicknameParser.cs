@@ -40,9 +40,11 @@ internal static class Packet3336NicknameParser
 
             var legionName = string.Empty;
             var identityTailOffset = tailOffset;
+            var directFactionCode = (byte)0;
             if (PacketIdentityTrailerParser.TryReadNicknameAdjacentLegionBlock(payload, tailOffset, out var parsedLegionName, out var parsedFactionCode, out var legionTailOffset))
             {
                 legionName = parsedLegionName;
+                directFactionCode = parsedFactionCode;
                 identityTailOffset = legionTailOffset;
             }
 
@@ -57,7 +59,7 @@ internal static class Packet3336NicknameParser
                 classCode = originClassCode;
             }
 
-            var directFactionCode = NicknameParserUtil.TryReadFactionCode(payload, classOffset + sizeof(int));
+            directFactionCode = NicknameParserUtil.TryReadFactionCode(payload, classOffset + sizeof(int)) is { } classFactionCode and not 0 ? classFactionCode : directFactionCode;
             var factionCode = NicknameParserUtil.SelectFactionCode(directFactionCode, originServerId);
             result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, identityTailOffset, classCode, originServerId, factionCode, legionName);
             return true;

@@ -924,16 +924,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         var end = coverages[0].EndMilliseconds;
         for (var i = 1; i < coverages.Count; i++)
         {
-            var coverage = coverages[i];
-            if (coverage.StartMilliseconds <= end)
+            var (coverageStart, coverageEnd) = coverages[i];
+            if (coverageStart <= end)
             {
-                end = Math.Max(end, coverage.EndMilliseconds);
+                end = Math.Max(end, coverageEnd);
                 continue;
             }
 
             result.Add(new PlaybackTimelineSpan(start, end, fillBrush, borderBrush));
-            start = coverage.StartMilliseconds;
-            end = coverage.EndMilliseconds;
+            start = coverageStart;
+            end = coverageEnd;
         }
 
         result.Add(new PlaybackTimelineSpan(start, end, fillBrush, borderBrush));
@@ -999,7 +999,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         return read.Markers;
     }
 
-    private static IReadOnlyList<ScenePlaybackTrackMarker> FilterRecentMarkers(IReadOnlyList<ScenePlaybackTrackMarker> markers, long start, long end)
+    private static List<ScenePlaybackTrackMarker> FilterRecentMarkers(IReadOnlyList<ScenePlaybackTrackMarker> markers, long start, long end)
     {
         var result = new List<ScenePlaybackTrackMarker>(Math.Min(markers.Count, MaxEventWindowMarkers));
         for (var i = 0; i < markers.Count; i++)

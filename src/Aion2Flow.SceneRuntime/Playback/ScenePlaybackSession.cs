@@ -552,18 +552,11 @@ public sealed class ScenePlaybackSession
         }
     }
 
-    private struct TrackAccumulator
+    private struct TrackAccumulator(long firstOrdinal)
     {
-        private long _firstOrdinal;
-        private long _lastOrdinal;
+        private long _firstOrdinal = firstOrdinal;
+        private long _lastOrdinal = firstOrdinal;
         private int _count;
-
-        public TrackAccumulator(long firstOrdinal)
-        {
-            _firstOrdinal = firstOrdinal;
-            _lastOrdinal = firstOrdinal;
-            _count = 0;
-        }
 
         public void Apply(long ordinal)
         {

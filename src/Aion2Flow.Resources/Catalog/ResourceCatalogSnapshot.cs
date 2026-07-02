@@ -66,7 +66,7 @@ public sealed class ResourceCatalogSnapshot(ResourceSharedCatalog shared, Resour
         return result;
     }
 
-    private static IReadOnlyDictionary<int, NpcDisplayEntry> BuildNpcDisplayCatalog(IReadOnlyDictionary<int, NpcDefinition> definitions, IReadOnlyDictionary<int, string> names)
+    private static FrozenDictionary<int, NpcDisplayEntry> BuildNpcDisplayCatalog(IReadOnlyDictionary<int, NpcDefinition> definitions, IReadOnlyDictionary<int, string> names)
     {
         var result = new Dictionary<int, NpcDisplayEntry>(definitions.Count);
         foreach (var (code, definition) in definitions)
@@ -80,7 +80,7 @@ public sealed class ResourceCatalogSnapshot(ResourceSharedCatalog shared, Resour
         return result.ToFrozenDictionary();
     }
 
-    private static IReadOnlyDictionary<string, LocalizedNpcName> BuildLocalizedNpcNames(IReadOnlyDictionary<string, NpcNameDefinition> definitions, IReadOnlyDictionary<string, string> names)
+    private static FrozenDictionary<string, LocalizedNpcName> BuildLocalizedNpcNames(IReadOnlyDictionary<string, NpcNameDefinition> definitions, IReadOnlyDictionary<string, string> names)
     {
         var result = new Dictionary<string, LocalizedNpcName>(StringComparer.Ordinal);
         foreach (var (resourceKey, definition) in definitions)

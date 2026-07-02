@@ -75,7 +75,9 @@ public sealed class SceneBoundaryService
         return changed;
     }
 
+#pragma warning disable CA1822
     public SceneTransitionKind MarkSceneTransportBoundary() => SceneTransitionKind.None;
+#pragma warning restore CA1822
 
     internal SceneBoundaryServiceSnapshot CreateSnapshot() => new(CurrentMapId, CurrentMapInstanceId, SceneTransitionRevision, _pendingMapId, _pendingAllowSameMapReload);
 

@@ -88,7 +88,7 @@ internal static class ResourcePackReader
         return payload;
     }
 
-    private static IReadOnlyDictionary<SectionId, ResourcePackSection> ReadSections(byte[] payload)
+    private static Dictionary<SectionId, ResourcePackSection> ReadSections(byte[] payload)
     {
         ReadOnlySpan<byte> cursor = payload;
         var magic = ReadUInt32(ref cursor);
@@ -156,7 +156,7 @@ internal static class ResourcePackReader
         return result;
     }
 
-    private static IReadOnlyDictionary<int, SkillClientMetadata> ReadSkillClientMetadata(ResourcePackSection section)
+    private static FrozenDictionary<int, SkillClientMetadata> ReadSkillClientMetadata(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -180,7 +180,7 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static IReadOnlyDictionary<int, SkillDisplayProjection> ReadSkillDisplayProjections(ResourcePackSection section)
+    private static FrozenDictionary<int, SkillDisplayProjection> ReadSkillDisplayProjections(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -202,7 +202,7 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static IReadOnlyList<SkillEffectReference> ReadSkillEffectReferences(ResourcePackSection section)
+    private static SkillEffectReference[] ReadSkillEffectReferences(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -216,7 +216,7 @@ internal static class ResourcePackReader
         return result;
     }
 
-    private static IReadOnlyDictionary<int, NpcDefinition> ReadNpcDefinitions(ResourcePackSection section)
+    private static FrozenDictionary<int, NpcDefinition> ReadNpcDefinitions(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -231,7 +231,7 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static IReadOnlyDictionary<string, NpcNameDefinition> ReadNpcNameDefinitions(ResourcePackSection section)
+    private static FrozenDictionary<string, NpcNameDefinition> ReadNpcNameDefinitions(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -246,7 +246,7 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    private static IReadOnlySet<uint> ReadKnownMapIds(ResourcePackSection section)
+    private static FrozenSet<uint> ReadKnownMapIds(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -260,7 +260,7 @@ internal static class ResourcePackReader
         return result.ToFrozenSet();
     }
 
-    private static IReadOnlySet<int> ReadServerCodes(ResourcePackSection section)
+    private static FrozenSet<int> ReadServerCodes(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -274,7 +274,7 @@ internal static class ResourcePackReader
         return result.ToFrozenSet();
     }
 
-    private static IReadOnlyDictionary<int, string> ReadIntStringMap(ResourcePackSection section)
+    private static FrozenDictionary<int, string> ReadIntStringMap(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -288,7 +288,7 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static IReadOnlyDictionary<uint, string> ReadUIntStringMap(ResourcePackSection section)
+    private static FrozenDictionary<uint, string> ReadUIntStringMap(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -302,7 +302,7 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static IReadOnlyDictionary<string, string> ReadStringStringMap(ResourcePackSection section)
+    private static FrozenDictionary<string, string> ReadStringStringMap(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
@@ -316,7 +316,7 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    private static IReadOnlyDictionary<int, ServerNameEntry> ReadServerNames(ResourcePackSection section)
+    private static FrozenDictionary<int, ServerNameEntry> ReadServerNames(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;

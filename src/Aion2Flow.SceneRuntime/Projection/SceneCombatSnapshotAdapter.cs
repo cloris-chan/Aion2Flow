@@ -962,10 +962,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return inline;
         }
 
-        public static OwnerCandidateAccumulator FromSnapshot(IReadOnlyList<int> ownerIds)
+        public static OwnerCandidateAccumulator FromSnapshot(int[] ownerIds)
         {
             var accumulator = new OwnerCandidateAccumulator();
-            for (var i = 0; i < ownerIds.Count; i++)
+            for (var i = 0; i < ownerIds.Length; i++)
                 accumulator.Add(ownerIds[i]);
             return accumulator;
         }

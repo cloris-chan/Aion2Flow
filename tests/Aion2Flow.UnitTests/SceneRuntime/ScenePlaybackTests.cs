@@ -664,8 +664,8 @@ public sealed class ScenePlaybackTests
     {
         await using var controller = CreateController(CreateArchiveRecord());
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => controller.StepEventAsync(0, TestContext.Current.CancellationToken));
-        Assert.Throws<ArgumentOutOfRangeException>(() => controller.StepEventAsync(2, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await controller.StepEventAsync(0, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await controller.StepEventAsync(2, TestContext.Current.CancellationToken));
     }
 
     [Fact]

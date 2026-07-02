@@ -50,7 +50,6 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
 
     public void Initialize()
     {
-        var driverPath = ResolveDriverPath();
         try
         {
             lock (_sync)

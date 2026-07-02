@@ -26,7 +26,7 @@ public static class CombatEventClassifier
             return (CombatEventKind.Healing, CombatValueKind.DrainHealing);
 
         if (observation.PeriodicRelation != PeriodicEffectRelation.None)
-            return ClassifyPeriodic(sourceId, targetId, in observation);
+            return ClassifyPeriodic(in observation);
 
         return ClassifyDirect(sourceId, targetId, in observation);
     }
@@ -47,7 +47,7 @@ public static class CombatEventClassifier
         return (CombatEventKind.Damage, CombatValueKind.Damage);
     }
 
-    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyPeriodic(int sourceId, int targetId, in CombatObservation observation)
+    private static (CombatEventKind EventKind, CombatValueKind ValueKind) ClassifyPeriodic(in CombatObservation observation)
     {
         if (observation.PeriodicRelation == PeriodicEffectRelation.Self)
         {

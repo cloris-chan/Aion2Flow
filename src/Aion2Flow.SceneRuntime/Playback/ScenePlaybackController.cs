@@ -179,7 +179,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
             previousTask = _checkpointTask;
             generation = ++_checkpointGeneration;
             _checkpointCancellation = cancellation;
-            _checkpointTask = RebuildCheckpointsCoreAsync(cancellation.Token, generation);
+            _checkpointTask = RebuildCheckpointsCoreAsync(generation, cancellation.Token);
         }
 
         CancelAndDisposeAfterCompletion(previousCancellation, previousTask);
@@ -191,7 +191,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         long generation;
         lock (_stateGate)
             generation = ++_checkpointGeneration;
-        return RebuildCheckpointsCoreAsync(cancellationToken, generation);
+        return RebuildCheckpointsCoreAsync(generation, cancellationToken);
     }
 
     public ValueTask<ScenePlaybackFrame> SeekAsync(long positionMilliseconds, CancellationToken cancellationToken = default) =>
@@ -335,7 +335,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
 
             try
             {
-                await AdvanceCoreAsync(tickTarget.Value.PositionMilliseconds, cancellationToken, tickTarget.Value.SeekGeneration).ConfigureAwait(false);
+                await AdvanceCoreAsync(tickTarget.Value.PositionMilliseconds, tickTarget.Value.SeekGeneration, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -528,7 +528,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    private async ValueTask<ScenePlaybackFrame> AdvanceCoreAsync(long positionMilliseconds, CancellationToken cancellationToken, long expectedGeneration)
+    private async ValueTask<ScenePlaybackFrame> AdvanceCoreAsync(long positionMilliseconds, long expectedGeneration, CancellationToken cancellationToken)
     {
         lock (_stateGate)
         {
@@ -561,7 +561,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    private async Task RebuildCheckpointsCoreAsync(CancellationToken cancellationToken, long generation)
+    private async Task RebuildCheckpointsCoreAsync(long generation, CancellationToken cancellationToken)
     {
         var publishStarted = false;
         lock (_stateGate)
@@ -603,7 +603,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    private IReadOnlyList<ScenePlaybackCheckpoint> BuildCheckpoints(CancellationToken cancellationToken)
+    private List<ScenePlaybackCheckpoint> BuildCheckpoints(CancellationToken cancellationToken)
     {
         var interval = _options.CheckpointIntervalMilliseconds;
         var session = new ScenePlaybackSession(Source);

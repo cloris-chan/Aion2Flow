@@ -91,7 +91,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
         }
     }
 
+#pragma warning disable CA1822
     public JournalCursor CreateCursor(long startOrdinal) => new(startOrdinal);
+#pragma warning restore CA1822
 
     public ObservedEventEnvelope Read(long observationOrdinal)
     {

@@ -1,6 +1,6 @@
 namespace Cloris.Aion2Flow.WinDivert;
 
-public enum WinDivertEvent 
+public enum WinDivertEvent
 {
     NetworkPacket,
     FlowEstablished,

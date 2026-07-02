@@ -1,21 +1,13 @@
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
-public sealed class EncounterTargetInfo
+public sealed class EncounterTargetInfo(int targetId, int damageAmount, long firstDamageTime, long lastDamageTime)
 {
     private readonly HashSet<Guid> _processedPacketIds = new();
 
-    public EncounterTargetInfo(int targetId, int damageAmount, long firstDamageTime, long lastDamageTime)
-    {
-        TargetId = targetId;
-        DamageAmount = damageAmount;
-        FirstDamageTime = firstDamageTime;
-        LastDamageTime = lastDamageTime;
-    }
-
-    public int TargetId { get; }
-    public int DamageAmount { get; private set; }
-    public long FirstDamageTime { get; private set; }
-    public long LastDamageTime { get; private set; }
+    public int TargetId { get; } = targetId;
+    public int DamageAmount { get; private set; } = damageAmount;
+    public long FirstDamageTime { get; private set; } = firstDamageTime;
+    public long LastDamageTime { get; private set; } = lastDamageTime;
     public long EncounterTime => LastDamageTime - FirstDamageTime;
 
     public void ProcessPacket(ParsedCombatPacket packet)

@@ -513,8 +513,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             SceneStarted = sceneStarted;
             SceneStartObservationOrdinal = startOrdinal;
             combat.Clear();
-            _applier = new DomainEventApplier(entities, boundary, metadataRegistry, combat);
-            _applier.TrackBossFocus = trackBossFocus;
+            _applier = new DomainEventApplier(entities, boundary, metadataRegistry, combat)
+            {
+                TrackBossFocus = trackBossFocus
+            };
             _adapter = null;
             _detailSubscriptions.Clear();
             _lastDetailDeltas.Clear();

@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Cloris.Aion2Flow.Controls;
 
-namespace Cloris.Aion2Flow.UnitTests.Controls;
+namespace Cloris.Aion2Flow.Tests.Controls;
 
 public sealed class MarqueeTextPresenterTests
 {

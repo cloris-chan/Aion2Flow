@@ -580,7 +580,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         }
     }
 
-    private long ResolveBossFocusDisplayKey(SceneDisplayContext? displayContext, int instanceId, int npcCode)
+    private static long ResolveBossFocusDisplayKey(SceneDisplayContext? displayContext, int instanceId, int npcCode)
     {
         if (npcCode > 0 &&
             displayContext?.ResolveNpcCodeCatalogEntry(npcCode) is { Kind: var kind } &&
@@ -600,7 +600,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             : current;
     }
 
-    private int ResolveBossFocusNpcCode(SceneDisplayContext? displayContext, int instanceId)
+    private static int ResolveBossFocusNpcCode(SceneDisplayContext? displayContext, int instanceId)
         => displayContext is not null && displayContext.TryResolveNpcCode(instanceId, out var npcCode) ? npcCode : 0;
 
     private int FindBossFocusDisplayIndex(long displayKey)
