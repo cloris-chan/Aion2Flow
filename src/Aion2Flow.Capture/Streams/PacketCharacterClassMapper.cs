@@ -6,20 +6,17 @@ internal static class PacketCharacterClassMapper
 {
     public static CharacterClass? ToCharacterClass(int? classCode)
     {
-        if (classCode is not { } code || code is < 5 or > 40)
-            return null;
-
-        return ((code - 5) >> 2) switch
+        return classCode switch
         {
-            0 => CharacterClass.Gladiator,
-            1 => CharacterClass.Templar,
-            2 => CharacterClass.Ranger,
-            3 => CharacterClass.Assassin,
-            4 => CharacterClass.Elementalist,
-            5 => CharacterClass.Sorcerer,
-            6 => CharacterClass.Cleric,
-            7 => CharacterClass.Chanter,
-            8 => CharacterClass.Brawler,
+            >= 5 and <= 8 => CharacterClass.Gladiator,
+            >= 9 and <= 12 => CharacterClass.Templar,
+            >= 13 and <= 16 => CharacterClass.Ranger,
+            >= 17 and <= 20 => CharacterClass.Assassin,
+            >= 21 and <= 24 => CharacterClass.Elementalist,
+            >= 25 and <= 28 => CharacterClass.Sorcerer,
+            >= 29 and <= 32 => CharacterClass.Cleric,
+            >= 33 and <= 36 => CharacterClass.Chanter,
+            >= 45 and <= 48 => CharacterClass.Brawler,
             _ => null
         };
     }
