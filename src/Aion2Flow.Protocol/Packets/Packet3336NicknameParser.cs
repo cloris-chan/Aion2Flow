@@ -7,6 +7,7 @@ internal readonly record struct Packet3336Nickname(int PlayerId, string Nickname
 internal static class Packet3336NicknameParser
 {
     private const byte CurrentNamePrefix = 0x5f;
+    private const byte CurrentExtendedNamePrefix = 0x5e;
     private const byte CurrentNameMarker = 0x37;
 
     public static bool TryParse(ReadOnlySpan<byte> packet, out Packet3336Nickname result)
@@ -28,9 +29,7 @@ internal static class Packet3336NicknameParser
         reader.TryAdvance(2);
 
         if (!reader.TryReadVarInt(out var playerId)) return false;
-        if (!reader.TryReadByte(out var prefix) || prefix != CurrentNamePrefix) return false;
-        if (!reader.TryReadVarInt(out _)) return false;
-        if (!reader.TryReadByte(out var marker) || marker != CurrentNameMarker) return false;
+        if (!TryReadNamePreamble(ref reader)) return false;
         if (!NicknameParserUtil.TryReadLengthPrefixedNickname(payload, reader.Offset, strict: true, out var sanitizedName, out var nicknameLength, out var tailOffset)) return false;
         if (!NicknameParserUtil.TryReadOriginServerIdLe16(payload, tailOffset, out var originServerId)) return false;
 
@@ -42,5 +41,32 @@ internal static class Packet3336NicknameParser
         var identityTailOffset = postServerOffset + sizeof(int) + 1;
         result = new Packet3336Nickname(playerId, sanitizedName, nicknameLength, identityTailOffset, originServerId, factionCode, string.Empty);
         return true;
+    }
+
+    private static bool TryReadNamePreamble(ref PacketSpanReader reader)
+    {
+        if (!reader.TryReadByte(out var prefix))
+        {
+            return false;
+        }
+
+        switch (prefix)
+        {
+            case CurrentNamePrefix:
+                break;
+            case CurrentExtendedNamePrefix:
+                if (!reader.TryReadByte(out _))
+                {
+                    return false;
+                }
+
+                break;
+            default:
+                return false;
+        }
+
+        return reader.TryReadVarInt(out _) &&
+            reader.TryReadByte(out var marker) &&
+            marker == CurrentNameMarker;
     }
 }

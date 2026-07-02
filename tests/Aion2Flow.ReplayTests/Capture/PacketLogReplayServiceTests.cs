@@ -87,6 +87,27 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260703041828_Applies_Extended3336_SelfIdentity_Without4536()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentBrawlerExtendedSelfIdentity}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        const int playerId = 4233;
+        Assert.DoesNotContain(entries, static entry => entry.Raw.Opcode == 0x4536);
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x3336 &&
+                            entry.State is { EntityId: playerId, StateCode: StateCodes.PlayerIdentity, Text: "dfdyhj", IsLocalPlayer: true, OriginServerId: 1014, Faction: Faction.Light });
+
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(playerId, out var metadata));
+        Assert.Equal("dfdyhj", metadata.Nickname);
+        Assert.Equal(Faction.Light, metadata.Faction);
+        Assert.Equal(1014, metadata.OriginServerId);
+    }
+
+    [Fact]
     public void Replay_20260702200648_Parses_CurrentPartyAndForceMemberRelations()
     {
         SetResources();
