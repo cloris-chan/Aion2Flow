@@ -13,6 +13,7 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Services.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -266,7 +267,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             Dispatcher.UIThread.Post(ChangeSceneKind);
         else if (e.PropertyName == nameof(SettingsFlyoutViewModel.UseCompactMainMetrics))
             Dispatcher.UIThread.Post(() => CombatantColumns.UseCompactMainMetrics = SettingsFlyout.UseCompactMainMetrics);
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.ShowFocusStatusBar))
+        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.ShowFocusStatusBar) ||
+                 e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantStatisticsScope))
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
     }
 
@@ -427,7 +429,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         foreach (var row in deferral.Snapshot)
         {
             if (snapshot.Combatants.TryGetValue(row.Id, out var data) &&
-                ShouldDisplayCombatant(data))
+                ShouldDisplayCombatant(row.Id, data))
             {
                 row.CharacterClass = data.CharacterClass;
                 row.DamagePerSecond = data.DamagePerSecond;
@@ -449,7 +451,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             if (Combatants.ContainsKey(id))
                 continue;
 
-            if (!ShouldDisplayCombatant(data))
+            if (!ShouldDisplayCombatant(id, data))
                 continue;
 
             Combatants.Add(new CombatantRowViewModel(
@@ -462,6 +464,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                 data.DamageAmount,
                 data.HealingAmount));
         }
+
+        if (SelectedCombatant is { } selectedCombatant && !Combatants.ContainsKey(selectedCombatant.Id))
+            SelectedCombatant = null;
 
         RefreshCombatantBars(snapshot.EncounterId);
         Combatants.Sort(CompareCombatantRows);
@@ -877,14 +882,35 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         return (hash ^ (byte)(value >> 24)) * 16_777_619u;
     }
 
-    private static bool ShouldDisplayCombatant(SceneCombatantMetrics data)
+    private bool ShouldDisplayCombatant(int combatantId, SceneCombatantMetrics data)
     {
-        if (data.CharacterClass is null)
+        if (!data.IsVisiblePlayerCombatant)
         {
             return false;
         }
 
-        return data.IsVisiblePlayerCombatant;
+        var scope = SettingsFlyout.CombatantStatisticsScope;
+        if (scope == CombatantStatisticsScope.All)
+        {
+            return data.CharacterClass is not null;
+        }
+
+        if (DisplayContext?.TryResolvePcMetadata(combatantId, out var metadata) != true)
+        {
+            return false;
+        }
+
+        if (metadata.IsLocalPlayer)
+        {
+            return true;
+        }
+
+        return scope switch
+        {
+            CombatantStatisticsScope.Party => metadata.GroupRelation == PlayerGroupRelation.PartyMember,
+            CombatantStatisticsScope.Force => metadata.GroupRelation is PlayerGroupRelation.PartyMember or PlayerGroupRelation.ForceMember,
+            _ => false
+        };
     }
 
     public async ValueTask DisposeAsync()

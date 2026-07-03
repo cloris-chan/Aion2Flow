@@ -44,6 +44,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             TopmostMode = persisted.TopmostMode;
             MaxVisibleCombatantRows = persisted.MaxVisibleCombatantRows;
             CombatantSortMetric = persisted.CombatantSortMetric;
+            CombatantStatisticsScope = persisted.CombatantStatisticsScope;
             SceneKind = persisted.SceneKind;
             UseCompactMainMetrics = persisted.UseCompactMainMetrics;
             ShowFocusStatusBar = persisted.ShowFocusStatusBar;
@@ -84,6 +85,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public IReadOnlyList<CombatantSortMetric> CombatantSortMetricOptions { get; } = [CombatantSortMetric.DamagePerSecond, CombatantSortMetric.TotalDamage];
 
+    public IReadOnlyList<CombatantStatisticsScope> CombatantStatisticsScopeOptions { get; } = [CombatantStatisticsScope.Self, CombatantStatisticsScope.Party, CombatantStatisticsScope.Force, CombatantStatisticsScope.All];
+
     public IReadOnlyList<SceneKind> SceneKindOptions { get; } = [SceneKind.Standard, SceneKind.Boss];
 
     public IReadOnlyList<PlayerSelfMarkerDisplayMode> PlayerSelfMarkerDisplayModeOptions { get; } = [PlayerSelfMarkerDisplayMode.Always, PlayerSelfMarkerDisplayMode.WhenNamesHidden, PlayerSelfMarkerDisplayMode.Hidden];
@@ -104,6 +107,10 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CombatantSortMetricDisplay))]
     public partial CombatantSortMetric CombatantSortMetric { get; set; } = CombatantSortMetric.DamagePerSecond;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CombatantStatisticsScopeDisplay))]
+    public partial CombatantStatisticsScope CombatantStatisticsScope { get; set; } = CombatantStatisticsScope.All;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SceneKindDisplay))]
@@ -181,6 +188,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public string CombatantSortMetricDisplay => Localization[$"Settings_CombatantSortMetric_{CombatantSortMetric}"];
 
+    public string CombatantStatisticsScopeDisplay => Localization[$"Settings_CombatantStatisticsScope_{CombatantStatisticsScope}"];
+
     public string SceneKindDisplay => Localization[$"Settings_SceneKind_{SceneKind}"];
 
     public string UseCompactMainMetricsDisplay => Localization[UseCompactMainMetrics ? "Settings_MainMetricsCompact_On" : "Settings_MainMetricsCompact_Off"];
@@ -253,6 +262,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     partial void OnMaxVisibleCombatantRowsChanged(int value) => PersistSettings();
 
     partial void OnCombatantSortMetricChanged(CombatantSortMetric value) => PersistSettings();
+
+    partial void OnCombatantStatisticsScopeChanged(CombatantStatisticsScope value) => PersistSettings();
 
     partial void OnSceneKindChanged(SceneKind value) => PersistSettings();
 
@@ -350,6 +361,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.TopmostMode = TopmostMode;
             s.MaxVisibleCombatantRows = MaxVisibleCombatantRows;
             s.CombatantSortMetric = CombatantSortMetric;
+            s.CombatantStatisticsScope = CombatantStatisticsScope;
             s.SceneKind = SceneKind;
             s.UseCompactMainMetrics = UseCompactMainMetrics;
             s.ShowFocusStatusBar = ShowFocusStatusBar;
@@ -379,6 +391,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(TopmostModeDisplay));
         OnPropertyChanged(nameof(CombatantSortMetricDisplay));
+        OnPropertyChanged(nameof(CombatantStatisticsScopeDisplay));
         OnPropertyChanged(nameof(SceneKindDisplay));
         OnPropertyChanged(nameof(UseCompactMainMetricsDisplay));
         OnPropertyChanged(nameof(ShowFocusStatusBarDisplay));

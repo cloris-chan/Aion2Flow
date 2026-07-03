@@ -916,6 +916,51 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Statistics scope.
+        /// </summary>
+        internal static string Settings_CombatantStatisticsScope {
+            get {
+                return ResourceManager.GetString("Settings_CombatantStatisticsScope", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to All.
+        /// </summary>
+        internal static string Settings_CombatantStatisticsScope_All {
+            get {
+                return ResourceManager.GetString("Settings_CombatantStatisticsScope_All", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Force.
+        /// </summary>
+        internal static string Settings_CombatantStatisticsScope_Force {
+            get {
+                return ResourceManager.GetString("Settings_CombatantStatisticsScope_Force", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Party.
+        /// </summary>
+        internal static string Settings_CombatantStatisticsScope_Party {
+            get {
+                return ResourceManager.GetString("Settings_CombatantStatisticsScope_Party", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Self.
+        /// </summary>
+        internal static string Settings_CombatantStatisticsScope_Self {
+            get {
+                return ResourceManager.GetString("Settings_CombatantStatisticsScope_Self", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Target status bar.
         /// </summary>
         internal static string Settings_FocusStatusBar {

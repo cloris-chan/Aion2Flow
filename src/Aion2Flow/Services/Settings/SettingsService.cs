@@ -84,6 +84,7 @@ public sealed class SettingsService
         TopmostMode = source.TopmostMode,
         MaxVisibleCombatantRows = source.MaxVisibleCombatantRows,
         CombatantSortMetric = source.CombatantSortMetric,
+        CombatantStatisticsScope = source.CombatantStatisticsScope,
         SceneKind = source.SceneKind,
         UseCompactMainMetrics = source.UseCompactMainMetrics,
         ShowFocusStatusBar = source.ShowFocusStatusBar,

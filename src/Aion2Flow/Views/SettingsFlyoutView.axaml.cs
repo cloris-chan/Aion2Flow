@@ -16,6 +16,7 @@ public partial class SettingsFlyoutView : UserControl
 {
     private MenuItem? _topmostMenuItem;
     private MenuItem? _visibleRowsMenuItem;
+    private MenuItem? _combatantStatisticsScopeMenuItem;
     private MenuItem? _combatantSortMetricMenuItem;
     private MenuItem? _sceneKindMenuItem;
     private MenuItem? _compactMainMetricsMenuItem;
@@ -82,6 +83,7 @@ public partial class SettingsFlyoutView : UserControl
 
         RebuildTopmostMenuItems();
         RebuildVisibleRowsMenuItems();
+        RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
@@ -94,6 +96,7 @@ public partial class SettingsFlyoutView : UserControl
     {
         RebuildTopmostMenuItems();
         RebuildVisibleRowsMenuItems();
+        RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
@@ -115,6 +118,11 @@ public partial class SettingsFlyoutView : UserControl
             case nameof(SettingsFlyoutViewModel.MaxVisibleCombatantRowsDisplay):
                 RefreshVisibleRowsHeader();
                 RefreshVisibleRowsCheckmarks();
+                break;
+            case nameof(SettingsFlyoutViewModel.CombatantStatisticsScope):
+            case nameof(SettingsFlyoutViewModel.CombatantStatisticsScopeDisplay):
+                RefreshCombatantStatisticsScopeHeader();
+                RefreshCombatantStatisticsScopeCheckmarks();
                 break;
             case nameof(SettingsFlyoutViewModel.CombatantSortMetric):
             case nameof(SettingsFlyoutViewModel.CombatantSortMetricDisplay):
@@ -159,6 +167,7 @@ public partial class SettingsFlyoutView : UserControl
     {
         RebuildLanguageMenuItems();
         RebuildTopmostMenuItems();
+        RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
@@ -190,6 +199,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _languageMenuItem = mi;
             RebuildLanguageMenuItems();
+        }
+    }
+
+    private void CombatantStatisticsScopeMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _combatantStatisticsScopeMenuItem != mi)
+        {
+            _combatantStatisticsScopeMenuItem = mi;
+            RebuildCombatantStatisticsScopeMenuItems();
         }
     }
 
@@ -316,6 +334,47 @@ public partial class SettingsFlyoutView : UserControl
             if (child is MenuItem { Tag: int count } mi)
             {
                 mi.Icon = CreateCheckmark(count == vm.MaxVisibleCombatantRows);
+            }
+        }
+    }
+
+    private void RebuildCombatantStatisticsScopeMenuItems()
+    {
+        RefreshCombatantStatisticsScopeHeader();
+        var vm = ViewModel;
+        if (_combatantStatisticsScopeMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        _combatantStatisticsScopeMenuItem.Items.Clear();
+        foreach (var scope in vm.CombatantStatisticsScopeOptions)
+        {
+            var item = new MenuItem
+            {
+                Header = vm.Localization[$"Settings_CombatantStatisticsScope_{scope}"],
+                Tag = scope
+            };
+            item.Classes.Add("FlyoutMenuItem");
+            item.Icon = CreateCheckmark(scope == vm.CombatantStatisticsScope);
+            item.Click += CombatantStatisticsScopeItemClicked;
+            _combatantStatisticsScopeMenuItem.Items.Add(item);
+        }
+    }
+
+    private void RefreshCombatantStatisticsScopeCheckmarks()
+    {
+        var vm = ViewModel;
+        if (_combatantStatisticsScopeMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        foreach (var child in _combatantStatisticsScopeMenuItem.Items)
+        {
+            if (child is MenuItem { Tag: CombatantStatisticsScope scope } mi)
+            {
+                mi.Icon = CreateCheckmark(scope == vm.CombatantStatisticsScope);
             }
         }
     }
@@ -576,6 +635,14 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
+    private void CombatantStatisticsScopeItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm && sender is MenuItem { Tag: CombatantStatisticsScope scope })
+        {
+            vm.CombatantStatisticsScope = scope;
+        }
+    }
+
     private void SceneKindItemClicked(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm && sender is MenuItem { Tag: SceneKind kind })
@@ -672,6 +739,13 @@ public partial class SettingsFlyoutView : UserControl
         var vm = ViewModel;
         if (_visibleRowsMenuItem is null || vm is null) return;
         _visibleRowsMenuItem.Header = CreateRowHeader(vm.Localization["Settings_VisibleRows"], vm.MaxVisibleCombatantRowsDisplay);
+    }
+
+    private void RefreshCombatantStatisticsScopeHeader()
+    {
+        var vm = ViewModel;
+        if (_combatantStatisticsScopeMenuItem is null || vm is null) return;
+        _combatantStatisticsScopeMenuItem.Header = CreateRowHeader(vm.Localization["Settings_CombatantStatisticsScope"], vm.CombatantStatisticsScopeDisplay);
     }
 
     private void RefreshCombatantSortMetricHeader()

@@ -52,6 +52,11 @@
   <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>켬</value></data>
   <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>끔</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>표시 행 수</value></data>
+  <data name="Settings_CombatantStatisticsScope" xml:space="preserve"><value>통계 범위</value></data>
+  <data name="Settings_CombatantStatisticsScope_Self" xml:space="preserve"><value>나</value></data>
+  <data name="Settings_CombatantStatisticsScope_Party" xml:space="preserve"><value>파티</value></data>
+  <data name="Settings_CombatantStatisticsScope_Force" xml:space="preserve"><value>포스</value></data>
+  <data name="Settings_CombatantStatisticsScope_All" xml:space="preserve"><value>전체</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>언어</value></data>
   <data name="Settings_UiScale" xml:space="preserve"><value>UI 배율</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>전투 초기화 단축키</value></data>

@@ -52,6 +52,11 @@
   <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>開啟</value></data>
   <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>顯示行數</value></data>
+  <data name="Settings_CombatantStatisticsScope" xml:space="preserve"><value>統計範圍</value></data>
+  <data name="Settings_CombatantStatisticsScope_Self" xml:space="preserve"><value>自己</value></data>
+  <data name="Settings_CombatantStatisticsScope_Party" xml:space="preserve"><value>組隊</value></data>
+  <data name="Settings_CombatantStatisticsScope_Force" xml:space="preserve"><value>部隊</value></data>
+  <data name="Settings_CombatantStatisticsScope_All" xml:space="preserve"><value>全部</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
   <data name="Settings_UiScale" xml:space="preserve"><value>介面縮放</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戰鬥重置快捷鍵</value></data>

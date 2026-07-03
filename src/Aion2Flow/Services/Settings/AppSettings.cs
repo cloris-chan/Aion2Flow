@@ -12,6 +12,8 @@ public sealed class AppSettings
 
     public CombatantSortMetric CombatantSortMetric { get; set; } = CombatantSortMetric.DamagePerSecond;
 
+    public CombatantStatisticsScope CombatantStatisticsScope { get; set; } = CombatantStatisticsScope.All;
+
     public SceneKind SceneKind { get; set; } = SceneKind.Standard;
 
     public bool UseCompactMainMetrics { get; set; } = true;

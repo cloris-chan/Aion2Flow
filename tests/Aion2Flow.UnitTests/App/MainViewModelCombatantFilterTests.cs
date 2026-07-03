@@ -128,6 +128,70 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_AllScope_UsesExistingVisiblePlayerLogic()
+    {
+        var fixture = MainViewModelFixture.Create();
+        AppendScopedCombatants(fixture);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal([100, 200, 300, 400], fixture.ViewModel.Combatants.Select(static row => row.Id));
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SelfScope_ShowsOnlyLocalPlayer()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Self;
+        AppendScopedCombatants(fixture);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal([100], fixture.ViewModel.Combatants.Select(static row => row.Id));
+    }
+
+    [Fact]
+    public void RefreshCombatStats_SelfScope_UsesLocalPlayerIdentityWithoutClass()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Self;
+        fixture.AppendSceneIdentity(100, "Self", isLocalPlayer: true);
+        fixture.AppendSceneIdentity(200, "Other");
+        fixture.AppendSceneDamage(100, 900_002, 999_999, 500, 3_000, 1);
+        fixture.AppendSceneDamage(200, 900_002, 11000010, 1_000, 3_100, 2);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(100, row.Id);
+        Assert.Null(row.CharacterClass);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_PartyScope_ShowsLocalPlayerAndPartyMembers()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Party;
+        AppendScopedCombatants(fixture);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal([100, 200], fixture.ViewModel.Combatants.Select(static row => row.Id));
+    }
+
+    [Fact]
+    public void RefreshCombatStats_ForceScope_ShowsLocalPlayerPartyAndForceMembers()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Force;
+        AppendScopedCombatants(fixture);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal([100, 200, 300], fixture.ViewModel.Combatants.Select(static row => row.Id));
+    }
+
+    [Fact]
     public void RefreshCombatStats_SceneMode_DisplaysSceneSnapshot()
     {
         var fixture = MainViewModelFixture.Create();
@@ -864,6 +928,10 @@ public sealed class MainViewModelCombatantFilterTests
 
         public void AppendSceneNickname(int playerId, string name) => MainViewModelCombatantFilterTests.AppendSceneNickname(_captureService.Scene, playerId, name);
 
+        public void AppendSceneIdentity(int playerId, string name, bool isLocalPlayer = false) => MainViewModelCombatantFilterTests.AppendSceneIdentity(_captureService.Scene, playerId, name, isLocalPlayer);
+
+        public void AppendScenePlayerGroupMember(int playerId, PlayerGroupMembership membership) => MainViewModelCombatantFilterTests.AppendScenePlayerGroupMember(_captureService.Scene, playerId, membership);
+
         public IRuntimeObservationSink CreateLiveSink() => SceneSinkFactory.CreateForLive(_captureService.Scene)();
 
         public SceneCombatSnapshot CreateSceneSnapshot() => _captureService.Scene.Owner.CreateSnapshot();
@@ -915,9 +983,19 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     private static void AppendSceneNickname(SceneLiveReadModel scene, int playerId, string name)
+        => AppendSceneIdentity(scene, playerId, name);
+
+    private static void AppendSceneIdentity(SceneLiveReadModel scene, int playerId, string name, bool isLocalPlayer = false)
     {
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
-        sink.AppendNickname(playerId, name);
+        sink.AppendNickname(playerId, name, isLocalPlayer: isLocalPlayer);
+    }
+
+    private static void AppendScenePlayerGroupMember(SceneLiveReadModel scene, int playerId, PlayerGroupMembership membership)
+    {
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var source = SyntheticObservationExtensions.Source();
+        sink.AppendPlayerGroupMember(in source, playerId, in membership);
     }
 
     private static void AppendLiveBattle(IRuntimeObservationSink sink, long sceneStartedMilliseconds, int playerId, string name, int damage, long start, long end, long firstBatchOrdinal)
@@ -1013,6 +1091,21 @@ public sealed class MainViewModelCombatantFilterTests
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
         sink.StageDestinationMap(mapId);
         sink.StageDestinationMapInstance(instanceId);
+    }
+
+    private static void AppendScopedCombatants(MainViewModelFixture fixture)
+    {
+        fixture.AppendSceneIdentity(100, "Self", isLocalPlayer: true);
+        fixture.AppendSceneIdentity(200, "Party");
+        fixture.AppendSceneIdentity(300, "Force");
+        fixture.AppendSceneIdentity(400, "Other");
+        fixture.AppendScenePlayerGroupMember(100, PlayerGroupMembership.Force(7, 1, 1));
+        fixture.AppendScenePlayerGroupMember(200, PlayerGroupMembership.Force(7, 1, 2));
+        fixture.AppendScenePlayerGroupMember(300, PlayerGroupMembership.Force(7, 3, 1));
+        fixture.AppendSceneDamage(100, 900_002, 11000010, 1_000, 3_000, 1);
+        fixture.AppendSceneDamage(200, 900_002, 11000010, 800, 3_100, 2);
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 600, 3_200, 3);
+        fixture.AppendSceneDamage(400, 900_002, 11000010, 400, 3_300, 4);
     }
 
     private static double GetHueDistance(Color left, Color right)

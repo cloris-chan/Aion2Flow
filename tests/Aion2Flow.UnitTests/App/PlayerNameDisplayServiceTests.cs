@@ -176,6 +176,17 @@ public sealed class PlayerNameDisplayServiceTests
     }
 
     [Fact]
+    public void SettingsService_PersistsCombatantStatisticsScope()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "Aion2Flow.Tests", $"{Guid.NewGuid():N}.json");
+        var settings = new SettingsService(path);
+
+        settings.Update(static s => s.CombatantStatisticsScope = CombatantStatisticsScope.Force);
+
+        Assert.Equal(CombatantStatisticsScope.Force, new SettingsService(path).Current.CombatantStatisticsScope);
+    }
+
+    [Fact]
     public void SettingsService_PersistsAndClampsUiScalePercent()
     {
         var path = Path.Combine(Path.GetTempPath(), "Aion2Flow.Tests", $"{Guid.NewGuid():N}.json");
