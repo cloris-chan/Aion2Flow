@@ -100,6 +100,9 @@ public sealed class ResourcePackTests
     [InlineData(ResourceLanguage.TraditionalChinese, 17121450, "痊癒光輝", SkillCategory.Cleric, SkillSourceType.PcSkill, "STR_SKILL_PC_CLERIC_17121450")]
     [InlineData(ResourceLanguage.English, 11800008, "Murderous Burst", SkillCategory.Gladiator, SkillSourceType.PcSkill, "STR_SKILL_PC_GLADIATOR_11800008")]
     [InlineData(ResourceLanguage.English, 19010000, "Flurry", SkillCategory.Brawler, SkillSourceType.PcSkill, "STR_SKILL_PC_FIGHTER_19010000")]
+    [InlineData(ResourceLanguage.TraditionalChinese, 19150350, "升天擊[暴走]", SkillCategory.Brawler, SkillSourceType.PcSkill, "STR_SKILL_PC_FIGHTER_19160350")]
+    [InlineData(ResourceLanguage.TraditionalChinese, 19160351, "升天擊第1階段", SkillCategory.Brawler, SkillSourceType.PcSkill, "STR_SKILL_PC_FIGHTER_19150001")]
+    [InlineData(ResourceLanguage.TraditionalChinese, 19190120, "爆裂拳[暴走]", SkillCategory.Brawler, SkillSourceType.PcSkill, "STR_SKILL_PC_FIGHTER_19200120")]
     [InlineData(ResourceLanguage.TraditionalChinese, 3001110, "神石：海格黛的束縛", SkillCategory.Item, SkillSourceType.ClientSkill, "SkillString_ITEM_3001110")]
     public void Skills_Expose_SkillDat_Based_Identity_With_Localized_Text(
         string language,
@@ -166,6 +169,10 @@ public sealed class ResourcePackTests
     [Theory]
     [InlineData(17040250, 17040000, 17040250, 17040000, 0b10010, 0, false)]
     [InlineData(19010040, 19010000, 19010040, 19010000, 0b01000, 0, false)]
+    [InlineData(19010047, 19010000, 19010047, 19010000, 0b01000, 7, false)]
+    [InlineData(19150350, 19150000, 19150350, 19150000, 0b10100, 0, true)]
+    [InlineData(19160351, 19160000, 19160351, 19160000, 0b10100, 1, false)]
+    [InlineData(19190120, 19190000, 19190120, 19190000, 0b00011, 0, true)]
     [InlineData(1227237, 1227237, 1227237, 1227237, 0, 0, false)]
     [InlineData(12090230, 12090000, 12090230, 12090000, 0b00110, 0, true)]
     public void SkillDisplayProjections_Expose_Resource_Display_Projection(
@@ -194,7 +201,6 @@ public sealed class ResourcePackTests
     [InlineData(16030047, 16030000, 16030040, 16030000, 0b01000, 7)]
     [InlineData(16257000, 16107000, 16107000, 16250000, 0, 0)]
     [InlineData(18370047, 18370000, 18370000, 18370000, 0b01000, 7)]
-    [InlineData(19010047, 19010000, 19010040, 19010000, 0b01000, 7)]
     public void SkillDisplayProjections_Expose_Packet_Display_Projection(
         int skillCode,
         int expectedPresentationSkillId,
@@ -232,6 +238,10 @@ public sealed class ResourcePackTests
     [InlineData(16300243, "ICON_EL_SKILL_030.webp")]
     [InlineData(17440000, "ICON_CL_SKILL_046.webp")]
     [InlineData(17440047, "ICON_CL_SKILL_046.webp")]
+    [InlineData(19150350, "ICON_GT_SKILL_015.webp")]
+    [InlineData(19160351, "ICON_GT_SKILL_016.webp")]
+    [InlineData(19190120, "ICON_GT_SKILL_019.webp")]
+    [InlineData(19200120, "ICON_GT_SKILL_020.webp")]
     [InlineData(3001110, "Icon_Item_Usable_Godstone_WP_r_004.webp")]
     [InlineData(30011101, "Icon_Item_Usable_Godstone_WP_r_004.webp")]
     [InlineData(3000122, "Icon_Item_Usable_Godstone_WP_r_016.webp")]
