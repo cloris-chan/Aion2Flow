@@ -50,7 +50,7 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
 
     public bool StagePendingDestinationMapFromSceneState(in PacketObservationSource packet, uint value)
     {
-        if (!SceneMapIdClassifier.IsSceneStateMapId(value))
+        if (!SceneMapIdClassifier.IsAmbiguousSceneStateMapId(value))
         {
             return false;
         }
@@ -61,7 +61,18 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
 
     public bool ConfirmDestinationMapFromSceneState(in PacketObservationSource packet, uint value)
     {
-        if (!SceneMapIdClassifier.IsSceneStateMapId(value))
+        if (!SceneMapIdClassifier.IsAmbiguousSceneStateMapId(value))
+        {
+            return false;
+        }
+
+        sink.ConfirmDestinationMap(in packet, value, allowSameMapReload: true);
+        return true;
+    }
+
+    public bool ConfirmDestinationMapFromMapEvent(in PacketObservationSource packet, uint value)
+    {
+        if (!SceneMapIdClassifier.IsPacketMapEventId(value))
         {
             return false;
         }

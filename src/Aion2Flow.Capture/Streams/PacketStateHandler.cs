@@ -113,6 +113,22 @@ internal sealed class PacketStateHandler
         return context.MarkParsed();
     }
 
+    public static bool ParseMapEventPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context, ushort opcode)
+    {
+        if (!PacketMapEventParser.TryParse(packet, out var parsed))
+        {
+            return false;
+        }
+
+        var source = context.CreateObservationSource(opcode, packet.Length);
+        if (!context.Writer.ConfirmDestinationMapFromMapEvent(in source, parsed.MapId))
+        {
+            return false;
+        }
+
+        return context.MarkParsed();
+    }
+
     public static bool ParseState4136Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (!Packet4136Parser.TryParse(packet, out var parsed))

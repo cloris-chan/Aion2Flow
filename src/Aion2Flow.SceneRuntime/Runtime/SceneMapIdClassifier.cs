@@ -1,18 +1,14 @@
-using Cloris.Aion2Flow.Resources.Catalog;
-
 namespace Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 internal static class SceneMapIdClassifier
 {
-    private static readonly Lazy<HashSet<uint>> KnownResourceMapIds = new(LoadKnownResourceMapIds);
+    public static bool IsPacketMapEventId(uint value) => value != 0;
 
-    public static bool IsSceneStateMapId(uint value)
-        => value != 0 && (KnownResourceMapIds.Value.Contains(value) || IsRuntimeMapIdRange(value));
-
-    private static bool IsRuntimeMapIdRange(uint value)
-        => value is (>= 1000 and < 2000)
+    public static bool IsAmbiguousSceneStateMapId(uint value)
+        => value is (>= 20 and < 2000)
+            or (>= 100000 and < 200000)
             or (>= 200000 and < 300000)
-            or (>= 500000 and < 700000);
-
-    private static HashSet<uint> LoadKnownResourceMapIds() => [.. ResourceCatalog.LoadShared().KnownMapIds];
+            or (>= 300000 and < 400000)
+            or (>= 500000 and < 700000)
+            or (>= 800000 and < 900000);
 }

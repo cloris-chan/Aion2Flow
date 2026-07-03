@@ -248,6 +248,7 @@ public sealed class ResourcePackTests
     [InlineData(20u, "渾沌艾雷修藍塔下層")]
     [InlineData(22u, "渾沌艾雷修藍塔中層")]
     [InlineData(50u, "萬神殿")]
+    [InlineData(1000u, "波伊塔")]
     [InlineData(1010u, "斐爾特朗")]
     [InlineData(154001u, "科赫塔監視哨所")]
     [InlineData(200003u, "惡夢")]
@@ -258,6 +259,7 @@ public sealed class ResourcePackTests
     [InlineData(600011u, "烏努庫庫峽谷")]
     [InlineData(600091u, "凶猛的角岩窟")]
     [InlineData(600121u, "無之搖籃")]
+    [InlineData(840037u, "褪色的脈動書庫")]
     [InlineData(500017u, "布里特拉空襲")]
     public void Maps_Resolve_Client_Table_Scene_Id_Aliases(uint mapId, string expectedName)
     {

@@ -54,6 +54,32 @@ internal static class CapturePacketTestData
         return [.. frame];
     }
 
+    public static byte[] BuildMapEvent0061Frame(uint mapId)
+    {
+        var payload = new List<byte> { 0x00, 0x61 };
+        AppendUInt32Le(payload, mapId);
+        payload.Add(0x03);
+        AppendUInt64Le(payload, 0x0000019F21876F5C);
+        AppendUInt64Le(payload, 0x0000019F2190C0E8);
+        return BuildFrame(payload);
+    }
+
+    public static byte[] BuildMapEvent0161Frame(uint mapId)
+    {
+        var payload = new List<byte> { 0x01, 0x61, 0x00 };
+        AppendUInt32Le(payload, mapId);
+        payload.AddRange([0x01, 0x00]);
+        return BuildFrame(payload);
+    }
+
+    public static byte[] BuildMapEvent0191Frame(uint mapId)
+    {
+        var payload = new List<byte> { 0x01, 0x91, 0x00, 0x00 };
+        AppendUInt32Le(payload, mapId);
+        AppendUInt32Le(payload, 0u);
+        return BuildFrame(payload);
+    }
+
     private static void Append0438Payload(List<byte> buffer, int targetId, int sourceId, int skillCode)
     {
         AppendVarInt(buffer, targetId);
@@ -89,6 +115,34 @@ internal static class CapturePacketTestData
         buffer.Add((byte)(raw >> 16));
         buffer.Add((byte)(raw >> 24));
     }
+
+    private static void AppendUInt32Le(List<byte> buffer, uint value)
+    {
+        buffer.Add((byte)value);
+        buffer.Add((byte)(value >> 8));
+        buffer.Add((byte)(value >> 16));
+        buffer.Add((byte)(value >> 24));
+    }
+
+    private static void AppendUInt64Le(List<byte> buffer, ulong value)
+    {
+        buffer.Add((byte)value);
+        buffer.Add((byte)(value >> 8));
+        buffer.Add((byte)(value >> 16));
+        buffer.Add((byte)(value >> 24));
+        buffer.Add((byte)(value >> 32));
+        buffer.Add((byte)(value >> 40));
+        buffer.Add((byte)(value >> 48));
+        buffer.Add((byte)(value >> 56));
+    }
+
+    private static byte[] BuildFrame(List<byte> payload)
+    {
+        var frame = new List<byte>(payload.Count + 1);
+        AppendVarInt(frame, payload.Count + 4);
+        frame.AddRange(payload);
+        return [.. frame];
+    }
 }
 
 internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
@@ -96,6 +150,8 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
     public int CurrentTarget { get; set; }
     public int CombatObservationCount { get; private set; }
     public int LastSkillCode { get; private set; }
+    public int ConfirmedMapCount { get; private set; }
+    public uint LastConfirmedMapId { get; private set; }
 
     public int ResolveLifecycleId(int rawInstanceId) => rawInstanceId;
     public int RebindInstanceLifecycle(int rawInstanceId) => rawInstanceId;
@@ -130,6 +186,8 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
 
     public void ConfirmDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload)
     {
+        ConfirmedMapCount++;
+        LastConfirmedMapId = mapId;
     }
 
     public void ConfirmPendingDestinationMapArrival(in PacketObservationSource packet)
