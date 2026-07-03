@@ -29,7 +29,7 @@
         <SolidColorBrush x:Key="OverlayBrush.DetailSurfaceStrong">#6A070B0E</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailCard">#72070B0F</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSeparator">#16FFFFFF</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailDamageShareFill">#B8063A37</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailDamageShareFill">#C20B5F59</SolidColorBrush>
         <LinearGradientBrush x:Key="OverlayBrush.RowCardSelected" StartPoint="0%,0%" EndPoint="100%,0%">
             <GradientStop Color="#14000000" Offset="0" />
             <GradientStop Color="#1A000000" Offset="1" />
