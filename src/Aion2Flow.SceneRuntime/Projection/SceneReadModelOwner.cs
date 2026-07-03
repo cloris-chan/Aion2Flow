@@ -11,14 +11,14 @@ namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
 public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, TimeProvider? timeProvider = null)
 {
-    private const long BossFocusVisibilityTimeoutMilliseconds = 10_000;
+    public const long BossFocusVisibilityTimeoutMilliseconds = 10_000;
     private readonly Lock _gate = new();
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private DomainEventApplier _applier = new(entities, boundary, metadataRegistry, combat);
     private readonly SceneCombatSnapshotBuilder _snapshotBuilder = new();
     private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
     private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
-    private readonly Dictionary<BossDamageContributionKey, long> _bossDamageContributionScratch = [];
+    private readonly Dictionary<BossDamageContributionKey, BossDamageContributionAccumulator> _bossDamageContributionScratch = [];
     private readonly List<BossDamageContribution> _bossDamageContributionBuffer = [];
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
@@ -375,15 +375,16 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 continue;
 
             var key = new BossDamageContributionKey(pair.TargetId, sourceId);
-            ref var damage = ref CollectionsMarshal.GetValueRefOrAddDefault(_bossDamageContributionScratch, key, out _);
-            damage += pair.TotalDamage;
+            ref var contribution = ref CollectionsMarshal.GetValueRefOrAddDefault(_bossDamageContributionScratch, key, out _);
+            contribution.DamageAmount += pair.TotalDamage;
+            contribution.LastObservedAtMilliseconds = Math.Max(contribution.LastObservedAtMilliseconds, pair.LastObserved);
         }
 
         if (_bossDamageContributionScratch.Count == 0)
             return [];
 
-        foreach (var (key, damage) in _bossDamageContributionScratch)
-            _bossDamageContributionBuffer.Add(new BossDamageContribution(key.BossId, key.SourceCombatantId, damage));
+        foreach (var (key, contribution) in _bossDamageContributionScratch)
+            _bossDamageContributionBuffer.Add(new BossDamageContribution(key.BossId, key.SourceCombatantId, contribution.DamageAmount, contribution.LastObservedAtMilliseconds));
         _bossDamageContributionBuffer.Sort(static (left, right) =>
         {
             var cmp = left.BossId.CompareTo(right.BossId);
@@ -529,11 +530,17 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _snapshotCacheValidUntilMilliseconds = -1;
         }
     }
+
+    private struct BossDamageContributionAccumulator
+    {
+        public long DamageAmount;
+        public long LastObservedAtMilliseconds;
+    }
 }
 
 public readonly record struct SceneArchiveCapture(SceneCombatSnapshot Snapshot, SceneArchivePayload Payload);
 
-public readonly record struct BossDamageContribution(int BossId, int SourceCombatantId, long DamageAmount);
+public readonly record struct BossDamageContribution(int BossId, int SourceCombatantId, long DamageAmount, long LastObservedAtMilliseconds);
 
 internal readonly record struct BossDamageContributionKey(int BossId, int SourceCombatantId);
 

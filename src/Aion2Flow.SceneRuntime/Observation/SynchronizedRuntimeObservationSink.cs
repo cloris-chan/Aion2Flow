@@ -160,6 +160,11 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.AppendPlayerGroupMember(in packet, uid, in membership);
     }
 
+    public void AppendPlayerGroupProfile(in PacketObservationSource packet, int originServerId, string nickname, in PlayerGroupMembership membership)
+    {
+        lock (gate) inner.AppendPlayerGroupProfile(in packet, originServerId, nickname, in membership);
+    }
+
     public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode)
     {
         lock (gate) inner.AppendNpcCode(in packet, instanceId, npcCode);

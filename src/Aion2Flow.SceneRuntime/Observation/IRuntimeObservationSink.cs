@@ -62,6 +62,8 @@ public interface IRuntimeObservationSink
 
     void AppendPlayerGroupMember(in PacketObservationSource packet, int uid, in PlayerGroupMembership membership);
 
+    void AppendPlayerGroupProfile(in PacketObservationSource packet, int originServerId, string nickname, in PlayerGroupMembership membership);
+
     void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode);
 
     void AppendNpcName(in PacketObservationSource packet, int npcCode, string name);

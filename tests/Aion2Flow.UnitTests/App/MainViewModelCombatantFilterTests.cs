@@ -287,6 +287,85 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_ScopeSelf_HidesTrainingDummyFocusActivatedOnlyByOutOfScopeCombatant()
+    {
+        const int dummyNpcCode = 2_400_032;
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Self;
+        fixture.AppendSceneIdentity(100, "Self", isLocalPlayer: true);
+        fixture.AppendSceneIdentity(400, "Other");
+        fixture.AppendSceneDamage(400, 900_002, 11000010, 400, 3_000, 1);
+        fixture.AppendSceneBossFocus(900_002, dummyNpcCode, NpcKind.TrainingDummy, 80_000, 100_000, 3_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Empty(fixture.ViewModel.Combatants);
+        Assert.Empty(fixture.ViewModel.BossFocuses);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_ScopeSelf_HidesOutOfScopeBossFocusAndBossShare()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Self;
+        fixture.AppendSceneIdentity(100, "Self", isLocalPlayer: true);
+        fixture.AppendSceneIdentity(400, "Other");
+        fixture.AppendSceneDamage(100, 900_010, 11000010, 600, 2_500, 1);
+        fixture.AppendSceneDamage(400, 900_002, 11000010, 400, 3_000, 2);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 700, 1_000, 3_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(100, row.Id);
+        Assert.Empty(fixture.ViewModel.BossFocuses);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        Assert.False(row.HasBossShare);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_ScopeSelf_ShowsBossFocusActivatedByLocalCombatant()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Self;
+        fixture.AppendSceneIdentity(100, "Self", isLocalPlayer: true);
+        fixture.AppendSceneIdentity(400, "Other");
+        fixture.AppendSceneDamage(100, 900_002, 11000010, 600, 2_500, 1);
+        fixture.AppendSceneDamage(400, 900_003, 11000010, 400, 3_000, 2);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 700, 1_000, 3_500);
+        fixture.AppendSceneBossFocus(900_003, "Other Boss", 700, 1_000, 3_600);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        var focus = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.Equal(100, row.Id);
+        Assert.Equal(900_002, focus.InstanceId);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        Assert.True(row.HasBossShare);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_ScopeSelf_OutOfScopeDamageDoesNotRefreshBossFocusTimeout()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Self;
+        fixture.AppendSceneIdentity(100, "Self", isLocalPlayer: true);
+        fixture.AppendSceneIdentity(400, "Other");
+        fixture.AppendSceneDamage(100, 900_002, 11000010, 600, 1_000, 1);
+        fixture.AppendSceneDamage(400, 900_002, 11000010, 400, 12_000, 2);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 700, 1_000, 12_000);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(100, row.Id);
+        Assert.Empty(fixture.ViewModel.BossFocuses);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        Assert.False(row.HasBossShare);
+    }
+
+    [Fact]
     public void RefreshCombatStats_SceneMode_MergesTrainingDummyFocusDisplayByNpcCode()
     {
         const int dummyNpcCode = 2_400_032;

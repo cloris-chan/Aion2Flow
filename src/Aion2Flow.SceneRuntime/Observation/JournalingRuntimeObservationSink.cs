@@ -579,6 +579,34 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         });
     }
 
+    public void AppendPlayerGroupProfile(in PacketObservationSource packet, int originServerId, string nickname, in PlayerGroupMembership membership)
+    {
+        if (originServerId <= 0 || string.IsNullOrWhiteSpace(nickname) || !membership.IsKnown)
+            return;
+
+        var stamp = CreateStamp(in packet);
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneSessionId(),
+            Stamp = stamp,
+            Domain = ObservedEventDomain.State,
+            SourceEntityId = 0,
+            TargetEntityId = 0,
+            Raw = packet.Raw,
+            State = new StateObservation
+            {
+                EntityId = 0,
+                StateCode = StateCodes.PlayerGroupMembership,
+                Value0 = (int)membership.Kind,
+                Value1 = membership.SubPartyIndex,
+                DetailRaw = ((long)membership.GroupId << 8) | membership.MemberSlotIndex,
+                Text = nickname,
+                OriginServerId = originServerId,
+                GroupMembership = membership
+            }
+        });
+    }
+
     public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode)
     {
         instanceId = ResolveLifecycleId(instanceId);

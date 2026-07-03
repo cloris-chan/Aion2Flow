@@ -360,7 +360,13 @@ public sealed class DomainEventApplier
         if (state.StateCode == StateCodes.PlayerGroupMembership)
         {
             if (entry.SourceEntityId > 0 && state.GroupMembership.IsKnown)
+            {
                 _metadataRegistry.UpsertPlayerGroupMembership(entry.SourceEntityId, state.GroupMembership);
+            }
+            else if (state.GroupMembership.IsKnown && state.OriginServerId is > 0 && !string.IsNullOrWhiteSpace(state.Text))
+            {
+                _metadataRegistry.UpsertPlayerGroupProfile(state.OriginServerId.Value, state.Text, state.GroupMembership);
+            }
             return;
         }
 

@@ -163,7 +163,57 @@ public sealed class SceneIdentityTests
 
         registry.UpsertPlayerGroupMembership(300, PlayerGroupMembership.Force(7, 3, 1));
         Assert.True(registry.TryGetPcMetadata(300, out otherSquad));
+        Assert.Equal(PlayerGroupRelation.PartyMember, otherSquad.GroupRelation);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_LocalPlayerMetadata_RecalculatesExistingGroupRelations()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(100, "Self", originServerId: 2001);
+        registry.UpsertPcMetadata(200, "Same Party");
+        registry.UpsertPcMetadata(300, "Other Squad");
+
+        registry.UpsertPlayerGroupProfile(2001, "Self", PlayerGroupMembership.Party(5));
+        registry.UpsertPlayerGroupMembership(100, PlayerGroupMembership.Force(7, 2, 1));
+        registry.UpsertPlayerGroupMembership(200, PlayerGroupMembership.Force(7, 2, 2));
+        registry.UpsertPlayerGroupMembership(300, PlayerGroupMembership.Force(7, 3, 1));
+        Assert.True(registry.TryGetPcMetadata(100, out var preLocalSelf));
+        Assert.Equal(PlayerGroupRelation.PartyMember, preLocalSelf.GroupRelation);
+
+        registry.UpsertPcMetadata(100, "Self", isLocalPlayer: true, originServerId: 2001);
+
+        Assert.True(registry.TryGetPcMetadata(100, out var self));
+        Assert.True(registry.TryGetPcMetadata(200, out var sameParty));
+        Assert.True(registry.TryGetPcMetadata(300, out var otherSquad));
+        Assert.Equal(PlayerGroupRelation.Unknown, self.GroupRelation);
+        Assert.Equal(PlayerGroupRelation.PartyMember, sameParty.GroupRelation);
         Assert.Equal(PlayerGroupRelation.ForceMember, otherSquad.GroupRelation);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_DirectForceProfile_MarksForceMemberWithoutLocalForceRow()
+    {
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(100, "Self", isLocalPlayer: true);
+        registry.UpsertPcMetadata(200, "Force");
+
+        registry.UpsertPlayerGroupMembership(200, PlayerGroupMembership.Force(0, 0, 2));
+
+        Assert.True(registry.TryGetPcMetadata(200, out var forceMember));
+        Assert.Equal(PlayerGroupRelation.ForceMember, forceMember.GroupRelation);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_PlayerGroupProfile_ResolvesWhenMatchingPcMetadataArrives()
+    {
+        var registry = new RuntimeMetadataRegistry();
+
+        registry.UpsertPlayerGroupProfile(2002, "浮屠", PlayerGroupMembership.Party(5));
+        registry.UpsertPcMetadata(9551, "浮屠", originServerId: 2002);
+
+        Assert.True(registry.TryGetPcMetadata(9551, out var partyMember));
+        Assert.Equal(PlayerGroupRelation.PartyMember, partyMember.GroupRelation);
     }
 
     [Fact]

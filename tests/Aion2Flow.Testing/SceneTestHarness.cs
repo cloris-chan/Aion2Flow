@@ -220,6 +220,7 @@ public sealed class SceneTestHarness : IDisposable
         public void RegisterObservation2C38(in PacketObservationSource packet, int entityId, scoped ReadOnlySpan<AuraResultRecord> results) => inner.RegisterObservation2C38(in packet, entityId, results);
         public void AppendNickname(in PacketObservationSource packet, int uid, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null, string legionName = "") => inner.AppendNickname(in packet, uid, nickname, faction, characterClass, isLocalPlayer, originServerId, legionName);
         public void AppendPlayerGroupMember(in PacketObservationSource packet, int uid, in PlayerGroupMembership membership) => inner.AppendPlayerGroupMember(in packet, uid, in membership);
+        public void AppendPlayerGroupProfile(in PacketObservationSource packet, int originServerId, string nickname, in PlayerGroupMembership membership) => inner.AppendPlayerGroupProfile(in packet, originServerId, nickname, in membership);
         public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode) => inner.AppendNpcCode(in packet, instanceId, npcCode);
         public void AppendNpcName(in PacketObservationSource packet, int npcCode, string name) => inner.AppendNpcName(in packet, npcCode, name);
         public void AppendNpcKind(in PacketObservationSource packet, int instanceId, NpcKind kind) => inner.AppendNpcKind(in packet, instanceId, kind);

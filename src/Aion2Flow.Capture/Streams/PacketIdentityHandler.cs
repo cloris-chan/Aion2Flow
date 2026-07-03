@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
@@ -40,13 +41,19 @@ internal static class PacketIdentityHandler
 
     public static bool ParsePartyProfilePacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!PacketPlayerGroupParser.TryParsePartyProfile(packet, out var parsed))
+        var source = context.CreateObservationSource(0x0D92, packet.Length);
+        if (PacketPlayerGroupParser.TryParsePartyMember(packet, out var member))
+        {
+            AppendPlayerGroupMember(context, in source, in member);
+            return context.MarkParsed();
+        }
+
+        if (!PacketPlayerGroupParser.TryParsePartyProfile(packet, out var profile))
         {
             return false;
         }
 
-        var source = context.CreateObservationSource(0x0D92, packet.Length);
-        context.Sink.AppendPlayerGroupMember(in source, parsed.EntityId, PlayerGroupMembership.Party(parsed.MemberSlotIndex));
+        AppendPartyGroupProfile(context, in source, in profile);
         return context.MarkParsed();
     }
 
@@ -58,13 +65,50 @@ internal static class PacketIdentityHandler
         }
 
         var source = context.CreateObservationSource(0x1D96, packet.Length);
-        context.Sink.AppendPlayerGroupMember(in source, parsed.EntityId, PlayerGroupMembership.Force(parsed.GroupId, parsed.SubPartyIndex, parsed.MemberSlotIndex));
+        AppendPlayerGroupMember(context, in source, in parsed);
+        return context.MarkParsed();
+    }
+
+    public static bool ParseForceProfilePacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        if (!PacketPlayerGroupParser.TryParseForceProfile(packet, out var parsed))
+        {
+            return false;
+        }
+
+        var source = context.CreateObservationSource(0x1B96, packet.Length);
+        AppendPlayerGroupMember(context, in source, in parsed);
+        return context.MarkParsed();
+    }
+
+    public static bool ParsePartyMemberListPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        var members = new PacketPlayerGroupMember[6];
+        var count = PacketPlayerGroupParser.ParsePartyMemberList(packet, members);
+        var profiles = new PacketPlayerGroupProfile[6];
+        var profileCount = PacketPlayerGroupParser.ParsePartyProfileList(packet, profiles);
+        if (count == 0 && profileCount == 0)
+        {
+            return false;
+        }
+
+        var source = context.CreateObservationSource(0x0092, packet.Length);
+        for (var i = 0; i < count; i++)
+        {
+            AppendPlayerGroupMember(context, in source, in members[i]);
+        }
+
+        for (var i = 0; i < profileCount; i++)
+        {
+            AppendPartyGroupProfile(context, in source, in profiles[i]);
+        }
+
         return context.MarkParsed();
     }
 
     public static bool ParseForceMemberListPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        Span<PacketPlayerGroupMember> members = stackalloc PacketPlayerGroupMember[32];
+        var members = new PacketPlayerGroupMember[32];
         var count = PacketPlayerGroupParser.ParseMemberList(packet, members);
         if (count == 0)
         {
@@ -74,11 +118,7 @@ internal static class PacketIdentityHandler
         var source = context.CreateObservationSource(0x1E96, packet.Length);
         for (var i = 0; i < count; i++)
         {
-            var parsed = members[i];
-            var membership = parsed.Kind == PacketPlayerGroupKind.Force
-                ? PlayerGroupMembership.Force(parsed.GroupId, parsed.SubPartyIndex, parsed.MemberSlotIndex)
-                : PlayerGroupMembership.Party(parsed.MemberSlotIndex);
-            context.Sink.AppendPlayerGroupMember(in source, parsed.EntityId, in membership);
+            AppendPlayerGroupMember(context, in source, in members[i]);
         }
 
         return context.MarkParsed();
@@ -86,6 +126,13 @@ internal static class PacketIdentityHandler
 
     public static bool ParseNicknamePacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
+        if (PacketPlayerGroupParser.TryParse048DPartyMember(packet, out var member))
+        {
+            var source = context.CreateObservationSource(0x048D, packet.Length);
+            AppendPlayerGroupMember(context, in source, in member);
+            return context.MarkParsed();
+        }
+
         if (!Packet048DNicknameParser.TryParse(packet, out var parsed))
         {
             return false;
@@ -93,5 +140,23 @@ internal static class PacketIdentityHandler
 
         context.Sink.AppendNickname(context.CreateObservationSource(0x048D, packet.Length), parsed.PlayerId, parsed.Nickname, PacketFactionMapper.ToFaction(parsed.FactionCode), originServerId: parsed.OriginServerId, legionName: parsed.LegionName);
         return context.MarkParsed();
+    }
+
+    private static void AppendPlayerGroupMember(PacketParseContext context, in PacketObservationSource source, in PacketPlayerGroupMember parsed)
+    {
+        if (parsed.HasIdentityProfile)
+        {
+            context.Sink.AppendNickname(in source, parsed.EntityId, parsed.Nickname, originServerId: parsed.OriginServerId);
+        }
+
+        var membership = parsed.Kind == PacketPlayerGroupKind.Force
+            ? PlayerGroupMembership.Force(parsed.GroupId, parsed.SubPartyIndex, parsed.MemberSlotIndex)
+            : PlayerGroupMembership.Party(parsed.MemberSlotIndex);
+        context.Sink.AppendPlayerGroupMember(in source, parsed.EntityId, in membership);
+    }
+
+    private static void AppendPartyGroupProfile(PacketParseContext context, in PacketObservationSource source, in PacketPlayerGroupProfile profile)
+    {
+        context.Sink.AppendPlayerGroupProfile(in source, profile.OriginServerId, profile.Nickname, PlayerGroupMembership.Party(profile.MemberSlotIndex));
     }
 }

@@ -9,4 +9,7 @@ public static class ReplayScenarioCatalog
     public const string CurrentClericDamageWithoutIdentity = "aion2flow.stream.20260702190835.log";
     public const string CurrentPartyForceRelation = "aion2flow.stream.20260702200648.log";
     public const string CurrentBrawlerExtendedSelfIdentity = "aion2flow.stream.20260703041828.log";
+    public const string CurrentCrossServerMatchedPartyRelation = "aion2flow.stream.20260704002230.log";
+    public const string CurrentForceDungeonInitialRelation = "aion2flow.stream.20260704005035.log";
+    public const string CurrentActivityDungeonIndependentPlayers = "aion2flow.stream.20260704010004.log";
 }

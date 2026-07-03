@@ -145,6 +145,68 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260704002230_Parses_CrossServerMatchedPartyRelations()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentCrossServerMatchedPartyRelation}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x0092 &&
+                            entry.State is { EntityId: 10780, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x048D &&
+                            entry.State is { EntityId: 14000, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
+
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 9975, 10780, 14000, 14819);
+        AssertGroupRelation(replay, 12478, PlayerGroupRelation.Unknown);
+    }
+
+    [Fact]
+    public void Replay_20260704005035_Parses_ForceDungeonInitialRelations()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentForceDungeonInitialRelation}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x1B96 &&
+                            entry.State is { EntityId: 8108, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Force, GroupMembership.GroupId: 0 });
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x0D92 &&
+                            entry.SourceEntityId == 0 &&
+                            entry.State is { EntityId: 0, StateCode: StateCodes.PlayerGroupMembership, Text: "浮屠", OriginServerId: 2002, GroupMembership.Kind: PlayerGroupKind.Party, GroupMembership.MemberSlotIndex: 5 });
+
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x0092 &&
+                            entry.SourceEntityId == 0 &&
+                            entry.State is { EntityId: 0, StateCode: StateCodes.PlayerGroupMembership, Text: "浮屠", OriginServerId: 2002, GroupMembership.Kind: PlayerGroupKind.Party, GroupMembership.MemberSlotIndex: 5 });
+
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 1285, 2664, 9551, 15547);
+        AssertGroupRelations(replay, PlayerGroupRelation.ForceMember, 870, 6538, 8108, 9301, 15480);
+        AssertGroupRelation(replay, 9142, PlayerGroupRelation.Unknown);
+    }
+
+    [Fact]
+    public void Replay_20260704010004_KeepsActivityDungeonPlayersIndependent()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentActivityDungeonIndependentPlayers}"));
+
+        AssertGroupRelations(replay, PlayerGroupRelation.Unknown, 4520, 4990, 7048, 7329, 9974, 10532);
+    }
+
+    [Fact]
     public void Replay_20260702181554_Parses_Current0438_Defensive_Result_Modifiers()
     {
         SetResources();
@@ -328,6 +390,18 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(matching.Sum(e => e.Observation.Damage) == expectedAmount, $"amount={matching.Sum(e => e.Observation.Damage)} expected={expectedAmount}\n{skillDump}");
         Assert.All(matching, e => Assert.False(e.ContributesDamage));
         Assert.All(matching, e => Assert.True(e.ContributesHealing));
+    }
+
+    private static void AssertGroupRelations(PacketLogReplayResult replay, PlayerGroupRelation expectedRelation, params int[] entityIds)
+    {
+        foreach (var entityId in entityIds)
+            AssertGroupRelation(replay, entityId, expectedRelation);
+    }
+
+    private static void AssertGroupRelation(PacketLogReplayResult replay, int entityId, PlayerGroupRelation expectedRelation)
+    {
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(entityId, out var metadata), $"missing PC metadata for {entityId}");
+        Assert.Equal(expectedRelation, metadata.GroupRelation);
     }
 
     private static int CountHitsWith(SceneReplayPacket packet, DamageModifiers modifier)

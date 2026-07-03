@@ -25,10 +25,14 @@ public readonly record struct NpcCodeEntry(int InstanceId, int NpcCode);
 
 public readonly record struct MapCodeEntry(uint InstanceId, uint MapCode);
 
+internal readonly record struct PlayerGroupProfileKey(int OriginServerId, string Nickname);
+
 public sealed class RuntimeMetadataRegistry
 {
     private readonly Dictionary<int, PcMetadata> _pcMetadataByEntityId = [];
-    private readonly Dictionary<int, PlayerGroupMembership> _playerGroupMembershipByEntityId = [];
+    private readonly Dictionary<int, PlayerGroupMembership> _partyMembershipByEntityId = [];
+    private readonly Dictionary<int, PlayerGroupMembership> _forceMembershipByEntityId = [];
+    private readonly Dictionary<PlayerGroupProfileKey, PlayerGroupMembership> _profileMembershipByKey = [];
     private readonly Dictionary<int, int> _npcCodesByInstanceId = [];
     private readonly Dictionary<uint, uint> _mapCodesByInstanceId = [];
     private int _localPlayerEntityId;
@@ -47,6 +51,7 @@ public sealed class RuntimeMetadataRegistry
         nickname ??= string.Empty;
         legionName ??= string.Empty;
         var changed = false;
+        var recalculateGroupRelations = false;
         if (isLocalPlayer)
         {
             List<int>? previousLocalEntityIds = null;
@@ -73,7 +78,7 @@ public sealed class RuntimeMetadataRegistry
             if (_localPlayerEntityId != entityId)
             {
                 _localPlayerEntityId = entityId;
-                changed |= RecalculateForceRelations();
+                recalculateGroupRelations = true;
             }
         }
 
@@ -93,18 +98,27 @@ public sealed class RuntimeMetadataRegistry
         var resolvedIsLocalPlayer = isLocalPlayer || exists && current.IsLocalPlayer;
         var resolvedOriginServerId = originServerId is > 0 ? originServerId : exists ? current.OriginServerId : null;
         var resolvedLegionName = !string.IsNullOrWhiteSpace(legionName) ? legionName : exists ? current.LegionName : string.Empty;
-        var resolvedGroupRelation = exists ? current.GroupRelation : PlayerGroupRelation.Unknown;
+        var resolvedGroupRelation = resolvedIsLocalPlayer
+            ? PlayerGroupRelation.Unknown
+            : exists
+                ? current.GroupRelation
+                : PlayerGroupRelation.Unknown;
         var next = new PcMetadata(entityId, resolvedNickname, resolvedFaction, resolvedClass, resolvedIsLocalPlayer, resolvedOriginServerId, resolvedLegionName, resolvedGroupRelation);
-        if (exists && current.Equals(next))
+        if (!exists || !current.Equals(next))
         {
-            if (changed)
-                _revision++;
-            return changed;
+            current = next;
+            changed = true;
         }
 
-        current = next;
-        _revision++;
-        return true;
+        if (resolvedOriginServerId is > 0 && !string.IsNullOrWhiteSpace(resolvedNickname))
+            changed |= ApplyProfileGroupMembership(entityId, resolvedOriginServerId.Value, resolvedNickname);
+
+        if (recalculateGroupRelations)
+            changed |= RecalculateGroupRelations();
+
+        if (changed)
+            _revision++;
+        return changed;
     }
 
     public bool UpsertPlayerGroupMembership(int entityId, PlayerGroupMembership membership)
@@ -112,28 +126,41 @@ public sealed class RuntimeMetadataRegistry
         if (entityId <= 0 || !membership.IsKnown)
             return false;
 
-        var changed = false;
-        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_playerGroupMembershipByEntityId, entityId, out var exists);
-        if (membership.Kind == PlayerGroupKind.Party && exists && current.Kind == PlayerGroupKind.Force)
-        {
-            changed = ApplyPartyGroupRelation(entityId);
-            if (changed)
-                _revision++;
-            return changed;
-        }
+        var changed = UpsertPlayerGroupMembershipCore(entityId, membership);
+        if (changed)
+            _revision++;
+        return changed;
+    }
 
+    public bool UpsertPlayerGroupProfile(int originServerId, string nickname, PlayerGroupMembership membership)
+    {
+        if (originServerId <= 0 || string.IsNullOrWhiteSpace(nickname) || !membership.IsKnown)
+            return false;
+
+        var key = new PlayerGroupProfileKey(originServerId, nickname);
+        var changed = false;
+        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_profileMembershipByKey, key, out var exists);
         if (!exists || !current.Equals(membership))
         {
             current = membership;
             changed = true;
         }
 
-        changed |= membership.Kind == PlayerGroupKind.Force
-            ? ApplyForceGroupRelation(entityId, membership)
-            : ApplyPartyGroupRelation(entityId);
+        List<int>? matchingEntityIds = null;
+        foreach (var (entityId, metadata) in _pcMetadataByEntityId)
+        {
+            if (metadata.OriginServerId == originServerId && string.Equals(metadata.Nickname, nickname, StringComparison.Ordinal))
+            {
+                matchingEntityIds ??= [];
+                matchingEntityIds.Add(entityId);
+            }
+        }
 
-        if (entityId == _localPlayerEntityId && membership.Kind == PlayerGroupKind.Force)
-            changed |= RecalculateForceRelations();
+        if (matchingEntityIds is not null)
+        {
+            for (var i = 0; i < matchingEntityIds.Count; i++)
+                changed |= UpsertPlayerGroupMembershipCore(matchingEntityIds[i], membership);
+        }
 
         if (changed)
             _revision++;
@@ -228,23 +255,65 @@ public sealed class RuntimeMetadataRegistry
 
     public void Clear()
     {
-        if (_pcMetadataByEntityId.Count == 0 && _playerGroupMembershipByEntityId.Count == 0 && _npcCodesByInstanceId.Count == 0 && _mapCodesByInstanceId.Count == 0)
+        if (_pcMetadataByEntityId.Count == 0 && _partyMembershipByEntityId.Count == 0 && _forceMembershipByEntityId.Count == 0 && _profileMembershipByKey.Count == 0 && _npcCodesByInstanceId.Count == 0 && _mapCodesByInstanceId.Count == 0)
             return;
 
         _pcMetadataByEntityId.Clear();
-        _playerGroupMembershipByEntityId.Clear();
+        _partyMembershipByEntityId.Clear();
+        _forceMembershipByEntityId.Clear();
+        _profileMembershipByKey.Clear();
         _npcCodesByInstanceId.Clear();
         _mapCodesByInstanceId.Clear();
         _localPlayerEntityId = 0;
         _revision++;
     }
 
-    private bool ApplyPartyGroupRelation(int entityId)
+    private bool UpsertPlayerGroupMembershipCore(int entityId, in PlayerGroupMembership membership)
+    {
+        if (entityId <= 0 || !membership.IsKnown)
+            return false;
+
+        var changed = membership.Kind switch
+        {
+            PlayerGroupKind.Party => UpsertMembership(_partyMembershipByEntityId, entityId, membership),
+            PlayerGroupKind.Force => UpsertMembership(_forceMembershipByEntityId, entityId, membership),
+            _ => false
+        };
+
+        changed |= ApplyCurrentGroupRelation(entityId);
+
+        if (entityId == _localPlayerEntityId && membership.Kind == PlayerGroupKind.Force)
+            changed |= RecalculateGroupRelations();
+
+        return changed;
+    }
+
+    private static bool UpsertMembership(Dictionary<int, PlayerGroupMembership> memberships, int entityId, in PlayerGroupMembership membership)
+    {
+        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(memberships, entityId, out var exists);
+        if (exists && current.Equals(membership))
+            return false;
+
+        current = membership;
+        return true;
+    }
+
+    private bool ApplyProfileGroupMembership(int entityId, int originServerId, string nickname)
+    {
+        return _profileMembershipByKey.TryGetValue(new PlayerGroupProfileKey(originServerId, nickname), out var membership) &&
+               UpsertPlayerGroupMembershipCore(entityId, membership);
+    }
+
+    private bool ApplyCurrentGroupRelation(int entityId)
     {
         if (entityId == _localPlayerEntityId)
             return SetGroupRelation(entityId, PlayerGroupRelation.Unknown);
 
-        return SetGroupRelation(entityId, PlayerGroupRelation.PartyMember);
+        if (_partyMembershipByEntityId.ContainsKey(entityId))
+            return SetGroupRelation(entityId, PlayerGroupRelation.PartyMember);
+
+        return _forceMembershipByEntityId.TryGetValue(entityId, out var membership) &&
+               ApplyForceGroupRelation(entityId, membership);
     }
 
     private bool ApplyForceGroupRelation(int entityId, in PlayerGroupMembership membership)
@@ -252,29 +321,32 @@ public sealed class RuntimeMetadataRegistry
         if (entityId == _localPlayerEntityId)
             return SetGroupRelation(entityId, PlayerGroupRelation.Unknown);
 
-        if (!_playerGroupMembershipByEntityId.TryGetValue(_localPlayerEntityId, out var localMembership) ||
-            localMembership.Kind != PlayerGroupKind.Force ||
+        if (_partyMembershipByEntityId.ContainsKey(entityId))
+            return SetGroupRelation(entityId, PlayerGroupRelation.PartyMember);
+
+        if (membership.GroupId == 0)
+            return SetGroupRelation(entityId, PlayerGroupRelation.ForceMember);
+
+        if (!_forceMembershipByEntityId.TryGetValue(_localPlayerEntityId, out var localMembership) ||
             localMembership.GroupId == 0 ||
             membership.GroupId != localMembership.GroupId)
-        {
             return false;
-        }
 
         return SetGroupRelation(
             entityId,
-            membership.SubPartyIndex == localMembership.SubPartyIndex
+            membership.SubPartyIndex != 0 && membership.SubPartyIndex == localMembership.SubPartyIndex
                 ? PlayerGroupRelation.PartyMember
                 : PlayerGroupRelation.ForceMember);
     }
 
-    private bool RecalculateForceRelations()
+    private bool RecalculateGroupRelations()
     {
         var changed = false;
-        foreach (var (entityId, membership) in _playerGroupMembershipByEntityId)
-        {
-            if (membership.Kind == PlayerGroupKind.Force)
-                changed |= ApplyForceGroupRelation(entityId, membership);
-        }
+        foreach (var entityId in _partyMembershipByEntityId.Keys)
+            changed |= ApplyCurrentGroupRelation(entityId);
+
+        foreach (var entityId in _forceMembershipByEntityId.Keys)
+            changed |= ApplyCurrentGroupRelation(entityId);
 
         return changed;
     }
