@@ -57,6 +57,43 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SelectBattleCombatant_Computes_DamageSkillShare_From_CurrentSectionTotal()
+    {
+        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+
+        using var scene = new SceneTestHarness();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+
+        const int playerId = 1001;
+        const int bossId = 9001;
+
+        scene.AppendNickname(playerId, "Perigee");
+        AppendPacket(scene.Sink, playerId, bossId, 11000010, 700, 1_000, CombatEventKind.Damage, CombatValueKind.Damage);
+        AppendPacket(scene.Sink, playerId, bossId, 99000010, 300, 2_000, CombatEventKind.Damage, CombatValueKind.Damage);
+
+        SelectSceneCombatant(viewModel, scene, playerId);
+
+        Assert.Equal(1000, viewModel.OutgoingDamage.Total);
+        var rows = viewModel.OutgoingDamage.Rows.OrderBy(static row => row.SkillCode).ToArray();
+        Assert.Collection(
+            rows,
+            row =>
+            {
+                Assert.Equal(11000010, row.SkillCode);
+                Assert.Equal(700, row.TotalAmount);
+                Assert.Equal(0.7d, row.SharePercent, 10);
+            },
+            row =>
+            {
+                Assert.Equal(99000010, row.SkillCode);
+                Assert.Equal(300, row.TotalAmount);
+                Assert.Equal(0.3d, row.SharePercent, 10);
+            });
+    }
+
+    [Fact]
     public void SelectBattleCombatant_Uses_Filtered_Damage_Duration_For_Subset_Counterparts()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
