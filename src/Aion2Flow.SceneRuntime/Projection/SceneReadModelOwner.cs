@@ -371,7 +371,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 continue;
 
             var sourceId = adapter.ResolveDetailCombatantId(pair.SourceId);
-            if (sourceId <= 0 || !snapshot.Combatants.TryGetValue(sourceId, out var sourceMetrics) || !sourceMetrics.IsVisiblePlayerCombatant || sourceMetrics.CharacterClass is null)
+            if (sourceId <= 0 || !snapshot.Combatants.TryGetValue(sourceId, out var sourceMetrics) || !sourceMetrics.IsVisiblePlayerCombatant)
                 continue;
 
             var key = new BossDamageContributionKey(pair.TargetId, sourceId);

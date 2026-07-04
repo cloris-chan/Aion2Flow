@@ -346,6 +346,27 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_ScopeSelf_ShowsBossFocusActivatedByClasslessLocalCombatant()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.Settings.CombatantStatisticsScope = CombatantStatisticsScope.Self;
+        fixture.AppendSceneIdentity(100, "Self", isLocalPlayer: true);
+        fixture.AppendSceneDamage(100, 900_002, 999_999, 300, 2_500, 1);
+        fixture.AppendSceneDamage(100, 900_002, 999_999, 300, 2_600, 2);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 700, 1_000, 3_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        var focus = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.Equal(100, row.Id);
+        Assert.Null(row.CharacterClass);
+        Assert.Equal(900_002, focus.InstanceId);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        Assert.True(row.HasBossShare);
+    }
+
+    [Fact]
     public void RefreshCombatStats_ScopeSelf_OutOfScopeDamageDoesNotRefreshBossFocusTimeout()
     {
         var fixture = MainViewModelFixture.Create();
