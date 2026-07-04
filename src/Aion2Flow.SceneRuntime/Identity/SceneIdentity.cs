@@ -140,9 +140,10 @@ public sealed class RuntimeMetadataRegistry
         var key = new PlayerGroupProfileKey(originServerId, nickname);
         var changed = false;
         ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_profileMembershipByKey, key, out var exists);
-        if (!exists || !current.Equals(membership))
+        var effectiveMembership = exists ? ResolveProfileMembership(current, membership) : membership;
+        if (!exists || !current.Equals(effectiveMembership))
         {
-            current = membership;
+            current = effectiveMembership;
             changed = true;
         }
 
@@ -159,7 +160,7 @@ public sealed class RuntimeMetadataRegistry
         if (matchingEntityIds is not null)
         {
             for (var i = 0; i < matchingEntityIds.Count; i++)
-                changed |= UpsertPlayerGroupMembershipCore(matchingEntityIds[i], membership);
+                changed |= UpsertPlayerGroupMembershipCore(matchingEntityIds[i], current);
         }
 
         if (changed)
@@ -296,6 +297,15 @@ public sealed class RuntimeMetadataRegistry
 
         current = membership;
         return true;
+    }
+
+    private static PlayerGroupMembership ResolveProfileMembership(in PlayerGroupMembership current, in PlayerGroupMembership incoming)
+    {
+        // Party profiles carry narrower membership than force roster profiles for the same player identity.
+        if (current.Kind == PlayerGroupKind.Party && incoming.Kind == PlayerGroupKind.Force)
+            return current;
+
+        return incoming;
     }
 
     private bool ApplyProfileGroupMembership(int entityId, int originServerId, string nickname)

@@ -145,7 +145,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260704002230_Parses_CrossServerMatchedPartyRelations()
+    public void Replay_20260704002230_Parses_CrossServerMatchedPartyRelationsFromExplicitPackets()
     {
         SetResources();
 
@@ -157,13 +157,13 @@ public sealed class PacketLogReplayServiceTests
             static entry => entry.Raw.Opcode == 0x0092 &&
                             entry.State is { EntityId: 10780, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
 
-        Assert.Contains(
+        Assert.DoesNotContain(
             entries,
             static entry => entry.Raw.Opcode == 0x048D &&
-                            entry.State is { EntityId: 14000, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
+                            entry.State is { StateCode: StateCodes.PlayerGroupMembership });
 
-        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 9975, 10780, 14000, 14819);
-        AssertGroupRelation(replay, 12478, PlayerGroupRelation.Unknown);
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 9975, 10780, 14819);
+        AssertGroupRelations(replay, PlayerGroupRelation.Unknown, 12478, 14000);
     }
 
     [Fact]
@@ -202,8 +202,59 @@ public sealed class PacketLogReplayServiceTests
         SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentActivityDungeonIndependentPlayers}"));
+        var entries = ReadAllJournalEntries(replay);
 
+        Assert.DoesNotContain(
+            entries,
+            static entry => entry.Raw.Opcode == 0x0A96 &&
+                            entry.State is { StateCode: StateCodes.PlayerGroupMembership });
         AssertGroupRelations(replay, PlayerGroupRelation.Unknown, 4520, 4990, 7048, 7329, 9974, 10532);
+    }
+
+    [Fact]
+    public void Replay_20260704153057_Parses_ForceRosterProfilesWithoutSceneIds()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentForceDungeonPreInstanceRoster}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        AssertForceRosterProfile(entries, "拳X", 2001, 1);
+        AssertForceRosterProfile(entries, "折柳", 2005, 2);
+        AssertForceRosterProfile(entries, "大奶的诱惑", 1004, 3);
+        AssertForceRosterProfile(entries, "Apple苹果", 2010, 4);
+        AssertForceRosterProfile(entries, "娜烏西卡", 2006, 5);
+        AssertForceRosterProfile(entries, "韭艾", 2012, 5);
+    }
+
+    [Fact]
+    public void Replay_20260704155002_DoesNotPromoteCombat048DFramesToGroupRelations()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentForceDungeonWithoutExplicitRelationPackets}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        Assert.DoesNotContain(
+            entries,
+            static entry => entry.Raw.Opcode == 0x048D &&
+                            entry.State is { StateCode: StateCodes.PlayerGroupMembership });
+
+        AssertGroupRelations(replay, PlayerGroupRelation.Unknown, 1339, 3316, 4110, 4909, 7740, 10984, 11101, 12588, 15338, 15481);
+    }
+
+    [Fact]
+    public void Replay_20260704153057_And_20260704155002_ResolvesForceDungeonRosterProfilesThroughGlobalRegistry()
+    {
+        SetResources();
+
+        var replay = ReplayCombinedFixtures(
+            ReplayScenarioCatalog.CurrentForceDungeonPreInstanceRoster,
+            ReplayScenarioCatalog.CurrentForceDungeonWithoutExplicitRelationPackets);
+
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 3316, 4909, 7740, 15338);
+        AssertGroupRelations(replay, PlayerGroupRelation.ForceMember, 1339, 4110, 10984, 11101, 12588);
+        AssertGroupRelation(replay, 15481, PlayerGroupRelation.Unknown);
     }
 
     [Fact]
@@ -315,6 +366,29 @@ public sealed class PacketLogReplayServiceTests
 
     private static void SetResources() => CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese));
 
+    private static PacketLogReplayResult ReplayCombinedFixtures(params string[] fixtureNames)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"aion2flow-replay-{Guid.NewGuid():N}.stream.log");
+        try
+        {
+            using (var writer = File.CreateText(path))
+            {
+                for (var i = 0; i < fixtureNames.Length; i++)
+                {
+                    foreach (var line in File.ReadLines(FixtureHelper.GetPath($"logs/{fixtureNames[i]}")))
+                        writer.WriteLine(line);
+                }
+            }
+
+            return PacketLogReplayService.Replay(path);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
     private static IReadOnlyList<ObservedEventEnvelope> ReadAllJournalEntries(PacketLogReplayResult replay)
     {
         var entries = new List<ObservedEventEnvelope>(replay.SceneJournal.Count);
@@ -402,6 +476,28 @@ public sealed class PacketLogReplayServiceTests
     {
         Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(entityId, out var metadata), $"missing PC metadata for {entityId}");
         Assert.Equal(expectedRelation, metadata.GroupRelation);
+    }
+
+    private static void AssertForceRosterProfile(IReadOnlyList<ObservedEventEnvelope> entries, string nickname, int originServerId, byte memberSlotIndex)
+    {
+        Assert.Contains(
+            entries,
+            entry => entry.Raw.Opcode == 0x0A96 &&
+                     entry.SourceEntityId == 0 &&
+                     entry.State is
+                     {
+                         EntityId: 0,
+                         StateCode: StateCodes.PlayerGroupMembership,
+                         Text: var text,
+                         OriginServerId: var stateOriginServerId,
+                         GroupMembership.Kind: PlayerGroupKind.Force,
+                         GroupMembership.GroupId: 0,
+                         GroupMembership.SubPartyIndex: 0,
+                         GroupMembership.MemberSlotIndex: var stateMemberSlotIndex
+                     } &&
+                     text == nickname &&
+                     stateOriginServerId == originServerId &&
+                     stateMemberSlotIndex == memberSlotIndex);
     }
 
     private static int CountHitsWith(SceneReplayPacket packet, DamageModifiers modifier)

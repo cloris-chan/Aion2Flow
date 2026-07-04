@@ -36,6 +36,7 @@ internal static class PacketOpcodeDispatcher
             (0x29, 0x33) => PacketIdentityHandler.ParseLegionMetadataPacket(packet, ref context),
             (0x35, 0x38) => PacketCombatHandler.Parse3538SidecarPacket(packet, ref context),
             (0x00, 0x92) => PacketIdentityHandler.ParsePartyMemberListPacket(packet, ref context),
+            (0x0a, 0x96) => PacketIdentityHandler.ParseForceRosterProfilePacket(packet, ref context),
             (0x0d, 0x92) => PacketIdentityHandler.ParsePartyProfilePacket(packet, ref context),
             (0x1b, 0x96) => PacketIdentityHandler.ParseForceProfilePacket(packet, ref context),
             (0x1d, 0x96) => PacketIdentityHandler.ParseForceMemberPacket(packet, ref context),

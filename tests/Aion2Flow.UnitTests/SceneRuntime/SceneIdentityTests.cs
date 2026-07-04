@@ -217,6 +217,32 @@ public sealed class SceneIdentityTests
     }
 
     [Fact]
+    public void RuntimeMetadataRegistry_PlayerGroupProfile_ResolvesForceWhenMatchingPcMetadataArrives()
+    {
+        var registry = new RuntimeMetadataRegistry();
+
+        registry.UpsertPlayerGroupProfile(2005, "折柳", PlayerGroupMembership.Force(0, 0, 2));
+        registry.UpsertPcMetadata(1339, "折柳", originServerId: 2005);
+
+        Assert.True(registry.TryGetPcMetadata(1339, out var forceMember));
+        Assert.Equal(PlayerGroupRelation.ForceMember, forceMember.GroupRelation);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_PlayerGroupProfile_DoesNotDowngradePartyProfileToForce()
+    {
+        var registry = new RuntimeMetadataRegistry();
+
+        registry.UpsertPlayerGroupProfile(2006, "娜烏西卡", PlayerGroupMembership.Force(0, 0, 5));
+        registry.UpsertPlayerGroupProfile(2006, "娜烏西卡", PlayerGroupMembership.Party(5));
+        registry.UpsertPlayerGroupProfile(2006, "娜烏西卡", PlayerGroupMembership.Force(0, 0, 5));
+        registry.UpsertPcMetadata(7740, "娜烏西卡", originServerId: 2006);
+
+        Assert.True(registry.TryGetPcMetadata(7740, out var partyMember));
+        Assert.Equal(PlayerGroupRelation.PartyMember, partyMember.GroupRelation);
+    }
+
+    [Fact]
     public void DomainEventApplier_RecordsMapInstanceCodeInRuntimeMetadataRegistry()
     {
         var boundary = new SceneBoundaryStore();

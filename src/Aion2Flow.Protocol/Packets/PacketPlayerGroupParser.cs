@@ -14,7 +14,7 @@ internal readonly record struct PacketPlayerGroupMember(PacketPlayerGroupKind Ki
     public bool HasIdentityProfile => OriginServerId > 0 && !string.IsNullOrEmpty(Nickname);
 }
 
-internal readonly record struct PacketPlayerGroupProfile(int OriginServerId, string Nickname, byte MemberSlotIndex);
+internal readonly record struct PacketPlayerGroupProfile(PacketPlayerGroupKind Kind, int OriginServerId, string Nickname, uint GroupId, byte SubPartyIndex, byte MemberSlotIndex);
 
 internal static class PacketPlayerGroupParser
 {
@@ -28,6 +28,10 @@ internal static class PacketPlayerGroupParser
     private const int ProfileListMinimumRowStride = 112;
     private const int ProfileListNameLengthOffset = 56;
     private const int CompactProfileNameLengthOffset = 55;
+    private const int ForceRosterServerOffset = 14;
+    private const int ForceRosterUuidMarkerOffset = 18;
+    private const int ForceRosterRepeatedServerOffset = ForceRosterUuidMarkerOffset + 1 + ExpectedUuidLength + 6;
+    private const int ForceRosterNameLengthOffset = ForceRosterRepeatedServerOffset + sizeof(ushort);
 
     public static bool TryParsePartyMember(ReadOnlySpan<byte> packet, out PacketPlayerGroupMember member)
     {
@@ -65,24 +69,13 @@ internal static class PacketPlayerGroupParser
         return TryReadCompactForceProfileRow(body, 0, out member, out _);
     }
 
-    public static bool TryParse048DPartyMember(ReadOnlySpan<byte> packet, out PacketPlayerGroupMember member)
+    public static bool TryParseForceRosterProfile(ReadOnlySpan<byte> packet, out PacketPlayerGroupProfile profile)
     {
-        member = default;
-        if (!TryReadPayload(packet, 0x04, 0x8D, out var body))
+        profile = default;
+        if (!TryReadPayload(packet, 0x0A, 0x96, out var body))
             return false;
 
-        var reader = new PacketSpanReader(body);
-        if (!reader.TryReadVarInt(out var entityId) || entityId <= 0)
-            return false;
-
-        if (!reader.TryAdvance(4) || !reader.TryReadVarInt(out var targetId) || targetId <= 0)
-            return false;
-
-        if (!Is048DPartyMemberTrailer(reader.RemainingSpan))
-            return false;
-
-        member = new PacketPlayerGroupMember(PacketPlayerGroupKind.Party, entityId, 0, 0, 0);
-        return true;
+        return TryReadForceRosterProfileRow(body, 0, out profile, out _);
     }
 
     public static int ParsePartyMemberList(ReadOnlySpan<byte> packet, Span<PacketPlayerGroupMember> destination)
@@ -306,7 +299,46 @@ internal static class PacketPlayerGroupParser
         if (!TryReadIdentityName(body, nameLengthOffset, requireValidText: true, out var nickname, out rowTailOffset))
             return false;
 
-        profile = new PacketPlayerGroupProfile(originServerId, nickname, memberSlotIndex);
+        profile = new PacketPlayerGroupProfile(PacketPlayerGroupKind.Party, originServerId, nickname, 0, 0, memberSlotIndex);
+        return true;
+    }
+
+    private static bool TryReadForceRosterProfileRow(ReadOnlySpan<byte> body, int rowOffset, out PacketPlayerGroupProfile profile, out int rowTailOffset)
+    {
+        profile = default;
+        rowTailOffset = 0;
+        if (rowOffset < 0 || rowOffset + ForceRosterNameLengthOffset + 1 > body.Length)
+            return false;
+
+        var memberSlotIndex = body[rowOffset + 9];
+        if (memberSlotIndex is < 1 or > 6 ||
+            BinaryPrimitives.ReadInt32LittleEndian(body[(rowOffset + 10)..]) != 0)
+        {
+            return false;
+        }
+
+        var originServerId = BinaryPrimitives.ReadUInt16LittleEndian(body[(rowOffset + ForceRosterServerOffset)..]);
+        var originServerIdCopy = BinaryPrimitives.ReadUInt16LittleEndian(body[(rowOffset + ForceRosterServerOffset + sizeof(ushort))..]);
+        if (!IsKnownServerId(originServerId) || originServerId != originServerIdCopy)
+            return false;
+
+        var uuidTextOffset = rowOffset + ForceRosterUuidMarkerOffset + 1;
+        var repeatedServerOffset = rowOffset + ForceRosterRepeatedServerOffset;
+        var nameLengthOffset = rowOffset + ForceRosterNameLengthOffset;
+        if (body[rowOffset + ForceRosterUuidMarkerOffset] != (byte)'$' ||
+            !IsUuidText(body.Slice(uuidTextOffset, ExpectedUuidLength)) ||
+            BinaryPrimitives.ReadUInt16LittleEndian(body[repeatedServerOffset..]) != originServerId)
+        {
+            return false;
+        }
+
+        if (!TryReadIdentityName(body, nameLengthOffset, requireValidText: true, out var nickname, out rowTailOffset) ||
+            NicknameParserUtil.TryReadClassCode(body, rowTailOffset) is null)
+        {
+            return false;
+        }
+
+        profile = new PacketPlayerGroupProfile(PacketPlayerGroupKind.Force, originServerId, nickname, 0, 0, memberSlotIndex);
         return true;
     }
 
@@ -415,23 +447,6 @@ internal static class PacketPlayerGroupParser
         }
 
         return true;
-    }
-
-    private static bool Is048DPartyMemberTrailer(ReadOnlySpan<byte> tail)
-    {
-        return tail.Length == 16 &&
-               tail[0] == 0 &&
-               tail[1] == 0 &&
-               tail[2] == 0 &&
-               tail[3] == 0 &&
-               tail[4] == 0 &&
-               tail[5] == 0 &&
-               tail[10] == 0 &&
-               tail[11] == 0 &&
-               tail[12] == 0 &&
-               tail[13] == 0 &&
-               tail[14] == 0x01 &&
-               tail[15] == 0x02;
     }
 
     private static bool IsKnownServerId(int serverId) => serverId is >= 1000 and <= 2999;
