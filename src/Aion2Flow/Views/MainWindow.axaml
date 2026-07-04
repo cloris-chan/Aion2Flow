@@ -94,7 +94,7 @@
 
                             <Grid ColumnDefinitions="*,Auto"
                                   ColumnSpacing="8"
-                                  Margin="14,2,8,2">
+                                  Margin="8,2,8,2">
                                 <Grid Grid.Column="0"
                                       ColumnDefinitions="*,Auto"
                                       ColumnSpacing="4"
@@ -208,8 +208,8 @@
                                                            IsHitTestVisible="False" />
 
                             <Grid ColumnDefinitions="2,*,Auto,Auto,Auto"
-                                  ColumnSpacing="8"
-                                  Margin="5,2">
+                                  ColumnSpacing="5"
+                                  Margin="3,2">
                                 <Border Grid.Column="0"
                                         Name="RowAccent"
                                         Classes="MainRowAccent" />

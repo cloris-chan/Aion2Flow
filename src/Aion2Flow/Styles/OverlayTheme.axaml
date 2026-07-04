@@ -28,6 +28,11 @@
         <SolidColorBrush x:Key="OverlayBrush.DetailSurface">#52060A0D</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSurfaceStrong">#6A070B0E</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailCard">#72070B0F</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailHudPanel">#5405080B</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailHudPanelSoft">#3205080B</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailHudPanelHover">#4A0A151D</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailHudLine">#4A7D9AAE</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailHudLineSoft">#24FFFFFF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSeparator">#16FFFFFF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailDamageShareFill">#C20B5F59</SolidColorBrush>
         <LinearGradientBrush x:Key="OverlayBrush.RowCardSelected" StartPoint="0%,0%" EndPoint="100%,0%">
@@ -686,10 +691,10 @@
 
     <Style Selector="Border.DetailFlyoutCard">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailBackdrop}" />
-        <Setter Property="BorderBrush" Value="#22FFFFFF" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLine}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="16" />
-        <Setter Property="Padding" Value="12" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="10" />
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
@@ -726,15 +731,17 @@
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
-        <Setter Property="Padding" Value="10,4,10,6" />
+        <Setter Property="Padding" Value="12,4,12,5" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="MinWidth" Value="72" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="MinWidth" Value="70" />
+        <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Name="TabChrome"
                         Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
                         CornerRadius="{TemplateBinding CornerRadius}"
                         Padding="{TemplateBinding Padding}">
                     <Grid RowDefinitions="Auto,2"
@@ -748,11 +755,11 @@
                                           Foreground="{TemplateBinding Foreground}" />
                         <Border Grid.Row="1"
                                 Name="TabIndicator"
-                                Width="18"
                                 Height="2"
-                                CornerRadius="999"
+                                Margin="8,0"
+                                CornerRadius="0"
                                 Background="Transparent"
-                                HorizontalAlignment="Center" />
+                                HorizontalAlignment="Stretch" />
                     </Grid>
                 </Border>
             </ControlTemplate>
@@ -760,7 +767,8 @@
     </Style>
 
     <Style Selector="ToggleButton.DetailDirectionTab:pointerover /template/ Border#TabChrome">
-        <Setter Property="Background" Value="#12000000" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelSoft}" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLine}" />
     </Style>
 
     <Style Selector="ToggleButton.DetailDirectionTab:pointerover">
@@ -772,7 +780,8 @@
     </Style>
 
     <Style Selector="ToggleButton.DetailDirectionTab:checked /template/ Border#TabChrome">
-        <Setter Property="Background" Value="#0CFFFFFF" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.BorderStrong}" />
     </Style>
 
     <Style Selector="ToggleButton.DetailDirectionTab:checked /template/ Border#TabIndicator">
@@ -811,13 +820,13 @@
     </Style>
 
     <Style Selector="Border.MetricCardSurface">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailCard}" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Padding" Value="7,5" />
-        <Setter Property="MinWidth" Value="84" />
-        <Setter Property="Margin" Value="0,0,4,4" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelSoft}" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLineSoft}" />
+        <Setter Property="BorderThickness" Value="2,0,0,1" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="MinWidth" Value="88" />
+        <Setter Property="Margin" Value="0,0,6,6" />
     </Style>
 
     <Style Selector="TextBlock.MetricLabel">
@@ -854,11 +863,11 @@
     </Style>
 
     <Style Selector="Border.CounterpartTable">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailSurfaceStrong}" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelSoft}" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="10" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="8" />
     </Style>
 
     <Style Selector="CheckBox.CounterpartSelectAll">
@@ -879,7 +888,7 @@
                                 Background="#12000000"
                                 BorderBrush="#52A8BED0"
                                 BorderThickness="1"
-                                CornerRadius="4" />
+                                CornerRadius="0" />
                         <Path Name="SelectionCheck"
                               Data="M 3.5 8 L 6.5 11 L 12.5 4.5"
                               Stroke="{StaticResource OverlayBrush.Text}"
@@ -889,7 +898,7 @@
                                 Width="8"
                                 Height="2"
                                 Background="{StaticResource OverlayBrush.Text}"
-                                CornerRadius="999"
+                                CornerRadius="0"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 IsVisible="False" />
@@ -945,7 +954,7 @@
                             Background="#12000000"
                             BorderBrush="#4E9EB6C7"
                             BorderThickness="1"
-                            CornerRadius="4" />
+                            CornerRadius="0" />
                     <Path Name="SelectionCheck"
                           Data="M 3.5 8 L 6.5 11 L 12.5 4.5"
                           Stroke="{StaticResource OverlayBrush.Text}"
@@ -955,7 +964,7 @@
                             Width="8"
                             Height="2"
                             Background="{StaticResource OverlayBrush.Text}"
-                            CornerRadius="999"
+                            CornerRadius="0"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             IsVisible="False" />
@@ -1010,14 +1019,16 @@
     </Style>
 
     <Style Selector="Border.CounterpartRow">
-        <Setter Property="CornerRadius" Value="6" />
-        <Setter Property="Padding" Value="8,4" />
-        <Setter Property="Background" Value="#10000000" />
-        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="6,4" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailSeparator}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Margin" Value="0" />
     </Style>
 
     <Style Selector="Border.CounterpartRow:pointerover">
-        <Setter Property="Background" Value="#18000000" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
     </Style>
 
     <Style Selector="controls|CombatantDisplay.CounterpartName TextBlock#PART_Text">
@@ -1054,11 +1065,11 @@
     </Style>
 
     <Style Selector="Border.DetailTableCard">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailSurfaceStrong}" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelSoft}" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="8" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="0" />
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
@@ -1069,27 +1080,44 @@
     </Style>
 
     <Style Selector="Border.DetailTableHeaderBand">
-        <Setter Property="Background" Value="#26000000" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLineSoft}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Padding" Value="10,7" />
     </Style>
 
     <Style Selector="Border.DetailTableRow">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailSeparator}" />
-        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Padding" Value="10,4" />
         <Setter Property="Margin" Value="0" />
     </Style>
 
-    <Style Selector="controls|FractionalProgressBar.DetailDamageShareBackground">
-        <Setter Property="Fill" Value="{StaticResource OverlayBrush.DetailDamageShareFill}" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="CornerRadius" Value="6" />
+    <Style Selector="controls|SegmentedTableSeparator.DetailTableHeaderSeparator">
         <Setter Property="IsHitTestVisible" Value="False" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="Margin" Value="0,0,0,-7" />
+    </Style>
+
+    <Style Selector="controls|SegmentedTableSeparator.DetailTableRowSeparator">
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="Margin" Value="0,0,0,-4" />
+    </Style>
+
+    <Style Selector="controls|FractionalProgressBar.DetailDamageShareBackground">
+        <Setter Property="Fill" Value="{StaticResource OverlayBrush.DetailDamageShareFill}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="Margin" Value="0,-2,0,-2" />
     </Style>
 
     <Style Selector="TextBlock.DetailTableHeader">

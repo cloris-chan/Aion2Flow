@@ -148,6 +148,10 @@
                                             <Border Classes="CounterpartRow">
                                                 <Grid ColumnDefinitions="Auto,*,96,60"
                                                       ColumnSpacing="4">
+                                                    <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                                      Grid.ColumnSpan="4"
+                                                                                      LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
+                                                                                      Classes="DetailTableRowSeparator" />
                                                     <CheckBox Grid.Column="0"
                                                               Classes="CounterpartRowCheckBox"
                                                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -203,6 +207,10 @@
                                         <ColumnDefinition Width="86" />
                                         <ColumnDefinition Width="86" />
                                     </Grid.ColumnDefinitions>
+                                    <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                      Grid.ColumnSpan="22"
+                                                                      LineBrush="{StaticResource OverlayBrush.DetailHudLineSoft}"
+                                                                      Classes="DetailTableHeaderSeparator" />
                                     <TextBlock Grid.Column="0"
                                                Classes="DetailTableHeaderLeft"
                                                Text="{markups:Translate Column_Skill}" />
@@ -302,6 +310,10 @@
                                                                                 Grid.ColumnSpan="21"
                                                                                 Classes="DetailDamageShareBackground"
                                                                                 Value="{Binding SharePercent}" />
+                                                <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                                  Grid.ColumnSpan="22"
+                                                                                  LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
+                                                                                  Classes="DetailTableRowSeparator" />
                                                 <controls:SkillDisplay Grid.Column="0"
                                                                        Classes="DetailRowText"
                                                                        SkillCode="{Binding SkillCode}"
@@ -579,6 +591,10 @@
                                             <Border Classes="CounterpartRow">
                                                 <Grid ColumnDefinitions="Auto,*,84,48,84,48"
                                                       ColumnSpacing="4">
+                                                    <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                                      Grid.ColumnSpan="6"
+                                                                                      LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
+                                                                                      Classes="DetailTableRowSeparator" />
                                                     <CheckBox Grid.Column="0"
                                                               Classes="CounterpartRowCheckBox"
                                                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -630,6 +646,10 @@
                                             <ColumnDefinition Width="80" />
                                             <ColumnDefinition Width="56" />
                                         </Grid.ColumnDefinitions>
+                                        <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                          Grid.ColumnSpan="8"
+                                                                          LineBrush="{StaticResource OverlayBrush.DetailHudLineSoft}"
+                                                                          Classes="DetailTableHeaderSeparator" />
                                         <TextBlock Grid.Column="0"
                                                    Classes="DetailTableHeaderLeft"
                                                    Text="{markups:Translate Column_Skill}" />
@@ -672,6 +692,10 @@
                                                         <ColumnDefinition Width="80" />
                                                         <ColumnDefinition Width="56" />
                                                     </Grid.ColumnDefinitions>
+                                                    <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                                      Grid.ColumnSpan="8"
+                                                                                      LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
+                                                                                      Classes="DetailTableRowSeparator" />
                                                     <controls:SkillDisplay Grid.Column="0"
                                                                            Classes="DetailRowText"
                                                                            SkillCode="{Binding SkillCode}"
@@ -730,6 +754,10 @@
                                             <ColumnDefinition Width="80" />
                                             <ColumnDefinition Width="56" />
                                         </Grid.ColumnDefinitions>
+                                        <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                          Grid.ColumnSpan="5"
+                                                                          LineBrush="{StaticResource OverlayBrush.DetailHudLineSoft}"
+                                                                          Classes="DetailTableHeaderSeparator" />
                                         <TextBlock Grid.Column="0"
                                                    Classes="DetailTableHeaderLeft"
                                                    Text="{markups:Translate Column_Skill}" />
@@ -760,6 +788,10 @@
                                                         <ColumnDefinition Width="80" />
                                                         <ColumnDefinition Width="56" />
                                                     </Grid.ColumnDefinitions>
+                                                    <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                                      Grid.ColumnSpan="5"
+                                                                                      LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
+                                                                                      Classes="DetailTableRowSeparator" />
                                                     <controls:SkillDisplay Grid.Column="0"
                                                                            Classes="DetailRowText"
                                                                            SkillCode="{Binding SkillCode}"
