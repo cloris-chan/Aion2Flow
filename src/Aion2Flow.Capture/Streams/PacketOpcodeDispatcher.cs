@@ -9,6 +9,9 @@ internal static class PacketOpcodeDispatcher
 
     public static bool TryParseExactFrame(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
+        if (!PacketTransportCodec.TryReadTransportLength(packet, 0, out var frameLength) || frameLength != packet.Length)
+            return false;
+
         var reader = new PacketSpanReader(packet);
         if (!reader.TryReadVarInt(out _)) return false;
         if (reader.Remaining < 2) return false;
