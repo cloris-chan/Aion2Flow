@@ -108,6 +108,36 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260705015611_Applies_CrossServer3336_SelfIdentityMarker3F()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentCrossServerSelfIdentityMarker3F}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        const int playerId = 5905;
+        var selfIdentityEntries = entries
+            .Where(static entry => entry.Raw.Opcode == 0x3336 &&
+                                   entry.State is
+                                   {
+                                       EntityId: playerId,
+                                       StateCode: StateCodes.PlayerIdentity,
+                                       Text: "綠豆冰糕",
+                                       IsLocalPlayer: true,
+                                       OriginServerId: 1007,
+                                       Faction: Faction.Light
+                                   })
+            .ToArray();
+
+        Assert.True(selfIdentityEntries.Length >= 3, $"self 3336 entries={selfIdentityEntries.Length}");
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(playerId, out var metadata));
+        Assert.Equal("綠豆冰糕", metadata.Nickname);
+        Assert.Equal(Faction.Light, metadata.Faction);
+        Assert.Equal(1007, metadata.OriginServerId);
+        Assert.True(metadata.IsLocalPlayer);
+    }
+
+    [Fact]
     public void Replay_20260704202443_Applies_Current4536_Marker17PcProfiles()
     {
         SetResources();

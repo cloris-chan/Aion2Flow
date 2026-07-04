@@ -9,6 +9,7 @@ internal static class Packet3336NicknameParser
     private const byte CurrentNamePrefix = 0x5f;
     private const byte CurrentExtendedNamePrefix = 0x5e;
     private const byte CurrentNameMarker = 0x37;
+    private const byte CurrentCrossServerNameMarker = 0x3f;
 
     public static bool TryParse(ReadOnlySpan<byte> packet, out Packet3336Nickname result)
     {
@@ -67,6 +68,6 @@ internal static class Packet3336NicknameParser
 
         return reader.TryReadVarInt(out _) &&
             reader.TryReadByte(out var marker) &&
-            marker == CurrentNameMarker;
+            marker is CurrentNameMarker or CurrentCrossServerNameMarker;
     }
 }

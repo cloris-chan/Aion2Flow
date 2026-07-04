@@ -15,4 +15,5 @@ public static class ReplayScenarioCatalog
     public const string CurrentActivityDungeonIndependentPlayers = "aion2flow.stream.20260704010004.log";
     public const string CurrentForceDungeonPreInstanceRoster = "aion2flow.stream.20260704153057.log";
     public const string CurrentForceDungeonWithoutExplicitRelationPackets = "aion2flow.stream.20260704155002.log";
+    public const string CurrentCrossServerSelfIdentityMarker3F = "aion2flow.stream.20260705015611.log";
 }
