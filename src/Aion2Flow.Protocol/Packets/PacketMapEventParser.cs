@@ -24,7 +24,6 @@ internal static class PacketMapEventParser
         {
             (0x00, 0x61) => 0,
             (0x01, 0x61) => 1,
-            (0x01, 0x91) => 2,
             _ => -1
         };
 

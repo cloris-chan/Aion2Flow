@@ -2,7 +2,9 @@ namespace Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 internal static class SceneMapIdClassifier
 {
-    public static bool IsPacketMapEventId(uint value) => value != 0;
+    private const uint MinimumDirectMapEventId = 1000;
+
+    public static bool IsPacketMapEventId(uint value) => value >= MinimumDirectMapEventId;
 
     public static bool IsAmbiguousSceneStateMapId(uint value)
         => value is (>= 20 and < 2000)

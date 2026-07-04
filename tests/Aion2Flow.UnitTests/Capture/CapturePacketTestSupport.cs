@@ -72,11 +72,11 @@ internal static class CapturePacketTestData
         return BuildFrame(payload);
     }
 
-    public static byte[] BuildMapEvent0191Frame(uint mapId)
+    public static byte[] BuildState0240Frame(uint value0)
     {
-        var payload = new List<byte> { 0x01, 0x91, 0x00, 0x00 };
-        AppendUInt32Le(payload, mapId);
-        AppendUInt32Le(payload, 0u);
+        var payload = new List<byte> { 0x02, 0x40 };
+        AppendUInt32Le(payload, value0);
+        AppendUInt16Le(payload, 0);
         return BuildFrame(payload);
     }
 
@@ -122,6 +122,12 @@ internal static class CapturePacketTestData
         buffer.Add((byte)(value >> 8));
         buffer.Add((byte)(value >> 16));
         buffer.Add((byte)(value >> 24));
+    }
+
+    private static void AppendUInt16Le(List<byte> buffer, ushort value)
+    {
+        buffer.Add((byte)value);
+        buffer.Add((byte)(value >> 8));
     }
 
     private static void AppendUInt64Le(List<byte> buffer, ulong value)
