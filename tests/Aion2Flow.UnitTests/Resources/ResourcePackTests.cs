@@ -103,6 +103,7 @@ public sealed class ResourcePackTests
     [InlineData(ResourceLanguage.TraditionalChinese, 19150350, "升天擊[暴走]", SkillCategory.Brawler, SkillSourceType.PcSkill, "STR_SKILL_PC_FIGHTER_19160350")]
     [InlineData(ResourceLanguage.TraditionalChinese, 19160351, "升天擊第1階段", SkillCategory.Brawler, SkillSourceType.PcSkill, "STR_SKILL_PC_FIGHTER_19150001")]
     [InlineData(ResourceLanguage.TraditionalChinese, 19190120, "爆裂拳[暴走]", SkillCategory.Brawler, SkillSourceType.PcSkill, "STR_SKILL_PC_FIGHTER_19200120")]
+    [InlineData(ResourceLanguage.TraditionalChinese, 16001316, "風之精靈：暴風", SkillCategory.Elementalist, SkillSourceType.PcSkill, "STR_SKILL_PC_ELEMENTALIST_16001312")]
     [InlineData(ResourceLanguage.TraditionalChinese, 3001110, "神石：海格黛的束縛", SkillCategory.Item, SkillSourceType.ClientSkill, "SkillString_ITEM_3001110")]
     public void Skills_Expose_SkillDat_Based_Identity_With_Localized_Text(
         string language,
@@ -242,6 +243,7 @@ public sealed class ResourcePackTests
     [InlineData(19160351, "ICON_GT_SKILL_016.webp")]
     [InlineData(19190120, "ICON_GT_SKILL_019.webp")]
     [InlineData(19200120, "ICON_GT_SKILL_020.webp")]
+    [InlineData(16001316, "ICON_EL_SKILL_024.webp")]
     [InlineData(3001110, "Icon_Item_Usable_Godstone_WP_r_004.webp")]
     [InlineData(30011101, "Icon_Item_Usable_Godstone_WP_r_004.webp")]
     [InlineData(3000122, "Icon_Item_Usable_Godstone_WP_r_016.webp")]
