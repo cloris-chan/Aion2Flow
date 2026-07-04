@@ -53,7 +53,7 @@ internal static class Packet4536PcMetadataParser
     {
         while (reader.Remaining > 0)
         {
-            if (reader.RemainingSpan[0] == 0x07 &&
+            if (reader.RemainingSpan[0] is 0x07 or 0x17 &&
                 NicknameParserUtil.TryReadLengthPrefixedNickname(payload, reader.Offset + 1, out _, out _, out var tailOffset) &&
                 NicknameParserUtil.TryReadClassCode(payload, tailOffset) is not null)
             {

@@ -108,6 +108,18 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260704202443_Applies_Current4536_Marker17PcProfiles()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentNearbyPcProfilesMarker17}"));
+
+        AssertPcMetadata(replay, 15683, "血焰", CharacterClass.Assassin, Faction.Light);
+        AssertPcMetadata(replay, 865, "侯爷丶", CharacterClass.Ranger, Faction.Light);
+        AssertPcMetadata(replay, 13932, "啵里哩啵", CharacterClass.Elementalist, Faction.Light);
+    }
+
+    [Fact]
     public void Replay_20260702200648_Parses_CurrentPartyAndForceMemberRelations()
     {
         SetResources();
@@ -476,6 +488,14 @@ public sealed class PacketLogReplayServiceTests
     {
         Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(entityId, out var metadata), $"missing PC metadata for {entityId}");
         Assert.Equal(expectedRelation, metadata.GroupRelation);
+    }
+
+    private static void AssertPcMetadata(PacketLogReplayResult replay, int entityId, string nickname, CharacterClass characterClass, Faction faction)
+    {
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(entityId, out var metadata), $"missing PC metadata for {entityId}");
+        Assert.Equal(nickname, metadata.Nickname);
+        Assert.Equal(characterClass, metadata.CharacterClass);
+        Assert.Equal(faction, metadata.Faction);
     }
 
     private static void AssertForceRosterProfile(IReadOnlyList<ObservedEventEnvelope> entries, string nickname, int originServerId, byte memberSlotIndex)
