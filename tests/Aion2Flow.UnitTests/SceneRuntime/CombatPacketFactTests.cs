@@ -118,6 +118,41 @@ public class CombatPacketFactTests
     }
 
     [Fact]
+    public void ScenePath_CompactActionCloseStopsLaterValueFromMatchingClosedOpener()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateCompactActionOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
+        journal.Append(CreateCompactActionCloser(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, flag: 0));
+        journal.Append(CreateDirectValue(sceneId, 2, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(8972, 5578, out var pair));
+        Assert.Equal(2048, pair!.TotalDamage);
+        Assert.Equal(0, pair.TotalHealing);
+        Assert.True(combat.TryGetCombatant(8972, out var source));
+        Assert.Equal(2048, source!.OutgoingDamage);
+        Assert.Equal(0, source.OutgoingHealing);
+    }
+
+    [Fact]
+    public void ScenePath_CompactActionCloseRequiresMatchingBodyCode()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateCompactActionOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
+        journal.Append(CreateCompactActionCloser(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17800002, marker: 193, flag: 0));
+        journal.Append(CreateDirectValue(sceneId, 2, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(8972, 5578, out var pair));
+        Assert.Equal(0, pair!.TotalDamage);
+        Assert.Equal(2048, pair.TotalHealing);
+    }
+
+    [Fact]
     public void ScenePath_ClassifiesInlineSidecarCompactActionRecoveryAsHealing()
     {
         var journal = new ObservedEventJournal();
@@ -353,6 +388,27 @@ public class CombatPacketFactTests
             Type = mode,
             Flag = flag,
             ChainId = echoSourceId,
+            LayoutTag = 0
+        }
+    };
+
+    private static ObservedEventEnvelope CreateCompactActionCloser(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int flag, int scopeId = 0, long batchOrdinal = 100) => new()
+    {
+        SceneSessionId = sceneId,
+        Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FrameOrdinal = ordinal + 10, BatchOrdinal = batchOrdinal },
+        Domain = ObservedEventDomain.Combat,
+        SourceEntityId = sourceId,
+        TargetEntityId = 0,
+        Raw = new RawPacketReference(0x0638, 0, 0, CreateStructurePath(scopeId)),
+        Combat = new CombatObservation
+        {
+            BodyResourceEffectRef = ResourceEffectRef.FromRaw(bodyCodeRaw),
+            Damage = 0,
+            HitCount = 0,
+            AttemptCount = 0,
+            DetailRaw = marker,
+            Marker = marker,
+            Flag = flag,
             LayoutTag = 0
         }
     };

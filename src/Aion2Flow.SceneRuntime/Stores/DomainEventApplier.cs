@@ -146,6 +146,9 @@ public sealed class DomainEventApplier
         if (entry.Raw.Opcode == 0x0238)
             ApplyStampedCombatResults(_compactActionDirectValue.ObserveCompactControl0238(entry.SourceEntityId, in combatObservation, in stamp, in structurePath));
 
+        if (entry.Raw.Opcode == 0x0638)
+            ApplyStampedCombatResults(_compactActionDirectValue.ObserveCompactControl0638(entry.SourceEntityId, in combatObservation, in stamp, in structurePath));
+
         if (entry.Raw.Opcode == 0x0438)
             ApplyStampedCombatResults(_compactActionDirectValue.ObserveCompactValueSidecar0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath));
 

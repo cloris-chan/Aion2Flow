@@ -374,7 +374,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(813_802, player.OutgoingDamage);
         Assert.Equal(2, player.OutgoingHits);
         Assert.Equal(2, player.OutgoingAttempts);
-        Assert.Equal(6_565, player.OutgoingHealing);
+        Assert.Equal(719, player.OutgoingHealing);
         Assert.Equal(1_025, player.OutgoingShield);
         Assert.Equal(7, player.IncomingDamage);
         Assert.Equal(7, player.IncomingHits);

@@ -86,6 +86,14 @@ public sealed class CompactActionDirectValueCanonicalizer
         return FlushValuesMatchedBy(in opener);
     }
 
+    public StampedCombatCanonicalizationBatch ObserveCompactControl0638(int sourceId, in CombatObservation observation, in TimelineStamp stamp, in PacketStructurePath structurePath)
+    {
+        if (IsCompactActionCloser(sourceId, in observation))
+            ClosePendingActionOpener(sourceId, observation.BodyResourceEffectRef.RawId, observation.Marker, stamp.BatchOrdinal, ResolveAssociationScope(in structurePath));
+
+        return StampedCombatCanonicalizationBatch.Empty;
+    }
+
     public StampedCombatCanonicalizationBatch CompleteBatch(long batchOrdinal)
     {
         if (_pendingValues.Count == 0)
@@ -144,6 +152,19 @@ public sealed class CompactActionDirectValueCanonicalizer
         }
 
         return results.ToBatch();
+    }
+
+    private void ClosePendingActionOpener(int sourceId, uint bodyCodeRaw, int marker, long batchOrdinal, int scopeId)
+    {
+        for (var i = _pendingOpeners.Count - 1; i >= 0; i--)
+        {
+            var pending = _pendingOpeners[i];
+            if (MatchesAction(in pending, sourceId, bodyCodeRaw, marker, batchOrdinal, scopeId))
+            {
+                _pendingOpeners.RemoveAt(i);
+                return;
+            }
+        }
     }
 
     private StampedCombatCanonicalizationBatch FlushValuesMatchedBy(in PendingCompactActionInlineRecoveryGroup group)
@@ -313,6 +334,15 @@ public sealed class CompactActionDirectValueCanonicalizer
     private static bool IsCompactActionOpener(int sourceId, in CombatObservation observation) =>
         sourceId > 0 &&
         observation.BodyCodeRaw > 0 &&
+        observation.Marker > 0 &&
+        observation.Damage == 0 &&
+        observation.HitCount == 0 &&
+        observation.AttemptCount == 0 &&
+        observation.LayoutTag == 0;
+
+    private static bool IsCompactActionCloser(int sourceId, in CombatObservation observation) =>
+        sourceId > 0 &&
+        observation.BodyResourceEffectRef.RawId > 0 &&
         observation.Marker > 0 &&
         observation.Damage == 0 &&
         observation.HitCount == 0 &&
