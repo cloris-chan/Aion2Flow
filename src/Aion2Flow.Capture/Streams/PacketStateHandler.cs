@@ -314,7 +314,7 @@ internal sealed class PacketStateHandler
         var isHealth = Packet008DRemainHpParser.IsHealthValue(parsed);
         if (isHealth)
         {
-            context.Sink.AppendNpcHp(context.CreateObservationSource(0x008D, packet.Length), parsed.NpcId, checked((int)parsed.Hp));
+            context.Sink.AppendNpcHp(context.CreateObservationSource(0x008D, packet.Length), parsed.NpcId, parsed.Hp);
         }
 
         if (isHealth)

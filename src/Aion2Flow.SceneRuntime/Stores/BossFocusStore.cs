@@ -86,7 +86,7 @@ public sealed class BossFocusStore(EntityStore entities)
             RememberActivity(instanceId, observedAtMilliseconds);
     }
 
-    public void ApplyNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds)
+    public void ApplyNpcHp(int instanceId, long hp, long maxHp, long observedAtMilliseconds)
     {
         var resolvedMaxHp = ResolveMaxHp(instanceId, maxHp);
         var hasMaxHp = resolvedMaxHp > 0;
@@ -181,7 +181,7 @@ public sealed class BossFocusStore(EntityStore entities)
     private void RememberActivity(int instanceId, long observedAtMilliseconds)
     {
         var observedAt = Math.Max(0, observedAtMilliseconds);
-        if (entities.TryGet(instanceId, out var entity) && entity.CurrentHp is int hp)
+        if (entities.TryGet(instanceId, out var entity) && entity.CurrentHp is long hp)
         {
             Remember(instanceId, hp, entity.MaxHp ?? 0, entity.MaxHp.HasValue, observedAt);
             return;
@@ -216,7 +216,7 @@ public sealed class BossFocusStore(EntityStore entities)
         }
     }
 
-    private void Remember(int instanceId, int hp, int maxHp, bool hasMaxHp, long observedAtMilliseconds)
+    private void Remember(int instanceId, long hp, long maxHp, bool hasMaxHp, long observedAtMilliseconds)
     {
         var resolvedHp = Math.Max(0, hp);
         var resolvedMaxHp = hasMaxHp ? Math.Max(1, maxHp) : 0;
@@ -253,10 +253,10 @@ public sealed class BossFocusStore(EntityStore entities)
         _encounterBosses[instanceId] = snapshot;
     }
 
-    private int ResolveMaxHp(int instanceId, int maxHp)
+    private long ResolveMaxHp(int instanceId, long maxHp)
     {
         var resolved = maxHp;
-        if (entities.TryGet(instanceId, out var entity) && entity.MaxHp is int entityMaxHp)
+        if (entities.TryGet(instanceId, out var entity) && entity.MaxHp is long entityMaxHp)
             resolved = Math.Max(resolved, entityMaxHp);
         return resolved;
     }
@@ -278,8 +278,8 @@ public sealed class BossFocusStore(EntityStore entities)
     public readonly record struct Snapshot
     {
         public int InstanceId { get; init; }
-        public int Hp { get; init; }
-        public int MaxHp { get; init; }
+        public long Hp { get; init; }
+        public long MaxHp { get; init; }
         public long CumulativeLostHp { get; init; }
         public long LastObservedAtMilliseconds { get; init; }
         public bool HasHp { get; init; }

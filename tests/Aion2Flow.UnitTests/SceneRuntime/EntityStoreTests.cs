@@ -90,10 +90,10 @@ public class EntityStoreTests
         store.ApplyNpc2C38State(4370, 95, 7);
 
         Assert.True(store.TryGet(4370, out var entity));
-        Assert.Equal((uint)6, entity!.Sequence2136);
-        Assert.Equal((uint)200003, entity.Value2136);
-        Assert.Equal((uint)200003, entity.Value0140);
-        Assert.Equal((uint)200003, entity.Value0240);
+        Assert.Equal(6L, entity!.Sequence2136);
+        Assert.Equal(200003L, entity.Value2136);
+        Assert.Equal(200003L, entity.Value0140);
+        Assert.Equal(200003L, entity.Value0240);
         Assert.Equal(((byte)2, (byte)79), entity.State4636);
         Assert.Equal((95, 7), entity.Latest2C38);
     }
@@ -317,6 +317,33 @@ public class DomainEventApplierTests
         Assert.True(entities.TryGet(56688, out var entity));
         Assert.Equal(22847, entity!.CurrentHp);
         Assert.Equal(9000000, entity.MaxHp);
+    }
+
+    [Fact]
+    public void Applier_ResourceObservation_PreservesLargeNpcHp()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+
+        journal.Append(new ObservedEventEnvelope
+        {
+            SceneSessionId = sceneId,
+            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
+            Domain = ObservedEventDomain.Resource,
+            SourceEntityId = 56688,
+            TargetEntityId = 0,
+            Resource = new ResourceObservation { EntityId = 56688, CurrentValue = 3_500_000_000L, MaximumValue = 4_000_000_000L }
+        });
+
+        var entities = new EntityStore();
+        var metadata = new SceneBoundaryStore();
+        var applier = new DomainEventApplier(entities, metadata, new CombatStore());
+
+        applier.ApplyJournal(journal);
+
+        Assert.True(entities.TryGet(56688, out var entity));
+        Assert.Equal(3_500_000_000L, entity!.CurrentHp);
+        Assert.Equal(4_000_000_000L, entity.MaxHp);
     }
 
     [Fact]
@@ -739,10 +766,10 @@ public class DomainEventApplierTests
         applier.ApplyJournal(journal);
 
         Assert.True(entities.TryGet(4370, out var entity));
-        Assert.Equal((uint)6, entity!.Sequence2136);
-        Assert.Equal((uint)200003, entity.Value2136);
-        Assert.Equal((uint)200003, entity.Value0140);
-        Assert.Equal((uint)200003, entity.Value0240);
+        Assert.Equal(6L, entity!.Sequence2136);
+        Assert.Equal(200003L, entity.Value2136);
+        Assert.Equal(200003L, entity.Value0140);
+        Assert.Equal(200003L, entity.Value0240);
         Assert.Equal(((byte)2, (byte)79), entity.State4636);
         Assert.Equal((95, 7), entity.Latest2C38);
     }

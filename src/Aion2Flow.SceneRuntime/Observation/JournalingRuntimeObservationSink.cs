@@ -118,7 +118,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             });
         }
 
-        if (state.Hp is int hp)
+        if (state.Hp is long hp)
         {
             var stamp = CreateStamp(in packet);
             journal.Append(new ObservedEventEnvelope
@@ -685,7 +685,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         collectionPolicy?.OnBossMetadataChanged();
     }
 
-    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
@@ -719,7 +719,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         collectionPolicy?.OnBossMetadataChanged();
     }
 
-    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp, int maxHp)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp, long maxHp)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
@@ -813,7 +813,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         collectionPolicy?.OnBossMetadataChanged();
     }
 
-    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, uint sequence, uint value0)
+    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
@@ -833,14 +833,14 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 EntityId = instanceId,
                 StateCode = 2136,
-                Value0 = (int)sequence,
-                Value1 = (int)value0,
+                Value0 = sequence,
+                Value1 = value0,
                 DetailRaw = 0
             }
         });
     }
 
-    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, uint value0)
+    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
@@ -859,14 +859,14 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 EntityId = instanceId,
                 StateCode = 140,
-                Value0 = (int)value0,
+                Value0 = value0,
                 Value1 = 0,
                 DetailRaw = 0
             }
         });
     }
 
-    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, uint value0)
+    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0)
     {
         instanceId = ResolveLifecycleId(instanceId);
         var state = GetOrAddNpcState(instanceId);
@@ -885,7 +885,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 EntityId = instanceId,
                 StateCode = 240,
-                Value0 = (int)value0,
+                Value0 = value0,
                 Value1 = 0,
                 DetailRaw = 0
             }
@@ -985,18 +985,18 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     private sealed class RuntimeNpcState
     {
         public int? NpcCode { get; set; }
-        public int? Hp { get; set; }
-        public int? MaxHp { get; set; }
+        public long? Hp { get; set; }
+        public long? MaxHp { get; set; }
         public RawPacketReference? NpcCodeRaw { get; set; }
         public RawPacketReference? KindRaw { get; set; }
         public RawPacketReference? HpRaw { get; set; }
         public long? HpObservedAtMilliseconds { get; set; }
         public bool? BattleToggledOn { get; set; }
         public NpcKind? Kind { get; set; }
-        public uint? Value2136 { get; set; }
-        public uint? Sequence2136 { get; set; }
-        public uint? Value0140 { get; set; }
-        public uint? Value0240 { get; set; }
+        public long? Value2136 { get; set; }
+        public long? Sequence2136 { get; set; }
+        public long? Value0140 { get; set; }
+        public long? Value0240 { get; set; }
         public (byte State0, byte State1)? State4636 { get; set; }
         public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
 

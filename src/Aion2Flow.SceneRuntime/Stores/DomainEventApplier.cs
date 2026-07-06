@@ -112,9 +112,9 @@ public sealed class DomainEventApplier
                 ApplyState(in entry, in state);
                 break;
             case ObservedEventDomain.Resource when entry.Resource is { } resource:
-                _entities.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0));
+                _entities.ApplyNpcHp(resource.EntityId, resource.CurrentValue ?? 0, resource.MaximumValue ?? 0);
                 if (TrackBossFocus)
-                    _bossFocus.ApplyNpcHp(resource.EntityId, (int)(resource.CurrentValue ?? 0), (int)(resource.MaximumValue ?? 0), observedAtMilliseconds);
+                    _bossFocus.ApplyNpcHp(resource.EntityId, resource.CurrentValue ?? 0, resource.MaximumValue ?? 0, observedAtMilliseconds);
                 TryApplyBossCombatActivity(resource.EntityId, observedAtMilliseconds);
                 break;
             case ObservedEventDomain.Scene when entry.Scene is { } scene:
@@ -377,7 +377,7 @@ public sealed class DomainEventApplier
 
         if (state.StateCode == StateCodes.NpcKind)
         {
-            var kind = Enum.IsDefined((NpcKind)state.Value0) ? (NpcKind)state.Value0 : NpcKind.Unknown;
+            var kind = state.Value0 is >= int.MinValue and <= int.MaxValue && Enum.IsDefined((NpcKind)(int)state.Value0) ? (NpcKind)(int)state.Value0 : NpcKind.Unknown;
             _entities.ApplyNpcKind(state.EntityId, kind);
             if (TrackBossFocus)
                 _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
@@ -412,19 +412,19 @@ public sealed class DomainEventApplier
 
         if (state.StateCode == 2136)
         {
-            _entities.ApplyNpc2136State(state.EntityId, checked((uint)state.Value0), checked((uint)state.Value1));
+            _entities.ApplyNpc2136State(state.EntityId, state.Value0, state.Value1);
             return;
         }
 
         if (state.StateCode == 140)
         {
-            _entities.ApplyNpc0140Value(state.EntityId, checked((uint)state.Value0));
+            _entities.ApplyNpc0140Value(state.EntityId, state.Value0);
             return;
         }
 
         if (state.StateCode == 240)
         {
-            _entities.ApplyNpc0240Value(state.EntityId, checked((uint)state.Value0));
+            _entities.ApplyNpc0240Value(state.EntityId, state.Value0);
             return;
         }
 

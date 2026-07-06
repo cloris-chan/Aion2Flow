@@ -68,13 +68,13 @@ internal static class SyntheticObservationExtensions
         sink.AppendNpcKind(in source, instanceId, kind);
     }
 
-    public static void AppendNpcHp(this IRuntimeObservationSink sink, int instanceId, int hp, long observedAtMilliseconds)
+    public static void AppendNpcHp(this IRuntimeObservationSink sink, int instanceId, long hp, long observedAtMilliseconds)
     {
         var source = Source(observedAtMilliseconds, 0x008D);
         sink.AppendNpcHp(in source, instanceId, hp);
     }
 
-    public static void AppendNpcHp(this IRuntimeObservationSink sink, int instanceId, int hp, int maxHp, long observedAtMilliseconds)
+    public static void AppendNpcHp(this IRuntimeObservationSink sink, int instanceId, long hp, long maxHp, long observedAtMilliseconds)
     {
         var source = Source(observedAtMilliseconds, 0x008D);
         sink.AppendNpcHp(in source, instanceId, hp, maxHp);
@@ -92,19 +92,19 @@ internal static class SyntheticObservationExtensions
         sink.ToggleNpcBattle(in source, instanceId);
     }
 
-    public static void AppendNpc2136State(this IRuntimeObservationSink sink, int instanceId, uint sequence, uint value0)
+    public static void AppendNpc2136State(this IRuntimeObservationSink sink, int instanceId, long sequence, long value0)
     {
         var source = Source(opcode: 0x2136);
         sink.AppendNpc2136State(in source, instanceId, sequence, value0);
     }
 
-    public static void AppendNpc0140Value(this IRuntimeObservationSink sink, int instanceId, uint value0)
+    public static void AppendNpc0140Value(this IRuntimeObservationSink sink, int instanceId, long value0)
     {
         var source = Source(opcode: 0x0140);
         sink.AppendNpc0140Value(in source, instanceId, value0);
     }
 
-    public static void AppendNpc0240Value(this IRuntimeObservationSink sink, int instanceId, uint value0)
+    public static void AppendNpc0240Value(this IRuntimeObservationSink sink, int instanceId, long value0)
     {
         var source = Source(opcode: 0x0240);
         sink.AppendNpc0240Value(in source, instanceId, value0);

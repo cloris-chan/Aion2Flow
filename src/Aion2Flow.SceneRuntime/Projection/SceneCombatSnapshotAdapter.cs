@@ -1067,15 +1067,15 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (targetId <= 0)
             return null;
 
-        uint? value2136 = null;
-        uint? sequence2136 = null;
-        uint? value0140 = null;
-        uint? value0240 = null;
+        long? value2136 = null;
+        long? sequence2136 = null;
+        long? value0140 = null;
+        long? value0240 = null;
         byte? state4636Value0 = null;
         byte? state4636Value1 = null;
         int? sequence2C38 = null;
         int? result2C38 = null;
-        int? hp = null;
+        long? hp = null;
         bool? battleToggledOn = null;
 
         if (entities.TryGet(targetId, out var entity))

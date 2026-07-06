@@ -40,19 +40,19 @@ public sealed class SceneTestHarness : IDisposable
 
     public void AppendNpcKind(int instanceId, NpcKind kind) => Sink.AppendNpcKind(NextSource(), instanceId, kind);
 
-    public void AppendNpcHp(int instanceId, int hp, long observedAtMilliseconds) => Sink.AppendNpcHp(SourceAt(observedAtMilliseconds), instanceId, hp);
+    public void AppendNpcHp(int instanceId, long hp, long observedAtMilliseconds) => Sink.AppendNpcHp(SourceAt(observedAtMilliseconds), instanceId, hp);
 
-    public void AppendNpcHp(int instanceId, int hp, int maxHp, long observedAtMilliseconds) => Sink.AppendNpcHp(SourceAt(observedAtMilliseconds), instanceId, hp, maxHp);
+    public void AppendNpcHp(int instanceId, long hp, long maxHp, long observedAtMilliseconds) => Sink.AppendNpcHp(SourceAt(observedAtMilliseconds), instanceId, hp, maxHp);
 
     public void SetNpcBattle(int instanceId, bool isActive, long observedAtMilliseconds) => Sink.SetNpcBattle(SourceAt(observedAtMilliseconds), instanceId, isActive);
 
     public void ToggleNpcBattle(int instanceId) => Sink.ToggleNpcBattle(NextSource(), instanceId);
 
-    public void AppendNpc2136State(int instanceId, uint sequence, uint value0) => Sink.AppendNpc2136State(NextSource(), instanceId, sequence, value0);
+    public void AppendNpc2136State(int instanceId, long sequence, long value0) => Sink.AppendNpc2136State(NextSource(), instanceId, sequence, value0);
 
-    public void AppendNpc0140Value(int instanceId, uint value0) => Sink.AppendNpc0140Value(NextSource(), instanceId, value0);
+    public void AppendNpc0140Value(int instanceId, long value0) => Sink.AppendNpc0140Value(NextSource(), instanceId, value0);
 
-    public void AppendNpc0240Value(int instanceId, uint value0) => Sink.AppendNpc0240Value(NextSource(), instanceId, value0);
+    public void AppendNpc0240Value(int instanceId, long value0) => Sink.AppendNpc0240Value(NextSource(), instanceId, value0);
 
     public void AppendNpc4636State(int instanceId, byte state0, byte state1) => Sink.AppendNpc4636State(NextSource(), instanceId, state0, state1);
 
@@ -224,13 +224,13 @@ public sealed class SceneTestHarness : IDisposable
         public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode) => inner.AppendNpcCode(in packet, instanceId, npcCode);
         public void AppendNpcName(in PacketObservationSource packet, int npcCode, string name) => inner.AppendNpcName(in packet, npcCode, name);
         public void AppendNpcKind(in PacketObservationSource packet, int instanceId, NpcKind kind) => inner.AppendNpcKind(in packet, instanceId, kind);
-        public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp) => inner.AppendNpcHp(in packet, instanceId, hp);
-        public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp, int maxHp) => inner.AppendNpcHp(in packet, instanceId, hp, maxHp);
+        public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp) => inner.AppendNpcHp(in packet, instanceId, hp);
+        public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp, long maxHp) => inner.AppendNpcHp(in packet, instanceId, hp, maxHp);
         public void SetNpcBattle(in PacketObservationSource packet, int instanceId, bool isActive) => inner.SetNpcBattle(in packet, instanceId, isActive);
         public void ToggleNpcBattle(in PacketObservationSource packet, int instanceId) => inner.ToggleNpcBattle(in packet, instanceId);
-        public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, uint sequence, uint value0) => inner.AppendNpc2136State(in packet, instanceId, sequence, value0);
-        public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, uint value0) => inner.AppendNpc0140Value(in packet, instanceId, value0);
-        public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, uint value0) => inner.AppendNpc0240Value(in packet, instanceId, value0);
+        public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0) => inner.AppendNpc2136State(in packet, instanceId, sequence, value0);
+        public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0) => inner.AppendNpc0140Value(in packet, instanceId, value0);
+        public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0) => inner.AppendNpc0240Value(in packet, instanceId, value0);
         public void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1) => inner.AppendNpc4636State(in packet, instanceId, state0, state1);
         public void AppendSummon(in PacketObservationSource packet, int ownerId, int summonInstanceId) => inner.AppendSummon(in packet, ownerId, summonInstanceId);
     }

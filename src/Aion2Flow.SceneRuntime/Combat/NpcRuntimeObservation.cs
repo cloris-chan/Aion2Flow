@@ -3,15 +3,15 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 public sealed class NpcRuntimeObservation
 {
     public int InstanceId { get; set; }
-    public uint? Value2136 { get; set; }
-    public uint? Sequence2136 { get; set; }
-    public uint? Value0140 { get; set; }
-    public uint? Value0240 { get; set; }
+    public long? Value2136 { get; set; }
+    public long? Sequence2136 { get; set; }
+    public long? Value0140 { get; set; }
+    public long? Value0240 { get; set; }
     public byte? State4636Value0 { get; set; }
     public byte? State4636Value1 { get; set; }
     public int? Sequence2C38 { get; set; }
     public int? Result2C38 { get; set; }
-    public int? Hp { get; set; }
+    public long? Hp { get; set; }
     public bool? BattleToggledOn { get; set; }
     public NpcRuntimePhaseHint PhaseHint { get; set; }
 

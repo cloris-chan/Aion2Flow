@@ -180,12 +180,12 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.AppendNpcKind(in packet, instanceId, kind);
     }
 
-    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp)
     {
         lock (gate) inner.AppendNpcHp(in packet, instanceId, hp);
     }
 
-    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp, int maxHp)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp, long maxHp)
     {
         lock (gate) inner.AppendNpcHp(in packet, instanceId, hp, maxHp);
     }
@@ -200,17 +200,17 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.ToggleNpcBattle(in packet, instanceId);
     }
 
-    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, uint sequence, uint value0)
+    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0)
     {
         lock (gate) inner.AppendNpc2136State(in packet, instanceId, sequence, value0);
     }
 
-    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, uint value0)
+    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0)
     {
         lock (gate) inner.AppendNpc0140Value(in packet, instanceId, value0);
     }
 
-    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, uint value0)
+    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0)
     {
         lock (gate) inner.AppendNpc0240Value(in packet, instanceId, value0);
     }

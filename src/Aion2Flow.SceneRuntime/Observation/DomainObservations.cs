@@ -111,7 +111,7 @@ public readonly record struct CombatObservation
     public int ChainId { get; init; }
 }
 
-public readonly record struct StateObservation(int EntityId, int StateCode, int Value0, int Value1, long DetailRaw, string? Text, Faction Faction = Faction.Unknown, CharacterClass? CharacterClass = null, bool IsLocalPlayer = false, int? OriginServerId = null, string? LegionName = null, PlayerGroupMembership GroupMembership = default);
+public readonly record struct StateObservation(int EntityId, int StateCode, long Value0, long Value1, long DetailRaw, string? Text, Faction Faction = Faction.Unknown, CharacterClass? CharacterClass = null, bool IsLocalPlayer = false, int? OriginServerId = null, string? LegionName = null, PlayerGroupMembership GroupMembership = default);
 
 public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, int Value0, int Value1, string? DiagnosticKey);
 

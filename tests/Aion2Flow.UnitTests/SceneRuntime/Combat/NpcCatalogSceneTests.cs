@@ -418,7 +418,7 @@ public sealed class NpcCatalogSceneTests
 
         Assert.True(scene.TryGetNpcRuntimeState(entityId, out var state), $"Replay scene missing NPC state for entity {entityId}");
         Assert.Equal(npcCode, state.NpcCode);
-        Assert.Equal((uint)sceneStateValue, state.Value2136);
+        Assert.Equal((long)sceneStateValue, state.Value2136);
     }
 
     [Theory]

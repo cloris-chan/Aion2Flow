@@ -80,6 +80,17 @@ internal static class CapturePacketTestData
         return BuildFrame(payload);
     }
 
+    public static byte[] BuildRemainHp008DFrame(int npcId, uint hp)
+    {
+        var payload = new List<byte> { 0x00, 0x8D };
+        AppendVarInt(payload, npcId);
+        AppendVarInt(payload, 2);
+        AppendVarInt(payload, 1);
+        AppendVarInt(payload, 0);
+        AppendUInt32Le(payload, hp);
+        return BuildFrame(payload);
+    }
+
     private static void Append0438Payload(List<byte> buffer, int targetId, int sourceId, int skillCode)
     {
         AppendVarInt(buffer, targetId);
@@ -158,6 +169,10 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
     public int LastSkillCode { get; private set; }
     public int ConfirmedMapCount { get; private set; }
     public uint LastConfirmedMapId { get; private set; }
+    public int NpcHpObservationCount { get; private set; }
+    public int LastNpcHpInstanceId { get; private set; }
+    public long LastNpcHp { get; private set; }
+    public bool ThrowOnNpcHp { get; set; }
 
     public int ResolveLifecycleId(int rawInstanceId) => rawInstanceId;
     public int RebindInstanceLifecycle(int rawInstanceId) => rawInstanceId;
@@ -269,12 +284,19 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
     {
     }
 
-    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp)
     {
+        if (ThrowOnNpcHp)
+            throw new InvalidOperationException("npc hp append failed");
+
+        NpcHpObservationCount++;
+        LastNpcHpInstanceId = instanceId;
+        LastNpcHp = hp;
     }
 
-    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp, int maxHp)
+    public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp, long maxHp)
     {
+        AppendNpcHp(in packet, instanceId, hp);
     }
 
     public void SetNpcBattle(in PacketObservationSource packet, int instanceId, bool isActive)
@@ -285,15 +307,15 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
     {
     }
 
-    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, uint sequence, uint value0)
+    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0)
     {
     }
 
-    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, uint value0)
+    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0)
     {
     }
 
-    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, uint value0)
+    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0)
     {
     }
 

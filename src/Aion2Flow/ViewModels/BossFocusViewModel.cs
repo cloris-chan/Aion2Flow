@@ -6,7 +6,7 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
 {
     private static readonly ProgressSegment[] EmptySegments = [];
 
-    public BossFocusViewModel(UiFrameBatchService frameBatchService, long displayKey, int instanceId, int npcCode, int instanceCount, int hp, int maxHp, bool hasHp, bool hasMaxHp)
+    public BossFocusViewModel(UiFrameBatchService frameBatchService, long displayKey, int instanceId, int npcCode, int instanceCount, long hp, long maxHp, bool hasHp, bool hasMaxHp)
         : base(frameBatchService)
     {
         DisplayKey = displayKey;
@@ -108,7 +108,7 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         private set => SetFrameProperty(ref field, value);
     } = EmptySegments;
 
-    public void Update(int instanceId, int npcCode, int instanceCount, int hp, int maxHp, bool hasHp, bool hasMaxHp)
+    public void Update(int instanceId, int npcCode, int instanceCount, long hp, long maxHp, bool hasHp, bool hasMaxHp)
     {
         InstanceId = instanceId;
         NpcCode = npcCode;
@@ -122,7 +122,7 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
             BarSegments = segments.Count == 0 ? EmptySegments : [.. segments];
     }
 
-    private void Apply(int hp, int maxHp, bool hasHp, bool hasMaxHp)
+    private void Apply(long hp, long maxHp, bool hasHp, bool hasMaxHp)
     {
         var resolvedMaxHp = Math.Max(1, maxHp);
         if (hasHp && hasMaxHp)

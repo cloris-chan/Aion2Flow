@@ -85,12 +85,17 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
             }
 
             var packet = _tail.Data[..packetLength];
-            if (EmitPacket(packet, in connection, captureTimestampMilliseconds))
+            try
             {
-                hasParsed = true;
+                if (EmitPacket(packet, in connection, captureTimestampMilliseconds))
+                {
+                    hasParsed = true;
+                }
             }
-
-            _tail.Consume(packetLength);
+            finally
+            {
+                _tail.Consume(packetLength);
+            }
         }
     }
 

@@ -70,23 +70,23 @@ public interface IRuntimeObservationSink
 
     void AppendNpcKind(in PacketObservationSource packet, int instanceId, NpcKind kind);
 
-    void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp);
+    void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp);
 
-    void AppendNpcHp(in PacketObservationSource packet, int instanceId, int hp, int maxHp);
+    void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp, long maxHp);
 
     void SetNpcBattle(in PacketObservationSource packet, int instanceId, bool isActive);
 
     void ToggleNpcBattle(in PacketObservationSource packet, int instanceId);
 
-    void AppendNpc2136State(in PacketObservationSource packet, int instanceId, uint sequence, uint value0);
+    void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0);
 
-    void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, uint value0);
+    void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0);
 
-    void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, uint value0);
+    void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0);
 
     void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1);
 
     void AppendSummon(in PacketObservationSource packet, int ownerId, int summonInstanceId);
 }
 
-public readonly record struct RuntimeNpcStateSnapshot(int? NpcCode, int? Hp, int? MaxHp, long? HpObservedAtMilliseconds, bool? BattleToggledOn, NpcKind? Kind, uint? Value2136, uint? Sequence2136, uint? Value0140, uint? Value0240, (byte State0, byte State1)? State4636, (int SequenceId, int ResultCode)? Latest2C38);
+public readonly record struct RuntimeNpcStateSnapshot(int? NpcCode, long? Hp, long? MaxHp, long? HpObservedAtMilliseconds, bool? BattleToggledOn, NpcKind? Kind, long? Value2136, long? Sequence2136, long? Value0140, long? Value0240, (byte State0, byte State1)? State4636, (int SequenceId, int ResultCode)? Latest2C38);

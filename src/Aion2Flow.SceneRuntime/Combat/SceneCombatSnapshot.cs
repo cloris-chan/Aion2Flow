@@ -461,15 +461,15 @@ public readonly record struct EncounterSummarySnapshot(
 
 public readonly record struct NpcRuntimeObservationSnapshot(
     int InstanceId,
-    uint? Value2136,
-    uint? Sequence2136,
-    uint? Value0140,
-    uint? Value0240,
+    long? Value2136,
+    long? Sequence2136,
+    long? Value0140,
+    long? Value0240,
     byte? State4636Value0,
     byte? State4636Value1,
     int? Sequence2C38,
     int? Result2C38,
-    int? Hp,
+    long? Hp,
     bool? BattleToggledOn,
     NpcRuntimePhaseHint PhaseHint);
 
@@ -479,9 +479,9 @@ public readonly record struct SceneBossFocusSnapshot
 
     public NpcKind Kind { get; init; }
 
-    public int Hp { get; init; }
+    public long Hp { get; init; }
 
-    public int MaxHp { get; init; }
+    public long MaxHp { get; init; }
 
     public long CumulativeLostHp { get; init; }
 

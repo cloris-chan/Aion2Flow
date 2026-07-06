@@ -418,7 +418,7 @@ public sealed class ScenePlaybackSession
         private long? ResolveResourceMaximum(in ResourceObservation resource)
         {
             var maximumValue = resource.MaximumValue;
-            if (_entities.TryGet(resource.EntityId, out var entity) && entity.MaxHp is int entityMaxHp)
+            if (_entities.TryGet(resource.EntityId, out var entity) && entity.MaxHp is long entityMaxHp)
                 maximumValue = maximumValue.HasValue ? Math.Max(maximumValue.Value, entityMaxHp) : entityMaxHp;
 
             return maximumValue;

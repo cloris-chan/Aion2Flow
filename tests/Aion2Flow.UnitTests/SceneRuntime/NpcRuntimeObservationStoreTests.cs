@@ -16,10 +16,10 @@ public sealed class NpcRuntimeObservationStoreTests
         scene.Sink.RegisterObservation2C38(4370, 95, 7, 0, 0, 0);
 
         Assert.True(scene.TryGetNpcRuntimeState(4370, out var state));
-        Assert.Equal((uint)6, state.Sequence2136);
-        Assert.Equal((uint)200003, state.Value2136);
-        Assert.Equal((uint)200003, state.Value0140);
-        Assert.Equal((uint)200003, state.Value0240);
+        Assert.Equal(6L, state.Sequence2136);
+        Assert.Equal(200003L, state.Value2136);
+        Assert.Equal(200003L, state.Value0140);
+        Assert.Equal(200003L, state.Value0240);
         Assert.Equal((byte)2, state.State4636?.State0);
         Assert.Equal((byte)79, state.State4636?.State1);
         Assert.Equal(95, state.Latest2C38?.SequenceId);

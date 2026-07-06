@@ -151,7 +151,7 @@ public sealed class EntityStore
         return true;
     }
 
-    public void ApplyNpcHp(int instanceId, int hp, int maxHp)
+    public void ApplyNpcHp(int instanceId, long hp, long maxHp)
     {
         var entity = GetOrAdd(instanceId);
         var resolvedMaxHp = maxHp > 0 ? maxHp : entity.MaxHp;
@@ -176,7 +176,7 @@ public sealed class EntityStore
         _revision++;
     }
 
-    public void ApplyNpc2136State(int instanceId, uint sequence, uint value0)
+    public void ApplyNpc2136State(int instanceId, long sequence, long value0)
     {
         var entity = GetOrAdd(instanceId);
         if (entity.Sequence2136 == sequence && entity.Value2136 == value0)
@@ -187,7 +187,7 @@ public sealed class EntityStore
         _revision++;
     }
 
-    public void ApplyNpc0140Value(int instanceId, uint value0)
+    public void ApplyNpc0140Value(int instanceId, long value0)
     {
         var entity = GetOrAdd(instanceId);
         if (entity.Value0140 == value0)
@@ -197,7 +197,7 @@ public sealed class EntityStore
         _revision++;
     }
 
-    public void ApplyNpc0240Value(int instanceId, uint value0)
+    public void ApplyNpc0240Value(int instanceId, long value0)
     {
         var entity = GetOrAdd(instanceId);
         if (entity.Value0240 == value0)
@@ -297,13 +297,13 @@ internal readonly record struct EntityRecordSnapshot(
     CombatantClassEvidence ClassEvidence,
     int? OwnerEntityId,
     EntityOwnerKind OwnerKind,
-    int? CurrentHp,
-    int? MaxHp,
+    long? CurrentHp,
+    long? MaxHp,
     bool NpcCombatActive,
-    uint? Value2136,
-    uint? Sequence2136,
-    uint? Value0140,
-    uint? Value0240,
+    long? Value2136,
+    long? Sequence2136,
+    long? Value0140,
+    long? Value0240,
     (byte State0, byte State1)? State4636,
     (int SequenceId, int ResultCode)? Latest2C38,
     long LastObservedOrdinal)
@@ -364,13 +364,13 @@ public sealed class EntityRecord
     public CombatantClassEvidence ClassEvidence { get; set; }
     public int? OwnerEntityId { get; set; }
     public EntityOwnerKind OwnerKind { get; set; }
-    public int? CurrentHp { get; set; }
-    public int? MaxHp { get; set; }
+    public long? CurrentHp { get; set; }
+    public long? MaxHp { get; set; }
     public bool NpcCombatActive { get; set; }
-    public uint? Value2136 { get; set; }
-    public uint? Sequence2136 { get; set; }
-    public uint? Value0140 { get; set; }
-    public uint? Value0240 { get; set; }
+    public long? Value2136 { get; set; }
+    public long? Sequence2136 { get; set; }
+    public long? Value0140 { get; set; }
+    public long? Value0240 { get; set; }
     public (byte State0, byte State1)? State4636 { get; set; }
     public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
     public long LastObservedOrdinal { get; set; }
