@@ -326,7 +326,7 @@ public sealed class EncounterArchiveServiceTests
         const int bossCode = 2_999_997;
         CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>
         {
-            [bossCode] = new(bossCode, "Archive Boss", NpcCatalogKind.Boss)
+            [bossCode] = new(bossCode, "Archive Boss", NpcCatalogKind.Boss, NpcHpDisplayScale.Normal)
         });
 
         var journal = new ObservedEventJournal();

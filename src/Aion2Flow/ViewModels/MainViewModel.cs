@@ -549,12 +549,28 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
             if (row is null)
             {
-                row = new BossFocusViewModel(_frameBatchService, group.DisplayKey, group.Representative.InstanceId, group.NpcCode, group.InstanceCount, group.Representative.Hp, group.Representative.MaxHp, group.Representative.HasHp, group.Representative.HasMaxHp);
+                row = new BossFocusViewModel(
+                    _frameBatchService,
+                    group.DisplayKey,
+                    group.Representative.InstanceId,
+                    group.NpcCode,
+                    group.InstanceCount,
+                    NormalizeBossHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp),
+                    NormalizeBossHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp),
+                    group.Representative.HasHp,
+                    group.Representative.HasMaxHp);
                 BossFocuses.Add(row);
             }
             else
             {
-                row.Update(group.Representative.InstanceId, group.NpcCode, group.InstanceCount, group.Representative.Hp, group.Representative.MaxHp, group.Representative.HasHp, group.Representative.HasMaxHp);
+                row.Update(
+                    group.Representative.InstanceId,
+                    group.NpcCode,
+                    group.InstanceCount,
+                    NormalizeBossHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp),
+                    NormalizeBossHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp),
+                    group.Representative.HasHp,
+                    group.Representative.HasMaxHp);
             }
 
             var hpBrush = ResolveBossHpBrush(encounterId, group.DisplayKey);
@@ -577,7 +593,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             var existingIndex = FindBossFocusDisplayIndex(displayKey);
             if (existingIndex < 0)
             {
-                _bossFocusDisplayGroups.Add(new BossFocusDisplayGroup(displayKey, snapshot, npcCode, 1, ResolveBossShareEffectiveHp(snapshot), displayObservedAtMilliseconds));
+                _bossFocusDisplayGroups.Add(new BossFocusDisplayGroup(displayKey, snapshot, npcCode, 1, ResolveBossShareEffectiveHp(npcCode, snapshot), displayObservedAtMilliseconds));
                 continue;
             }
 
@@ -586,7 +602,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             var representative = candidateWins ? snapshot : existing.Representative;
             var representativeNpcCode = candidateWins ? npcCode : existing.NpcCode;
             var representativeObservedAtMilliseconds = candidateWins ? displayObservedAtMilliseconds : existing.RepresentativeObservedAtMilliseconds;
-            _bossFocusDisplayGroups[existingIndex] = new BossFocusDisplayGroup(displayKey, representative, representativeNpcCode, existing.InstanceCount + 1, existing.EffectiveHp + ResolveBossShareEffectiveHp(snapshot), representativeObservedAtMilliseconds);
+            _bossFocusDisplayGroups[existingIndex] = new BossFocusDisplayGroup(displayKey, representative, representativeNpcCode, existing.InstanceCount + 1, existing.EffectiveHp + ResolveBossShareEffectiveHp(npcCode, snapshot), representativeObservedAtMilliseconds);
         }
     }
 
@@ -772,7 +788,27 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         return damage;
     }
 
-    private static long ResolveBossShareEffectiveHp(SceneBossFocusSnapshot boss) => boss.HasHp && boss.HasMaxHp && boss.EffectiveHp > 0 ? boss.EffectiveHp : 0;
+    private static long ResolveBossShareEffectiveHp(int npcCode, SceneBossFocusSnapshot boss) => boss.HasHp && boss.HasMaxHp && boss.EffectiveHp > 0 ? NormalizeBossHpForDisplay(boss.Kind, npcCode, boss.EffectiveHp) : 0;
+
+    private static long NormalizeBossHpForDisplay(NpcKind kind, int npcCode, long value)
+    {
+        if (value <= 0)
+            return 0;
+
+        if (kind != NpcKind.Boss)
+            return value;
+
+        var divisor = ResolveBossHpDisplayDivisor(npcCode);
+        return divisor <= 1 ? value : (value + divisor / 2) / divisor;
+    }
+
+    private static int ResolveBossHpDisplayDivisor(int npcCode)
+    {
+        if (npcCode > 0 && CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry))
+            return entry.HpDisplayDivisor;
+
+        return 1;
+    }
 
     private static long FindBossContributionAmount(IReadOnlyList<BossDamageContribution> damageContributions, int bossId, int sourceCombatantId)
     {

@@ -60,6 +60,7 @@ public sealed class ResourcePackTests
         Assert.True(catalog.TryGetValue(2000002, out var npc));
         Assert.Equal("德拉克紐特弓手", npc.Name);
         Assert.Equal(NpcCatalogKind.Monster, npc.Kind);
+        Assert.Equal(NpcHpDisplayScale.Normal, npc.HpDisplayScale);
     }
 
     [Fact]
@@ -70,6 +71,19 @@ public sealed class ResourcePackTests
         Assert.True(catalog.TryGetValue(2405210, out var npc));
         Assert.Equal("盜賊團掠奪者", npc.Name);
         Assert.Equal(NpcCatalogKind.Monster, npc.Kind);
+    }
+
+    [Theory]
+    [InlineData(2110465, NpcHpDisplayScale.LevelScaled)]
+    [InlineData(2340057, NpcHpDisplayScale.LevelScaled)]
+    [InlineData(2702110, NpcHpDisplayScale.LevelScaled)]
+    [InlineData(2980079, NpcHpDisplayScale.Normal)]
+    public void NpcCatalog_Exposes_Hp_Display_Scale(int npcCode, NpcHpDisplayScale expectedScale)
+    {
+        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
+
+        Assert.True(catalog.TryGetValue(npcCode, out var npc));
+        Assert.Equal(expectedScale, npc.HpDisplayScale);
     }
 
     [Fact]

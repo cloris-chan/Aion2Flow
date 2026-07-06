@@ -157,7 +157,7 @@ public sealed class SummonAttributionSceneTests
     {
         CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>
         {
-            [2920115] = new(2920115, "火之精靈", NpcCatalogKind.Summon)
+            [2920115] = new(2920115, "火之精靈", NpcCatalogKind.Summon, NpcHpDisplayScale.Normal)
         });
 
         using var scene = new SceneTestHarness();
@@ -224,7 +224,7 @@ public sealed class SummonAttributionSceneTests
         const int summonNpcCode = 2920115;
         CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>
         {
-            [summonNpcCode] = new(summonNpcCode, "火之精靈", NpcCatalogKind.Summon)
+            [summonNpcCode] = new(summonNpcCode, "火之精靈", NpcCatalogKind.Summon, NpcHpDisplayScale.Normal)
         });
         using var scene = new SceneTestHarness();
         var writer = new SceneObservationWriter(scene.Sink);

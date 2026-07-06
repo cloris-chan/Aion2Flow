@@ -48,7 +48,7 @@ public sealed class NpcCatalogSceneTests
         const int summonNpcCode = 2920190;
         CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>
         {
-            [summonNpcCode] = new(summonNpcCode, "古代精靈", NpcCatalogKind.Summon)
+            [summonNpcCode] = new(summonNpcCode, "古代精靈", NpcCatalogKind.Summon, NpcHpDisplayScale.Normal)
         });
         using var scene = new SceneTestHarness();
         var writer = new SceneObservationWriter(scene.Sink);

@@ -82,7 +82,7 @@ public sealed class ResourceCatalogSnapshot(ResourceSharedCatalog shared, Resour
         {
             if (names.TryGetValue(code, out var name) && !string.IsNullOrWhiteSpace(name))
             {
-                result[code] = new NpcDisplayEntry(code, name, definition.Kind);
+                result[code] = new NpcDisplayEntry(code, name, definition.Kind, definition.HpDisplayScale);
             }
         }
 

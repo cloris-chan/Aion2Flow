@@ -1155,7 +1155,7 @@ public class SceneCombatSnapshotAdapterTests
     {
         CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>
         {
-            [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss)
+            [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss, NpcHpDisplayScale.Normal)
         });
 
         var entities = new EntityStore();
@@ -1217,7 +1217,7 @@ public class SceneCombatSnapshotAdapterTests
             new SkillDisplayEntry(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc")
         ], new Dictionary<int, NpcDisplayEntry>
         {
-            [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss)
+            [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss, NpcHpDisplayScale.Normal)
         });
 
         var entities = new EntityStore();

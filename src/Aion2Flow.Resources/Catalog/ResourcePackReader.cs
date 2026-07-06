@@ -263,7 +263,8 @@ internal static class ResourcePackReader
         var result = new Dictionary<int, NpcDefinition>(count);
         for (var i = 0; i < count; i++)
         {
-            var definition = new NpcDefinition(ReadInt32(ref cursor), (NpcCatalogKind)ReadByte(ref cursor));
+            var code = ReadInt32(ref cursor);
+            var definition = new NpcDefinition(code, (NpcCatalogKind)ReadByte(ref cursor), (NpcHpDisplayScale)ReadByte(ref cursor));
             result.Add(definition.Code, definition);
         }
 
