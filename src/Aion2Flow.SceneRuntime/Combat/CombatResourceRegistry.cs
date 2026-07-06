@@ -156,15 +156,20 @@ public static class CombatResourceRegistry
 
     public static bool TryResolveSkillByEffectRef(ResourceEffectRef effectRef, out SkillDisplayEntry skillDisplayEntry)
     {
-        if (TryResolveSkillIdByEffectRef(effectRef, out var skillId) &&
-            SkillDisplayMap.TryGetValue(skillId, out skillDisplayEntry) &&
+        if (!TryResolveSkillIdByEffectRef(effectRef, out var skillId))
+        {
+            skillDisplayEntry = default;
+            return false;
+        }
+
+        var displaySkillId = ResolveDisplaySkillIdForCode(skillId);
+        if (SkillDisplayMap.TryGetValue(displaySkillId, out skillDisplayEntry) &&
             !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
         {
             return true;
         }
 
-        if (TryResolveSkillIdByEffectRef(effectRef, out skillId) &&
-            SkillMap.TryGetValue(skillId, out skillDisplayEntry) &&
+        if (SkillMap.TryGetValue(displaySkillId, out skillDisplayEntry) &&
             !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
         {
             return true;
@@ -208,7 +213,7 @@ public static class CombatResourceRegistry
     {
         _skillClientMetadata = skillClientMetadata;
         _skillDisplayProjections = skillDisplayProjections;
-        _effectSkillIds = SkillEffectReferenceIndex.Build(skillEffectReferences);
+        _effectSkillIds = SkillEffectReferenceIndex.BuildUnambiguousSkillIdsByEffectCode(skillEffectReferences);
     }
 
     public static NpcKind ResolveNpcKind(NpcCatalogKind kind) =>

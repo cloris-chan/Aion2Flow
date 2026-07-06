@@ -83,6 +83,9 @@ public sealed class LocalizationServicesTests
     [InlineData(100034, "風之精靈：基本攻擊", "ICON_EL_SKILL_012.webp")]
     [InlineData(100048, "地之精靈：基本攻擊", "ICON_EL_SKILL_013.webp")]
     [InlineData(17040257, "天罰", "ICON_CL_SKILL_005.webp")]
+    [InlineData(170402571, "天罰", "ICON_CL_SKILL_005.webp")]
+    [InlineData(16030047, "大地震動", "ICON_EL_SKILL_003.webp")]
+    [InlineData(160300471, "大地震動", "ICON_EL_SKILL_003.webp")]
     [InlineData(17440047, "高潔氣息", "ICON_CL_SKILL_046.webp")]
     [InlineData(17730001, "主神恩寵", "ICON_CL_SKILL_Passive_012.webp")]
     [InlineData(3001110, "神石：海格黛的束縛", "Icon_Item_Usable_Godstone_WP_r_004.webp")]
@@ -107,9 +110,9 @@ public sealed class LocalizationServicesTests
     }
 
     [Theory]
-    [InlineData(1227237, "攻擊", null)]
-    [InlineData(1227265, "亡靈迅殺", null)]
-    public void GameResourceService_Resolves_Client_SkillDat_Display_Names(int skillCode, string expectedName, string? expectedIcon)
+    [InlineData(1227237, "攻擊", "ICON_TE_SKILL_001.webp")]
+    [InlineData(1227265, "亡靈迅殺", "ICON_TE_SKILL_001.webp")]
+    public void GameResourceService_Resolves_Client_SkillDat_Display_Names(int skillCode, string expectedName, string expectedIcon)
     {
         try
         {
@@ -147,9 +150,9 @@ public sealed class LocalizationServicesTests
     }
 
     [Theory]
-    [InlineData(1607415, "攻擊")]
-    [InlineData(1607400, "攻擊")]
-    public void GameResourceService_Resolves_Exact_Client_Skills_Without_Player_Family_Fallback(int skillCode, string expectedName)
+    [InlineData(1607415, "攻擊", "ICON_TE_SKILL_001.webp")]
+    [InlineData(1607400, "攻擊", "ICON_TE_SKILL_001.webp")]
+    public void GameResourceService_Resolves_Exact_Client_Skills_Without_Player_Family_Fallback(int skillCode, string expectedName, string expectedIcon)
     {
         try
         {
@@ -159,7 +162,7 @@ public sealed class LocalizationServicesTests
             using var resources = new GameResourceService(languageService);
 
             Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
-            Assert.Null(resources.ResolveSkillIconAssetName(skillCode));
+            Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
         }
         finally
         {

@@ -1213,8 +1213,8 @@ public class SceneCombatSnapshotAdapterTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new SkillDisplayEntry(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc"),
+            new SkillDisplayEntry(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc")
         ], new Dictionary<int, NpcDisplayEntry>
         {
             [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss)
@@ -1262,9 +1262,9 @@ public class SceneCombatSnapshotAdapterTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new SkillDisplayEntry(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
-            new SkillDisplayEntry(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
+            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc"),
+            new SkillDisplayEntry(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon"),
+            new SkillDisplayEntry(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon")
         ], new Dictionary<int, NpcDisplayEntry>());
 
         var entities = new EntityStore();
@@ -1312,8 +1312,8 @@ public class SceneCombatSnapshotAdapterTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null),
-            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc", null)
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc"),
+            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc")
         ], new Dictionary<int, NpcDisplayEntry>());
 
         var entities = new EntityStore();
@@ -2265,7 +2265,7 @@ public class SceneReadModelOwnerTests
     {
         return
         [
-            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc", null)
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc")
         ];
     }
 

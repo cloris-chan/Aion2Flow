@@ -17,6 +17,7 @@ internal static class ResourcePackReader
         NpcNameDefinitions = 6,
         KnownMapIds = 7,
         ServerCodes = 8,
+        SkillRelatedSkills = 9,
         SkillNames = 101,
         NpcNames = 102,
         NpcCatalogNames = 103,
@@ -34,6 +35,7 @@ internal static class ResourcePackReader
             ReadSkillClientMetadata(RequireSection(sections, SectionId.SkillClientMetadata)),
             ReadSkillDisplayProjections(RequireSection(sections, SectionId.SkillDisplayProjections)),
             ReadSkillEffectReferences(RequireSection(sections, SectionId.SkillEffectReferences)),
+            ReadSkillRelatedSkills(RequireSection(sections, SectionId.SkillRelatedSkills)),
             ReadNpcDefinitions(RequireSection(sections, SectionId.NpcDefinitions)),
             ReadNpcNameDefinitions(RequireSection(sections, SectionId.NpcNameDefinitions)),
             ReadKnownMapIds(RequireSection(sections, SectionId.KnownMapIds)),
@@ -148,8 +150,7 @@ internal static class ResourcePackReader
                 ReadInt32(ref cursor),
                 (SkillCategory)ReadByte(ref cursor),
                 (SkillSourceType)ReadByte(ref cursor),
-                ReadString(ref cursor),
-                ReadNullableString(ref cursor)));
+                ReadString(ref cursor)));
         }
 
         RequireFullyRead(cursor);
@@ -166,13 +167,41 @@ internal static class ResourcePackReader
             var entry = new SkillClientMetadata(
                 ReadInt32(ref cursor),
                 ReadString(ref cursor),
+                ReadInt32(ref cursor),
+                (SkillSourceKeyRelation)ReadByte(ref cursor),
+                ReadString(ref cursor),
+                ReadInt32(ref cursor),
                 ReadString(ref cursor),
                 ReadString(ref cursor),
                 ReadString(ref cursor),
                 ReadString(ref cursor),
                 ReadString(ref cursor),
                 ReadString(ref cursor),
-                ReadString(ref cursor));
+                ReadString(ref cursor),
+                ReadStringArray(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadString(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadString(ref cursor),
+                ReadIntArray(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
+                ReadStringArray(ref cursor),
+                ReadStringArray(ref cursor),
+                ReadString(ref cursor),
+                ReadIntArray(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
+                ReadInt32(ref cursor));
             result.Add(entry.SkillId, entry);
         }
 
@@ -191,10 +220,7 @@ internal static class ResourcePackReader
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
-                ReadInt32(ref cursor),
-                ReadInt32(ref cursor),
-                ReadInt32(ref cursor),
-                ReadByte(ref cursor) != 0);
+                ReadInt32(ref cursor));
             result.Add(projection.SkillCode, projection);
         }
 
@@ -209,7 +235,21 @@ internal static class ResourcePackReader
         var result = new SkillEffectReference[count];
         for (var i = 0; i < result.Length; i++)
         {
-            result[i] = new SkillEffectReference(ReadInt32(ref cursor), ReadInt32(ref cursor), ReadInt32(ref cursor), ReadInt32(ref cursor), ReadInt32(ref cursor));
+            result[i] = new SkillEffectReference(ReadInt32(ref cursor), ReadInt32(ref cursor), (SkillEffectReferenceKind)ReadByte(ref cursor), ReadInt32(ref cursor));
+        }
+
+        RequireFullyRead(cursor);
+        return result;
+    }
+
+    private static SkillRelatedSkill[] ReadSkillRelatedSkills(ResourcePackSection section)
+    {
+        var cursor = section.Payload.Span;
+        var count = section.Count;
+        var result = new SkillRelatedSkill[count];
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = new SkillRelatedSkill(ReadInt32(ref cursor), ReadInt32(ref cursor), ReadInt32(ref cursor), (SkillRelationKind)ReadByte(ref cursor), ReadString(ref cursor), ReadString(ref cursor));
         }
 
         RequireFullyRead(cursor);
@@ -331,12 +371,6 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static string? ReadNullableString(ref ReadOnlySpan<byte> cursor)
-    {
-        var length = ReadInt32(ref cursor);
-        return length < 0 ? null : ReadStringBody(ref cursor, length);
-    }
-
     private static string ReadString(ref ReadOnlySpan<byte> cursor)
     {
         var length = ReadInt32(ref cursor);
@@ -346,6 +380,40 @@ internal static class ResourcePackReader
         }
 
         return ReadStringBody(ref cursor, length);
+    }
+
+    private static string[] ReadStringArray(ref ReadOnlySpan<byte> cursor)
+    {
+        var count = ReadInt32(ref cursor);
+        if (count < 0)
+        {
+            throw new InvalidDataException("Unexpected negative string array length in resource pack.");
+        }
+
+        var values = new string[count];
+        for (var i = 0; i < values.Length; i++)
+        {
+            values[i] = ReadString(ref cursor);
+        }
+
+        return values;
+    }
+
+    private static int[] ReadIntArray(ref ReadOnlySpan<byte> cursor)
+    {
+        var count = ReadInt32(ref cursor);
+        if (count < 0)
+        {
+            throw new InvalidDataException("Unexpected negative int array length in resource pack.");
+        }
+
+        var values = new int[count];
+        for (var i = 0; i < values.Length; i++)
+        {
+            values[i] = ReadInt32(ref cursor);
+        }
+
+        return values;
     }
 
     private static string ReadStringBody(ref ReadOnlySpan<byte> cursor, int length)

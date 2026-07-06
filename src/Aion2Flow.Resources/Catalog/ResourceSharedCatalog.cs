@@ -5,6 +5,7 @@ public sealed class ResourceSharedCatalog(
     IReadOnlyDictionary<int, SkillClientMetadata> skillClientMetadata,
     IReadOnlyDictionary<int, SkillDisplayProjection> skillDisplayProjections,
     IReadOnlyList<SkillEffectReference> skillEffectReferences,
+    IReadOnlyList<SkillRelatedSkill> skillRelatedSkills,
     IReadOnlyDictionary<int, NpcDefinition> npcDefinitions,
     IReadOnlyDictionary<string, NpcNameDefinition> npcNameDefinitions,
     IReadOnlySet<uint> knownMapIds,
@@ -13,10 +14,19 @@ public sealed class ResourceSharedCatalog(
     public SkillDefinitionCatalog SkillDefinitions { get; } = skillDefinitions;
     public IReadOnlyDictionary<int, SkillClientMetadata> SkillClientMetadata { get; } = skillClientMetadata;
     public IReadOnlyDictionary<int, SkillDisplayProjection> SkillDisplayProjections { get; } = skillDisplayProjections;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByPresentationSkillId { get; } = SkillDisplayProjectionIndex.BuildByPresentationSkillId(skillDisplayProjections);
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByDisplaySkillId { get; } = SkillDisplayProjectionIndex.BuildByDisplaySkillId(skillDisplayProjections);
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByBaseSkillId { get; } = SkillDisplayProjectionIndex.BuildByBaseSkillId(skillDisplayProjections);
     public IReadOnlyList<SkillEffectReference> SkillEffectReferences { get; } = skillEffectReferences;
+    public IReadOnlyList<SkillRelatedSkill> SkillRelatedSkills { get; } = skillRelatedSkills;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByOwnerSkillId { get; } = SkillRelatedSkillIndex.BuildByOwnerSkillId(skillRelatedSkills);
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByRelatedSkillCode { get; } = SkillRelatedSkillIndex.BuildByRelatedSkillCode(skillRelatedSkills);
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByRelatedSourceSkillId { get; } = SkillRelatedSkillIndex.BuildByRelatedSourceSkillId(skillRelatedSkills);
     public IReadOnlyDictionary<int, NpcDefinition> NpcDefinitions { get; } = npcDefinitions;
     public IReadOnlyDictionary<string, NpcNameDefinition> NpcNameDefinitions { get; } = npcNameDefinitions;
     public IReadOnlySet<uint> KnownMapIds { get; } = knownMapIds;
     public IReadOnlySet<int> ServerCodes { get; } = serverCodes;
-    public IReadOnlyDictionary<uint, int> EffectSkillIds { get; } = SkillEffectReferenceIndex.Build(skillEffectReferences);
+    public IReadOnlyDictionary<uint, int> EffectSkillIds { get; } = SkillEffectReferenceIndex.BuildUnambiguousSkillIdsByEffectCode(skillEffectReferences);
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillEffectReference>> SkillEffectReferencesBySkillId { get; } = SkillEffectReferenceIndex.BuildBySkillId(skillEffectReferences);
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillEffectReference>> SkillEffectReferencesByEffectCode { get; } = SkillEffectReferenceIndex.BuildByEffectCode(skillEffectReferences);
 }

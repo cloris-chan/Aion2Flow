@@ -9,8 +9,8 @@ public sealed class SkillDetailPresentationAggregatorTests
     public void AddOrMerge_Merges_Generated_Presentation_Group()
     {
         SetSkillDisplayProjections(
-            new SkillDisplayProjection(16300243, 16300000, 16300240, 16300000, 0b01010, 3, false),
-            new SkillDisplayProjection(16300027, 16300000, 16300020, 16300000, 0, 7, false));
+            new SkillDisplayProjection(16300243, 16300000, 16300240, 16300000),
+            new SkillDisplayProjection(16300027, 16300000, 16300020, 16300000));
 
         var rows = new List<SkillDetailRowData>();
         var indexes = new Dictionary<SkillPresentationKey, int>();
@@ -31,8 +31,8 @@ public sealed class SkillDetailPresentationAggregatorTests
     public void AddOrMerge_Merges_Derived_Skill_With_Different_Display_Name()
     {
         SetSkillDisplayProjections(
-            new SkillDisplayProjection(16330020, 16330000, 16330020, 16330000, 0, 0, false),
-            new SkillDisplayProjection(16330027, 16330000, 16330020, 16330000, 0, 7, false));
+            new SkillDisplayProjection(16330020, 16330000, 16330020, 16330000),
+            new SkillDisplayProjection(16330027, 16330000, 16330020, 16330000));
 
         var rows = new List<SkillDetailRowData>();
         var indexes = new Dictionary<SkillPresentationKey, int>();
@@ -49,15 +49,15 @@ public sealed class SkillDetailPresentationAggregatorTests
     }
 
     [Theory]
-    [InlineData(11010047, 11010000)]
+    [InlineData(11010047, 11420000)]
     [InlineData(16330027, 16330000)]
     [InlineData(19010047, 19010000)]
     public void FromActionKey_Uses_Generated_Presentation_Relations(int skillCode, int expectedPresentationSkillCode)
     {
         SetSkillDisplayProjections(
-            new SkillDisplayProjection(11010047, 11010000, 11010040, 11010000, 0b01000, 7, false),
-            new SkillDisplayProjection(16330027, 16330000, 16330020, 16330000, 0, 7, false),
-            new SkillDisplayProjection(19010047, 19010000, 19010040, 19010000, 0b01000, 7, false));
+            new SkillDisplayProjection(11010047, 11420000, 11010047, 11420000),
+            new SkillDisplayProjection(16330027, 16330000, 16330020, 16330000),
+            new SkillDisplayProjection(19010047, 19010000, 19010040, 19010000));
 
         var key = SkillPresentationKey.FromActionKey(new CombatActionKey(skillCode, default, default));
 

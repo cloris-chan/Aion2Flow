@@ -44,7 +44,7 @@ public sealed class GameResourceService : IDisposable
             }
 
             if (TryResolveSkillIdByEffectRef(catalog, unchecked((uint)skillCode), out var ownerSkillId) &&
-                TryResolveSkillName(Skills, ownerSkillId, out name))
+                TryResolveSkillName(Skills, ResolveDisplaySkillIdForCode(catalog, ownerSkillId), out name))
             {
                 return name;
             }
@@ -84,6 +84,12 @@ public sealed class GameResourceService : IDisposable
         if (TryResolveSkillIdByEffectRef(snapshot, unchecked((uint)skillCode), out var ownerSkillId))
         {
             assetName = SkillIconCatalog.ResolveAssetName(ownerSkillId);
+            if (assetName is not null)
+            {
+                return assetName;
+            }
+
+            assetName = SkillIconCatalog.ResolveAssetName(ResolveDisplaySkillIdForCode(snapshot, ownerSkillId));
             if (assetName is not null)
             {
                 return assetName;

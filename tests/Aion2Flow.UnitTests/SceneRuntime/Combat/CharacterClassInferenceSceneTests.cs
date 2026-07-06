@@ -146,7 +146,7 @@ public sealed class CharacterClassInferenceSceneTests
 
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(17060233, "Thunderbolt MAX", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc", null)
+            new SkillDisplayEntry(17060233, "Thunderbolt MAX", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc")
         ], new Dictionary<int, NpcDisplayEntry>());
 
         var snapshotAfterResources = scene.CreateSnapshot();
@@ -161,10 +161,10 @@ public sealed class CharacterClassInferenceSceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(13352450, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc", null),
-            new SkillDisplayEntry(16790001, "Revitalization Contract", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new SkillDisplayEntry(16200130, "Defiance", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new SkillDisplayEntry(16190040, "Enhance: Spirit's Benediction", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null)
+            new SkillDisplayEntry(13352450, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc"),
+            new SkillDisplayEntry(16790001, "Revitalization Contract", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc"),
+            new SkillDisplayEntry(16200130, "Defiance", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc"),
+            new SkillDisplayEntry(16190040, "Enhance: Spirit's Benediction", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc")
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();

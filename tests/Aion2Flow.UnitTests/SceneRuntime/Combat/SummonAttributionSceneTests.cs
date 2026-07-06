@@ -567,11 +567,11 @@ public sealed class SummonAttributionSceneTests
     {
         return
         [
-            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new SkillDisplayEntry(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
-            new SkillDisplayEntry(16100004, "Fire Spirit: Strike", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null),
-            new SkillDisplayEntry(16770001, "Spirit Recovery", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc", null),
-            new SkillDisplayEntry(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon", null)
+            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc"),
+            new SkillDisplayEntry(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon"),
+            new SkillDisplayEntry(16100004, "Fire Spirit: Strike", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon"),
+            new SkillDisplayEntry(16770001, "Spirit Recovery", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc"),
+            new SkillDisplayEntry(16990004, "Spirit's Descent Restore", SkillCategory.Elementalist, SkillSourceType.Unknown, "summon")
         ];
     }
 

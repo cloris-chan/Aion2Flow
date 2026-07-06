@@ -11,7 +11,16 @@ public sealed class ResourceCatalogSnapshot(ResourceSharedCatalog shared, Resour
     public SkillDefinitionCatalog SkillDefinitions => Shared.SkillDefinitions;
     public IReadOnlyDictionary<int, SkillClientMetadata> SkillClientMetadata => Shared.SkillClientMetadata;
     public IReadOnlyDictionary<int, SkillDisplayProjection> SkillDisplayProjections => Shared.SkillDisplayProjections;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByPresentationSkillId => Shared.SkillDisplayProjectionsByPresentationSkillId;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByDisplaySkillId => Shared.SkillDisplayProjectionsByDisplaySkillId;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByBaseSkillId => Shared.SkillDisplayProjectionsByBaseSkillId;
     public IReadOnlyList<SkillEffectReference> SkillEffectReferences => Shared.SkillEffectReferences;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillEffectReference>> SkillEffectReferencesBySkillId => Shared.SkillEffectReferencesBySkillId;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillEffectReference>> SkillEffectReferencesByEffectCode => Shared.SkillEffectReferencesByEffectCode;
+    public IReadOnlyList<SkillRelatedSkill> SkillRelatedSkills => Shared.SkillRelatedSkills;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByOwnerSkillId => Shared.SkillRelatedSkillsByOwnerSkillId;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByRelatedSkillCode => Shared.SkillRelatedSkillsByRelatedSkillCode;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByRelatedSourceSkillId => Shared.SkillRelatedSkillsByRelatedSourceSkillId;
     public IReadOnlyDictionary<uint, int> EffectSkillIds => Shared.EffectSkillIds;
     public IReadOnlyDictionary<int, NpcDisplayEntry> NpcCatalog { get; } = BuildNpcDisplayCatalog(shared.NpcDefinitions, locale.NpcCatalogNames);
     public IReadOnlyDictionary<string, LocalizedNpcName> NpcNames { get; } = BuildLocalizedNpcNames(shared.NpcNameDefinitions, locale.NpcNames);
@@ -60,7 +69,7 @@ public sealed class ResourceCatalogSnapshot(ResourceSharedCatalog shared, Resour
             var name = names.TryGetValue(definition.SkillId, out var localizedName) && !string.IsNullOrWhiteSpace(localizedName)
                 ? localizedName
                 : definition.SkillId.ToString(CultureInfo.InvariantCulture);
-            result.Add(new SkillDisplayEntry(definition.SkillId, name, definition.Category, definition.SourceType, definition.SourceKey, definition.TriggeredSkillIdsCsv));
+            result.Add(new SkillDisplayEntry(definition.SkillId, name, definition.Category, definition.SourceType, definition.SourceKey));
         }
 
         return result;
