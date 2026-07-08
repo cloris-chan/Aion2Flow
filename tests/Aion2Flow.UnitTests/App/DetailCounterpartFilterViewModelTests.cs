@@ -7,6 +7,37 @@ namespace Cloris.Aion2Flow.Tests.App;
 public sealed class DetailCounterpartFilterViewModelTests
 {
     [Fact]
+    public void CounterpartSummary_TracksSelectionAndLanguage()
+    {
+        var language = new LanguageService();
+        language.SetLanguage(LanguageService.English);
+        using var localization = new LocalizationService(language);
+        var filter = new DetailCounterpartFilterViewModel(localization, "Direction_Targets");
+
+        filter.ReplaceCounterparts(
+        [
+            CreateOption(1001, 100),
+            CreateOption(1002, 200)
+        ]);
+
+        Assert.Equal("Targets 2/2", filter.CounterpartSummary);
+
+        var changedProperties = new List<string?>();
+        filter.PropertyChanged += (_, e) => changedProperties.Add(e.PropertyName);
+
+        filter.Counterparts[1].IsSelected = false;
+
+        Assert.Equal("Targets 1/2", filter.CounterpartSummary);
+        Assert.Contains(nameof(DetailCounterpartFilterViewModel.CounterpartSummary), changedProperties);
+
+        changedProperties.Clear();
+        language.SetLanguage(LanguageService.TraditionalChinese);
+
+        Assert.Equal("目標 1/2", filter.CounterpartSummary);
+        Assert.Contains(nameof(DetailCounterpartFilterViewModel.CounterpartSummary), changedProperties);
+    }
+
+    [Fact]
     public void ReplaceCounterparts_StableOrder_UpdatesInPlaceWithoutCollectionNotification()
     {
         var language = new LanguageService();

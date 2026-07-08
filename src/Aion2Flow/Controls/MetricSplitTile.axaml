@@ -7,8 +7,7 @@
     <Border Classes="MetricCardSurface">
         <StackPanel Spacing="4">
             <TextBlock Classes="MetricLabel"
-                       Text="{Binding Label, ElementName=Root}"
-                       TextWrapping="Wrap" />
+                       Text="{Binding Label, ElementName=Root}" />
             <StackPanel Orientation="Horizontal"
                         Spacing="4">
                 <controls:NumericBlock Classes="MetricSplitValue"

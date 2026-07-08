@@ -16,7 +16,8 @@
           controls:DisplayContextProvider.DisplayContext="{Binding DisplayContext}">
         <Grid Grid.Row="0"
               ColumnDefinitions="*,Auto"
-              ColumnSpacing="16">
+              ColumnSpacing="16"
+              Margin="10,10,10,0">
             <controls:CombatantDisplay Grid.Column="0"
                                         Classes="DetailHeaderName"
                                         EntityId="{Binding SelectedCombatantId}"

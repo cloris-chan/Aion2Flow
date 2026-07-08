@@ -32,8 +32,8 @@
         <SolidColorBrush x:Key="OverlayBrush.DetailHudPanelSoft">#3205080B</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailHudPanelHover">#4A0A151D</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailHudLine">#4A7D9AAE</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailHudLineSoft">#24FFFFFF</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.DetailSeparator">#16FFFFFF</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailHudLineSoft">#38FFFFFF</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.DetailSeparator">#30FFFFFF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailDamageShareFill">#C20B5F59</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.SettingsBackdrop">#F0060A0D</SolidColorBrush>
         <LinearGradientBrush x:Key="OverlayBrush.RowCardSelected" StartPoint="0%,0%" EndPoint="100%,0%">
@@ -758,7 +758,7 @@
         <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLine}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Padding" Value="10" />
+        <Setter Property="Padding" Value="0" />
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
@@ -864,23 +864,40 @@
         <Setter Property="Padding" Value="0" />
     </Style>
 
-    <Style Selector="TextBlock.DetailSummaryTitle">
+    <Style Selector="Border.DetailSummaryPanel">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="Border.DetailSummaryBanner">
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLine}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="TextBlock.DetailBannerTitle">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="MinWidth" Value="72" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
-    <Style Selector="Grid.DetailSummarySplitGrid">
-        <Setter Property="ColumnSpacing" Value="12" />
-    </Style>
-
-    <Style Selector="WrapPanel.DetailSummaryMetricsWrap">
-        <Setter Property="VerticalAlignment" Value="Top" />
-    </Style>
-
-    <Style Selector="TextBlock.DetailSummaryLabel">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="11" />
+    <Style Selector="Grid.DetailBannerMetrics">
+        <Setter Property="ColumnSpacing" Value="6" />
+        <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="Border.MetricCardSurface">
@@ -891,6 +908,129 @@
         <Setter Property="Padding" Value="8,4" />
         <Setter Property="MinWidth" Value="88" />
         <Setter Property="Margin" Value="0,0,6,6" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailBannerMetric">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailBannerMetric Border.MetricCardSurface">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailBannerMetric Border.MetricAccent">
+        <Setter Property="Width" Value="1" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Background" Value="#D8FFFFFF" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,1,4,0" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailBannerMetric TextBlock.MetricLabel">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailBannerMetric controls|NumericBlock.MetricValue">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <Style Selector="Border.DetailMetricRowsPanel">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+
+    <Style Selector="Border.DetailMetricRowBand">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="MinHeight" Value="30" />
+    </Style>
+
+    <Style Selector="Border.DetailMetricRowBandLast">
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style Selector="Grid.DetailMetricRow">
+        <Setter Property="ColumnSpacing" Value="18" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailLineMetric">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="controls|MetricSplitTile.DetailLineMetric">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailLineMetric Border.MetricCardSurface">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailSeparator}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <Style Selector="controls|MetricSplitTile.DetailLineMetric Border.MetricCardSurface">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailSeparator}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailLineMetric StackPanel.MetricContent">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="Spacing" Value="6" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|MetricSplitTile.DetailLineMetric StackPanel">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="Spacing" Value="4" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailLineMetric TextBlock.MetricLabel">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|MetricSplitTile.DetailLineMetric TextBlock.MetricLabel">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="controls|MetricTile.DetailLineMetric controls|NumericBlock.MetricValue">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style Selector="controls|MetricSplitTile.DetailLineMetric controls|NumericBlock.MetricSplitValue">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style Selector="controls|MetricSplitTile.DetailLineMetric controls|NumericBlock.MetricSplitSecondary">
+        <Setter Property="FontSize" Value="11" />
     </Style>
 
     <Style Selector="TextBlock.MetricLabel">
@@ -926,12 +1066,47 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <Style Selector="Border.CounterpartTable">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelSoft}" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
+    <Style Selector="Button.CounterpartSelectorButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLine}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
         <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Padding" Value="8" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="MinWidth" Value="104" />
+        <Setter Property="MinHeight" Value="24" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="Button.CounterpartSelectorButton:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
+        <Setter Property="CornerRadius" Value="0" />
+    </Style>
+
+    <Style Selector="TextBlock.CounterpartSelectorText">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="Path.CounterpartSelectorGlyph">
+        <Setter Property="Width" Value="12" />
+        <Setter Property="Height" Value="12" />
+        <Setter Property="Stretch" Value="None" />
+        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="StrokeThickness" Value="1.5" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="2,0,0,0" />
+    </Style>
+
+    <Style Selector="Border.CounterpartSelectorFlyout">
+        <Setter Property="Background" Value="#E80A1015" />
+        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="10" />
     </Style>
 
     <Style Selector="CheckBox.CounterpartSelectAll">
@@ -1067,11 +1242,6 @@
     <Style Selector="ScrollViewer.CounterpartItemsScroller">
         <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
         <Setter Property="VerticalScrollBarVisibility" Value="Hidden" />
-    </Style>
-
-    <Style Selector="Border.CounterpartSplitTable">
-        <Setter Property="MinHeight" Value="88" />
-        <Setter Property="VerticalAlignment" Value="Stretch" />
     </Style>
 
     <Style Selector="TextBlock.CounterpartHeaderText">

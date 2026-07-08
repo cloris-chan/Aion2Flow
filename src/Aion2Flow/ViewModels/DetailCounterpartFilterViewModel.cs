@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -24,6 +25,19 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
     public string CounterpartTitleKey { get; }
 
     public string CounterpartTitle => Localization[CounterpartTitleKey];
+
+    public string CounterpartSummary
+    {
+        get
+        {
+            var count = Counterparts.Count;
+            if (count == 0)
+                return CounterpartTitle;
+
+            var selectedCount = CountSelectedCounterparts();
+            return string.Create(CultureInfo.InvariantCulture, $"{CounterpartTitle} {selectedCount}/{count}");
+        }
+    }
 
     public KeyedObservableCollection<int, DetailCounterpartSelectionViewModel> Counterparts { get; } = new(static counterpart => counterpart.CombatantId)
     {
@@ -94,6 +108,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(HasCounterparts));
             OnPropertyChanged(nameof(AreAllCounterpartsSelected));
+            OnPropertyChanged(nameof(CounterpartSummary));
             return;
         }
 
@@ -179,6 +194,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
 
         OnPropertyChanged(nameof(HasCounterparts));
         OnPropertyChanged(nameof(AreAllCounterpartsSelected));
+        OnPropertyChanged(nameof(CounterpartSummary));
     }
 
     private bool ApplyCounterpartsInPlaceIfOrderMatches(IList<DetailCounterpartOption> options)
@@ -228,6 +244,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
         Counterparts.Clear();
         OnPropertyChanged(nameof(HasCounterparts));
         OnPropertyChanged(nameof(AreAllCounterpartsSelected));
+        OnPropertyChanged(nameof(CounterpartSummary));
     }
 
     private void SetAllCounterpartsSelected(bool isSelected)
@@ -258,6 +275,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(AreAllCounterpartsSelected));
+        OnPropertyChanged(nameof(CounterpartSummary));
         if (changed)
         {
             SelectionChanged?.Invoke(this, EventArgs.Empty);
@@ -272,6 +290,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(AreAllCounterpartsSelected));
+        OnPropertyChanged(nameof(CounterpartSummary));
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -280,6 +299,21 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
         if (e.PropertyName is "Item[]" or nameof(LocalizationService.CurrentLanguage))
         {
             OnPropertyChanged(nameof(CounterpartTitle));
+            OnPropertyChanged(nameof(CounterpartSummary));
         }
+    }
+
+    private int CountSelectedCounterparts()
+    {
+        var selectedCount = 0;
+        foreach (var counterpart in Counterparts)
+        {
+            if (counterpart.IsSelected)
+            {
+                selectedCount++;
+            }
+        }
+
+        return selectedCount;
     }
 }
