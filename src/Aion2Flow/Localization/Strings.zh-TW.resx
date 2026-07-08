@@ -182,9 +182,6 @@
   <data name="Playback_Status_Loading" xml:space="preserve"><value>正在載入幀</value></data>
   <data name="Playback_Status_Playing" xml:space="preserve"><value>播放中</value></data>
   <data name="Playback_Status_Paused" xml:space="preserve"><value>已暫停</value></data>
-  <data name="Playback_CheckpointsBuildingFormat" xml:space="preserve"><value>正在建立 checkpoints... {0}</value></data>
-  <data name="Playback_CheckpointsReadyFormat" xml:space="preserve"><value>Checkpoints {0}</value></data>
-  <data name="Playback_CheckpointsButton" xml:space="preserve"><value>Checkpoints</value></data>
   <data name="Playback_PreviousEvent" xml:space="preserve"><value>上一個事件</value></data>
   <data name="Playback_PreviousSecond" xml:space="preserve"><value>後退 1 秒</value></data>
   <data name="Playback_NextSecond" xml:space="preserve"><value>前進 1 秒</value></data>
@@ -192,7 +189,25 @@
   <data name="Playback_Label_Speed" xml:space="preserve"><value>速率</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>戰鬥對象</value></data>
   <data name="Playback_CombatantDetails" xml:space="preserve"><value>戰鬥對象詳情</value></data>
+  <data name="Playback_Inspector" xml:space="preserve"><value>回放分析</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>事件窗口</value></data>
+  <data name="Playback_OutgoingDamage" xml:space="preserve"><value>造成傷害</value></data>
+  <data name="Playback_OutgoingHealing" xml:space="preserve"><value>造成治療</value></data>
+  <data name="Playback_OutgoingShield" xml:space="preserve"><value>提供屏障</value></data>
+  <data name="Playback_IncomingDamage" xml:space="preserve"><value>承受傷害</value></data>
+  <data name="Playback_IncomingHealing" xml:space="preserve"><value>承受治療</value></data>
+  <data name="Playback_IncomingShield" xml:space="preserve"><value>承受屏障</value></data>
+  <data name="Playback_Metric_PerSecond" xml:space="preserve"><value>秒量</value></data>
+  <data name="Playback_Metric_Share" xml:space="preserve"><value>佔比</value></data>
+  <data name="Playback_Metric_Count" xml:space="preserve"><value>次數</value></data>
+  <data name="Playback_Metric_Direct" xml:space="preserve"><value>直擊</value></data>
+  <data name="Playback_Metric_Periodic" xml:space="preserve"><value>持續</value></data>
+  <data name="Playback_Metric_Hit" xml:space="preserve"><value>命中</value></data>
+  <data name="Playback_Metric_Direction" xml:space="preserve"><value>前 / 後</value></data>
+  <data name="Playback_Metric_Avoidance" xml:space="preserve"><value>迴避</value></data>
+  <data name="Playback_Metric_Guard" xml:space="preserve"><value>格擋</value></data>
+  <data name="Playback_Metric_Coverage" xml:space="preserve"><value>覆蓋率</value></data>
+  <data name="Playback_Metric_ActiveTime" xml:space="preserve"><value>持續時間</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>對象</value></data>
   <data name="Playback_Column_Damage" xml:space="preserve"><value>傷害</value></data>
   <data name="Playback_Column_Healing" xml:space="preserve"><value>治療</value></data>

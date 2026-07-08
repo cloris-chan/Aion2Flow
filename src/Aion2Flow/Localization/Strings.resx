@@ -182,9 +182,6 @@
   <data name="Playback_Status_Loading" xml:space="preserve"><value>Loading frame</value></data>
   <data name="Playback_Status_Playing" xml:space="preserve"><value>Playing</value></data>
   <data name="Playback_Status_Paused" xml:space="preserve"><value>Paused</value></data>
-  <data name="Playback_CheckpointsBuildingFormat" xml:space="preserve"><value>Building checkpoints... {0}</value></data>
-  <data name="Playback_CheckpointsReadyFormat" xml:space="preserve"><value>Checkpoints {0}</value></data>
-  <data name="Playback_CheckpointsButton" xml:space="preserve"><value>Checkpoints</value></data>
   <data name="Playback_PreviousEvent" xml:space="preserve"><value>Previous event</value></data>
   <data name="Playback_PreviousSecond" xml:space="preserve"><value>Back 1 second</value></data>
   <data name="Playback_NextSecond" xml:space="preserve"><value>Forward 1 second</value></data>
@@ -192,7 +189,25 @@
   <data name="Playback_Label_Speed" xml:space="preserve"><value>Speed</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>Combatants</value></data>
   <data name="Playback_CombatantDetails" xml:space="preserve"><value>Combatant Details</value></data>
+  <data name="Playback_Inspector" xml:space="preserve"><value>Playback Inspector</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>Event Window</value></data>
+  <data name="Playback_OutgoingDamage" xml:space="preserve"><value>Outgoing Damage</value></data>
+  <data name="Playback_OutgoingHealing" xml:space="preserve"><value>Outgoing Healing</value></data>
+  <data name="Playback_OutgoingShield" xml:space="preserve"><value>Outgoing Shield</value></data>
+  <data name="Playback_IncomingDamage" xml:space="preserve"><value>Incoming Damage</value></data>
+  <data name="Playback_IncomingHealing" xml:space="preserve"><value>Incoming Healing</value></data>
+  <data name="Playback_IncomingShield" xml:space="preserve"><value>Incoming Shield</value></data>
+  <data name="Playback_Metric_PerSecond" xml:space="preserve"><value>Per Sec</value></data>
+  <data name="Playback_Metric_Share" xml:space="preserve"><value>Share</value></data>
+  <data name="Playback_Metric_Count" xml:space="preserve"><value>Count</value></data>
+  <data name="Playback_Metric_Direct" xml:space="preserve"><value>Direct</value></data>
+  <data name="Playback_Metric_Periodic" xml:space="preserve"><value>Periodic</value></data>
+  <data name="Playback_Metric_Hit" xml:space="preserve"><value>Hit</value></data>
+  <data name="Playback_Metric_Direction" xml:space="preserve"><value>Front / Back</value></data>
+  <data name="Playback_Metric_Avoidance" xml:space="preserve"><value>Avoid</value></data>
+  <data name="Playback_Metric_Guard" xml:space="preserve"><value>Guard</value></data>
+  <data name="Playback_Metric_Coverage" xml:space="preserve"><value>Coverage</value></data>
+  <data name="Playback_Metric_ActiveTime" xml:space="preserve"><value>Active</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>Combatant</value></data>
   <data name="Playback_Column_Damage" xml:space="preserve"><value>Damage</value></data>
   <data name="Playback_Column_Healing" xml:space="preserve"><value>Healing</value></data>

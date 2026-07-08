@@ -32,6 +32,15 @@ internal static class ScenePlaybackTimelineBuilder
     private static readonly IBrush ActionBrush = Brush.Parse("#65A7FF");
     private static readonly IBrush DiagnosticBrush = Brush.Parse("#9AA8B4");
     private static readonly IBrush OtherBrush = Brush.Parse("#D4DCE5");
+    private static readonly IBrush[] SkillAccentBrushes =
+    [
+        Brush.Parse("#18D7F4"),
+        Brush.Parse("#89D66B"),
+        Brush.Parse("#FFD166"),
+        Brush.Parse("#FF8A65"),
+        Brush.Parse("#C98EFF"),
+        Brush.Parse("#65A7FF")
+    ];
     private static readonly IBrush[] AuraAccentBrushes =
     [
         Brush.Parse("#22D3EE"),
@@ -71,7 +80,7 @@ internal static class ScenePlaybackTimelineBuilder
         return new PlaybackTimelineBuildResult(global, combatants);
     }
 
-    public static PlaybackAuraTimelineLane[] BuildAuraTimelineTracks(ScenePlaybackAuraTimeline timeline, LocalizationService localization, SceneDisplayContext displayContext)
+    public static PlaybackAuraTimelineLane[] BuildAuraTimelineTracks(ScenePlaybackAuraTimeline timeline, long durationMilliseconds, LocalizationService localization, SceneDisplayContext displayContext)
     {
         if (timeline.Coverages.Count == 0 && timeline.Applications.Count == 0)
             return [];
@@ -117,7 +126,9 @@ internal static class ScenePlaybackTimelineBuilder
             }
 
             var spans = MergeAuraCoverages(builder.Coverages, fill, accent);
-            result.Add(new PlaybackAuraTimelineLane(skillCode, fallback, accent, markers, spans, builder.Applications.Count));
+            var activeMilliseconds = SumSpanDuration(spans);
+            var coverage = durationMilliseconds > 0 ? activeMilliseconds / (double)durationMilliseconds : 0d;
+            result.Add(new PlaybackAuraTimelineLane(skillCode, fallback, markers, spans, builder.Applications.Count, coverage.ToString("P1", CultureInfo.CurrentCulture), FormatDuration(activeMilliseconds)));
         }
 
         result.Sort((left, right) =>
@@ -221,6 +232,25 @@ internal static class ScenePlaybackTimelineBuilder
         return (int)(value % AuraAccentBrushes.Length);
     }
 
+    private static int ResolveSkillPaletteIndex(int skillCode)
+    {
+        var value = unchecked((uint)skillCode);
+        value ^= value >> 16;
+        return (int)(value % SkillAccentBrushes.Length);
+    }
+
+    public static IBrush ResolveSkillBrush(SkillBaseKey key)
+        => SkillAccentBrushes[ResolveSkillPaletteIndex(key.SkillCode)];
+
+    private static double ResolveSkillMarkerWeight(long amount, int eventCount)
+    {
+        var magnitude = amount >= 0 ? (double)amount : -(double)(amount + 1) + 1d;
+        var baseWeight = magnitude > 0
+            ? Math.Clamp(Math.Log10(magnitude + 1) * 2.2d, 3d, 12d)
+            : 5d;
+        return Math.Clamp(baseWeight + Math.Log2(Math.Max(1, eventCount)) * 0.75d, 3d, 12d);
+    }
+
     private static double ResolveMarkerWeight(ScenePlaybackTrackMarker marker, int eventCount)
     {
         var amount = marker.Amount >= 0 ? (double)marker.Amount : -(double)marker.Amount;
@@ -241,7 +271,7 @@ internal static class ScenePlaybackTimelineBuilder
         return 0;
     }
 
-    private static IBrush ResolveTrackBrush(ScenePlaybackTrack track) => track switch
+    public static IBrush ResolveTrackBrush(ScenePlaybackTrack track) => track switch
     {
         ScenePlaybackTrack.Combat => CombatBrush,
         ScenePlaybackTrack.Resource => ResourceBrush,
@@ -252,6 +282,21 @@ internal static class ScenePlaybackTimelineBuilder
         ScenePlaybackTrack.Diagnostic => DiagnosticBrush,
         _ => OtherBrush
     };
+
+    private static long SumSpanDuration(IReadOnlyList<PlaybackTimelineSpan> spans)
+    {
+        var total = 0d;
+        for (var i = 0; i < spans.Count; i++)
+            total += Math.Max(0d, spans[i].EndMilliseconds - spans[i].StartMilliseconds);
+
+        return (long)Math.Round(total, MidpointRounding.AwayFromZero);
+    }
+
+    private static string FormatDuration(long milliseconds)
+    {
+        var value = TimeSpan.FromMilliseconds(Math.Max(0, milliseconds));
+        return value.TotalHours >= 1 ? value.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture) : value.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
+    }
 }
 
 internal readonly record struct AuraTimelineDisplayKey(uint DisplayResourceEffectRefRaw, int InstanceSequenceId)

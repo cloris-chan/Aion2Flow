@@ -14,4 +14,23 @@ public sealed record PlaybackTimelineStrip(IReadOnlyList<PlaybackTimelineBand> B
     public static PlaybackTimelineStrip Empty { get; } = new([], 0);
 }
 
-public sealed record PlaybackAuraTimelineLane(int SkillCode, string FallbackText, IBrush AccentBrush, IReadOnlyList<PlaybackTimelineMarker> Markers, IReadOnlyList<PlaybackTimelineSpan> Spans, int Count);
+public sealed record PlaybackSkillTimelineLane(
+    int SkillCode,
+    string FallbackText,
+    IReadOnlyList<PlaybackTimelineMarker> Markers,
+    int EventCount,
+    string AmountText,
+    string PerSecondText,
+    string DirectText,
+    string PeriodicText,
+    string HitText,
+    string CriticalText,
+    string PerfectText,
+    string SmiteText,
+    string MultiHitText,
+    string DirectionText,
+    string AvoidanceText,
+    string GuardText,
+    string ShareText);
+
+public sealed record PlaybackAuraTimelineLane(int SkillCode, string FallbackText, IReadOnlyList<PlaybackTimelineMarker> Markers, IReadOnlyList<PlaybackTimelineSpan> Spans, int Count, string CoverageText, string ActiveTimeText);

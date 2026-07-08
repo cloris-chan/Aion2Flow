@@ -5,7 +5,6 @@
         xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
         xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
         xmlns:pres="clr-namespace:Cloris.Aion2Flow.Presentation"
-        xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
         x:Class="Cloris.Aion2Flow.Views.ScenePlaybackWindow"
         x:DataType="vm:ScenePlaybackViewModel"
         Classes="PlaybackWindow"
@@ -17,6 +16,103 @@
         Icon="/Assets/Images/Aion2Flow.png">
     <Window.Resources>
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        <DataTemplate x:Key="PlaybackSkillTimelineLaneTemplate" x:DataType="pres:PlaybackSkillTimelineLane">
+            <Border Classes="PlaybackDetailTimelineRow">
+                <Grid Classes="PlaybackDetailTimelineGrid"
+                      ColumnDefinitions="230,88,66,58,46,84,78,78,78,78,74,70,70,*"
+                      ColumnSpacing="8">
+                    <controls:PlaybackTimelineView Grid.ColumnSpan="14"
+                                                   Classes="PlaybackTimelineRail PlaybackSkillTimelineLane PlaybackTimelineBackgroundRail"
+                                                   Markers="{Binding Markers}"
+                                                   DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
+                                                   PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}"
+                                                   SeekRequested="TimelineSeekRequested" />
+                    <controls:SkillDisplay Classes="PlaybackAuraSkill"
+                                           SkillCode="{Binding SkillCode}"
+                                           FallbackText="{Binding FallbackText}"
+                                           IconSize="18" />
+                    <TextBlock Grid.Column="1"
+                               Classes="PlaybackDetailAmount"
+                               Text="{Binding AmountText}" />
+                    <StackPanel Grid.Column="2" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_PerSecond}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding PerSecondText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Share}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding ShareText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Count}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding EventCount}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="5" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Hit}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding HitText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="6" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Stat_Critical}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding CriticalText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="7" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Stat_Perfect}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding PerfectText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="8" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Stat_Smite}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding SmiteText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="9" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Stat_MultiHit}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding MultiHitText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="10" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Direction}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding DirectionText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="11" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Avoidance}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding AvoidanceText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="12" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Guard}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding GuardText}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PlaybackAuraTimelineLaneTemplate" x:DataType="pres:PlaybackAuraTimelineLane">
+            <Border Classes="PlaybackDetailTimelineRow">
+                <Grid Classes="PlaybackDetailTimelineGrid"
+                      ColumnDefinitions="230,78,78,56,*"
+                      ColumnSpacing="8">
+                    <controls:PlaybackTimelineView Grid.ColumnSpan="5"
+                                                   Classes="PlaybackTimelineRail PlaybackAuraTimelineLane PlaybackTimelineBackgroundRail"
+                                                   Markers="{Binding Markers}"
+                                                   Spans="{Binding Spans}"
+                                                   DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
+                                                   PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}"
+                                                   SeekRequested="TimelineSeekRequested" />
+                    <controls:SkillDisplay Classes="PlaybackAuraSkill"
+                                           SkillCode="{Binding SkillCode}"
+                                           FallbackText="{Binding FallbackText}"
+                                           IconSize="18" />
+                    <StackPanel Grid.Column="1" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Coverage}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding CoverageText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_ActiveTime}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding ActiveTimeText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Classes="PlaybackInlineMetric">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Count}" />
+                        <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding Count}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <Window.Styles>
@@ -24,25 +120,18 @@
     </Window.Styles>
 
     <Grid x:Name="RootLayout"
-          ColumnSpacing="0"
           Margin="12"
           controls:DisplayContextProvider.DisplayContext="{Binding DisplayContext}">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="0" />
-            <ColumnDefinition Width="0" />
-        </Grid.ColumnDefinitions>
-        <Grid Grid.Column="0"
-              RowDefinitions="Auto,*,190"
+        <Grid RowDefinitions="Auto,*,190"
               RowSpacing="10"
               MinWidth="0">
         <Border Grid.Row="0"
                 Classes="PlaybackTopBar">
             <Grid RowDefinitions="Auto,Auto"
                   RowSpacing="8">
-                <Grid ColumnDefinitions="320,*"
+                <Grid ColumnDefinitions="*,Auto"
                       ColumnSpacing="16">
-                    <Grid RowDefinitions="Auto,Auto"
+                    <Grid RowDefinitions="Auto,Auto,Auto"
                           RowSpacing="5"
                           VerticalAlignment="Center">
                         <TextBlock Classes="PlaybackSceneTitle"
@@ -55,7 +144,53 @@
                             <TextBlock Classes="PlaybackHeaderStatus"
                                        Text="{Binding StatusText}" />
                             <TextBlock Classes="PlaybackHeaderSubtle"
-                                       Text="{Binding CheckpointText}" />
+                                       Text="{Binding PositionText}" />
+                            <TextBlock Classes="PlaybackHeaderSubtle"
+                                       Text="/" />
+                            <TextBlock Classes="PlaybackHeaderSubtle"
+                                       Text="{Binding DurationText}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2"
+                                    Classes="PlaybackTimelineLegend"
+                                    Orientation="Horizontal"
+                                    Spacing="12"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="5">
+                                <Border Classes="PlaybackTrackAccent"
+                                        Background="#18D7F4" />
+                                <TextBlock Classes="PlaybackTrackName"
+                                           Text="{markups:Translate Playback_Track_Combat}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="5">
+                                <Border Classes="PlaybackTrackAccent"
+                                        Background="#8CE271" />
+                                <TextBlock Classes="PlaybackTrackName"
+                                           Text="{markups:Translate Playback_Track_RemainingHp}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="5">
+                                <Border Classes="PlaybackTrackAccent"
+                                        Background="#C98EFF" />
+                                <TextBlock Classes="PlaybackTrackName"
+                                           Text="{markups:Translate Playback_Track_Aura}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="5">
+                                <Border Classes="PlaybackTrackAccent"
+                                        Background="#FFD166" />
+                                <TextBlock Classes="PlaybackTrackName"
+                                           Text="{markups:Translate Playback_Track_State}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="5">
+                                <Border Classes="PlaybackTrackAccent"
+                                        Background="#65A7FF" />
+                                <TextBlock Classes="PlaybackTrackName"
+                                           Text="{markups:Translate Playback_Track_Action}" />
+                            </StackPanel>
                         </StackPanel>
                     </Grid>
 
@@ -123,81 +258,15 @@
                                 Content="4x"
                                 Command="{Binding SetSpeedCommand}"
                                 CommandParameter="4" />
-
-                        <Border Classes="PlaybackToolbarDivider" />
-
-                        <Button Classes="PlaybackIconButton"
-                                Command="{Binding RefreshCommand}">
-                            <Path Classes="PlaybackGlyph" Data="{StaticResource rotate-cw}" />
-                        </Button>
-                        <Button Classes="PlaybackTextButton PlaybackCheckpointButton"
-                                Content="{markups:Translate Playback_CheckpointsButton}"
-                                Command="{Binding RebuildCheckpointsCommand}" />
                     </StackPanel>
                 </Grid>
 
-                <Grid Grid.Row="1"
-                      Classes="PlaybackAlignedTimelineGrid"
-                      ColumnDefinitions="420,36,*,64,10"
-                      ColumnSpacing="10">
-                    <Grid Grid.Column="0"
-                          ColumnDefinitions="*,Auto"
-                          ColumnSpacing="12">
-                        <StackPanel Classes="PlaybackTimelineLegend"
-                                    Orientation="Horizontal"
-                                    Spacing="12"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal"
-                                        Spacing="5">
-                                <Border Classes="PlaybackTrackAccent"
-                                        Background="#18D7F4" />
-                                <TextBlock Classes="PlaybackTrackName"
-                                           Text="{markups:Translate Playback_Track_Combat}" />
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal"
-                                        Spacing="5">
-                                <Border Classes="PlaybackTrackAccent"
-                                        Background="#8CE271" />
-                                <TextBlock Classes="PlaybackTrackName"
-                                           Text="{markups:Translate Playback_Track_RemainingHp}" />
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal"
-                                        Spacing="5">
-                                <Border Classes="PlaybackTrackAccent"
-                                        Background="#C98EFF" />
-                                <TextBlock Classes="PlaybackTrackName"
-                                           Text="{markups:Translate Playback_Track_Aura}" />
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal"
-                                        Spacing="5">
-                                <Border Classes="PlaybackTrackAccent"
-                                        Background="#FFD166" />
-                                <TextBlock Classes="PlaybackTrackName"
-                                           Text="{markups:Translate Playback_Track_State}" />
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal"
-                                        Spacing="5">
-                                <Border Classes="PlaybackTrackAccent"
-                                        Background="#65A7FF" />
-                                <TextBlock Classes="PlaybackTrackName"
-                                           Text="{markups:Translate Playback_Track_Action}" />
-                            </StackPanel>
-                        </StackPanel>
-                        <TextBlock Grid.Column="1"
-                                   Classes="PlaybackTimeTextRight"
-                                   Text="{Binding PositionText}" />
-                    </Grid>
-                    <controls:PlaybackTimelineStripView Grid.Column="2"
-                                                        Classes="PlaybackTimelineStrip PlaybackGlobalTimelineStrip"
-                                                        Bands="{Binding GlobalTimeline.Bands}"
-                                                        DurationMilliseconds="{Binding DurationMilliseconds}"
-                                                        PositionMilliseconds="{Binding PositionMilliseconds}"
-                                                        SeekRequested="TimelineSeekRequested" />
-                    <TextBlock Grid.Column="3"
-                               Classes="PlaybackTimeTextRight"
-                               Text="{Binding DurationText}" />
-                </Grid>
+                <controls:PlaybackTimelineStripView Grid.Row="1"
+                                                    Classes="PlaybackTimelineStrip PlaybackGlobalTimelineStrip PlaybackScrollbarGutter"
+                                                    Bands="{Binding GlobalTimeline.Bands}"
+                                                    DurationMilliseconds="{Binding DurationMilliseconds}"
+                                                    PositionMilliseconds="{Binding PositionMilliseconds}"
+                                                    SeekRequested="TimelineSeekRequested" />
             </Grid>
         </Border>
 
@@ -210,23 +279,27 @@
                     <TextBlock Classes="PlaybackPanelTitle"
                                Text="{markups:Translate Playback_Combatants}" />
                     <Grid Grid.Row="1"
-                          Classes="PlaybackTableHeader PlaybackAlignedTimelineGrid"
-                          ColumnDefinitions="420,36,*,64,10"
+                          Classes="PlaybackTableHeader PlaybackAlignedTimelineGrid PlaybackScrollbarGutter"
+                          ColumnDefinitions="32,250,88,76,76,68,160,*,64,10"
                           ColumnSpacing="10">
-                        <Grid ColumnDefinitions="*,76,62,128"
-                              ColumnSpacing="8">
-                            <TextBlock Classes="PlaybackHeaderCell"
-                                       Text="{markups:Translate Playback_Column_Combatant}" />
-                            <TextBlock Grid.Column="1"
-                                       Classes="PlaybackHeaderCellRight"
-                                       Text="{markups:Translate Playback_Column_Damage}" />
-                            <TextBlock Grid.Column="2"
-                                       Classes="PlaybackHeaderCellRight"
-                                       Text="{markups:Translate Playback_Column_Healing}" />
-                            <TextBlock Grid.Column="3"
-                                       Classes="PlaybackHeaderCellRight"
-                                       Text="{markups:Translate Playback_Column_RemainingHp}" />
-                        </Grid>
+                        <TextBlock Grid.Column="1"
+                                   Classes="PlaybackHeaderCell"
+                                   Text="{markups:Translate Playback_Column_Combatant}" />
+                        <TextBlock Grid.Column="2"
+                                   Classes="PlaybackHeaderCellRight"
+                                   Text="{markups:Translate Playback_Column_Damage}" />
+                        <TextBlock Grid.Column="3"
+                                   Classes="PlaybackHeaderCellRight"
+                                   Text="{markups:Translate Metric_Dps}" />
+                        <TextBlock Grid.Column="4"
+                                   Classes="PlaybackHeaderCellRight"
+                                   Text="{markups:Translate Playback_Column_Healing}" />
+                        <TextBlock Grid.Column="5"
+                                   Classes="PlaybackHeaderCellRight"
+                                   Text="{markups:Translate Metric_Hps}" />
+                        <TextBlock Grid.Column="6"
+                                   Classes="PlaybackHeaderCellRight"
+                                   Text="{markups:Translate Playback_Column_RemainingHp}" />
                     </Grid>
                     <ScrollViewer Grid.Row="2"
                                   Classes="PlaybackPanelScroller AppScrollViewer"
@@ -238,41 +311,16 @@
                                           Classes="PlaybackCombatantItem"
                                           Classes.PlaybackSelected="{Binding IsSelected}">
                                         <Grid Classes="PlaybackCombatantRow PlaybackAlignedTimelineGrid"
-                                              ColumnDefinitions="420,36,*,64"
+                                              ColumnDefinitions="32,250,88,76,76,68,160,*,64,10"
                                               ColumnSpacing="10"
                                               Tapped="CombatantRowTapped">
-                                            <Grid ColumnDefinitions="*,76,62,128"
-                                                  ColumnSpacing="8"
-                                                  VerticalAlignment="Center">
-                                                <controls:CombatantDisplay Classes="PlaybackCombatantName"
-                                                                           EntityId="{Binding EntityId}"
-                                                                           IconSize="20" />
-                                                <StackPanel Grid.Column="1"
-                                                            HorizontalAlignment="Right">
-                                                    <TextBlock Classes="PlaybackRowValue"
-                                                               Text="{Binding DamageText}" />
-                                                    <TextBlock Classes="PlaybackRowSubtle"
-                                                               Text="{Binding DamagePerSecondText}" />
-                                                </StackPanel>
-                                                <StackPanel Grid.Column="2"
-                                                            HorizontalAlignment="Right">
-                                                    <TextBlock Classes="PlaybackRowValue"
-                                                               Text="{Binding HealingText}" />
-                                                    <TextBlock Classes="PlaybackRowSubtle"
-                                                               Text="{Binding HealingPerSecondText}" />
-                                                </StackPanel>
-                                                <Grid Grid.Column="3"
-                                                      RowDefinitions="Auto,Auto"
-                                                      RowSpacing="4">
-                                                    <TextBlock Classes="PlaybackRowSubtle"
-                                                               Text="{Binding HpText}"
-                                                               TextAlignment="Right" />
-                                                    <controls:SegmentedProgressBar Grid.Row="1"
-                                                                                   Classes="PlaybackHpBar"
-                                                                                   Segments="{Binding HpSegments}" />
-                                                </Grid>
-                                            </Grid>
-                                            <Button Grid.Column="1"
+                                            <controls:PlaybackTimelineStripView Grid.ColumnSpan="10"
+                                                                                Classes="PlaybackTimelineStrip PlaybackCombatantTimelineStrip PlaybackTimelineBackgroundStrip"
+                                                                                Bands="{Binding Timeline.Bands}"
+                                                                                DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
+                                                                                PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}"
+                                                                                SeekRequested="TimelineSeekRequested" />
+                                            <Button Grid.Column="0"
                                                     Classes="PlaybackIconButton PlaybackExpandButton"
                                                     Click="CombatantExpandClicked"
                                                     ToolTip.Tip="{markups:Translate Playback_CombatantDetails}">
@@ -285,13 +333,30 @@
                                                           IsVisible="{Binding IsExpanded}" />
                                                 </Grid>
                                             </Button>
-                                            <controls:PlaybackTimelineStripView Grid.Column="2"
-                                                                                Classes="PlaybackTimelineStrip PlaybackCombatantTimelineStrip"
-                                                                                Bands="{Binding Timeline.Bands}"
-                                                                                DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
-                                                                                IsPlayheadVisible="False"
-                                                                                SeekRequested="TimelineSeekRequested" />
+                                            <controls:CombatantDisplay Grid.Column="1"
+                                                                       Classes="PlaybackCombatantName"
+                                                                       EntityId="{Binding EntityId}"
+                                                                       IconSize="20" />
+                                            <TextBlock Grid.Column="2"
+                                                       Classes="PlaybackRowValue PlaybackNumericCell"
+                                                       Text="{Binding DamageText}" />
                                             <TextBlock Grid.Column="3"
+                                                       Classes="PlaybackRowSubtle PlaybackNumericCell"
+                                                       Text="{Binding DamagePerSecondText}" />
+                                            <TextBlock Grid.Column="4"
+                                                       Classes="PlaybackRowValue PlaybackNumericCell"
+                                                       Text="{Binding HealingText}" />
+                                            <TextBlock Grid.Column="5"
+                                                       Classes="PlaybackRowSubtle PlaybackNumericCell"
+                                                       Text="{Binding HealingPerSecondText}" />
+                                            <Grid Grid.Column="6"
+                                                  Classes="PlaybackHpCell">
+                                                <controls:SegmentedProgressBar Classes="PlaybackHpBar"
+                                                                               Segments="{Binding HpSegments}" />
+                                                <TextBlock Classes="PlaybackHpText"
+                                                           Text="{Binding HpText}" />
+                                            </Grid>
+                                            <TextBlock Grid.Column="8"
                                                        Classes="PlaybackTrackCount"
                                                        Text="{Binding Timeline.Count}" />
                                         </Grid>
@@ -299,59 +364,70 @@
                                         <Border Grid.Row="1"
                                                 Classes="PlaybackExpandedCombatant"
                                                 IsVisible="{Binding IsExpanded}">
-                                            <Grid RowDefinitions="Auto,*"
-                                                  RowSpacing="8">
-                                                <Grid Grid.Row="0"
-                                                      Classes="PlaybackAlignedTimelineGrid"
-                                                      ColumnDefinitions="420,36,*,64"
-                                                      ColumnSpacing="10">
-                                                    <TextBlock Grid.Column="0"
-                                                               Classes="PlaybackRowSubtle"
-                                                               Text="{markups:Translate Playback_AuraCoverage}" />
-                                                    <controls:PlaybackTimelineStripView Grid.Column="2"
-                                                                                        Classes="PlaybackTimelineStrip PlaybackExpandedTimelineStrip"
-                                                                                        Bands="{Binding Timeline.Bands}"
-                                                                                        DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
-                                                                                        PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}"
-                                                                                        SeekRequested="TimelineSeekRequested" />
-                                                    <TextBlock Grid.Column="3"
-                                                               Classes="PlaybackTrackCount"
-                                                               Text="{Binding Timeline.Count}" />
-                                                </Grid>
+                                            <StackPanel Spacing="5">
+                                                <Border Classes="PlaybackDetailSectionHeader"
+                                                        IsVisible="{Binding $parent[Window].DataContext.HasOutgoingDamageTimelineRows}">
+                                                    <TextBlock Classes="PlaybackPanelTitle"
+                                                               Text="{markups:Translate Playback_OutgoingDamage}" />
+                                                </Border>
+                                                <ItemsControl IsVisible="{Binding $parent[Window].DataContext.HasOutgoingDamageTimelineRows}"
+                                                              ItemsSource="{Binding $parent[Window].DataContext.OutgoingDamageTimelineRows}"
+                                                              ItemTemplate="{StaticResource PlaybackSkillTimelineLaneTemplate}" />
 
-                                                <ItemsControl Grid.Row="1"
-                                                              IsVisible="{Binding $parent[Window].DataContext.IsAuraTimelineVisible}"
-                                                              ItemsSource="{Binding $parent[Window].DataContext.AuraTimelineTracks}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="pres:PlaybackAuraTimelineLane">
-                                                            <Grid Classes="PlaybackAuraTimelineRow"
-                                                                  ColumnDefinitions="420,36,*,64"
-                                                                  ColumnSpacing="10">
-                                                                <Grid ColumnDefinitions="4,*"
-                                                                      ColumnSpacing="4">
-                                                                    <Border Classes="PlaybackAuraAccent"
-                                                                            Background="{Binding AccentBrush}" />
-                                                                    <controls:SkillDisplay Grid.Column="1"
-                                                                                           Classes="PlaybackAuraSkill"
-                                                                                           SkillCode="{Binding SkillCode}"
-                                                                                           FallbackText="{Binding FallbackText}"
-                                                                                           IconSize="18" />
-                                                                </Grid>
-                                                                <controls:PlaybackTimelineView Grid.Column="2"
-                                                                                               Classes="PlaybackTimelineRail PlaybackAuraTimelineLane"
-                                                                                               Markers="{Binding Markers}"
-                                                                                               Spans="{Binding Spans}"
-                                                                                               DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
-                                                                                               PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}"
-                                                                                               SeekRequested="TimelineSeekRequested" />
-                                                                <TextBlock Grid.Column="3"
-                                                                           Classes="PlaybackTrackCount"
-                                                                           Text="{Binding Count}" />
-                                                            </Grid>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </Grid>
+                                                <Border Classes="PlaybackDetailSectionHeader"
+                                                        IsVisible="{Binding $parent[Window].DataContext.HasOutgoingHealingTimelineRows}">
+                                                    <TextBlock Classes="PlaybackPanelTitle"
+                                                               Text="{markups:Translate Playback_OutgoingHealing}" />
+                                                </Border>
+                                                <ItemsControl IsVisible="{Binding $parent[Window].DataContext.HasOutgoingHealingTimelineRows}"
+                                                              ItemsSource="{Binding $parent[Window].DataContext.OutgoingHealingTimelineRows}"
+                                                              ItemTemplate="{StaticResource PlaybackSkillTimelineLaneTemplate}" />
+
+                                                <Border Classes="PlaybackDetailSectionHeader"
+                                                        IsVisible="{Binding $parent[Window].DataContext.HasOutgoingShieldTimelineRows}">
+                                                    <TextBlock Classes="PlaybackPanelTitle"
+                                                               Text="{markups:Translate Playback_OutgoingShield}" />
+                                                </Border>
+                                                <ItemsControl IsVisible="{Binding $parent[Window].DataContext.HasOutgoingShieldTimelineRows}"
+                                                              ItemsSource="{Binding $parent[Window].DataContext.OutgoingShieldTimelineRows}"
+                                                              ItemTemplate="{StaticResource PlaybackSkillTimelineLaneTemplate}" />
+
+                                                <Border Classes="PlaybackDetailSectionHeader"
+                                                        IsVisible="{Binding $parent[Window].DataContext.HasIncomingDamageTimelineRows}">
+                                                    <TextBlock Classes="PlaybackPanelTitle"
+                                                               Text="{markups:Translate Playback_IncomingDamage}" />
+                                                </Border>
+                                                <ItemsControl IsVisible="{Binding $parent[Window].DataContext.HasIncomingDamageTimelineRows}"
+                                                              ItemsSource="{Binding $parent[Window].DataContext.IncomingDamageTimelineRows}"
+                                                              ItemTemplate="{StaticResource PlaybackSkillTimelineLaneTemplate}" />
+
+                                                <Border Classes="PlaybackDetailSectionHeader"
+                                                        IsVisible="{Binding $parent[Window].DataContext.HasIncomingHealingTimelineRows}">
+                                                    <TextBlock Classes="PlaybackPanelTitle"
+                                                               Text="{markups:Translate Playback_IncomingHealing}" />
+                                                </Border>
+                                                <ItemsControl IsVisible="{Binding $parent[Window].DataContext.HasIncomingHealingTimelineRows}"
+                                                              ItemsSource="{Binding $parent[Window].DataContext.IncomingHealingTimelineRows}"
+                                                              ItemTemplate="{StaticResource PlaybackSkillTimelineLaneTemplate}" />
+
+                                                <Border Classes="PlaybackDetailSectionHeader"
+                                                        IsVisible="{Binding $parent[Window].DataContext.HasIncomingShieldTimelineRows}">
+                                                    <TextBlock Classes="PlaybackPanelTitle"
+                                                               Text="{markups:Translate Playback_IncomingShield}" />
+                                                </Border>
+                                                <ItemsControl IsVisible="{Binding $parent[Window].DataContext.HasIncomingShieldTimelineRows}"
+                                                              ItemsSource="{Binding $parent[Window].DataContext.IncomingShieldTimelineRows}"
+                                                              ItemTemplate="{StaticResource PlaybackSkillTimelineLaneTemplate}" />
+
+                                                <Border Classes="PlaybackDetailSectionHeader"
+                                                        IsVisible="{Binding $parent[Window].DataContext.IsAuraTimelineVisible}">
+                                                    <TextBlock Classes="PlaybackPanelTitle"
+                                                               Text="{markups:Translate Playback_AuraCoverage}" />
+                                                </Border>
+                                                <ItemsControl IsVisible="{Binding $parent[Window].DataContext.IsAuraTimelineVisible}"
+                                                              ItemsSource="{Binding $parent[Window].DataContext.AuraTimelineTracks}"
+                                                              ItemTemplate="{StaticResource PlaybackAuraTimelineLaneTemplate}" />
+                                            </StackPanel>
                                         </Border>
                                     </Grid>
                                 </DataTemplate>
@@ -370,50 +446,63 @@
                 <TextBlock Classes="PlaybackPanelTitle"
                            Text="{markups:Translate Playback_EventWindow}" />
                 <Grid Grid.Row="1"
-                      Classes="PlaybackTableHeader"
-                      ColumnDefinitions="78,84,*,*,*,84"
-                      ColumnSpacing="8">
-                    <TextBlock Classes="PlaybackHeaderCell"
-                               Text="{markups:Translate Playback_Column_Time}" />
-                    <TextBlock Grid.Column="1"
-                               Classes="PlaybackHeaderCell"
-                               Text="{markups:Translate Playback_Column_Track}" />
-                    <TextBlock Grid.Column="2"
-                               Classes="PlaybackHeaderCell"
-                               Text="{markups:Translate Playback_Column_Source}" />
+                      Classes="PlaybackTableHeader PlaybackAlignedTimelineGrid PlaybackScrollbarGutter"
+                      ColumnDefinitions="320,32,*,72,10"
+                      ColumnSpacing="10">
+                    <Grid ColumnDefinitions="64,62,*,*,*"
+                          ColumnSpacing="8">
+                        <TextBlock Classes="PlaybackHeaderCell"
+                                   Text="{markups:Translate Playback_Column_Time}" />
+                        <TextBlock Grid.Column="1"
+                                   Classes="PlaybackHeaderCell"
+                                   Text="{markups:Translate Playback_Column_Track}" />
+                        <TextBlock Grid.Column="2"
+                                   Classes="PlaybackHeaderCell"
+                                   Text="{markups:Translate Playback_Column_Source}" />
+                        <TextBlock Grid.Column="3"
+                                   Classes="PlaybackHeaderCell"
+                                   Text="{markups:Translate Playback_Column_Target}" />
+                        <TextBlock Grid.Column="4"
+                                   Classes="PlaybackHeaderCell"
+                                   Text="{markups:Translate Playback_Column_Skill}" />
+                    </Grid>
                     <TextBlock Grid.Column="3"
-                               Classes="PlaybackHeaderCell"
-                               Text="{markups:Translate Playback_Column_Target}" />
-                    <TextBlock Grid.Column="4"
-                               Classes="PlaybackHeaderCell"
-                               Text="{markups:Translate Playback_Column_Skill}" />
-                    <TextBlock Grid.Column="5"
                                Classes="PlaybackHeaderCellRight"
                                Text="{markups:Translate Playback_Column_Amount}" />
                 </Grid>
                 <ScrollViewer Grid.Row="2"
-                              Classes="PlaybackPanelScroller AppScrollViewer">
+                              Classes="PlaybackPanelScroller AppScrollViewer"
+                              VerticalScrollBarVisibility="Visible">
                     <ItemsControl ItemsSource="{Binding EventWindow}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:PlaybackEventRowViewModel">
-                                <Grid Classes="PlaybackEventRow"
-                                      ColumnDefinitions="78,84,*,*,*,84"
-                                      ColumnSpacing="8">
-                                    <TextBlock Classes="PlaybackEventTime"
-                                               Text="{Binding TimeText}" />
-                                    <TextBlock Grid.Column="1"
-                                               Classes="PlaybackEventTrack"
-                                               Text="{Binding TrackText}" />
-                                    <TextBlock Grid.Column="2"
-                                               Classes="PlaybackEventText"
-                                               Text="{Binding SourceText}" />
+                                <Grid Classes="PlaybackEventRow PlaybackAlignedTimelineGrid"
+                                      ColumnDefinitions="320,32,*,72,10"
+                                      ColumnSpacing="10">
+                                    <controls:PlaybackTimelineView Grid.ColumnSpan="5"
+                                                                   Classes="PlaybackTimelineRail PlaybackEventTimelineLane PlaybackTimelineBackgroundRail"
+                                                                   Markers="{Binding TimelineMarkers}"
+                                                                   DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
+                                                                   PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}"
+                                                                   SeekRequested="TimelineSeekRequested" />
+                                    <Grid ColumnDefinitions="64,62,*,*,*"
+                                          ColumnSpacing="8">
+                                        <TextBlock Classes="PlaybackEventTime"
+                                                   Text="{Binding TimeText}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="PlaybackEventTrack"
+                                                   Text="{Binding TrackText}" />
+                                        <TextBlock Grid.Column="2"
+                                                   Classes="PlaybackEventText"
+                                                   Text="{Binding SourceText}" />
+                                        <TextBlock Grid.Column="3"
+                                                   Classes="PlaybackEventText"
+                                                   Text="{Binding TargetText}" />
+                                        <TextBlock Grid.Column="4"
+                                                   Classes="PlaybackEventText"
+                                                   Text="{Binding SkillText}" />
+                                    </Grid>
                                     <TextBlock Grid.Column="3"
-                                               Classes="PlaybackEventText"
-                                               Text="{Binding TargetText}" />
-                                    <TextBlock Grid.Column="4"
-                                               Classes="PlaybackEventText"
-                                               Text="{Binding SkillText}" />
-                                    <TextBlock Grid.Column="5"
                                                Classes="PlaybackEventAmount"
                                                Text="{Binding AmountText}" />
                                 </Grid>
@@ -424,35 +513,5 @@
             </Grid>
         </Border>
         </Grid>
-
-        <GridSplitter Grid.Column="1"
-                      Classes="PlaybackDetailsSplitter"
-                      ResizeDirection="Columns"
-                      ResizeBehavior="PreviousAndNext"
-                      IsVisible="{Binding IsCombatantDetailsVisible}" />
-
-        <Border Grid.Column="2"
-                Classes="PlaybackPanel PlaybackDetailsPanel"
-                IsVisible="{Binding IsCombatantDetailsVisible}"
-                MinWidth="620"
-                MinHeight="0">
-            <Grid RowDefinitions="Auto,*"
-                  RowSpacing="8"
-                  MinHeight="0">
-                <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Classes="PlaybackPanelTitle"
-                               Text="{markups:Translate Playback_CombatantDetails}" />
-                    <Button Grid.Column="1"
-                            Classes="PlaybackIconButton PlaybackDetailsCloseButton"
-                            Command="{Binding CloseDetailsInspectorCommand}"
-                            ToolTip.Tip="{markups:Translate Action_Close}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource x}" />
-                    </Button>
-                </Grid>
-                <views:CombatantDetailsView Grid.Row="1"
-                                            DataContext="{Binding CombatantDetails}"
-                                            VerticalScrollBarVisibility="Auto" />
-            </Grid>
-        </Border>
     </Grid>
 </Window>

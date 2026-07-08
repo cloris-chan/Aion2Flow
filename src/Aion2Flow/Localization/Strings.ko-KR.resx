@@ -182,9 +182,6 @@
   <data name="Playback_Status_Loading" xml:space="preserve"><value>프레임 로딩 중</value></data>
   <data name="Playback_Status_Playing" xml:space="preserve"><value>재생 중</value></data>
   <data name="Playback_Status_Paused" xml:space="preserve"><value>일시 정지</value></data>
-  <data name="Playback_CheckpointsBuildingFormat" xml:space="preserve"><value>체크포인트 생성 중... {0}</value></data>
-  <data name="Playback_CheckpointsReadyFormat" xml:space="preserve"><value>체크포인트 {0}</value></data>
-  <data name="Playback_CheckpointsButton" xml:space="preserve"><value>체크포인트</value></data>
   <data name="Playback_PreviousEvent" xml:space="preserve"><value>이전 이벤트</value></data>
   <data name="Playback_PreviousSecond" xml:space="preserve"><value>1초 뒤로</value></data>
   <data name="Playback_NextSecond" xml:space="preserve"><value>1초 앞으로</value></data>
@@ -192,7 +189,25 @@
   <data name="Playback_Label_Speed" xml:space="preserve"><value>속도</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>전투 대상</value></data>
   <data name="Playback_CombatantDetails" xml:space="preserve"><value>전투 대상 상세</value></data>
+  <data name="Playback_Inspector" xml:space="preserve"><value>재생 분석</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>이벤트 창</value></data>
+  <data name="Playback_OutgoingDamage" xml:space="preserve"><value>가한 피해</value></data>
+  <data name="Playback_OutgoingHealing" xml:space="preserve"><value>가한 치유</value></data>
+  <data name="Playback_OutgoingShield" xml:space="preserve"><value>제공 보호막</value></data>
+  <data name="Playback_IncomingDamage" xml:space="preserve"><value>받은 피해</value></data>
+  <data name="Playback_IncomingHealing" xml:space="preserve"><value>받은 치유</value></data>
+  <data name="Playback_IncomingShield" xml:space="preserve"><value>받은 보호막</value></data>
+  <data name="Playback_Metric_PerSecond" xml:space="preserve"><value>초당</value></data>
+  <data name="Playback_Metric_Share" xml:space="preserve"><value>비율</value></data>
+  <data name="Playback_Metric_Count" xml:space="preserve"><value>횟수</value></data>
+  <data name="Playback_Metric_Direct" xml:space="preserve"><value>직접</value></data>
+  <data name="Playback_Metric_Periodic" xml:space="preserve"><value>지속</value></data>
+  <data name="Playback_Metric_Hit" xml:space="preserve"><value>적중</value></data>
+  <data name="Playback_Metric_Direction" xml:space="preserve"><value>전 / 후</value></data>
+  <data name="Playback_Metric_Avoidance" xml:space="preserve"><value>회피</value></data>
+  <data name="Playback_Metric_Guard" xml:space="preserve"><value>막기</value></data>
+  <data name="Playback_Metric_Coverage" xml:space="preserve"><value>커버리지</value></data>
+  <data name="Playback_Metric_ActiveTime" xml:space="preserve"><value>활성 시간</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>대상</value></data>
   <data name="Playback_Column_Damage" xml:space="preserve"><value>피해</value></data>
   <data name="Playback_Column_Healing" xml:space="preserve"><value>치유</value></data>

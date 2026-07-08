@@ -401,6 +401,33 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public void TrackReader_CombatSkillSampledRead_GroupsSelectedCombatantSkillsOnIndependentLanes()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendCombat(journal, sceneId, 100, 200, 100, 1, 1_000, skillCode: 1_001);
+        AppendCombat(journal, sceneId, 100, 201, 300, 2, 1_100, skillCode: 1_002);
+        AppendCombat(journal, sceneId, 300, 100, 150, 3, 2_000, skillCode: 1_001);
+        AppendCombat(journal, sceneId, 900, 901, 9_999, 4, 2_500, skillCode: 1_003);
+        AppendCombat(journal, sceneId, 100, 202, 250, 5, 4_500, skillCode: 1_002);
+        var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
+        var snapshot = owner.CreateSnapshot();
+        var segment = owner.CreateArchivePayload(snapshot).TimelineSegment;
+        var timeRange = ScenePlaybackTimeline.ResolveTimeRange(segment, snapshot);
+
+        var read = ScenePlaybackTrackReader.ReadCombatSkillSampled(segment, 100, 0, timeRange.DurationMilliseconds, maxSkills: 2, maxMarkersPerSkill: 4);
+
+        Assert.Equal([1_002, 1_001], read.Skills.Select(static skill => skill.SkillCode));
+        Assert.Equal(2, read.Skills[0].Count);
+        Assert.Equal(550, read.Skills[0].Amount);
+        Assert.Equal(2, read.Skills[1].Count);
+        Assert.Equal(250, read.Skills[1].Amount);
+        Assert.DoesNotContain(read.Skills, static skill => skill.SkillCode == 1_003);
+        Assert.Contains(read.Skills[0].Samples, static sample => sample.Marker.PositionMilliseconds == 1_100);
+        Assert.Contains(read.Skills[0].Samples, static sample => sample.Marker.PositionMilliseconds == 4_500);
+    }
+
+    [Fact]
     public void Seek_Backwards_RebuildsAuraState()
     {
         var journal = new ObservedEventJournal();
@@ -1103,7 +1130,7 @@ public sealed class ScenePlaybackTests
         });
     }
 
-    private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int damage, long ordinal, long observedAt, CombatValueKind valueKind = CombatValueKind.Damage)
+    private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int damage, long ordinal, long observedAt, CombatValueKind valueKind = CombatValueKind.Damage, int skillCode = 11000010)
     {
         journal.Append(new ObservedEventEnvelope
         {
@@ -1115,7 +1142,7 @@ public sealed class ScenePlaybackTests
             Raw = new RawPacketReference(0x0438, 0, ordinal),
             Combat = new CombatObservation
             {
-                SkillCode = 11000010,
+                SkillCode = skillCode,
                 Damage = damage,
                 HitCount = 1,
                 AttemptCount = 1,

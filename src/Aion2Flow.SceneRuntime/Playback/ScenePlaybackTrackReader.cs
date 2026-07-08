@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
@@ -178,6 +179,95 @@ public static class ScenePlaybackTrackReader
         return new ScenePlaybackCombatantTrackSampledReadResult(results.ToArray());
     }
 
+    public static ScenePlaybackCombatSkillSampledReadResult ReadCombatSkillSampled(
+        SceneJournalSegment segment,
+        int combatantId,
+        long startPositionMilliseconds,
+        long endPositionMilliseconds,
+        int maxSkills,
+        int maxMarkersPerSkill)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxSkills);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxMarkersPerSkill);
+        if (segment.IsEmpty || combatantId <= 0 || endPositionMilliseconds < startPositionMilliseconds)
+            return ScenePlaybackCombatSkillSampledReadResult.Empty;
+
+        var skills = new Dictionary<CombatEventKey, CombatSkillSampleAccumulator>();
+        var windowDuration = Math.Max(1, endPositionMilliseconds - startPositionMilliseconds);
+        var cursor = segment.CreateCursor();
+        var stopWindow = false;
+        while (!stopWindow)
+        {
+            var result = segment.ReadEntries(cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
+            {
+                foreach (ref readonly var entry in entries)
+                {
+                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                    var position = Math.Max(0, offset);
+                    if (position > endPositionMilliseconds)
+                    {
+                        stopWindow = true;
+                        return;
+                    }
+
+                    if (position < startPositionMilliseconds || entry.Combat is not { } combat)
+                        continue;
+
+                    var sourceEntityId = entry.SourceEntityId;
+                    var targetEntityId = entry.TargetEntityId;
+                    if (sourceEntityId != combatantId && targetEntityId != combatantId)
+                        continue;
+
+                    var eventKey = CombatEventKey.FromObservation(in combat);
+                    if (!eventKey.HasSkillCode && eventKey.BodyResourceEffectRef.IsEmpty && eventKey.DetailResourceEffectRef.IsEmpty)
+                        continue;
+
+                    if (!skills.TryGetValue(eventKey, out var accumulator))
+                    {
+                        accumulator = new CombatSkillSampleAccumulator(maxMarkersPerSkill);
+                        skills.Add(eventKey, accumulator);
+                    }
+
+                    var marker = new ScenePlaybackCombatSkillMarker(
+                        position,
+                        entry.Stamp.ObservationOrdinal,
+                        sourceEntityId,
+                        targetEntityId,
+                        eventKey,
+                        combat.Damage);
+                    var bucketIndex = Math.Clamp((int)((position - startPositionMilliseconds) / (double)windowDuration * maxMarkersPerSkill), 0, maxMarkersPerSkill - 1);
+                    accumulator.Add(in marker, bucketIndex);
+                }
+            });
+
+            if (result.Count == 0)
+                break;
+
+            cursor = result.Cursor;
+        }
+
+        if (skills.Count == 0)
+            return ScenePlaybackCombatSkillSampledReadResult.Empty;
+
+        var results = new List<ScenePlaybackCombatSkillSamples>(skills.Count);
+        foreach (var (eventKey, accumulator) in skills)
+            results.Add(accumulator.CreateSamples(eventKey));
+
+        results.Sort(static (left, right) =>
+        {
+            var comparison = AbsoluteMagnitude(right.Amount).CompareTo(AbsoluteMagnitude(left.Amount));
+            if (comparison != 0)
+                return comparison;
+
+            comparison = right.Count.CompareTo(left.Count);
+            return comparison != 0 ? comparison : left.EventKey.CompareTo(right.EventKey);
+        });
+        if (results.Count > maxSkills)
+            results.RemoveRange(maxSkills, results.Count - maxSkills);
+
+        return new ScenePlaybackCombatSkillSampledReadResult(results.ToArray());
+    }
+
     private static void AddCombatantSample(Dictionary<int, CombatantSampleAccumulator> combatants, int combatantId, in ScenePlaybackTrackMarker marker, long startPositionMilliseconds, long windowDuration, int maxMarkersPerCombatantTrack)
     {
         if (combatantId <= 0)
@@ -239,6 +329,25 @@ public static class ScenePlaybackTrackReader
             => value >= 0 ? (ulong)value : (ulong)(-(value + 1)) + 1;
     }
 
+    private struct CombatSkillSampleBucket
+    {
+        private ScenePlaybackCombatSkillMarker _marker;
+        private double _averagePosition;
+
+        public int Count { get; private set; }
+
+        public void Add(in ScenePlaybackCombatSkillMarker marker)
+        {
+            Count++;
+            _averagePosition += (marker.PositionMilliseconds - _averagePosition) / Count;
+            if (Count == 1 || AbsoluteMagnitude(marker.Amount) > AbsoluteMagnitude(_marker.Amount))
+                _marker = marker;
+        }
+
+        public readonly ScenePlaybackCombatSkillSample CreateSample()
+            => new(_marker with { PositionMilliseconds = (long)Math.Round(_averagePosition, MidpointRounding.AwayFromZero) }, Count);
+    }
+
     private sealed class CombatantSampleAccumulator(int maxMarkersPerCombatantTrack)
     {
         private readonly SampleBucket[] _buckets = new SampleBucket[checked(TrackBucketCount * maxMarkersPerCombatantTrack)];
@@ -278,6 +387,35 @@ public static class ScenePlaybackTrackReader
         }
     }
 
+    private sealed class CombatSkillSampleAccumulator(int maxMarkersPerSkill)
+    {
+        private readonly CombatSkillSampleBucket[] _buckets = new CombatSkillSampleBucket[maxMarkersPerSkill];
+
+        public int Count { get; private set; }
+
+        public long Amount { get; private set; }
+
+        public void Add(in ScenePlaybackCombatSkillMarker marker, int bucketIndex)
+        {
+            Count++;
+            Amount += marker.Amount;
+            _buckets[bucketIndex].Add(in marker);
+        }
+
+        public ScenePlaybackCombatSkillSamples CreateSamples(CombatEventKey eventKey)
+        {
+            var samples = new List<ScenePlaybackCombatSkillSample>(Math.Min(_buckets.Length, maxMarkersPerSkill));
+            for (var bucketIndex = 0; bucketIndex < _buckets.Length; bucketIndex++)
+            {
+                ref readonly var bucket = ref _buckets[bucketIndex];
+                if (bucket.Count > 0)
+                    samples.Add(bucket.CreateSample());
+            }
+
+            return new ScenePlaybackCombatSkillSamples(eventKey, samples.ToArray(), Count, Amount);
+        }
+    }
+
     private static int ToTrackIndex(ScenePlaybackTrack track)
     {
         var index = (int)track;
@@ -301,6 +439,9 @@ public static class ScenePlaybackTrackReader
 
         return checked(max + 1);
     }
+
+    private static ulong AbsoluteMagnitude(long value)
+        => value >= 0 ? (ulong)value : (ulong)(-(value + 1)) + 1;
 }
 
 public enum ScenePlaybackLifecycleEventKind : byte
@@ -345,4 +486,24 @@ public readonly record struct ScenePlaybackCombatantTrackSamples(int CombatantId
 public readonly record struct ScenePlaybackCombatantTrackSampledReadResult(IReadOnlyList<ScenePlaybackCombatantTrackSamples> Combatants)
 {
     public static ScenePlaybackCombatantTrackSampledReadResult Empty { get; } = new([]);
+}
+
+public readonly record struct ScenePlaybackCombatSkillMarker(
+    long PositionMilliseconds,
+    long ObservationOrdinal,
+    int SourceEntityId,
+    int TargetEntityId,
+    CombatEventKey EventKey,
+    long Amount);
+
+public readonly record struct ScenePlaybackCombatSkillSample(ScenePlaybackCombatSkillMarker Marker, int EventCount);
+
+public readonly record struct ScenePlaybackCombatSkillSamples(CombatEventKey EventKey, IReadOnlyList<ScenePlaybackCombatSkillSample> Samples, int Count, long Amount)
+{
+    public int SkillCode => EventKey.SkillCode;
+}
+
+public readonly record struct ScenePlaybackCombatSkillSampledReadResult(IReadOnlyList<ScenePlaybackCombatSkillSamples> Skills)
+{
+    public static ScenePlaybackCombatSkillSampledReadResult Empty { get; } = new([]);
 }

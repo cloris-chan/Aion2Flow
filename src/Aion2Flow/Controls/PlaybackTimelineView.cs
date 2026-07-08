@@ -160,11 +160,20 @@ public sealed class PlaybackTimelineView : Control
 
     private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, double duration, Rect bounds)
     {
-        var markerWidth = marker.IsApplication ? Math.Clamp(bounds.Height - 6d, 10d, 16d) : Math.Clamp(marker.Weight, 3d, 12d);
-        var x = Math.Clamp(PlaybackTimelineGeometry.PositionToX(marker.PositionMilliseconds, duration, bounds.Width) - markerWidth * 0.5d, 0d, Math.Max(0d, bounds.Width - markerWidth));
-        var height = marker.IsApplication ? markerWidth : Math.Max(8d, bounds.Height - 8d);
-        var y = (bounds.Height - height) * 0.5d;
-        context.FillRectangle(marker.Brush, new Rect(x, y, markerWidth, height));
+        var centerX = PlaybackTimelineGeometry.PositionToX(marker.PositionMilliseconds, duration, bounds.Width);
+        if (marker.IsApplication)
+        {
+            var radius = Math.Clamp(bounds.Height * 0.26d, 1.6d, 3d);
+            var x = Math.Clamp(centerX, radius, Math.Max(radius, bounds.Width - radius));
+            context.DrawEllipse(marker.Brush, null, new Point(x, bounds.Height * 0.5d), radius, radius);
+            return;
+        }
+
+        var markerWidth = Math.Clamp(marker.Weight * 1.35d, 3d, 16d);
+        var start = Math.Max(0d, centerX - markerWidth * 0.5d);
+        var end = Math.Min(bounds.Width, centerX + markerWidth * 0.5d);
+        var y = Math.Round(bounds.Height * 0.5d) + 0.5d;
+        context.DrawLine(new Pen(marker.Brush, 1d), new Point(start, y), new Point(Math.Max(start + 1d, end), y));
     }
 
     private static void DrawSpan(DrawingContext context, PlaybackTimelineSpan span, double duration, Rect bounds)
@@ -172,9 +181,11 @@ public sealed class PlaybackTimelineView : Control
         var start = PlaybackTimelineGeometry.PositionToX(span.StartMilliseconds, duration, bounds.Width);
         var end = PlaybackTimelineGeometry.PositionToX(span.EndMilliseconds, duration, bounds.Width);
         var width = Math.Max(1d, end - start);
-        var rect = new Rect(start, 3d, width, Math.Max(1d, bounds.Height - 6d));
+        var thickness = Math.Clamp(bounds.Height * 0.28d, 1d, 2d);
+        var y = Math.Round((bounds.Height - thickness) * 0.5d) + 0.5d;
+        var rect = new Rect(start, y, width, thickness);
         context.FillRectangle(span.FillBrush, rect);
-        context.DrawRectangle(null, new Pen(span.BorderBrush, 1d), rect);
+        context.DrawLine(new Pen(span.BorderBrush, 1d), new Point(start, y + thickness * 0.5d), new Point(start + width, y + thickness * 0.5d));
     }
 
     private void RequestSeek(double x)
