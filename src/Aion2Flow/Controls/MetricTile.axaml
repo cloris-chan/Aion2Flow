@@ -6,7 +6,7 @@
              x:Name="Root">
     <Border Classes="MetricCardSurface">
         <Grid ColumnDefinitions="Auto,*"
-              ColumnSpacing="6">
+              ColumnSpacing="0">
             <Border Classes="MetricAccent" />
             <StackPanel Grid.Column="1"
                         Classes="MetricContent"
