@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
@@ -175,6 +176,7 @@ public sealed class EncounterArchiveServiceTests
         var cloneDelta = clone.CreateDetailDelta(playerId);
 
         Assert.Equal([1L, 2L], delta.Events.Select(static e => e.Revision));
+        Assert.All(delta.Events, static e => Assert.Equal(CombatContributionCanonicalization.CompactAvoidance, e.Canonicalization));
         Assert.Equal([1, 2], payload.EventIndicesByCombatant[playerId]);
         Assert.Equal([new DirectedPairKey(playerId, bossId)], delta.OutgoingPairs);
         Assert.Equal([new DirectedPairKey(bossId, playerId)], delta.IncomingPairs);
@@ -182,6 +184,7 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal(100, delta.Combatant!.Value.OutgoingDamage);
         Assert.Equal(75, delta.Combatant.Value.IncomingDamage);
         Assert.Equal([1L, 2L], cloneDelta.Events.Select(static e => e.Revision));
+        Assert.All(cloneDelta.Events, static e => Assert.Equal(CombatContributionCanonicalization.CompactAvoidance, e.Canonicalization));
         Assert.Equal([1, 2], clone.EventIndicesByCombatant[playerId]);
         Assert.Equal(payload.Events[1], clone.Events[1]);
     }
@@ -195,7 +198,7 @@ public sealed class EncounterArchiveServiceTests
         const int bossId = 200;
         AppendCombat(journal, sceneId, playerId, bossId, 100, 1, 1_000);
         AppendCombat(journal, sceneId, playerId, bossId, 200, 2, 2_000);
-        journal.CompleteBatch(1);
+        journal.CompleteFlush(1);
         var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
         var snapshot = owner.CreateSnapshot();
         var payload = owner.CreateArchivePayload(snapshot);
@@ -290,7 +293,7 @@ public sealed class EncounterArchiveServiceTests
         var sceneId = Guid.NewGuid();
         AppendCombat(journal, sceneId, playerId, targetId, 100, 1, 1_000);
         AppendCombat(journal, sceneId, playerId, targetId, 1, 2, 1_001);
-        journal.CompleteBatch(1);
+        journal.CompleteFlush(1);
         var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now, registry);
         owner.Refresh();
 
@@ -339,7 +342,7 @@ public sealed class EncounterArchiveServiceTests
         AppendState(journal, sceneId, bossId, 0, StateCodes.NpcBattle, 1, 0, null, 6, 1_005);
         AppendCombat(journal, sceneId, playerId, bossId, 750, 7, 1_500);
         AppendCombat(journal, sceneId, playerId, bossId, 1, 8, 1_501);
-        journal.CompleteBatch(1);
+        journal.CompleteFlush(1);
 
         var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), sceneStarted);
         owner.Refresh();
@@ -351,7 +354,7 @@ public sealed class EncounterArchiveServiceTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
             Domain = ObservedEventDomain.State,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
@@ -365,7 +368,7 @@ public sealed class EncounterArchiveServiceTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
             Domain = ObservedEventDomain.Resource,
             SourceEntityId = entityId,
             TargetEntityId = 0,
@@ -379,7 +382,7 @@ public sealed class EncounterArchiveServiceTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,
@@ -396,13 +399,9 @@ public sealed class EncounterArchiveServiceTests
         });
     }
 
-    private static SceneArchiveCombatEvent CreateArchiveEvent(int sourceId, int targetId, int damage, long revision, long timestamp) => new()
+    private static SceneArchiveCombatEvent CreateArchiveEvent(int sourceId, int targetId, int damage, long revision, long timestamp)
     {
-        SourceId = sourceId,
-        TargetId = targetId,
-        Revision = revision,
-        ObservedAtMilliseconds = timestamp,
-        Observation = new CombatObservation
+        var observation = new CombatObservation
         {
             SkillCode = 11000010,
             Damage = damage,
@@ -410,8 +409,20 @@ public sealed class EncounterArchiveServiceTests
             AttemptCount = 1,
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage
-        }
-    };
+        };
+
+        return new SceneArchiveCombatEvent
+        {
+            SourceId = sourceId,
+            TargetId = targetId,
+            Revision = revision,
+            ObservedAtMilliseconds = timestamp,
+            Observation = observation,
+            EventKey = CombatEventKey.FromObservation(in observation),
+            Contribution = CombatContributionClassifier.Evaluate(in observation),
+            Canonicalization = CombatContributionCanonicalization.CompactAvoidance
+        };
+    }
 
     private static DirectedPairSnapshot CreatePair(int sourceId, int targetId, long damage, long firstObserved, long lastObserved, long revision) => new()
     {

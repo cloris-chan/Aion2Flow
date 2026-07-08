@@ -8,37 +8,25 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, ICombatDetailEventWriter
 {
-    private struct CounterpartAggregateMetrics
-    {
-        public long DamageAmount;
-        public long HealingAmount;
-        public long ShieldAmount;
-    }
-
     private readonly List<CombatDetailEvent> _detailEvents = [];
-    private readonly Dictionary<int, CounterpartAggregateMetrics> _counterpartMetrics = [];
-    private readonly List<int> _sortedCounterpartIds = [];
-    private readonly List<DetailCounterpartOption> _counterpartOptions = [];
-    private readonly HashSet<int> _selectedDamageCounterpartIds = [];
-    private readonly HashSet<int> _selectedSupportCounterpartIds = [];
-    private readonly Dictionary<CombatActionKey, SkillMetrics> _skillMetrics = [];
+    private readonly DetailCounterpartOptionBuilder _counterpartOptionBuilder = new();
+    private readonly HashSet<int> _outgoingDamageSelectionIds = [];
+    private readonly HashSet<int> _outgoingSupportSelectionIds = [];
+    private readonly HashSet<int> _incomingDamageSelectionIds = [];
+    private readonly HashSet<int> _incomingSupportSelectionIds = [];
+    private readonly SkillDetailSectionAggregation _outgoingDamageSectionAggregation = new();
+    private readonly SkillDetailSectionAggregation _outgoingHealingSectionAggregation = new();
+    private readonly SkillDetailSectionAggregation _outgoingShieldSectionAggregation = new();
+    private readonly SkillDetailSectionAggregation _incomingDamageSectionAggregation = new();
+    private readonly SkillDetailSectionAggregation _incomingHealingSectionAggregation = new();
+    private readonly SkillDetailSectionAggregation _incomingShieldSectionAggregation = new();
     private readonly List<SkillDetailRowData> _sectionRows = [];
-    private readonly Dictionary<SkillPresentationKey, int> _sectionRowIndexes = [];
+    private readonly Dictionary<SkillBaseKey, int> _sectionRowIndexes = [];
     private readonly LocalizationService _localization;
     private SceneCombatSnapshot _currentSnapshot = new();
     private Guid _encounterContextId;
     private int? _combatantId;
     private long _detailRevision = -1;
-
-    private enum DetailSectionKind
-    {
-        OutgoingDamage,
-        OutgoingHealing,
-        OutgoingShield,
-        IncomingDamage,
-        IncomingHealing,
-        IncomingShield
-    }
 
     public CombatantDetailsFlyoutViewModel(LocalizationService localization, UiFrameBatchService frameBatchService)
     {
@@ -269,141 +257,59 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             return;
         }
 
-        OutgoingDetail.DamageCounterpartFilter.ReplaceCounterparts(BuildCounterpartOptions(DetailSectionKind.OutgoingDamage));
-        OutgoingDetail.SupportCounterpartFilter.ReplaceCounterparts(BuildCounterpartOptions(DetailSectionKind.OutgoingHealing, DetailSectionKind.OutgoingShield));
-        IncomingDetail.DamageCounterpartFilter.ReplaceCounterparts(BuildCounterpartOptions(DetailSectionKind.IncomingDamage));
-        IncomingDetail.SupportCounterpartFilter.ReplaceCounterparts(BuildCounterpartOptions(DetailSectionKind.IncomingHealing, DetailSectionKind.IncomingShield));
-    }
-
-    private List<DetailCounterpartOption> BuildCounterpartOptions(DetailSectionKind firstSectionKind, DetailSectionKind? secondSectionKind = null)
-    {
-        _counterpartMetrics.Clear();
-        _sortedCounterpartIds.Clear();
-        _counterpartOptions.Clear();
-
-        if (_combatantId is null)
-        {
-            return _counterpartOptions;
-        }
-
-        var packetsSpan = CollectionsMarshal.AsSpan(_detailEvents);
-        foreach (ref readonly var detailPacket in packetsSpan)
-        {
-            if (TryAccumulateCounterpart(in detailPacket, firstSectionKind))
-                continue;
-
-            if (secondSectionKind.HasValue)
-                TryAccumulateCounterpart(in detailPacket, secondSectionKind.Value);
-        }
-
-        long totalDamage = 0, totalHealing = 0, totalShield = 0;
-        foreach (var metrics in _counterpartMetrics.Values)
-        {
-            totalDamage += metrics.DamageAmount;
-            totalHealing += metrics.HealingAmount;
-            totalShield += metrics.ShieldAmount;
-        }
-
-        _sortedCounterpartIds.AddRange(_counterpartMetrics.Keys);
-        _sortedCounterpartIds.Sort((left, right) =>
-        {
-            var leftMetrics = _counterpartMetrics[left];
-            var rightMetrics = _counterpartMetrics[right];
-            var cmp = (rightMetrics.DamageAmount + rightMetrics.HealingAmount + rightMetrics.ShieldAmount)
-                .CompareTo(leftMetrics.DamageAmount + leftMetrics.HealingAmount + leftMetrics.ShieldAmount);
-            if (cmp != 0)
-            {
-                return cmp;
-            }
-
-            cmp = rightMetrics.DamageAmount.CompareTo(leftMetrics.DamageAmount);
-            if (cmp != 0)
-            {
-                return cmp;
-            }
-
-            cmp = rightMetrics.HealingAmount.CompareTo(leftMetrics.HealingAmount);
-            if (cmp != 0)
-            {
-                return cmp;
-            }
-
-            cmp = rightMetrics.ShieldAmount.CompareTo(leftMetrics.ShieldAmount);
-            if (cmp != 0)
-            {
-                return cmp;
-            }
-
-            var leftName = DisplayContext?.GetEntitySortKey(left) ?? left.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            var rightName = DisplayContext?.GetEntitySortKey(right) ?? right.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            return StringComparer.CurrentCulture.Compare(leftName, rightName);
-        });
-
-        foreach (var combatantId in _sortedCounterpartIds)
-        {
-            var metrics = _counterpartMetrics[combatantId];
-            _counterpartOptions.Add(new DetailCounterpartOption(
-                combatantId,
-                metrics.DamageAmount,
-                totalDamage > 0 ? metrics.DamageAmount / (double)totalDamage : 0d,
-                metrics.HealingAmount,
-                totalHealing > 0 ? metrics.HealingAmount / (double)totalHealing : 0d,
-                metrics.ShieldAmount,
-                totalShield > 0 ? metrics.ShieldAmount / (double)totalShield : 0d));
-        }
-
-        return _counterpartOptions;
-    }
-
-    private bool TryAccumulateCounterpart(in CombatDetailEvent detailPacket, DetailSectionKind sectionKind)
-    {
-        if (_combatantId is null ||
-            !MatchesSection(in detailPacket, sectionKind, _combatantId.Value) ||
-            !ContributesToSection(in detailPacket, sectionKind))
-        {
-            return false;
-        }
-
-        var combatantId = GetCounterpartCombatantId(in detailPacket, sectionKind);
-        if (combatantId <= 0)
-        {
-            return true;
-        }
-
-        _counterpartMetrics.TryGetValue(combatantId, out var metrics);
-        var amount = GetSectionContributionAmount(in detailPacket, sectionKind);
-        switch (sectionKind)
-        {
-            case DetailSectionKind.OutgoingDamage:
-            case DetailSectionKind.IncomingDamage:
-                metrics.DamageAmount += amount;
-                break;
-            case DetailSectionKind.OutgoingHealing:
-            case DetailSectionKind.IncomingHealing:
-                metrics.HealingAmount += amount;
-                break;
-            case DetailSectionKind.OutgoingShield:
-            case DetailSectionKind.IncomingShield:
-                metrics.ShieldAmount += amount;
-                break;
-        }
-
-        _counterpartMetrics[combatantId] = metrics;
-        return true;
+        _counterpartOptionBuilder.Accumulate(CollectionsMarshal.AsSpan(_detailEvents), _combatantId.Value);
+        OutgoingDetail.DamageCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildOutgoingDamageOptions(DisplayContext));
+        OutgoingDetail.SupportCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildOutgoingSupportOptions(DisplayContext));
+        IncomingDetail.DamageCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildIncomingDamageOptions(DisplayContext));
+        IncomingDetail.SupportCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildIncomingSupportOptions(DisplayContext));
     }
 
     private void RefreshAllSections()
     {
-        RefreshDirection(
-            OutgoingDetail,
-            DetailSectionKind.OutgoingDamage,
-            DetailSectionKind.OutgoingHealing,
-            DetailSectionKind.OutgoingShield);
-        RefreshDirection(
-            IncomingDetail,
-            DetailSectionKind.IncomingDamage,
-            DetailSectionKind.IncomingHealing,
-            DetailSectionKind.IncomingShield);
+        if (_combatantId is null)
+        {
+            ClearSectionsOnly();
+            return;
+        }
+
+        CopyDirectionSelections(OutgoingDetail, _outgoingDamageSelectionIds, _outgoingSupportSelectionIds, out var outgoingDamageCounterpartCount, out var outgoingSupportCounterpartCount);
+        CopyDirectionSelections(IncomingDetail, _incomingDamageSelectionIds, _incomingSupportSelectionIds, out var incomingDamageCounterpartCount, out var incomingSupportCounterpartCount);
+
+        ResetDirectionAggregations(
+            _outgoingDamageSectionAggregation,
+            _outgoingHealingSectionAggregation,
+            _outgoingShieldSectionAggregation,
+            _outgoingDamageSelectionIds,
+            _outgoingSupportSelectionIds,
+            outgoingDamageCounterpartCount,
+            outgoingSupportCounterpartCount);
+        ResetDirectionAggregations(
+            _incomingDamageSectionAggregation,
+            _incomingHealingSectionAggregation,
+            _incomingShieldSectionAggregation,
+            _incomingDamageSelectionIds,
+            _incomingSupportSelectionIds,
+            incomingDamageCounterpartCount,
+            incomingSupportCounterpartCount);
+
+        var packetsSpan = CollectionsMarshal.AsSpan(_detailEvents);
+        var combatantId = _combatantId.Value;
+        foreach (ref readonly var detailPacket in packetsSpan)
+        {
+            AccumulateSection(_outgoingDamageSectionAggregation, in detailPacket, DetailSectionKind.OutgoingDamage, combatantId, _outgoingDamageSelectionIds);
+            AccumulateSection(_outgoingHealingSectionAggregation, in detailPacket, DetailSectionKind.OutgoingHealing, combatantId, _outgoingSupportSelectionIds);
+            AccumulateSection(_outgoingShieldSectionAggregation, in detailPacket, DetailSectionKind.OutgoingShield, combatantId, _outgoingSupportSelectionIds);
+            AccumulateSection(_incomingDamageSectionAggregation, in detailPacket, DetailSectionKind.IncomingDamage, combatantId, _incomingDamageSelectionIds);
+            AccumulateSection(_incomingHealingSectionAggregation, in detailPacket, DetailSectionKind.IncomingHealing, combatantId, _incomingSupportSelectionIds);
+            AccumulateSection(_incomingShieldSectionAggregation, in detailPacket, DetailSectionKind.IncomingShield, combatantId, _incomingSupportSelectionIds);
+        }
+
+        ApplyAggregatedSection(OutgoingDetail.DamageSection, DetailSectionKind.OutgoingDamage, _outgoingDamageSectionAggregation);
+        ApplyAggregatedSection(OutgoingDetail.HealingSection, DetailSectionKind.OutgoingHealing, _outgoingHealingSectionAggregation);
+        ApplyAggregatedSection(OutgoingDetail.ShieldSection, DetailSectionKind.OutgoingShield, _outgoingShieldSectionAggregation);
+        ApplyAggregatedSection(IncomingDetail.DamageSection, DetailSectionKind.IncomingDamage, _incomingDamageSectionAggregation);
+        ApplyAggregatedSection(IncomingDetail.HealingSection, DetailSectionKind.IncomingHealing, _incomingHealingSectionAggregation);
+        ApplyAggregatedSection(IncomingDetail.ShieldSection, DetailSectionKind.IncomingShield, _incomingShieldSectionAggregation);
     }
 
     private void RefreshDirection(
@@ -412,307 +318,135 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         DetailSectionKind healingSectionKind,
         DetailSectionKind shieldSectionKind)
     {
-        directionDetail.DamageCounterpartFilter.CopySelectedCounterpartIds(_selectedDamageCounterpartIds);
-        var selectedDamageCounterpartIds = _selectedDamageCounterpartIds;
-        var selectableDamageCounterpartCount = directionDetail.DamageCounterpartFilter.Counterparts.Count;
-        directionDetail.SupportCounterpartFilter.CopySelectedCounterpartIds(_selectedSupportCounterpartIds);
-        var selectedSupportCounterpartIds = _selectedSupportCounterpartIds;
-        var selectableSupportCounterpartCount = directionDetail.SupportCounterpartFilter.Counterparts.Count;
+        var isOutgoing = ReferenceEquals(directionDetail, OutgoingDetail);
+        var damageAggregation = isOutgoing ? _outgoingDamageSectionAggregation : _incomingDamageSectionAggregation;
+        var healingAggregation = isOutgoing ? _outgoingHealingSectionAggregation : _incomingHealingSectionAggregation;
+        var shieldAggregation = isOutgoing ? _outgoingShieldSectionAggregation : _incomingShieldSectionAggregation;
+        var selectedDamageCounterpartIds = isOutgoing ? _outgoingDamageSelectionIds : _incomingDamageSelectionIds;
+        var selectedSupportCounterpartIds = isOutgoing ? _outgoingSupportSelectionIds : _incomingSupportSelectionIds;
+        CopyDirectionSelections(directionDetail, selectedDamageCounterpartIds, selectedSupportCounterpartIds, out var selectableDamageCounterpartCount, out var selectableSupportCounterpartCount);
 
-        RefreshSection(directionDetail.DamageSection, damageSectionKind, selectedDamageCounterpartIds, selectableDamageCounterpartCount);
-        RefreshSection(directionDetail.HealingSection, healingSectionKind, selectedSupportCounterpartIds, selectableSupportCounterpartCount);
-        RefreshSection(directionDetail.ShieldSection, shieldSectionKind, selectedSupportCounterpartIds, selectableSupportCounterpartCount);
-    }
-
-    private void RefreshSection(
-        SkillDetailSectionViewModel section,
-        DetailSectionKind sectionKind,
-        HashSet<int> selectedCounterpartIds,
-        int selectableCounterpartCount)
-    {
         if (_combatantId is null)
         {
-            section.Clear();
+            directionDetail.DamageSection.Clear();
+            directionDetail.HealingSection.Clear();
+            directionDetail.ShieldSection.Clear();
             return;
         }
 
-        var metrics = _skillMetrics;
-        metrics.Clear();
-        var hasSubsetFilter = selectableCounterpartCount > 0 && selectedCounterpartIds.Count != selectableCounterpartCount;
-        var firstObserved = long.MaxValue;
-        var lastObserved = long.MinValue;
+        ResetDirectionAggregations(
+            damageAggregation,
+            healingAggregation,
+            shieldAggregation,
+            selectedDamageCounterpartIds,
+            selectedSupportCounterpartIds,
+            selectableDamageCounterpartCount,
+            selectableSupportCounterpartCount);
 
         var packetsSpan = CollectionsMarshal.AsSpan(_detailEvents);
+        var combatantId = _combatantId.Value;
         foreach (ref readonly var detailPacket in packetsSpan)
         {
-            if (!MatchesSection(in detailPacket, sectionKind, _combatantId.Value))
-            {
-                continue;
-            }
-
-            var counterpartCombatantId = GetCounterpartCombatantId(in detailPacket, sectionKind);
-            if (counterpartCombatantId > 0)
-            {
-                if (!selectedCounterpartIds.Contains(counterpartCombatantId))
-                {
-                    continue;
-                }
-            }
-            else if (hasSubsetFilter)
-            {
-                continue;
-            }
-
-            if (!ContributesToSection(in detailPacket, sectionKind))
-            {
-                continue;
-            }
-
-            var observedAt = ResolveObservedAt(in detailPacket);
-            if (observedAt > 0)
-            {
-                firstObserved = Math.Min(firstObserved, observedAt);
-                lastObserved = Math.Max(lastObserved, observedAt);
-            }
-
-            var detailObservation = detailPacket.Observation;
-            var actionKey = CombatActionKey.FromObservation(in detailObservation);
-            ref var skillMetrics = ref CollectionsMarshal.GetValueRefOrAddDefault(metrics, actionKey, out var exists);
-            if (!exists)
-            {
-                var observation = detailPacket.Observation;
-                skillMetrics = new SkillMetrics(in observation);
-            }
-
-            var skillObservation = detailPacket.Observation;
-            skillMetrics.ProcessObservation(in skillObservation);
+            AccumulateSection(damageAggregation, in detailPacket, damageSectionKind, combatantId, selectedDamageCounterpartIds);
+            AccumulateSection(healingAggregation, in detailPacket, healingSectionKind, combatantId, selectedSupportCounterpartIds);
+            AccumulateSection(shieldAggregation, in detailPacket, shieldSectionKind, combatantId, selectedSupportCounterpartIds);
         }
+
+        ApplyAggregatedSection(directionDetail.DamageSection, damageSectionKind, damageAggregation);
+        ApplyAggregatedSection(directionDetail.HealingSection, healingSectionKind, healingAggregation);
+        ApplyAggregatedSection(directionDetail.ShieldSection, shieldSectionKind, shieldAggregation);
+    }
+
+    private static void CopyDirectionSelections(
+        CombatDirectionDetailViewModel directionDetail,
+        HashSet<int> selectedDamageCounterpartIds,
+        HashSet<int> selectedSupportCounterpartIds,
+        out int selectableDamageCounterpartCount,
+        out int selectableSupportCounterpartCount)
+    {
+        directionDetail.DamageCounterpartFilter.CopySelectedCounterpartIds(selectedDamageCounterpartIds);
+        selectableDamageCounterpartCount = directionDetail.DamageCounterpartFilter.Counterparts.Count;
+        directionDetail.SupportCounterpartFilter.CopySelectedCounterpartIds(selectedSupportCounterpartIds);
+        selectableSupportCounterpartCount = directionDetail.SupportCounterpartFilter.Counterparts.Count;
+    }
+
+    private static void ResetDirectionAggregations(
+        SkillDetailSectionAggregation damageAggregation,
+        SkillDetailSectionAggregation healingAggregation,
+        SkillDetailSectionAggregation shieldAggregation,
+        HashSet<int> selectedDamageCounterpartIds,
+        HashSet<int> selectedSupportCounterpartIds,
+        int selectableDamageCounterpartCount,
+        int selectableSupportCounterpartCount)
+    {
+        damageAggregation.Reset(selectableDamageCounterpartCount > 0 && selectedDamageCounterpartIds.Count != selectableDamageCounterpartCount);
+        healingAggregation.Reset(selectableSupportCounterpartCount > 0 && selectedSupportCounterpartIds.Count != selectableSupportCounterpartCount);
+        shieldAggregation.Reset(healingAggregation.HasSubsetFilter);
+    }
+
+    private static void AccumulateSection(
+        SkillDetailSectionAggregation aggregation,
+        in CombatDetailEvent detailPacket,
+        DetailSectionKind sectionKind,
+        int combatantId,
+        HashSet<int> selectedCounterpartIds)
+    {
+        if (!SkillDetailSectionRules.Matches(in detailPacket, sectionKind, combatantId))
+            return;
+
+        var counterpartCombatantId = SkillDetailSectionRules.GetCounterpartCombatantId(in detailPacket, sectionKind);
+        if (counterpartCombatantId > 0)
+        {
+            if (!selectedCounterpartIds.Contains(counterpartCombatantId))
+                return;
+        }
+        else if (aggregation.HasSubsetFilter)
+        {
+            return;
+        }
+
+        if (!SkillDetailSectionRules.Contributes(in detailPacket, sectionKind))
+            return;
+
+        var observedAt = detailPacket.ObservedAt;
+        if (observedAt > 0)
+        {
+            aggregation.FirstObserved = Math.Min(aggregation.FirstObserved, observedAt);
+            aggregation.LastObserved = Math.Max(aggregation.LastObserved, observedAt);
+        }
+
+        var eventKey = detailPacket.EventKey;
+        ref var skillMetrics = ref CollectionsMarshal.GetValueRefOrAddDefault(aggregation.SkillMetrics, eventKey, out var exists);
+        if (!exists)
+        {
+            var observation = detailPacket.Observation;
+            skillMetrics = new SkillMetrics(eventKey, in observation);
+        }
+
+        var skillObservation = detailPacket.Observation;
+        var contribution = detailPacket.Contribution;
+        skillMetrics.ProcessContribution(in skillObservation, in contribution);
+        ref var eventCount = ref CollectionsMarshal.GetValueRefOrAddDefault(aggregation.EventCounts, eventKey, out _);
+        eventCount++;
+    }
+
+    private void ApplyAggregatedSection(SkillDetailSectionViewModel section, DetailSectionKind sectionKind, SkillDetailSectionAggregation aggregation)
+    {
+        var metrics = aggregation.SkillMetrics;
 
         _sectionRows.Clear();
         _sectionRowIndexes.Clear();
         if (sectionKind is DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage)
-            BuildDamageRows(metrics, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
+            SkillDetailRowBuilder.BuildDamageRows(metrics, aggregation.EventCounts, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
         else if (sectionKind is DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield)
-            BuildShieldRows(metrics, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
+            SkillDetailRowBuilder.BuildShieldRows(metrics, aggregation.EventCounts, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
         else
-            BuildHealingRows(metrics, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
+            SkillDetailRowBuilder.BuildHealingRows(metrics, aggregation.EventCounts, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
 
-        var durationSeconds = hasSubsetFilter
-            ? ResolveObservedDurationSeconds(firstObserved, lastObserved)
+        var durationSeconds = aggregation.HasSubsetFilter
+            ? ResolveObservedDurationSeconds(aggregation.FirstObserved, aggregation.LastObserved)
             : ResolveSceneDurationSeconds();
-        ApplySectionRows(section, metrics, _sectionRows, sectionKind, durationSeconds, !hasSubsetFilter);
-    }
-
-    private static void ApplySectionRows(
-        SkillDetailSectionViewModel section,
-        Dictionary<CombatActionKey, SkillMetrics> skills,
-        List<SkillDetailRowData> rows,
-        DetailSectionKind sectionKind,
-        double durationSeconds,
-        bool usesSceneDuration)
-    {
-        section.ReplaceRows(rows);
-        section.SkillCount = rows.Count;
-        section.HasSkills = rows.Count > 0;
-        section.DurationSeconds = durationSeconds;
-        section.UsesSceneDuration = usesSceneDuration;
-
-        if (sectionKind is DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage)
-        {
-            ApplyDamageSection(section, skills, durationSeconds);
-            return;
-        }
-
-        long totalAmount = 0, directAmount = 0, periodicAmount = 0, drainAmount = 0, regenerationAmount = 0, shieldAmount = 0, shieldAbsorbedAmount = 0;
-        int hits = 0, attempts = 0, periodicHits = 0, evades = 0, invincible = 0, criticals = 0;
-
-        var span = CollectionsMarshal.AsSpan(rows);
-        foreach (ref var row in span)
-        {
-            totalAmount += row.TotalAmount;
-            directAmount += row.DirectAmount;
-            periodicAmount += row.PeriodicAmount;
-            drainAmount += row.DrainAmount;
-            regenerationAmount += row.RegenerationAmount;
-            shieldAmount += row.ShieldAmount;
-            shieldAbsorbedAmount += row.ShieldAbsorbedAmount;
-            hits += row.Hits;
-            attempts += row.Attempts;
-            periodicHits += row.PeriodicHits;
-            evades += row.Evades;
-            invincible += row.Invincible;
-            criticals += row.Criticals;
-        }
-
-        section.Total = totalAmount;
-        section.DirectTotal = directAmount;
-        section.PeriodicTotal = periodicAmount;
-        section.DrainTotal = drainAmount;
-        section.RegenerationTotal = regenerationAmount;
-        section.Shield = shieldAmount;
-        section.ShieldAbsorbed = shieldAbsorbedAmount;
-        section.Hits = hits;
-        section.Attempts = attempts;
-        section.PeriodicHits = periodicHits;
-        section.Evades = evades;
-        section.Invincible = invincible;
-        section.Criticals = criticals;
-        section.PerfectCount = 0;
-        section.SmiteCount = 0;
-        section.MultiHitCount = 0;
-        section.FrontCount = 0;
-        section.BackCount = 0;
-        section.ParryCount = 0;
-        section.BlockCount = 0;
-        section.PerfectParryCount = 0;
-        section.PerfectBlockCount = 0;
-        section.EnduranceCount = 0;
-        section.RegenerationCount = 0;
-
-        section.PerSecond = durationSeconds > 0 ? totalAmount / durationSeconds : 0d;
-
-        section.HitRate = 0d;
-        section.CriticalRate = 0d;
-        section.SmiteRate = 0d;
-        section.MultiHitRate = 0d;
-        section.FrontRate = 0d;
-        section.ParryRate = 0d;
-        section.PerfectRate = 0d;
-        section.PerfectParryRate = 0d;
-        section.EnduranceRate = 0d;
-        section.BackRate = 0d;
-        section.RegenerationRate = 0d;
-        section.BlockRate = 0d;
-        section.PerfectBlockRate = 0d;
-        section.EvadeRate = 0d;
-        section.InvincibleRate = 0d;
-    }
-
-    private static void ApplyDamageSection(SkillDetailSectionViewModel section, Dictionary<CombatActionKey, SkillMetrics> skills, double durationSeconds)
-    {
-        long total = 0, directTotal = 0, periodicTotal = 0;
-        int totalHits = 0, totalAttempts = 0, totalPeriodicHits = 0;
-        int critical = 0, perfect = 0, smite = 0, multiHit = 0, front = 0;
-        int parry = 0, block = 0, endurance = 0, regeneration = 0, back = 0;
-        int perfectParry = 0, perfectBlock = 0;
-        int evades = 0, invincible = 0;
-
-        foreach (var (_, skill) in skills)
-        {
-            directTotal += skill.DamageAmount;
-            periodicTotal += skill.PeriodicDamageAmount;
-            total += skill.DamageAmount + skill.PeriodicDamageAmount;
-            totalHits += skill.Times;
-            totalAttempts += skill.AttemptTimes;
-            totalPeriodicHits += skill.PeriodicDamageTimes;
-            evades += skill.EvadeTimes;
-            invincible += skill.InvincibleTimes;
-            critical += skill.CriticalTimes;
-            perfect += skill.PerfectTimes;
-            smite += skill.SmiteTimes;
-            multiHit += skill.MultiHitTimes;
-            front += skill.FrontTimes;
-            parry += skill.ParryTimes;
-            block += skill.BlockTimes;
-            perfectParry += skill.PerfectParryTimes;
-            perfectBlock += skill.PerfectBlockTimes;
-            endurance += skill.EnduranceTimes;
-            regeneration += skill.RegenerationTimes;
-            back += skill.BackTimes;
-        }
-
-        section.Total = total;
-        section.DirectTotal = directTotal;
-        section.PeriodicTotal = periodicTotal;
-        section.DrainTotal = 0;
-        section.Hits = totalHits;
-        section.Attempts = totalAttempts;
-        section.PeriodicHits = totalPeriodicHits;
-        section.Evades = evades;
-        section.Invincible = invincible;
-        section.Criticals = critical;
-        section.PerfectCount = perfect;
-        section.SmiteCount = smite;
-        section.MultiHitCount = multiHit;
-        section.FrontCount = front;
-        section.BackCount = back;
-        section.ParryCount = parry;
-        section.BlockCount = block;
-        section.PerfectParryCount = perfectParry;
-        section.PerfectBlockCount = perfectBlock;
-        section.EnduranceCount = endurance;
-        section.RegenerationCount = regeneration;
-
-        section.PerSecond = durationSeconds > 0 ? section.Total / durationSeconds : 0d;
-
-        section.HitRate = totalAttempts > 0 ? totalHits / (double)totalAttempts : 0d;
-        section.CriticalRate = totalHits > 0 ? critical / (double)totalHits : 0d;
-        section.PerfectRate = totalHits > 0 ? perfect / (double)totalHits : 0d;
-        section.SmiteRate = totalHits > 0 ? smite / (double)totalHits : 0d;
-        section.MultiHitRate = totalHits > 0 ? multiHit / (double)totalHits : 0d;
-        section.FrontRate = totalHits > 0 ? front / (double)totalHits : 0d;
-        section.ParryRate = totalHits > 0 ? parry / (double)totalHits : 0d;
-        section.BlockRate = totalHits > 0 ? block / (double)totalHits : 0d;
-        section.PerfectParryRate = totalHits > 0 ? perfectParry / (double)totalHits : 0d;
-        section.PerfectBlockRate = totalHits > 0 ? perfectBlock / (double)totalHits : 0d;
-        section.EnduranceRate = totalHits > 0 ? endurance / (double)totalHits : 0d;
-        section.RegenerationRate = totalHits > 0 ? regeneration / (double)totalHits : 0d;
-        section.BackRate = totalHits > 0 ? back / (double)totalHits : 0d;
-        section.EvadeRate = totalAttempts > 0 ? evades / (double)totalAttempts : 0d;
-        section.InvincibleRate = totalAttempts > 0 ? invincible / (double)totalAttempts : 0d;
-    }
-
-    private static bool MatchesSection(in CombatDetailEvent packet, DetailSectionKind sectionKind, int combatantId)
-    {
-        return sectionKind switch
-        {
-            DetailSectionKind.OutgoingDamage or DetailSectionKind.OutgoingHealing or DetailSectionKind.OutgoingShield => packet.SourceId == combatantId,
-            DetailSectionKind.IncomingDamage or DetailSectionKind.IncomingHealing or DetailSectionKind.IncomingShield => packet.TargetId == combatantId,
-            _ => false
-        };
-    }
-
-    private static int GetCounterpartCombatantId(in CombatDetailEvent packet, DetailSectionKind sectionKind)
-    {
-        if (sectionKind == DetailSectionKind.IncomingShield &&
-            packet.ValueKind == CombatValueKind.Shield &&
-            packet.SourceId > 0 &&
-            packet.TargetId > 0 &&
-            packet.SourceId != packet.TargetId)
-        {
-            return 0;
-        }
-
-        return sectionKind switch
-        {
-            DetailSectionKind.OutgoingDamage or DetailSectionKind.OutgoingHealing or DetailSectionKind.OutgoingShield => packet.TargetId,
-            DetailSectionKind.IncomingDamage or DetailSectionKind.IncomingHealing or DetailSectionKind.IncomingShield => packet.SourceId,
-            _ => 0
-        };
-    }
-
-    private static bool ContributesToSection(in CombatDetailEvent packet, DetailSectionKind sectionKind)
-    {
-        var observation = packet.Observation;
-        var contribution = CombatContributionClassifier.Evaluate(in observation);
-        return sectionKind switch
-        {
-            DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage => contribution.CountsAsDamage,
-            DetailSectionKind.OutgoingHealing or DetailSectionKind.IncomingHealing => contribution.CountsAsHealing,
-            DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield => contribution.CountsAsShieldGrant || contribution.CountsAsShieldAbsorbed,
-            _ => false
-        };
-    }
-
-    private static long GetSectionContributionAmount(in CombatDetailEvent packet, DetailSectionKind sectionKind)
-    {
-        return sectionKind switch
-        {
-            DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage => Math.Max(0L, packet.Amount),
-            DetailSectionKind.OutgoingHealing or DetailSectionKind.IncomingHealing => Math.Max(0L, packet.Amount),
-            DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield => Math.Max(0L, packet.Amount),
-            _ => 0L
-        };
+        SkillDetailSectionSummaryApplier.Apply(section, metrics, _sectionRows, sectionKind, durationSeconds, !aggregation.HasSubsetFilter);
     }
 
     private double ResolveSceneDurationSeconds()
@@ -720,245 +454,6 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     private static double ResolveObservedDurationSeconds(long firstObserved, long lastObserved)
         => firstObserved != long.MaxValue && lastObserved != long.MinValue ? Math.Max(1d, Math.Max(0, lastObserved - firstObserved) / 1000d) : 0d;
-
-    private static long ResolveObservedAt(in CombatDetailEvent detailPacket)
-        => detailPacket.ObservedAt;
-
-    private static void BuildDamageRows(
-        Dictionary<CombatActionKey, SkillMetrics> skills,
-        SceneDisplayContext? displayContext,
-        LocalizationService localization,
-        List<SkillDetailRowData> rows,
-        Dictionary<SkillPresentationKey, int> rowIndexes)
-    {
-        foreach (var (_, skill) in skills)
-        {
-            if (IsHiddenDamageOutcomeSkill(skill.SkillCode))
-            {
-                continue;
-            }
-
-            var totalAmount = skill.DamageAmount + skill.PeriodicDamageAmount;
-            var directHits = skill.Times;
-            var attempts = skill.AttemptTimes;
-            var periodicHits = skill.PeriodicDamageTimes;
-            var evades = skill.EvadeTimes;
-            var invincible = skill.InvincibleTimes;
-            if (totalAmount <= 0 && directHits <= 0 && periodicHits <= 0 && attempts <= 0 && evades <= 0 && invincible <= 0)
-            {
-                continue;
-            }
-
-            var presentation = ResolveSkillDisplayProjection(skill.ActionKey, displayContext, localization);
-            var row = new SkillDetailRowData
-            {
-                PresentationKey = presentation.Key,
-                SkillCode = presentation.SkillCode,
-                DisplayName = presentation.DisplayName,
-                TotalAmount = totalAmount,
-                DirectAmount = skill.DamageAmount,
-                PeriodicAmount = skill.PeriodicDamageAmount,
-                Hits = directHits,
-                Attempts = attempts,
-                PeriodicHits = periodicHits,
-                Evades = evades,
-                Invincible = invincible,
-                Criticals = skill.CriticalTimes,
-                Back = skill.BackTimes,
-                Parry = skill.ParryTimes,
-                PerfectParry = skill.PerfectParryTimes,
-                Perfect = skill.PerfectTimes,
-                Smite = skill.SmiteTimes,
-                MultiHit = skill.MultiHitTimes,
-                Front = skill.FrontTimes,
-                Endurance = skill.EnduranceTimes,
-                Regeneration = skill.RegenerationTimes,
-                Block = skill.BlockTimes,
-                PerfectBlock = skill.PerfectBlockTimes,
-            };
-            SkillDetailPresentationAggregator.AddOrMerge(rows, rowIndexes, in row);
-        }
-
-        rows.Sort((a, b) =>
-        {
-            var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
-            if (cmp != 0) return cmp;
-            cmp = b.Hits.CompareTo(a.Hits);
-            if (cmp != 0) return cmp;
-            return ComparePresentationRows(in a, in b);
-        });
-
-        var sectionTotal = 0L;
-        foreach (ref var row in CollectionsMarshal.AsSpan(rows))
-        {
-            sectionTotal += row.TotalAmount;
-        }
-
-        if (sectionTotal > 0)
-        {
-            foreach (ref var row in CollectionsMarshal.AsSpan(rows))
-            {
-                row.SharePercent = row.TotalAmount / (double)sectionTotal;
-            }
-        }
-
-    }
-
-    private static bool IsHiddenDamageOutcomeSkill(int skillCode)
-        => skillCode == SyntheticCombatSkillCodes.UnresolvedInvincible;
-
-    private static void BuildHealingRows(
-        Dictionary<CombatActionKey, SkillMetrics> skills,
-        SceneDisplayContext? displayContext,
-        LocalizationService localization,
-        List<SkillDetailRowData> rows,
-        Dictionary<SkillPresentationKey, int> rowIndexes)
-    {
-        foreach (var (_, skill) in skills)
-        {
-            var directHealingAmount = Math.Max(0L, skill.HealingAmount - skill.PeriodicHealingAmount - skill.DrainHealingAmount - skill.RegenerationHealingAmount);
-            var directHealingHits = Math.Max(0, skill.HealingTimes - skill.PeriodicHealingTimes - skill.DrainHealingTimes - skill.RegenerationHealingTimes);
-            var totalAmount = directHealingAmount + skill.PeriodicHealingAmount + skill.DrainHealingAmount + skill.RegenerationHealingAmount;
-            var totalHits = directHealingHits + skill.PeriodicHealingTimes + skill.DrainHealingTimes + skill.RegenerationHealingTimes;
-            if (totalAmount <= 0 && totalHits <= 0)
-            {
-                continue;
-            }
-
-            var presentation = ResolveSkillDisplayProjection(skill.ActionKey, displayContext, localization);
-            var row = new SkillDetailRowData
-            {
-                PresentationKey = presentation.Key,
-                SkillCode = presentation.SkillCode,
-                DisplayName = presentation.DisplayName,
-                TotalAmount = totalAmount,
-                DirectAmount = directHealingAmount,
-                PeriodicAmount = skill.PeriodicHealingAmount,
-                DrainAmount = skill.DrainHealingAmount,
-                RegenerationAmount = skill.RegenerationHealingAmount,
-                Hits = totalHits,
-                Attempts = totalHits,
-                PeriodicHits = skill.PeriodicHealingTimes,
-            };
-            SkillDetailPresentationAggregator.AddOrMerge(rows, rowIndexes, in row);
-        }
-
-        rows.Sort((a, b) =>
-        {
-            var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
-            if (cmp != 0) return cmp;
-            cmp = b.Hits.CompareTo(a.Hits);
-            if (cmp != 0) return cmp;
-            return ComparePresentationRows(in a, in b);
-        });
-
-        var sectionTotal = 0L;
-        foreach (ref var row in CollectionsMarshal.AsSpan(rows))
-        {
-            sectionTotal += row.TotalAmount;
-        }
-
-        if (sectionTotal > 0)
-        {
-            foreach (ref var row in CollectionsMarshal.AsSpan(rows))
-            {
-                row.SharePercent = row.TotalAmount / (double)sectionTotal;
-            }
-        }
-
-    }
-
-    private static void BuildShieldRows(
-        Dictionary<CombatActionKey, SkillMetrics> skills,
-        SceneDisplayContext? displayContext,
-        LocalizationService localization,
-        List<SkillDetailRowData> rows,
-        Dictionary<SkillPresentationKey, int> rowIndexes)
-    {
-        foreach (var (_, skill) in skills)
-        {
-            if (skill.ShieldAmount <= 0 && skill.ShieldTimes <= 0 &&
-                skill.ShieldAbsorbedAmount <= 0 && skill.ShieldAbsorbedTimes <= 0)
-            {
-                continue;
-            }
-
-            var presentation = ResolveSkillDisplayProjection(skill.ActionKey, displayContext, localization);
-            var row = new SkillDetailRowData
-            {
-                PresentationKey = presentation.Key,
-                SkillCode = presentation.SkillCode,
-                DisplayName = presentation.DisplayName,
-                TotalAmount = skill.ShieldAmount,
-                ShieldAmount = skill.ShieldAmount,
-                ShieldAbsorbedAmount = skill.ShieldAbsorbedAmount,
-                Hits = skill.ShieldTimes,
-                Attempts = skill.ShieldTimes,
-            };
-            SkillDetailPresentationAggregator.AddOrMerge(rows, rowIndexes, in row);
-        }
-
-        rows.Sort((a, b) =>
-        {
-            var cmp = b.TotalAmount.CompareTo(a.TotalAmount);
-            if (cmp != 0) return cmp;
-            cmp = b.Hits.CompareTo(a.Hits);
-            if (cmp != 0) return cmp;
-            return ComparePresentationRows(in a, in b);
-        });
-
-        var sectionTotal = 0L;
-        foreach (ref var row in CollectionsMarshal.AsSpan(rows))
-        {
-            sectionTotal += row.TotalAmount;
-        }
-
-        if (sectionTotal > 0)
-        {
-            foreach (ref var row in CollectionsMarshal.AsSpan(rows))
-            {
-                row.SharePercent = row.TotalAmount / (double)sectionTotal;
-            }
-        }
-
-    }
-
-    private static DetailSkillDisplayProjection ResolveSkillDisplayProjection(CombatActionKey actionKey, SceneDisplayContext? displayContext, LocalizationService localization)
-    {
-        var key = SkillPresentationKey.FromActionKey(actionKey);
-        var skillCode = key.SkillCode == actionKey.SkillCode || displayContext?.ContainsSkill(key.SkillCode) == true
-            ? key.SkillCode
-            : actionKey.SkillCode;
-        var displayActionKey = new CombatActionKey(skillCode, actionKey.BodyResourceEffectRef, actionKey.DetailResourceEffectRef);
-        return new DetailSkillDisplayProjection(key, skillCode, ResolveActionDisplayName(displayActionKey, displayContext, localization));
-    }
-
-    private readonly record struct DetailSkillDisplayProjection(SkillPresentationKey Key, int SkillCode, string DisplayName);
-
-    private static string ResolveActionDisplayName(CombatActionKey actionKey, SceneDisplayContext? displayContext, LocalizationService localization)
-    {
-        if (actionKey.SkillCode > 0)
-            return displayContext?.ResolveSkillName(actionKey.SkillCode) ?? actionKey.SkillCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-        if (displayContext is not null)
-        {
-            var bodyName = displayContext.ResolveSkillName(actionKey.BodyResourceEffectRef);
-            if (!string.IsNullOrWhiteSpace(bodyName))
-                return bodyName;
-
-            var detailName = displayContext.ResolveSkillName(actionKey.DetailResourceEffectRef);
-            if (!string.IsNullOrWhiteSpace(detailName))
-                return detailName;
-        }
-
-        return actionKey.FormatFallbackLabel(localization["Skill_UnknownEffect"]);
-    }
-
-    private static int ComparePresentationRows(in SkillDetailRowData left, in SkillDetailRowData right)
-    {
-        var comparison = StringComparer.CurrentCulture.Compare(left.DisplayName, right.DisplayName);
-        return comparison != 0 ? comparison : left.PresentationKey.CompareTo(right.PresentationKey);
-    }
 
     private void RefreshSectionRatesOnly()
     {

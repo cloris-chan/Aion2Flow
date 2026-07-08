@@ -13,7 +13,9 @@ public static class ReplayScenarioCatalog
     public const string CurrentCrossServerMatchedPartyRelation = "aion2flow.stream.20260704002230.log";
     public const string CurrentForceDungeonInitialRelation = "aion2flow.stream.20260704005035.log";
     public const string CurrentActivityDungeonIndependentPlayers = "aion2flow.stream.20260704010004.log";
+    public const string CurrentOwnerTargetCanonicalizationEdge = "aion2flow.stream.20260704053009.log";
     public const string CurrentForceDungeonPreInstanceRoster = "aion2flow.stream.20260704153057.log";
     public const string CurrentForceDungeonWithoutExplicitRelationPackets = "aion2flow.stream.20260704155002.log";
     public const string CurrentCrossServerSelfIdentityMarker3F = "aion2flow.stream.20260705015611.log";
+    public const string CurrentOwnerSystemCanonicalization = "aion2flow.stream.20260705051242.log";
 }

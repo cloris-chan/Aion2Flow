@@ -17,14 +17,13 @@ public sealed class DomainEventApplier
     private readonly CombatStore _combat;
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery;
     private readonly PeriodicPoolCanonicalizer _periodicPool;
-    private readonly CompactActionDirectValueCanonicalizer _compactActionDirectValue;
+    private readonly CompactDirectValueCanonicalizer _compactDirectValue;
     private readonly OwnerTargetSummonResourceCanonicalizer _ownerTargetSummonResource;
     private readonly CompactAvoidanceCanonicalizer _compactAvoidance;
     private readonly TransientEffectOwnerTracker _transientEffectOwners;
     private readonly BossFocusStore _bossFocus;
-
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
-        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactActionDirectValueCanonicalizer(), new CompactAvoidanceCanonicalizer(), new TransientEffectOwnerTracker(), new BossFocusStore(entities))
+        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactDirectValueCanonicalizer(), new CompactAvoidanceCanonicalizer(), new TransientEffectOwnerTracker(), new BossFocusStore(entities))
     {
     }
 
@@ -33,7 +32,7 @@ public sealed class DomainEventApplier
     {
     }
 
-    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactActionDirectValueCanonicalizer compactActionDirectValue, CompactAvoidanceCanonicalizer compactAvoidance, TransientEffectOwnerTracker transientEffectOwners, BossFocusStore bossFocus)
+    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactDirectValueCanonicalizer compactDirectValue, CompactAvoidanceCanonicalizer compactAvoidance, TransientEffectOwnerTracker transientEffectOwners, BossFocusStore bossFocus)
     {
         _entities = entities;
         _boundary = boundary;
@@ -41,7 +40,7 @@ public sealed class DomainEventApplier
         _combat = combat;
         _systemPeriodicRecovery = systemPeriodicRecovery;
         _periodicPool = periodicPool;
-        _compactActionDirectValue = compactActionDirectValue;
+        _compactDirectValue = compactDirectValue;
         _ownerTargetSummonResource = new OwnerTargetSummonResourceCanonicalizer(entities);
         _compactAvoidance = compactAvoidance;
         _transientEffectOwners = transientEffectOwners;
@@ -58,23 +57,26 @@ public sealed class DomainEventApplier
     internal DomainEventApplierSnapshot CreateSnapshot() => new(
         _systemPeriodicRecovery.CreateSnapshot(),
         _periodicPool.CreateSnapshot(),
-        _compactActionDirectValue.CreateSnapshot(),
+        _compactDirectValue.CreateSnapshot(),
         _compactAvoidance.CreateSnapshot(),
         _transientEffectOwners.CreateSnapshot(),
         _bossFocus.CreateSnapshot());
 
     internal static DomainEventApplier FromSnapshot(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, DomainEventApplierSnapshot snapshot)
-        => new(
+    {
+        var applier = new DomainEventApplier(
             entities,
             boundary,
             metadataRegistry,
             combat,
             SystemPeriodicRecoveryCanonicalizer.FromSnapshot(snapshot.SystemPeriodicRecovery),
             PeriodicPoolCanonicalizer.FromSnapshot(snapshot.PeriodicPool),
-            CompactActionDirectValueCanonicalizer.FromSnapshot(snapshot.CompactActionDirectValue),
+            CompactDirectValueCanonicalizer.FromSnapshot(snapshot.CompactDirectValue),
             CompactAvoidanceCanonicalizer.FromSnapshot(snapshot.CompactAvoidance),
             TransientEffectOwnerTracker.FromSnapshot(snapshot.TransientEffectOwners),
             BossFocusStore.FromSnapshot(entities, snapshot.BossFocus));
+        return applier;
+    }
 
     public void ApplyJournal(ObservedEventJournal journal)
     {
@@ -126,82 +128,128 @@ public sealed class DomainEventApplier
         }
     }
 
-    public void CompleteBatch(long batchOrdinal)
+    public void CompleteFlush()
     {
-        foreach (var result in _compactActionDirectValue.CompleteBatch(batchOrdinal))
-            ApplyStampedCombatResult(in result);
-
-        foreach (var result in _compactAvoidance.CompleteBatch(batchOrdinal))
-            ApplyStampedCombatResult(in result);
+        FlushPendingOutcomeSidecars();
     }
 
-    public void FlushPendingOutcomeSidecars() => CompleteBatch(long.MaxValue);
+    public void FlushPendingOutcomeSidecars()
+    {
+        foreach (var result in _compactDirectValue.FlushPending())
+            ApplyStampedCombatResult(in result);
+
+        foreach (var result in _compactAvoidance.FlushPending())
+            ApplyStampedCombatResult(in result);
+    }
 
     private void ApplyCombat(in ObservedEventEnvelope entry, in CombatObservation combatObservation)
     {
         var stamp = entry.Stamp;
-        var structurePath = entry.Raw.StructurePath;
         var observedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         ObserveTransientEffectOwnerPacket(in entry, in combatObservation, observedAtMilliseconds);
         if (entry.Raw.Opcode == 0x0238)
-            ApplyStampedCombatResults(_compactActionDirectValue.ObserveCompactControl0238(entry.SourceEntityId, in combatObservation, in stamp, in structurePath));
+        {
+            var controlResults = _compactDirectValue.ObserveCompactControl0238(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw);
+            if (controlResults.Count > 0)
+            {
+                ApplyStampedCombatResults(controlResults);
+            }
+
+            return;
+        }
 
         if (entry.Raw.Opcode == 0x0638)
-            ApplyStampedCombatResults(_compactActionDirectValue.ObserveCompactControl0638(entry.SourceEntityId, in combatObservation, in stamp, in structurePath));
+        {
+            ApplyStampedCombatResults(in entry, _compactDirectValue.ObserveCompactControl0638(entry.SourceEntityId, in combatObservation));
+            return;
+        }
 
         if (entry.Raw.Opcode == 0x0438)
-            ApplyStampedCombatResults(_compactActionDirectValue.ObserveCompactValueSidecar0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath));
+        {
+            var sidecarResults = _compactDirectValue.ObserveCompactValueSidecar0438(entry.SourceEntityId, entry.TargetEntityId, in combatObservation);
+            if (sidecarResults.Count > 0)
+            {
+                ApplyStampedCombatResults(in entry, sidecarResults);
+            }
+        }
 
         if (entry.Raw.Opcode == 0x0438 &&
-            _compactActionDirectValue.TryObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, observedAtMilliseconds, out var actionResults))
+            _compactDirectValue.TryObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw, out var compactResults, out var compactHeader))
         {
-            ApplyStampedCombatResults(actionResults);
+            if (compactResults.Count == 0)
+                return;
+
+            if (compactHeader.HasHeader)
+            {
+                ApplyStampedCombatResults(compactResults);
+            }
+            else
+            {
+                ApplyStampedCombatResults(in entry, compactResults);
+            }
+
             return;
         }
 
         var rawResults = entry.Raw.Opcode switch
         {
-            0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, in structurePath, observedAtMilliseconds),
-            0x0238 => _compactAvoidance.AdvanceBatch(in stamp),
-            0x0638 => _compactAvoidance.AdvanceBatch(in stamp),
-            _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds)
+            0x0438 => _compactAvoidance.ObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw),
+            0x0238 => StampedCombatCanonicalizationBatch.Empty,
+            0x0638 => StampedCombatCanonicalizationBatch.Empty,
+            _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw)
         };
 
-        ApplyStampedCombatResults(rawResults);
+        ApplyStampedCombatResults(in entry, rawResults);
     }
 
     private void ApplyStampedCombatResults(StampedCombatCanonicalizationBatch results)
     {
+        if (results.Count == 0)
+            return;
+
         foreach (var result in results)
             ApplyStampedCombatResult(in result);
+    }
+
+    private void ApplyStampedCombatResults(in ObservedEventEnvelope entry, StampedCombatCanonicalizationBatch results)
+    {
+        if (results.Count == 0)
+            return;
+
+        ApplyStampedCombatResults(results);
     }
 
     private void ApplyStampedCombatResult(in StampedCombatCanonicalizationResult rawResult)
     {
         var observation = rawResult.Observation;
         var resultStamp = rawResult.Stamp;
-        var result = new CombatCanonicalizationResult(rawResult.SourceId, rawResult.TargetId, observation);
-        ApplyCanonicalizedCombatResult(in resultStamp, in result, rawResult.ObservedAtMilliseconds);
+        var result = new CombatCanonicalizationResult(rawResult.SourceId, rawResult.TargetId, observation, rawResult.Canonicalization);
+        ApplyCanonicalizedCombatResult(in resultStamp, in result, rawResult.ObservedAtMilliseconds, rawResult.Raw);
     }
 
-    private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds)
+    private void ApplyCanonicalizedCombatResult(in TimelineStamp stamp, in CombatCanonicalizationResult result, long observedAtMilliseconds, RawPacketReference raw)
     {
         var resultObservation = result.Observation;
         TryApplyTransientEffectOwner(result.SourceId, result.TargetId, in resultObservation, observedAtMilliseconds);
         var ownerTargetSummonResourceResult = _ownerTargetSummonResource.Normalize(result.SourceId, result.TargetId, in resultObservation);
+        var ownerTargetCanonicalization = result.Canonicalization | ownerTargetSummonResourceResult.Canonicalization;
         var observation = ownerTargetSummonResourceResult.Observation;
-        var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonResourceResult.SourceId, ownerTargetSummonResourceResult.TargetId, in stamp, in observation);
+        var systemRecoveryResult = _systemPeriodicRecovery.Normalize(ownerTargetSummonResourceResult.SourceId, ownerTargetSummonResourceResult.TargetId, in observation);
+        var systemRecoveryCanonicalization = ownerTargetCanonicalization | systemRecoveryResult.Canonicalization;
         var systemRecoveryObservation = systemRecoveryResult.Observation;
         foreach (var normalized in _periodicPool.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
-            ApplyCombatResult(in normalized, observedAtMilliseconds);
+        {
+            var final = normalized.WithCanonicalization(systemRecoveryCanonicalization);
+            ApplyCombatResult(in final, observedAtMilliseconds, stamp.ObservationOrdinal, raw);
+        }
     }
 
-    private void ApplyCombatResult(in CombatCanonicalizationResult result, long observedAtMilliseconds)
+    private void ApplyCombatResult(in CombatCanonicalizationResult result, long observedAtMilliseconds, long sourceObservationOrdinal, RawPacketReference raw)
     {
         var observation = result.Observation;
         _entities.ApplyCharacterClassEvidence(result.SourceId, in observation);
 
-        _combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds);
+        _combat.ApplyCombat(result.SourceId, result.TargetId, in observation, observedAtMilliseconds, sourceObservationOrdinal, raw, result.Canonicalization);
         TryApplyBossCombatActivity(result.SourceId, observedAtMilliseconds);
         TryApplyBossCombatActivity(result.TargetId, observedAtMilliseconds);
     }
@@ -461,7 +509,7 @@ public sealed class DomainEventApplier
 internal sealed record DomainEventApplierSnapshot(
     SystemPeriodicRecoveryCanonicalizerSnapshot SystemPeriodicRecovery,
     PeriodicPoolCanonicalizerSnapshot PeriodicPool,
-    CompactActionDirectValueCanonicalizerSnapshot CompactActionDirectValue,
+    CompactDirectValueCanonicalizerSnapshot CompactDirectValue,
     CompactAvoidanceCanonicalizerSnapshot CompactAvoidance,
     TransientEffectOwnerTrackerSnapshot TransientEffectOwners,
     BossFocusStoreSnapshot BossFocus);

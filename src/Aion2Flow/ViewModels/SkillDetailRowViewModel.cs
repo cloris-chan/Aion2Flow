@@ -4,10 +4,12 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
-    public SkillPresentationKey PresentationKey { get; set; }
+    public SkillBaseKey BaseKey { get; set; }
     public int SkillCode { get; set; }
     public string DisplayName { get; set => SetFrameProperty(ref field, value); } = string.Empty;
 
+    public int EventCount { get; set => SetFrameProperty(ref field, value); }
+    public bool IsSelected { get; set => SetFrameProperty(ref field, value); }
     public long TotalAmount { get; set => SetFrameProperty(ref field, value); }
     public long DirectAmount { get; set => SetFrameProperty(ref field, value); }
     public long PeriodicAmount { get; set => SetFrameProperty(ref field, value); }
@@ -49,28 +51,11 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
     public double InvincibleRate { get; set => SetFrameProperty(ref field, value); }
 
     public void ApplyFrom(in SkillDetailRowData data)
-        => ApplyFromCore(in data);
-
-    private void ApplyFromCore(in SkillDetailRowData data)
     {
-        var criticalRate = data.Hits > 0 ? data.Criticals / (double)data.Hits : 0d;
-        var backRate = data.Hits > 0 ? data.Back / (double)data.Hits : 0d;
-        var parryRate = data.Hits > 0 ? data.Parry / (double)data.Hits : 0d;
-        var perfectParryRate = data.Hits > 0 ? data.PerfectParry / (double)data.Hits : 0d;
-        var perfectRate = data.Hits > 0 ? data.Perfect / (double)data.Hits : 0d;
-        var smiteRate = data.Hits > 0 ? data.Smite / (double)data.Hits : 0d;
-        var multiHitRate = data.Hits > 0 ? data.MultiHit / (double)data.Hits : 0d;
-        var frontRate = data.Hits > 0 ? data.Front / (double)data.Hits : 0d;
-        var enduranceRate = data.Hits > 0 ? data.Endurance / (double)data.Hits : 0d;
-        var regenerationRate = data.Hits > 0 ? data.Regeneration / (double)data.Hits : 0d;
-        var blockRate = data.Hits > 0 ? data.Block / (double)data.Hits : 0d;
-        var perfectBlockRate = data.Hits > 0 ? data.PerfectBlock / (double)data.Hits : 0d;
-        var evadeRate = data.Attempts > 0 ? data.Evades / (double)data.Attempts : 0d;
-        var invincibleRate = data.Attempts > 0 ? data.Invincible / (double)data.Attempts : 0d;
-
-        PresentationKey = data.PresentationKey;
+        BaseKey = data.BaseKey;
         SkillCode = data.SkillCode;
         DisplayName = data.DisplayName;
+        EventCount = data.EventCount;
         TotalAmount = data.TotalAmount;
         DirectAmount = data.DirectAmount;
         PeriodicAmount = data.PeriodicAmount;
@@ -96,62 +81,67 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         Block = data.Block;
         PerfectBlock = data.PerfectBlock;
         SharePercent = data.SharePercent;
-        CriticalRate = criticalRate;
-        BackRate = backRate;
-        ParryRate = parryRate;
-        PerfectParryRate = perfectParryRate;
-        PerfectRate = perfectRate;
-        SmiteRate = smiteRate;
-        MultiHitRate = multiHitRate;
-        FrontRate = frontRate;
-        EnduranceRate = enduranceRate;
-        RegenerationRate = regenerationRate;
-        BlockRate = blockRate;
-        PerfectBlockRate = perfectBlockRate;
-        EvadeRate = evadeRate;
-        InvincibleRate = invincibleRate;
+        CriticalRate = data.Hits > 0 ? data.Criticals / (double)data.Hits : 0d;
+        BackRate = data.Hits > 0 ? data.Back / (double)data.Hits : 0d;
+        ParryRate = data.Hits > 0 ? data.Parry / (double)data.Hits : 0d;
+        PerfectParryRate = data.Hits > 0 ? data.PerfectParry / (double)data.Hits : 0d;
+        PerfectRate = data.Hits > 0 ? data.Perfect / (double)data.Hits : 0d;
+        SmiteRate = data.Hits > 0 ? data.Smite / (double)data.Hits : 0d;
+        MultiHitRate = data.Hits > 0 ? data.MultiHit / (double)data.Hits : 0d;
+        FrontRate = data.Hits > 0 ? data.Front / (double)data.Hits : 0d;
+        EnduranceRate = data.Hits > 0 ? data.Endurance / (double)data.Hits : 0d;
+        RegenerationRate = data.Hits > 0 ? data.Regeneration / (double)data.Hits : 0d;
+        BlockRate = data.Hits > 0 ? data.Block / (double)data.Hits : 0d;
+        PerfectBlockRate = data.Hits > 0 ? data.PerfectBlock / (double)data.Hits : 0d;
+        EvadeRate = data.Attempts > 0 ? data.Evades / (double)data.Attempts : 0d;
+        InvincibleRate = data.Attempts > 0 ? data.Invincible / (double)data.Attempts : 0d;
     }
 }
 
-public readonly record struct SkillPresentationKey(CombatActionKey ActionKey) : IComparable<SkillPresentationKey>
+public readonly record struct SkillBaseKey(CombatEventKey EventKey) : IComparable<SkillBaseKey>
 {
-    public int SkillCode => ActionKey.SkillCode;
+    public int SkillCode => EventKey.SkillCode;
 
-    public static SkillPresentationKey FromActionKey(CombatActionKey actionKey)
+    public static SkillBaseKey FromEventKey(CombatEventKey eventKey)
     {
-        var presentationSkillId = CombatResourceRegistry.ResolvePresentationSkillIdForCode(actionKey.SkillCode);
-        if (presentationSkillId <= 0 || presentationSkillId == actionKey.SkillCode)
-            return new SkillPresentationKey(actionKey);
+        if (!CombatResourceRegistry.TryResolveBaseSkillIdForEventKey(eventKey, out var baseSkillId))
+            return new SkillBaseKey(eventKey);
 
-        return new SkillPresentationKey(new CombatActionKey(presentationSkillId, default, default));
+        if (baseSkillId <= 0 ||
+            baseSkillId == eventKey.SkillCode &&
+            eventKey.BodyResourceEffectRef.IsEmpty &&
+            eventKey.DetailResourceEffectRef.IsEmpty)
+        {
+            return new SkillBaseKey(eventKey);
+        }
+
+        return new SkillBaseKey(new CombatEventKey(baseSkillId, default, default));
     }
 
-    public int CompareTo(SkillPresentationKey other) => ActionKey.CompareTo(other.ActionKey);
+    public int CompareTo(SkillBaseKey other) => EventKey.CompareTo(other.EventKey);
 }
 
-internal static class SkillDetailPresentationAggregator
+internal static class SkillDetailBaseAggregator
 {
-    public static void AddOrMerge(
-        List<SkillDetailRowData> rows,
-        Dictionary<SkillPresentationKey, int> rowIndexes,
-        in SkillDetailRowData row)
+    public static void AddOrMerge(List<SkillDetailRowData> rows, Dictionary<SkillBaseKey, int> rowIndexes, in SkillDetailRowData row)
     {
-        if (rowIndexes.TryGetValue(row.PresentationKey, out var index))
+        if (rowIndexes.TryGetValue(row.BaseKey, out var index))
         {
             System.Runtime.InteropServices.CollectionsMarshal.AsSpan(rows)[index].Merge(in row);
             return;
         }
 
-        rowIndexes.Add(row.PresentationKey, rows.Count);
+        rowIndexes.Add(row.BaseKey, rows.Count);
         rows.Add(row);
     }
 }
 
 public struct SkillDetailRowData
 {
-    public SkillPresentationKey PresentationKey;
+    public SkillBaseKey BaseKey;
     public int SkillCode;
     public string DisplayName;
+    public int EventCount;
     public long TotalAmount;
     public long DirectAmount;
     public long PeriodicAmount;
@@ -180,13 +170,14 @@ public struct SkillDetailRowData
 
     public void Merge(in SkillDetailRowData other)
     {
-        if (other.SkillCode == PresentationKey.SkillCode ||
-            SkillCode != PresentationKey.SkillCode && other.SkillCode < SkillCode)
+        if (other.SkillCode == BaseKey.SkillCode ||
+            SkillCode != BaseKey.SkillCode && other.SkillCode < SkillCode)
         {
             SkillCode = other.SkillCode;
             DisplayName = other.DisplayName;
         }
 
+        EventCount += other.EventCount;
         TotalAmount += other.TotalAmount;
         DirectAmount += other.DirectAmount;
         PeriodicAmount += other.PeriodicAmount;

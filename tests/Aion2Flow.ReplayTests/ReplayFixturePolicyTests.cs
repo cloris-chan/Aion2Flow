@@ -14,7 +14,9 @@ public sealed class ReplayFixturePolicyTests
             "Hex" + "Helper",
             "Fixture" + "Catalog",
             "From" + "Fixture",
-            "Convert." + "FromHexString"
+            "Convert." + "FromHexString",
+            "Without" + "PacketScopeOrSharedBatch",
+            "Without" + "ScopeOrBatch"
         };
 
         var sourceViolations = Directory

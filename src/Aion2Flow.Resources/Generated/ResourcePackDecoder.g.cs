@@ -7,5 +7,5 @@ internal static class ResourcePackDecoder
     public const ushort FormatVersion = 9;
     public const byte SharedPackKind = 1;
     public const byte LocalePackKind = 2;
-    public const byte StringMask = 0x50;
+    public const byte StringMask = 0xE6;
 }

@@ -45,8 +45,6 @@ public struct ParsedCombatPacket
     public long DetailRaw { get; set; }
     public ResourceEffectRef DetailResourceEffectRef { get; set; }
     public CombatResourceKind ResourceKind { get; set; } = CombatResourceKind.Unknown;
-    public long FrameOrdinal { get; set; }
-    public long BatchOrdinal { get; set; }
     public long Timestamp { get; init; } = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     public Guid Id { get; init; } = Guid.CreateVersion7();
     public DamageModifiers Modifiers { get; set; }
@@ -123,7 +121,7 @@ public struct ParsedCombatPacket
         ChainId = Unknown
     };
 
-    public static ParsedCombatPacket FromObservation(int sourceId, int targetId, in CombatObservation observation, long timestamp = 0, long frameOrdinal = 0, long batchOrdinal = 0) => new()
+    public static ParsedCombatPacket FromObservation(int sourceId, int targetId, in CombatObservation observation, long timestamp = 0) => new()
     {
         SourceId = sourceId,
         TargetId = targetId,
@@ -155,9 +153,7 @@ public struct ParsedCombatPacket
         PeriodicTailSkillCodeRaw = observation.PeriodicTailSkillCodeRaw,
         PeriodicTailPrefixValue = observation.PeriodicTailPrefixValue,
         PeriodicTailLength = observation.PeriodicTailLength,
-        Timestamp = timestamp,
-        FrameOrdinal = frameOrdinal,
-        BatchOrdinal = batchOrdinal
+        Timestamp = timestamp
     };
 
     internal readonly string FormatEffectLabel()

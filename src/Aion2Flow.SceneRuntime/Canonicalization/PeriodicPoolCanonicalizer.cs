@@ -78,7 +78,7 @@ public sealed class PeriodicPoolCanonicalizer
             HitCount = 0,
             AttemptCount = 0
         };
-        return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized));
+        return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, normalized, CombatContributionCanonicalization.PeriodicStandaloneDamage));
     }
 
     private static bool IsStandaloneMode10DamagePacket(int sourceId, int targetId, in CombatObservation observation) =>
@@ -111,7 +111,7 @@ public sealed class PeriodicPoolCanonicalizer
                 Damage = emittedValue,
                 EventKind = CombatEventKind.Healing,
                 ValueKind = CombatValueKind.PeriodicHealing
-            }));
+            }, CombatContributionCanonicalization.PeriodicContinuationHealing));
 
         return ApplyShieldAbsorb(targetId, key, state, observation with { Damage = emittedValue });
     }
@@ -121,7 +121,7 @@ public sealed class PeriodicPoolCanonicalizer
         if (emittedValue <= 0)
             return CombatCanonicalizationBatch.Empty;
 
-        return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, observation with { Damage = emittedValue }));
+        return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(sourceId, targetId, observation with { Damage = emittedValue }, CombatContributionCanonicalization.PeriodicStandaloneContinuation));
     }
 
     private CombatCanonicalizationBatch ApplyShieldAbsorb(int targetId, Key key, RemainingValueState state, in CombatObservation observation)
@@ -131,7 +131,7 @@ public sealed class PeriodicPoolCanonicalizer
             EventKind = CombatEventKind.Support,
             ValueKind = CombatValueKind.Shield,
             EffectTag = PacketEffectTag.ShieldAbsorbed
-        });
+        }, CombatContributionCanonicalization.PeriodicShieldAbsorbed);
 
         if (state.ShieldGrantEmitted)
             return CombatCanonicalizationBatch.One(absorbedResult);
@@ -143,7 +143,7 @@ public sealed class PeriodicPoolCanonicalizer
             ValueKind = CombatValueKind.Shield,
             EffectTag = PacketEffectTag.ShieldGrant
         };
-        return CombatCanonicalizationBatch.Two(new CombatCanonicalizationResult(state.GrantSourceId, state.GrantTargetId, grant), absorbedResult);
+        return CombatCanonicalizationBatch.Two(new CombatCanonicalizationResult(state.GrantSourceId, state.GrantTargetId, grant, CombatContributionCanonicalization.PeriodicShieldGrant), absorbedResult);
     }
 
     private static CombatObservation NormalizeBaseObservation(int sourceId, int targetId, in CombatObservation observation) => CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
@@ -157,7 +157,15 @@ internal sealed record PeriodicPoolCanonicalizerSnapshot(PeriodicPoolCanonicaliz
 
 internal readonly record struct PeriodicPoolCanonicalizerStateSnapshot(int TargetId, int ChainId, int SkillIdentityCode, long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatObservation Grant, bool ShieldGrantEmitted);
 
-public readonly record struct CombatCanonicalizationResult(int SourceId, int TargetId, CombatObservation Observation);
+public readonly record struct CombatCanonicalizationResult(int SourceId, int TargetId, CombatObservation Observation, CombatContributionCanonicalization Canonicalization)
+{
+    public CombatCanonicalizationResult(int sourceId, int targetId, CombatObservation observation)
+        : this(sourceId, targetId, observation, CombatContributionCanonicalization.None)
+    {
+    }
+
+    public CombatCanonicalizationResult WithCanonicalization(CombatContributionCanonicalization canonicalization) => this with { Canonicalization = Canonicalization | canonicalization };
+}
 
 public readonly struct CombatCanonicalizationBatch
 {

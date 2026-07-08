@@ -4,5 +4,5 @@ public interface IObservedEventSink
 {
     void Append(in ObservedEventEnvelope observation);
 
-    void CompleteBatch(long batchOrdinal);
+    void CompleteFlush(long flushId);
 }

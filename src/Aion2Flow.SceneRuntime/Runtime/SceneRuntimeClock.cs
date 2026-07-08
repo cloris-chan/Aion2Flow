@@ -12,7 +12,7 @@ public sealed class SceneRuntimeClock(long sceneStartedAtMilliseconds)
 
     public void Reset(DateTimeOffset sceneStartedAt) => Volatile.Write(ref _sceneStartedAtMilliseconds, sceneStartedAt.ToUnixTimeMilliseconds());
 
-    public TimelineStamp CreateStamp(long captureTimestampMilliseconds, long frameOrdinal, long batchOrdinal)
+    public TimelineStamp CreateStamp(long captureTimestampMilliseconds, long flushId)
     {
         var offsetMilliseconds = captureTimestampMilliseconds - Volatile.Read(ref _sceneStartedAtMilliseconds);
         var offsetTicks = Math.Max(0, offsetMilliseconds) * TimeSpan.TicksPerMillisecond;
@@ -21,8 +21,7 @@ public sealed class SceneRuntimeClock(long sceneStartedAtMilliseconds)
         {
             OffsetTicks = offsetTicks,
             ObservationOrdinal = Interlocked.Increment(ref _nextObservationOrdinal) - 1,
-            FrameOrdinal = frameOrdinal,
-            BatchOrdinal = batchOrdinal
+            FlushId = flushId
         };
     }
 

@@ -157,6 +157,22 @@
   <data name="Column_Skill" xml:space="preserve"><value>技能</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>直擊</value></data>
   <data name="Column_Share" xml:space="preserve"><value>佔比</value></data>
+  <data name="Column_Events" xml:space="preserve"><value>事件</value></data>
+  <data name="Column_Action" xml:space="preserve"><value>動作</value></data>
+  <data name="Column_Index" xml:space="preserve"><value>序號</value></data>
+  <data name="Column_Header" xml:space="preserve"><value>起始</value></data>
+  <data name="Column_Evidence" xml:space="preserve"><value>證據</value></data>
+  <data name="Column_Route" xml:space="preserve"><value>路徑</value></data>
+  <data name="Column_Opcode" xml:space="preserve"><value>Opcode</value></data>
+  <data name="Column_Opcodes" xml:space="preserve"><value>Opcode</value></data>
+  <data name="Column_HeaderPacket" xml:space="preserve"><value>起始封包</value></data>
+  <data name="Column_Packet" xml:space="preserve"><value>封包</value></data>
+  <data name="Column_Source" xml:space="preserve"><value>來源</value></data>
+  <data name="Column_Target" xml:space="preserve"><value>目標</value></data>
+  <data name="Column_Time" xml:space="preserve"><value>時間</value></data>
+  <data name="Column_Value" xml:space="preserve"><value>類型</value></data>
+  <data name="Column_Effect" xml:space="preserve"><value>效果</value></data>
+  <data name="Column_Canonicalization" xml:space="preserve"><value>校正</value></data>
   <data name="Settings_CombatantSortMetric" xml:space="preserve"><value>排序依據</value></data>
   <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
   <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>總傷害</value></data>

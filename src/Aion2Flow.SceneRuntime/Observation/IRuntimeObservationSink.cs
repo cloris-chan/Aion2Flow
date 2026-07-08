@@ -42,7 +42,7 @@ public interface IRuntimeObservationSink
 
     void AppendCombatObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatObservation observation);
 
-    void CompleteBatch(long batchOrdinal);
+    void CompleteFlush(long flushId);
 
     void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type);
 

@@ -9,16 +9,16 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
     private const int MaxDecompressedSize = 4 * 1024 * 1024;
     private const int MaxRetainedDecompressionBufferSize = 512 * 1024;
     private readonly SceneObservationWriter _writer = new(sink);
-    private readonly PacketOrdinalState _ordinals = new();
+    private readonly PacketFlushState _flushState = new();
     private byte[]? _decompressionBuffer;
 
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
 
-    public long CurrentAppendBatchOrdinal => _ordinals.CurrentAppendBatchOrdinal;
+    public long CurrentAppendFlushId => _flushState.CurrentAppendFlushId;
 
-    public long BeginAppendBatch() => _ordinals.BeginAppendBatch();
+    public long BeginAppendFlush() => _flushState.BeginAppendFlush();
 
-    public void EndAppendBatch(long previous) => _ordinals.EndAppendBatch(previous);
+    public void EndAppendFlush(long previous) => _flushState.EndAppendFlush(previous);
 
     public void Dispose()
     {
@@ -31,7 +31,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
 
     public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, long timestampMilliseconds)
     {
-        var context = new PacketParseContext(sink, _writer, _ordinals, connection, timestampMilliseconds);
+        var context = new PacketParseContext(sink, _writer, _flushState, connection, timestampMilliseconds);
         var previous = context.EnterStructure(PacketStructureKind.TransportPacket, 0, packet.Length, 0, packet.Length, 0);
         try
         {
@@ -179,7 +179,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
             return false;
         }
 
-        var previousBatchOrdinal = _ordinals.BeginFrameBatch();
+        var previousFlushId = _flushState.BeginFrameFlush();
         var offset = 0;
         var siblingIndex = 0;
 
@@ -235,7 +235,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
         }
         finally
         {
-            _ordinals.EndFrameBatch(previousBatchOrdinal);
+            _flushState.EndFrameFlush(previousFlushId);
         }
     }
 
@@ -422,7 +422,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
 
     private bool ParseFramePayload(ReadOnlySpan<byte> payload, ref PacketParseContext context)
     {
-        var (Frame, Batch) = _ordinals.BeginFramePayload();
+        var previousFlushId = _flushState.BeginFramePayload();
 
         try
         {
@@ -430,7 +430,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
         }
         finally
         {
-            _ordinals.EndFramePayload(Frame, Batch);
+            _flushState.EndFramePayload(previousFlushId);
         }
     }
 

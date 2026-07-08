@@ -130,9 +130,9 @@ public sealed class SkillIdentitySceneTests
             new SkillDisplayEntry(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc"),
             new SkillDisplayEntry(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc"),
             new SkillDisplayEntry(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc")
-        ], new Dictionary<int, NpcDisplayEntry>(), new Dictionary<int, SkillDisplayProjection>
+        ], new Dictionary<int, NpcDisplayEntry>(), new Dictionary<int, SkillBaseProjection>
         {
-            [12240039] = new(12240039, 12240000, 12240030, 12240000)
+            [12240039] = new(12240039, 12240000)
         });
 
         using var scene = new SceneTestHarness();
@@ -314,10 +314,10 @@ public sealed class SkillIdentitySceneTests
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out _));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         var entry = Assert.Single(skills.AsSpan().ToArray());
-        Assert.Equal(new CombatActionKey(0, body, detail), entry.ActionKey);
+        Assert.Equal(new CombatEventKey(0, body, detail), entry.EventKey);
         Assert.Equal(0, entry.Metrics.SkillCode);
         Assert.Equal(2000, entry.Metrics.DamageAmount);
-        Assert.Equal("Unknown effect B:1700000011 D:1700000012", entry.ActionKey.FormatFallbackLabel());
+        Assert.Equal("Unknown effect B:1700000011 D:1700000012", entry.EventKey.FormatFallbackLabel());
     }
 
     [Fact]
@@ -332,7 +332,7 @@ public sealed class SkillIdentitySceneTests
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
         const int sourceId = 100;
         const int targetId = 200;
-        var source = new PacketObservationSource(1_000, 0, 1, 0x0438, 16, 0, default);
+        var source = new PacketObservationSource(1_000, 1, 0x0438, 16, 0, default);
 
         sink.RegisterCompactValue0438(in source, targetId, sourceId, 1218810, 3, 0, 1);
 
@@ -351,7 +351,7 @@ public sealed class SkillIdentitySceneTests
     {
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
-        var source = new PacketObservationSource(1_000, 0, 1, 0x0238, 16, 0, default);
+        var source = new PacketObservationSource(1_000, 1, 0x0238, 16, 0, default);
 
         sink.RegisterCompactControl0238(in source, 100, 0, 30011101, 3, 0, 100);
 
@@ -369,7 +369,7 @@ public sealed class SkillIdentitySceneTests
     {
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
-        var source = new PacketObservationSource(1_000, 0, 1, 0x0638, 16, 0, default);
+        var source = new PacketObservationSource(1_000, 1, 0x0638, 16, 0, default);
         var effectRef = ResourceEffectRef.FromRaw(30011101);
 
         sink.RegisterCompactControl0638(in source, 100, effectRef, 3, 0);

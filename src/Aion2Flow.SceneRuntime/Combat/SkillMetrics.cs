@@ -4,13 +4,27 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
-public struct SkillMetrics(in CombatObservation observation)
+public struct SkillMetrics
 {
-    private readonly CombatValueKind _primaryValueKind = observation.ValueKind;
+    private readonly CombatValueKind _primaryValueKind;
 
-    public CombatActionKey ActionKey { get; private set; } = CombatActionKey.FromObservation(in observation);
-    public int SkillCode { get; private set; } = observation.SkillCode;
-    public CombatEventKind EventKind { get; private set; } = observation.EventKind;
+    public SkillMetrics(in CombatObservation observation)
+        : this(CombatEventKey.FromObservation(in observation), in observation)
+    {
+    }
+
+    public SkillMetrics(CombatEventKey eventKey, in CombatObservation observation)
+        : this()
+    {
+        _primaryValueKind = observation.ValueKind;
+        EventKey = eventKey;
+        SkillCode = observation.SkillCode;
+        EventKind = observation.EventKind;
+    }
+
+    public CombatEventKey EventKey { get; private set; }
+    public int SkillCode { get; private set; }
+    public CombatEventKind EventKind { get; private set; }
     public readonly CombatValueKind PrimaryValueKind => ResolvePrimaryValueKind();
     public long DamageAmount { get; set; }
     public long PeriodicDamageAmount { get; set; }
@@ -51,7 +65,7 @@ public struct SkillMetrics(in CombatObservation observation)
     {
         return new SkillMetricsSnapshot
         {
-            ActionKey = ActionKey,
+            EventKey = EventKey,
             SkillCode = SkillCode,
             EventKind = EventKind,
             PrimaryValueKind = PrimaryValueKind,
@@ -119,8 +133,11 @@ public struct SkillMetrics(in CombatObservation observation)
     public void ProcessObservation(in CombatObservation observation)
     {
         var contribution = CombatContributionClassifier.Evaluate(in observation);
-        ProcessCore(observation.EventKind, observation.ValueKind, observation.EffectTag, observation.Modifiers, observation.Damage, in contribution);
+        ProcessContribution(in observation, in contribution);
     }
+
+    public void ProcessContribution(in CombatObservation observation, in CombatContribution contribution) =>
+        ProcessCore(observation.EventKind, observation.ValueKind, observation.EffectTag, observation.Modifiers, observation.Damage, in contribution);
 
     private void ProcessCore(CombatEventKind eventKind, CombatValueKind valueKind, PacketEffectTag effectTag, DamageModifiers modifiers, long damage, in CombatContribution contribution)
     {
@@ -268,7 +285,7 @@ public struct SkillMetrics(in CombatObservation observation)
 }
 
 public readonly record struct SkillMetricsSnapshot(
-    CombatActionKey ActionKey,
+    CombatEventKey EventKey,
     int SkillCode,
     CombatEventKind EventKind,
     CombatValueKind PrimaryValueKind,
@@ -307,13 +324,13 @@ public readonly record struct SkillMetricsSnapshot(
     int EnduranceTimes,
     int RegenerationTimes);
 
-public readonly record struct SkillMetricsSnapshotEntry(CombatActionKey ActionKey, SkillMetricsSnapshot Metrics)
+public readonly record struct SkillMetricsSnapshotEntry(CombatEventKey EventKey, SkillMetricsSnapshot Metrics)
 {
-    public int SkillCode => ActionKey.SkillCode;
+    public int SkillCode => EventKey.SkillCode;
 
-    public void Deconstruct(out CombatActionKey actionKey, out SkillMetricsSnapshot metrics)
+    public void Deconstruct(out CombatEventKey eventKey, out SkillMetricsSnapshot metrics)
     {
-        actionKey = ActionKey;
+        eventKey = EventKey;
         metrics = Metrics;
     }
 }
@@ -331,7 +348,7 @@ public readonly struct CombatSkillBreakdownSnapshot
 
     public SkillMetricsSnapshotMap Skills { get; }
 
-    internal static CombatSkillBreakdownSnapshot From(Dictionary<CombatActionKey, SkillMetrics> metrics)
+    internal static CombatSkillBreakdownSnapshot From(Dictionary<CombatEventKey, SkillMetrics> metrics)
     {
         if (metrics.Count == 0)
         {
@@ -340,18 +357,18 @@ public readonly struct CombatSkillBreakdownSnapshot
 
         var entries = new SkillMetricsSnapshotEntry[metrics.Count];
         var index = 0;
-        foreach (var (actionKey, skillMetrics) in metrics)
+        foreach (var (eventKey, skillMetrics) in metrics)
         {
-            entries[index++] = new SkillMetricsSnapshotEntry(actionKey, skillMetrics.ToSnapshot());
+            entries[index++] = new SkillMetricsSnapshotEntry(eventKey, skillMetrics.ToSnapshot());
         }
 
-        Array.Sort(entries, static (left, right) => left.ActionKey.CompareTo(right.ActionKey));
+        Array.Sort(entries, static (left, right) => left.EventKey.CompareTo(right.EventKey));
         return new CombatSkillBreakdownSnapshot(entries);
     }
 
 }
 
-public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActionKey, SkillMetricsSnapshot>
+public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatEventKey, SkillMetricsSnapshot>
 {
     private readonly SkillMetricsSnapshotEntry[]? _entries;
 
@@ -366,13 +383,13 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
 
     public ValueCollection Values => new(_entries);
 
-    IEnumerable<CombatActionKey> IReadOnlyDictionary<CombatActionKey, SkillMetricsSnapshot>.Keys => Keys;
+    IEnumerable<CombatEventKey> IReadOnlyDictionary<CombatEventKey, SkillMetricsSnapshot>.Keys => Keys;
 
-    IEnumerable<SkillMetricsSnapshot> IReadOnlyDictionary<CombatActionKey, SkillMetricsSnapshot>.Values => Values;
+    IEnumerable<SkillMetricsSnapshot> IReadOnlyDictionary<CombatEventKey, SkillMetricsSnapshot>.Values => Values;
 
     private ReadOnlySpan<SkillMetricsSnapshotEntry> Entries => _entries ?? [];
 
-    public SkillMetricsSnapshot this[CombatActionKey key]
+    public SkillMetricsSnapshot this[CombatEventKey key]
     {
         get
         {
@@ -385,12 +402,12 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
         }
     }
 
-    public bool ContainsKey(CombatActionKey key)
+    public bool ContainsKey(CombatEventKey key)
     {
         return FindIndex(key) >= 0;
     }
 
-    public bool TryGetValue(CombatActionKey key, out SkillMetricsSnapshot value)
+    public bool TryGetValue(CombatEventKey key, out SkillMetricsSnapshot value)
     {
         var index = FindIndex(key);
         if (index >= 0)
@@ -413,7 +430,7 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
     public bool TryGetBySkillCode(int skillCode, out SkillMetricsSnapshot value)
     {
         if (skillCode > 0)
-            return TryGetValue(new CombatActionKey(skillCode, default, default), out value);
+            return TryGetValue(new CombatEventKey(skillCode, default, default), out value);
 
         value = default;
         return false;
@@ -424,22 +441,22 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
         return new Enumerator(_entries);
     }
 
-    IEnumerator<KeyValuePair<CombatActionKey, SkillMetricsSnapshot>> IEnumerable<KeyValuePair<CombatActionKey, SkillMetricsSnapshot>>.GetEnumerator()
+    IEnumerator<KeyValuePair<CombatEventKey, SkillMetricsSnapshot>> IEnumerable<KeyValuePair<CombatEventKey, SkillMetricsSnapshot>>.GetEnumerator()
     {
         var entries = _entries ?? [];
         for (var i = 0; i < entries.Length; i++)
         {
             var entry = entries[i];
-            yield return new KeyValuePair<CombatActionKey, SkillMetricsSnapshot>(entry.ActionKey, entry.Metrics);
+            yield return new KeyValuePair<CombatEventKey, SkillMetricsSnapshot>(entry.EventKey, entry.Metrics);
         }
     }
 
     IEnumerator IEnumerable.GetEnumerator()
     {
-        return ((IEnumerable<KeyValuePair<CombatActionKey, SkillMetricsSnapshot>>)this).GetEnumerator();
+        return ((IEnumerable<KeyValuePair<CombatEventKey, SkillMetricsSnapshot>>)this).GetEnumerator();
     }
 
-    private int FindIndex(CombatActionKey key)
+    private int FindIndex(CombatEventKey key)
     {
         var entries = Entries;
         var low = 0;
@@ -448,7 +465,7 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
         while (low <= high)
         {
             var mid = low + ((high - low) >> 1);
-            var midKey = entries[mid].ActionKey;
+            var midKey = entries[mid].EventKey;
             var cmp = midKey.CompareTo(key);
             if (cmp == 0)
             {
@@ -497,7 +514,7 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
         }
     }
 
-    public readonly struct KeyCollection : IReadOnlyCollection<CombatActionKey>
+    public readonly struct KeyCollection : IReadOnlyCollection<CombatEventKey>
     {
         private readonly SkillMetricsSnapshotEntry[]? _entries;
 
@@ -513,18 +530,18 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
             return new Enumerator(_entries);
         }
 
-        IEnumerator<CombatActionKey> IEnumerable<CombatActionKey>.GetEnumerator()
+        IEnumerator<CombatEventKey> IEnumerable<CombatEventKey>.GetEnumerator()
         {
             var entries = _entries ?? [];
             for (var i = 0; i < entries.Length; i++)
             {
-                yield return entries[i].ActionKey;
+                yield return entries[i].EventKey;
             }
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable<CombatActionKey>)this).GetEnumerator();
+            return ((IEnumerable<CombatEventKey>)this).GetEnumerator();
         }
 
         public struct Enumerator
@@ -539,7 +556,7 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
                 Current = default;
             }
 
-            public CombatActionKey Current { get; private set; }
+            public CombatEventKey Current { get; private set; }
 
             public bool MoveNext()
             {
@@ -551,7 +568,7 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatActio
                 }
 
                 _index = next;
-                Current = entries[next].ActionKey;
+                Current = entries[next].EventKey;
                 return true;
             }
         }

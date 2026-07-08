@@ -12,10 +12,10 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     private readonly ObservedEventJournal journal;
     private readonly SceneRuntimeClock clock;
     private readonly Func<Guid> sceneSessionId;
-    private readonly Func<long>? nextBatchOrdinal;
+    private readonly Func<long>? nextFlushId;
     private readonly ILiveSceneCollectionPolicy? collectionPolicy;
     private readonly LifecycleRemapService _lifecycle = new();
-    private readonly Dictionary<long, long> _mappedBatchOrdinals = [];
+    private readonly Dictionary<long, long> _mappedFlushIds = [];
     private readonly Dictionary<int, RuntimeNpcState> _npcStates = [];
     private readonly HashSet<int> _knownEntities = [];
     private readonly Dictionary<int, int> _summonOwnerByInstance = [];
@@ -24,17 +24,17 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     {
     }
 
-    public JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextBatchOrdinal = null)
-        : this(journal, clock, sceneSessionId, nextBatchOrdinal, null)
+    public JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextFlushId = null)
+        : this(journal, clock, sceneSessionId, nextFlushId, null)
     {
     }
 
-    internal JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextBatchOrdinal, ILiveSceneCollectionPolicy? collectionPolicy)
+    internal JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextFlushId, ILiveSceneCollectionPolicy? collectionPolicy)
     {
         this.journal = journal;
         this.clock = clock;
         this.sceneSessionId = sceneSessionId;
-        this.nextBatchOrdinal = nextBatchOrdinal;
+        this.nextFlushId = nextFlushId;
         this.collectionPolicy = collectionPolicy;
     }
 
@@ -290,7 +290,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         });
     }
 
-    public void CompleteBatch(long batchOrdinal) => journal.CompleteBatch(MapBatchOrdinal(batchOrdinal));
+    public void CompleteFlush(long flushId) => journal.CompleteFlush(MapFlushId(flushId));
 
     public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type)
     {
@@ -946,21 +946,21 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         });
     }
 
-    private long MapBatchOrdinal(long batchOrdinal)
+    private long MapFlushId(long flushId)
     {
-        if (nextBatchOrdinal is null || batchOrdinal <= 0)
-            return batchOrdinal;
+        if (nextFlushId is null || flushId <= 0)
+            return flushId;
 
-        if (_mappedBatchOrdinals.TryGetValue(batchOrdinal, out var mapped))
+        if (_mappedFlushIds.TryGetValue(flushId, out var mapped))
             return mapped;
 
-        mapped = nextBatchOrdinal();
-        _mappedBatchOrdinals[batchOrdinal] = mapped;
+        mapped = nextFlushId();
+        _mappedFlushIds[flushId] = mapped;
         return mapped;
     }
 
     private TimelineStamp CreateStamp(in PacketObservationSource packet)
-        => clock.CreateStamp(packet.CaptureTimestampMilliseconds, packet.FrameOrdinal, MapBatchOrdinal(packet.BatchOrdinal));
+        => clock.CreateStamp(packet.CaptureTimestampMilliseconds, MapFlushId(packet.FlushId));
 
     private long ResolvePacketOffsetMilliseconds(in PacketObservationSource packet) =>
         Math.Max(0, packet.CaptureTimestampMilliseconds - clock.SceneStartedAtMilliseconds);

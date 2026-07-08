@@ -9,7 +9,7 @@ public sealed class ObservedEventJournal(int capacity = 0)
     private readonly List<ObservedEventEnvelope> _entries = capacity > 0 ? new(capacity) : [];
     private long _firstObservationOrdinal = 0;
     private long _nextObservationOrdinal;
-    private long _lastCompletedBatchOrdinal = -1;
+    private long _lastCompletedFlushId = -1;
 
     public int Count
     {
@@ -26,9 +26,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
         get { lock (_gate) return _nextObservationOrdinal; }
     }
 
-    public long LastCompletedBatchOrdinal
+    public long LastCompletedFlushId
     {
-        get { lock (_gate) return _lastCompletedBatchOrdinal; }
+        get { lock (_gate) return _lastCompletedFlushId; }
     }
 
     public static ObservedEventJournal FromEntries(IReadOnlyList<ObservedEventEnvelope> entries)
@@ -41,7 +41,7 @@ public sealed class ObservedEventJournal(int capacity = 0)
 
         journal._firstObservationOrdinal = entries[0].Stamp.ObservationOrdinal;
         journal._nextObservationOrdinal = journal._firstObservationOrdinal;
-        var lastBatchOrdinal = -1L;
+        var lastFlushId = -1L;
         for (var i = 0; i < entries.Count; i++)
         {
             var entry = entries[i];
@@ -50,10 +50,10 @@ public sealed class ObservedEventJournal(int capacity = 0)
 
             journal._entries.Add(entry);
             journal._nextObservationOrdinal++;
-            lastBatchOrdinal = Math.Max(lastBatchOrdinal, entry.Stamp.BatchOrdinal);
+            lastFlushId = Math.Max(lastFlushId, entry.Stamp.FlushId);
         }
 
-        journal._lastCompletedBatchOrdinal = lastBatchOrdinal;
+        journal._lastCompletedFlushId = lastFlushId;
         return journal;
     }
 
@@ -79,15 +79,15 @@ public sealed class ObservedEventJournal(int capacity = 0)
             _entries.EnsureCapacity(capacity);
     }
 
-    public void CompleteBatch(long batchOrdinal)
+    public void CompleteFlush(long flushId)
     {
         lock (_gate)
         {
-            if (batchOrdinal <= _lastCompletedBatchOrdinal)
+            if (flushId <= _lastCompletedFlushId)
                 throw new ArgumentException(
-                    $"BatchOrdinal must be > {_lastCompletedBatchOrdinal}, " +
-                    $"got {batchOrdinal}.");
-            _lastCompletedBatchOrdinal = batchOrdinal;
+                    $"FlushId must be > {_lastCompletedFlushId}, " +
+                    $"got {flushId}.");
+            _lastCompletedFlushId = flushId;
         }
     }
 
@@ -103,6 +103,22 @@ public sealed class ObservedEventJournal(int capacity = 0)
             if (index >= _entries.Count || _entries[index].Stamp.ObservationOrdinal != observationOrdinal)
                 throw new ArgumentOutOfRangeException(nameof(observationOrdinal));
             return _entries[index];
+        }
+    }
+
+    public bool TryRead(long observationOrdinal, out ObservedEventEnvelope observedEvent)
+    {
+        lock (_gate)
+        {
+            var index = FindPosition(observationOrdinal);
+            if (index >= _entries.Count || _entries[index].Stamp.ObservationOrdinal != observationOrdinal)
+            {
+                observedEvent = default;
+                return false;
+            }
+
+            observedEvent = _entries[index];
+            return true;
         }
     }
 

@@ -27,7 +27,7 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
 
     private bool AppendAndProcessCore(ReadOnlySpan<byte> payload, in TcpConnection connection, long captureTimestampMilliseconds)
     {
-        var previousAppendBatchOrdinal = _parser.BeginAppendBatch();
+        var previousAppendFlushId = _parser.BeginAppendFlush();
 
         try
         {
@@ -64,14 +64,14 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
             }
             else
             {
-                sink.CompleteBatch(_parser.CurrentAppendBatchOrdinal);
+                sink.CompleteFlush(_parser.CurrentAppendFlushId);
             }
 
             return hasParsed;
         }
         finally
         {
-            _parser.EndAppendBatch(previousAppendBatchOrdinal);
+            _parser.EndAppendFlush(previousAppendFlushId);
         }
     }
 

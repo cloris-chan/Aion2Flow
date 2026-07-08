@@ -3,6 +3,7 @@
              xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
              xmlns:conv="clr-namespace:Cloris.Aion2Flow.Converters"
              xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
+             xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.CombatDirectionDetailView"
              x:DataType="vm:CombatDirectionDetailViewModel">
@@ -274,13 +275,19 @@
                                     <TextBlock Grid.Column="20"
                                                Classes="DetailTableHeader"
                                                Text="{markups:Translate Stat_Invincible}" />
+                                    <TextBlock Grid.Column="21"
+                                               Classes="DetailTableHeader"
+                                               Text="{markups:Translate Column_Events}" />
                                 </Grid>
                             </Border>
 
-                            <ItemsControl ItemsSource="{Binding DamageSection.Rows}">
+                            <ItemsControl x:Name="DamageRows"
+                                          ItemsSource="{Binding DamageSection.Rows}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-                                        <Border Classes="DetailTableRow">
+                                        <Border Classes="DetailTableRow SelectableDetailTableRow"
+                                                Classes.selected="{Binding IsSelected}"
+                                                Tapped="SkillDetailRowTapped">
                                             <Grid ColumnSpacing="4">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" SharedSizeGroup="DamageSkillName" />
@@ -307,7 +314,7 @@
                                                     <ColumnDefinition Width="86" />
                                                 </Grid.ColumnDefinitions>
                                                 <controls:FractionalProgressBar Grid.Column="0"
-                                                                                Grid.ColumnSpan="21"
+                                                                                Grid.ColumnSpan="22"
                                                                                 Classes="DetailDamageShareBackground"
                                                                                 Value="{Binding SharePercent}" />
                                                 <controls:SegmentedTableSeparator Grid.Column="0"
@@ -481,12 +488,14 @@
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
                                                                        Value="{Binding InvincibleRate}" />
                                             </StackPanel>
+                                            <controls:NumericBlock Grid.Column="21"
+                                                                   Classes="DetailRowValue"
+                                                                   Value="{Binding EventCount}" />
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-
                             <TextBlock Classes="OverlayMutedText"
                                        Text="{markups:Translate Empty_Skills}"
                                        IsVisible="{Binding DamageSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
@@ -645,9 +654,10 @@
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="80" />
                                             <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="72" />
                                         </Grid.ColumnDefinitions>
                                         <controls:SegmentedTableSeparator Grid.Column="0"
-                                                                          Grid.ColumnSpan="8"
+                                                                          Grid.ColumnSpan="9"
                                                                           LineBrush="{StaticResource OverlayBrush.DetailHudLineSoft}"
                                                                           Classes="DetailTableHeaderSeparator" />
                                         <TextBlock Grid.Column="0"
@@ -674,13 +684,19 @@
                                         <TextBlock Grid.Column="7"
                                                    Classes="DetailTableHeader"
                                                    Text="{markups:Translate Column_Share}" />
+                                        <TextBlock Grid.Column="8"
+                                                   Classes="DetailTableHeader"
+                                                   Text="{markups:Translate Column_Events}" />
                                     </Grid>
                                 </Border>
 
-                                <ItemsControl ItemsSource="{Binding HealingSection.Rows}">
+                                <ItemsControl x:Name="HealingRows"
+                                              ItemsSource="{Binding HealingSection.Rows}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-                                            <Border Classes="DetailTableRow">
+                                            <Border Classes="DetailTableRow SelectableDetailTableRow"
+                                                    Classes.selected="{Binding IsSelected}"
+                                                    Tapped="SkillDetailRowTapped">
                                                 <Grid ColumnSpacing="4">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" SharedSizeGroup="HealingSkillName" />
@@ -691,9 +707,10 @@
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="80" />
                                                         <ColumnDefinition Width="56" />
+                                                        <ColumnDefinition Width="72" />
                                                     </Grid.ColumnDefinitions>
                                                     <controls:SegmentedTableSeparator Grid.Column="0"
-                                                                                      Grid.ColumnSpan="8"
+                                                                                      Grid.ColumnSpan="9"
                                                                                       LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
                                                                                       Classes="DetailTableRowSeparator" />
                                                     <controls:SkillDisplay Grid.Column="0"
@@ -726,6 +743,9 @@
                                                                    FractionDigits="1"
                                                                    TrimTrailingZeros="False"
                                                                    UsePercentageNotation="True" />
+                                            <controls:NumericBlock Grid.Column="8"
+                                                                   Classes="DetailRowValue"
+                                                                   Value="{Binding EventCount}" />
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
@@ -753,9 +773,10 @@
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="80" />
                                             <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="72" />
                                         </Grid.ColumnDefinitions>
                                         <controls:SegmentedTableSeparator Grid.Column="0"
-                                                                          Grid.ColumnSpan="5"
+                                                                          Grid.ColumnSpan="6"
                                                                           LineBrush="{StaticResource OverlayBrush.DetailHudLineSoft}"
                                                                           Classes="DetailTableHeaderSeparator" />
                                         <TextBlock Grid.Column="0"
@@ -773,13 +794,19 @@
                                         <TextBlock Grid.Column="4"
                                                    Classes="DetailTableHeader"
                                                    Text="{markups:Translate Column_Share}" />
+                                        <TextBlock Grid.Column="5"
+                                                   Classes="DetailTableHeader"
+                                                   Text="{markups:Translate Column_Events}" />
                                     </Grid>
                                 </Border>
 
-                                <ItemsControl ItemsSource="{Binding ShieldSection.Rows}">
+                                <ItemsControl x:Name="ShieldRows"
+                                              ItemsSource="{Binding ShieldSection.Rows}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
-                                            <Border Classes="DetailTableRow">
+                                            <Border Classes="DetailTableRow SelectableDetailTableRow"
+                                                    Classes.selected="{Binding IsSelected}"
+                                                    Tapped="SkillDetailRowTapped">
                                                 <Grid ColumnSpacing="4">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" SharedSizeGroup="ShieldSkillName" />
@@ -787,9 +814,10 @@
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="80" />
                                                         <ColumnDefinition Width="56" />
+                                                        <ColumnDefinition Width="72" />
                                                     </Grid.ColumnDefinitions>
                                                     <controls:SegmentedTableSeparator Grid.Column="0"
-                                                                                      Grid.ColumnSpan="5"
+                                                                                      Grid.ColumnSpan="6"
                                                                                       LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
                                                                                       Classes="DetailTableRowSeparator" />
                                                     <controls:SkillDisplay Grid.Column="0"
@@ -813,6 +841,9 @@
                                                                    FractionDigits="1"
                                                                    TrimTrailingZeros="False"
                                                                    UsePercentageNotation="True" />
+                                            <controls:NumericBlock Grid.Column="5"
+                                                                   Classes="DetailRowValue"
+                                                                   Value="{Binding EventCount}" />
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>

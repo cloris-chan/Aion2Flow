@@ -141,16 +141,22 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                     var payloadLength = packetSpan.Length - payloadOffset;
                     var captureTicks = address.Timestamp;
                     var gateAccepted = CaptureConnectionGate.ShouldProcessPacket(in connection, hasCloseFlag, out var isReversed);
+                    var matchedDiscoveryPort = false;
                     if (!gateAccepted)
                     {
                         if (payloadLength == 0 ||
                             hasCloseFlag ||
-                            !connection.DestinationIsLocal ||
-                            !_processPortDiscoveryService.AllPorts.Contains(dstPort))
+                            !connection.DestinationIsLocal)
                         {
                             continue;
                         }
 
+                        if (!_processPortDiscoveryService.AllPorts.Contains(dstPort))
+                        {
+                            continue;
+                        }
+
+                        matchedDiscoveryPort = true;
                         isReversed = false;
                     }
 
@@ -181,7 +187,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         _tcpRttEstimator.Clear();
                         _protocolRttEstimator.Clear();
 
-                        if (!_processPortDiscoveryService.AllPorts.Contains(dstPort))
+                        if (!matchedDiscoveryPort && !_processPortDiscoveryService.AllPorts.Contains(dstPort))
                             continue;
                     }
 

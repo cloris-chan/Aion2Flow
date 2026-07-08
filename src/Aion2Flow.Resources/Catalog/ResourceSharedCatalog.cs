@@ -3,7 +3,7 @@ namespace Cloris.Aion2Flow.Resources.Catalog;
 public sealed class ResourceSharedCatalog(
     SkillDefinitionCatalog skillDefinitions,
     IReadOnlyDictionary<int, SkillClientMetadata> skillClientMetadata,
-    IReadOnlyDictionary<int, SkillDisplayProjection> skillDisplayProjections,
+    IReadOnlyDictionary<int, SkillBaseProjection> skillBaseProjections,
     IReadOnlyList<SkillEffectReference> skillEffectReferences,
     IReadOnlyList<SkillRelatedSkill> skillRelatedSkills,
     IReadOnlyDictionary<int, NpcDefinition> npcDefinitions,
@@ -13,10 +13,8 @@ public sealed class ResourceSharedCatalog(
 {
     public SkillDefinitionCatalog SkillDefinitions { get; } = skillDefinitions;
     public IReadOnlyDictionary<int, SkillClientMetadata> SkillClientMetadata { get; } = skillClientMetadata;
-    public IReadOnlyDictionary<int, SkillDisplayProjection> SkillDisplayProjections { get; } = skillDisplayProjections;
-    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByPresentationSkillId { get; } = SkillDisplayProjectionIndex.BuildByPresentationSkillId(skillDisplayProjections);
-    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByDisplaySkillId { get; } = SkillDisplayProjectionIndex.BuildByDisplaySkillId(skillDisplayProjections);
-    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByBaseSkillId { get; } = SkillDisplayProjectionIndex.BuildByBaseSkillId(skillDisplayProjections);
+    public IReadOnlyDictionary<int, SkillBaseProjection> SkillBaseProjections { get; } = skillBaseProjections;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillBaseProjection>> SkillBaseProjectionsByBaseSkillId { get; } = SkillBaseProjectionIndex.BuildByBaseSkillId(skillBaseProjections);
     public IReadOnlyList<SkillEffectReference> SkillEffectReferences { get; } = skillEffectReferences;
     public IReadOnlyList<SkillRelatedSkill> SkillRelatedSkills { get; } = skillRelatedSkills;
     public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByOwnerSkillId { get; } = SkillRelatedSkillIndex.BuildByOwnerSkillId(skillRelatedSkills);

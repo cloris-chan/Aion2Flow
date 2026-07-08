@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
@@ -148,6 +149,12 @@ public class PeriodicPoolCanonicalizerTests
         Assert.Equal(0, target.IncomingAttempts);
         Assert.Equal(1000, grantPair!.TotalShield);
         Assert.Equal(300, grantPair.TotalShieldAbsorbed);
+        var grantEvent = Assert.Single(combat.Events, static e => e.Canonicalization == CombatContributionCanonicalization.PeriodicShieldGrant);
+        var absorbedEvent = Assert.Single(combat.Events, static e => e.Canonicalization == CombatContributionCanonicalization.PeriodicShieldAbsorbed);
+        Assert.Equal(casterId, grantEvent.SourceId);
+        Assert.Equal(targetId, grantEvent.TargetId);
+        Assert.Equal(casterId, absorbedEvent.SourceId);
+        Assert.Equal(targetId, absorbedEvent.TargetId);
     }
 
     [Fact]
@@ -194,6 +201,9 @@ public class PeriodicPoolCanonicalizerTests
         Assert.Equal(600, target!.IncomingHealing);
         Assert.Equal(0, caster.OutgoingShield);
         Assert.Equal(0, target.IncomingShield);
+        var contributionEvent = Assert.Single(combat.Events, static e => e.Canonicalization == CombatContributionCanonicalization.PeriodicContinuationHealing);
+        Assert.Equal(casterId, contributionEvent.SourceId);
+        Assert.Equal(targetId, contributionEvent.TargetId);
     }
 
     [Fact]
@@ -319,9 +329,9 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        AppendPeriodicPoolPacket(sink, casterA, targetId, 500001, tailA, 1000, chainId, 9, 1_000, 1, 1);
-        AppendPeriodicPoolPacket(sink, casterB, targetId, 500002, tailB, 2000, chainId, 9, 1_100, 1, 1);
-        AppendPeriodicPoolPacket(sink, attackerId, targetId, 500001, tailA, 700, chainId, 11, 2_000, 2, 2, tailPrefixValue: 300);
+        AppendPeriodicPoolPacket(sink, casterA, targetId, 500001, tailA, 1000, chainId, 9, 1_000, 1);
+        AppendPeriodicPoolPacket(sink, casterB, targetId, 500002, tailB, 2000, chainId, 9, 1_100, 1);
+        AppendPeriodicPoolPacket(sink, attackerId, targetId, 500001, tailA, 700, chainId, 11, 2_000, 2, tailPrefixValue: 300);
 
         var combat = Apply(journal);
 
@@ -464,14 +474,12 @@ public class PeriodicPoolCanonicalizerTests
             Damage = 1395,
             Unknown = 6,
             Timestamp = 1_000,
-            FrameOrdinal = 1,
-            BatchOrdinal = 1,
             BodyResourceEffectRef = ResourceEffectRef.FromRaw(16140000),
             PeriodicTailSkillCodeRaw = 16140030,
             PeriodicTailLength = 4
         };
         packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
-        sink.AppendCombatPacket(packet);
+        sink.AppendCombatPacket(packet, flushId: 1);
 
         var combat = Apply(journal);
 
@@ -505,14 +513,12 @@ public class PeriodicPoolCanonicalizerTests
             Damage = 4676,
             Unknown = 4242,
             Timestamp = 1_000,
-            FrameOrdinal = 1,
-            BatchOrdinal = 1,
             BodyResourceEffectRef = ResourceEffectRef.FromRaw(17091250),
             PeriodicTailSkillCodeRaw = 17091250,
             PeriodicTailLength = 4
         };
         packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 10);
-        sink.AppendCombatPacket(packet);
+        sink.AppendCombatPacket(packet, flushId: 1);
 
         var combat = Apply(journal);
 
@@ -536,13 +542,11 @@ public class PeriodicPoolCanonicalizerTests
             Damage = 1395,
             Unknown = 6,
             Timestamp = 1_000,
-            FrameOrdinal = 1,
-            BatchOrdinal = 1,
             BodyResourceEffectRef = ResourceEffectRef.FromRaw(16140000),
             PeriodicTailLength = 0
         };
         packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
-        sink.AppendCombatPacket(packet);
+        sink.AppendCombatPacket(packet, flushId: 1);
 
         var combat = Apply(journal);
 
@@ -559,8 +563,8 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        AppendPeriodicPoolPacket(sink, sourceId, targetId, 16140000, 16140030, 1395, 6, 10, 1_000, 1, 1);
-        AppendPeriodicPoolPacket(sink, sourceId, targetId, 16140000, 16140030, 1405, 6, 10, 2_000, 2, 2);
+        AppendPeriodicPoolPacket(sink, sourceId, targetId, 16140000, 16140030, 1395, 6, 10, 1_000, 1);
+        AppendPeriodicPoolPacket(sink, sourceId, targetId, 16140000, 16140030, 1405, 6, 10, 2_000, 2);
 
         var combat = Apply(journal);
 
@@ -630,8 +634,7 @@ public class PeriodicPoolCanonicalizerTests
         int chainId,
         int mode,
         long timestamp,
-        long frameOrdinal,
-        long batchOrdinal,
+        long flushId,
         int tailPrefixValue = 0)
     {
         var packet = new ParsedCombatPacket
@@ -642,15 +645,13 @@ public class PeriodicPoolCanonicalizerTests
             Damage = damage,
             Unknown = chainId,
             Timestamp = timestamp,
-            FrameOrdinal = frameOrdinal,
-            BatchOrdinal = batchOrdinal,
             BodyResourceEffectRef = ResourceEffectRef.FromRaw(skillCode),
             PeriodicTailSkillCodeRaw = tailSkillCode,
             PeriodicTailPrefixValue = tailPrefixValue,
             PeriodicTailLength = tailPrefixValue > 0 ? 5 : 4
         };
         packet.SetPeriodicEffect(PeriodicEffectRelation.Target, mode);
-        sink.AppendCombatPacket(packet);
+        sink.AppendCombatPacket(packet, flushId);
     }
 
 }

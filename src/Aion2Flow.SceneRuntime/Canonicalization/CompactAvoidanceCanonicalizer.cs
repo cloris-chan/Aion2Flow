@@ -9,161 +9,126 @@ public sealed class CompactAvoidanceCanonicalizer
 {
     private const int MaxPendingAvoidances = 32;
 
-    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker, long BatchOrdinal, int ScopeId, TimelineStamp Stamp, long ObservedAtMilliseconds);
+    private readonly record struct CompactAvoidanceKey(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker);
+    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw);
 
     private readonly List<PendingCompactAvoidance> _pendingCompact = new(MaxPendingAvoidances);
-    private long _currentBatchOrdinal;
+    private CompactAvoidanceKey _lastCompactAvoidanceKey;
+    private int _lastCompactAvoidanceLayoutTag;
+    private bool _hasLastCompactAvoidanceKey;
 
-    public StampedCombatCanonicalizationBatch NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds)
+    public StampedCombatCanonicalizationBatch NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw)
     {
-        var prefix = EnsureBatch(stamp.BatchOrdinal);
-        var result = new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, observation);
-        return Append(prefix, result);
+        var result = new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation);
+        return StampedCombatCanonicalizationBatch.One(result);
     }
 
-    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, in PacketStructurePath structurePath, long observedAtMilliseconds)
+    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw)
     {
         var isCompactSignal = IsCompactSignalShape(in observation) &&
                               observation.EventKind == CombatEventKind.Unknown &&
                               observation.ValueKind == CombatValueKind.Unknown;
         if (!isCompactSignal)
-            return NormalizeCombat(sourceId, targetId, in stamp, in observation, observedAtMilliseconds);
+        {
+            ClearCompactAvoidanceRun();
+            return NormalizeCombat(sourceId, targetId, in stamp, in observation, observedAtMilliseconds, raw);
+        }
 
         if (IsCompactType2Sidecar(in observation))
         {
-            CancelPendingCompactEvade(sourceId, targetId, observation.Marker, ResolveAssociationScope(in structurePath));
-            return EnsureBatch(stamp.BatchOrdinal);
+            CancelPendingCompactEvade(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker);
+            ClearCompactAvoidanceRun();
+            return StampedCombatCanonicalizationBatch.Empty;
         }
 
-        var prefix = EnsureBatch(stamp.BatchOrdinal);
-        if (TryObserveCompactAvoidance(sourceId, targetId, in stamp, in observation, in structurePath, observedAtMilliseconds))
-            return prefix;
+        if (TryObserveCompactAvoidance(sourceId, targetId, in stamp, in observation, observedAtMilliseconds, raw))
+            return StampedCombatCanonicalizationBatch.Empty;
 
-        return prefix;
+        ClearCompactAvoidanceRun();
+        return StampedCombatCanonicalizationBatch.Empty;
     }
 
-    public StampedCombatCanonicalizationBatch AdvanceBatch(in TimelineStamp stamp) => EnsureBatch(stamp.BatchOrdinal);
-
-    public StampedCombatCanonicalizationBatch CompleteBatch(long batchOrdinal)
+    public StampedCombatCanonicalizationBatch FlushPending()
     {
-        if (_currentBatchOrdinal == 0)
+        if (_pendingCompact.Count == 0)
             return StampedCombatCanonicalizationBatch.Empty;
 
-        if (batchOrdinal > 0 && _currentBatchOrdinal > 0 && batchOrdinal < _currentBatchOrdinal)
-            return StampedCombatCanonicalizationBatch.Empty;
-
-        return FinalizeBatch();
+        return FlushPendingCompact();
     }
 
-    internal CompactAvoidanceCanonicalizerSnapshot CreateSnapshot() => new([.. _pendingCompact], _currentBatchOrdinal);
+    internal CompactAvoidanceCanonicalizerSnapshot CreateSnapshot() => new([.. _pendingCompact], _hasLastCompactAvoidanceKey, _lastCompactAvoidanceKey.SourceId, _lastCompactAvoidanceKey.TargetId, _lastCompactAvoidanceKey.BodySkillVariantRaw, _lastCompactAvoidanceKey.Marker, _lastCompactAvoidanceLayoutTag);
 
     internal static CompactAvoidanceCanonicalizer FromSnapshot(CompactAvoidanceCanonicalizerSnapshot snapshot)
     {
-        var canonicalizer = new CompactAvoidanceCanonicalizer { _currentBatchOrdinal = snapshot.CurrentBatchOrdinal };
+        var canonicalizer = new CompactAvoidanceCanonicalizer
+        {
+            _hasLastCompactAvoidanceKey = snapshot.HasLastCompactAvoidanceKey,
+            _lastCompactAvoidanceKey = new CompactAvoidanceKey(snapshot.LastSourceId, snapshot.LastTargetId, snapshot.LastBodySkillVariantRaw, snapshot.LastMarker),
+            _lastCompactAvoidanceLayoutTag = snapshot.LastLayoutTag
+        };
         canonicalizer._pendingCompact.AddRange(snapshot.Pending);
         return canonicalizer;
     }
 
-    private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, in PacketStructurePath structurePath, long observedAtMilliseconds)
+    private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw)
     {
         if (!IsCompactEvadeSignal(sourceId, targetId, in observation) || observation.Marker <= 0)
             return false;
 
-        var scopeId = ResolveAssociationScope(in structurePath);
-        if (HasPendingCompactAvoidance(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker, _currentBatchOrdinal, scopeId))
+        var key = new CompactAvoidanceKey(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker);
+        if (_hasLastCompactAvoidanceKey &&
+            _lastCompactAvoidanceKey == key &&
+            IsDuplicateCompactAvoidanceSignal(_lastCompactAvoidanceLayoutTag, observation.LayoutTag))
+        {
+            _lastCompactAvoidanceLayoutTag = observation.LayoutTag;
             return true;
+        }
 
-        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker, _currentBatchOrdinal, scopeId, stamp, observedAtMilliseconds));
+        _pendingCompact.Add(new PendingCompactAvoidance(sourceId, targetId, observation.BodySkillVariantRaw, observation.Marker, stamp, observedAtMilliseconds, raw));
+        _lastCompactAvoidanceKey = key;
+        _lastCompactAvoidanceLayoutTag = observation.LayoutTag;
+        _hasLastCompactAvoidanceKey = true;
         TrimPending();
         return true;
     }
 
-    private bool HasPendingCompactAvoidance(int sourceId, int targetId, int bodySkillVariantRaw, int marker, long batchOrdinal, int scopeId)
-    {
-        for (var i = _pendingCompact.Count - 1; i >= 0; i--)
-        {
-            var pending = _pendingCompact[i];
-            if (pending.SourceId == sourceId &&
-                pending.TargetId == targetId &&
-                pending.BodySkillVariantRaw == bodySkillVariantRaw &&
-                pending.Marker == marker &&
-                pending.BatchOrdinal == batchOrdinal &&
-                pending.ScopeId == scopeId)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private StampedCombatCanonicalizationBatch FinalizeBatch()
+    private StampedCombatCanonicalizationBatch FlushPendingCompact()
     {
         var results = new StampedCombatCanonicalizationBatchBuilder(_pendingCompact.Count);
         foreach (var pending in _pendingCompact)
-            results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, pending.ObservedAtMilliseconds, CreateCompactEvade(in pending)));
+            results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, pending.ObservedAtMilliseconds, pending.Raw, CreateCompactEvade(in pending), CombatContributionCanonicalization.CompactAvoidance));
 
         _pendingCompact.Clear();
-        _currentBatchOrdinal = 0;
+        ClearCompactAvoidanceRun();
         return results.ToBatch();
     }
 
-    private StampedCombatCanonicalizationBatch EnsureBatch(long batchOrdinal)
+    private void CancelPendingCompactEvade(int sourceId, int targetId, int bodySkillVariantRaw, int marker)
     {
-        var resolvedBatchOrdinal = batchOrdinal > 0 ? batchOrdinal : 0;
-        if (_currentBatchOrdinal == 0)
-        {
-            _currentBatchOrdinal = resolvedBatchOrdinal;
-            return StampedCombatCanonicalizationBatch.Empty;
-        }
-
-        if (resolvedBatchOrdinal == 0 || resolvedBatchOrdinal == _currentBatchOrdinal)
-            return StampedCombatCanonicalizationBatch.Empty;
-
-        var results = FinalizeBatch();
-        _currentBatchOrdinal = resolvedBatchOrdinal;
-        return results;
-    }
-
-    private static StampedCombatCanonicalizationBatch Append(StampedCombatCanonicalizationBatch prefix, in StampedCombatCanonicalizationResult result)
-    {
-        if (prefix.Count == 0)
-            return StampedCombatCanonicalizationBatch.One(result);
-
-        var results = new StampedCombatCanonicalizationBatchBuilder(prefix.Count + 1);
-        results.AddRange(prefix);
-        results.Add(result);
-        return results.ToBatch();
-    }
-
-    private void CancelPendingCompactEvade(int sourceId, int targetId, int marker, int scopeId)
-    {
-        var currentBatchOrdinal = _currentBatchOrdinal;
         for (var i = _pendingCompact.Count - 1; i >= 0; i--)
         {
             var pending = _pendingCompact[i];
             if (pending.SourceId == sourceId &&
                 pending.TargetId == targetId &&
                 pending.Marker == marker &&
-                MatchesScopeOrCurrentBatch(in pending, scopeId, currentBatchOrdinal))
+                (bodySkillVariantRaw <= 0 || pending.BodySkillVariantRaw == bodySkillVariantRaw))
             {
                 _pendingCompact.RemoveAt(i);
             }
         }
     }
 
-    private static bool MatchesScopeOrCurrentBatch(in PendingCompactAvoidance pending, int scopeId, long currentBatchOrdinal)
-    {
-        if (pending.ScopeId > 0 && scopeId > 0)
-            return pending.ScopeId == scopeId;
-
-        return currentBatchOrdinal > 0 && pending.BatchOrdinal == currentBatchOrdinal;
-    }
-
     private void TrimPending()
     {
         while (_pendingCompact.Count > MaxPendingAvoidances)
             _pendingCompact.RemoveAt(0);
+    }
+
+    private void ClearCompactAvoidanceRun()
+    {
+        _lastCompactAvoidanceKey = default;
+        _lastCompactAvoidanceLayoutTag = 0;
+        _hasLastCompactAvoidanceKey = false;
     }
 
     private static bool IsCompactEvadeSignal(int sourceId, int targetId, in CombatObservation observation) =>
@@ -178,20 +143,8 @@ public sealed class CompactAvoidanceCanonicalizer
 
     private static bool IsCompactType2Sidecar(in CombatObservation observation) => IsCompactSignalShape(in observation) && observation.Type == 2;
 
-    private static int ResolveAssociationScope(in PacketStructurePath structurePath)
-    {
-        if (structurePath.IsEmpty)
-            return 0;
-
-        var parent = structurePath.Parent;
-        if (parent.ScopeId > 0)
-            return parent.ScopeId;
-
-        if (structurePath.Leaf.ParentScopeId > 0)
-            return structurePath.Leaf.ParentScopeId;
-
-        return structurePath.Leaf.ScopeId;
-    }
+    private static bool IsDuplicateCompactAvoidanceSignal(int previousLayoutTag, int currentLayoutTag) =>
+        previousLayoutTag == 2 && currentLayoutTag == 0;
 
     private static CombatObservation CreateCompactEvade(in PendingCompactAvoidance pending)
     {
@@ -213,9 +166,17 @@ public sealed class CompactAvoidanceCanonicalizer
 
 }
 
-internal sealed record CompactAvoidanceCanonicalizerSnapshot(CompactAvoidanceCanonicalizer.PendingCompactAvoidance[] Pending, long CurrentBatchOrdinal);
+internal sealed record CompactAvoidanceCanonicalizerSnapshot(CompactAvoidanceCanonicalizer.PendingCompactAvoidance[] Pending, bool HasLastCompactAvoidanceKey, int LastSourceId, int LastTargetId, int LastBodySkillVariantRaw, int LastMarker, int LastLayoutTag);
 
-public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, CombatObservation Observation);
+public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatObservation Observation, CombatContributionCanonicalization Canonicalization)
+{
+    public StampedCombatCanonicalizationResult(int sourceId, int targetId, TimelineStamp stamp, long observedAtMilliseconds, RawPacketReference raw, CombatObservation observation)
+        : this(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, CombatContributionCanonicalization.None)
+    {
+    }
+
+    public StampedCombatCanonicalizationResult WithCanonicalization(CombatContributionCanonicalization canonicalization) => this with { Canonicalization = Canonicalization | canonicalization };
+}
 
 public readonly struct StampedCombatCanonicalizationBatch
 {

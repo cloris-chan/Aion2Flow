@@ -73,7 +73,7 @@ public sealed class BossSceneCollectionTests
 
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
         AppendDamage(sink, 100, 300, 200, 1_200, 2);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(2);
         var snapshot = scene.CreateFrame().Snapshot;
 
         Assert.NotEqual(waitingEncounterId, scene.SessionId);
@@ -96,7 +96,7 @@ public sealed class BossSceneCollectionTests
         sink.AppendNpcHp(Source(30), 300, 243_719_813, 243_750_000);
 
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
-        sink.CompleteBatch(1);
+        sink.CompleteFlush(1);
         var snapshot = scene.CreateFrame().Snapshot;
 
         var focus = Assert.Single(snapshot.BossFocuses.AsSpan().ToArray());
@@ -121,7 +121,7 @@ public sealed class BossSceneCollectionTests
 
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
         AppendDamage(sink, 100, 300, 200, 1_200, 2);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(2);
         var snapshot = scene.CreateFrame().Snapshot;
 
         Assert.NotEqual(waitingEncounterId, scene.SessionId);
@@ -149,7 +149,7 @@ public sealed class BossSceneCollectionTests
 
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
         AppendDamage(sink, 100, 300, 200, 1_200, 2);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(2);
         var snapshot = scene.CreateFrame().Snapshot;
 
         Assert.NotEqual(waitingEncounterId, scene.SessionId);
@@ -174,7 +174,7 @@ public sealed class BossSceneCollectionTests
 
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
         AppendDamage(sink, 100, 301, 700, 2_000, 2);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(2);
         var snapshot = scene.CreateFrame().Snapshot;
 
         Assert.Equal(BossSceneState.Recording, scene.BossState);
@@ -193,7 +193,7 @@ public sealed class BossSceneCollectionTests
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 30);
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
         AppendDamage(sink, 100, 300, 200, 1_200, 2);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(2);
         _ = scene.CreateFrame();
 
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
@@ -210,7 +210,7 @@ public sealed class BossSceneCollectionTests
         var frozenCount = scene.Journal.Count;
         sink.SetNpcBattle(Source(2_500), 300, false);
         AppendDamage(sink, 100, 200, 900, 3_000, 3);
-        sink.CompleteBatch(3);
+        sink.CompleteFlush(3);
         var snapshot = scene.CreateFrame().Snapshot;
 
         Assert.Equal(frozenCount, scene.Journal.Count);
@@ -227,7 +227,7 @@ public sealed class BossSceneCollectionTests
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
-        sink.CompleteBatch(1);
+        sink.CompleteFlush(1);
         _ = scene.CreateFrame();
 
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
@@ -253,7 +253,7 @@ public sealed class BossSceneCollectionTests
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
         AppendDamage(sink, 100, 300, 200, 1_200, 2);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(2);
         _ = scene.CreateFrame();
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
         timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
@@ -263,7 +263,7 @@ public sealed class BossSceneCollectionTests
         AppendNpc(sink, 301, 2_100_003, NpcKind.Boss, 3_000);
         AppendDamage(sink, 100, 301, 700, 4_000, 3);
         AppendDamage(sink, 100, 301, 300, 4_200, 4);
-        sink.CompleteBatch(4);
+        sink.CompleteFlush(4);
 
         Assert.True(scene.TryDequeuePendingArchive(out var archived));
         Assert.Equal(SceneKind.Boss, archived.Snapshot.Kind);
@@ -287,7 +287,7 @@ public sealed class BossSceneCollectionTests
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
         AppendDamage(sink, 100, 300, 500, 1_000, 1);
         AppendDamage(sink, 100, 300, 200, 1_800, 2);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(2);
         _ = scene.CreateFrame();
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
         timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
@@ -334,9 +334,9 @@ public sealed class BossSceneCollectionTests
         sink.AppendNpcKind(in source, instanceId, kind);
     }
 
-    private static void AppendDamage(IRuntimeObservationSink sink, int sourceId, int targetId, int damage, long offsetMilliseconds, long batchOrdinal)
+    private static void AppendDamage(IRuntimeObservationSink sink, int sourceId, int targetId, int damage, long offsetMilliseconds, long flushId)
     {
-        var source = Source(offsetMilliseconds, batchOrdinal);
+        var source = Source(offsetMilliseconds, flushId);
         var observation = new CombatObservation
         {
             SkillCode = 11_000_010,
@@ -349,8 +349,8 @@ public sealed class BossSceneCollectionTests
         sink.AppendCombatObservation(in source, sourceId, targetId, in observation);
     }
 
-    private static PacketObservationSource Source(long offsetMilliseconds, long batchOrdinal = 0) =>
-        new(Started.ToUnixTimeMilliseconds() + offsetMilliseconds, 0, batchOrdinal, 0, 0, offsetMilliseconds, default);
+    private static PacketObservationSource Source(long offsetMilliseconds, long flushId = 0) =>
+        new(Started.ToUnixTimeMilliseconds() + offsetMilliseconds, flushId, 0, 0, offsetMilliseconds, default);
 
     private static ObservedEventEnvelope[] ReadJournal(SceneLiveReadModel scene)
     {

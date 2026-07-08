@@ -1,5 +1,5 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -25,7 +25,10 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
 
     public string CounterpartTitle => Localization[CounterpartTitleKey];
 
-    public ObservableCollection<DetailCounterpartSelectionViewModel> Counterparts { get; } = [];
+    public KeyedObservableCollection<int, DetailCounterpartSelectionViewModel> Counterparts { get; } = new(static counterpart => counterpart.CombatantId)
+    {
+        ResetThreshold = 24
+    };
 
     public bool HasCounterparts => Counterparts.Count > 0;
 
@@ -86,6 +89,14 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
 
     public void ReplaceCounterparts(IReadOnlyCollection<DetailCounterpartOption> options)
     {
+        var optionList = options as IList<DetailCounterpartOption> ?? [.. options];
+        if (ApplyCounterpartsInPlaceIfOrderMatches(optionList))
+        {
+            OnPropertyChanged(nameof(HasCounterparts));
+            OnPropertyChanged(nameof(AreAllCounterpartsSelected));
+            return;
+        }
+
         _previousSelections.Clear();
         _existingByCombatantId.Clear();
         _expectedCombatantIds.Clear();
@@ -97,66 +108,68 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
         }
 
         var selectNewOptions = _previousSelections.Count == 0 || _previousSelections.Values.All(static value => value);
-        var optionList = options as IList<DetailCounterpartOption> ?? [.. options];
 
         _suppressSelectionChanged = true;
         try
         {
-            for (var index = 0; index < optionList.Count; index++)
+            using (Counterparts.SuspendNotifications())
             {
-                var option = optionList[index];
-                _expectedCombatantIds.Add(option.CombatantId);
-                var isSelected = _previousSelections.TryGetValue(option.CombatantId, out var preservedSelection)
-                    ? preservedSelection
-                    : selectNewOptions;
-
-                if (!_existingByCombatantId.TryGetValue(option.CombatantId, out var counterpart))
+                for (var index = 0; index < optionList.Count; index++)
                 {
-                    counterpart = new DetailCounterpartSelectionViewModel(
-                        option.CombatantId,
-                        option.DamageAmount,
-                        option.DamageShare,
-                        option.HealingAmount,
-                        option.HealingShare,
-                        option.ShieldAmount,
-                        option.ShieldShare,
-                        isSelected);
+                    var option = optionList[index];
+                    _expectedCombatantIds.Add(option.CombatantId);
+                    var isSelected = _previousSelections.TryGetValue(option.CombatantId, out var preservedSelection)
+                        ? preservedSelection
+                        : selectNewOptions;
+
+                    if (!_existingByCombatantId.TryGetValue(option.CombatantId, out var counterpart))
+                    {
+                        counterpart = new DetailCounterpartSelectionViewModel(
+                            option.CombatantId,
+                            option.DamageAmount,
+                            option.DamageShare,
+                            option.HealingAmount,
+                            option.HealingShare,
+                            option.ShieldAmount,
+                            option.ShieldShare,
+                            isSelected);
+                        counterpart.SelectionChanged += HandleCounterpartSelectionChanged;
+
+                        if (index < Counterparts.Count)
+                        {
+                            Counterparts.Insert(index, counterpart);
+                        }
+                        else
+                        {
+                            Counterparts.Add(counterpart);
+                        }
+
+                        _existingByCombatantId[option.CombatantId] = counterpart;
+                        continue;
+                    }
+
                     counterpart.SelectionChanged += HandleCounterpartSelectionChanged;
+                    counterpart.ApplyFrom(option);
+                    counterpart.IsSelected = isSelected;
 
-                    if (index < Counterparts.Count)
+                    var currentIndex = Counterparts.IndexOf(counterpart);
+                    if (currentIndex >= 0 && currentIndex != index)
                     {
-                        Counterparts.Insert(index, counterpart);
+                        MoveCounterpart(currentIndex, index);
                     }
-                    else
+                }
+
+                for (var index = Counterparts.Count - 1; index >= 0; index--)
+                {
+                    var counterpart = Counterparts[index];
+                    if (_expectedCombatantIds.Contains(counterpart.CombatantId))
                     {
-                        Counterparts.Add(counterpart);
+                        continue;
                     }
 
-                    _existingByCombatantId[option.CombatantId] = counterpart;
-                    continue;
+                    counterpart.SelectionChanged -= HandleCounterpartSelectionChanged;
+                    Counterparts.RemoveAt(index);
                 }
-
-                counterpart.SelectionChanged += HandleCounterpartSelectionChanged;
-                counterpart.ApplyFrom(option);
-                counterpart.IsSelected = isSelected;
-
-                var currentIndex = Counterparts.IndexOf(counterpart);
-                if (currentIndex >= 0 && currentIndex != index)
-                {
-                    Counterparts.Move(currentIndex, index);
-                }
-            }
-
-            for (var index = Counterparts.Count - 1; index >= 0; index--)
-            {
-                var counterpart = Counterparts[index];
-                if (_expectedCombatantIds.Contains(counterpart.CombatantId))
-                {
-                    continue;
-                }
-
-                counterpart.SelectionChanged -= HandleCounterpartSelectionChanged;
-                Counterparts.RemoveAt(index);
             }
         }
         finally
@@ -166,6 +179,43 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
 
         OnPropertyChanged(nameof(HasCounterparts));
         OnPropertyChanged(nameof(AreAllCounterpartsSelected));
+    }
+
+    private bool ApplyCounterpartsInPlaceIfOrderMatches(IList<DetailCounterpartOption> options)
+    {
+        if (Counterparts.Count != options.Count)
+            return false;
+
+        for (var i = 0; i < options.Count; i++)
+        {
+            if (Counterparts[i].CombatantId != options[i].CombatantId)
+                return false;
+        }
+
+        _suppressSelectionChanged = true;
+        try
+        {
+            for (var i = 0; i < options.Count; i++)
+            {
+                Counterparts[i].ApplyFrom(options[i]);
+            }
+        }
+        finally
+        {
+            _suppressSelectionChanged = false;
+        }
+
+        return true;
+    }
+
+    private void MoveCounterpart(int oldIndex, int newIndex)
+    {
+        if (oldIndex == newIndex)
+            return;
+
+        var counterpart = Counterparts[oldIndex];
+        Counterparts.RemoveAt(oldIndex);
+        Counterparts.Insert(newIndex, counterpart);
     }
 
     public void Clear()

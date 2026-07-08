@@ -268,20 +268,20 @@ public sealed class ResourcePackTests
         Assert.Equal(SkillSourceKeyRelation.ExactRecord, clericSkill.SourceRelation);
         Assert.Equal("None", clericSkill.ParentKey);
         Assert.Equal(17050250, clericSkill.TopLevelSkillId);
-        Assert.Equal("Active", clericSkill.ActionType);
-        Assert.Equal("Negative", clericSkill.DispositionType);
-        Assert.Equal("Magic", clericSkill.DamageType);
-        Assert.Equal("MainTarget", clericSkill.TargetProcessType);
-        Assert.Contains("Attack", clericSkill.ClientCategoryTypes);
+        Assert.Equal(SkillClientActionType.Active, clericSkill.ActionType);
+        Assert.Equal(SkillClientDispositionType.Negative, clericSkill.DispositionType);
+        Assert.Equal(SkillClientDamageType.Magic, clericSkill.DamageType);
+        Assert.Equal(SkillClientTargetProcessType.MainTarget, clericSkill.TargetProcessType);
+        Assert.Equal(SkillClientCategoryType.Attack, clericSkill.ClientCategoryTypes & SkillClientCategoryType.Attack);
 
         Assert.True(metadata.TryGetValue(1227265, out var npcSkill));
         Assert.Equal("SkillString_NPC_1227260", npcSkill.SourceKey);
         Assert.Equal(1227260, npcSkill.SourceSkillId);
         Assert.Equal(SkillSourceKeyRelation.GenericSourceKey, npcSkill.SourceRelation);
-        Assert.Equal("System", npcSkill.ActionType);
-        Assert.Equal("Negative", npcSkill.DispositionType);
-        Assert.Equal("Magic", npcSkill.DamageType);
-        Assert.Equal("Self", npcSkill.TargetProcessType);
+        Assert.Equal(SkillClientActionType.System, npcSkill.ActionType);
+        Assert.Equal(SkillClientDispositionType.Negative, npcSkill.DispositionType);
+        Assert.Equal(SkillClientDamageType.Magic, npcSkill.DamageType);
+        Assert.Equal(SkillClientTargetProcessType.Self, npcSkill.TargetProcessType);
 
         Assert.True(metadata.TryGetValue(16001316, out var sameFamilySkill));
         Assert.Equal("STR_SKILL_PC_ELEMENTALIST_16001312", sameFamilySkill.SourceKey);
@@ -299,12 +299,10 @@ public sealed class ResourcePackTests
         Assert.Equal(SkillSourceKeyRelation.PacketAlias, packetAliasSkill.SourceRelation);
 
         Assert.True(metadata.TryGetValue(16190050, out var elementalistSkill));
-        Assert.Equal("Elementalist_Skill019", elementalistSkill.ImplementationName);
-        Assert.Equal("Skill/ICON_EL_SKILL_019", elementalistSkill.IconPath);
-        Assert.Equal(["Orb"], elementalistSkill.WeaponTypes);
-        Assert.Equal(["Buff"], elementalistSkill.ClientCategoryTypes);
-        Assert.Equal("All", elementalistSkill.RotateType);
-        Assert.Equal("ProjectileFire", elementalistSkill.TargetLocationType);
+        Assert.Equal(SkillClientWeaponType.Orb, elementalistSkill.WeaponTypes);
+        Assert.Equal(SkillClientCategoryType.Buff, elementalistSkill.ClientCategoryTypes);
+        Assert.Equal(SkillClientRotateType.All, elementalistSkill.RotateType);
+        Assert.Equal(SkillClientTargetLocationType.ProjectileFire, elementalistSkill.TargetLocationType);
 
         Assert.True(metadata.TryGetValue(16200000, out var nestedElementalistSkill));
         Assert.Equal("STR_SKILL_PC_ELEMENTALIST_16200000", nestedElementalistSkill.SourceKey);
@@ -319,16 +317,15 @@ public sealed class ResourcePackTests
 
         Assert.True(metadata.TryGetValue(10000001, out var commonSkill));
         Assert.Equal(0, commonSkill.RowBaseSkillId);
-        Assert.Equal(["Heal"], commonSkill.ClientCategoryTypes);
+        Assert.Equal(SkillClientCategoryType.Heal, commonSkill.ClientCategoryTypes);
 
         Assert.True(metadata.TryGetValue(9007, out var autoLoadSkill));
-        Assert.Equal("Time", autoLoadSkill.AutoLoadType);
-        Assert.Equal([3, 3, 5000, 10000, 15000], autoLoadSkill.AutoLoadPayloadInts);
+        Assert.Equal(SkillClientAutoLoadType.Time, autoLoadSkill.AutoLoadType);
 
         Assert.True(metadata.TryGetValue(17410000, out var autoLoadEffectSkill));
         Assert.Equal(1, autoLoadEffectSkill.AutoLoadFlags);
         Assert.Equal(174100001, autoLoadEffectSkill.AutoLoadEffectDataId);
-        Assert.Equal("None", autoLoadEffectSkill.AutoLoadType);
+        Assert.Equal(SkillClientAutoLoadType.None, autoLoadEffectSkill.AutoLoadType);
 
         Assert.True(metadata.TryGetValue(16030047, out var layoutOnlySkill));
         Assert.Equal("None", layoutOnlySkill.SourceKey);
@@ -336,80 +333,64 @@ public sealed class ResourcePackTests
         Assert.Equal(SkillSourceKeyRelation.None, layoutOnlySkill.SourceRelation);
         Assert.Equal("None", layoutOnlySkill.ParentKey);
         Assert.Equal(16030047, layoutOnlySkill.TopLevelSkillId);
-        Assert.Equal("System", layoutOnlySkill.ActionType);
-        Assert.Equal("Magic", layoutOnlySkill.DamageType);
-        Assert.Equal("Skill/ICON_EL_SKILL_003", layoutOnlySkill.IconPath);
+        Assert.Equal(SkillClientActionType.System, layoutOnlySkill.ActionType);
+        Assert.Equal(SkillClientDamageType.Magic, layoutOnlySkill.DamageType);
         Assert.Equal(16030000, layoutOnlySkill.RowBaseSkillId);
     }
 
     [Theory]
-    [InlineData(11010047, 11420000, 11010047, 11420000)]
-    [InlineData(17040250, 17040000, 17040250, 17040000)]
-    [InlineData(19010040, 19010000, 19010040, 19010000)]
-    [InlineData(19010047, 19010000, 19010047, 19010000)]
-    [InlineData(19150350, 19150000, 19150350, 19150000)]
-    [InlineData(19160351, 19150000, 19160351, 19150000)]
-    [InlineData(19190120, 19190000, 19190120, 19190000)]
-    [InlineData(1227237, 1227237, 1227237, 1227237)]
-    [InlineData(12090230, 12090000, 12090230, 12090000)]
-    public void SkillDisplayProjections_Expose_Resource_Display_Projection(
+    [InlineData(11010047, 11420000)]
+    [InlineData(17040250, 17040000)]
+    [InlineData(19010040, 19010000)]
+    [InlineData(19010047, 19010000)]
+    [InlineData(19150350, 19150000)]
+    [InlineData(19160351, 19150000)]
+    [InlineData(19190120, 19190000)]
+    [InlineData(1227237, 1227237)]
+    [InlineData(12090230, 12090000)]
+    public void SkillBaseProjections_Expose_Resource_Base_Projection(
         int skillCode,
-        int expectedPresentationSkillId,
-        int expectedDisplaySkillId,
         int expectedBaseSkillId)
     {
-        var projections = ResourceCatalog.LoadShared().SkillDisplayProjections;
+        var projections = ResourceCatalog.LoadShared().SkillBaseProjections;
 
         Assert.True(projections.TryGetValue(skillCode, out var projection));
         Assert.Equal(skillCode, projection.SkillCode);
-        Assert.Equal(expectedPresentationSkillId, projection.PresentationSkillId);
-        Assert.Equal(expectedDisplaySkillId, projection.DisplaySkillId);
         Assert.Equal(expectedBaseSkillId, projection.BaseSkillId);
     }
 
     [Theory]
-    [InlineData(17040257, 17050000, 17050000, 17050000)]
-    [InlineData(16030047, 16030000, 16030000, 16030000)]
-    [InlineData(16257000, 16107000, 16107000, 16257000)]
-    [InlineData(18370047, 18370000, 18370000, 18370000)]
-    public void SkillDisplayProjections_Expose_Packet_Display_Projection(
+    [InlineData(17040257, 17050000)]
+    [InlineData(16030047, 16030000)]
+    [InlineData(16257000, 16257000)]
+    [InlineData(18370047, 18370000)]
+    public void SkillBaseProjections_Expose_Packet_Base_Projection(
         int skillCode,
-        int expectedPresentationSkillId,
-        int expectedDisplaySkillId,
         int expectedBaseSkillId)
     {
         var skills = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills;
-        var projections = ResourceCatalog.LoadShared().SkillDisplayProjections;
+        var projections = ResourceCatalog.LoadShared().SkillBaseProjections;
 
         Assert.DoesNotContain(skills, skill => skill.SkillId == skillCode);
         Assert.True(projections.TryGetValue(skillCode, out var projection));
         Assert.Equal(skillCode, projection.SkillCode);
-        Assert.Equal(expectedPresentationSkillId, projection.PresentationSkillId);
-        Assert.Equal(expectedDisplaySkillId, projection.DisplaySkillId);
         Assert.Equal(expectedBaseSkillId, projection.BaseSkillId);
     }
 
     [Fact]
-    public void SkillDisplayProjections_Expose_Structured_Lookups()
+    public void SkillBaseProjections_Expose_Structured_Lookups()
     {
         var shared = ResourceCatalog.LoadShared();
 
-        Assert.True(shared.SkillDisplayProjectionsByBaseSkillId.TryGetValue(16030000, out var elementalBaseProjections));
+        Assert.True(shared.SkillBaseProjectionsByBaseSkillId.TryGetValue(16030000, out var elementalBaseProjections));
         Assert.Contains(elementalBaseProjections, projection =>
             projection.SkillCode == 16030047 &&
-            projection.PresentationSkillId == 16030000 &&
-            projection.DisplaySkillId == 16030000);
+            projection.BaseSkillId == 16030000);
 
-        Assert.True(shared.SkillDisplayProjectionsByPresentationSkillId.TryGetValue(17050000, out var clericPresentationProjections));
-        Assert.Contains(clericPresentationProjections, projection =>
+        Assert.True(shared.SkillBaseProjectionsByBaseSkillId.TryGetValue(17050000, out var clericBaseProjections));
+        Assert.Contains(clericBaseProjections, projection =>
             projection.SkillCode == 17040257 &&
-            projection.DisplaySkillId == 17050000 &&
             projection.BaseSkillId == 17050000);
-
-        Assert.True(shared.SkillDisplayProjectionsByDisplaySkillId.TryGetValue(17050000, out var clericDisplayProjections));
-        Assert.Contains(clericDisplayProjections, projection =>
-            projection.SkillCode == 17040257 &&
-            projection.PresentationSkillId == 17050000);
     }
 
     [Theory]

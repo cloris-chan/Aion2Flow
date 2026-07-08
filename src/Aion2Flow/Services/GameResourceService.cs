@@ -44,13 +44,13 @@ public sealed class GameResourceService : IDisposable
             }
 
             if (TryResolveSkillIdByEffectRef(catalog, unchecked((uint)skillCode), out var ownerSkillId) &&
-                TryResolveSkillName(Skills, ResolveDisplaySkillIdForCode(catalog, ownerSkillId), out name))
+                TryResolveSkillNameBySkillOrBase(catalog, ownerSkillId, out name))
             {
                 return name;
             }
 
-            var displaySkillId = ResolveDisplaySkillIdForCode(catalog, skillCode);
-            if (displaySkillId != skillCode && TryResolveSkillName(Skills, displaySkillId, out name))
+            var baseSkillId = ResolveBaseSkillIdForCode(catalog, skillCode);
+            if (baseSkillId != skillCode && TryResolveSkillName(Skills, baseSkillId, out name))
             {
                 return name;
             }
@@ -83,23 +83,14 @@ public sealed class GameResourceService : IDisposable
 
         if (TryResolveSkillIdByEffectRef(snapshot, unchecked((uint)skillCode), out var ownerSkillId))
         {
-            assetName = SkillIconCatalog.ResolveAssetName(ownerSkillId);
-            if (assetName is not null)
-            {
+            if (TryResolveSkillIconAssetNameBySkillOrBase(snapshot, ownerSkillId, out assetName))
                 return assetName;
-            }
-
-            assetName = SkillIconCatalog.ResolveAssetName(ResolveDisplaySkillIdForCode(snapshot, ownerSkillId));
-            if (assetName is not null)
-            {
-                return assetName;
-            }
         }
 
-        var displaySkillId = ResolveDisplaySkillIdForCode(snapshot, skillCode);
-        if (displaySkillId != skillCode)
+        var baseSkillId = ResolveBaseSkillIdForCode(snapshot, skillCode);
+        if (baseSkillId != skillCode)
         {
-            assetName = SkillIconCatalog.ResolveAssetName(displaySkillId);
+            assetName = SkillIconCatalog.ResolveAssetName(baseSkillId);
             if (assetName is not null)
             {
                 return assetName;
@@ -109,15 +100,44 @@ public sealed class GameResourceService : IDisposable
         return null;
     }
 
-    private static int ResolveDisplaySkillIdForCode(ResourceCatalogSnapshot snapshot, int skillCode)
+    private bool TryResolveSkillNameBySkillOrBase(ResourceCatalogSnapshot snapshot, int skillCode, out string name)
+    {
+        if (TryResolveSkillName(Skills, skillCode, out name))
+        {
+            return true;
+        }
+
+        var baseSkillId = ResolveBaseSkillIdForCode(snapshot, skillCode);
+        return baseSkillId != skillCode && TryResolveSkillName(Skills, baseSkillId, out name);
+    }
+
+    private static bool TryResolveSkillIconAssetNameBySkillOrBase(ResourceCatalogSnapshot snapshot, int skillCode, out string? assetName)
+    {
+        assetName = SkillIconCatalog.ResolveAssetName(skillCode);
+        if (assetName is not null)
+        {
+            return true;
+        }
+
+        var baseSkillId = ResolveBaseSkillIdForCode(snapshot, skillCode);
+        if (baseSkillId == skillCode)
+        {
+            return false;
+        }
+
+        assetName = SkillIconCatalog.ResolveAssetName(baseSkillId);
+        return assetName is not null;
+    }
+
+    private static int ResolveBaseSkillIdForCode(ResourceCatalogSnapshot snapshot, int skillCode)
     {
         if (skillCode <= 0)
         {
             return 0;
         }
 
-        return snapshot.SkillDisplayProjections.TryGetValue(skillCode, out var presentation) && presentation.DisplaySkillId > 0
-            ? presentation.DisplaySkillId
+        return snapshot.SkillBaseProjections.TryGetValue(skillCode, out var projection) && projection.BaseSkillId > 0
+            ? projection.BaseSkillId
             : skillCode;
     }
 

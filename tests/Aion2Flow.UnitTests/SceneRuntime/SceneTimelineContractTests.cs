@@ -13,8 +13,8 @@ public class SceneTimelineContractTests
     [Fact]
     public void TimelineStamp_ObservationOrdinal_IsPrimaryOrderingKey()
     {
-        var earlier = new TimelineStamp(OffsetTicks: 1000, ObservationOrdinal: 1, FrameOrdinal: 10, BatchOrdinal: 5);
-        var later = new TimelineStamp(OffsetTicks: 500, ObservationOrdinal: 2, FrameOrdinal: 10, BatchOrdinal: 5);
+        var earlier = new TimelineStamp(OffsetTicks: 1000, ObservationOrdinal: 1, FlushId: 5);
+        var later = new TimelineStamp(OffsetTicks: 500, ObservationOrdinal: 2, FlushId: 5);
 
         Assert.True(earlier.ObservationOrdinal < later.ObservationOrdinal);
     }
@@ -22,23 +22,22 @@ public class SceneTimelineContractTests
     [Fact]
     public void TimelineStamp_Equality_IsStructural()
     {
-        var a = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 5, FrameOrdinal: 3, BatchOrdinal: 1);
-        var b = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 5, FrameOrdinal: 3, BatchOrdinal: 1);
-        var c = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 6, FrameOrdinal: 3, BatchOrdinal: 1);
+        var a = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 5, FlushId: 1);
+        var b = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 5, FlushId: 1);
+        var c = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 6, FlushId: 1);
 
         Assert.Equal(a, b);
         Assert.NotEqual(a, c);
     }
 
     [Fact]
-    public void TimelineStamp_PreservesFrameAndBatchOrdinals()
+    public void TimelineStamp_PreservesObservationAndFlushIds()
     {
-        var stamp = new TimelineStamp(OffsetTicks: 5000, ObservationOrdinal: 42, FrameOrdinal: 99, BatchOrdinal: 7);
+        var stamp = new TimelineStamp(OffsetTicks: 5000, ObservationOrdinal: 42, FlushId: 7);
 
         Assert.Equal(5000, stamp.OffsetTicks);
         Assert.Equal(42, stamp.ObservationOrdinal);
-        Assert.Equal(99, stamp.FrameOrdinal);
-        Assert.Equal(7, stamp.BatchOrdinal);
+        Assert.Equal(7, stamp.FlushId);
     }
 
     [Fact]
@@ -84,7 +83,7 @@ public class SceneTimelineContractTests
     {
         var envelope = new ObservedEventEnvelope(
             SceneSessionId: Guid.NewGuid(),
-            Stamp: new TimelineStamp(100, 0, 1, 1),
+            Stamp: new TimelineStamp(100, 0, 1),
             Domain: ObservedEventDomain.Combat,
             SourceEntityId: 100,
             TargetEntityId: 200,
@@ -105,7 +104,7 @@ public class SceneTimelineContractTests
     {
         var envelope = new ObservedEventEnvelope(
             SceneSessionId: Guid.NewGuid(),
-            Stamp: new TimelineStamp(0, 0, 0, 0),
+            Stamp: new TimelineStamp(0, 0, 0),
             Domain: ObservedEventDomain.Scene,
             SourceEntityId: 0,
             TargetEntityId: 0,
@@ -124,7 +123,7 @@ public class SceneTimelineContractTests
     {
         var envelope = new ObservedEventEnvelope(
             SceneSessionId: Guid.NewGuid(),
-            Stamp: new TimelineStamp(0, 0, 0, 0),
+            Stamp: new TimelineStamp(0, 0, 0),
             Domain: ObservedEventDomain.Diagnostic,
             SourceEntityId: 0,
             TargetEntityId: 0,
@@ -246,7 +245,7 @@ public class SceneTimelineContractTests
 
         for (int i = 0; i < 10; i++)
         {
-            var stamp = new TimelineStamp(i * 100, i, i, 0);
+            var stamp = new TimelineStamp(i * 100, i, 0);
             journal.Append(new ObservedEventEnvelope(sceneId, stamp, ObservedEventDomain.Combat, i, 0, default));
         }
 
@@ -261,10 +260,10 @@ public class SceneTimelineContractTests
         var sceneId = Guid.NewGuid();
 
         journal.Append(new ObservedEventEnvelope(sceneId,
-            new TimelineStamp(0, 0, 0, 0), ObservedEventDomain.Combat, 0, 0, default));
+            new TimelineStamp(0, 0, 0), ObservedEventDomain.Combat, 0, 0, default));
 
         var badEntry = new ObservedEventEnvelope(sceneId,
-            new TimelineStamp(100, 2, 0, 0), ObservedEventDomain.Combat, 0, 0, default);
+            new TimelineStamp(100, 2, 0), ObservedEventDomain.Combat, 0, 0, default);
 
         Assert.Throws<ArgumentException>(() => journal.Append(badEntry));
     }
@@ -276,7 +275,7 @@ public class SceneTimelineContractTests
         var sceneId = Guid.NewGuid();
 
         var entry = new ObservedEventEnvelope(sceneId,
-            new TimelineStamp(500, 0, 1, 1), ObservedEventDomain.Scene, 0, 0, default,
+            new TimelineStamp(500, 0, 1), ObservedEventDomain.Scene, 0, 0, default,
             Scene: new SceneObservation(910035, 0, 0, 0, "test"));
         journal.Append(entry);
 
@@ -294,18 +293,18 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void Journal_CompleteBatch_MonotonicallyIncreasing()
+    public void Journal_CompleteFlush_MonotonicallyIncreasing()
     {
         var journal = new ObservedEventJournal();
 
-        journal.CompleteBatch(0);
-        journal.CompleteBatch(1);
-        journal.CompleteBatch(5);
+        journal.CompleteFlush(0);
+        journal.CompleteFlush(1);
+        journal.CompleteFlush(5);
 
-        Assert.Equal(5, journal.LastCompletedBatchOrdinal);
+        Assert.Equal(5, journal.LastCompletedFlushId);
 
-        Assert.Throws<ArgumentException>(() => journal.CompleteBatch(5));
-        Assert.Throws<ArgumentException>(() => journal.CompleteBatch(3));
+        Assert.Throws<ArgumentException>(() => journal.CompleteFlush(5));
+        Assert.Throws<ArgumentException>(() => journal.CompleteFlush(3));
     }
 
     [Fact]
@@ -316,7 +315,7 @@ public class SceneTimelineContractTests
 
         for (int i = 0; i < 10; i++)
             journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var cursor0 = journal.CreateCursor(0);
         Assert.Equal(0, cursor0.NextObservationOrdinal);
@@ -336,7 +335,7 @@ public class SceneTimelineContractTests
 
         for (int i = 0; i < 10; i++)
             journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var cursor = journal.CreateCursor(3);
         var entries = new ObservedEventEnvelope[4];
@@ -356,7 +355,7 @@ public class SceneTimelineContractTests
 
         for (int i = 0; i < 3; i++)
             journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var cursor = journal.CreateCursor(1);
         var entries = new ObservedEventEnvelope[100];
@@ -374,7 +373,7 @@ public class SceneTimelineContractTests
 
         for (int i = 0; i < 3; i++)
             journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         ObservedEventEnvelope[] copied = [];
         var result = journal.ReadEntries(journal.CreateCursor(1), 10, entries => copied = entries.ToArray());
@@ -392,7 +391,7 @@ public class SceneTimelineContractTests
 
         for (var i = 0; i < 10; i++)
             journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         long[] ordinals = [];
         var result = journal.ReadEntries(journal.CreateCursor(3), 7, 10, entries => ordinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
@@ -410,12 +409,12 @@ public class SceneTimelineContractTests
 
         for (var i = 0; i < 3; i++)
             journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var first = journal.ReadEntries(journal.CreateCursor(0), 2, 10, _ => { });
         for (var i = 3; i < 20; i++)
             journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         long[] ordinals = [];
         var second = journal.ReadEntries(first.Cursor, journal.NextObservationOrdinal, 64, entries => ordinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
@@ -435,7 +434,7 @@ public class SceneTimelineContractTests
 
         for (var i = 0; i < 6; i++)
             journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, i, 0), ObservedEventDomain.Combat, i, 0, default));
+                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var segment = new SceneJournalSegment(journal, 2, 5, IsLiveGrowing: false);
         long[] ordinals = [];
@@ -451,9 +450,9 @@ public class SceneTimelineContractTests
     {
         var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 0);
 
-        var s1 = clock.CreateStamp(1000, 1, 1);
-        var s2 = clock.CreateStamp(2000, 2, 1);
-        var s3 = clock.CreateStamp(3000, 3, 1);
+        var s1 = clock.CreateStamp(1000, 1);
+        var s2 = clock.CreateStamp(2000, 1);
+        var s3 = clock.CreateStamp(3000, 1);
 
         Assert.Equal(0, s1.ObservationOrdinal);
         Assert.Equal(1, s2.ObservationOrdinal);
@@ -461,14 +460,13 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void Clock_CreateStamp_PreservesFrameAndBatch()
+    public void Clock_CreateStamp_PreservesBatch()
     {
         var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 0);
 
-        var stamp = clock.CreateStamp(5000, frameOrdinal: 42, batchOrdinal: 7);
+        var stamp = clock.CreateStamp(5000, flushId: 7);
 
-        Assert.Equal(42, stamp.FrameOrdinal);
-        Assert.Equal(7, stamp.BatchOrdinal);
+        Assert.Equal(7, stamp.FlushId);
     }
 
     [Fact]
@@ -476,8 +474,8 @@ public class SceneTimelineContractTests
     {
         var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 5_000);
 
-        var atStart = clock.CreateStamp(5_000, 0, 0);
-        var afterStart = clock.CreateStamp(10_000, 0, 0);
+        var atStart = clock.CreateStamp(5_000, 0);
+        var afterStart = clock.CreateStamp(10_000, 0);
 
         Assert.Equal(0, atStart.OffsetTicks);
         Assert.Equal(TimeSpan.FromSeconds(5).Ticks, afterStart.OffsetTicks);
@@ -489,11 +487,10 @@ public class SceneTimelineContractTests
         var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 0);
         clock.Reset(DateTimeOffset.FromUnixTimeMilliseconds(4_000));
 
-        var stamp = clock.CreateStamp(5_000, frameOrdinal: 5, batchOrdinal: 3);
+        var stamp = clock.CreateStamp(5_000, flushId: 3);
 
         Assert.Equal(10_000_000, stamp.OffsetTicks);
-        Assert.Equal(5, stamp.FrameOrdinal);
-        Assert.Equal(3, stamp.BatchOrdinal);
+        Assert.Equal(3, stamp.FlushId);
     }
 
     [Fact]
@@ -529,7 +526,7 @@ public class SceneTimelineContractTests
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(sceneStartedAtMilliseconds: 5_000);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var source = new PacketObservationSource(6_250, 1, 1, 0x008D, 16, 7, default);
+        var source = new PacketObservationSource(6_250, 1, 0x008D, 16, 7, default);
 
         sink.AppendNpcHp(in source, 42, 9_000, 10_000);
 
@@ -543,7 +540,7 @@ public class SceneTimelineContractTests
     {
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
-        var source = new PacketObservationSource(1_000, 1, 1, 0x2A38, 41, 7, default);
+        var source = new PacketObservationSource(1_000, 1, 0x2A38, 41, 7, default);
 
         sink.RegisterObservation2A38(in source, 42, 1, 19, 95, 163_000_001, 3_000, 0x010203040506, 0x10203040, 414, 77, 2, ResourceEffectRef.FromRaw(16_300_243), 13, 0x0102030405060708, 0x090A0B0C0D);
 
@@ -564,7 +561,7 @@ public class SceneTimelineContractTests
     {
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
-        var source = new PacketObservationSource(1_000, 1, 1, 0x2B38, 50, 7, default);
+        var source = new PacketObservationSource(1_000, 1, 0x2B38, 50, 7, default);
 
         sink.RegisterObservation2B38(in source, 42, 77, 19, 95, ResourceEffectRef.FromRaw(16_300_243), 123_456, 1, 2, 20);
 
@@ -583,7 +580,7 @@ public class SceneTimelineContractTests
     {
         var journal = new ObservedEventJournal();
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
-        var source = new PacketObservationSource(1_000, 1, 1, 0x2C38, 16, 7, default);
+        var source = new PacketObservationSource(1_000, 1, 0x2C38, 16, 7, default);
 
         Span<AuraResultRecord> results = stackalloc AuraResultRecord[4];
         results[0] = new AuraResultRecord(7, 93, 11, 23_771, 1, 2);

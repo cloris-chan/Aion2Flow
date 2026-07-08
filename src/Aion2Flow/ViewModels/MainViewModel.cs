@@ -6,7 +6,6 @@ using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.Presentation;
-using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -502,7 +501,13 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
         var snapshots = liveFrame?.BossFocuses ?? snapshot.BossFocuses;
         var damageContributions = liveFrame?.BossDamageContributions ?? EmptyBossDamageContributions;
-        BuildBossFocusDisplayGroups(snapshots, damageContributions);
+        BossFocusDisplayBuilder.Build(
+            snapshots,
+            damageContributions,
+            DisplayContext,
+            SettingsFlyout.CombatantStatisticsScope,
+            Combatants.ContainsKey,
+            _bossFocusDisplayGroups);
         if (SettingsFlyout.ShowFocusStatusBar)
         {
             SyncBossFocuses(snapshot.EncounterId, damageContributions);
@@ -555,8 +560,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                     group.Representative.InstanceId,
                     group.NpcCode,
                     group.InstanceCount,
-                    NormalizeBossHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp),
-                    NormalizeBossHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp),
+                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp),
+                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp),
                     group.Representative.HasHp,
                     group.Representative.HasMaxHp);
                 BossFocuses.Add(row);
@@ -567,8 +572,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                     group.Representative.InstanceId,
                     group.NpcCode,
                     group.InstanceCount,
-                    NormalizeBossHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp),
-                    NormalizeBossHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp),
+                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp),
+                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp),
                     group.Representative.HasHp,
                     group.Representative.HasMaxHp);
             }
@@ -576,92 +581,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             var hpBrush = ResolveBossHpBrush(encounterId, group.DisplayKey);
             row.UpdateSegments(CreateBossSegments(group.Representative, damageContributions, hpBrush, encounterId));
         }
-    }
-
-    private void BuildBossFocusDisplayGroups(SnapshotList<SceneBossFocusSnapshot> snapshots, IReadOnlyList<BossDamageContribution> damageContributions)
-    {
-        _bossFocusDisplayGroups.Clear();
-        var displayContext = DisplayContext;
-        for (var i = 0; i < snapshots.Count; i++)
-        {
-            var snapshot = snapshots[i];
-            if (!TryResolveBossFocusDisplayActivity(snapshot, damageContributions, out var displayObservedAtMilliseconds))
-                continue;
-
-            var npcCode = ResolveBossFocusNpcCode(displayContext, snapshot.InstanceId);
-            var displayKey = ResolveBossFocusDisplayKey(displayContext, snapshot.InstanceId, npcCode);
-            var existingIndex = FindBossFocusDisplayIndex(displayKey);
-            if (existingIndex < 0)
-            {
-                _bossFocusDisplayGroups.Add(new BossFocusDisplayGroup(displayKey, snapshot, npcCode, 1, ResolveBossShareEffectiveHp(npcCode, snapshot), displayObservedAtMilliseconds));
-                continue;
-            }
-
-            var existing = _bossFocusDisplayGroups[existingIndex];
-            var candidateWins = IsBetterBossFocusRepresentative(existing.Representative, existing.RepresentativeObservedAtMilliseconds, snapshot, displayObservedAtMilliseconds);
-            var representative = candidateWins ? snapshot : existing.Representative;
-            var representativeNpcCode = candidateWins ? npcCode : existing.NpcCode;
-            var representativeObservedAtMilliseconds = candidateWins ? displayObservedAtMilliseconds : existing.RepresentativeObservedAtMilliseconds;
-            _bossFocusDisplayGroups[existingIndex] = new BossFocusDisplayGroup(displayKey, representative, representativeNpcCode, existing.InstanceCount + 1, existing.EffectiveHp + ResolveBossShareEffectiveHp(npcCode, snapshot), representativeObservedAtMilliseconds);
-        }
-    }
-
-    private bool TryResolveBossFocusDisplayActivity(SceneBossFocusSnapshot snapshot, IReadOnlyList<BossDamageContribution> damageContributions, out long observedAtMilliseconds)
-    {
-        observedAtMilliseconds = snapshot.LastObservedAtMilliseconds;
-        if (SettingsFlyout.CombatantStatisticsScope == CombatantStatisticsScope.All)
-            return true;
-
-        var start = FindBossContributionStart(damageContributions, snapshot.InstanceId);
-        if (start < 0)
-            return false;
-
-        observedAtMilliseconds = 0;
-        var hasDisplayActivity = false;
-        for (var i = start; i < damageContributions.Count && damageContributions[i].BossId == snapshot.InstanceId; i++)
-        {
-            var contribution = damageContributions[i];
-            if (contribution.DamageAmount > 0 && Combatants.ContainsKey(contribution.SourceCombatantId))
-            {
-                hasDisplayActivity = true;
-                observedAtMilliseconds = Math.Max(observedAtMilliseconds, contribution.LastObservedAtMilliseconds);
-            }
-        }
-
-        return hasDisplayActivity &&
-               Math.Max(0, snapshot.LastObservedAtMilliseconds - observedAtMilliseconds) <= SceneReadModelOwner.BossFocusVisibilityTimeoutMilliseconds;
-    }
-
-    private static long ResolveBossFocusDisplayKey(SceneDisplayContext? displayContext, int instanceId, int npcCode)
-    {
-        if (npcCode > 0 &&
-            displayContext?.ResolveNpcCodeCatalogEntry(npcCode) is { Kind: var kind } &&
-            kind == NpcCatalogKind.TrainingDummy)
-        {
-            return -(long)npcCode;
-        }
-
-        return instanceId;
-    }
-
-    private static bool IsBetterBossFocusRepresentative(SceneBossFocusSnapshot current, long currentObservedAtMilliseconds, SceneBossFocusSnapshot candidate, long candidateObservedAtMilliseconds)
-    {
-        var cmp = candidateObservedAtMilliseconds.CompareTo(currentObservedAtMilliseconds);
-        return cmp > 0 || (cmp == 0 && candidate.InstanceId < current.InstanceId);
-    }
-
-    private static int ResolveBossFocusNpcCode(SceneDisplayContext? displayContext, int instanceId)
-        => displayContext is not null && displayContext.TryResolveNpcCode(instanceId, out var npcCode) ? npcCode : 0;
-
-    private int FindBossFocusDisplayIndex(long displayKey)
-    {
-        for (var i = 0; i < _bossFocusDisplayGroups.Count; i++)
-        {
-            if (_bossFocusDisplayGroups[i].DisplayKey == displayKey)
-                return i;
-        }
-
-        return -1;
     }
 
     private List<ProgressSegment> CreateBossSegments(SceneBossFocusSnapshot boss, IReadOnlyList<BossDamageContribution> damageContributions, IBrush hpBrush, Guid encounterId)
@@ -679,7 +598,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         if (lostRatio <= 0)
             return _bossSegmentScratch;
 
-        var start = FindBossContributionStart(damageContributions, boss.InstanceId);
+        var start = BossFocusDisplayBuilder.FindContributionStart(damageContributions, boss.InstanceId);
         if (start < 0)
             return _bossSegmentScratch;
 
@@ -712,33 +631,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         return _bossSegmentScratch;
     }
 
-    private static int FindBossContributionStart(IReadOnlyList<BossDamageContribution> damageContributions, int bossId)
-    {
-        var left = 0;
-        var right = damageContributions.Count - 1;
-        while (left <= right)
-        {
-            var mid = left + ((right - left) >> 1);
-            var contributionBossId = damageContributions[mid].BossId;
-            if (contributionBossId == bossId)
-            {
-                while (mid > 0 && damageContributions[mid - 1].BossId == bossId)
-                    mid--;
-                return mid;
-            }
-
-            if (contributionBossId < bossId)
-                left = mid + 1;
-            else
-                right = mid - 1;
-        }
-
-        return -1;
-    }
-
     private void RefreshCombatantBossShares(IReadOnlyList<BossDamageContribution> damageContributions)
     {
-        var scope = CreateCombatantBossShareScope();
+        var scope = BossFocusDisplayBuilder.CreateShareScope(_bossFocusDisplayGroups);
         var hasBossColumn = scope.EffectiveHp > 0;
         CombatantColumns.Update(hasBossColumn);
         if (!hasBossColumn)
@@ -751,79 +646,12 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         for (var i = 0; i < Combatants.Count; i++)
         {
             var row = Combatants[i];
-            var damage = FindAggregateBossContributionAmount(damageContributions, row.Id);
+            var damage = BossFocusDisplayBuilder.FindAggregateContributionAmount(
+                _bossFocusDisplayGroups,
+                damageContributions,
+                row.Id);
             row.UpdateBossShare(damage > 0 ? damage / (double)scope.EffectiveHp : 0, isVisible: true);
         }
-    }
-
-    private CombatantBossShareScope CreateCombatantBossShareScope()
-    {
-        var effectiveHp = 0L;
-        for (var i = 0; i < _bossFocusDisplayGroups.Count; i++)
-        {
-            var group = _bossFocusDisplayGroups[i];
-            var boss = group.Representative;
-            if (boss.Kind != NpcKind.Boss || group.EffectiveHp <= 0)
-                continue;
-
-            effectiveHp += group.EffectiveHp;
-        }
-
-        return new CombatantBossShareScope(effectiveHp);
-    }
-
-    private long FindAggregateBossContributionAmount(IReadOnlyList<BossDamageContribution> damageContributions, int combatantId)
-    {
-        var damage = 0L;
-        for (var i = 0; i < _bossFocusDisplayGroups.Count; i++)
-        {
-            var group = _bossFocusDisplayGroups[i];
-            var boss = group.Representative;
-            if (boss.Kind != NpcKind.Boss || group.EffectiveHp <= 0)
-                continue;
-
-            damage += FindBossContributionAmount(damageContributions, boss.InstanceId, combatantId);
-        }
-
-        return damage;
-    }
-
-    private static long ResolveBossShareEffectiveHp(int npcCode, SceneBossFocusSnapshot boss) => boss.HasHp && boss.HasMaxHp && boss.EffectiveHp > 0 ? NormalizeBossHpForDisplay(boss.Kind, npcCode, boss.EffectiveHp) : 0;
-
-    private static long NormalizeBossHpForDisplay(NpcKind kind, int npcCode, long value)
-    {
-        if (value <= 0)
-            return 0;
-
-        if (kind != NpcKind.Boss)
-            return value;
-
-        var divisor = ResolveBossHpDisplayDivisor(npcCode);
-        return divisor <= 1 ? value : (value + divisor / 2) / divisor;
-    }
-
-    private static int ResolveBossHpDisplayDivisor(int npcCode)
-    {
-        if (npcCode > 0 && CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry))
-            return entry.HpDisplayDivisor;
-
-        return 1;
-    }
-
-    private static long FindBossContributionAmount(IReadOnlyList<BossDamageContribution> damageContributions, int bossId, int sourceCombatantId)
-    {
-        var start = FindBossContributionStart(damageContributions, bossId);
-        if (start < 0)
-            return 0;
-
-        for (var i = start; i < damageContributions.Count && damageContributions[i].BossId == bossId; i++)
-        {
-            var contribution = damageContributions[i];
-            if (contribution.SourceCombatantId == sourceCombatantId)
-                return Math.Max(0L, contribution.DamageAmount);
-        }
-
-        return 0;
     }
 
     private void RefreshCombatantBars(Guid encounterId)
@@ -1283,7 +1111,4 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         }
     }
 
-    private readonly record struct BossFocusDisplayGroup(long DisplayKey, SceneBossFocusSnapshot Representative, int NpcCode, int InstanceCount, long EffectiveHp, long RepresentativeObservedAtMilliseconds);
-
-    private readonly record struct CombatantBossShareScope(long EffectiveHp);
 }

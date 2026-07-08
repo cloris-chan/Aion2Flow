@@ -127,14 +127,16 @@ public sealed class ScenePlaybackSession
         private readonly Dictionary<ScenePlaybackAuraInstanceKey, ScenePlaybackAuraState> _auraInstances;
         private readonly Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks;
         private readonly Queue<ScenePlaybackTrackMarker> _recentMarkers;
+        private ScenePlaybackTrackMarker[] _recentMarkerSnapshot = [];
+        private bool _recentMarkerSnapshotDirty;
         private SceneJournalSegment _segment;
         private ScenePlaybackTimeRange _timeRange;
         private JournalCursor _cursor;
         private long _targetOffsetMilliseconds;
         private long _positionMilliseconds;
         private long _appliedEndOrdinal;
-        private long _currentBatchOrdinal = -1;
-        private long _completedBatchOrdinal = -1;
+        private long _currentFlushId = -1;
+        private long _completedFlushId = -1;
         private int _detailCombatantId;
         private CombatDetailSubscription? _detailSubscription;
 
@@ -156,8 +158,8 @@ public sealed class ScenePlaybackSession
             _targetOffsetMilliseconds = timeRange.HasTiming ? timeRange.StartOffsetMilliseconds : 0;
             _positionMilliseconds = 0;
             _appliedEndOrdinal = segment.StartObservationOrdinal;
-            _currentBatchOrdinal = -1;
-            _completedBatchOrdinal = -1;
+            _currentFlushId = -1;
+            _completedFlushId = -1;
             _applier = new DomainEventApplier(_entities, _boundary, _metadata, _combat);
             _adapter = new SceneCombatSnapshotAdapter(_entities, _combat, _boundary, _applier.BossFocus, _encounterId);
         }
@@ -254,7 +256,7 @@ public sealed class ScenePlaybackSession
                     break;
             }
 
-            TryCompleteCurrentBatchAtSegmentEnd();
+            TryCompleteCurrentFlushAtSegmentEnd();
         }
 
         private void ApplyEntriesToObservationOrdinal(long endObservationOrdinalExclusive)
@@ -283,7 +285,7 @@ public sealed class ScenePlaybackSession
                     break;
             }
 
-            TryCompleteCurrentBatchAtSegmentEnd();
+            TryCompleteCurrentFlushAtSegmentEnd();
         }
 
         private void ResolvePositionAtObservationBoundary(long endObservationOrdinalExclusive)
@@ -307,35 +309,35 @@ public sealed class ScenePlaybackSession
 
         private void ApplyEntry(in ObservedEventEnvelope entry, long offset)
         {
-            var batchOrdinal = entry.Stamp.BatchOrdinal;
-            if (_currentBatchOrdinal >= 0 && batchOrdinal != _currentBatchOrdinal)
-                CompleteBatch(_currentBatchOrdinal);
+            var flushId = entry.Stamp.FlushId;
+            if (_currentFlushId >= 0 && flushId != _currentFlushId)
+                CompleteFlush(_currentFlushId);
 
-            _currentBatchOrdinal = batchOrdinal;
+            _currentFlushId = flushId;
             _applier.ApplyEntry(in entry);
             ApplyFrameTracks(in entry, offset);
             _appliedEndOrdinal = entry.Stamp.ObservationOrdinal + 1;
             _cursor = new JournalCursor(_appliedEndOrdinal);
         }
 
-        private void CompleteBatch(long batchOrdinal)
+        private void CompleteFlush(long flushId)
         {
-            if (batchOrdinal <= 0 || batchOrdinal <= _completedBatchOrdinal)
+            if (flushId <= 0 || flushId <= _completedFlushId)
                 return;
 
-            _applier.CompleteBatch(batchOrdinal);
-            _completedBatchOrdinal = batchOrdinal;
+            _applier.CompleteFlush();
+            _completedFlushId = flushId;
         }
 
-        private void TryCompleteCurrentBatchAtSegmentEnd()
+        private void TryCompleteCurrentFlushAtSegmentEnd()
         {
-            if (_currentBatchOrdinal <= 0 || _cursor.NextObservationOrdinal < _segment.CurrentEndObservationOrdinalExclusive)
+            if (_currentFlushId <= 0 || _cursor.NextObservationOrdinal < _segment.CurrentEndObservationOrdinalExclusive)
                 return;
 
-            if (_segment.IsLiveGrowing && (_segment.Journal?.LastCompletedBatchOrdinal ?? -1) < _currentBatchOrdinal)
+            if (_segment.IsLiveGrowing && (_segment.Journal?.LastCompletedFlushId ?? -1) < _currentFlushId)
                 return;
 
-            CompleteBatch(_currentBatchOrdinal);
+            CompleteFlush(_currentFlushId);
         }
 
         private void ApplyFrameTracks(in ObservedEventEnvelope entry, long offset)
@@ -429,6 +431,7 @@ public sealed class ScenePlaybackSession
             _recentMarkers.Enqueue(marker);
             while (_recentMarkers.Count > DefaultRecentMarkerCapacity)
                 _recentMarkers.Dequeue();
+            _recentMarkerSnapshotDirty = true;
         }
 
         private static long? ResolveExpiration(long renewedAtMilliseconds, ushort durationMilliseconds)
@@ -537,7 +540,12 @@ public sealed class ScenePlaybackSession
             if (_recentMarkers.Count == 0)
                 return [];
 
-            return _recentMarkers.ToArray();
+            if (!_recentMarkerSnapshotDirty)
+                return _recentMarkerSnapshot;
+
+            _recentMarkerSnapshot = _recentMarkers.ToArray();
+            _recentMarkerSnapshotDirty = false;
+            return _recentMarkerSnapshot;
         }
 
         private sealed class PlaybackDetailEventWriter : ICombatDetailEventWriter

@@ -4,6 +4,7 @@ using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.ViewModels;
 
@@ -276,7 +277,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -292,7 +293,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AppendScenePacket(scene, sink, playerId, bossId, 11000010, 300, 5_000, CombatEventKind.Damage, CombatValueKind.Damage, 5);
         AppendScenePacket(scene, sink, playerId, addId, 11000010, 200, 5_500, CombatEventKind.Damage, CombatValueKind.Damage, 6);
         for (var i = 1; i <= 6; i++)
-            sink.CompleteBatch(i);
+            sink.CompleteFlush(i);
 
         var snapshot = scene.Owner.CreateSnapshot();
         var detail = scene.Owner.CreateDetailDelta(snapshot, playerId);
@@ -327,7 +328,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         using var localization = new LocalizationService(language);
         var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
         const int summonId = 5001;
@@ -337,8 +338,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.AppendSummon(playerId, summonId);
         AppendScenePacket(scene, sink, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
         AppendScenePacket(scene, sink, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var snapshot = scene.Owner.CreateSnapshot();
         var detail = scene.Owner.CreateDetailDelta(snapshot, playerId);
@@ -360,7 +361,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -368,8 +369,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.AppendNickname(playerId, "Perigee");
         AppendScenePacket(scene, sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
         AppendScenePacket(scene, sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var snapshot = scene.Owner.CreateSnapshot();
         var payload = scene.Owner.CreateArchivePayload(snapshot);
@@ -396,7 +397,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -404,8 +405,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.AppendNickname(playerId, "Scene Player");
         AppendScenePacket(scene, sink, playerId, bossId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
         AppendScenePacket(scene, sink, playerId, bossId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var snapshot = scene.Owner.CreateSnapshot();
         var payload = scene.Owner.CreateArchivePayload(snapshot);
@@ -465,7 +466,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
         const int summonId = 5001;
@@ -475,8 +476,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.AppendSummon(playerId, summonId);
         AppendScenePacket(scene, sink, summonId, bossId, 11000010, 700, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
         AppendScenePacket(scene, sink, summonId, bossId, 11000010, 300, 11_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var snapshot = scene.Owner.CreateSnapshot();
         var payload = scene.Owner.CreateArchivePayload(snapshot);
@@ -1253,7 +1254,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         long timestamp,
         CombatEventKind eventKind,
         CombatValueKind valueKind,
-        long batchOrdinal)
+        long flushId)
     {
         sink.AppendCombatPacket(new ParsedCombatPacket
         {
@@ -1262,12 +1263,11 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             SkillCode = skillCode,
             Damage = damage,
             Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + timestamp,
-            BatchOrdinal = batchOrdinal,
             HitContribution = 1,
             AttemptContribution = 1,
             EventKind = eventKind,
             ValueKind = valueKind
-        });
+        }, flushId: flushId);
     }
 
     private static void AssertModifierValues(int actualCount, double actualRate, int expectedCount, int denominator)
@@ -1349,7 +1349,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
         var archive = new EncounterArchiveService();
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
         const int npcInstanceId = 29994;
@@ -1361,8 +1361,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.AppendNpcName(npcCode, "訓練用稻草人");
         AppendScenePacket(scene, sink, playerId, npcInstanceId, 11000010, 600, 10_000, CombatEventKind.Damage, CombatValueKind.Damage, 1);
         AppendScenePacket(scene, sink, playerId, npcInstanceId, 11000010, 400, 15_000, CombatEventKind.Damage, CombatValueKind.Damage, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var archivedSnapshot = scene.Owner.CreateSnapshot();
         var payload = scene.Owner.CreateArchivePayload(archivedSnapshot);

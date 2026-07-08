@@ -260,203 +260,115 @@ public partial class SettingsFlyoutView : UserControl
     {
         RefreshTopmostHeader();
         var vm = ViewModel;
-        if (_topmostMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        _topmostMenuItem.Items.Clear();
-        foreach (var mode in vm.TopmostModeOptions)
-        {
-            var item = new MenuItem
-            {
-                Header = vm.Localization[$"Settings_Topmost_{mode}"],
-                Tag = mode
-            };
-            item.Classes.Add("FlyoutMenuItem");
-            item.Icon = CreateCheckmark(mode == vm.TopmostMode);
-            item.Click += TopmostModeItemClicked;
-            _topmostMenuItem.Items.Add(item);
-        }
+        RebuildTaggedMenuItems(_topmostMenuItem, vm.TopmostModeOptions, mode => vm.Localization[$"Settings_Topmost_{mode}"], mode => mode, mode => mode == vm.TopmostMode, TopmostModeItemClicked);
     }
 
     private void RefreshTopmostCheckmarks()
     {
         var vm = ViewModel;
-        if (_topmostMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        foreach (var child in _topmostMenuItem.Items)
-        {
-            if (child is MenuItem { Tag: TopmostMode mode } mi)
-            {
-                mi.Icon = CreateCheckmark(mode == vm.TopmostMode);
-            }
-        }
+        RefreshTaggedMenuCheckmarks<TopmostMode>(_topmostMenuItem, mode => mode == vm.TopmostMode);
     }
 
     private void RebuildVisibleRowsMenuItems()
     {
         RefreshVisibleRowsHeader();
         var vm = ViewModel;
-        if (_visibleRowsMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        _visibleRowsMenuItem.Items.Clear();
-        foreach (var count in vm.RowCountOptions)
-        {
-            var item = new MenuItem
-            {
-                Header = count.ToString(),
-                Tag = count
-            };
-            item.Classes.Add("FlyoutMenuItem");
-            item.Icon = CreateCheckmark(count == vm.MaxVisibleCombatantRows);
-            item.Click += VisibleRowsItemClicked;
-            _visibleRowsMenuItem.Items.Add(item);
-        }
+        RebuildTaggedMenuItems(_visibleRowsMenuItem, vm.RowCountOptions, static count => count.ToString(), static count => count, count => count == vm.MaxVisibleCombatantRows, VisibleRowsItemClicked);
     }
 
     private void RefreshVisibleRowsCheckmarks()
     {
         var vm = ViewModel;
-        if (_visibleRowsMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        foreach (var child in _visibleRowsMenuItem.Items)
-        {
-            if (child is MenuItem { Tag: int count } mi)
-            {
-                mi.Icon = CreateCheckmark(count == vm.MaxVisibleCombatantRows);
-            }
-        }
+        RefreshTaggedMenuCheckmarks<int>(_visibleRowsMenuItem, count => count == vm.MaxVisibleCombatantRows);
     }
 
     private void RebuildCombatantStatisticsScopeMenuItems()
     {
         RefreshCombatantStatisticsScopeHeader();
         var vm = ViewModel;
-        if (_combatantStatisticsScopeMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        _combatantStatisticsScopeMenuItem.Items.Clear();
-        foreach (var scope in vm.CombatantStatisticsScopeOptions)
-        {
-            var item = new MenuItem
-            {
-                Header = vm.Localization[$"Settings_CombatantStatisticsScope_{scope}"],
-                Tag = scope
-            };
-            item.Classes.Add("FlyoutMenuItem");
-            item.Icon = CreateCheckmark(scope == vm.CombatantStatisticsScope);
-            item.Click += CombatantStatisticsScopeItemClicked;
-            _combatantStatisticsScopeMenuItem.Items.Add(item);
-        }
+        RebuildTaggedMenuItems(_combatantStatisticsScopeMenuItem, vm.CombatantStatisticsScopeOptions, scope => vm.Localization[$"Settings_CombatantStatisticsScope_{scope}"], scope => scope, scope => scope == vm.CombatantStatisticsScope, CombatantStatisticsScopeItemClicked);
     }
 
     private void RefreshCombatantStatisticsScopeCheckmarks()
     {
         var vm = ViewModel;
-        if (_combatantStatisticsScopeMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        foreach (var child in _combatantStatisticsScopeMenuItem.Items)
-        {
-            if (child is MenuItem { Tag: CombatantStatisticsScope scope } mi)
-            {
-                mi.Icon = CreateCheckmark(scope == vm.CombatantStatisticsScope);
-            }
-        }
+        RefreshTaggedMenuCheckmarks<CombatantStatisticsScope>(_combatantStatisticsScopeMenuItem, scope => scope == vm.CombatantStatisticsScope);
     }
 
     private void RebuildCombatantSortMetricMenuItems()
     {
         RefreshCombatantSortMetricHeader();
         var vm = ViewModel;
-        if (_combatantSortMetricMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        _combatantSortMetricMenuItem.Items.Clear();
-        foreach (var metric in vm.CombatantSortMetricOptions)
-        {
-            var item = new MenuItem
-            {
-                Header = vm.Localization[$"Settings_CombatantSortMetric_{metric}"],
-                Tag = metric
-            };
-            item.Classes.Add("FlyoutMenuItem");
-            item.Icon = CreateCheckmark(metric == vm.CombatantSortMetric);
-            item.Click += CombatantSortMetricItemClicked;
-            _combatantSortMetricMenuItem.Items.Add(item);
-        }
+        RebuildTaggedMenuItems(_combatantSortMetricMenuItem, vm.CombatantSortMetricOptions, metric => vm.Localization[$"Settings_CombatantSortMetric_{metric}"], metric => metric, metric => metric == vm.CombatantSortMetric, CombatantSortMetricItemClicked);
     }
 
     private void RefreshCombatantSortMetricCheckmarks()
     {
         var vm = ViewModel;
-        if (_combatantSortMetricMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        foreach (var child in _combatantSortMetricMenuItem.Items)
-        {
-            if (child is MenuItem { Tag: CombatantSortMetric metric } mi)
-            {
-                mi.Icon = CreateCheckmark(metric == vm.CombatantSortMetric);
-            }
-        }
+        RefreshTaggedMenuCheckmarks<CombatantSortMetric>(_combatantSortMetricMenuItem, metric => metric == vm.CombatantSortMetric);
     }
 
     private void RebuildSceneKindMenuItems()
     {
         RefreshSceneKindHeader();
         var vm = ViewModel;
-        if (_sceneKindMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        _sceneKindMenuItem.Items.Clear();
-        foreach (var kind in vm.SceneKindOptions)
-        {
-            var item = new MenuItem
-            {
-                Header = vm.Localization[$"Settings_SceneKind_{kind}"],
-                Tag = kind
-            };
-            item.Classes.Add("FlyoutMenuItem");
-            item.Icon = CreateCheckmark(kind == vm.SceneKind);
-            item.Click += SceneKindItemClicked;
-            _sceneKindMenuItem.Items.Add(item);
-        }
+        RebuildTaggedMenuItems(_sceneKindMenuItem, vm.SceneKindOptions, kind => vm.Localization[$"Settings_SceneKind_{kind}"], kind => kind, kind => kind == vm.SceneKind, SceneKindItemClicked);
     }
 
     private void RefreshSceneKindCheckmarks()
     {
         var vm = ViewModel;
-        if (_sceneKindMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        foreach (var child in _sceneKindMenuItem.Items)
-        {
-            if (child is MenuItem { Tag: SceneKind kind } mi)
-                mi.Icon = CreateCheckmark(kind == vm.SceneKind);
-        }
+        RefreshTaggedMenuCheckmarks<SceneKind>(_sceneKindMenuItem, kind => kind == vm.SceneKind);
     }
 
     private void RebuildPlayerNameSettingsMenuItems()
@@ -473,20 +385,7 @@ public partial class SettingsFlyoutView : UserControl
         _playerSelfMarkerMenuItem = new MenuItem();
         _playerSelfMarkerMenuItem.Classes.Add("FlyoutMenuItem");
         _playerSelfMarkerMenuItem.Classes.Add("SettingsRowItem");
-        _playerSelfMarkerMenuItem.Items.Clear();
-        foreach (var mode in vm.PlayerSelfMarkerDisplayModeOptions)
-        {
-            var item = new MenuItem
-            {
-                Header = vm.Localization[$"Settings_PlayerSelfMarker_{mode}"],
-                Tag = mode,
-                StaysOpenOnClick = true
-            };
-            item.Classes.Add("FlyoutMenuItem");
-            item.Icon = CreateCheckmark(mode == vm.PlayerSelfMarkerDisplayMode);
-            item.Click += PlayerSelfMarkerDisplayModeItemClicked;
-            _playerSelfMarkerMenuItem.Items.Add(item);
-        }
+        RebuildTaggedMenuItems(_playerSelfMarkerMenuItem, vm.PlayerSelfMarkerDisplayModeOptions, mode => vm.Localization[$"Settings_PlayerSelfMarker_{mode}"], mode => mode, mode => mode == vm.PlayerSelfMarkerDisplayMode, PlayerSelfMarkerDisplayModeItemClicked, staysOpenOnClick: true);
 
         _showPlayerShortServerNameMenuItem = CreateToggleMenuItem(vm.Localization["Settings_PlayerShortServerName"], vm.ShowPlayerShortServerNameDisplay, vm.ShowPlayerShortServerName, ShowPlayerShortServerNameMenuItemClicked);
         _showPlayerLegionNameMenuItem = CreateToggleMenuItem(vm.Localization["Settings_PlayerLegionName"], vm.ShowPlayerLegionNameDisplay, vm.ShowPlayerLegionName, ShowPlayerLegionNameMenuItemClicked);
@@ -511,38 +410,28 @@ public partial class SettingsFlyoutView : UserControl
 
         if (_showPlayerNamesMenuItem is not null)
         {
-            _showPlayerNamesMenuItem.Header = CreateRowHeader(vm.Localization["Settings_ShowPlayerNames"], vm.ShowPlayerNamesDisplay);
-            _showPlayerNamesMenuItem.Icon = CreateCheckmark(vm.ShowPlayerNames);
+            RefreshToggleMenuItem(_showPlayerNamesMenuItem, vm.Localization["Settings_ShowPlayerNames"], vm.ShowPlayerNamesDisplay, vm.ShowPlayerNames);
         }
 
         if (_playerSelfMarkerMenuItem is not null)
         {
             _playerSelfMarkerMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerSelfMarker"], vm.PlayerSelfMarkerDisplayModeDisplay);
-            foreach (var child in _playerSelfMarkerMenuItem.Items)
-            {
-                if (child is MenuItem { Tag: PlayerSelfMarkerDisplayMode mode } mi)
-                {
-                    mi.Icon = CreateCheckmark(mode == vm.PlayerSelfMarkerDisplayMode);
-                }
-            }
+            RefreshTaggedMenuCheckmarks<PlayerSelfMarkerDisplayMode>(_playerSelfMarkerMenuItem, mode => mode == vm.PlayerSelfMarkerDisplayMode);
         }
 
         if (_showPlayerShortServerNameMenuItem is not null)
         {
-            _showPlayerShortServerNameMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerShortServerName"], vm.ShowPlayerShortServerNameDisplay);
-            _showPlayerShortServerNameMenuItem.Icon = CreateCheckmark(vm.ShowPlayerShortServerName);
+            RefreshToggleMenuItem(_showPlayerShortServerNameMenuItem, vm.Localization["Settings_PlayerShortServerName"], vm.ShowPlayerShortServerNameDisplay, vm.ShowPlayerShortServerName);
         }
 
         if (_showPlayerLegionNameMenuItem is not null)
         {
-            _showPlayerLegionNameMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerLegionName"], vm.ShowPlayerLegionNameDisplay);
-            _showPlayerLegionNameMenuItem.Icon = CreateCheckmark(vm.ShowPlayerLegionName);
+            RefreshToggleMenuItem(_showPlayerLegionNameMenuItem, vm.Localization["Settings_PlayerLegionName"], vm.ShowPlayerLegionNameDisplay, vm.ShowPlayerLegionName);
         }
 
         if (_tintPlayerNamesByFactionMenuItem is not null)
         {
-            _tintPlayerNamesByFactionMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerFactionTint"], vm.TintPlayerNamesByFactionDisplay);
-            _tintPlayerNamesByFactionMenuItem.Icon = CreateCheckmark(vm.TintPlayerNamesByFaction);
+            RefreshToggleMenuItem(_tintPlayerNamesByFactionMenuItem, vm.Localization["Settings_PlayerFactionTint"], vm.TintPlayerNamesByFactionDisplay, vm.TintPlayerNamesByFaction);
         }
     }
 
@@ -554,8 +443,7 @@ public partial class SettingsFlyoutView : UserControl
             return;
         }
 
-        _compactMainMetricsMenuItem.Header = CreateRowHeader(vm.Localization["Settings_MainMetricsCompact"], vm.UseCompactMainMetricsDisplay);
-        _compactMainMetricsMenuItem.Icon = CreateCheckmark(vm.UseCompactMainMetrics);
+        RefreshToggleMenuItem(_compactMainMetricsMenuItem, vm.Localization["Settings_MainMetricsCompact"], vm.UseCompactMainMetricsDisplay, vm.UseCompactMainMetrics);
     }
 
     private void RefreshFocusStatusBarMenuItem()
@@ -566,49 +454,30 @@ public partial class SettingsFlyoutView : UserControl
             return;
         }
 
-        _focusStatusBarMenuItem.Header = CreateRowHeader(vm.Localization["Settings_FocusStatusBar"], vm.ShowFocusStatusBarDisplay);
-        _focusStatusBarMenuItem.Icon = CreateCheckmark(vm.ShowFocusStatusBar);
+        RefreshToggleMenuItem(_focusStatusBarMenuItem, vm.Localization["Settings_FocusStatusBar"], vm.ShowFocusStatusBarDisplay, vm.ShowFocusStatusBar);
     }
 
     private void RebuildLanguageMenuItems()
     {
         RefreshLanguageHeader();
         var vm = ViewModel;
-        if (_languageMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        _languageMenuItem.Items.Clear();
-        foreach (var option in vm.Languages)
-        {
-            var item = new MenuItem
-            {
-                Header = option.DisplayName,
-                Tag = option.Code
-            };
-            item.Classes.Add("FlyoutMenuItem");
-            item.Icon = CreateCheckmark(string.Equals(option.Code, vm.SelectedLanguage?.Code, StringComparison.Ordinal));
-            item.Click += LanguageItemClicked;
-            _languageMenuItem.Items.Add(item);
-        }
+        RebuildTaggedMenuItems(_languageMenuItem, vm.Languages, static option => option.DisplayName, static option => option.Code, option => string.Equals(option.Code, vm.SelectedLanguage?.Code, StringComparison.Ordinal), LanguageItemClicked);
     }
 
     private void RefreshLanguageCheckmarks()
     {
         var vm = ViewModel;
-        if (_languageMenuItem is null || vm is null)
+        if (vm is null)
         {
             return;
         }
 
-        foreach (var child in _languageMenuItem.Items)
-        {
-            if (child is MenuItem { Tag: string code } mi)
-            {
-                mi.Icon = CreateCheckmark(string.Equals(code, vm.SelectedLanguage?.Code, StringComparison.Ordinal));
-            }
-        }
+        RefreshTaggedMenuCheckmarks<string>(_languageMenuItem, code => string.Equals(code, vm.SelectedLanguage?.Code, StringComparison.Ordinal));
     }
 
     private void TopmostModeItemClicked(object? sender, RoutedEventArgs e)
@@ -774,6 +643,56 @@ public partial class SettingsFlyoutView : UserControl
         var vm = ViewModel;
         if (_playerNameSettingsMenuItem is null || vm is null) return;
         _playerNameSettingsMenuItem.Header = CreateRowHeader(vm.Localization["Settings_PlayerNameSettings"], vm.PlayerNameSettingsDisplay);
+    }
+
+    private static void RebuildTaggedMenuItems<TOption, TTag>(
+        MenuItem? menuItem,
+        IEnumerable<TOption> options,
+        Func<TOption, string> resolveHeader,
+        Func<TOption, TTag> resolveTag,
+        Func<TOption, bool> isSelected,
+        EventHandler<RoutedEventArgs> click,
+        bool staysOpenOnClick = false)
+    {
+        if (menuItem is null)
+            return;
+
+        menuItem.Items.Clear();
+        foreach (var option in options)
+        {
+            var item = new MenuItem
+            {
+                Header = resolveHeader(option),
+                Tag = resolveTag(option),
+                StaysOpenOnClick = staysOpenOnClick
+            };
+            item.Classes.Add("FlyoutMenuItem");
+            item.Classes.Add("SettingsOptionItem");
+            item.Icon = CreateCheckmark(isSelected(option));
+            item.Click += click;
+            menuItem.Items.Add(item);
+        }
+    }
+
+    private static void RefreshTaggedMenuCheckmarks<TTag>(MenuItem? menuItem, Func<TTag, bool> isSelected)
+    {
+        if (menuItem is null)
+            return;
+
+        foreach (var child in menuItem.Items)
+        {
+            if (child is MenuItem { Tag: TTag value } mi)
+                mi.Icon = CreateCheckmark(isSelected(value));
+        }
+    }
+
+    private static void RefreshToggleMenuItem(MenuItem? menuItem, string label, string value, bool isChecked)
+    {
+        if (menuItem is null)
+            return;
+
+        menuItem.Header = CreateRowHeader(label, value);
+        menuItem.Icon = CreateCheckmark(isChecked);
     }
 
     private static MenuItem CreateToggleMenuItem(string label, string value, bool isChecked, EventHandler<RoutedEventArgs> click)

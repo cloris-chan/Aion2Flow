@@ -6,6 +6,8 @@ namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
 public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0, int pairCapacity = 0) : ISnapshotChangeFeed<CombatSnapshotChange>
 {
+    public const long UnknownSourceObservationOrdinal = -1;
+
     private readonly Dictionary<(int Source, int Target), CombatPairRecord> _pairs = pairCapacity > 0 ? new(pairCapacity) : [];
     private readonly Dictionary<int, CombatantRecord> _combatants = combatantCapacity > 0 ? new(combatantCapacity) : [];
     private readonly Dictionary<int, HashSet<(int, int)>> _outgoingBySource = combatantCapacity > 0 ? new(combatantCapacity) : [];
@@ -43,27 +45,36 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         }
     }
 
-    public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation, long observedAtMilliseconds)
+    public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation, long observedAtMilliseconds, long sourceObservationOrdinal = UnknownSourceObservationOrdinal, RawPacketReference raw = default, CombatContributionCanonicalization canonicalization = CombatContributionCanonicalization.None)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(observedAtMilliseconds);
-        _revision++;
+        ValidateSourceObservationOrdinal(sourceObservationOrdinal);
         var contribution = CombatContributionClassifier.Evaluate(in observation);
+        AppendCombatEvent(sourceId, targetId, observedAtMilliseconds, sourceObservationOrdinal, raw, in observation, in contribution, canonicalization);
+    }
+
+    private static void ValidateSourceObservationOrdinal(long sourceObservationOrdinal)
+    {
+        if (sourceObservationOrdinal < UnknownSourceObservationOrdinal)
+            throw new ArgumentOutOfRangeException(nameof(sourceObservationOrdinal), sourceObservationOrdinal, "Source observation ordinal must be -1 or greater.");
+    }
+
+    private void AppendCombatEvent(int sourceId, int targetId, long observedAtMilliseconds, long sourceObservationOrdinal, RawPacketReference raw, in CombatObservation observation, in CombatContribution contribution, CombatContributionCanonicalization canonicalization)
+    {
+        _revision++;
+        var eventKey = CombatEventKey.FromObservation(in observation);
         var eventRecord = new CombatEventRecord
         {
             SourceId = sourceId,
             TargetId = targetId,
             Observation = observation,
+            Raw = raw,
             ObservedAtMilliseconds = observedAtMilliseconds,
+            SourceObservationOrdinal = sourceObservationOrdinal,
             Revision = _revision,
-            ContributesDamage = contribution.CountsAsDamage,
-            ContributesHealing = contribution.CountsAsHealing,
-            ContributesShieldGrant = contribution.CountsAsShieldGrant,
-            ContributesShieldAbsorbed = contribution.CountsAsShieldAbsorbed,
-            HitCount = contribution.HitCount,
-            AttemptCount = contribution.AttemptCount,
-            EvadeCount = contribution.EvadeCount,
-            InvincibleCount = contribution.InvincibleCount,
-            MultiHitCount = contribution.MultiHitCount
+            EventKey = eventKey,
+            Contribution = contribution,
+            Canonicalization = canonicalization
         };
         _events.Add(eventRecord);
         var totalHealing = contribution.HealingAmount;
@@ -632,17 +643,22 @@ public readonly record struct CombatEventRecord
     public int SourceId { get; init; }
     public int TargetId { get; init; }
     public CombatObservation Observation { get; init; }
+    public RawPacketReference Raw { get; init; }
     public long ObservedAtMilliseconds { get; init; }
+    public long SourceObservationOrdinal { get; init; }
     public long Revision { get; init; }
-    public bool ContributesDamage { get; init; }
-    public bool ContributesHealing { get; init; }
-    public bool ContributesShieldGrant { get; init; }
-    public bool ContributesShieldAbsorbed { get; init; }
-    public int HitCount { get; init; }
-    public int AttemptCount { get; init; }
-    public int EvadeCount { get; init; }
-    public int InvincibleCount { get; init; }
-    public int MultiHitCount { get; init; }
+    public CombatEventKey EventKey { get; init; }
+    public CombatContribution Contribution { get; init; }
+    public CombatContributionCanonicalization Canonicalization { get; init; }
+    public bool ContributesDamage => Contribution.CountsAsDamage;
+    public bool ContributesHealing => Contribution.CountsAsHealing;
+    public bool ContributesShieldGrant => Contribution.CountsAsShieldGrant;
+    public bool ContributesShieldAbsorbed => Contribution.CountsAsShieldAbsorbed;
+    public int HitCount => Contribution.HitCount;
+    public int AttemptCount => Contribution.AttemptCount;
+    public int EvadeCount => Contribution.EvadeCount;
+    public int InvincibleCount => Contribution.InvincibleCount;
+    public int MultiHitCount => Contribution.MultiHitCount;
 }
 
 public sealed class CombatantRecord

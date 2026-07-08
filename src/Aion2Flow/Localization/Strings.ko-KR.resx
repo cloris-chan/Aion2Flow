@@ -157,6 +157,22 @@
   <data name="Column_Skill" xml:space="preserve"><value>스킬</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>직격</value></data>
   <data name="Column_Share" xml:space="preserve"><value>비율</value></data>
+  <data name="Column_Events" xml:space="preserve"><value>이벤트</value></data>
+  <data name="Column_Action" xml:space="preserve"><value>행동</value></data>
+  <data name="Column_Index" xml:space="preserve"><value>번호</value></data>
+  <data name="Column_Header" xml:space="preserve"><value>헤더</value></data>
+  <data name="Column_Evidence" xml:space="preserve"><value>증거</value></data>
+  <data name="Column_Route" xml:space="preserve"><value>경로</value></data>
+  <data name="Column_Opcode" xml:space="preserve"><value>Opcode</value></data>
+  <data name="Column_Opcodes" xml:space="preserve"><value>Opcode</value></data>
+  <data name="Column_HeaderPacket" xml:space="preserve"><value>헤더 패킷</value></data>
+  <data name="Column_Packet" xml:space="preserve"><value>패킷</value></data>
+  <data name="Column_Source" xml:space="preserve"><value>출처</value></data>
+  <data name="Column_Target" xml:space="preserve"><value>대상</value></data>
+  <data name="Column_Time" xml:space="preserve"><value>시간</value></data>
+  <data name="Column_Value" xml:space="preserve"><value>값</value></data>
+  <data name="Column_Effect" xml:space="preserve"><value>효과</value></data>
+  <data name="Column_Canonicalization" xml:space="preserve"><value>정규화</value></data>
   <data name="Settings_CombatantSortMetric" xml:space="preserve"><value>정렬 기준</value></data>
   <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
   <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>총 피해</value></data>

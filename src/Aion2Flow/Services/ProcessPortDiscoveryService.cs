@@ -17,16 +17,13 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
 {
     private enum PortEventType { Add, Remove }
     internal readonly record struct PortPair(ushort LocalPort, ushort RemotePort);
-    private readonly record struct QueueEventItem(long ExpiredAt, PortEventType Type, uint ProcessId, PortPair PortPair);
 
     private const string ProcessName = "Aion2";
     private const int SearchPollInterval = 1000;
     private const int KnownProcessPollInterval = 1000;
-    private const int QueueExpiration = 10_000;
+    private const int KnownProcessRefreshInterval = 5000;
 
     private readonly ConcurrentDictionary<uint, HashSet<PortPair>> _processPorts = new();
-
-    private readonly ConcurrentQueue<QueueEventItem> _eventQueue = new();
 
     private volatile bool _snapshotDirty = true;
     private ImmutableArray<uint> _processIdsSnapshot = [];
@@ -109,7 +106,6 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
         return Task.Factory.StartNew(() =>
         {
             var address = new WinDivertAddress();
-            var sw = Stopwatch.StartNew();
             var buffer = Span<byte>.Empty;
 
             while (!token.IsCancellationRequested)
@@ -131,10 +127,6 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
                     {
                         UpdatePortState(flow.ProcessId, new(flow.LocalPort, flow.RemotePort), eventType.Value);
                     }
-                    else
-                    {
-                        _eventQueue.Enqueue(new(sw.ElapsedMilliseconds + QueueExpiration, eventType.Value, flow.ProcessId, new(flow.LocalPort, flow.RemotePort)));
-                    }
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex)
@@ -155,66 +147,60 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
             var vanishedPids = new List<uint>();
             var currentConnections = new HashSet<PortPair>();
             var sw = Stopwatch.StartNew();
+            var nextProcessRefreshAt = 0L;
 
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    currentPids.Clear();
-                    if (TryGetPidsByProcessName(ProcessName, currentPids))
+                    var now = sw.ElapsedMilliseconds;
+                    if (knownPids.Count == 0 || now >= nextProcessRefreshAt)
                     {
-                        long now = sw.ElapsedMilliseconds;
-
-                        foreach (var pid in currentPids)
+                        currentPids.Clear();
+                        if (TryGetPidsByProcessName(ProcessName, currentPids))
                         {
-                            var isNewProcess = knownPids.Add(pid);
-                            EnsureProcessTracked(pid);
+                            nextProcessRefreshAt = now + (currentPids.Count == 0 ? SearchPollInterval : KnownProcessRefreshInterval);
 
-                            currentConnections.Clear();
-                            if (TryGetTcpPortsForPid(pid, currentConnections))
+                            foreach (var pid in currentPids)
                             {
-                                SynchronizeProcessPorts(pid, currentConnections);
+                                knownPids.Add(pid);
+                                EnsureProcessTracked(pid);
                             }
 
-                            if (isNewProcess)
+                            vanishedPids.Clear();
+                            foreach (var pid in knownPids)
                             {
-                                foreach (var item in _eventQueue)
-                                {
-                                    if (item.ProcessId == pid)
-                                        UpdatePortState(pid, item.PortPair, item.Type);
-                                }
+                                if (!currentPids.Contains(pid))
+                                    vanishedPids.Add(pid);
                             }
-                        }
 
-                        vanishedPids.Clear();
-                        foreach (var pid in knownPids)
-                        {
-                            if (!currentPids.Contains(pid))
-                                vanishedPids.Add(pid);
-                        }
-
-                        if (vanishedPids.Count != 0)
-                        {
-                            foreach (var pid in vanishedPids)
+                            if (vanishedPids.Count != 0)
                             {
-                                knownPids.Remove(pid);
-                                if (_processPorts.TryRemove(pid, out var portSet))
+                                foreach (var pid in vanishedPids)
                                 {
-                                    lock (portSet)
+                                    knownPids.Remove(pid);
+                                    if (_processPorts.TryRemove(pid, out var portSet))
                                     {
-                                        var uniqueLocals = new HashSet<ushort>();
-                                        foreach (var (LocalPort, _) in portSet) uniqueLocals.Add(LocalPort);
-                                        foreach (var lp in uniqueLocals) Removed?.Invoke(pid, lp);
+                                        lock (portSet)
+                                        {
+                                            var uniqueLocals = new HashSet<ushort>();
+                                            foreach (var (LocalPort, _) in portSet) uniqueLocals.Add(LocalPort);
+                                            foreach (var lp in uniqueLocals) Removed?.Invoke(pid, lp);
+                                        }
+                                        _snapshotDirty = true;
                                     }
-                                    _snapshotDirty = true;
                                 }
                             }
                         }
+                    }
 
-                        while (_eventQueue.TryPeek(out var item) && item.ExpiredAt < now)
-                        {
-                            _eventQueue.TryDequeue(out _);
-                        }
+                    foreach (var pid in knownPids)
+                    {
+                        EnsureProcessTracked(pid);
+
+                        currentConnections.Clear();
+                        if (TryGetTcpPortsForPid(pid, currentConnections))
+                            SynchronizeProcessPorts(pid, currentConnections);
                     }
                 }
                 catch (Exception ex)

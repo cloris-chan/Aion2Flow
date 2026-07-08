@@ -110,9 +110,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.AppendCombatObservation(in packet, sourceId, targetId, in observation);
     }
 
-    public void CompleteBatch(long batchOrdinal)
+    public void CompleteFlush(long flushId)
     {
-        lock (gate) inner.CompleteBatch(batchOrdinal);
+        lock (gate) inner.CompleteFlush(flushId);
     }
 
     public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type)

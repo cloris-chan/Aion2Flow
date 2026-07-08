@@ -395,7 +395,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_100 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_100 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1, FlushId = 1 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = ownerId,
             TargetEntityId = 0,
@@ -406,7 +406,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_480 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, BatchOrdinal = 2 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_480 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 2 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = effectSourceId,
             TargetEntityId = 0,
@@ -417,7 +417,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_620 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, BatchOrdinal = 3 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_620 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 3 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = effectSourceId,
             TargetEntityId = targetId,
@@ -437,7 +437,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_680 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, BatchOrdinal = 4 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_680 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 4 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = effectSourceId,
             TargetEntityId = targetId,
@@ -496,7 +496,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 1 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = ownerId,
             TargetEntityId = targetId,
@@ -513,7 +513,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_240 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, BatchOrdinal = 2 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_240 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 2 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = effectSourceId,
             TargetEntityId = targetId,
@@ -533,7 +533,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, BatchOrdinal = 3 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 3 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = effectSourceId,
             TargetEntityId = targetId,
@@ -553,7 +553,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_400 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 5, BatchOrdinal = 4 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_400 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 5, FlushId = 4 },
             Domain = ObservedEventDomain.State,
             SourceEntityId = effectSourceId,
             State = new StateObservation { EntityId = effectSourceId, StateCode = 2_920_658 }
@@ -593,7 +593,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1, FlushId = 1 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = nonPlayerSourceId,
             TargetEntityId = 0,
@@ -604,7 +604,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, BatchOrdinal = 2 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 2 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = effectSourceId,
             TargetEntityId = 0,
@@ -615,7 +615,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_460 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, BatchOrdinal = 3 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_460 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 3 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = effectSourceId,
             TargetEntityId = targetId,
@@ -635,7 +635,7 @@ public class DomainEventApplierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_520 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, BatchOrdinal = 4 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_520 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 4 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = effectSourceId,
             TargetEntityId = targetId,
@@ -1795,7 +1795,7 @@ public class SceneReadModelOwnerTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0, BatchOrdinal = 100 },
+            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0, FlushId = 100 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = 100,
             TargetEntityId = 200,
@@ -1816,7 +1816,7 @@ public class SceneReadModelOwnerTests
 
         Assert.False(owner.Combat.TryGetPair(100, 200, out _));
 
-        journal.CompleteBatch(100);
+        journal.CompleteFlush(100);
         owner.Refresh();
 
         Assert.True(owner.Combat.TryGetPair(100, 200, out var pair));
@@ -1831,18 +1831,18 @@ public class SceneReadModelOwnerTests
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
         AppendScenePacket(scene, sink, 100, 200, 11000010, 300, 2_000, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var firstSnapshot = scene.Owner.CreateSnapshot();
         var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
 
         AppendScenePacket(scene, sink, 300, 400, 11000010, 700, 3_000, 3);
-        sink.CompleteBatch(3);
+        sink.CompleteFlush(3);
 
         var secondSnapshot = scene.Owner.CreateSnapshot();
         var warm = scene.Owner.CreateDetailDelta(secondSnapshot, 100);
@@ -1858,18 +1858,18 @@ public class SceneReadModelOwnerTests
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
         AppendScenePacket(scene, sink, 100, 200, 11000010, 300, 2_000, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var firstSnapshot = scene.Owner.CreateSnapshot();
         var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
 
         AppendScenePacket(scene, sink, 100, 200, 11000010, 200, 3_000, 3);
-        sink.CompleteBatch(3);
+        sink.CompleteFlush(3);
 
         var secondSnapshot = scene.Owner.CreateSnapshot();
         var warm = scene.Owner.CreateDetailDelta(secondSnapshot, 100);
@@ -1885,12 +1885,12 @@ public class SceneReadModelOwnerTests
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
         AppendScenePacket(scene, sink, 300, 400, 11000010, 700, 2_000, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var snapshot = scene.Owner.CreateSnapshot();
         var first = scene.Owner.CreateDetailDelta(snapshot, 100);
@@ -1909,20 +1909,20 @@ public class SceneReadModelOwnerTests
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var scene = new SceneLiveReadModel();
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextBatchOrdinal);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         sink.AppendNickname(100, "Owner");
         sink.AppendSummon(100, 500);
         AppendScenePacket(scene, sink, 500, 200, 11000010, 500, 1_000, 1);
         AppendScenePacket(scene, sink, 500, 200, 11000010, 300, 2_000, 2);
-        sink.CompleteBatch(1);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
 
         var firstSnapshot = scene.Owner.CreateSnapshot();
         var cold = scene.Owner.CreateDetailDelta(firstSnapshot, 100);
 
         AppendScenePacket(scene, sink, 500, 200, 11000010, 200, 3_000, 3);
-        sink.CompleteBatch(3);
+        sink.CompleteFlush(3);
 
         var secondSnapshot = scene.Owner.CreateSnapshot();
         var warm = scene.Owner.CreateDetailDelta(secondSnapshot, 100);
@@ -1957,13 +1957,12 @@ public class SceneReadModelOwnerTests
                     SkillCode = 11000010,
                     Damage = 10,
                     Timestamp = 1_000 + currentBatch * 25,
-                    BatchOrdinal = currentBatch,
                     HitContribution = 1,
                     AttemptContribution = 1,
                     EventKind = CombatEventKind.Damage,
                     ValueKind = CombatValueKind.Damage
-                });
-                sink.CompleteBatch(currentBatch);
+                }, flushId: currentBatch);
+                sink.CompleteFlush(currentBatch);
                 if (currentBatch % 37 == 0)
                     scene.Reset(new DateTimeOffset(2026, 5, 9, 14, 30, (int)(currentBatch % 60), TimeSpan.Zero));
             }
@@ -2037,12 +2036,11 @@ public class SceneReadModelOwnerTests
                 SkillCode = 11000010,
                 Damage = 500,
                 Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + 1_000,
-                BatchOrdinal = 1,
                 HitContribution = 1,
                 AttemptContribution = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            });
+            }, flushId: 1);
             sink.AppendCombatPacket(new ParsedCombatPacket
             {
                 SourceId = 100,
@@ -2050,14 +2048,13 @@ public class SceneReadModelOwnerTests
                 SkillCode = 11000010,
                 Damage = 300,
                 Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + 2_000,
-                BatchOrdinal = 2,
                 HitContribution = 1,
                 AttemptContribution = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            });
-            sink.CompleteBatch(1);
-            sink.CompleteBatch(2);
+            }, flushId: 2);
+            sink.CompleteFlush(1);
+            sink.CompleteFlush(2);
 
             var first = scene.Owner.CreateSnapshot();
             var oldSessionId = scene.SessionId;
@@ -2071,12 +2068,11 @@ public class SceneReadModelOwnerTests
                 SkillCode = 11000010,
                 Damage = 700,
                 Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + 3_000,
-                BatchOrdinal = 3,
                 HitContribution = 1,
                 AttemptContribution = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            });
+            }, flushId: 3);
             sink.AppendCombatPacket(new ParsedCombatPacket
             {
                 SourceId = 100,
@@ -2084,14 +2080,13 @@ public class SceneReadModelOwnerTests
                 SkillCode = 11000010,
                 Damage = 300,
                 Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + 4_000,
-                BatchOrdinal = 4,
                 HitContribution = 1,
                 AttemptContribution = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            });
-            sink.CompleteBatch(3);
-            sink.CompleteBatch(4);
+            }, flushId: 4);
+            sink.CompleteFlush(3);
+            sink.CompleteFlush(4);
 
             var second = scene.Owner.CreateSnapshot();
 
@@ -2129,13 +2124,12 @@ public class SceneReadModelOwnerTests
                 SkillCode = 11000010,
                 Damage = 500,
                 Timestamp = 1_000,
-                BatchOrdinal = 1,
                 HitContribution = 1,
                 AttemptContribution = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            });
-            sink.CompleteBatch(1);
+            }, flushId: 1);
+            sink.CompleteFlush(1);
 
             scene.Reset(new DateTimeOffset(2026, 5, 30, 19, 35, 44, TimeSpan.Zero));
 
@@ -2277,7 +2271,7 @@ public class SceneReadModelOwnerTests
         int skillCode,
         int damage,
         long timestamp,
-        long batchOrdinal)
+        long flushId)
     {
         sink.AppendCombatPacket(new ParsedCombatPacket
         {
@@ -2286,11 +2280,10 @@ public class SceneReadModelOwnerTests
             SkillCode = skillCode,
             Damage = damage,
             Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + timestamp,
-            BatchOrdinal = batchOrdinal,
             HitContribution = 1,
             AttemptContribution = 1,
             EventKind = CombatEventKind.Damage,
             ValueKind = CombatValueKind.Damage
-        });
+        }, flushId: flushId);
     }
 }

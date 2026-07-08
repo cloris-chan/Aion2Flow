@@ -294,11 +294,11 @@ public sealed class BossFocusStoreTests
         var clock = new SceneRuntimeClock(sceneStarted.ToUnixTimeMilliseconds());
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
         var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), sceneStarted, new RuntimeMetadataRegistry(), timeProvider);
-        var kindSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 100, 0, 0, 0, 0, 0, default);
-        var hpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 200, 0, 0, 0, 0, 0, default);
-        var combatSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 300, 0, 1, 0, 0, 0, default);
-        var deathSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 1_200, 0, 2, 0, 0, 0, default);
-        var restoredHpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 12_500, 0, 3, 0, 0, 0, default);
+        var kindSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 100, 0, 0, 0, 0, default);
+        var hpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 200, 0, 0, 0, 0, default);
+        var combatSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 300, 1, 0, 0, 0, default);
+        var deathSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 1_200, 2, 0, 0, 0, default);
+        var restoredHpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 12_500, 3, 0, 0, 0, default);
         var combat = new CombatObservation
         {
             Damage = 500,
@@ -311,12 +311,12 @@ public sealed class BossFocusStoreTests
         sink.AppendNpcKind(in kindSource, 3518, NpcKind.Boss);
         sink.AppendNpcHp(in hpSource, 3518, 156_500, 167_000);
         sink.AppendCombatObservation(in combatSource, 100, 3518, in combat);
-        sink.CompleteBatch(1);
+        sink.CompleteFlush(1);
         timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(300));
         Assert.Single(owner.CreateSnapshot().BossFocuses);
 
         sink.AppendNpcHp(in deathSource, 3518, 0, 167_000);
-        sink.CompleteBatch(2);
+        sink.CompleteFlush(2);
         timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(1_200));
         Assert.Single(owner.CreateSnapshot().BossFocuses);
 
@@ -324,7 +324,7 @@ public sealed class BossFocusStoreTests
         Assert.Empty(owner.CreateSnapshot().BossFocuses);
 
         sink.AppendNpcHp(in restoredHpSource, 3518, 167_000, 167_000);
-        sink.CompleteBatch(3);
+        sink.CompleteFlush(3);
 
         Assert.Empty(owner.CreateSnapshot().BossFocuses);
     }
@@ -338,9 +338,9 @@ public sealed class BossFocusStoreTests
         var clock = new SceneRuntimeClock(sceneStarted.ToUnixTimeMilliseconds());
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
         var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), sceneStarted, new RuntimeMetadataRegistry(), timeProvider);
-        var kindSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 100, 0, 0, 0, 0, 0, default);
-        var hpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 200, 0, 0, 0, 0, 0, default);
-        var combatSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 300, 0, 0, 0, 0, 0, default);
+        var kindSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 100, 0, 0, 0, 0, default);
+        var hpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 200, 0, 0, 0, 0, default);
+        var combatSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 300, 0, 0, 0, 0, default);
         var combat = new CombatObservation
         {
             Damage = 500,

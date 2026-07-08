@@ -82,7 +82,7 @@ public sealed class PacketLogReplayService
         var metadataRegistry = new RuntimeMetadataRegistry();
         var replayTimeProvider = new ReplayTimeProvider(sceneStarted);
         var owner = new SceneReadModelOwner(journal, sceneId, sceneStarted, metadataRegistry, replayTimeProvider);
-        long nextBatchOrdinal = 0;
+        long nextFlushId = 0;
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var inboundProcessors = new Dictionary<TcpConnection, ReplayConnectionProcessor>();
@@ -126,7 +126,7 @@ public sealed class PacketLogReplayService
                     journal,
                     clock,
                     () => sceneId,
-                    () => Interlocked.Increment(ref nextBatchOrdinal));
+                    () => Interlocked.Increment(ref nextFlushId));
                 inboundProcessor = new ReplayConnectionProcessor(
                     connectionSink,
                     new PacketStreamProcessor(connectionSink));
@@ -161,7 +161,7 @@ public sealed class PacketLogReplayService
                 var connection = entry.Connection;
                 if (hasLastParsedConnection && !lastParsedConnection.IsSameConnection(in connection, out _))
                 {
-                    var source = new PacketObservationSource(entry.Timestamp.ToUnixTimeMilliseconds(), 0, 0, 0, entry.Payload.Length, 0, default);
+                    var source = new PacketObservationSource(entry.Timestamp.ToUnixTimeMilliseconds(), 0, 0, entry.Payload.Length, 0, default);
                     inboundProcessor.Sink.MarkSceneTransportBoundary(in source);
                 }
 
@@ -177,7 +177,7 @@ public sealed class PacketLogReplayService
             }
         }
 
-        journal.CompleteBatch(long.MaxValue);
+        journal.CompleteFlush(long.MaxValue);
         foreach (var processor in inboundProcessors.Values)
             processor.Dispose();
 

@@ -183,7 +183,7 @@ public sealed class CombatContributionClassifierTests
             EventKind = CombatEventKind.Support,
             ValueKind = CombatValueKind.Shield
         }, 3, 1_200);
-        journal.CompleteBatch(1);
+        journal.CompleteFlush(1);
 
         var owner = new SceneReadModelOwner(journal);
         var snapshot = owner.CreateSnapshot();
@@ -204,7 +204,7 @@ public sealed class CombatContributionClassifierTests
         journal.Append(new ObservedEventEnvelope
         {
             SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FrameOrdinal = ordinal, BatchOrdinal = 1 },
+            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
             Domain = ObservedEventDomain.Combat,
             SourceEntityId = sourceId,
             TargetEntityId = targetId,

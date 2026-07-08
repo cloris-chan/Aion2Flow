@@ -1,4 +1,6 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
@@ -168,9 +170,12 @@ public sealed class FrameBatchedObservableObjectTests
     {
         var frameBatch = new UiFrameBatchService();
         var section = new SkillDetailSectionViewModel(frameBatch);
+        var baseKey = SkillBaseKey.FromEventKey(new CombatEventKey(11000010, default, default));
         var rowData = new SkillDetailRowData
         {
+            BaseKey = baseKey,
             SkillCode = 11000010,
+            EventCount = 2,
             TotalAmount = 500,
             DirectAmount = 500,
             Hits = 2,
@@ -182,8 +187,137 @@ public sealed class FrameBatchedObservableObjectTests
 
         var row = Assert.Single(section.Rows);
         Assert.Equal(rowData.SkillCode, row.SkillCode);
+        Assert.Equal(rowData.EventCount, row.EventCount);
         Assert.Equal(rowData.TotalAmount, row.TotalAmount);
         Assert.Equal(0.5d, row.CriticalRate);
+    }
+
+    [Fact]
+    public void SkillDetailSection_StableRows_UpdateInPlaceWithoutCollectionNotification()
+    {
+        var frameBatch = new UiFrameBatchService();
+        var section = new SkillDetailSectionViewModel(frameBatch);
+        var firstKey = new SkillBaseKey(new CombatEventKey(11000010, default, default));
+        var secondKey = new SkillBaseKey(new CombatEventKey(12000010, default, default));
+
+        section.ReplaceRows(
+        [
+            CreateRowData(firstKey, 11000010, 1, 100),
+            CreateRowData(secondKey, 12000010, 2, 200)
+        ]);
+
+        var firstRow = section.Rows[0];
+        var secondRow = section.Rows[1];
+        var collectionChangeCount = 0;
+        section.Rows.CollectionChanged += (_, _) => collectionChangeCount++;
+
+        section.ReplaceRows(
+        [
+            CreateRowData(firstKey, 11000010, 3, 300),
+            CreateRowData(secondKey, 12000010, 4, 400)
+        ]);
+
+        Assert.Equal(0, collectionChangeCount);
+        Assert.Same(firstRow, section.Rows[0]);
+        Assert.Same(secondRow, section.Rows[1]);
+        Assert.Equal(300, section.Rows[0].TotalAmount);
+        Assert.Equal(400, section.Rows[1].TotalAmount);
+    }
+
+    [Fact]
+    public void SkillDetailSection_LargeStructuralRowChanges_ResetOnce()
+    {
+        var frameBatch = new UiFrameBatchService();
+        var section = new SkillDetailSectionViewModel(frameBatch);
+        section.Rows.ResetThreshold = 4;
+
+        section.ReplaceRows(CreateRows(11000010, 6));
+
+        var actions = new List<NotifyCollectionChangedAction>();
+        section.Rows.CollectionChanged += (_, e) => actions.Add(e.Action);
+
+        section.ReplaceRows(CreateRows(12000010, 6));
+
+        Assert.Equal([NotifyCollectionChangedAction.Reset], actions);
+        Assert.Equal(6, section.Rows.Count);
+        Assert.Equal(12000010, section.Rows[0].SkillCode);
+    }
+
+    [Fact]
+    public void SkillDetailSection_SelectRow_MarksSelectedRow()
+    {
+        var frameBatch = new UiFrameBatchService();
+        var section = new SkillDetailSectionViewModel(frameBatch);
+        var baseKey = SkillBaseKey.FromEventKey(new CombatEventKey(11000010, default, default));
+
+        section.ReplaceRows(
+        [
+            CreateRowData(baseKey, 11000010, 1, 100)
+        ]);
+
+        var row = Assert.Single(section.Rows);
+        section.SelectRow(row);
+
+        Assert.Same(row, section.SelectedRow);
+        Assert.True(row.IsSelected);
+    }
+
+    [Fact]
+    public void SkillDetailSection_ReplaceRows_PreservesSelection()
+    {
+        var frameBatch = new UiFrameBatchService();
+        var section = new SkillDetailSectionViewModel(frameBatch);
+        var baseKey = SkillBaseKey.FromEventKey(new CombatEventKey(11000010, default, default));
+
+        section.ReplaceRows(
+        [
+            CreateRowData(baseKey, 11000010, 1, 100)
+        ]);
+
+        var selectedRow = Assert.Single(section.Rows);
+        section.SelectRow(selectedRow);
+
+        section.ReplaceRows(
+        [
+            CreateRowData(baseKey, 11000010, 8, 300)
+        ]);
+
+        Assert.Same(selectedRow, section.SelectedRow);
+        Assert.True(selectedRow.IsSelected);
+        Assert.Equal(8, selectedRow.EventCount);
+        Assert.Equal(300, selectedRow.TotalAmount);
+
+        section.ReplaceRows([]);
+
+        Assert.Null(section.SelectedRow);
+        Assert.False(selectedRow.IsSelected);
+    }
+
+    private static SkillDetailRowData CreateRowData(SkillBaseKey baseKey, int skillCode, int eventCount, long damage)
+    {
+        return new SkillDetailRowData
+        {
+            BaseKey = baseKey,
+            SkillCode = skillCode,
+            DisplayName = "Strike",
+            EventCount = eventCount,
+            TotalAmount = damage,
+            DirectAmount = damage,
+            Hits = 1,
+            Attempts = 1
+        };
+    }
+
+    private static List<SkillDetailRowData> CreateRows(int firstSkillCode, int count)
+    {
+        var rows = new List<SkillDetailRowData>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var skillCode = firstSkillCode + i;
+            rows.Add(CreateRowData(new SkillBaseKey(new CombatEventKey(skillCode, default, default)), skillCode, i, 100 + i));
+        }
+
+        return rows;
     }
 
     private sealed class TestFrameViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)

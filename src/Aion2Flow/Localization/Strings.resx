@@ -157,6 +157,22 @@
   <data name="Column_Skill" xml:space="preserve"><value>Skill</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>Direct</value></data>
   <data name="Column_Share" xml:space="preserve"><value>Share</value></data>
+  <data name="Column_Events" xml:space="preserve"><value>Events</value></data>
+  <data name="Column_Action" xml:space="preserve"><value>Action</value></data>
+  <data name="Column_Index" xml:space="preserve"><value>Index</value></data>
+  <data name="Column_Header" xml:space="preserve"><value>Header</value></data>
+  <data name="Column_Evidence" xml:space="preserve"><value>Evidence</value></data>
+  <data name="Column_Route" xml:space="preserve"><value>Route</value></data>
+  <data name="Column_Opcode" xml:space="preserve"><value>Opcode</value></data>
+  <data name="Column_Opcodes" xml:space="preserve"><value>Opcodes</value></data>
+  <data name="Column_HeaderPacket" xml:space="preserve"><value>Header Packet</value></data>
+  <data name="Column_Packet" xml:space="preserve"><value>Packet</value></data>
+  <data name="Column_Source" xml:space="preserve"><value>Source</value></data>
+  <data name="Column_Target" xml:space="preserve"><value>Target</value></data>
+  <data name="Column_Time" xml:space="preserve"><value>Time</value></data>
+  <data name="Column_Value" xml:space="preserve"><value>Value</value></data>
+  <data name="Column_Effect" xml:space="preserve"><value>Effect</value></data>
+  <data name="Column_Canonicalization" xml:space="preserve"><value>Canonicalization</value></data>
   <data name="Settings_CombatantSortMetric" xml:space="preserve"><value>Sort By</value></data>
   <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
   <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>Total Damage</value></data>

@@ -1,8 +1,10 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
@@ -66,6 +68,44 @@ public sealed class PacketLogReplayServiceTests
         AssertSkillValueKind(replay, skillCode: 12_350_150, CombatEventKind.Healing, CombatValueKind.Healing, expectedCount: 3, expectedAmount: 7_808);
         Assert.Equal(48_912, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911 && packet.ValueKind == CombatValueKind.Healing).Sum(static packet => packet.Damage));
         Assert.Equal(6_329, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911 && packet.ValueKind == CombatValueKind.Support).Sum(static packet => packet.Damage));
+    }
+
+    [Fact]
+    public void Replay_20260705051242_Covers_OwnerTarget_And_SystemPeriodic_Canonicalization()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerSystemCanonicalization}"));
+
+        var ownerRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.OwnerTargetSummonResource, expectedCount: 345);
+        Assert.Equal(191, ownerRows.Count(static e => e.Canonicalization == (CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.OwnerTargetSummonResource)));
+        Assert.Equal(154, ownerRows.Count(static e => e.Canonicalization == (CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryByOpener | CombatContributionCanonicalization.OwnerTargetSummonResource)));
+        var systemSeedRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.SystemPeriodicRecoverySeed, expectedCount: 9);
+        var systemHealingRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.SystemPeriodicRecoveryHealing, expectedCount: 9);
+        Assert.All(systemSeedRows, static e =>
+        {
+            Assert.Equal(CombatEventKind.Support, e.Observation.EventKind);
+            Assert.Equal(CombatValueKind.Support, e.Observation.ValueKind);
+        });
+        Assert.All(systemHealingRows, static e =>
+        {
+            Assert.Equal(CombatEventKind.Healing, e.Observation.EventKind);
+            Assert.Equal(CombatValueKind.PeriodicHealing, e.Observation.ValueKind);
+        });
+        AssertBalancedSystemPeriodicRecoveryPairs(systemSeedRows, systemHealingRows);
+    }
+
+    [Fact]
+    public void Replay_20260704053009_Covers_OwnerTarget_CompactTwoContribution_Edge()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerTargetCanonicalizationEdge}"));
+
+        var ownerRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.OwnerTargetSummonResource, expectedCount: 127);
+        Assert.Equal(122, ownerRows.Count(static e => e.Canonicalization == (CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.OwnerTargetSummonResource)));
+        Assert.Equal(5, ownerRows.Count(static e => e.Canonicalization == (CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryByOpener | CombatContributionCanonicalization.OwnerTargetSummonResource)));
+        Assert.All(ownerRows, static row => Assert.Equal((ushort)0x0438, row.Raw.Opcode));
     }
 
     [Fact]
@@ -374,7 +414,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(813_802, player.OutgoingDamage);
         Assert.Equal(2, player.OutgoingHits);
         Assert.Equal(2, player.OutgoingAttempts);
-        Assert.Equal(719, player.OutgoingHealing);
+        Assert.Equal(6_565, player.OutgoingHealing);
         Assert.Equal(1_025, player.OutgoingShield);
         Assert.Equal(7, player.IncomingDamage);
         Assert.Equal(7, player.IncomingHits);
@@ -388,6 +428,8 @@ public sealed class PacketLogReplayServiceTests
 
         var packets = SceneReplayTestView.Packets(replay);
         Assert.Equal(813_802, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_060_233 && packet.ContributesDamage).Sum(static packet => packet.Damage));
+        Assert.Equal(719, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_720_001 && packet.ValueKind == CombatValueKind.Healing).Sum(static packet => packet.Damage));
+        Assert.Equal(5_846, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_800_001 && packet.ValueKind == CombatValueKind.Healing).Sum(static packet => packet.Damage));
 
         var incomingHits = packets
             .Where(static packet => packet.TargetId == playerId && packet.LayoutTag == 0x46 && packet.HitContribution > 0)
@@ -407,6 +449,37 @@ public sealed class PacketLogReplayServiceTests
     }
 
     private static void SetResources() => CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese));
+
+    private static CombatEventRecord[] AssertCanonicalizedRows(PacketLogReplayResult replay, CombatContributionCanonicalization flag, int expectedCount)
+    {
+        var rows = replay.SceneOwner.Combat.Events
+            .Where(e => HasCanonicalization(in e, flag))
+            .ToArray();
+        var dump = string.Join(
+            Environment.NewLine,
+            replay.SceneOwner.Combat.Events
+                .Where(static e => e.Canonicalization != CombatContributionCanonicalization.None)
+                .GroupBy(static e => e.Canonicalization)
+                .OrderBy(static group => group.Key)
+                .Select(static group => $"{group.Key}: {group.Count()}"));
+
+        Assert.True(rows.Length == expectedCount, $"{flag} rows={rows.Length} expected={expectedCount}\n{dump}");
+        return rows;
+    }
+
+    private static void AssertBalancedSystemPeriodicRecoveryPairs(IReadOnlyList<CombatEventRecord> seedRows, IReadOnlyList<CombatEventRecord> healingRows)
+    {
+        var seeds = seedRows.Select(static row => CreateSystemRecoveryPairKey(in row)).Order().ToArray();
+        var healing = healingRows.Select(static row => CreateSystemRecoveryPairKey(in row)).Order().ToArray();
+        Assert.Equal(seeds, healing);
+    }
+
+    private static string CreateSystemRecoveryPairKey(in CombatEventRecord row)
+        => string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{row.SourceId}|{row.TargetId}|{row.EventKey.SkillCode}|{row.EventKey.BodyResourceEffectRef.RawId}|{row.EventKey.DetailResourceEffectRef.RawId}|{row.Observation.ChainId}|{row.Observation.Damage}");
+
+    private static bool HasCanonicalization(in CombatEventRecord row, CombatContributionCanonicalization flag) => (row.Canonicalization & flag) == flag;
 
     private static PacketLogReplayResult ReplayCombinedFixtures(params string[] fixtureNames)
     {

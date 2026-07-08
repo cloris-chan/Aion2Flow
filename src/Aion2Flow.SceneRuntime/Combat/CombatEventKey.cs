@@ -4,18 +4,18 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
-public readonly record struct CombatActionKey(int SkillCode, ResourceEffectRef BodyResourceEffectRef, ResourceEffectRef DetailResourceEffectRef) : IComparable<CombatActionKey>
+public readonly record struct CombatEventKey(int SkillCode, ResourceEffectRef BodyResourceEffectRef, ResourceEffectRef DetailResourceEffectRef) : IComparable<CombatEventKey>
 {
     private const string DefaultUnknownEffectLabel = "Unknown effect";
 
     public bool HasSkillCode => SkillCode > 0;
 
-    public static CombatActionKey FromObservation(in CombatObservation observation)
+    public static CombatEventKey FromObservation(in CombatObservation observation)
     {
         if (observation.SkillCode > 0)
-            return new CombatActionKey(observation.SkillCode, default, default);
+            return new CombatEventKey(observation.SkillCode, default, default);
 
-        return new CombatActionKey(0, observation.BodyResourceEffectRef, observation.DetailResourceEffectRef);
+        return new CombatEventKey(0, observation.BodyResourceEffectRef, observation.DetailResourceEffectRef);
     }
 
     public string FormatFallbackLabel(string unknownEffectLabel = DefaultUnknownEffectLabel)
@@ -41,7 +41,7 @@ public readonly record struct CombatActionKey(int SkillCode, ResourceEffectRef B
 
     public string FormatSortKey(string unknownEffectLabel = DefaultUnknownEffectLabel) => HasSkillCode ? SkillCode.ToString(CultureInfo.InvariantCulture) : FormatFallbackLabel(unknownEffectLabel);
 
-    public int CompareTo(CombatActionKey other)
+    public int CompareTo(CombatEventKey other)
     {
         var cmp = SkillCode.CompareTo(other.SkillCode);
         if (cmp != 0) return cmp;

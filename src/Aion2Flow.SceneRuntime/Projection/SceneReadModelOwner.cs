@@ -23,8 +23,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
     private JournalCursor _cursor = journal.CreateCursor(0);
     private SceneCombatSnapshotAdapter? _adapter;
-    private long _lastAppliedBatchOrdinal = -1;
-    private long _appliedBatchOrdinal = -1;
+    private long _lastAppliedFlushId = -1;
+    private long _appliedFlushId = -1;
     private SnapshotCacheKey _snapshotCacheKey;
     private SceneCombatSnapshot? _snapshotCache;
     private long _snapshotCacheValidUntilMilliseconds = -1;
@@ -74,7 +74,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public long SceneStartObservationOrdinal { get; private set; } = journal.FirstObservationOrdinal;
     public long AppliedObservationOrdinal { get; private set; }
     public long AppliedNextObservationOrdinal => _cursor.NextObservationOrdinal;
-    public long AppliedBatchOrdinal => _appliedBatchOrdinal;
+    public long AppliedFlushId => _appliedFlushId;
     public ProjectionCacheStats ProjectionCacheStats => _projectionCacheStats;
 
     public SceneCombatSnapshot CreateSnapshot()
@@ -154,7 +154,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             {
                 if (endObservationOrdinalExclusive < _cursor.NextObservationOrdinal)
                     throw new InvalidOperationException("Cannot create an archive capture before the applied journal cursor.");
-                RefreshCore(endObservationOrdinalExclusive, completeBatches: true);
+                RefreshCore(endObservationOrdinalExclusive, completeFlushes: true);
             }
             var snapshot = CreateSnapshotCore();
             var payload = SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, boundary, metadataRegistry, _applier.BossFocus, CreateAdapter(), CreateTimelineSegment(isLiveGrowing: false, endObservationOrdinalExclusive));
@@ -248,11 +248,11 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
-    private void RefreshCore() => RefreshCore(long.MaxValue, completeBatches: true);
+    private void RefreshCore() => RefreshCore(long.MaxValue, completeFlushes: true);
 
-    private void RefreshCore(long stopBeforeObservationOrdinal, bool completeBatches)
+    private void RefreshCore(long stopBeforeObservationOrdinal, bool completeFlushes)
     {
-        var lastAppliedBatchOrdinal = _lastAppliedBatchOrdinal;
+        var lastAppliedFlushId = _lastAppliedFlushId;
         while (true)
         {
             if (_cursor.NextObservationOrdinal >= stopBeforeObservationOrdinal)
@@ -271,7 +271,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
                 _applier.ApplyEntry(in entry);
                 AppliedObservationOrdinal++;
-                lastAppliedBatchOrdinal = Math.Max(lastAppliedBatchOrdinal, entry.Stamp.BatchOrdinal);
+                lastAppliedFlushId = Math.Max(lastAppliedFlushId, entry.Stamp.FlushId);
                 applied++;
             }
 
@@ -281,15 +281,15 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _cursor = applied == result.Count ? result.Cursor : journal.CreateCursor(entries[applied - 1].Stamp.ObservationOrdinal + 1);
         }
 
-        _lastAppliedBatchOrdinal = lastAppliedBatchOrdinal;
-        if (!completeBatches)
+        _lastAppliedFlushId = lastAppliedFlushId;
+        if (!completeFlushes)
             return;
 
-        var completedBatch = Math.Min(journal.LastCompletedBatchOrdinal, _lastAppliedBatchOrdinal);
-        if (completedBatch > _appliedBatchOrdinal)
+        var completedFlushId = Math.Min(journal.LastCompletedFlushId, _lastAppliedFlushId);
+        if (completedFlushId > _appliedFlushId)
         {
-            _applier.CompleteBatch(completedBatch);
-            _appliedBatchOrdinal = completedBatch;
+            _applier.CompleteFlush();
+            _appliedFlushId = completedFlushId;
         }
     }
 
@@ -508,7 +508,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     {
         lock (_gate)
         {
-            RefreshCore(startOrdinal, completeBatches: false);
+            RefreshCore(startOrdinal, completeFlushes: false);
             EncounterId = encounterId;
             Kind = kind;
             SceneStarted = sceneStarted;
@@ -523,8 +523,8 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             _lastDetailDeltas.Clear();
             _cursor = journal.CreateCursor(startOrdinal);
             AppliedObservationOrdinal = 0;
-            _appliedBatchOrdinal = journal.LastCompletedBatchOrdinal;
-            _lastAppliedBatchOrdinal = _appliedBatchOrdinal;
+            _appliedFlushId = journal.LastCompletedFlushId;
+            _lastAppliedFlushId = _appliedFlushId;
             _snapshotCache = null;
             _snapshotCacheKey = default;
             _snapshotCacheValidUntilMilliseconds = -1;

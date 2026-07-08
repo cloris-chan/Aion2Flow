@@ -18,12 +18,14 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private readonly Dictionary<int, SummonOwnerInferenceAccumulator> _ownerInferenceBySource = [];
     private readonly Dictionary<SkillCategory, OwnerCandidateAccumulator> _ownerCandidatesByCategory = [];
     private readonly Dictionary<SummonOwnerInferenceKey, OwnerCandidateAccumulator> _directOwnerCandidatesBySummonCategory = [];
+    private readonly Dictionary<int, OwnerInferenceSkillClassification> _ownerInferenceSkillClassifications = [];
     private readonly Dictionary<int, int> _resolvedCombatantIds = [];
     private readonly Dictionary<int, bool> _knownSummons = [];
     private readonly Dictionary<int, TargetInfo> _targetInfos = [];
     private long _ownerInferenceCombatRevision = -1;
     private long _ownerInferenceEntityRevision = -1;
     private long _ownerInferenceSkillMapRevision = -1;
+    private long _ownerInferenceSkillClassificationRevision = -1;
     private long _ownerInferenceVersion;
     private int _ownerInferenceScannedEventCount;
     private long _classEvidenceCombatRevision = -1;
@@ -175,7 +177,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return false;
         }
 
-        detailEvent = new CombatDetailEvent(record.Observation, eventSourceId, record.TargetId, ObservedAt(record), record.Revision);
+        detailEvent = new CombatDetailEvent(record.Observation, eventSourceId, record.TargetId, ObservedAt(record), record.Revision, record.EventKey, record.Raw, record.Contribution, record.Canonicalization);
         return true;
     }
 
@@ -185,7 +187,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return CombatSkillBreakdownSnapshot.Empty;
 
         PrepareProjectionCaches();
-        var skills = new Dictionary<CombatActionKey, SkillMetrics>();
+        var skills = new Dictionary<CombatEventKey, SkillMetrics>();
         ApplySkillBreakdownEvents(snapshot, combatantId, skills);
 
         return CombatSkillBreakdownSnapshot.From(skills);
@@ -344,7 +346,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private void ApplySkillBreakdownEvents(SceneCombatSnapshot snapshot, int combatantId, Dictionary<CombatActionKey, SkillMetrics> skills)
+    private void ApplySkillBreakdownEvents(SceneCombatSnapshot snapshot, int combatantId, Dictionary<CombatEventKey, SkillMetrics> skills)
     {
         Span<int> relevantBuffer = stackalloc int[SmallSetStackCapacity];
         var relevant = new SmallIntSet(relevantBuffer);
@@ -382,17 +384,18 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private static void AddSkillEvent(Dictionary<CombatActionKey, SkillMetrics> skills, in CombatEventRecord e)
+    private static void AddSkillEvent(Dictionary<CombatEventKey, SkillMetrics> skills, in CombatEventRecord e)
     {
         var observation = e.Observation;
-        var actionKey = CombatActionKey.FromObservation(in observation);
-        ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(skills, actionKey, out var exists);
+        var eventKey = e.EventKey;
+        ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(skills, eventKey, out var exists);
         if (!exists)
         {
-            metrics = new SkillMetrics(in observation);
+            metrics = new SkillMetrics(eventKey, in observation);
         }
 
-        metrics.ProcessObservation(in observation);
+        var contribution = e.Contribution;
+        metrics.ProcessContribution(in observation, in contribution);
     }
 
     private int ResolveCombatantIdCached(int combatantId)
@@ -572,11 +575,11 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             if (entities.TryGet(sourceId, out var entity) && entity.Kind is not NpcKind.Unknown and not NpcKind.Summon)
                 continue;
 
-            var observation = e.Observation;
-            if (!TryResolveSkill(in observation, out var skill))
+            var skill = ClassifyOwnerInferenceSkill(e.Observation.SkillCode);
+            if (skill.Flags == OwnerInferenceSkillFlags.None)
                 continue;
 
-            if (IsSummonOwnerCandidateSkill(skill) && IsDirectSummonOwnerSupportEvidence(in e) && IsPotentialImplicitSummonTarget(sourceId, e.TargetId))
+            if (skill.IsOwnerCandidate && IsDirectSummonOwnerSupportEvidence(in e) && IsPotentialImplicitSummonTarget(sourceId, e.TargetId))
             {
                 var key = new SummonOwnerInferenceKey(e.TargetId, skill.Category);
                 ref var directOwners = ref CollectionsMarshal.GetValueRefOrAddDefault(_directOwnerCandidatesBySummonCategory, key, out var directOwnersExist);
@@ -589,13 +592,13 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             if (!sourceExists)
                 source = new SummonOwnerInferenceAccumulator(sourceId);
 
-            if (IsPreexistingSummonSignatureSkill(skill))
+            if (skill.IsPreexistingSummonSignature)
             {
                 source.AddSummonSkillCategory(skill.Category);
                 continue;
             }
 
-            if (!IsSummonOwnerCandidateSkill(skill))
+            if (!skill.IsOwnerCandidate)
                 continue;
 
             source.HasOwnerSkillEvidence = true;
@@ -811,6 +814,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         var combatRevision = combat.Revision;
         var entityRevision = entities.Revision;
         var skillMapRevision = CombatResourceRegistry.SkillMapRevision;
+        if (_ownerInferenceSkillClassificationRevision != skillMapRevision)
+        {
+            _ownerInferenceSkillClassifications.Clear();
+            _ownerInferenceSkillClassificationRevision = skillMapRevision;
+        }
+
         if (_ownerInferenceReady &&
             _ownerInferenceCombatRevision == combatRevision &&
             (_hasProjectionBaseline || _ownerInferenceEntityRevision == entityRevision) &&
@@ -857,6 +866,20 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         _knownSummons.Clear();
         _resolveCacheEntityRevision = entities.Revision;
         _resolveCacheOwnerVersion = _ownerInferenceVersion;
+    }
+
+    [Flags]
+    private enum OwnerInferenceSkillFlags : byte
+    {
+        None = 0,
+        OwnerCandidate = 1,
+        PreexistingSummonSignature = 2
+    }
+
+    private readonly record struct OwnerInferenceSkillClassification(SkillCategory Category, OwnerInferenceSkillFlags Flags)
+    {
+        public bool IsOwnerCandidate => (Flags & OwnerInferenceSkillFlags.OwnerCandidate) != 0;
+        public bool IsPreexistingSummonSignature => (Flags & OwnerInferenceSkillFlags.PreexistingSummonSignature) != 0;
     }
 
     private struct SummonOwnerInferenceAccumulator(int sourceId)
@@ -1030,13 +1053,26 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private static bool TryResolveSkill(in CombatObservation observation, out SkillDisplayEntry skill)
+    private OwnerInferenceSkillClassification ClassifyOwnerInferenceSkill(int skillCode)
     {
-        if (observation.SkillCode > 0 && CombatResourceRegistry.SkillMap.TryGetValue(observation.SkillCode, out skill))
-            return true;
+        if (skillCode <= 0)
+            return default;
 
-        skill = default;
-        return false;
+        ref var classification = ref CollectionsMarshal.GetValueRefOrAddDefault(_ownerInferenceSkillClassifications, skillCode, out var exists);
+        if (exists)
+            return classification;
+
+        if (!CombatResourceRegistry.SkillMap.TryGetValue(skillCode, out var skill))
+            return default;
+
+        var flags = OwnerInferenceSkillFlags.None;
+        if (IsSummonOwnerCandidateSkill(skill))
+            flags |= OwnerInferenceSkillFlags.OwnerCandidate;
+        if (IsPreexistingSummonSignatureSkill(skill))
+            flags |= OwnerInferenceSkillFlags.PreexistingSummonSignature;
+
+        classification = new OwnerInferenceSkillClassification(skill.Category, flags);
+        return classification;
     }
 
     private static bool IsSummonOwnerCandidateSkill(SkillDisplayEntry skill) =>

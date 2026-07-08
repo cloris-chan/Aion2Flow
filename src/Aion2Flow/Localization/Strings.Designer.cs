@@ -10,8 +10,8 @@
 
 namespace Cloris.Aion2Flow.Localization {
     using System;
-    
-    
+
+
     /// <summary>
     ///   A strongly-typed resource class, for looking up localized strings, etc.
     /// </summary>
@@ -23,15 +23,15 @@ namespace Cloris.Aion2Flow.Localization {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Strings {
-        
+
         private static global::System.Resources.ResourceManager resourceMan;
-        
+
         private static global::System.Globalization.CultureInfo resourceCulture;
-        
+
         [global::System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode")]
         internal Strings() {
         }
-        
+
         /// <summary>
         ///   Returns the cached ResourceManager instance used by this class.
         /// </summary>
@@ -45,7 +45,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return resourceMan;
             }
         }
-        
+
         /// <summary>
         ///   Overrides the current thread's CurrentUICulture property for all
         ///   resource lookups using this strongly typed resource class.
@@ -59,7 +59,7 @@ namespace Cloris.Aion2Flow.Localization {
                 resourceCulture = value;
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Reset battle.
         /// </summary>
@@ -68,7 +68,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Action_BattleReset", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Close.
         /// </summary>
@@ -77,7 +77,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Action_Close", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Live.
         /// </summary>
@@ -86,7 +86,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Action_Live", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Select All.
         /// </summary>
@@ -95,7 +95,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Action_SelectAll", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Damage.
         /// </summary>
@@ -104,7 +104,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Category_Damage", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Healing.
         /// </summary>
@@ -113,7 +113,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Category_Healing", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Protective Shield.
         /// </summary>
@@ -122,7 +122,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Category_Shield", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Support.
         /// </summary>
@@ -131,7 +131,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Category_Support", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Assassin.
         /// </summary>
@@ -140,7 +140,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Assassin", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Brawler.
         /// </summary>
@@ -149,7 +149,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Brawler", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Chanter.
         /// </summary>
@@ -158,7 +158,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Chanter", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Cleric.
         /// </summary>
@@ -167,7 +167,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Cleric", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Elementalist.
         /// </summary>
@@ -176,7 +176,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Elementalist", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Gladiator.
         /// </summary>
@@ -185,7 +185,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Gladiator", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Ranger.
         /// </summary>
@@ -194,7 +194,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Ranger", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Sorcerer.
         /// </summary>
@@ -203,7 +203,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Sorcerer", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Templar.
         /// </summary>
@@ -212,7 +212,25 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("CharacterClass_Templar", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Action.
+        /// </summary>
+        internal static string Column_Action {
+            get {
+                return ResourceManager.GetString("Column_Action", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Canonicalization.
+        /// </summary>
+        internal static string Column_Canonicalization {
+            get {
+                return ResourceManager.GetString("Column_Canonicalization", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Direct.
         /// </summary>
@@ -221,7 +239,52 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Column_Direct", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Effect.
+        /// </summary>
+        internal static string Column_Effect {
+            get {
+                return ResourceManager.GetString("Column_Effect", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Events.
+        /// </summary>
+        internal static string Column_Events {
+            get {
+                return ResourceManager.GetString("Column_Events", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Evidence.
+        /// </summary>
+        internal static string Column_Evidence {
+            get {
+                return ResourceManager.GetString("Column_Evidence", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Header.
+        /// </summary>
+        internal static string Column_Header {
+            get {
+                return ResourceManager.GetString("Column_Header", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Header Packet.
+        /// </summary>
+        internal static string Column_HeaderPacket {
+            get {
+                return ResourceManager.GetString("Column_HeaderPacket", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to History.
         /// </summary>
@@ -230,7 +293,52 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Column_History", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Index.
+        /// </summary>
+        internal static string Column_Index {
+            get {
+                return ResourceManager.GetString("Column_Index", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Opcode.
+        /// </summary>
+        internal static string Column_Opcode {
+            get {
+                return ResourceManager.GetString("Column_Opcode", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Opcodes.
+        /// </summary>
+        internal static string Column_Opcodes {
+            get {
+                return ResourceManager.GetString("Column_Opcodes", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Packet.
+        /// </summary>
+        internal static string Column_Packet {
+            get {
+                return ResourceManager.GetString("Column_Packet", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Route.
+        /// </summary>
+        internal static string Column_Route {
+            get {
+                return ResourceManager.GetString("Column_Route", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Share.
         /// </summary>
@@ -239,7 +347,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Column_Share", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Skill.
         /// </summary>
@@ -248,7 +356,43 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Column_Skill", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Source.
+        /// </summary>
+        internal static string Column_Source {
+            get {
+                return ResourceManager.GetString("Column_Source", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Target.
+        /// </summary>
+        internal static string Column_Target {
+            get {
+                return ResourceManager.GetString("Column_Target", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Time.
+        /// </summary>
+        internal static string Column_Time {
+            get {
+                return ResourceManager.GetString("Column_Time", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Value.
+        /// </summary>
+        internal static string Column_Value {
+            get {
+                return ResourceManager.GetString("Column_Value", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Incoming.
         /// </summary>
@@ -257,7 +401,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Direction_Incoming", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Outgoing.
         /// </summary>
@@ -266,7 +410,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Direction_Outgoing", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Sources.
         /// </summary>
@@ -275,7 +419,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Direction_Sources", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Targets.
         /// </summary>
@@ -284,7 +428,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Direction_Targets", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to No combat data yet.
         /// </summary>
@@ -293,7 +437,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Empty_Combatants", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to No archived battles.
         /// </summary>
@@ -302,7 +446,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Empty_History", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to No skill data.
         /// </summary>
@@ -311,7 +455,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Empty_Skills", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Attacks.
         /// </summary>
@@ -320,7 +464,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_Attacks", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to DPS.
         /// </summary>
@@ -329,7 +473,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_Dps", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Duration.
         /// </summary>
@@ -338,7 +482,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_Duration", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Healing Hits.
         /// </summary>
@@ -347,7 +491,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_HealingHits", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Healing Skills.
         /// </summary>
@@ -356,7 +500,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_HealingSkills", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Hit Count.
         /// </summary>
@@ -365,7 +509,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_HitCount", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to HPS.
         /// </summary>
@@ -374,7 +518,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_Hps", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Shield Hits.
         /// </summary>
@@ -383,7 +527,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_ShieldHits", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Shield Skills.
         /// </summary>
@@ -392,7 +536,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_ShieldSkills", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Skills.
         /// </summary>
@@ -401,7 +545,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_Skills", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Total.
         /// </summary>
@@ -410,7 +554,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_Total", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to DMG.
         /// </summary>
@@ -419,7 +563,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("MetricShort_Damage", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Drain Heal.
         /// </summary>
@@ -428,7 +572,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("MetricShort_DrainHeal", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Heal.
         /// </summary>
@@ -437,7 +581,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("MetricShort_Heal", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to HoT.
         /// </summary>
@@ -446,7 +590,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("MetricShort_Hot", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Periodic DMG.
         /// </summary>
@@ -455,7 +599,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("MetricShort_PeriodicDamage", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Periodic Hits.
         /// </summary>
@@ -464,7 +608,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("MetricShort_PeriodicHits", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Shield Absorbed.
         /// </summary>
@@ -473,7 +617,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("MetricShort_ShieldAbsorbed", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Buff / Debuff.
         /// </summary>
@@ -482,7 +626,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_AuraCoverage", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Effect #{0}.
         /// </summary>
@@ -491,7 +635,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_AuraUnknownFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Building checkpoints... {0}.
         /// </summary>
@@ -500,7 +644,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_CheckpointsBuildingFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Checkpoints.
         /// </summary>
@@ -509,7 +653,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_CheckpointsButton", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Checkpoints {0}.
         /// </summary>
@@ -518,7 +662,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_CheckpointsReadyFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Amount.
         /// </summary>
@@ -527,7 +671,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Amount", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Combatant.
         /// </summary>
@@ -536,7 +680,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Combatant", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Damage.
         /// </summary>
@@ -545,7 +689,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Damage", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Healing.
         /// </summary>
@@ -554,7 +698,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Healing", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Remaining HP.
         /// </summary>
@@ -563,7 +707,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_RemainingHp", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Skill.
         /// </summary>
@@ -572,7 +716,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Skill", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Source.
         /// </summary>
@@ -581,7 +725,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Source", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Target.
         /// </summary>
@@ -590,7 +734,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Target", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Time.
         /// </summary>
@@ -599,7 +743,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Time", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Track.
         /// </summary>
@@ -608,7 +752,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Column_Track", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Combatant Details.
         /// </summary>
@@ -617,7 +761,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_CombatantDetails", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Combatants.
         /// </summary>
@@ -626,7 +770,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Combatants", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Event Window.
         /// </summary>
@@ -635,7 +779,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_EventWindow", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Speed.
         /// </summary>
@@ -644,7 +788,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Label_Speed", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Apply {0} ms.
         /// </summary>
@@ -653,7 +797,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Lifecycle_OpenFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Apply.
         /// </summary>
@@ -662,7 +806,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Lifecycle_OpenIndefinite", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Refresh.
         /// </summary>
@@ -671,7 +815,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Lifecycle_Renew", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to End ({0}).
         /// </summary>
@@ -680,7 +824,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Lifecycle_ResultFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Next event.
         /// </summary>
@@ -689,7 +833,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_NextEvent", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Forward 1 second.
         /// </summary>
@@ -698,7 +842,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_NextSecond", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Playback.
         /// </summary>
@@ -707,7 +851,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Open", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Previous event.
         /// </summary>
@@ -716,7 +860,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_PreviousEvent", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Back 1 second.
         /// </summary>
@@ -725,7 +869,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_PreviousSecond", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Loading frame.
         /// </summary>
@@ -734,7 +878,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Status_Loading", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Paused.
         /// </summary>
@@ -743,7 +887,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Status_Paused", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Playing.
         /// </summary>
@@ -752,7 +896,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Status_Playing", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Action.
         /// </summary>
@@ -761,7 +905,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Track_Action", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Effect lifecycle.
         /// </summary>
@@ -770,7 +914,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Track_Aura", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Combat.
         /// </summary>
@@ -779,7 +923,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Track_Combat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Diagnostic.
         /// </summary>
@@ -788,7 +932,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Track_Diagnostic", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Other.
         /// </summary>
@@ -797,7 +941,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Track_Other", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Remaining HP.
         /// </summary>
@@ -806,7 +950,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Track_RemainingHp", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Scene.
         /// </summary>
@@ -815,7 +959,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Track_Scene", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to State.
         /// </summary>
@@ -824,7 +968,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Track_State", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Playback (Experimental) - {0}.
         /// </summary>
@@ -833,7 +977,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_WindowTitleFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Player.
         /// </summary>
@@ -842,7 +986,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("PlayerName_AnonymousPlayer", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Scene Activation.
         /// </summary>
@@ -851,7 +995,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Scene_Activation", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Scene Archive.
         /// </summary>
@@ -860,7 +1004,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Scene_Archive", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Combat Scene.
         /// </summary>
@@ -869,7 +1013,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Scene_Combat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Scene Teardown.
         /// </summary>
@@ -878,7 +1022,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Scene_Teardown", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Unknown Scene.
         /// </summary>
@@ -887,7 +1031,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Scene_Unknown", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Sort By.
         /// </summary>
@@ -896,7 +1040,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_CombatantSortMetric", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to DPS.
         /// </summary>
@@ -905,7 +1049,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_CombatantSortMetric_DamagePerSecond", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Total Damage.
         /// </summary>
@@ -914,7 +1058,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_CombatantSortMetric_TotalDamage", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Statistics scope.
         /// </summary>
@@ -968,7 +1112,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_FocusStatusBar", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Off.
         /// </summary>
@@ -977,7 +1121,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_FocusStatusBar_Off", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to On.
         /// </summary>
@@ -986,7 +1130,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_FocusStatusBar_On", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Battle reset hotkey.
         /// </summary>
@@ -995,7 +1139,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Hotkey_BattleReset", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Clear hotkey.
         /// </summary>
@@ -1004,7 +1148,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Hotkey_Clear", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to None.
         /// </summary>
@@ -1013,7 +1157,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Hotkey_None", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Press keys….
         /// </summary>
@@ -1022,7 +1166,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Hotkey_PressKeys", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Language.
         /// </summary>
@@ -1031,7 +1175,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Language", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Compact main numbers.
         /// </summary>
@@ -1040,7 +1184,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_MainMetricsCompact", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Off.
         /// </summary>
@@ -1049,7 +1193,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_MainMetricsCompact_Off", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to On.
         /// </summary>
@@ -1058,7 +1202,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_MainMetricsCompact_On", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Faction tint.
         /// </summary>
@@ -1067,7 +1211,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerFactionTint", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Off.
         /// </summary>
@@ -1076,7 +1220,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerFactionTint_Off", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to On.
         /// </summary>
@@ -1085,7 +1229,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerFactionTint_On", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Legion name.
         /// </summary>
@@ -1094,7 +1238,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerLegionName", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Hide.
         /// </summary>
@@ -1103,7 +1247,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerLegionName_Off", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Show.
         /// </summary>
@@ -1112,7 +1256,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerLegionName_On", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Player names.
         /// </summary>
@@ -1121,7 +1265,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerNameSettings", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Self marker.
         /// </summary>
@@ -1130,7 +1274,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerSelfMarker", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Always.
         /// </summary>
@@ -1139,7 +1283,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerSelfMarker_Always", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Off.
         /// </summary>
@@ -1148,7 +1292,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerSelfMarker_Hidden", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to When names are hidden.
         /// </summary>
@@ -1157,7 +1301,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerSelfMarker_WhenNamesHidden", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Server name.
         /// </summary>
@@ -1166,7 +1310,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerShortServerName", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Hide.
         /// </summary>
@@ -1175,7 +1319,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerShortServerName_Off", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Show.
         /// </summary>
@@ -1184,7 +1328,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_PlayerShortServerName_On", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Scene mode.
         /// </summary>
@@ -1193,7 +1337,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_SceneKind", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Boss battles only.
         /// </summary>
@@ -1202,7 +1346,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_SceneKind_Boss", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Standard.
         /// </summary>
@@ -1211,7 +1355,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_SceneKind_Standard", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Name visibility.
         /// </summary>
@@ -1220,7 +1364,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_ShowPlayerNames", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Hide.
         /// </summary>
@@ -1229,7 +1373,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_ShowPlayerNames_Off", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Show.
         /// </summary>
@@ -1238,7 +1382,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_ShowPlayerNames_On", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Settings.
         /// </summary>
@@ -1247,7 +1391,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Title", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Topmost mode.
         /// </summary>
@@ -1256,7 +1400,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Topmost", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Always.
         /// </summary>
@@ -1265,7 +1409,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Topmost_Always", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to While game is active.
         /// </summary>
@@ -1274,7 +1418,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Topmost_GameForeground", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Never.
         /// </summary>
@@ -1283,7 +1427,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Topmost_Never", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to UI scale.
         /// </summary>
@@ -1292,7 +1436,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_UiScale", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Check for updates.
         /// </summary>
@@ -1301,7 +1445,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Update_Check", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Checking for updates….
         /// </summary>
@@ -1310,7 +1454,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Update_Checking", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to v{0}.
         /// </summary>
@@ -1319,7 +1463,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Update_CurrentVersionFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Downloading… {0}%.
         /// </summary>
@@ -1328,7 +1472,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Update_DownloadingFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Update failed.
         /// </summary>
@@ -1337,7 +1481,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Update_Failed", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Update {0} ready — restart to apply.
         /// </summary>
@@ -1346,7 +1490,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Update_ReadyFormat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Restart to update.
         /// </summary>
@@ -1355,7 +1499,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Update_Restart", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Up to date.
         /// </summary>
@@ -1364,7 +1508,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_Update_UpToDate", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Visible rows.
         /// </summary>
@@ -1373,7 +1517,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_VisibleRows", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Unknown effect.
         /// </summary>
@@ -1382,7 +1526,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Skill_UnknownEffect", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Back Attack.
         /// </summary>
@@ -1391,7 +1535,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Back", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Shield Block.
         /// </summary>
@@ -1400,7 +1544,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Block", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Critical.
         /// </summary>
@@ -1409,7 +1553,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Critical", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Endurance.
         /// </summary>
@@ -1418,7 +1562,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Endurance", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Evade.
         /// </summary>
@@ -1427,7 +1571,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Evade", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Front Attack.
         /// </summary>
@@ -1445,7 +1589,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Invincible", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Multi-Hit.
         /// </summary>
@@ -1454,7 +1598,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_MultiHit", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Weapon Parry.
         /// </summary>
@@ -1463,7 +1607,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Parry", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Perfect.
         /// </summary>
@@ -1472,7 +1616,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Perfect", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Perfect Shield Block.
         /// </summary>
@@ -1481,7 +1625,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_PerfectBlock", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Perfect Weapon Parry.
         /// </summary>
@@ -1490,7 +1634,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_PerfectParry", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Regeneration.
         /// </summary>
@@ -1499,7 +1643,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Regeneration", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Smite.
         /// </summary>
@@ -1508,7 +1652,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Stat_Smite", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to WinDivert is inactive.
         /// </summary>
@@ -1517,7 +1661,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_DriverIdle", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to WinDivert is active.
         /// </summary>
@@ -1526,7 +1670,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_DriverReady", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Latency estimated from combat packets (proxy mode).
         /// </summary>
@@ -1535,7 +1679,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_LatencyEstimatedFromCombat", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Battle connection locked.
         /// </summary>
@@ -1544,7 +1688,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_Locked", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Battle connection locked (proxy mode).
         /// </summary>
@@ -1553,7 +1697,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_LockedProxy", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Game ports are not being monitored.
         /// </summary>
@@ -1562,7 +1706,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_PortIdle", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Game ports detected.
         /// </summary>
@@ -1571,7 +1715,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_PortReady", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Waiting for game ports.
         /// </summary>
@@ -1580,7 +1724,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_PortWaiting", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Ready.
         /// </summary>
@@ -1589,7 +1733,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_Ready", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to TCP round-trip estimate.
         /// </summary>
@@ -1598,7 +1742,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_RttEstimated", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to No RTT estimate yet.
         /// </summary>
@@ -1607,7 +1751,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Status_RttUnavailable", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Battle connection not locked.
         /// </summary>

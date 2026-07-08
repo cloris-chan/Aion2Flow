@@ -232,7 +232,7 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
         RecordCombat(observation.SkillCode);
     }
 
-    public void CompleteBatch(long batchOrdinal)
+    public void CompleteFlush(long flushId)
     {
     }
 

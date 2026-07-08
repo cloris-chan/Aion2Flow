@@ -470,5 +470,5 @@ public sealed class NpcCatalogSceneTests
     }
 
     private static PacketObservationSource Source(long timestamp) =>
-        new(timestamp, 0, 1, 0, 0, 0, default);
+        new(timestamp, 1, 0, 0, 0, default);
 }

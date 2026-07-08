@@ -85,7 +85,7 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
         {
             if (_hasLastParsedConnection && !_lastParsedConnection.IsSameConnection(in connection, out _))
             {
-                var source = new PacketObservationSource(context.LastParsedTimestampMilliseconds, 0, 0, 0, 0, packet.SequenceNumber, default);
+                var source = new PacketObservationSource(context.LastParsedTimestampMilliseconds, 0, 0, 0, packet.SequenceNumber, default);
                 tcpStream.Sink.MarkSceneTransportBoundary(in source);
             }
 

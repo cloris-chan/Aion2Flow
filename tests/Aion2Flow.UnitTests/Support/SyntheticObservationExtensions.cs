@@ -23,12 +23,12 @@ internal static class SyntheticObservationExtensions
 
     public static void ApplyCombat(this CombatStore store, int sourceId, int targetId, in CombatObservation observation) => store.ApplyCombat(sourceId, targetId, in observation, store.Revision + 1);
 
-    public static PacketObservationSource Source(long timestamp = 0, ushort opcode = 0) => new(timestamp, 0, 0, opcode, 0, 0, default);
+    public static PacketObservationSource Source(long timestamp = 0, ushort opcode = 0) => new(timestamp, 0, opcode, 0, 0, default);
 
-    public static void AppendCombatPacket(this IRuntimeObservationSink sink, ParsedCombatPacket packet)
+    public static void AppendCombatPacket(this IRuntimeObservationSink sink, ParsedCombatPacket packet, long flushId = 0)
     {
         var observation = packet.ToObservation();
-        var source = new PacketObservationSource(packet.Timestamp, packet.FrameOrdinal, packet.BatchOrdinal, 0, 0, 0, default);
+        var source = new PacketObservationSource(packet.Timestamp, flushId, 0, 0, 0, default);
         sink.AppendCombatObservation(in source, packet.SourceId, packet.TargetId, in observation);
     }
 
@@ -122,9 +122,9 @@ internal static class SyntheticObservationExtensions
         sink.AppendSummon(in source, ownerId, summonInstanceId);
     }
 
-    public static void RegisterObservation2C38(this IRuntimeObservationSink sink, int entityId, int instanceSequenceId, int resultCode, long timestamp, long frameOrdinal, long batchOrdinal)
+    public static void RegisterObservation2C38(this IRuntimeObservationSink sink, int entityId, int instanceSequenceId, int resultCode, long timestamp, long flushId)
     {
-        var source = new PacketObservationSource(timestamp, frameOrdinal, batchOrdinal, 0x2C38, 0, 0, default);
+        var source = new PacketObservationSource(timestamp, flushId, 0x2C38, 0, 0, default);
         Span<AuraResultRecord> results = stackalloc AuraResultRecord[1];
         results[0] = new AuraResultRecord(0, instanceSequenceId, resultCode, 0, 0, 0);
         sink.RegisterObservation2C38(in source, entityId, results);

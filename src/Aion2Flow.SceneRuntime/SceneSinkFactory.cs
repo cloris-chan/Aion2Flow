@@ -35,7 +35,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private readonly Lock _gate = new();
     private readonly Queue<SceneArchiveCapture> _pendingArchives = [];
     private readonly HashSet<int> _seededBossSceneRuntimeStates = [];
-    private long _nextBatchOrdinal;
+    private long _nextFlushId;
     private SceneKind _kind;
     private BossSceneState _bossState;
     private long _frozenEndObservationOrdinalExclusive = -1;
@@ -116,13 +116,13 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         }
     }
 
-    public long NextBatchOrdinal() => Interlocked.Increment(ref _nextBatchOrdinal);
+    public long NextFlushId() => Interlocked.Increment(ref _nextFlushId);
 
     public IRuntimeObservationSink Synchronize(IRuntimeObservationSink sink) => new SynchronizedRuntimeObservationSink(sink, _gate);
 
     internal IRuntimeObservationSink CreateSink()
     {
-        var journaling = new JournalingRuntimeObservationSink(Journal, Clock, () => SessionId, NextBatchOrdinal, this);
+        var journaling = new JournalingRuntimeObservationSink(Journal, Clock, () => SessionId, NextFlushId, this);
         return Synchronize(journaling);
     }
 

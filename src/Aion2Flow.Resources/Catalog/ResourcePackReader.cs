@@ -11,7 +11,7 @@ internal static class ResourcePackReader
     {
         SkillDefinitions = 1,
         SkillClientMetadata = 2,
-        SkillDisplayProjections = 3,
+        SkillBaseProjections = 3,
         SkillEffectReferences = 4,
         NpcDefinitions = 5,
         NpcNameDefinitions = 6,
@@ -33,7 +33,7 @@ internal static class ResourcePackReader
         return new ResourceSharedCatalog(
             ReadSkillDefinitions(RequireSection(sections, SectionId.SkillDefinitions)),
             ReadSkillClientMetadata(RequireSection(sections, SectionId.SkillClientMetadata)),
-            ReadSkillDisplayProjections(RequireSection(sections, SectionId.SkillDisplayProjections)),
+            ReadSkillBaseProjections(RequireSection(sections, SectionId.SkillBaseProjections)),
             ReadSkillEffectReferences(RequireSection(sections, SectionId.SkillEffectReferences)),
             ReadSkillRelatedSkills(RequireSection(sections, SectionId.SkillRelatedSkills)),
             ReadNpcDefinitions(RequireSection(sections, SectionId.NpcDefinitions)),
@@ -171,36 +171,28 @@ internal static class ResourcePackReader
                 (SkillSourceKeyRelation)ReadByte(ref cursor),
                 ReadString(ref cursor),
                 ReadInt32(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadStringArray(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
+                (SkillClientActionType)ReadByte(ref cursor),
+                (SkillClientSubType)ReadByte(ref cursor),
+                (SkillClientOverlapType)ReadByte(ref cursor),
+                (SkillClientDispositionType)ReadByte(ref cursor),
+                (SkillClientDamageType)ReadByte(ref cursor),
+                (SkillClientWeaponType)ReadInt32(ref cursor),
+                (SkillClientTargetProcessType)ReadByte(ref cursor),
+                (SkillClientRotateType)ReadByte(ref cursor),
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
-                ReadString(ref cursor),
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
-                ReadString(ref cursor),
-                ReadIntArray(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
-                ReadStringArray(ref cursor),
-                ReadStringArray(ref cursor),
-                ReadString(ref cursor),
-                ReadIntArray(ref cursor),
-                ReadString(ref cursor),
-                ReadString(ref cursor),
+                (SkillClientAutoLoadType)ReadByte(ref cursor),
+                (SkillClientTargetLocationType)ReadByte(ref cursor),
+                (SkillClientHideSkillGauge)ReadByte(ref cursor),
+                (SkillClientAttributeType)ReadByte(ref cursor),
+                (SkillClientCategoryType)ReadInt32(ref cursor),
+                (SkillClientElementalSummonGroupType)ReadInt32(ref cursor),
+                (SkillClientSkillAutoType)ReadByte(ref cursor),
+                (SkillClientContextSkillSlotRegisterType)ReadByte(ref cursor),
                 ReadInt32(ref cursor));
             result.Add(entry.SkillId, entry);
         }
@@ -209,16 +201,14 @@ internal static class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static FrozenDictionary<int, SkillDisplayProjection> ReadSkillDisplayProjections(ResourcePackSection section)
+    private static FrozenDictionary<int, SkillBaseProjection> ReadSkillBaseProjections(ResourcePackSection section)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
-        var result = new Dictionary<int, SkillDisplayProjection>(count);
+        var result = new Dictionary<int, SkillBaseProjection>(count);
         for (var i = 0; i < count; i++)
         {
-            var projection = new SkillDisplayProjection(
-                ReadInt32(ref cursor),
-                ReadInt32(ref cursor),
+            var projection = new SkillBaseProjection(
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor));
             result.Add(projection.SkillCode, projection);
@@ -381,40 +371,6 @@ internal static class ResourcePackReader
         }
 
         return ReadStringBody(ref cursor, length);
-    }
-
-    private static string[] ReadStringArray(ref ReadOnlySpan<byte> cursor)
-    {
-        var count = ReadInt32(ref cursor);
-        if (count < 0)
-        {
-            throw new InvalidDataException("Unexpected negative string array length in resource pack.");
-        }
-
-        var values = new string[count];
-        for (var i = 0; i < values.Length; i++)
-        {
-            values[i] = ReadString(ref cursor);
-        }
-
-        return values;
-    }
-
-    private static int[] ReadIntArray(ref ReadOnlySpan<byte> cursor)
-    {
-        var count = ReadInt32(ref cursor);
-        if (count < 0)
-        {
-            throw new InvalidDataException("Unexpected negative int array length in resource pack.");
-        }
-
-        var values = new int[count];
-        for (var i = 0; i < values.Length; i++)
-        {
-            values[i] = ReadInt32(ref cursor);
-        }
-
-        return values;
     }
 
     private static string ReadStringBody(ref ReadOnlySpan<byte> cursor, int length)

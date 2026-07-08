@@ -15,7 +15,7 @@ public sealed class OwnerTargetSummonResourceCanonicalizer(EntityStore entities)
         {
             EventKind = CombatEventKind.Support,
             ValueKind = CombatValueKind.Support
-        });
+        }, CombatContributionCanonicalization.OwnerTargetSummonResource);
     }
 
     private bool IsOwnerTargetSummonResourceValue(int sourceId, int targetId, in CombatObservation observation)

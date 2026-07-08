@@ -244,7 +244,7 @@ public sealed class SceneArchivePayload
         return builder.ToScope();
     }
 
-    private static EventKey CreateKey(in CombatDetailEvent e) => new(e.Revision, e.SourceId, e.TargetId, e.SkillCode, e.ObservedAt, e.Amount, e.EventKind, e.ValueKind);
+    private static EventKey CreateKey(in CombatDetailEvent e) => new(e.Revision, e.SourceId, e.TargetId, e.SkillCode, e.ObservedAt, e.Amount, e.EventKind, e.ValueKind, e.Canonicalization);
 
     private static int CompareEvents(SceneArchiveCombatEvent left, SceneArchiveCombatEvent right)
     {
@@ -386,7 +386,7 @@ public sealed class SceneArchivePayload
         public void Apply(SceneArchiveCombatEvent e)
         {
             var observation = e.Observation;
-            var contribution = CombatContributionClassifier.Evaluate(in observation);
+            var contribution = e.Contribution;
 
             _totalDamage += contribution.DamageAmount;
             _totalHealing += contribution.HealingAmount;
@@ -544,7 +544,7 @@ public sealed class SceneArchivePayload
         }
     }
 
-    private readonly record struct EventKey(long Revision, int SourceId, int TargetId, int SkillCode, long Timestamp, long Damage, CombatEventKind EventKind, CombatValueKind ValueKind);
+    private readonly record struct EventKey(long Revision, int SourceId, int TargetId, int SkillCode, long Timestamp, long Damage, CombatEventKind EventKind, CombatValueKind ValueKind, CombatContributionCanonicalization Canonicalization);
 
     private sealed class ArchivePayloadIndex
     {
@@ -764,6 +764,10 @@ public readonly record struct SceneArchiveCombatEvent
     public int SourceId { get; init; }
     public int TargetId { get; init; }
     public CombatObservation Observation { get; init; }
+    public CombatEventKey EventKey { get; init; }
+    public RawPacketReference Raw { get; init; }
+    public CombatContribution Contribution { get; init; }
+    public CombatContributionCanonicalization Canonicalization { get; init; }
     public long ObservedAtMilliseconds { get; init; }
     public long Revision { get; init; }
     public long ObservedAt => ObservedAtMilliseconds;
@@ -773,11 +777,15 @@ public readonly record struct SceneArchiveCombatEvent
         SourceId = e.SourceId,
         TargetId = e.TargetId,
         Observation = e.Observation,
+        EventKey = e.EventKey,
+        Raw = e.Raw,
+        Contribution = e.Contribution,
+        Canonicalization = e.Canonicalization,
         ObservedAtMilliseconds = e.ObservedAtMilliseconds,
         Revision = e.Revision
     };
 
-    public CombatDetailEvent ToDetailEvent() => new(Observation, SourceId, TargetId, ObservedAtMilliseconds, Revision);
+    public CombatDetailEvent ToDetailEvent() => new(Observation, SourceId, TargetId, ObservedAtMilliseconds, Revision, EventKey, Raw, Contribution, Canonicalization);
 }
 
 public sealed class SceneArchiveEntityIdentity

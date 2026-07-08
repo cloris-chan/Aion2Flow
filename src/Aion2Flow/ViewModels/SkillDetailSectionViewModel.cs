@@ -1,17 +1,22 @@
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.Collections;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
     private readonly UiFrameBatchService _frameBatchService = frameBatchService;
-    private readonly Dictionary<SkillPresentationKey, SkillDetailRowViewModel> _existingByPresentationKey = [];
-    private readonly HashSet<SkillPresentationKey> _newPresentationKeys = [];
+    private readonly Dictionary<SkillBaseKey, SkillDetailRowViewModel> _existingByBaseKey = [];
+    private readonly HashSet<SkillBaseKey> _newBaseKeys = [];
 
     public ObservableCollection<SkillDetailScopeOption> ScopeOptions { get; } = [];
-    public ObservableCollection<SkillDetailRowViewModel> Rows { get; } = [];
+    public KeyedObservableCollection<SkillBaseKey, SkillDetailRowViewModel> Rows { get; } = new(static row => row.BaseKey)
+    {
+        ResetThreshold = 24
+    };
 
     public event EventHandler? SelectedScopeChanged;
 
@@ -19,6 +24,8 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
 
     [ObservableProperty]
     public partial SkillDetailScopeOption? SelectedScope { get; set; }
+
+    public SkillDetailRowViewModel? SelectedRow { get; private set => SetFrameProperty(ref field, value); }
 
     public long Total { get; set => SetFrameProperty(ref field, value); }
     public long DirectTotal { get; set => SetFrameProperty(ref field, value); }
@@ -85,21 +92,56 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
 
     public void ReplaceRows(List<SkillDetailRowData> dataRows)
     {
-        _existingByPresentationKey.Clear();
-        foreach (var row in Rows)
+        var selectedBaseKey = SelectedRow?.BaseKey;
+        if (ApplyRowsInPlaceIfOrderMatches(dataRows, selectedBaseKey))
+            return;
+
+        using (Rows.SuspendNotifications())
         {
-            _existingByPresentationKey.TryAdd(row.PresentationKey, row);
+            ReplaceRowsCore(dataRows);
         }
 
-        _newPresentationKeys.Clear();
+        SetSelectedRow(FindRow(selectedBaseKey));
+    }
+
+    private bool ApplyRowsInPlaceIfOrderMatches(List<SkillDetailRowData> dataRows, SkillBaseKey? selectedBaseKey)
+    {
+        if (Rows.Count != dataRows.Count)
+            return false;
+
+        var dataRowsSpan = CollectionsMarshal.AsSpan(dataRows);
+        for (var i = 0; i < dataRowsSpan.Length; i++)
+        {
+            if (!Rows[i].BaseKey.Equals(dataRowsSpan[i].BaseKey))
+                return false;
+        }
+
+        for (var i = 0; i < dataRowsSpan.Length; i++)
+        {
+            Rows[i].ApplyFrom(in dataRowsSpan[i]);
+        }
+
+        SetSelectedRow(FindRow(selectedBaseKey));
+        return true;
+    }
+
+    private void ReplaceRowsCore(List<SkillDetailRowData> dataRows)
+    {
+        _existingByBaseKey.Clear();
+        foreach (var row in Rows)
+        {
+            _existingByBaseKey.TryAdd(row.BaseKey, row);
+        }
+
+        _newBaseKeys.Clear();
         for (var i = 0; i < dataRows.Count; i++)
         {
-            _newPresentationKeys.Add(dataRows[i].PresentationKey);
+            _newBaseKeys.Add(dataRows[i].BaseKey);
         }
 
         for (var i = Rows.Count - 1; i >= 0; i--)
         {
-            if (!_newPresentationKeys.Contains(Rows[i].PresentationKey))
+            if (!_newBaseKeys.Contains(Rows[i].BaseKey))
             {
                 Rows.RemoveAt(i);
             }
@@ -108,13 +150,13 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         for (var i = 0; i < dataRows.Count; i++)
         {
             ref var data = ref CollectionsMarshal.AsSpan(dataRows)[i];
-            if (_existingByPresentationKey.TryGetValue(data.PresentationKey, out var existing))
+            if (_existingByBaseKey.TryGetValue(data.BaseKey, out var existing))
             {
                 existing.ApplyFrom(in data);
                 var currentIndex = Rows.IndexOf(existing);
                 if (currentIndex != i && currentIndex >= 0)
                 {
-                    Rows.Move(currentIndex, i);
+                    MoveRow(currentIndex, i);
                 }
             }
             else
@@ -133,8 +175,12 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         }
     }
 
+    [RelayCommand]
+    public void SelectRow(SkillDetailRowViewModel? row) => SetSelectedRow(row);
+
     public void Clear()
     {
+        SetSelectedRow(null);
         ScopeOptions.Clear();
         Rows.Clear();
         SelectedScope = null;
@@ -183,5 +229,47 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         EvadeRate = 0d;
         InvincibleRate = 0d;
         OnPropertyChanged(nameof(HasMultipleScopes));
+    }
+
+    private SkillDetailRowViewModel? FindRow(SkillBaseKey? baseKey)
+    {
+        if (baseKey is not { } key)
+            return null;
+
+        for (var i = 0; i < Rows.Count; i++)
+        {
+            var row = Rows[i];
+            if (row.BaseKey == key)
+                return row;
+        }
+
+        return null;
+    }
+
+    private void MoveRow(int oldIndex, int newIndex)
+    {
+        if (oldIndex == newIndex)
+            return;
+
+        var row = Rows[oldIndex];
+        Rows.RemoveAt(oldIndex);
+        Rows.Insert(newIndex, row);
+    }
+
+    private void SetSelectedRow(SkillDetailRowViewModel? row)
+    {
+        if (row is not null && !Rows.Contains(row))
+            row = null;
+
+        if (!ReferenceEquals(SelectedRow, row))
+        {
+            if (SelectedRow is { } previous)
+                previous.IsSelected = false;
+
+            SelectedRow = row;
+
+            if (row is not null)
+                row.IsSelected = true;
+        }
     }
 }

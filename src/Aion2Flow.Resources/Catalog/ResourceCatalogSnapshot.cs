@@ -10,10 +10,8 @@ public sealed class ResourceCatalogSnapshot(ResourceSharedCatalog shared, Resour
     public SkillDisplayCatalog Skills { get; } = BuildSkillDisplayCatalog(shared.SkillDefinitions, locale.SkillNames);
     public SkillDefinitionCatalog SkillDefinitions => Shared.SkillDefinitions;
     public IReadOnlyDictionary<int, SkillClientMetadata> SkillClientMetadata => Shared.SkillClientMetadata;
-    public IReadOnlyDictionary<int, SkillDisplayProjection> SkillDisplayProjections => Shared.SkillDisplayProjections;
-    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByPresentationSkillId => Shared.SkillDisplayProjectionsByPresentationSkillId;
-    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByDisplaySkillId => Shared.SkillDisplayProjectionsByDisplaySkillId;
-    public IReadOnlyDictionary<int, IReadOnlyList<SkillDisplayProjection>> SkillDisplayProjectionsByBaseSkillId => Shared.SkillDisplayProjectionsByBaseSkillId;
+    public IReadOnlyDictionary<int, SkillBaseProjection> SkillBaseProjections => Shared.SkillBaseProjections;
+    public IReadOnlyDictionary<int, IReadOnlyList<SkillBaseProjection>> SkillBaseProjectionsByBaseSkillId => Shared.SkillBaseProjectionsByBaseSkillId;
     public IReadOnlyList<SkillEffectReference> SkillEffectReferences => Shared.SkillEffectReferences;
     public IReadOnlyDictionary<int, IReadOnlyList<SkillEffectReference>> SkillEffectReferencesBySkillId => Shared.SkillEffectReferencesBySkillId;
     public IReadOnlyDictionary<int, IReadOnlyList<SkillEffectReference>> SkillEffectReferencesByEffectCode => Shared.SkillEffectReferencesByEffectCode;

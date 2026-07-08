@@ -11,8 +11,8 @@ public sealed class SceneTestHarness : IDisposable
     private readonly ReplaySinkHolder _holder = SceneSinkFactory.CreateForReplay();
     private readonly IRuntimeObservationSink _sink;
     private long _timestamp = 1_000;
-    private long _batchOrdinal;
-    private long _completedBatchOrdinal;
+    private long _flushId;
+    private long _completedFlushId;
 
     public SceneTestHarness()
     {
@@ -58,11 +58,11 @@ public sealed class SceneTestHarness : IDisposable
 
     public void AppendSummon(int ownerId, int summonInstanceId) => Sink.AppendSummon(NextSource(), ownerId, summonInstanceId);
 
-    public void AppendCombatPacket(ParsedCombatPacket packet)
+    public void AppendCombatPacket(ParsedCombatPacket packet, long flushId = 0)
     {
-        packet = PreparePacket(packet);
+        packet = PreparePacket(packet, flushId, out var resolvedFlushId);
         var observation = packet.ToObservation();
-        var source = new PacketObservationSource(packet.Timestamp, packet.FrameOrdinal, packet.BatchOrdinal, 0, 0, 0, default);
+        var source = new PacketObservationSource(packet.Timestamp, resolvedFlushId, 0, 0, 0, default);
         _holder.Sink.AppendCombatObservation(in source, packet.SourceId, packet.TargetId, in observation);
     }
 
@@ -81,10 +81,10 @@ public sealed class SceneTestHarness : IDisposable
 
     public void Dispose() => _holder.Dispose();
 
-    private ParsedCombatPacket PreparePacket(ParsedCombatPacket packet)
+    private ParsedCombatPacket PreparePacket(ParsedCombatPacket packet, long flushId, out long resolvedFlushId)
     {
-        var batchOrdinal = packet.BatchOrdinal > 0 ? packet.BatchOrdinal : ++_batchOrdinal;
-        _batchOrdinal = Math.Max(_batchOrdinal, batchOrdinal);
+        resolvedFlushId = flushId > 0 ? flushId : ++_flushId;
+        _flushId = Math.Max(_flushId, resolvedFlushId);
         if (packet.Timestamp <= 0 || packet.Timestamp > 10_000_000_000)
         {
             packet = WithTimestamp(packet, _timestamp);
@@ -95,17 +95,16 @@ public sealed class SceneTestHarness : IDisposable
             _timestamp = Math.Max(_timestamp, packet.Timestamp + 50);
         }
 
-        packet.BatchOrdinal = batchOrdinal;
         return packet;
     }
 
-    private void CompleteBatch(long batchOrdinal)
+    private void CompleteFlush(long flushId)
     {
-        if (batchOrdinal <= _completedBatchOrdinal)
+        if (flushId <= _completedFlushId)
             return;
 
-        _holder.Sink.CompleteBatch(batchOrdinal);
-        _completedBatchOrdinal = batchOrdinal;
+        _holder.Sink.CompleteFlush(flushId);
+        _completedFlushId = flushId;
     }
 
     private PacketObservationSource NextSource()
@@ -116,13 +115,13 @@ public sealed class SceneTestHarness : IDisposable
     }
 
     private PacketObservationSource SourceAt(long timestamp)
-        => new(timestamp, 0, ++_batchOrdinal, 0, 0, 0, default);
+        => new(timestamp, ++_flushId, 0, 0, 0, default);
 
     private void CompletePendingBatches()
     {
-        while (_completedBatchOrdinal < _batchOrdinal)
+        while (_completedFlushId < _flushId)
         {
-            CompleteBatch(_completedBatchOrdinal + 1);
+            CompleteFlush(_completedFlushId + 1);
         }
     }
 
@@ -151,8 +150,6 @@ public sealed class SceneTestHarness : IDisposable
             DetailRaw = packet.DetailRaw,
             DetailResourceEffectRef = packet.DetailResourceEffectRef,
             ResourceKind = packet.ResourceKind,
-            FrameOrdinal = packet.FrameOrdinal,
-            BatchOrdinal = packet.BatchOrdinal,
             Timestamp = timestamp,
             Id = packet.Id,
             Modifiers = packet.Modifiers,
@@ -199,18 +196,17 @@ public sealed class SceneTestHarness : IDisposable
         public void MarkSceneTransportBoundary(in PacketObservationSource packet) => inner.MarkSceneTransportBoundary(in packet);
         public void AppendCombatObservation(in PacketObservationSource source, int sourceId, int targetId, in CombatObservation observation)
         {
-            var packet = ParsedCombatPacket.FromObservation(sourceId, targetId, in observation, source.CaptureTimestampMilliseconds, source.FrameOrdinal, source.BatchOrdinal);
-            packet = owner.PreparePacket(packet);
+            var packet = ParsedCombatPacket.FromObservation(sourceId, targetId, in observation, source.CaptureTimestampMilliseconds);
+            packet = owner.PreparePacket(packet, source.FlushId, out var resolvedFlushId);
             var prepared = packet.ToObservation();
             var preparedSource = source with
             {
                 CaptureTimestampMilliseconds = packet.Timestamp,
-                FrameOrdinal = packet.FrameOrdinal,
-                BatchOrdinal = packet.BatchOrdinal
+                FlushId = resolvedFlushId
             };
             inner.AppendCombatObservation(in preparedSource, packet.SourceId, packet.TargetId, in prepared);
         }
-        public void CompleteBatch(long batchOrdinal) => owner.CompleteBatch(batchOrdinal);
+        public void CompleteFlush(long flushId) => owner.CompleteFlush(flushId);
         public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type) => inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodySkillVariantRaw, marker, layoutTag, type);
         public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type, int value) => inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodySkillVariantRaw, marker, layoutTag, type, value);
         public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId) => inner.RegisterCompactControl0238(in packet, sourceId, mode, bodyCodeRaw, marker, flag, echoSourceId);
