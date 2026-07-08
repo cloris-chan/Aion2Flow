@@ -2,6 +2,7 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Settings;
+using Cloris.Aion2Flow.Tests.SceneRuntime;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
@@ -100,6 +101,35 @@ public sealed class PlayerNameDisplayServiceTests
         Assert.Equal(1, context.ResolvePcAnonymousOrdinal(100));
         Assert.Equal(2, context.ResolvePcAnonymousOrdinal(300));
         Assert.Equal(1, context.ResolvePcAnonymousOrdinal(200));
+    }
+
+    [Fact]
+    public void SceneDisplayContext_AnonymousOrdinal_MergesScopeRegistryAndVisibleCombatants()
+    {
+        var builder = new SceneIdentityScopeBuilder();
+        builder.AddPcMetadata(new PcMetadata(100, "Scoped Elementalist", CharacterClass: CharacterClass.Elementalist));
+        var registry = new RuntimeMetadataRegistry();
+        registry.UpsertPcMetadata(50, "Registry Elementalist", characterClass: CharacterClass.Elementalist);
+        registry.UpsertPcMetadata(200, "Registry Cleric", characterClass: CharacterClass.Cleric);
+        registry.UpsertPcMetadata(300, "Registry Elementalist", characterClass: CharacterClass.Elementalist);
+        var snapshot = SceneSnapshotTestFactory.Create(
+            combatants:
+            [
+                SceneSnapshotTestFactory.Combatant(150, SceneSnapshotTestFactory.VisibleMetrics(CharacterClass.Cleric)),
+                SceneSnapshotTestFactory.Combatant(250, SceneSnapshotTestFactory.VisibleMetrics(CharacterClass.Elementalist)),
+                SceneSnapshotTestFactory.Combatant(400, SceneSnapshotTestFactory.VisibleMetrics(CharacterClass.Elementalist))
+            ]);
+        var language = new LanguageService();
+        using var resources = new GameResourceService(language);
+        var context = new SceneDisplayContext(builder.ToScope(), registry, snapshot, resources, "Unknown");
+
+        Assert.Equal(1, context.ResolvePcAnonymousOrdinal(50));
+        Assert.Equal(2, context.ResolvePcAnonymousOrdinal(100));
+        Assert.Equal(3, context.ResolvePcAnonymousOrdinal(250));
+        Assert.Equal(4, context.ResolvePcAnonymousOrdinal(300));
+        Assert.Equal(5, context.ResolvePcAnonymousOrdinal(400));
+        Assert.Equal(1, context.ResolvePcAnonymousOrdinal(150));
+        Assert.Equal(2, context.ResolvePcAnonymousOrdinal(200));
     }
 
     [Fact]

@@ -9,6 +9,9 @@ namespace Cloris.Aion2Flow.Services;
 
 public sealed class SceneDisplayContext(SceneIdentityScope identityScope, RuntimeMetadataRegistry? metadataRegistry, SceneCombatSnapshot? snapshot, GameResourceService resources, string unknownSceneName)
 {
+    private AnonymousOrdinalIndex? _anonymousOrdinalIndex;
+    private long _anonymousOrdinalIndexMetadataRevision = long.MinValue;
+
     public SceneIdentityScope IdentityScope { get; } = identityScope;
     public RuntimeMetadataRegistry? MetadataRegistry { get; } = metadataRegistry;
     public SceneCombatSnapshot Snapshot { get; } = snapshot ?? SceneCombatSnapshot.Empty;
@@ -54,32 +57,40 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
             return 1;
         }
 
-        var characterClass = ResolvePcClass(entityId);
-        var ordinal = 1;
+        return GetAnonymousOrdinalIndex().Resolve(entityId, this);
+    }
+
+    private AnonymousOrdinalIndex GetAnonymousOrdinalIndex()
+    {
+        var metadataRevision = MetadataRegistry?.Revision ?? -1;
+        var index = _anonymousOrdinalIndex;
+        if (index is not null && _anonymousOrdinalIndexMetadataRevision == metadataRevision)
+        {
+            return index;
+        }
+
+        index = BuildAnonymousOrdinalIndex();
+        _anonymousOrdinalIndex = index;
+        _anonymousOrdinalIndexMetadataRevision = metadataRevision;
+        return index;
+    }
+
+    private AnonymousOrdinalIndex BuildAnonymousOrdinalIndex()
+    {
+        var candidateIds = new List<int>();
         var scoped = IdentityScope.PcMetadataSpan;
         for (var i = 0; i < scoped.Length; i++)
         {
-            var entry = scoped[i];
-            if (entry.EntityId >= entityId)
-            {
-                break;
-            }
-
-            if (ResolvePcClass(entry.EntityId) == characterClass)
-            {
-                ordinal++;
-            }
+            candidateIds.Add(scoped[i].EntityId);
         }
 
         if (MetadataRegistry is not null)
         {
-            foreach (var (candidateId, metadata) in MetadataRegistry.PcMetadataByEntityId)
+            foreach (var (candidateId, _) in MetadataRegistry.PcMetadataByEntityId)
             {
-                if (candidateId < entityId &&
-                    !IdentityScope.TryGetPcMetadata(candidateId, out _) &&
-                    ResolvePcClass(candidateId) == characterClass)
+                if (!IdentityScope.TryGetPcMetadata(candidateId, out _))
                 {
-                    ordinal++;
+                    candidateIds.Add(candidateId);
                 }
             }
         }
@@ -88,21 +99,49 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
         for (var i = 0; i < combatants.Length; i++)
         {
             ref readonly var entry = ref combatants[i];
-            if (entry.Id >= entityId)
-            {
-                break;
-            }
-
             if (!IdentityScope.TryGetPcMetadata(entry.Id, out _) &&
                 MetadataRegistry?.TryGetPcMetadata(entry.Id, out _) != true &&
-                entry.Metrics.IsVisiblePlayerCombatant &&
-                ResolvePcClass(entry.Id) == characterClass)
+                entry.Metrics.IsVisiblePlayerCombatant)
             {
-                ordinal++;
+                candidateIds.Add(entry.Id);
             }
         }
 
-        return ordinal;
+        if (candidateIds.Count == 0)
+        {
+            return AnonymousOrdinalIndex.Empty;
+        }
+
+        candidateIds.Sort();
+        var uniqueCount = 0;
+        var previousId = 0;
+        for (var i = 0; i < candidateIds.Count; i++)
+        {
+            var candidateId = candidateIds[i];
+            if (i > 0 && candidateId == previousId)
+            {
+                continue;
+            }
+
+            candidateIds[uniqueCount++] = candidateId;
+            previousId = candidateId;
+        }
+
+        var entries = new AnonymousOrdinalEntry[uniqueCount];
+        var ordinalsByEntityId = new Dictionary<int, int>(uniqueCount);
+        var ordinalsByClass = new Dictionary<int, int>();
+        for (var i = 0; i < uniqueCount; i++)
+        {
+            var candidateId = candidateIds[i];
+            var classKey = GetAnonymousClassKey(ResolvePcClass(candidateId));
+            ordinalsByClass.TryGetValue(classKey, out var ordinal);
+            ordinal++;
+            ordinalsByClass[classKey] = ordinal;
+            entries[i] = new AnonymousOrdinalEntry(candidateId, classKey, ordinal);
+            ordinalsByEntityId[candidateId] = ordinal;
+        }
+
+        return new AnonymousOrdinalIndex(entries, ordinalsByEntityId);
     }
 
     public bool HasPcMetadata(int entityId) => entityId > 0 && TryGetPcMetadata(entityId, out _);
@@ -251,5 +290,41 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
         }
 
         return MetadataRegistry is not null && MetadataRegistry.TryGetNpcCode(instanceId, out npcCode);
+    }
+
+    private static int GetAnonymousClassKey(CharacterClass? characterClass)
+        => characterClass.HasValue ? (int)characterClass.Value : -1;
+
+    private readonly record struct AnonymousOrdinalEntry(int EntityId, int ClassKey, int Ordinal);
+
+    private sealed class AnonymousOrdinalIndex(AnonymousOrdinalEntry[] entries, Dictionary<int, int> ordinalsByEntityId)
+    {
+        public static AnonymousOrdinalIndex Empty { get; } = new([], []);
+
+        public int Resolve(int entityId, SceneDisplayContext context)
+        {
+            if (ordinalsByEntityId.TryGetValue(entityId, out var ordinal))
+            {
+                return ordinal;
+            }
+
+            var classKey = GetAnonymousClassKey(context.ResolvePcClass(entityId));
+            ordinal = 1;
+            for (var i = 0; i < entries.Length; i++)
+            {
+                ref readonly var entry = ref entries[i];
+                if (entry.EntityId >= entityId)
+                {
+                    break;
+                }
+
+                if (entry.ClassKey == classKey)
+                {
+                    ordinal++;
+                }
+            }
+
+            return ordinal;
+        }
     }
 }
