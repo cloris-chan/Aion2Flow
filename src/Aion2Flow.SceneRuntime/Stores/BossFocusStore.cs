@@ -34,33 +34,31 @@ public sealed class BossFocusStore(EntityStore entities)
 
     public IReadOnlyList<Snapshot> GetObservedBosses(long nowMilliseconds, long visibilityTimeoutMilliseconds)
     {
+        RemoveExpiredBosses(nowMilliseconds, visibilityTimeoutMilliseconds);
         if (_observed.Count == 0)
             return [];
 
-        List<int>? expired = null;
         var result = new List<Snapshot>(_observed.Count);
-        foreach (var (instanceId, snapshot) in _observed)
-        {
-            var elapsed = Math.Max(0, nowMilliseconds - snapshot.LastObservedAtMilliseconds);
-            if (elapsed <= visibilityTimeoutMilliseconds)
-                result.Add(snapshot);
-            else
-                (expired ??= []).Add(instanceId);
-        }
-
-        if (expired is not null)
-        {
-            foreach (var id in expired)
-            {
-                if (_observed.TryGetValue(id, out var snapshot))
-                    _lastClearedAtMilliseconds[id] = Math.Max(nowMilliseconds, snapshot.LastObservedAtMilliseconds);
-                _observed.Remove(id);
-            }
-            _revision++;
-        }
+        foreach (var snapshot in _observed.Values)
+            result.Add(snapshot);
 
         result.Sort(static (a, b) => a.InstanceId.CompareTo(b.InstanceId));
         return result;
+    }
+
+    internal BossFocusGroupState GetGroupState(long nowMilliseconds, long visibilityTimeoutMilliseconds)
+    {
+        RemoveExpiredBosses(nowMilliseconds, visibilityTimeoutMilliseconds);
+        if (_observed.Count == 0)
+            return BossFocusGroupState.Empty;
+
+        foreach (var snapshot in _observed.Values)
+        {
+            if (!snapshot.HasHp || snapshot.Hp > 0)
+                return BossFocusGroupState.ActiveOrUnknown;
+        }
+
+        return BossFocusGroupState.AllDead;
     }
 
     public IReadOnlyList<Snapshot> GetEncounterBosses()
@@ -178,6 +176,29 @@ public sealed class BossFocusStore(EntityStore entities)
             _revision++;
     }
 
+    private void RemoveExpiredBosses(long nowMilliseconds, long visibilityTimeoutMilliseconds)
+    {
+        List<int>? expired = null;
+        foreach (var (instanceId, snapshot) in _observed)
+        {
+            var elapsed = Math.Max(0, nowMilliseconds - snapshot.LastObservedAtMilliseconds);
+            if (elapsed > visibilityTimeoutMilliseconds)
+                (expired ??= []).Add(instanceId);
+        }
+
+        if (expired is null)
+            return;
+
+        for (var i = 0; i < expired.Count; i++)
+        {
+            var instanceId = expired[i];
+            var snapshot = _observed[instanceId];
+            _lastClearedAtMilliseconds[instanceId] = Math.Max(nowMilliseconds, snapshot.LastObservedAtMilliseconds);
+            _observed.Remove(instanceId);
+        }
+        _revision++;
+    }
+
     private void RememberActivity(int instanceId, long observedAtMilliseconds)
     {
         var observedAt = Math.Max(0, observedAtMilliseconds);
@@ -285,6 +306,13 @@ public sealed class BossFocusStore(EntityStore entities)
         public bool HasHp { get; init; }
         public bool HasMaxHp { get; init; }
     }
+}
+
+internal enum BossFocusGroupState : byte
+{
+    Empty,
+    ActiveOrUnknown,
+    AllDead
 }
 
 internal sealed record BossFocusStoreSnapshot(BossFocusObservedSnapshot[] Observed, BossFocusClearedSnapshot[] Cleared, BossFocusObservedSnapshot[] EncounterBosses, long Revision);

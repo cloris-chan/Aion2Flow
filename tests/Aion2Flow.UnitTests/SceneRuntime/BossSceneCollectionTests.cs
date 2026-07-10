@@ -184,7 +184,7 @@ public sealed class BossSceneCollectionTests
     }
 
     [Fact]
-    public void EmptyBossFocusFreezesSceneAndDropsFollowingCombat()
+    public void AllDeadBossFocusFreezesSceneImmediatelyAndDropsFollowingCombat()
     {
         var scene = CreateBossScene(out var timeProvider);
         var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -199,28 +199,38 @@ public sealed class BossSceneCollectionTests
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
         var deathFrame = scene.CreateFrame();
 
-        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
         var deadBoss = Assert.Single(deathFrame.BossFocuses.AsSpan().ToArray());
         Assert.True(deadBoss.HasHp);
         Assert.Equal(0, deadBoss.Hp);
-
-        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
-        _ = scene.CreateFrame();
-        Assert.Equal(BossSceneState.Frozen, scene.BossState);
+        Assert.Equal(200, deathFrame.Snapshot.EncounterTime);
         var frozenCount = scene.Journal.Count;
+        var frozenSessionId = scene.SessionId;
         sink.SetNpcBattle(Source(2_500), 300, false);
+        AppendDamage(sink, 100, 300, 800, 2_600, 3);
         AppendDamage(sink, 100, 200, 900, 3_000, 3);
         sink.CompleteFlush(3);
         var snapshot = scene.CreateFrame().Snapshot;
 
+        Assert.Equal(frozenSessionId, scene.SessionId);
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
         Assert.Equal(frozenCount, scene.Journal.Count);
         Assert.Equal(700, snapshot.Combatants[100].DamageAmount);
-        Assert.Empty(snapshot.BossFocuses);
+        Assert.Equal(200, snapshot.EncounterTime);
+        Assert.Single(snapshot.BossFocuses.AsSpan().ToArray());
         Assert.Equal([2_100_002], snapshot.BossNpcCodes.AsSpan().ToArray());
+        Assert.False(scene.TryDequeuePendingArchive(out _));
+
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        var expiredSnapshot = scene.CreateFrame().Snapshot;
+
+        Assert.Empty(expiredSnapshot.BossFocuses);
+        Assert.Equal(700, expiredSnapshot.Combatants[100].DamageAmount);
+        Assert.Equal(200, expiredSnapshot.EncounterTime);
     }
 
     [Fact]
-    public void DeadBossSceneKeepsFocusUntilTimeoutAndDoesNotArchiveImmediately()
+    public void DeadBossSceneFreezesImmediatelyButKeepsFocusUntilTimeout()
     {
         var scene = CreateBossScene(out var timeProvider);
         var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -232,7 +242,7 @@ public sealed class BossSceneCollectionTests
 
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
         var deadFrame = scene.CreateFrame();
-        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
         Assert.Single(deadFrame.BossFocuses.AsSpan().ToArray());
         Assert.False(scene.TryDequeuePendingArchive(out _));
 
@@ -245,9 +255,66 @@ public sealed class BossSceneCollectionTests
     }
 
     [Fact]
+    public void MultipleBossSceneFreezesOnlyAfterEveryFocusedBossIsDead()
+    {
+        var scene = CreateBossScene();
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        AppendNpc(sink, 301, 2_100_003, NpcKind.Boss, 30);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        AppendDamage(sink, 100, 301, 700, 1_200, 2);
+        sink.AppendNpcHp(Source(1_300), 300, 1_000, 1_000);
+        sink.AppendNpcHp(Source(1_400), 301, 2_000, 2_000);
+        sink.CompleteFlush(2);
+        _ = scene.CreateFrame();
+
+        sink.AppendNpcHp(Source(2_000), 300, 0, 1_000);
+        var oneDeadFrame = scene.CreateFrame();
+
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Equal(2, oneDeadFrame.BossFocuses.Count);
+        Assert.Contains(oneDeadFrame.BossFocuses.AsSpan().ToArray(), static boss => boss.InstanceId == 300 && boss.HasHp && boss.Hp == 0);
+        Assert.Contains(oneDeadFrame.BossFocuses.AsSpan().ToArray(), static boss => boss.InstanceId == 301 && boss.HasHp && boss.Hp == 2_000);
+
+        sink.AppendNpcHp(Source(2_100), 301, 0, 2_000);
+        var allDeadFrame = scene.CreateFrame();
+
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
+        Assert.Equal(2, allDeadFrame.BossFocuses.Count);
+        Assert.All(allDeadFrame.BossFocuses.AsSpan().ToArray(), static boss =>
+        {
+            Assert.True(boss.HasHp);
+            Assert.Equal(0, boss.Hp);
+        });
+    }
+
+    [Fact]
+    public void UnknownFocusedBossHpPreventsPrematureDeathFreeze()
+    {
+        var scene = CreateBossScene();
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        AppendNpc(sink, 301, 2_100_003, NpcKind.Boss, 30);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        AppendDamage(sink, 100, 301, 700, 1_200, 2);
+        sink.CompleteFlush(2);
+        _ = scene.CreateFrame();
+
+        sink.AppendNpcHp(Source(2_000), 300, 0, 1_000);
+        var frame = scene.CreateFrame();
+
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Equal(2, frame.BossFocuses.Count);
+        Assert.Contains(frame.BossFocuses.AsSpan().ToArray(), static boss => boss.InstanceId == 300 && boss.HasHp && boss.Hp == 0);
+        Assert.Contains(frame.BossFocuses.AsSpan().ToArray(), static boss => boss.InstanceId == 301 && !boss.HasHp);
+    }
+
+    [Fact]
     public void NextBossCombatArchivesFrozenSceneBeforeStartingNewScene()
     {
-        var scene = CreateBossScene(out var timeProvider);
+        var scene = CreateBossScene();
         var sink = SceneSinkFactory.CreateForLive(scene)();
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
@@ -256,8 +323,7 @@ public sealed class BossSceneCollectionTests
         sink.CompleteFlush(2);
         _ = scene.CreateFrame();
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
-        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
-        _ = scene.CreateFrame();
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
         var frozenEnd = scene.Owner.AppliedNextObservationOrdinal;
 
         AppendNpc(sink, 301, 2_100_003, NpcKind.Boss, 3_000);

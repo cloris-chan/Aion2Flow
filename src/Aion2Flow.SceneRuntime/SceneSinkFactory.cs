@@ -131,7 +131,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         lock (_gate)
         {
             var frame = Owner.CreateFrame(detailCombatantId, forceDetailRefresh);
-            UpdateBossStateFromFrame(frame);
+            RefreshBossStateCore();
             return frame;
         }
     }
@@ -141,7 +141,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         lock (_gate)
         {
             var frame = Owner.CreateFrame(detailCombatantId, detailWriter, forceDetailRefresh);
-            UpdateBossStateFromFrame(frame);
+            RefreshBossStateCore();
             return frame;
         }
     }
@@ -240,6 +240,9 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
         if (_bossState == BossSceneState.Frozen)
         {
+            if (Owner.Entities.TryGet(focusTargetId, out var focusTarget) && focusTarget.CurrentHp == 0)
+                return false;
+
             _pendingArchives.Enqueue(GetFrozenArchiveCore());
         }
 
@@ -284,20 +287,10 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         if (_kind != SceneKind.Boss || _bossState != BossSceneState.Recording)
             return;
 
-        if (Owner.GetActiveBossFocusCount() != 0)
+        if (Owner.GetActiveBossFocusState() == BossFocusGroupState.ActiveOrUnknown)
             return;
 
         FreezeBossSceneCore();
-    }
-
-    private void UpdateBossStateFromFrame(SceneReadModelFrame frame)
-    {
-        if (_kind == SceneKind.Boss &&
-            _bossState == BossSceneState.Recording &&
-            frame.BossFocuses.Count == 0)
-        {
-            FreezeBossSceneCore();
-        }
     }
 
     private void FreezeBossSceneCore()

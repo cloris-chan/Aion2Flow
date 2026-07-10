@@ -216,12 +216,12 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
-    public int GetActiveBossFocusCount()
+    internal BossFocusGroupState GetActiveBossFocusState()
     {
         lock (_gate)
         {
             RefreshCore();
-            return _applier.BossFocus.GetObservedBosses(GetSceneNowMilliseconds(), BossFocusVisibilityTimeoutMilliseconds).Count;
+            return _applier.BossFocus.GetGroupState(GetSceneNowMilliseconds(), BossFocusVisibilityTimeoutMilliseconds);
         }
     }
 
