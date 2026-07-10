@@ -11,11 +11,15 @@ public sealed class CompactDirectValueCanonicalizer
     private const int MaxPendingValues = 256;
     private const int MaxPendingSidecars = 256;
     private const int MaxConfirmedInlineRecoveryGroups = 128;
+    private const int MaxSamePayloadSelfRecoveryGroups = 128;
+    private const int MaxSamePayloadSelfPairRecoveryGroups = 128;
 
     internal readonly record struct PendingCompactOpener(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, int Mode, int Flag, int EchoSourceId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatObservation Observation, int MatchedValueCount);
     internal readonly record struct PendingCompactValue(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatObservation Observation);
     internal readonly record struct PendingCompactSidecar(int SourceId, int TargetId, uint BodyCodeRaw, int Marker);
     internal readonly record struct PendingCompactInlineRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker);
+    internal readonly record struct PendingSamePayloadSelfRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, uint DetailRefBase, PacketStructureKind ParentKind, int ParentScopeId);
+    internal readonly record struct PendingSamePayloadSelfPairRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, uint FirstDetailRef, uint SecondDetailRef, PacketStructureKind ParentKind, int ParentScopeId);
     internal readonly record struct CompactControlHeader(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatObservation Observation)
     {
         public static CompactControlHeader Empty { get; } = default;
@@ -28,6 +32,8 @@ public sealed class CompactDirectValueCanonicalizer
     private readonly List<PendingCompactValue> _pendingValues = new(MaxPendingValues);
     private readonly List<PendingCompactSidecar> _pendingSidecars = new(MaxPendingSidecars);
     private readonly List<PendingCompactInlineRecoveryGroup> _inlineRecoveryGroups = new(MaxConfirmedInlineRecoveryGroups);
+    private readonly List<PendingSamePayloadSelfRecoveryGroup> _samePayloadSelfRecoveryGroups = new(MaxSamePayloadSelfRecoveryGroups);
+    private readonly List<PendingSamePayloadSelfPairRecoveryGroup> _samePayloadSelfPairRecoveryGroups = new(MaxSamePayloadSelfPairRecoveryGroups);
 
     internal bool TryObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw, out StampedCombatCanonicalizationBatch results, out CompactControlHeader header)
     {
@@ -69,6 +75,18 @@ public sealed class CompactDirectValueCanonicalizer
             return true;
         }
 
+        if (TryFindSamePayloadSelfRecoveryGroup(sourceId, bodyCodeRaw, observation.Marker, in observation, raw, out _))
+        {
+            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, NormalizeAsHealing(in observation), CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup));
+            return true;
+        }
+
+        if (TryFindSamePayloadSelfPairRecoveryGroup(sourceId, targetId, bodyCodeRaw, observation.Marker, in observation, raw, out _))
+        {
+            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, NormalizeAsHealing(in observation), CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup));
+            return true;
+        }
+
         return ObservePendingCompactValue(sourceId, targetId, bodyCodeRaw, in stamp, in observation, observedAtMilliseconds, raw, out results);
     }
 
@@ -76,9 +94,13 @@ public sealed class CompactDirectValueCanonicalizer
     {
         var pending = new PendingCompactValue(sourceId, targetId, bodyCodeRaw, observation.Marker, stamp, observedAtMilliseconds, raw, observation);
         _pendingValues.Add(pending);
-        results = targetId == sourceId && TryConfirmInlineRecoveryGroupFromSelfValue(in pending, out var group)
-            ? FlushValuesMatchedBy(in group)
+        results = targetId == sourceId && TryConfirmInlineRecoveryGroupFromSelfValue(in pending, out var inlineGroup)
+            ? FlushValuesMatchedBy(in inlineGroup)
             : StampedCombatCanonicalizationBatch.Empty;
+        if (TryConfirmSamePayloadSelfRecoveryGroup(in pending, out var selfValueGroup))
+            results = Append(results, FlushValuesMatchedBy(in selfValueGroup));
+        if (TryConfirmSamePayloadSelfPairRecoveryGroup(in pending, out var selfPairGroup))
+            results = Append(results, FlushValuesMatchedBy(in selfPairGroup));
         results = Append(results, TrimPendingValues());
         return true;
     }
@@ -153,7 +175,7 @@ public sealed class CompactDirectValueCanonicalizer
         return false;
     }
 
-    internal CompactDirectValueCanonicalizerSnapshot CreateSnapshot() => new([.. _pendingOpeners], [.. _closedOpeners], [.. _pendingValues], [.. _pendingSidecars], [.. _inlineRecoveryGroups]);
+    internal CompactDirectValueCanonicalizerSnapshot CreateSnapshot() => new([.. _pendingOpeners], [.. _closedOpeners], [.. _pendingValues], [.. _pendingSidecars], [.. _inlineRecoveryGroups], [.. _samePayloadSelfRecoveryGroups], [.. _samePayloadSelfPairRecoveryGroups]);
 
     internal static CompactDirectValueCanonicalizer FromSnapshot(CompactDirectValueCanonicalizerSnapshot snapshot)
     {
@@ -163,6 +185,8 @@ public sealed class CompactDirectValueCanonicalizer
         canonicalizer._pendingValues.AddRange(snapshot.PendingValues);
         canonicalizer._pendingSidecars.AddRange(snapshot.PendingSidecars);
         canonicalizer._inlineRecoveryGroups.AddRange(snapshot.InlineRecoveryGroups);
+        canonicalizer._samePayloadSelfRecoveryGroups.AddRange(snapshot.SamePayloadSelfRecoveryGroups);
+        canonicalizer._samePayloadSelfPairRecoveryGroups.AddRange(snapshot.SamePayloadSelfPairRecoveryGroups);
         return canonicalizer;
     }
 
@@ -208,6 +232,50 @@ public sealed class CompactDirectValueCanonicalizer
             }
 
             results.Add(CreateResult(in pending, asHealing: true, CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryByInlineGroup));
+            _pendingValues.RemoveAt(i);
+        }
+
+        return results.ToBatch();
+    }
+
+    private StampedCombatCanonicalizationBatch FlushValuesMatchedBy(in PendingSamePayloadSelfRecoveryGroup group)
+    {
+        if (_pendingValues.Count == 0)
+            return StampedCombatCanonicalizationBatch.Empty;
+
+        var results = new StampedCombatCanonicalizationBatchBuilder(_pendingValues.Count);
+        for (var i = 0; i < _pendingValues.Count;)
+        {
+            var pending = _pendingValues[i];
+            if (!MatchesSamePayloadSelfRecoveryGroup(in group, in pending))
+            {
+                i++;
+                continue;
+            }
+
+            results.Add(CreateResult(in pending, asHealing: true, CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup));
+            _pendingValues.RemoveAt(i);
+        }
+
+        return results.ToBatch();
+    }
+
+    private StampedCombatCanonicalizationBatch FlushValuesMatchedBy(in PendingSamePayloadSelfPairRecoveryGroup group)
+    {
+        if (_pendingValues.Count == 0)
+            return StampedCombatCanonicalizationBatch.Empty;
+
+        var results = new StampedCombatCanonicalizationBatchBuilder(_pendingValues.Count);
+        for (var i = 0; i < _pendingValues.Count;)
+        {
+            var pending = _pendingValues[i];
+            if (!MatchesSamePayloadSelfPairRecoveryGroup(in group, in pending))
+            {
+                i++;
+                continue;
+            }
+
+            results.Add(CreateResult(in pending, asHealing: true, CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup));
             _pendingValues.RemoveAt(i);
         }
 
@@ -290,6 +358,50 @@ public sealed class CompactDirectValueCanonicalizer
         return false;
     }
 
+    private bool TryFindSamePayloadSelfRecoveryGroup(int sourceId, uint bodyCodeRaw, int marker, in CombatObservation observation, RawPacketReference raw, out PendingSamePayloadSelfRecoveryGroup group)
+    {
+        if (!TryCreateSamePayloadSelfRecoveryGroup(sourceId, bodyCodeRaw, marker, in observation, raw, out var candidateGroup))
+        {
+            group = default;
+            return false;
+        }
+
+        for (var i = _samePayloadSelfRecoveryGroups.Count - 1; i >= 0; i--)
+        {
+            var pending = _samePayloadSelfRecoveryGroups[i];
+            if (pending == candidateGroup)
+            {
+                group = pending;
+                return true;
+            }
+        }
+
+        group = default;
+        return false;
+    }
+
+    private bool TryFindSamePayloadSelfPairRecoveryGroup(int sourceId, int targetId, uint bodyCodeRaw, int marker, in CombatObservation observation, RawPacketReference raw, out PendingSamePayloadSelfPairRecoveryGroup group)
+    {
+        if (!IsSelfLoop2Value(sourceId, targetId, in observation))
+        {
+            group = default;
+            return false;
+        }
+
+        for (var i = _samePayloadSelfPairRecoveryGroups.Count - 1; i >= 0; i--)
+        {
+            var pending = _samePayloadSelfPairRecoveryGroups[i];
+            if (MatchesSamePayloadSelfPairRecoveryGroup(in pending, sourceId, targetId, bodyCodeRaw, marker, in observation, raw))
+            {
+                group = pending;
+                return true;
+            }
+        }
+
+        group = default;
+        return false;
+    }
+
     private bool TryConfirmInlineRecoveryGroupFromSelfValue(in PendingCompactValue value, out PendingCompactInlineRecoveryGroup group)
     {
         if (!HasMatchingSelfSidecar(in value))
@@ -316,6 +428,49 @@ public sealed class CompactDirectValueCanonicalizer
         return true;
     }
 
+    private bool TryConfirmSamePayloadSelfRecoveryGroup(in PendingCompactValue value, out PendingSamePayloadSelfRecoveryGroup group)
+    {
+        var observation = value.Observation;
+        if (!TryCreateSamePayloadSelfRecoveryGroup(value.SourceId, value.BodyCodeRaw, value.Marker, in observation, value.Raw, out group) ||
+            !HasMatchingSamePayloadSelfRecoveryCounterpart(in value, in group))
+        {
+            group = default;
+            return false;
+        }
+
+        ConfirmSamePayloadSelfRecoveryGroup(in group);
+        return true;
+    }
+
+    private bool TryConfirmSamePayloadSelfPairRecoveryGroup(in PendingCompactValue value, out PendingSamePayloadSelfPairRecoveryGroup group)
+    {
+        if (!IsSelfLoop2Value(in value))
+        {
+            group = default;
+            return false;
+        }
+
+        for (var i = _pendingValues.Count - 1; i >= 0; i--)
+        {
+            var candidate = _pendingValues[i];
+            if (candidate.Stamp == value.Stamp ||
+                !IsSelfLoop2Value(in candidate) ||
+                !TryCreateSamePayloadSelfPairRecoveryGroup(in value, in candidate, out group))
+            {
+                continue;
+            }
+
+            ConfirmSamePayloadSelfPairRecoveryGroup(in group);
+            var observation = value.Observation;
+            if (TryCreateSamePayloadSelfRecoveryGroup(value.SourceId, value.BodyCodeRaw, value.Marker, in observation, value.Raw, out var samePayloadGroup))
+                ConfirmSamePayloadSelfRecoveryGroup(in samePayloadGroup);
+            return true;
+        }
+
+        group = default;
+        return false;
+    }
+
     private void ConfirmInlineRecoveryGroup(in PendingCompactInlineRecoveryGroup group)
     {
         if (TryFindInlineRecoveryGroup(group.SourceId, group.BodyCodeRaw, group.Marker, out _))
@@ -323,6 +478,56 @@ public sealed class CompactDirectValueCanonicalizer
 
         _inlineRecoveryGroups.Add(group);
         TrimInlineRecoveryGroups();
+    }
+
+    private void ConfirmSamePayloadSelfRecoveryGroup(in PendingSamePayloadSelfRecoveryGroup group)
+    {
+        if (TryFindSamePayloadSelfRecoveryGroup(in group, out _))
+            return;
+
+        _samePayloadSelfRecoveryGroups.Add(group);
+        TrimSamePayloadSelfRecoveryGroups();
+    }
+
+    private void ConfirmSamePayloadSelfPairRecoveryGroup(in PendingSamePayloadSelfPairRecoveryGroup group)
+    {
+        if (TryFindSamePayloadSelfPairRecoveryGroup(in group, out _))
+            return;
+
+        _samePayloadSelfPairRecoveryGroups.Add(group);
+        TrimSamePayloadSelfPairRecoveryGroups();
+    }
+
+    private bool TryFindSamePayloadSelfRecoveryGroup(in PendingSamePayloadSelfRecoveryGroup group, out PendingSamePayloadSelfRecoveryGroup match)
+    {
+        for (var i = _samePayloadSelfRecoveryGroups.Count - 1; i >= 0; i--)
+        {
+            var pending = _samePayloadSelfRecoveryGroups[i];
+            if (pending == group)
+            {
+                match = pending;
+                return true;
+            }
+        }
+
+        match = default;
+        return false;
+    }
+
+    private bool TryFindSamePayloadSelfPairRecoveryGroup(in PendingSamePayloadSelfPairRecoveryGroup group, out PendingSamePayloadSelfPairRecoveryGroup match)
+    {
+        for (var i = _samePayloadSelfPairRecoveryGroups.Count - 1; i >= 0; i--)
+        {
+            var pending = _samePayloadSelfPairRecoveryGroups[i];
+            if (pending == group)
+            {
+                match = pending;
+                return true;
+            }
+        }
+
+        match = default;
+        return false;
     }
 
     private bool HasMatchingSelfSidecar(in PendingCompactValue value)
@@ -352,6 +557,25 @@ public sealed class CompactDirectValueCanonicalizer
             {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    private bool HasMatchingSamePayloadSelfRecoveryCounterpart(in PendingCompactValue value, in PendingSamePayloadSelfRecoveryGroup group)
+    {
+        var valueIsSelf = value.TargetId == value.SourceId;
+        for (var i = _pendingValues.Count - 1; i >= 0; i--)
+        {
+            var candidate = _pendingValues[i];
+            var candidateIsSelf = candidate.TargetId == candidate.SourceId;
+            if (candidateIsSelf == valueIsSelf ||
+                !MatchesSamePayloadSelfRecoveryGroup(in group, in candidate))
+            {
+                continue;
+            }
+
+            return true;
         }
 
         return false;
@@ -396,8 +620,96 @@ public sealed class CompactDirectValueCanonicalizer
         pendingBodyCodeRaw == bodyCodeRaw &&
         pendingMarker == marker;
 
+    private static bool TryCreateSamePayloadSelfRecoveryGroup(int sourceId, uint bodyCodeRaw, int marker, in CombatObservation observation, RawPacketReference raw, out PendingSamePayloadSelfRecoveryGroup group)
+    {
+        var parent = raw.StructurePath.Parent;
+        var detailRefBase = observation.DetailResourceEffectRef.RawId / 10;
+        if (sourceId <= 0 ||
+            bodyCodeRaw == 0 ||
+            marker <= 0 ||
+            detailRefBase == 0 ||
+            parent.Kind != PacketStructureKind.CompressedPayload ||
+            parent.ScopeId == 0)
+        {
+            group = default;
+            return false;
+        }
+
+        group = new PendingSamePayloadSelfRecoveryGroup(sourceId, bodyCodeRaw, marker, detailRefBase, parent.Kind, parent.ScopeId);
+        return true;
+    }
+
+    private static bool MatchesSamePayloadSelfRecoveryGroup(in PendingSamePayloadSelfRecoveryGroup group, in PendingCompactValue pending)
+    {
+        var parent = pending.Raw.StructurePath.Parent;
+        return pending.SourceId == group.SourceId &&
+               pending.BodyCodeRaw == group.BodyCodeRaw &&
+               pending.Marker == group.Marker &&
+               pending.Observation.DetailResourceEffectRef.RawId / 10 == group.DetailRefBase &&
+               parent.Kind == group.ParentKind &&
+               parent.ScopeId == group.ParentScopeId;
+    }
+
+    private static bool TryCreateSamePayloadSelfPairRecoveryGroup(in PendingCompactValue first, in PendingCompactValue second, out PendingSamePayloadSelfPairRecoveryGroup group)
+    {
+        var firstParent = first.Raw.StructurePath.Parent;
+        var secondParent = second.Raw.StructurePath.Parent;
+        var firstDetailRef = first.Observation.DetailResourceEffectRef.RawId;
+        var secondDetailRef = second.Observation.DetailResourceEffectRef.RawId;
+        if (first.SourceId != second.SourceId ||
+            first.BodyCodeRaw != second.BodyCodeRaw ||
+            first.Marker != second.Marker ||
+            firstDetailRef == 0 ||
+            secondDetailRef == 0 ||
+            firstDetailRef == secondDetailRef ||
+            firstDetailRef / 10 != secondDetailRef / 10 ||
+            firstParent.Kind != PacketStructureKind.CompressedPayload ||
+            firstParent.ScopeId == 0 ||
+            firstParent.Kind != secondParent.Kind ||
+            firstParent.ScopeId != secondParent.ScopeId)
+        {
+            group = default;
+            return false;
+        }
+
+        group = firstDetailRef < secondDetailRef
+            ? new PendingSamePayloadSelfPairRecoveryGroup(first.SourceId, first.BodyCodeRaw, first.Marker, firstDetailRef, secondDetailRef, firstParent.Kind, firstParent.ScopeId)
+            : new PendingSamePayloadSelfPairRecoveryGroup(first.SourceId, first.BodyCodeRaw, first.Marker, secondDetailRef, firstDetailRef, firstParent.Kind, firstParent.ScopeId);
+        return true;
+    }
+
+    private static bool MatchesSamePayloadSelfPairRecoveryGroup(in PendingSamePayloadSelfPairRecoveryGroup group, in PendingCompactValue pending)
+    {
+        var observation = pending.Observation;
+        return MatchesSamePayloadSelfPairRecoveryGroup(in group, pending.SourceId, pending.TargetId, pending.BodyCodeRaw, pending.Marker, in observation, pending.Raw);
+    }
+
+    private static bool MatchesSamePayloadSelfPairRecoveryGroup(in PendingSamePayloadSelfPairRecoveryGroup group, int sourceId, int targetId, uint bodyCodeRaw, int marker, in CombatObservation observation, RawPacketReference raw)
+    {
+        var parent = raw.StructurePath.Parent;
+        var detailRef = observation.DetailResourceEffectRef.RawId;
+        return IsSelfLoop2Value(sourceId, targetId, in observation) &&
+               sourceId == group.SourceId &&
+               bodyCodeRaw == group.BodyCodeRaw &&
+               marker == group.Marker &&
+               (detailRef == group.FirstDetailRef || detailRef == group.SecondDetailRef) &&
+               parent.Kind == group.ParentKind &&
+               parent.ScopeId == group.ParentScopeId;
+    }
+
+    private static bool IsSelfLoop2Value(in PendingCompactValue value)
+    {
+        var observation = value.Observation;
+        return IsSelfLoop2Value(value.SourceId, value.TargetId, in observation);
+    }
+
+    private static bool IsSelfLoop2Value(int sourceId, int targetId, in CombatObservation observation) =>
+        sourceId > 0 &&
+        targetId == sourceId &&
+        observation.Loop == 2;
+
     private static bool MatchesRecoveryOpener(in PendingCompactOpener pending, int sourceId) =>
-        pending.Mode is 0 or 12 &&
+        pending.Mode is 0 or 8 or 12 &&
         pending.Flag == 0 &&
         pending.EchoSourceId == sourceId;
 
@@ -473,6 +785,8 @@ public sealed class CompactDirectValueCanonicalizer
         _closedOpeners.Clear();
         _pendingSidecars.Clear();
         _inlineRecoveryGroups.Clear();
+        _samePayloadSelfRecoveryGroups.Clear();
+        _samePayloadSelfPairRecoveryGroups.Clear();
     }
 
     private StampedCombatCanonicalizationBatch TrimPendingValues()
@@ -497,6 +811,18 @@ public sealed class CompactDirectValueCanonicalizer
             _inlineRecoveryGroups.RemoveAt(0);
     }
 
+    private void TrimSamePayloadSelfRecoveryGroups()
+    {
+        while (_samePayloadSelfRecoveryGroups.Count > MaxSamePayloadSelfRecoveryGroups)
+            _samePayloadSelfRecoveryGroups.RemoveAt(0);
+    }
+
+    private void TrimSamePayloadSelfPairRecoveryGroups()
+    {
+        while (_samePayloadSelfPairRecoveryGroups.Count > MaxSamePayloadSelfPairRecoveryGroups)
+            _samePayloadSelfPairRecoveryGroups.RemoveAt(0);
+    }
+
     private static StampedCombatCanonicalizationBatch Append(StampedCombatCanonicalizationBatch first, StampedCombatCanonicalizationBatch second)
     {
         if (first.Count == 0)
@@ -518,4 +844,6 @@ internal sealed record CompactDirectValueCanonicalizerSnapshot(
     CompactDirectValueCanonicalizer.PendingCompactOpener[] ClosedOpeners,
     CompactDirectValueCanonicalizer.PendingCompactValue[] PendingValues,
     CompactDirectValueCanonicalizer.PendingCompactSidecar[] PendingSidecars,
-    CompactDirectValueCanonicalizer.PendingCompactInlineRecoveryGroup[] InlineRecoveryGroups);
+    CompactDirectValueCanonicalizer.PendingCompactInlineRecoveryGroup[] InlineRecoveryGroups,
+    CompactDirectValueCanonicalizer.PendingSamePayloadSelfRecoveryGroup[] SamePayloadSelfRecoveryGroups,
+    CompactDirectValueCanonicalizer.PendingSamePayloadSelfPairRecoveryGroup[] SamePayloadSelfPairRecoveryGroups);

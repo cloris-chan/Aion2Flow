@@ -5,7 +5,7 @@ using K4os.Compression.LZ4;
 
 namespace Cloris.Aion2Flow.Resources.Catalog;
 
-internal static class ResourcePackReader
+internal static partial class ResourcePackReader
 {
     private enum SectionId : ushort
     {
@@ -13,11 +13,24 @@ internal static class ResourcePackReader
         SkillClientMetadata = 2,
         SkillBaseProjections = 3,
         SkillEffectReferences = 4,
-        NpcDefinitions = 5,
-        NpcNameDefinitions = 6,
-        KnownMapIds = 7,
-        ServerCodes = 8,
-        SkillRelatedSkills = 9,
+        SkillRelatedSkills = 5,
+        SkillSemanticStrings = 6,
+        SkillEffects = 7,
+        SkillEffectFilters = 8,
+        SkillEffectFilterLocations = 9,
+        SkillEffectLevels = 10,
+        SkillProjectiles = 11,
+        SkillAbnormals = 12,
+        SkillAbnormalEffects = 13,
+        SkillAbnormalEffectLevels = 14,
+        SkillAbnormalEffectTypes = 15,
+        SkillAbnormalOverlapFx = 16,
+        SkillAbnormalProperties = 17,
+        SkillAbnormalStrings = 18,
+        NpcDefinitions = 19,
+        NpcNameDefinitions = 20,
+        KnownMapIds = 21,
+        ServerCodes = 22,
         SkillNames = 101,
         NpcNames = 102,
         NpcCatalogNames = 103,
@@ -29,6 +42,7 @@ internal static class ResourcePackReader
     {
         var payload = LoadPackPayload(ResourcePackManifest.SharedResourceName, ResourcePackDecoder.SharedPackKind, ResourcePackManifest.SharedUncompressedLength, ResourcePackManifest.SharedChecksum);
         var sections = ReadSections(payload);
+        var skillSemanticStrings = ReadSkillSemanticStrings(RequireSection(sections, SectionId.SkillSemanticStrings));
 
         return new ResourceSharedCatalog(
             ReadSkillDefinitions(RequireSection(sections, SectionId.SkillDefinitions)),
@@ -36,6 +50,7 @@ internal static class ResourcePackReader
             ReadSkillBaseProjections(RequireSection(sections, SectionId.SkillBaseProjections)),
             ReadSkillEffectReferences(RequireSection(sections, SectionId.SkillEffectReferences)),
             ReadSkillRelatedSkills(RequireSection(sections, SectionId.SkillRelatedSkills)),
+            ReadSkillSemanticCatalog(sections, skillSemanticStrings),
             ReadNpcDefinitions(RequireSection(sections, SectionId.NpcDefinitions)),
             ReadNpcNameDefinitions(RequireSection(sections, SectionId.NpcNameDefinitions)),
             ReadKnownMapIds(RequireSection(sections, SectionId.KnownMapIds)),
@@ -171,26 +186,94 @@ internal static class ResourcePackReader
                 (SkillSourceKeyRelation)ReadByte(ref cursor),
                 ReadString(ref cursor),
                 ReadInt32(ref cursor),
-                (SkillClientActionType)ReadByte(ref cursor),
-                (SkillClientSubType)ReadByte(ref cursor),
-                (SkillClientOverlapType)ReadByte(ref cursor),
-                (SkillClientDispositionType)ReadByte(ref cursor),
-                (SkillClientDamageType)ReadByte(ref cursor),
-                (SkillClientWeaponType)ReadInt32(ref cursor),
+                ReadByte(ref cursor),
+                (SkillClientSkillType)ReadByte(ref cursor),
+                (SkillClientSkillSubType)ReadByte(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadInt32(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                (SkillClientOverlapSkillType)ReadByte(ref cursor),
+                ReadBool(ref cursor),
+                (SkillClientSkillDispositionType)ReadByte(ref cursor),
+                (SkillClientSkillDamageType)ReadByte(ref cursor),
+                ReadBool(ref cursor),
+                (SkillClientNeedMainWeaponType)ReadInt32(ref cursor),
                 (SkillClientTargetProcessType)ReadByte(ref cursor),
+                ReadInt32(ref cursor),
+                ReadSingle(ref cursor),
+                ReadSingle(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadSingle(ref cursor),
+                ReadSingle(ref cursor),
+                ReadBool(ref cursor),
+                ReadSingle(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt64(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
+                ReadInt32(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
+                ReadString(ref cursor),
                 (SkillClientRotateType)ReadByte(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
-                ReadInt32(ref cursor),
-                ReadInt32(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
                 ReadInt32(ref cursor),
                 (SkillClientAutoLoadType)ReadByte(ref cursor),
-                (SkillClientTargetLocationType)ReadByte(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32Array(ref cursor),
+                ReadString(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                (SkillClientProjectileTargetLocationType)ReadByte(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
                 (SkillClientHideSkillGauge)ReadByte(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
                 (SkillClientAttributeType)ReadByte(ref cursor),
-                (SkillClientCategoryType)ReadInt32(ref cursor),
+                (SkillClientSkillCategoryType)ReadInt32(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
+                ReadBool(ref cursor),
                 (SkillClientElementalSummonGroupType)ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadBool(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
+                ReadInt32(ref cursor),
                 (SkillClientSkillAutoType)ReadByte(ref cursor),
                 (SkillClientContextSkillSlotRegisterType)ReadByte(ref cursor),
                 ReadInt32(ref cursor));
@@ -407,6 +490,17 @@ internal static class ResourcePackReader
         return value;
     }
 
+    private static bool ReadBool(ref ReadOnlySpan<byte> cursor)
+    {
+        var value = ReadByte(ref cursor);
+        return value switch
+        {
+            0 => false,
+            1 => true,
+            _ => throw new InvalidDataException($"Invalid resource pack bool value {value}.")
+        };
+    }
+
     private static ushort ReadUInt16(ref ReadOnlySpan<byte> cursor)
     {
         if (cursor.Length < sizeof(ushort))
@@ -429,6 +523,47 @@ internal static class ResourcePackReader
         var value = BinaryPrimitives.ReadInt32LittleEndian(cursor);
         cursor = cursor[sizeof(int)..];
         return value;
+    }
+
+    private static long ReadInt64(ref ReadOnlySpan<byte> cursor)
+    {
+        if (cursor.Length < sizeof(long))
+        {
+            throw new InvalidDataException("Unexpected end of resource pack.");
+        }
+
+        var value = BinaryPrimitives.ReadInt64LittleEndian(cursor);
+        cursor = cursor[sizeof(long)..];
+        return value;
+    }
+
+    private static float ReadSingle(ref ReadOnlySpan<byte> cursor)
+    {
+        if (cursor.Length < sizeof(float))
+        {
+            throw new InvalidDataException("Unexpected end of resource pack.");
+        }
+
+        var value = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(cursor));
+        cursor = cursor[sizeof(float)..];
+        return value;
+    }
+
+    private static int[] ReadInt32Array(ref ReadOnlySpan<byte> cursor)
+    {
+        var count = ReadInt32(ref cursor);
+        if (count < 0)
+        {
+            throw new InvalidDataException("Invalid negative Int32 array length in resource pack.");
+        }
+
+        var values = new int[count];
+        for (var i = 0; i < values.Length; i++)
+        {
+            values[i] = ReadInt32(ref cursor);
+        }
+
+        return values;
     }
 
     private static uint ReadUInt32(ref ReadOnlySpan<byte> cursor)

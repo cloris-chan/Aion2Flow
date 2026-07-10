@@ -8,6 +8,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 public sealed class CompactAvoidanceCanonicalizer
 {
     private const int MaxPendingAvoidances = 32;
+    private const int CurrentSkillCodeExclusiveUpperBound = 20_000_000;
 
     private readonly record struct CompactAvoidanceKey(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker);
     internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw);
@@ -136,6 +137,7 @@ public sealed class CompactAvoidanceCanonicalizer
         targetId > 0 &&
         sourceId > 0 &&
         targetId != sourceId &&
+        observation.BodySkillVariantRaw is > 0 and < CurrentSkillCodeExclusiveUpperBound &&
         observation.Type == 1 &&
         observation.LayoutTag is 0 or 2;
 

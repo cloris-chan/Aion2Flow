@@ -1803,6 +1803,7 @@ public class SceneReadModelOwnerTests
             Combat = new CombatObservation
             {
                 SkillCode = 11000010,
+                BodySkillVariantRaw = 11000010,
                 Damage = 0,
                 HitCount = 0,
                 AttemptCount = 0,

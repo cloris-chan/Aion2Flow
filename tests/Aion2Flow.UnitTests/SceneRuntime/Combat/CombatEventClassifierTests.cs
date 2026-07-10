@@ -1,7 +1,15 @@
+using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
+
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
 public sealed class CombatEventClassifierTests
 {
+    public CombatEventClassifierTests()
+    {
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
+    }
+
     [Fact]
     public void Classifies_Other_Target_Direct_Value_As_Damage()
     {
@@ -133,7 +141,7 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
-    public void SkillCode_Does_Not_Turn_Direct_Self_Value_Into_Healing_Or_Shield()
+    public void Skill_Profile_Alone_Does_Not_Override_Packet_Facts()
     {
         var packet = DirectPacket(12115, 12115, 1010000, 425);
 
@@ -141,7 +149,7 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
-    public void ResourceEffectRefs_Do_Not_Drive_Direct_Event_Semantics()
+    public void Exact_SkillEffect_Ref_Drives_Direct_Event_Semantics()
     {
         var packet = DirectPacket(4156, 34135, 16770001, 198);
         packet.BodyResourceEffectRef = ResourceEffectRef.FromRaw(1677000111);
@@ -150,7 +158,97 @@ public sealed class CombatEventClassifierTests
         packet.Type = 2;
         packet.Loop = 2;
 
-        AssertClassifies(packet, CombatEventKind.Damage, CombatValueKind.Damage);
+        AssertClassifies(packet, CombatEventKind.Healing, CombatValueKind.Healing);
+        Assert.Equal(CombatSemanticEvidenceKind.ExactEffect, CombatEventClassifier.Resolve(packet).EvidenceKind);
+    }
+
+    [Fact]
+    public void Effect_Group_Reference_Resolves_Through_The_Owning_Slot()
+    {
+        var packet = DirectPacket(4156, 34135, 4008, 198);
+        packet.DetailResourceEffectRef = ResourceEffectRef.FromRaw(400840);
+
+        var resolution = CombatEventClassifier.Resolve(packet);
+
+        Assert.Equal(CombatEventKind.Damage, resolution.EventKind);
+        Assert.Equal(CombatValueKind.Damage, resolution.ValueKind);
+        Assert.Equal(CombatSemanticEvidenceKind.SlotMatch, resolution.EvidenceKind);
+        Assert.Equal(SkillSemanticResourceNodeKind.SkillEffectGroup, resolution.ResourceNodeKind);
+        Assert.Equal(40084, resolution.ResourceNodeId);
+        Assert.Equal(4008, resolution.ResourceSkillId);
+    }
+
+    [Fact]
+    public void Packet_Avoidance_Remains_Authoritative_While_Preserving_Slot_Context()
+    {
+        var packet = DirectPacket(8912, 8912, 0, 0);
+        packet.BodyResourceEffectRef = ResourceEffectRef.FromRaw(1138005011);
+        packet.Modifiers = DamageModifiers.Invincible;
+        packet.AttemptContribution = 1;
+        packet.SetEffectTag(PacketEffectTag.ActiveSkillInvincible);
+
+        var resolution = CombatEventClassifier.Resolve(packet);
+
+        Assert.Equal(CombatEventKind.Damage, resolution.EventKind);
+        Assert.Equal(CombatValueKind.Damage, resolution.ValueKind);
+        Assert.Equal(CombatSemanticEvidenceKind.PacketAvoidance, resolution.EvidenceKind);
+        Assert.True(resolution.HasResourceEvidence);
+        Assert.True(resolution.ResourceCandidateSlotCount > 0);
+        Assert.Equal(SkillSemanticFacet.None, resolution.Facets & SkillSemanticFacet.Damage);
+    }
+
+    [Fact]
+    public void Exact_SkillEffect_Ref_Corrects_Self_Heal_Without_ResourceKind()
+    {
+        var packet = DirectPacket(18846, 18846, 1010000, 1064);
+        packet.DetailResourceEffectRef = ResourceEffectRef.FromRaw(101000011);
+
+        AssertClassifies(packet, CombatEventKind.Healing, CombatValueKind.Healing);
+    }
+
+    [Fact]
+    public void Packet_ResourceKind_Remains_Authoritative_Over_Effect_Semantics()
+    {
+        var packet = DirectPacket(18846, 18846, 1010000, 1064);
+        packet.DetailResourceEffectRef = ResourceEffectRef.FromRaw(101000011);
+        packet.ResourceKind = CombatResourceKind.Mana;
+
+        AssertClassifies(packet, CombatEventKind.Support, CombatValueKind.Support);
+    }
+
+    [Fact]
+    public void Packet_Drain_Fact_Remains_Authoritative_Over_Damage_Effect_Semantics()
+    {
+        var packet = DirectPacket(12115, 12115, 12240010, 540);
+        packet.DetailResourceEffectRef = ResourceEffectRef.FromRaw(1224001011);
+        packet.DrainHealAmount = 540;
+
+        AssertClassifies(packet, CombatEventKind.Healing, CombatValueKind.DrainHealing);
+    }
+
+    [Fact]
+    public void Structured_Semantic_Resolution_Does_Not_Allocate_Per_Event()
+    {
+        var observation = new CombatObservation
+        {
+            SkillCode = 4008,
+            Damage = 100,
+            HitCount = 1,
+            AttemptCount = 1,
+            DetailResourceEffectRef = ResourceEffectRef.FromRaw(400840)
+        };
+
+        for (var i = 0; i < 32; i++)
+            _ = CombatEventClassifier.Resolve(100, 200, in observation);
+
+        var checksum = 0;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 10_000; i++)
+            checksum += CombatEventClassifier.Resolve(100, 200, in observation).ResourceNodeId;
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        GC.KeepAlive(checksum);
+        Assert.Equal(0, allocated);
     }
 
     private static void AssertClassifies(ParsedCombatPacket packet, CombatEventKind eventKind, CombatValueKind valueKind)

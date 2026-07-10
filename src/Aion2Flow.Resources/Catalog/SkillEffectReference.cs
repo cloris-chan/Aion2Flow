@@ -7,8 +7,8 @@ public readonly record struct SkillEffectReference(int SkillId, int Slot, SkillE
 
 public enum SkillEffectReferenceKind : byte
 {
-    EffectId = 1,
-    EffectDataId = 2,
-    AuxEffectId = 3,
-    AutoLoadEffectDataId = 4
+    SkillEffectFilterId = 1,
+    SkillEffectGroupId = 2,
+    ProjectileId = 3,
+    ToggleOnAbnormalId = 4
 }

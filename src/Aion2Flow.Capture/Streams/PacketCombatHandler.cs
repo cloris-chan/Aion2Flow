@@ -287,6 +287,7 @@ internal static class PacketCombatHandler
             return false;
         }
 
+        if (!IsCurrentEmbedded0438DamageShape(parsed.LayoutTag, parsed.Flag, parsed.Type)) return false;
         if (parsed.Damage <= 0) return false;
 
         if (!context.Sink.IsKnownEntity(parsed.SourceId) && !context.Sink.IsKnownEntity(parsed.TargetId))
@@ -379,6 +380,7 @@ internal static class PacketCombatHandler
         if (reader.Remaining < 1) return false;
         var mode = payload[reader.Offset];
         if (!reader.TryAdvance(1)) return false;
+        if (!IsCurrentEmbedded0538ValueShape(mode)) return false;
         if (!reader.TryReadVarInt(out var sourceId)) return false;
         if (sourceId == 0 || targetId == 0) return false;
         if (!reader.TryReadVarInt(out var unknownInfo)) return false;
@@ -466,6 +468,22 @@ internal static class PacketCombatHandler
 
         return true;
     }
+
+    internal static bool IsCurrentEmbedded0438DamageShape(int layoutTag, int flag, int type) =>
+        layoutTag is >= 4 and <= 126 &&
+        (layoutTag & 1) == 0 &&
+        (layoutTag & 0x04) != 0 &&
+        flag is 0 or 4 or 16 or 20 &&
+        type is 0 or 1 or 2 or 3 or 8 or 9;
+
+    internal static bool IsCurrentEmbedded0438CombatValue(int damage, int drainHealAmount, int regenerationAmount, DamageModifiers modifiers) =>
+        damage > 0 ||
+        drainHealAmount > 0 ||
+        regenerationAmount > 0 ||
+        (modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) != 0;
+
+    internal static bool IsCurrentEmbedded0538ValueShape(int mode) =>
+        mode is 0 or 1 or 2 or 8 or 9 or 10 or 11 or 12 or 14 or 15 or 48 or 56 or 74;
 
     private static bool IsActiveSkillInvincible(int mode, int targetId, int sourceId, int packetValue) => mode == 56 && targetId > 0 && targetId == sourceId && packetValue > 0;
 }

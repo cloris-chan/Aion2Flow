@@ -11,6 +11,7 @@ public static class CombatResourceRegistry
     private static IReadOnlyDictionary<int, SkillClientMetadata> _skillClientMetadata = new Dictionary<int, SkillClientMetadata>();
     private static IReadOnlyDictionary<int, SkillBaseProjection> _skillBaseProjections = new Dictionary<int, SkillBaseProjection>();
     private static IReadOnlyDictionary<uint, int> _effectSkillIds = new Dictionary<uint, int>();
+    private static SkillSemanticOwnerGraph? _skillSemanticGraph;
 
     public static SkillDisplayCatalog SkillMap
     {
@@ -18,7 +19,7 @@ public static class CombatResourceRegistry
         set
         {
             _skillMap = value;
-            SetSkillResourceMetadata(new Dictionary<int, SkillClientMetadata>(), new Dictionary<int, SkillBaseProjection>(), []);
+            SetSkillResourceMetadata(new Dictionary<int, SkillClientMetadata>(), new Dictionary<int, SkillBaseProjection>(), [], null);
             SkillDisplayMap = _skillMap;
             SkillMapRevision++;
         }
@@ -46,7 +47,7 @@ public static class CombatResourceRegistry
     public static void SetGameResources(SkillDisplayCatalog skillMap, IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog)
     {
         SkillMap = skillMap;
-        SetSkillResourceMetadata(new Dictionary<int, SkillClientMetadata>(), new Dictionary<int, SkillBaseProjection>(), []);
+        SetSkillResourceMetadata(new Dictionary<int, SkillClientMetadata>(), new Dictionary<int, SkillBaseProjection>(), [], null);
         SkillDisplayMap = skillMap;
         NpcCatalog = npcCatalog;
     }
@@ -54,7 +55,7 @@ public static class CombatResourceRegistry
     public static void SetGameResources(ResourceCatalogSnapshot snapshot)
     {
         SkillMap = snapshot.Skills;
-        SetSkillResourceMetadata(snapshot.SkillClientMetadata, snapshot.SkillBaseProjections, snapshot.SkillEffectReferences);
+        SetSkillResourceMetadata(snapshot.SkillClientMetadata, snapshot.SkillBaseProjections, snapshot.SkillEffectReferences, snapshot.SkillSemanticOwnerGraph);
         SkillDisplayMap = snapshot.Skills;
         NpcCatalog = snapshot.NpcCatalog;
     }
@@ -67,7 +68,7 @@ public static class CombatResourceRegistry
         IReadOnlyList<SkillEffectReference> skillEffectReferences)
     {
         SkillMap = skillMap;
-        SetSkillResourceMetadata(skillClientMetadata, skillBaseProjections, skillEffectReferences);
+        SetSkillResourceMetadata(skillClientMetadata, skillBaseProjections, skillEffectReferences, null);
         SkillDisplayMap = skillMap;
         NpcCatalog = npcCatalog;
     }
@@ -78,7 +79,7 @@ public static class CombatResourceRegistry
         IReadOnlyDictionary<int, SkillBaseProjection> skillBaseProjections)
     {
         SkillMap = skillMap;
-        SetSkillResourceMetadata(new Dictionary<int, SkillClientMetadata>(), skillBaseProjections, []);
+        SetSkillResourceMetadata(new Dictionary<int, SkillClientMetadata>(), skillBaseProjections, [], null);
         SkillDisplayMap = skillMap;
         NpcCatalog = npcCatalog;
     }
@@ -110,6 +111,51 @@ public static class CombatResourceRegistry
         return true;
     }
 
+    public static bool TryResolveSkillEffectSemantics(ResourceEffectRef effectRef, out SkillSemanticEffectResolution resolution)
+    {
+        if (_skillSemanticGraph is not null &&
+            !effectRef.IsEmpty &&
+            effectRef.RawId <= int.MaxValue &&
+            _skillSemanticGraph.TryResolveEffect(unchecked((int)effectRef.RawId), out resolution))
+        {
+            return true;
+        }
+
+        resolution = default;
+        return false;
+    }
+
+    public static bool TryResolveDirectCombatEffectSemantics(in CombatObservation observation, out SkillSemanticEffectResolution resolution)
+        => TryResolveSkillEffectSemantics(observation.DetailResourceEffectRef, out resolution);
+
+    public static bool TryResolveCombatResourceSemantics(
+        ResourceEffectRef effectRef,
+        in CombatObservation observation,
+        out SkillSemanticResourceResolution resolution)
+    {
+        if (_skillSemanticGraph is null || effectRef.IsEmpty)
+        {
+            resolution = default;
+            return false;
+        }
+
+        var preferredSkillId = ResolveSemanticSkillId(in observation);
+        return _skillSemanticGraph.TryResolveResourceReference(effectRef.RawId, preferredSkillId, out resolution);
+    }
+
+    public static bool TryResolveDirectCombatResourceSemantics(in CombatObservation observation, out SkillSemanticResourceResolution resolution)
+        => TryResolveCombatResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
+
+    public static bool TryResolvePeriodicCombatResourceSemantics(in CombatObservation observation, out SkillSemanticResourceResolution resolution)
+    {
+        if (TryResolveCombatResourceSemantics(observation.BodyResourceEffectRef, in observation, out resolution))
+        {
+            return true;
+        }
+
+        return TryResolveCombatResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
+    }
+
     public static int ResolveBaseSkillIdForCode(int skillCode)
     {
         if (skillCode <= 0)
@@ -120,6 +166,27 @@ public static class CombatResourceRegistry
         return _skillBaseProjections.TryGetValue(skillCode, out var projection) && projection.BaseSkillId > 0
             ? projection.BaseSkillId
             : skillCode;
+    }
+
+    private static int ResolveSemanticSkillId(in CombatObservation observation)
+    {
+        var skillId = observation.SkillCode > 0
+            ? observation.SkillCode
+            : observation.BodySkillVariantRaw > 0
+                ? observation.BodySkillVariantRaw
+                : observation.PeriodicTailSkillCodeRaw;
+        if (skillId <= 0 || _skillSemanticGraph is null)
+        {
+            return 0;
+        }
+
+        if (_skillSemanticGraph.Profiles.ContainsKey(skillId))
+        {
+            return skillId;
+        }
+
+        var baseSkillId = ResolveBaseSkillIdForCode(skillId);
+        return _skillSemanticGraph.Profiles.ContainsKey(baseSkillId) ? baseSkillId : 0;
     }
 
     public static bool TryResolveBaseSkillIdForEffectRef(ResourceEffectRef effectRef, out int baseSkillId)
@@ -219,11 +286,13 @@ public static class CombatResourceRegistry
     private static void SetSkillResourceMetadata(
         IReadOnlyDictionary<int, SkillClientMetadata> skillClientMetadata,
         IReadOnlyDictionary<int, SkillBaseProjection> skillBaseProjections,
-        IReadOnlyList<SkillEffectReference> skillEffectReferences)
+        IReadOnlyList<SkillEffectReference> skillEffectReferences,
+        SkillSemanticOwnerGraph? skillSemanticGraph)
     {
         _skillClientMetadata = skillClientMetadata;
         _skillBaseProjections = skillBaseProjections;
         _effectSkillIds = SkillEffectReferenceIndex.BuildUnambiguousSkillIdsByEffectCode(skillEffectReferences);
+        _skillSemanticGraph = skillSemanticGraph;
     }
 
     public static NpcKind ResolveNpcKind(NpcCatalogKind kind) =>

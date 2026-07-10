@@ -7,13 +7,14 @@ public enum CombatContributionCanonicalization : ushort
     CompactDirectValue = 1 << 0,
     CompactRecoveryByOpener = 1 << 1,
     CompactRecoveryByInlineGroup = 1 << 2,
-    CompactAvoidance = 1 << 3,
-    OwnerTargetSummonResource = 1 << 4,
-    SystemPeriodicRecoverySeed = 1 << 5,
-    SystemPeriodicRecoveryHealing = 1 << 6,
-    PeriodicStandaloneDamage = 1 << 7,
-    PeriodicStandaloneContinuation = 1 << 8,
-    PeriodicContinuationHealing = 1 << 9,
-    PeriodicShieldGrant = 1 << 10,
-    PeriodicShieldAbsorbed = 1 << 11
+    CompactRecoveryBySelfValueGroup = 1 << 3,
+    CompactAvoidance = 1 << 4,
+    OwnerTargetSummonResource = 1 << 5,
+    SystemPeriodicRecoverySeed = 1 << 6,
+    SystemPeriodicRecoveryHealing = 1 << 7,
+    PeriodicStandaloneDamage = 1 << 8,
+    PeriodicStandaloneContinuation = 1 << 9,
+    PeriodicContinuationHealing = 1 << 10,
+    PeriodicShieldGrant = 1 << 11,
+    PeriodicShieldAbsorbed = 1 << 12
 }

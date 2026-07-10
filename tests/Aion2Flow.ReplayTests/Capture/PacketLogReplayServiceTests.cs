@@ -1,6 +1,5 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -77,9 +76,13 @@ public sealed class PacketLogReplayServiceTests
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerSystemCanonicalization}"));
 
-        var ownerRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.OwnerTargetSummonResource, expectedCount: 345);
-        Assert.Equal(191, ownerRows.Count(static e => e.Canonicalization == (CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.OwnerTargetSummonResource)));
-        Assert.Equal(154, ownerRows.Count(static e => e.Canonicalization == (CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryByOpener | CombatContributionCanonicalization.OwnerTargetSummonResource)));
+        var ownerRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.OwnerTargetSummonResource, expectedCount: 148);
+        Assert.All(ownerRows, static row =>
+        {
+            Assert.Equal(CombatEventKind.Support, row.Observation.EventKind);
+            Assert.Equal(CombatValueKind.Support, row.Observation.ValueKind);
+        });
+        AssertDirectSemanticHealsBypassOwnerCanonicalization(replay);
         var systemSeedRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.SystemPeriodicRecoverySeed, expectedCount: 9);
         var systemHealingRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.SystemPeriodicRecoveryHealing, expectedCount: 9);
         Assert.All(systemSeedRows, static e =>
@@ -102,9 +105,13 @@ public sealed class PacketLogReplayServiceTests
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerTargetCanonicalizationEdge}"));
 
-        var ownerRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.OwnerTargetSummonResource, expectedCount: 127);
-        Assert.Equal(122, ownerRows.Count(static e => e.Canonicalization == (CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.OwnerTargetSummonResource)));
-        Assert.Equal(5, ownerRows.Count(static e => e.Canonicalization == (CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryByOpener | CombatContributionCanonicalization.OwnerTargetSummonResource)));
+        var ownerRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.OwnerTargetSummonResource, expectedCount: 8);
+        Assert.All(ownerRows, static row =>
+        {
+            Assert.Equal(CombatEventKind.Support, row.Observation.EventKind);
+            Assert.Equal(CombatValueKind.Support, row.Observation.ValueKind);
+        });
+        AssertDirectSemanticHealsBypassOwnerCanonicalization(replay);
         Assert.All(ownerRows, static row => Assert.Equal((ushort)0x0438, row.Raw.Opcode));
     }
 
@@ -472,6 +479,30 @@ public sealed class PacketLogReplayServiceTests
         var seeds = seedRows.Select(static row => CreateSystemRecoveryPairKey(in row)).Order().ToArray();
         var healing = healingRows.Select(static row => CreateSystemRecoveryPairKey(in row)).Order().ToArray();
         Assert.Equal(seeds, healing);
+    }
+
+    private static void AssertDirectSemanticHealsBypassOwnerCanonicalization(PacketLogReplayResult replay)
+    {
+        var rows = replay.SceneOwner.Combat.Events
+            .Where(static row => IsDirectSemanticHeal(in row))
+            .ToArray();
+
+        Assert.NotEmpty(rows);
+        Assert.All(rows, static row =>
+        {
+            Assert.Equal(CombatEventKind.Healing, row.Observation.EventKind);
+            Assert.Equal(CombatValueKind.Healing, row.Observation.ValueKind);
+            Assert.False(HasCanonicalization(in row, CombatContributionCanonicalization.OwnerTargetSummonResource));
+        });
+    }
+
+    private static bool IsDirectSemanticHeal(in CombatEventRecord row)
+    {
+        var observation = row.Observation;
+        return observation.PeriodicRelation == PeriodicEffectRelation.None &&
+            observation.ResourceKind != CombatResourceKind.Mana &&
+            CombatResourceRegistry.TryResolveDirectCombatEffectSemantics(in observation, out var semantics) &&
+            (semantics.DirectFacets & SkillSemanticFacet.Healing) != 0;
     }
 
     private static string CreateSystemRecoveryPairKey(in CombatEventRecord row)

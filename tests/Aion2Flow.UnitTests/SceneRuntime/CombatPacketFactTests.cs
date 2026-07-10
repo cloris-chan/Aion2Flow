@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -8,6 +9,28 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
 public class CombatPacketFactTests
 {
+    public CombatPacketFactTests()
+        => CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>());
+
+    [Fact]
+    public void CombatContributionCanonicalization_UsesSemanticBitOrder()
+    {
+        Assert.Equal(0, (int)CombatContributionCanonicalization.None);
+        Assert.Equal(1 << 0, (int)CombatContributionCanonicalization.CompactDirectValue);
+        Assert.Equal(1 << 1, (int)CombatContributionCanonicalization.CompactRecoveryByOpener);
+        Assert.Equal(1 << 2, (int)CombatContributionCanonicalization.CompactRecoveryByInlineGroup);
+        Assert.Equal(1 << 3, (int)CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup);
+        Assert.Equal(1 << 4, (int)CombatContributionCanonicalization.CompactAvoidance);
+        Assert.Equal(1 << 5, (int)CombatContributionCanonicalization.OwnerTargetSummonResource);
+        Assert.Equal(1 << 6, (int)CombatContributionCanonicalization.SystemPeriodicRecoverySeed);
+        Assert.Equal(1 << 7, (int)CombatContributionCanonicalization.SystemPeriodicRecoveryHealing);
+        Assert.Equal(1 << 8, (int)CombatContributionCanonicalization.PeriodicStandaloneDamage);
+        Assert.Equal(1 << 9, (int)CombatContributionCanonicalization.PeriodicStandaloneContinuation);
+        Assert.Equal(1 << 10, (int)CombatContributionCanonicalization.PeriodicContinuationHealing);
+        Assert.Equal(1 << 11, (int)CombatContributionCanonicalization.PeriodicShieldGrant);
+        Assert.Equal(1 << 12, (int)CombatContributionCanonicalization.PeriodicShieldAbsorbed);
+    }
+
     [Fact]
     public void ScenePath_ClassifiesCompactControlDirectRecoveryAsHealing()
     {
@@ -118,6 +141,25 @@ public class CombatPacketFactTests
     }
 
     [Fact]
+    public void ScenePath_ClassifiesMode8CompactControlDirectRecoveryAsHealing()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17100140, marker: 186, mode: 8, flag: 0, echoSourceId: 8972));
+        journal.Append(CreateDirectValue(sceneId, 1, sourceId: 8972, targetId: 8972, bodyCodeRaw: 17100140, marker: 186, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 3324, loop: 2));
+        journal.Append(CreateDirectValue(sceneId, 2, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17100140, marker: 186, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 4698, loop: 1));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(8972, 8972, out var self));
+        Assert.Equal(0, self!.TotalDamage);
+        Assert.Equal(3324, self.TotalHealing);
+        Assert.True(combat.TryGetPair(8972, 5578, out var target));
+        Assert.Equal(0, target!.TotalDamage);
+        Assert.Equal(4698, target.TotalHealing);
+    }
+
+    [Fact]
     public void ScenePath_CompactControlCloseStillMatchesLaterRecoveryValue()
     {
         var journal = new ObservedEventJournal();
@@ -189,6 +231,89 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 5578, out var pair));
         Assert.Equal(0, pair!.TotalDamage);
         Assert.Equal(7761, pair.TotalHealing);
+    }
+
+    [Fact]
+    public void ScenePath_ClassifiesSamePayloadSelfValueRecoveryAsHealing()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateDirectValue(sceneId, 0, sourceId: 12613, targetId: 8062, bodyCodeRaw: 17100140, marker: 1, layoutTag: 4, flag: 0, type: 2, chainId: 19006, damage: 2694, loop: 1, detailRef: 1710004011, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 500, leafScopeId: 501, siblingIndex: 12)));
+        journal.Append(CreateDirectValue(sceneId, 1, sourceId: 12613, targetId: 12613, bodyCodeRaw: 17100140, marker: 1, layoutTag: 4, flag: 0, type: 2, chainId: 19006, damage: 2305, loop: 2, detailRef: 1710004011, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 500, leafScopeId: 502, siblingIndex: 13)));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(12613, 8062, out var target));
+        Assert.Equal(0, target!.TotalDamage);
+        Assert.Equal(2694, target.TotalHealing);
+        Assert.True(combat.TryGetPair(12613, 12613, out var self));
+        Assert.Equal(0, self!.TotalDamage);
+        Assert.Equal(2305, self.TotalHealing);
+        Assert.Equal(2, combat.Events.Count(static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0));
+    }
+
+    [Fact]
+    public void ScenePath_ClassifiesSamePayloadLoop2SelfPairRecoveryAsHealing()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateDirectValue(sceneId, 0, sourceId: 7023, targetId: 7023, bodyCodeRaw: 17101450, marker: 78, layoutTag: 4, flag: 0, type: 2, chainId: 16694, damage: 3432, loop: 2, detailRef: 1710004011, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 510, leafScopeId: 511, siblingIndex: 142)));
+        journal.Append(CreateDirectValue(sceneId, 1, sourceId: 7023, targetId: 7023, bodyCodeRaw: 17101450, marker: 78, layoutTag: 4, flag: 0, type: 2, chainId: 16694, damage: 4087, loop: 2, detailRef: 1710004012, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 510, leafScopeId: 512, siblingIndex: 143)));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(7023, 7023, out var self));
+        Assert.Equal(0, self!.TotalDamage);
+        Assert.Equal(7519, self.TotalHealing);
+        Assert.Equal(2, combat.Events.Count(static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0));
+    }
+
+    [Fact]
+    public void ScenePath_DoesNotClassifySelfValueRecoveryAcrossCompressedPayloads()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateDirectValue(sceneId, 0, sourceId: 4587, targetId: 3039, bodyCodeRaw: 17800001, marker: 111, layoutTag: 4, flag: 0, type: 2, chainId: 21686, damage: 2586, loop: 1, detailRef: 1780000111, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 600, leafScopeId: 601, siblingIndex: 18)));
+        journal.Append(CreateDirectValue(sceneId, 1, sourceId: 4587, targetId: 4587, bodyCodeRaw: 17800001, marker: 111, layoutTag: 4, flag: 0, type: 2, chainId: 21686, damage: 2104, loop: 1, detailRef: 1780000111, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 700, leafScopeId: 701, siblingIndex: 36)));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(4587, 3039, out var target));
+        Assert.Equal(2586, target!.TotalDamage);
+        Assert.Equal(0, target.TotalHealing);
+        Assert.True(combat.TryGetPair(4587, 4587, out var self));
+        Assert.Equal(0, self!.TotalHealing);
+        Assert.DoesNotContain(combat.Events, static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0);
+    }
+
+    [Fact]
+    public void ScenePath_DoesNotClassifySamePayloadLoop1SelfPairAsHealing()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateDirectValue(sceneId, 0, sourceId: 4587, targetId: 4587, bodyCodeRaw: 17800001, marker: 111, layoutTag: 4, flag: 0, type: 2, chainId: 21686, damage: 2586, loop: 1, detailRef: 1780000111, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 800, leafScopeId: 801, siblingIndex: 18)));
+        journal.Append(CreateDirectValue(sceneId, 1, sourceId: 4587, targetId: 4587, bodyCodeRaw: 17800001, marker: 111, layoutTag: 4, flag: 0, type: 2, chainId: 21686, damage: 2104, loop: 1, detailRef: 1780000112, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 800, leafScopeId: 802, siblingIndex: 19)));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(4587, 4587, out var self));
+        Assert.Equal(0, self!.TotalHealing);
+        Assert.DoesNotContain(combat.Events, static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0);
+    }
+
+    [Fact]
+    public void ScenePath_DoesNotClassifySamePayloadSelfPairWithSameDetailRefAsHealing()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.Append(CreateDirectValue(sceneId, 0, sourceId: 7023, targetId: 7023, bodyCodeRaw: 17101450, marker: 78, layoutTag: 4, flag: 0, type: 2, chainId: 16694, damage: 3432, loop: 2, detailRef: 1710004011, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 810, leafScopeId: 811, siblingIndex: 142)));
+        journal.Append(CreateDirectValue(sceneId, 1, sourceId: 7023, targetId: 7023, bodyCodeRaw: 17101450, marker: 78, layoutTag: 4, flag: 0, type: 2, chainId: 16694, damage: 4087, loop: 2, detailRef: 1710004011, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 810, leafScopeId: 812, siblingIndex: 143)));
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetPair(7023, 7023, out var self));
+        Assert.Equal(0, self!.TotalHealing);
+        Assert.DoesNotContain(combat.Events, static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0);
     }
 
     [Fact]
@@ -356,6 +481,28 @@ public class CombatPacketFactTests
     }
 
     [Fact]
+    public void CompactAvoidance_DoesNotPromoteOutOfDomainBodyToken()
+    {
+        var canonicalizer = new CompactAvoidanceCanonicalizer();
+        var stamp = new TimelineStamp { ObservationOrdinal = 1, FlushId = 1 };
+        var observation = new CombatObservation
+        {
+            SkillCode = 40_567_740,
+            BodySkillVariantRaw = 40_567_740,
+            HitCount = 0,
+            AttemptCount = 0,
+            Marker = 240,
+            LayoutTag = 0,
+            Type = 1
+        };
+
+        var observed = canonicalizer.ObserveCompactValue0438(33, 1_131_441, in stamp, in observation, 0, default);
+
+        Assert.Equal(0, observed.Count);
+        Assert.Equal(0, canonicalizer.FlushPending().Count);
+    }
+
+    [Fact]
     public void PeriodicNormalizer_PreservesParserAuthoritativeMultiHitCount()
     {
         var canonicalizer = new PeriodicPoolCanonicalizer();
@@ -456,18 +603,19 @@ public class CombatPacketFactTests
         }
     };
 
-    private static ObservedEventEnvelope CreateDirectValue(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int flag, int type, int chainId, int damage, int scopeId = 100, long flushId = 100, int loop = 1, CombatEventKind eventKind = CombatEventKind.Unknown, CombatValueKind valueKind = CombatValueKind.Unknown) => new()
+    private static ObservedEventEnvelope CreateDirectValue(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int flag, int type, int chainId, int damage, int scopeId = 100, long flushId = 100, int loop = 1, CombatEventKind eventKind = CombatEventKind.Unknown, CombatValueKind valueKind = CombatValueKind.Unknown, uint detailRef = 0, PacketStructurePath structurePath = default) => new()
     {
         SceneSessionId = sceneId,
         Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
         Domain = ObservedEventDomain.Combat,
         SourceEntityId = sourceId,
         TargetEntityId = targetId,
-        Raw = new RawPacketReference(0x0438, 0, 0, CreateStructurePath(scopeId)),
+        Raw = new RawPacketReference(0x0438, 0, 0, structurePath.IsEmpty ? CreateStructurePath(scopeId) : structurePath),
         Combat = new CombatObservation
         {
             SkillCode = bodyCodeRaw,
             BodySkillVariantRaw = bodyCodeRaw,
+            DetailResourceEffectRef = ResourceEffectRef.FromRaw(detailRef),
             Damage = damage,
             HitCount = 1,
             AttemptCount = 1,
@@ -514,5 +662,13 @@ public class CombatPacketFactTests
         var root = new PacketStructureReference(PacketStructureKind.TransportPacket, 10, 0, 1, 0, 0, 256, 0, 256);
         var leaf = new PacketStructureReference(PacketStructureKind.FrameBatchEntry, scopeId, root.ScopeId, 2, 0, 0, 64, 0, 64);
         return default(PacketStructurePath).Push(root).Push(leaf);
+    }
+
+    private static PacketStructurePath CreateCompressedPayloadStructurePath(int compressedScopeId, int leafScopeId, int siblingIndex)
+    {
+        var root = new PacketStructureReference(PacketStructureKind.TransportPacket, 10, 0, 1, 0, 0, 4096, 0, 4096);
+        var compressed = new PacketStructureReference(PacketStructureKind.CompressedPayload, compressedScopeId, root.ScopeId, 2, 0, 8, 4088, 8, 4088);
+        var leaf = new PacketStructureReference(PacketStructureKind.FrameBatchEntry, leafScopeId, compressed.ScopeId, 3, siblingIndex, 0, 30, 0, 30);
+        return default(PacketStructurePath).Push(root).Push(compressed).Push(leaf);
     }
 }

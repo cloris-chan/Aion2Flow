@@ -168,7 +168,7 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
-    public void CombatEventClassifier_UsesOnlyPacketStructureAndRelations()
+    public void CombatEventClassifier_UsesPacketFactsAndStructuredSemanticsWithoutDisplayHeuristics()
     {
         var root = FindRepositoryRoot();
         var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Combat", "CombatEventClassifier.cs"));
@@ -177,9 +177,9 @@ public sealed class DetailProjectionAllocationGuardTests
             "SkillMap",
             "SkillDisplayMap",
             "DisplaySkillNameFor",
-            "ResourceEffectRef",
-            "observation.SkillCode",
-            "BodySkillVariantRaw",
+            "SkillClientMetadata",
+            "Localization",
+            "Icon",
             "ParseSkillVariant",
             "InferOriginalSkillCode",
             "OriginalSkillCode",
@@ -192,6 +192,9 @@ public sealed class DetailProjectionAllocationGuardTests
 
         foreach (var term in forbiddenTerms)
             Assert.DoesNotContain(term, text, StringComparison.Ordinal);
+
+        Assert.Contains("CombatSemanticResolution", text, StringComparison.Ordinal);
+        Assert.Contains("TryResolveDirectCombatResourceSemantics", text, StringComparison.Ordinal);
     }
 
     [Fact]

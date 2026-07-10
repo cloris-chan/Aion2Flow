@@ -258,6 +258,86 @@ public sealed class ResourcePackTests
     }
 
     [Fact]
+    public void SkillSemantics_Expose_Current_Client_Tables_And_Node_Facets()
+    {
+        var shared = ResourceCatalog.LoadShared();
+        var semantics = shared.SkillSemantics;
+        var graph = shared.SkillSemanticOwnerGraph;
+
+        Assert.Equal(30_470, semantics.Effects.Count);
+        Assert.Equal(10_160, semantics.EffectFilters.Count);
+        Assert.Equal(324, semantics.EffectFilterLocations.Count);
+        Assert.Equal(71_533, semantics.EffectLevels.Count);
+        Assert.Equal(2_421, semantics.Projectiles.Count);
+        Assert.Equal(6_574, semantics.Abnormals.Count);
+        Assert.Equal(12_681, semantics.AbnormalEffects.Count);
+        Assert.Equal(15_851, semantics.AbnormalEffectLevels.Count);
+        Assert.Equal(61, semantics.AbnormalEffectTypes.Count);
+        Assert.Equal(30, semantics.AbnormalOverlapFx.Count);
+        Assert.Equal(3, semantics.AbnormalProperties.Count);
+        Assert.Equal(3_269, semantics.AbnormalStrings.Count);
+
+        Assert.True(graph.TryResolveEffect(101000011, out var directHeal));
+        Assert.Equal(SkillSemanticFacet.Healing, directHeal.DirectFacets);
+        Assert.Equal(SkillSemanticFacet.Healing, directHeal.Facets);
+
+        Assert.True(graph.TryResolveEffect(1406004012, out var dotApplication));
+        Assert.Equal(SkillSemanticFacet.None, dotApplication.DirectFacets);
+        Assert.Equal(
+            SkillSemanticFacet.DamageOverTime | SkillSemanticFacet.Debuff,
+            dotApplication.Facets & (SkillSemanticFacet.DamageOverTime | SkillSemanticFacet.Debuff));
+
+        Assert.True(graph.Profiles.TryGetValue(14060040, out var griffonArrow));
+        Assert.Equal(
+            SkillSemanticFacet.Damage | SkillSemanticFacet.DamageOverTime | SkillSemanticFacet.Debuff,
+            griffonArrow.Facets & (SkillSemanticFacet.Damage | SkillSemanticFacet.DamageOverTime | SkillSemanticFacet.Debuff));
+        Assert.Contains(140600401, griffonArrow.EffectGroupIds);
+        Assert.Contains(1406004012, griffonArrow.EffectIds);
+    }
+
+    [Fact]
+    public void SkillSemantics_Preserve_Effect_Slots_And_Typed_Value_Links()
+    {
+        var shared = ResourceCatalog.LoadShared();
+        var graph = shared.SkillSemanticOwnerGraph;
+
+        Assert.True(graph.EffectSlots.Count > 20_000);
+        Assert.True(graph.EffectSlotsBySkillId.TryGetValue(14060040, out var griffonArrowSlots));
+        Assert.Contains(griffonArrowSlots, static slot =>
+            slot.EffectGroupIds.Contains(140600401) &&
+            slot.EffectIds.Contains(1406004012) &&
+            (slot.Facets & SkillSemanticFacet.DamageOverTime) != 0);
+
+        Assert.True(graph.TryResolveResourceReference(400840, 4008, out var slotResolution));
+        Assert.Equal(SkillSemanticResourceNodeKind.SkillEffectGroup, slotResolution.NodeKind);
+        Assert.Equal(40084, slotResolution.NodeId);
+        Assert.NotNull(slotResolution.Slot);
+        Assert.Equal(4008, slotResolution.Slot!.SkillId);
+
+        Assert.True(shared.SkillSemantics.Effects[1406004012].Links.AppliedAbnormalId > 0);
+        Assert.Contains(shared.SkillSemantics.Effects.Values, static effect => effect.Links.TriggeredSkillId > 0);
+        Assert.Contains(shared.SkillSemantics.AbnormalEffects.Values, static effect => effect.Links.LinkedAbnormalId > 0);
+        Assert.Contains(shared.SkillSemantics.AbnormalEffects.Values, static effect => effect.Links.TriggeredSkillId > 0);
+    }
+
+    [Fact]
+    public void SkillSemanticOwnerGraph_Resolves_All_Known_Transitive_Semantic_Edges()
+    {
+        var graph = ResourceCatalog.LoadShared().SkillSemanticOwnerGraph;
+        var transitiveKinds = new[]
+        {
+            SkillSemanticOwnerEdgeKind.AbnormalTriggeredSkill,
+            SkillSemanticOwnerEdgeKind.EffectTriggeredSkill,
+            SkillSemanticOwnerEdgeKind.AbnormalLinkedAbnormal
+        };
+
+        var edges = graph.Edges.Where(edge => transitiveKinds.Contains(edge.Kind)).ToArray();
+
+        Assert.NotEmpty(edges);
+        Assert.All(edges, static edge => Assert.True(edge.IsResolved));
+    }
+
+    [Fact]
     public void SkillClientMetadata_Exposes_SkillDat_Metadata()
     {
         var metadata = ResourceCatalog.LoadShared().SkillClientMetadata;
@@ -268,19 +348,36 @@ public sealed class ResourcePackTests
         Assert.Equal(SkillSourceKeyRelation.ExactRecord, clericSkill.SourceRelation);
         Assert.Equal("None", clericSkill.ParentKey);
         Assert.Equal(17050250, clericSkill.TopLevelSkillId);
-        Assert.Equal(SkillClientActionType.Active, clericSkill.ActionType);
-        Assert.Equal(SkillClientDispositionType.Negative, clericSkill.DispositionType);
-        Assert.Equal(SkillClientDamageType.Magic, clericSkill.DamageType);
+        Assert.Equal(40, clericSkill.SkillLvMax);
+        Assert.Equal(SkillClientSkillType.Active, clericSkill.SkillType);
+        Assert.Equal(SkillClientSkillDispositionType.Negative, clericSkill.SkillDispositionType);
+        Assert.Equal(SkillClientSkillDamageType.Magic, clericSkill.SkillDamageType);
         Assert.Equal(SkillClientTargetProcessType.MainTarget, clericSkill.TargetProcessType);
-        Assert.Equal(SkillClientCategoryType.Attack, clericSkill.ClientCategoryTypes & SkillClientCategoryType.Attack);
+        Assert.Equal(SkillClientSkillCategoryType.Attack, clericSkill.CategoryTypeList & SkillClientSkillCategoryType.Attack);
+        Assert.Equal(170000031, clericSkill.TargetFilterId);
+        Assert.Equal(2000f, clericSkill.NeedSkillUseRange);
+        Assert.Equal(2000f, clericSkill.NeedSkillUseHeightRange);
+        Assert.False(clericSkill.NeedWeaponUseRange);
+        Assert.False(clericSkill.NeedWeaponUseHeightRange);
+        Assert.Equal(1900f, clericSkill.NeedSkillFollowRange);
+        Assert.Equal(1900f, clericSkill.NeedSkillFollowHeightRange);
+        Assert.True(clericSkill.CoolTimeStat);
+        Assert.Equal(0f, clericSkill.NeedCoolTime);
+        Assert.Equal(120, clericSkill.NeedCostMp);
+        Assert.Equal(0L, clericSkill.NeedCostHp);
+        Assert.Equal(1, clericSkill.SealStoneConsumptionCount);
+        Assert.Equal(22, clericSkill.AutoUseId);
+        Assert.False(clericSkill.AutoBattleOff);
+        Assert.Equal(1, clericSkill.WideCastingAlertSequence);
+        Assert.Equal(SkillClientSkillAutoType.On, clericSkill.SkillAutoType);
 
         Assert.True(metadata.TryGetValue(1227265, out var npcSkill));
         Assert.Equal("SkillString_NPC_1227260", npcSkill.SourceKey);
         Assert.Equal(1227260, npcSkill.SourceSkillId);
         Assert.Equal(SkillSourceKeyRelation.GenericSourceKey, npcSkill.SourceRelation);
-        Assert.Equal(SkillClientActionType.System, npcSkill.ActionType);
-        Assert.Equal(SkillClientDispositionType.Negative, npcSkill.DispositionType);
-        Assert.Equal(SkillClientDamageType.Magic, npcSkill.DamageType);
+        Assert.Equal(SkillClientSkillType.System, npcSkill.SkillType);
+        Assert.Equal(SkillClientSkillDispositionType.Negative, npcSkill.SkillDispositionType);
+        Assert.Equal(SkillClientSkillDamageType.Magic, npcSkill.SkillDamageType);
         Assert.Equal(SkillClientTargetProcessType.Self, npcSkill.TargetProcessType);
 
         Assert.True(metadata.TryGetValue(16001316, out var sameFamilySkill));
@@ -299,10 +396,30 @@ public sealed class ResourcePackTests
         Assert.Equal(SkillSourceKeyRelation.PacketAlias, packetAliasSkill.SourceRelation);
 
         Assert.True(metadata.TryGetValue(16190050, out var elementalistSkill));
-        Assert.Equal(SkillClientWeaponType.Orb, elementalistSkill.WeaponTypes);
-        Assert.Equal(SkillClientCategoryType.Buff, elementalistSkill.ClientCategoryTypes);
+        Assert.Equal(SkillClientNeedMainWeaponType.Orb, elementalistSkill.NeedMainWeaponTypes);
+        Assert.Equal(SkillClientSkillCategoryType.Buff, elementalistSkill.CategoryTypeList);
         Assert.Equal(SkillClientRotateType.All, elementalistSkill.RotateType);
-        Assert.Equal(SkillClientTargetLocationType.ProjectileFire, elementalistSkill.TargetLocationType);
+        Assert.True(elementalistSkill.IgnoreUseAim);
+        Assert.False(elementalistSkill.ExtendingWeaponDistanceRange);
+        Assert.False(elementalistSkill.ExtendingWeaponFilter);
+        Assert.Equal(SkillClientProjectileTargetLocationType.ProjectileFire, elementalistSkill.ProjectileTargetLocationType);
+        Assert.False(elementalistSkill.NotFollow);
+        Assert.True(elementalistSkill.HideSkillfloater);
+        Assert.False(elementalistSkill.IsAttackOnSkill);
+        Assert.False(elementalistSkill.AttackOffBySkillStart);
+        Assert.False(elementalistSkill.ProxyUsingSkill);
+        Assert.False(elementalistSkill.UseSkillFlush);
+        Assert.False(elementalistSkill.CanUseWhenPeaceState);
+        Assert.Equal(13, elementalistSkill.AutoUseId);
+
+        Assert.True(metadata.TryGetValue(16250000, out var autoUseBanSkill));
+        Assert.Equal(1003, autoUseBanSkill.BanGroupId);
+        Assert.Equal(5, autoUseBanSkill.AutoUseId);
+        Assert.Equal(160000001, autoUseBanSkill.TargetFilterId);
+        Assert.True(autoUseBanSkill.CoolTimeStat);
+        Assert.Equal(90000f, autoUseBanSkill.NeedCoolTime);
+        Assert.Equal(200, autoUseBanSkill.NeedCostMp);
+        Assert.Equal(SkillClientSkillAutoType.On, autoUseBanSkill.SkillAutoType);
 
         Assert.True(metadata.TryGetValue(16200000, out var nestedElementalistSkill));
         Assert.Equal("STR_SKILL_PC_ELEMENTALIST_16200000", nestedElementalistSkill.SourceKey);
@@ -310,22 +427,67 @@ public sealed class ResourcePackTests
         Assert.Equal(16190050, nestedElementalistSkill.TopLevelSkillId);
 
         Assert.True(metadata.TryGetValue(11030000, out var chainSkill));
-        Assert.Equal(11020000, chainSkill.ChainRelatedSkillId);
-        Assert.Equal(0, chainSkill.ChainFlags);
-        Assert.Equal(10000, chainSkill.ChainPrimaryWindowMs);
-        Assert.Equal(3000, chainSkill.ChainSecondaryWindowMs);
+        Assert.Equal(11020000, chainSkill.ChainSkillPrevSkillId);
+        Assert.False(chainSkill.RotateImmediately);
+        Assert.False(chainSkill.RotateSync);
+        Assert.False(chainSkill.IgnoreLockOn);
+        Assert.False(chainSkill.IgnoreCollision);
+        Assert.Equal(10000, chainSkill.ChainSkillActivateRate);
+        Assert.Equal(3000, chainSkill.ChainSkillAvailableTime);
+        Assert.False(chainSkill.IgnoreUseAim);
+        Assert.True(chainSkill.ExtendingWeaponDistanceRange);
+        Assert.True(chainSkill.ExtendingWeaponFilter);
+        Assert.False(chainSkill.ProxyUsingSkill);
+        Assert.True(chainSkill.UseSkillFlush);
+        Assert.False(chainSkill.CanUseWhenPeaceState);
 
         Assert.True(metadata.TryGetValue(10000001, out var commonSkill));
         Assert.Equal(0, commonSkill.RowBaseSkillId);
-        Assert.Equal(SkillClientCategoryType.Heal, commonSkill.ClientCategoryTypes);
+        Assert.Equal(SkillClientSkillCategoryType.Heal, commonSkill.CategoryTypeList);
 
         Assert.True(metadata.TryGetValue(9007, out var autoLoadSkill));
         Assert.Equal(SkillClientAutoLoadType.Time, autoLoadSkill.AutoLoadType);
+        Assert.Equal(2, autoLoadSkill.SkillLvMax);
+        Assert.Equal(3, autoLoadSkill.AutoLoadCount);
+        Assert.Equal(new[] { 5000, 10000, 15000 }, autoLoadSkill.AutoLoadTimeList);
+        Assert.True(autoLoadSkill.ProxyUsingSkill);
 
         Assert.True(metadata.TryGetValue(17410000, out var autoLoadEffectSkill));
-        Assert.Equal(1, autoLoadEffectSkill.AutoLoadFlags);
-        Assert.Equal(174100001, autoLoadEffectSkill.AutoLoadEffectDataId);
+        Assert.True(autoLoadEffectSkill.ShowChainSkillHudUI);
+        Assert.False(autoLoadEffectSkill.IsStigmaSkill);
+        Assert.Equal(174100001, autoLoadEffectSkill.ToggleOnAbnormalId);
         Assert.Equal(SkillClientAutoLoadType.None, autoLoadEffectSkill.AutoLoadType);
+        Assert.Equal(25, autoLoadEffectSkill.SkillLvMax);
+        Assert.Equal(0, autoLoadEffectSkill.AutoLoadCount);
+        Assert.Empty(autoLoadEffectSkill.AutoLoadTimeList);
+        Assert.Equal("None", autoLoadEffectSkill.CastingDecalName);
+
+        Assert.True(metadata.TryGetValue(1200504, out var casterFxSkill));
+        Assert.Equal("AB_WaterBind_SplashHit", casterFxSkill.SkillCasterFx);
+        Assert.Equal("None", casterFxSkill.AnimationName);
+        Assert.Equal(2700, casterFxSkill.ImpulseStrength);
+
+        Assert.True(metadata.TryGetValue(3000021, out var targetFxSkill));
+        Assert.Equal("SE_GodStone_Splash_Fire", targetFxSkill.SkillTargetFx);
+
+        Assert.True(metadata.TryGetValue(9166, out var castingAnimationSkill));
+        Assert.Equal("KrallWar_01_Skill04_Dummy", castingAnimationSkill.AnimationName);
+        Assert.Equal("KrallWar_01_Skill04_Casting", castingAnimationSkill.CastingAnimationName);
+
+        Assert.True(metadata.TryGetValue(5001, out var groundAnimationSkill));
+        Assert.Equal(SkillClientAutoLoadType.Stack, groundAnimationSkill.AutoLoadType);
+        Assert.Equal(1, groundAnimationSkill.SkillLvMax);
+        Assert.Equal(3, groundAnimationSkill.AutoLoadCount);
+        Assert.Empty(groundAnimationSkill.AutoLoadTimeList);
+        Assert.Equal("Throw_01", groundAnimationSkill.AnimationName);
+        Assert.Equal("Throw_01_Ground", groundAnimationSkill.GroundAnimationName);
+        Assert.Equal(50011, groundAnimationSkill.TargetFilterId);
+        Assert.Equal(3000f, groundAnimationSkill.NeedSkillUseRange);
+        Assert.Equal(3000f, groundAnimationSkill.NeedSkillUseHeightRange);
+        Assert.Equal(3000, groundAnimationSkill.GroundRadius);
+        Assert.Equal(500, groundAnimationSkill.GroundHeight);
+        Assert.Equal(400, groundAnimationSkill.GroundSkillRadius);
+        Assert.Equal(1, groundAnimationSkill.WideCastingAlertSequence);
 
         Assert.True(metadata.TryGetValue(16030047, out var layoutOnlySkill));
         Assert.Equal("None", layoutOnlySkill.SourceKey);
@@ -333,9 +495,62 @@ public sealed class ResourcePackTests
         Assert.Equal(SkillSourceKeyRelation.None, layoutOnlySkill.SourceRelation);
         Assert.Equal("None", layoutOnlySkill.ParentKey);
         Assert.Equal(16030047, layoutOnlySkill.TopLevelSkillId);
-        Assert.Equal(SkillClientActionType.System, layoutOnlySkill.ActionType);
-        Assert.Equal(SkillClientDamageType.Magic, layoutOnlySkill.DamageType);
+        Assert.Equal(SkillClientSkillType.System, layoutOnlySkill.SkillType);
+        Assert.Equal(SkillClientSkillDamageType.Magic, layoutOnlySkill.SkillDamageType);
         Assert.Equal(16030000, layoutOnlySkill.RowBaseSkillId);
+    }
+
+    [Fact]
+    public void SkillClientMetadata_Exposes_Public_Usmap_Overlap_Metadata()
+    {
+        var metadata = ResourceCatalog.LoadShared().SkillClientMetadata;
+
+        Assert.True(metadata.TryGetValue(17050250, out var clericSkill));
+        Assert.False(clericSkill.IsBasicSkill);
+        Assert.False(clericSkill.IsInterruptSkill);
+        Assert.True(clericSkill.IsCancelSkill);
+        Assert.Equal(0, clericSkill.ChargeId);
+        Assert.False(clericSkill.IgnoreSpeedStat);
+        Assert.False(clericSkill.IgnoreCannotUseSkill);
+        Assert.False(clericSkill.IgnoreCastingStat);
+        Assert.Equal(0, clericSkill.CastingTime);
+        Assert.Equal(17050000, clericSkill.GroupCoolTimeId);
+        Assert.True(clericSkill.MoveableInUse);
+        Assert.False(clericSkill.MoveableInCasting);
+        Assert.False(clericSkill.MoveableInGround);
+        Assert.False(clericSkill.GlideInUse);
+        Assert.False(clericSkill.UnableWhenCanNotMoveControl);
+        Assert.True(clericSkill.AdjustMoveSpeed);
+        Assert.False(clericSkill.SkillAutoFollowIgnore);
+        Assert.True(clericSkill.SkillCombatType);
+        Assert.Equal(SkillClientNeedMainWeaponType.Mace, clericSkill.NeedMainWeaponTypes);
+
+        Assert.True(metadata.TryGetValue(11100000, out var chargeSkill));
+        Assert.True(chargeSkill.IsCancelSkill);
+        Assert.Equal(11100000, chargeSkill.ChargeId);
+        Assert.Equal(11100000, chargeSkill.GroupCoolTimeId);
+        Assert.True(chargeSkill.SkillCombatType);
+        Assert.Equal(SkillClientNeedMainWeaponType.Greatsword, chargeSkill.NeedMainWeaponTypes);
+
+        Assert.True(metadata.TryGetValue(9166, out var castingSkill));
+        Assert.Equal(5000, castingSkill.CastingTime);
+        Assert.Equal(9166, castingSkill.GroupCoolTimeId);
+        Assert.True(castingSkill.SkillCombatType);
+
+        Assert.True(metadata.TryGetValue(9080, out var ignoreSpeedSkill));
+        Assert.Equal(SkillClientSkillSubType.Instant, ignoreSpeedSkill.SkillSubType);
+        Assert.True(ignoreSpeedSkill.IgnoreSpeedStat);
+        Assert.True(ignoreSpeedSkill.MoveableInUse);
+        Assert.False(ignoreSpeedSkill.SkillCombatType);
+
+        Assert.True(metadata.TryGetValue(1101, out var glideSkill));
+        Assert.True(glideSkill.GlideInUse);
+        Assert.True(glideSkill.MoveableInUse);
+
+        Assert.True(metadata.TryGetValue(9935, out var autoFollowIgnoredSkill));
+        Assert.True(autoFollowIgnoredSkill.SkillAutoFollowIgnore);
+        Assert.Equal(9933, autoFollowIgnoredSkill.GroupCoolTimeId);
+        Assert.True(autoFollowIgnoredSkill.SkillCombatType);
     }
 
     [Theory]
@@ -398,11 +613,11 @@ public sealed class ResourcePackTests
     [InlineData(12272651, 1227265)]
     [InlineData(160300471, 16030047)]
     [InlineData(170402571, 17040257)]
-    public void SkillEffectReferences_Map_Effect_Ids_Back_To_Owner_Skills(int effectId, int expectedSkillId)
+    public void SkillEffectReferences_Map_Reference_Codes_Back_To_Owner_Skills(int referenceCode, int expectedSkillId)
     {
         var references = ResourceCatalog.LoadShared().SkillEffectReferences;
 
-        Assert.Contains(references, reference => reference.SkillId == expectedSkillId && reference.References(effectId));
+        Assert.Contains(references, reference => reference.SkillId == expectedSkillId && reference.References(referenceCode));
     }
 
     [Fact]
@@ -413,29 +628,29 @@ public sealed class ResourcePackTests
         Assert.Contains(references, reference =>
             reference.SkillId == 5001 &&
             reference.Slot == 0 &&
-            reference.Kind == SkillEffectReferenceKind.EffectId &&
+            reference.Kind == SkillEffectReferenceKind.SkillEffectFilterId &&
             reference.EffectCode == 50011);
         Assert.Contains(references, reference =>
             reference.SkillId == 5001 &&
             reference.Slot == 0 &&
-            reference.Kind == SkillEffectReferenceKind.EffectDataId &&
+            reference.Kind == SkillEffectReferenceKind.SkillEffectGroupId &&
             reference.EffectCode == 50011);
         Assert.Contains(references, reference =>
             reference.SkillId == 5001 &&
             reference.Slot == 0 &&
-            reference.Kind == SkillEffectReferenceKind.AuxEffectId &&
+            reference.Kind == SkillEffectReferenceKind.ProjectileId &&
             reference.EffectCode == 50011);
     }
 
     [Fact]
-    public void SkillEffectReferences_Expose_AutoLoad_Effect_Data_Relations()
+    public void SkillEffectReferences_Expose_Toggle_On_Abnormal_Relations()
     {
         var references = ResourceCatalog.LoadShared().SkillEffectReferences;
 
         Assert.Contains(references, reference =>
             reference.SkillId == 17410000 &&
             reference.Slot < 0 &&
-            reference.Kind == SkillEffectReferenceKind.AutoLoadEffectDataId &&
+            reference.Kind == SkillEffectReferenceKind.ToggleOnAbnormalId &&
             reference.EffectCode == 174100001);
     }
 
@@ -448,18 +663,18 @@ public sealed class ResourcePackTests
         Assert.Contains(clericAutoLoadReferences, reference =>
             reference.SkillId == 17410000 &&
             reference.Slot < 0 &&
-            reference.Kind == SkillEffectReferenceKind.AutoLoadEffectDataId &&
+            reference.Kind == SkillEffectReferenceKind.ToggleOnAbnormalId &&
             reference.EffectCode == 174100001);
 
         Assert.True(shared.SkillEffectReferencesByEffectCode.TryGetValue(174100001, out var autoLoadCodeReferences));
         Assert.Contains(autoLoadCodeReferences, reference =>
             reference.SkillId == 17410000 &&
-            reference.Kind == SkillEffectReferenceKind.AutoLoadEffectDataId);
+            reference.Kind == SkillEffectReferenceKind.ToggleOnAbnormalId);
 
         Assert.True(shared.SkillEffectReferencesByEffectCode.TryGetValue(50011, out var multiKindReferences));
-        Assert.Contains(multiKindReferences, reference => reference.SkillId == 5001 && reference.Kind == SkillEffectReferenceKind.EffectId);
-        Assert.Contains(multiKindReferences, reference => reference.SkillId == 5001 && reference.Kind == SkillEffectReferenceKind.EffectDataId);
-        Assert.Contains(multiKindReferences, reference => reference.SkillId == 5001 && reference.Kind == SkillEffectReferenceKind.AuxEffectId);
+        Assert.Contains(multiKindReferences, reference => reference.SkillId == 5001 && reference.Kind == SkillEffectReferenceKind.SkillEffectFilterId);
+        Assert.Contains(multiKindReferences, reference => reference.SkillId == 5001 && reference.Kind == SkillEffectReferenceKind.SkillEffectGroupId);
+        Assert.Contains(multiKindReferences, reference => reference.SkillId == 5001 && reference.Kind == SkillEffectReferenceKind.ProjectileId);
     }
 
     [Theory]
@@ -564,6 +779,75 @@ public sealed class ResourcePackTests
             new[] { ResourceLanguage.English, ResourceLanguage.Korean, ResourceLanguage.TraditionalChinese },
             localeResourceNames.Keys.Order(StringComparer.Ordinal).ToArray());
         Assert.All(localeResourceNames.Values, resourceName => Assert.Contains(resourceName, resourceNames));
+    }
+
+    [Fact]
+    public void ResourcePackSectionIds_UseSemanticOrder()
+    {
+        var readerType = ResolveCatalogType("ResourcePackReader");
+        var sectionIdType = readerType.GetNestedType("SectionId", BindingFlags.NonPublic)!;
+        var expected = new (string Name, ushort Value)[]
+        {
+            ("SkillDefinitions", 1),
+            ("SkillClientMetadata", 2),
+            ("SkillBaseProjections", 3),
+            ("SkillEffectReferences", 4),
+            ("SkillRelatedSkills", 5),
+            ("SkillSemanticStrings", 6),
+            ("SkillEffects", 7),
+            ("SkillEffectFilters", 8),
+            ("SkillEffectFilterLocations", 9),
+            ("SkillEffectLevels", 10),
+            ("SkillProjectiles", 11),
+            ("SkillAbnormals", 12),
+            ("SkillAbnormalEffects", 13),
+            ("SkillAbnormalEffectLevels", 14),
+            ("SkillAbnormalEffectTypes", 15),
+            ("SkillAbnormalOverlapFx", 16),
+            ("SkillAbnormalProperties", 17),
+            ("SkillAbnormalStrings", 18),
+            ("NpcDefinitions", 19),
+            ("NpcNameDefinitions", 20),
+            ("KnownMapIds", 21),
+            ("ServerCodes", 22),
+            ("SkillNames", 101),
+            ("NpcNames", 102),
+            ("NpcCatalogNames", 103),
+            ("MapNames", 104),
+            ("ServerNames", 105)
+        };
+        var actual = Enum.GetNames(sectionIdType)
+            .Select(name => (Name: name, Value: Convert.ToUInt16(Enum.Parse(sectionIdType, name))))
+            .ToArray();
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void SkillSemanticOwnerEdgeKinds_UseSemanticOrder()
+    {
+        Assert.Equal(
+        [
+            SkillSemanticOwnerEdgeKind.SkillEffectFilter,
+            SkillSemanticOwnerEdgeKind.SkillEffectGroup,
+            SkillSemanticOwnerEdgeKind.SkillProjectile,
+            SkillSemanticOwnerEdgeKind.SkillToggleAbnormal,
+            SkillSemanticOwnerEdgeKind.EffectGroupEffect,
+            SkillSemanticOwnerEdgeKind.EffectLevel,
+            SkillSemanticOwnerEdgeKind.EffectAbnormal,
+            SkillSemanticOwnerEdgeKind.EffectTriggeredSkill,
+            SkillSemanticOwnerEdgeKind.FilterTargetAbnormalCriterion,
+            SkillSemanticOwnerEdgeKind.FilterTargetAbnormalGroupCriterion,
+            SkillSemanticOwnerEdgeKind.ProjectileChain,
+            SkillSemanticOwnerEdgeKind.ProjectileEffectFilter,
+            SkillSemanticOwnerEdgeKind.ProjectileEffectGroup,
+            SkillSemanticOwnerEdgeKind.ProjectileTargetFilter,
+            SkillSemanticOwnerEdgeKind.AbnormalEffect,
+            SkillSemanticOwnerEdgeKind.AbnormalEffectLevel,
+            SkillSemanticOwnerEdgeKind.AbnormalTriggeredSkill,
+            SkillSemanticOwnerEdgeKind.AbnormalLinkedAbnormal
+        ],
+        Enum.GetValues<SkillSemanticOwnerEdgeKind>());
     }
 
     [Fact]

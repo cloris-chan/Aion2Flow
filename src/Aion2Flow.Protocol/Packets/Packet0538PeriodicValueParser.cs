@@ -3,7 +3,7 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0538PeriodicValue(int TargetId, int Mode, int SourceId, int Unknown, ResourceEffectRef BodyResourceEffectRef, int Damage, int TailLength, int TailRaw, int TailSkillCodeRaw, int TailPrefixValue)
+internal readonly record struct Packet0538PeriodicValue(int TargetId, int Mode, int SourceId, int Unknown, ResourceEffectRef BodyResourceEffectRef, int Damage, int TailLength, int TailRaw, int TailSkillCodeRaw, int TailPrefixValue, bool HasRecognizedTail)
 {
     public bool IsLinkRecord => Mode == 48;
 
@@ -48,6 +48,7 @@ internal static class Packet0538PeriodicValueParser
         var tailRaw = 0;
         var tailSkillCodeRaw = 0;
         var tailPrefixValue = 0;
+        var hasRecognizedTail = tailLength == 0;
         if (tailLength is > 0 and < 4)
         {
             var tailPrefixReader = new PacketSpanReader(reader.RemainingSpan);
@@ -56,6 +57,7 @@ internal static class Packet0538PeriodicValueParser
                 parsedTailPrefixValue > 0)
             {
                 tailPrefixValue = parsedTailPrefixValue;
+                hasRecognizedTail = true;
             }
         }
         else if (tailLength == 4)
@@ -68,6 +70,7 @@ internal static class Packet0538PeriodicValueParser
             }
 
             tailRaw = tailSkillCodeRaw;
+            hasRecognizedTail = tailSkillCodeRaw > 0;
         }
         else if (tailLength > 4)
         {
@@ -83,10 +86,11 @@ internal static class Packet0538PeriodicValueParser
                 }
 
                 tailPrefixValue = parsedTailPrefixValue;
+                hasRecognizedTail = tailSkillCodeRaw > 0;
             }
         }
 
-        result = new Packet0538PeriodicValue(targetId, mode, sourceId, unknown, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), damage, tailLength, tailRaw, tailSkillCodeRaw, tailPrefixValue);
+        result = new Packet0538PeriodicValue(targetId, mode, sourceId, unknown, ResourceEffectRef.FromRaw(bodyResourceEffectRefRaw), damage, tailLength, tailRaw, tailSkillCodeRaw, tailPrefixValue, hasRecognizedTail);
         return true;
     }
 

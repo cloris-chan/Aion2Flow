@@ -1,6 +1,4 @@
 using Cloris.Aion2Flow.Resources.Catalog;
-using Cloris.Aion2Flow.Protocol.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
@@ -100,8 +98,8 @@ public sealed class SkillDetailBaseAggregatorTests
         SetSkillBaseResources(
             [new SkillBaseProjection(16300027, 16300000)],
             [
-                new SkillEffectReference(16300027, 0, SkillEffectReferenceKind.EffectId, 1234),
-                new SkillEffectReference(16300027, 1, SkillEffectReferenceKind.EffectDataId, 5678)
+                new SkillEffectReference(16300027, 0, SkillEffectReferenceKind.SkillEffectFilterId, 1234),
+                new SkillEffectReference(16300027, 1, SkillEffectReferenceKind.SkillEffectGroupId, 5678)
             ]);
 
         var actionKey = new CombatEventKey(0, ResourceEffectRef.FromRaw(1234), ResourceEffectRef.FromRaw(5678));

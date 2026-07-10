@@ -22,6 +22,9 @@ internal static class PacketUnknownFramePayloadScanner
                 continue;
             }
 
+            if (HasEmbeddedLengthPrefix(payload, offset))
+                continue;
+
             if (payload[offset] == 0x02 && payload[offset + 1] == 0x38)
             {
                 if (PacketCombatHandler.TryParseCompactControl0238At(payload, offset, ref context, out consumed))
@@ -96,6 +99,21 @@ internal static class PacketUnknownFramePayloadScanner
         }
 
         var frame = payload.Slice(offset, frameLength);
+        if (payload[opcodeOffset] == 0x04 && payload[opcodeOffset + 1] == 0x38 &&
+            !IsCurrentEmbedded0438Frame(frame, lengthInfo.ByteCount))
+        {
+            return false;
+        }
+
+        if (payload[opcodeOffset] == 0x05 &&
+            payload[opcodeOffset + 1] == 0x38 &&
+            Packet0538PeriodicValueParser.TryParse(frame, out var periodic) &&
+            (!PacketCombatHandler.IsCurrentEmbedded0538ValueShape(periodic.Mode) ||
+             !periodic.HasRecognizedTail))
+        {
+            return false;
+        }
+
         var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, offset, frameLength, bodyOffset, frameLength - bodyOffset, siblingIndex);
         try
         {
@@ -109,6 +127,47 @@ internal static class PacketUnknownFramePayloadScanner
 
     private static bool IsEmbeddedCombatFrame(byte opcode0, byte opcode1)
         => (opcode0, opcode1) is (0x02, 0x38) or (0x04, 0x38) or (0x05, 0x38) or (0x06, 0x38);
+
+    private static bool IsCurrentEmbedded0438Frame(ReadOnlySpan<byte> frame, int prefixLength)
+    {
+        if (Packet0438DamageParser.TryParsePayload(frame[prefixLength..], out var damage, out _))
+        {
+            return damage.HasCurrentBodySkillVariant &&
+                PacketCombatHandler.IsCurrentEmbedded0438DamageShape(damage.LayoutTag, damage.Flag, damage.Type) &&
+                PacketCombatHandler.IsCurrentEmbedded0438CombatValue(damage.Damage, damage.DrainHealAmount, damage.RegenerationAmount, damage.Modifiers);
+        }
+
+        if (Packet0438ImplicitDetailSidecarParser.TryParse(frame, out _))
+            return true;
+
+        if (Packet0438CompactValueParser.TryParse(frame, out _))
+            return true;
+
+        if (Packet0438CompactSignalParser.TryParse(frame, out _))
+            return true;
+
+        return false;
+    }
+
+    private static bool HasEmbeddedLengthPrefix(ReadOnlySpan<byte> payload, int opcodeOffset)
+    {
+        for (var prefixLength = 1; prefixLength <= 5 && prefixLength <= opcodeOffset; prefixLength++)
+        {
+            var prefixOffset = opcodeOffset - prefixLength;
+            if (!PacketTransportCodec.TryReadVarInt(payload, prefixOffset, out var lengthInfo) ||
+                lengthInfo.ByteCount != prefixLength)
+            {
+                continue;
+            }
+
+            var frameLength = lengthInfo.Value + lengthInfo.ByteCount - 4;
+            var bodyOffset = lengthInfo.ByteCount + 2;
+            if (frameLength > bodyOffset && frameLength <= payload.Length - prefixOffset)
+                return true;
+        }
+
+        return false;
+    }
 
     private static bool TryParseSummonPacketAt(ReadOnlySpan<byte> packet, int opcodeOffset, ref PacketParseContext context, out int consumed)
     {

@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -30,6 +31,13 @@ public sealed class OwnerTargetSummonResourceCanonicalizer(EntityStore entities)
             observation.Loop != 1 ||
             (observation.HitCount <= 0 && observation.AttemptCount <= 0))
             return false;
+
+        if (CombatResourceRegistry.TryResolveDirectCombatEffectSemantics(in observation, out var semantics) &&
+            ((semantics.DirectFacets & (SkillSemanticFacet.Damage | SkillSemanticFacet.Healing)) != 0 ||
+             (semantics.Facets & SkillSemanticFacet.Shield) != 0))
+        {
+            return false;
+        }
 
         return entities.TryGet(sourceId, out var source) && source.OwnerKind == EntityOwnerKind.Summon && source.OwnerEntityId == targetId ||
                entities.TryGet(targetId, out var target) && target.OwnerKind == EntityOwnerKind.Summon && target.OwnerEntityId == sourceId;

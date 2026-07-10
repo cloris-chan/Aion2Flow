@@ -16,6 +16,8 @@ public sealed class ResourceCatalogSnapshot(ResourceSharedCatalog shared, Resour
     public IReadOnlyDictionary<int, IReadOnlyList<SkillEffectReference>> SkillEffectReferencesBySkillId => Shared.SkillEffectReferencesBySkillId;
     public IReadOnlyDictionary<int, IReadOnlyList<SkillEffectReference>> SkillEffectReferencesByEffectCode => Shared.SkillEffectReferencesByEffectCode;
     public IReadOnlyList<SkillRelatedSkill> SkillRelatedSkills => Shared.SkillRelatedSkills;
+    public SkillSemanticCatalog SkillSemantics => Shared.SkillSemantics;
+    public SkillSemanticOwnerGraph SkillSemanticOwnerGraph => Shared.SkillSemanticOwnerGraph;
     public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByOwnerSkillId => Shared.SkillRelatedSkillsByOwnerSkillId;
     public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByRelatedSkillCode => Shared.SkillRelatedSkillsByRelatedSkillCode;
     public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByRelatedSourceSkillId => Shared.SkillRelatedSkillsByRelatedSourceSkillId;

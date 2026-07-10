@@ -6,6 +6,7 @@ public sealed class ResourceSharedCatalog(
     IReadOnlyDictionary<int, SkillBaseProjection> skillBaseProjections,
     IReadOnlyList<SkillEffectReference> skillEffectReferences,
     IReadOnlyList<SkillRelatedSkill> skillRelatedSkills,
+    SkillSemanticCatalog skillSemantics,
     IReadOnlyDictionary<int, NpcDefinition> npcDefinitions,
     IReadOnlyDictionary<string, NpcNameDefinition> npcNameDefinitions,
     IReadOnlySet<uint> knownMapIds,
@@ -17,6 +18,8 @@ public sealed class ResourceSharedCatalog(
     public IReadOnlyDictionary<int, IReadOnlyList<SkillBaseProjection>> SkillBaseProjectionsByBaseSkillId { get; } = SkillBaseProjectionIndex.BuildByBaseSkillId(skillBaseProjections);
     public IReadOnlyList<SkillEffectReference> SkillEffectReferences { get; } = skillEffectReferences;
     public IReadOnlyList<SkillRelatedSkill> SkillRelatedSkills { get; } = skillRelatedSkills;
+    public SkillSemanticCatalog SkillSemantics { get; } = skillSemantics;
+    public SkillSemanticOwnerGraph SkillSemanticOwnerGraph { get; } = SkillSemanticOwnerGraph.Build(skillSemantics, skillEffectReferences);
     public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByOwnerSkillId { get; } = SkillRelatedSkillIndex.BuildByOwnerSkillId(skillRelatedSkills);
     public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByRelatedSkillCode { get; } = SkillRelatedSkillIndex.BuildByRelatedSkillCode(skillRelatedSkills);
     public IReadOnlyDictionary<int, IReadOnlyList<SkillRelatedSkill>> SkillRelatedSkillsByRelatedSourceSkillId { get; } = SkillRelatedSkillIndex.BuildByRelatedSourceSkillId(skillRelatedSkills);
