@@ -141,7 +141,17 @@ public sealed class SkillSemanticOwnerGraph
         return false;
     }
 
-    public bool TryResolveResourceReference(uint rawId, int preferredSkillId, out SkillSemanticResourceResolution resolution)
+    public bool TryResolveDirectResourceReference(uint rawId, int preferredSkillId, out SkillSemanticResourceResolution resolution)
+        => TryResolveResourceReference(rawId, preferredSkillId, ResourceReferenceDomain.Direct, out resolution);
+
+    public bool TryResolvePeriodicResourceReference(uint rawId, int preferredSkillId, out SkillSemanticResourceResolution resolution)
+        => TryResolveResourceReference(rawId, preferredSkillId, ResourceReferenceDomain.Periodic, out resolution);
+
+    private bool TryResolveResourceReference(
+        uint rawId,
+        int preferredSkillId,
+        ResourceReferenceDomain domain,
+        out SkillSemanticResourceResolution resolution)
     {
         if (rawId is 0 or > int.MaxValue)
         {
@@ -150,19 +160,20 @@ public sealed class SkillSemanticOwnerGraph
         }
 
         var candidateId = unchecked((int)rawId);
-        if (TryResolveResourceNode(rawId, candidateId, preferredSkillId, includeAbnormalNodes: false, out resolution))
+        if (TryResolveResourceNode(rawId, candidateId, preferredSkillId, domain, includeAbnormalNodes: domain == ResourceReferenceDomain.Periodic, out resolution))
         {
             return true;
         }
 
         candidateId = unchecked((int)(rawId / 10));
         if (candidateId > 0 &&
-            TryResolveResourceNode(rawId, candidateId, preferredSkillId, includeAbnormalNodes: true, out resolution))
+            TryResolveResourceNode(rawId, candidateId, preferredSkillId, domain, includeAbnormalNodes: true, out resolution))
         {
             return true;
         }
 
-        if (TryResolveResourceNode(rawId, unchecked((int)rawId), preferredSkillId, includeAbnormalNodes: true, out resolution))
+        if (domain == ResourceReferenceDomain.Direct &&
+            TryResolveResourceNode(rawId, unchecked((int)rawId), preferredSkillId, domain, includeAbnormalNodes: true, out resolution))
         {
             return true;
         }
@@ -201,8 +212,21 @@ public sealed class SkillSemanticOwnerGraph
         return new SkillSemanticOwnerGraph(profiles.ToFrozenDictionary(), orderedEdges, facets, slots);
     }
 
-    private bool TryResolveResourceNode(uint rawId, int nodeId, int preferredSkillId, bool includeAbnormalNodes, out SkillSemanticResourceResolution resolution)
+    private bool TryResolveResourceNode(
+        uint rawId,
+        int nodeId,
+        int preferredSkillId,
+        ResourceReferenceDomain domain,
+        bool includeAbnormalNodes,
+        out SkillSemanticResourceResolution resolution)
     {
+        if (domain == ResourceReferenceDomain.Periodic &&
+            includeAbnormalNodes &&
+            TryResolveAbnormalResourceNode(rawId, nodeId, preferredSkillId, out resolution))
+        {
+            return true;
+        }
+
         if (DirectFacetsByEffectId.TryGetValue(nodeId, out var directEffectFacets) && FacetsByEffectId.TryGetValue(nodeId, out var effectFacets))
         {
             resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillEffect, nodeId, directEffectFacets, effectFacets, EffectSlotsByEffectId, preferredSkillId);
@@ -221,21 +245,34 @@ public sealed class SkillSemanticOwnerGraph
             return true;
         }
 
-        if (includeAbnormalNodes && FacetsByAbnormalEffectId.TryGetValue(nodeId, out var abnormalEffectFacets))
+        if (domain == ResourceReferenceDomain.Direct &&
+            includeAbnormalNodes &&
+            TryResolveAbnormalResourceNode(rawId, nodeId, preferredSkillId, out resolution))
         {
-            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillAbnormalEffect, nodeId, SkillSemanticFacet.None, abnormalEffectFacets, EffectSlotsByAbnormalEffectId, preferredSkillId);
-            return true;
-        }
-
-        if (includeAbnormalNodes && FacetsByAbnormalId.TryGetValue(nodeId, out var abnormalFacets))
-        {
-            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillAbnormal, nodeId, SkillSemanticFacet.None, abnormalFacets, EffectSlotsByAbnormalId, preferredSkillId);
             return true;
         }
 
         if (EffectSlotsByEffectFilterId.ContainsKey(nodeId))
         {
             resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillEffectFilter, nodeId, SkillSemanticFacet.None, SkillSemanticFacet.None, EffectSlotsByEffectFilterId, preferredSkillId);
+            return true;
+        }
+
+        resolution = default;
+        return false;
+    }
+
+    private bool TryResolveAbnormalResourceNode(uint rawId, int nodeId, int preferredSkillId, out SkillSemanticResourceResolution resolution)
+    {
+        if (FacetsByAbnormalEffectId.TryGetValue(nodeId, out var abnormalEffectFacets))
+        {
+            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillAbnormalEffect, nodeId, SkillSemanticFacet.None, abnormalEffectFacets, EffectSlotsByAbnormalEffectId, preferredSkillId);
+            return true;
+        }
+
+        if (FacetsByAbnormalId.TryGetValue(nodeId, out var abnormalFacets))
+        {
+            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillAbnormal, nodeId, SkillSemanticFacet.None, abnormalFacets, EffectSlotsByAbnormalId, preferredSkillId);
             return true;
         }
 
@@ -329,6 +366,12 @@ public sealed class SkillSemanticOwnerGraph
         return owners.ToFrozenDictionary(
             static pair => pair.Key,
             static pair => (IReadOnlyList<int>)pair.Value.Order().ToArray());
+    }
+
+    private enum ResourceReferenceDomain : byte
+    {
+        Direct = 1,
+        Periodic = 2
     }
 
     private sealed class ProfileBuilder(

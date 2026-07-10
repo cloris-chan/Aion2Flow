@@ -128,7 +128,7 @@ public static class CombatResourceRegistry
     public static bool TryResolveDirectCombatEffectSemantics(in CombatObservation observation, out SkillSemanticEffectResolution resolution)
         => TryResolveSkillEffectSemantics(observation.DetailResourceEffectRef, out resolution);
 
-    public static bool TryResolveCombatResourceSemantics(
+    private static bool TryResolveDirectResourceSemantics(
         ResourceEffectRef effectRef,
         in CombatObservation observation,
         out SkillSemanticResourceResolution resolution)
@@ -140,20 +140,35 @@ public static class CombatResourceRegistry
         }
 
         var preferredSkillId = ResolveSemanticSkillId(in observation);
-        return _skillSemanticGraph.TryResolveResourceReference(effectRef.RawId, preferredSkillId, out resolution);
+        return _skillSemanticGraph.TryResolveDirectResourceReference(effectRef.RawId, preferredSkillId, out resolution);
+    }
+
+    private static bool TryResolvePeriodicResourceSemantics(
+        ResourceEffectRef effectRef,
+        in CombatObservation observation,
+        out SkillSemanticResourceResolution resolution)
+    {
+        if (_skillSemanticGraph is null || effectRef.IsEmpty)
+        {
+            resolution = default;
+            return false;
+        }
+
+        var preferredSkillId = ResolveSemanticSkillId(in observation);
+        return _skillSemanticGraph.TryResolvePeriodicResourceReference(effectRef.RawId, preferredSkillId, out resolution);
     }
 
     public static bool TryResolveDirectCombatResourceSemantics(in CombatObservation observation, out SkillSemanticResourceResolution resolution)
-        => TryResolveCombatResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
+        => TryResolveDirectResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
 
     public static bool TryResolvePeriodicCombatResourceSemantics(in CombatObservation observation, out SkillSemanticResourceResolution resolution)
     {
-        if (TryResolveCombatResourceSemantics(observation.BodyResourceEffectRef, in observation, out resolution))
+        if (TryResolvePeriodicResourceSemantics(observation.BodyResourceEffectRef, in observation, out resolution))
         {
             return true;
         }
 
-        return TryResolveCombatResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
+        return TryResolvePeriodicResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
     }
 
     public static int ResolveBaseSkillIdForCode(int skillCode)

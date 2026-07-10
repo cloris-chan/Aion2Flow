@@ -308,11 +308,19 @@ public sealed class ResourcePackTests
             slot.EffectIds.Contains(1406004012) &&
             (slot.Facets & SkillSemanticFacet.DamageOverTime) != 0);
 
-        Assert.True(graph.TryResolveResourceReference(400840, 4008, out var slotResolution));
+        Assert.True(graph.TryResolveDirectResourceReference(400840, 4008, out var slotResolution));
         Assert.Equal(SkillSemanticResourceNodeKind.SkillEffectGroup, slotResolution.NodeKind);
         Assert.Equal(40084, slotResolution.NodeId);
         Assert.NotNull(slotResolution.Slot);
         Assert.Equal(4008, slotResolution.Slot!.SkillId);
+
+        Assert.True(graph.TryResolveDirectResourceReference(1742001011, 17420010, out var directCollision));
+        Assert.Equal(SkillSemanticResourceNodeKind.SkillEffect, directCollision.NodeKind);
+        Assert.Equal(SkillSemanticFacet.Buff, directCollision.Facets & SkillSemanticFacet.Buff);
+
+        Assert.True(graph.TryResolvePeriodicResourceReference(1742001011, 17420010, out var periodicCollision));
+        Assert.Equal(SkillSemanticResourceNodeKind.SkillAbnormalEffect, periodicCollision.NodeKind);
+        Assert.Equal(SkillSemanticFacet.Shield, periodicCollision.Facets & SkillSemanticFacet.Shield);
 
         Assert.True(shared.SkillSemantics.Effects[1406004012].Links.AppliedAbnormalId > 0);
         Assert.Contains(shared.SkillSemantics.Effects.Values, static effect => effect.Links.TriggeredSkillId > 0);
@@ -682,6 +690,11 @@ public sealed class ResourcePackTests
     [InlineData(12240010, "ICON_TE_SKILL_004.webp")]
     [InlineData(16030047, "ICON_EL_SKILL_003.webp")]
     [InlineData(16300243, "ICON_EL_SKILL_030.webp")]
+    [InlineData(17270040, "ICON_CL_SKILL_026.webp")]
+    [InlineData(17270047, "ICON_CL_SKILL_026.webp")]
+    [InlineData(17280010, "ICON_CL_SKILL_027.webp")]
+    [InlineData(17290000, "ICON_CL_SKILL_028.webp")]
+    [InlineData(17420010, "ICON_CL_SKILL_042.webp")]
     [InlineData(17440000, "ICON_CL_SKILL_046.webp")]
     [InlineData(17440047, "ICON_CL_SKILL_046.webp")]
     [InlineData(19150350, "ICON_GT_SKILL_015.webp")]

@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.Resources.Catalog;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
@@ -367,6 +366,40 @@ public class PeriodicPoolCanonicalizerTests
         Assert.False(combat.TryGetCombatant(playerId, out var player));
         Assert.Null(player);
         Assert.False(combat.TryGetPair(playerId, playerId, out _));
+    }
+
+    [Fact]
+    public void ScenePath_SemanticMode9ShieldGrantEmitsWithoutAbsorb()
+    {
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        const int playerId = 15104;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+        var grant = new ParsedCombatPacket
+        {
+            SourceId = playerId,
+            TargetId = playerId,
+            SkillCode = 17420010,
+            Damage = 3119,
+            Unknown = 79,
+            Timestamp = 1_000,
+            BodyResourceEffectRef = ResourceEffectRef.FromRaw(1742001011),
+            PeriodicTailSkillCodeRaw = 17420010,
+            PeriodicTailLength = 4
+        };
+        grant.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
+        sink.AppendCombatPacket(grant);
+
+        var combat = Apply(journal);
+
+        Assert.True(combat.TryGetCombatant(playerId, out var player));
+        Assert.Equal(3119, player!.OutgoingShield);
+        Assert.Equal(3119, player.IncomingShield);
+        var shieldEvent = Assert.Single(combat.Events);
+        Assert.Equal(CombatContributionCanonicalization.PeriodicShieldGrant, shieldEvent.Canonicalization);
+        Assert.Equal(CombatValueKind.Shield, shieldEvent.Observation.ValueKind);
+        Assert.Equal(PacketEffectTag.ShieldGrant, shieldEvent.Observation.EffectTag);
     }
 
     [Fact]

@@ -1,6 +1,5 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
@@ -222,6 +221,31 @@ public sealed class FrameBatchedObservableObjectTests
         Assert.Same(secondRow, section.Rows[1]);
         Assert.Equal(300, section.Rows[0].TotalAmount);
         Assert.Equal(400, section.Rows[1].TotalAmount);
+    }
+
+    [Fact]
+    public void SkillDetailSection_StableRow_NotifiesWhenDisplaySkillCodeChanges()
+    {
+        var frameBatch = new UiFrameBatchService();
+        var section = new SkillDetailSectionViewModel(frameBatch);
+        var baseKey = new SkillBaseKey(new CombatEventKey(17270000, default, default));
+
+        section.ReplaceRows([CreateRowData(baseKey, 17280010, 1, 100)]);
+        frameBatch.FlushFrame();
+
+        var row = Assert.Single(section.Rows);
+        var changed = new List<string?>();
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        section.ReplaceRows([CreateRowData(baseKey, 17270040, 2, 200)]);
+
+        Assert.Same(row, Assert.Single(section.Rows));
+        Assert.Equal(17270040, row.SkillCode);
+        Assert.DoesNotContain(nameof(SkillDetailRowViewModel.SkillCode), changed);
+
+        frameBatch.FlushFrame();
+
+        Assert.Contains(nameof(SkillDetailRowViewModel.SkillCode), changed);
     }
 
     [Fact]

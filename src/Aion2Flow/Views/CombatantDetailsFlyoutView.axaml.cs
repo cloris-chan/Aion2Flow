@@ -47,6 +47,7 @@ public partial class CombatantDetailsFlyoutView : UserControl
 
         rootCard.Width = width;
         rootCard.MaxWidth = width;
+        rootCard.Height = height;
         rootCard.MaxHeight = height;
     }
 }

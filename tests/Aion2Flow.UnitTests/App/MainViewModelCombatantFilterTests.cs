@@ -745,6 +745,30 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_SceneMode_SwitchingBackToPlayerReplacesDetailEventContext()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneIdentity(300, "First Player");
+        fixture.AppendSceneIdentity(301, "Second Player");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 400, 3_000, 1);
+        fixture.AppendSceneDamage(301, 900_002, 11000010, 600, 4_000, 2);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var firstPlayer = fixture.ViewModel.Combatants.Single(static row => row.Id == 300);
+        var secondPlayer = fixture.ViewModel.Combatants.Single(static row => row.Id == 301);
+
+        fixture.ViewModel.SelectedCombatant = firstPlayer;
+        Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
+
+        fixture.ViewModel.SelectedCombatant = secondPlayer;
+        Assert.Equal(600, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
+
+        fixture.ViewModel.SelectedCombatant = firstPlayer;
+        Assert.Equal(400, fixture.ViewModel.CombatantDetails.OutgoingDamage.Total);
+        Assert.Equal(300, fixture.ViewModel.CombatantDetails.SelectedCombatantId);
+    }
+
+    [Fact]
     public void ArchiveCurrentEncounter_SceneMode_WritesScenePayload()
     {
         var fixture = MainViewModelFixture.Create();

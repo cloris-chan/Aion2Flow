@@ -12,6 +12,7 @@
             Classes="DetailFlyoutCard"
             Width="920"
             MaxWidth="1080"
+            Height="720"
             MaxHeight="720">
         <views:CombatantDetailsView />
     </Border>

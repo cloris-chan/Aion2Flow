@@ -141,6 +141,23 @@ public sealed class CombatEventClassifierTests
     }
 
     [Fact]
+    public void Classifies_Periodic_AbnormalEffect_Shield_When_Id_Collides_With_SkillEffect()
+    {
+        var packet = DirectPacket(15104, 15104, 17420010, 3119);
+        packet.BodyResourceEffectRef = ResourceEffectRef.FromRaw(1742001011);
+        packet.PeriodicTailSkillCodeRaw = 17420010;
+        packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
+
+        var resolution = CombatEventClassifier.Resolve(packet);
+
+        Assert.Equal(CombatEventKind.Support, resolution.EventKind);
+        Assert.Equal(CombatValueKind.Shield, resolution.ValueKind);
+        Assert.Equal(SkillSemanticResourceNodeKind.SkillAbnormalEffect, resolution.ResourceNodeKind);
+        Assert.Equal(1742001011, resolution.ResourceNodeId);
+        Assert.Equal(SkillSemanticFacet.Shield, resolution.Facets & SkillSemanticFacet.Shield);
+    }
+
+    [Fact]
     public void Skill_Profile_Alone_Does_Not_Override_Packet_Facts()
     {
         var packet = DirectPacket(12115, 12115, 1010000, 425);
@@ -238,7 +255,7 @@ public sealed class CombatEventClassifierTests
             DetailResourceEffectRef = ResourceEffectRef.FromRaw(400840)
         };
 
-        for (var i = 0; i < 32; i++)
+        for (var i = 0; i < 10_000; i++)
             _ = CombatEventClassifier.Resolve(100, 200, in observation);
 
         var checksum = 0;

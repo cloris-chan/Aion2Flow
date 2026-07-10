@@ -57,8 +57,29 @@ public sealed class PeriodicPoolCanonicalizer
 
     private CombatCanonicalizationBatch OpenState(int sourceId, int targetId, Key key, in CombatObservation observation)
     {
-        if (observation.Damage > 0 && sourceId > 0 && targetId > 0)
-            _states[key] = new RemainingValueState(Math.Max(0, observation.Damage), sourceId, sourceId, targetId, observation, false);
+        if (observation.Damage <= 0 || sourceId <= 0 || targetId <= 0)
+            return CombatCanonicalizationBatch.Empty;
+
+        var isSemanticShieldGrant = observation.ValueKind == CombatValueKind.Shield;
+        var grant = isSemanticShieldGrant
+            ? observation with { EffectTag = PacketEffectTag.ShieldGrant }
+            : observation;
+        _states[key] = new RemainingValueState(
+            Math.Max(0, observation.Damage),
+            sourceId,
+            sourceId,
+            targetId,
+            grant,
+            isSemanticShieldGrant);
+
+        if (isSemanticShieldGrant)
+        {
+            return CombatCanonicalizationBatch.One(new CombatCanonicalizationResult(
+                sourceId,
+                targetId,
+                grant,
+                CombatContributionCanonicalization.PeriodicShieldGrant));
+        }
 
         return CombatCanonicalizationBatch.Empty;
     }

@@ -466,6 +466,15 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Direct Healing.
+        /// </summary>
+        internal static string Metric_DirectHealing {
+            get {
+                return ResourceManager.GetString("Metric_DirectHealing", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to DPS.
         /// </summary>
         internal static string Metric_Dps {
@@ -555,6 +564,15 @@ namespace Cloris.Aion2Flow.Localization {
             }
         }
         
+        /// <summary>
+        ///   Looks up a localized string similar to Total Healing.
+        /// </summary>
+        internal static string Metric_TotalHealing {
+            get {
+                return ResourceManager.GetString("Metric_TotalHealing", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to DMG.
         /// </summary>

@@ -614,9 +614,10 @@
                                            Classes="DetailBannerTitle"
                                            Text="{markups:Translate Category_Support}" />
 
-                                <Grid Grid.Column="1"
+                                <Grid x:Name="SupportBannerMetrics"
+                                      Grid.Column="1"
                                       Classes="DetailBannerMetrics"
-                                      ColumnDefinitions="*,*,*,*,*,*">
+                                      ColumnDefinitions="*,*,*,*">
                                     <controls:MetricTile Grid.Column="0"
                                                          Classes="DetailBannerMetric"
                                                          Label="{markups:Translate Metric_Hps}"
@@ -632,17 +633,9 @@
                                                          Suffix="s" />
                                     <controls:MetricTile Grid.Column="2"
                                                          Classes="DetailBannerMetric"
-                                                         Label="{markups:Translate Category_Healing}"
+                                                         Label="{markups:Translate Metric_TotalHealing}"
                                                          Value="{Binding HealingSection.Total}" />
                                     <controls:MetricTile Grid.Column="3"
-                                                         Classes="DetailBannerMetric"
-                                                         Label="{markups:Translate MetricShort_Heal}"
-                                                         Value="{Binding HealingSection.DirectTotal}" />
-                                    <controls:MetricTile Grid.Column="4"
-                                                         Classes="DetailBannerMetric"
-                                                         Label="{markups:Translate MetricShort_Hot}"
-                                                         Value="{Binding HealingSection.PeriodicTotal}" />
-                                    <controls:MetricTile Grid.Column="5"
                                                          Classes="DetailBannerMetric"
                                                          Label="{markups:Translate Category_Shield}"
                                                          Value="{Binding ShieldSection.Total}" />
@@ -775,7 +768,7 @@
                                   ColumnDefinitions="*,*,*,*,*">
                                 <controls:MetricTile Grid.Column="0"
                                                      Classes="DetailLineMetric"
-                                                     Label="{markups:Translate MetricShort_Heal}"
+                                                     Label="{markups:Translate Metric_DirectHealing}"
                                                      Value="{Binding HealingSection.DirectTotal}" />
                                 <controls:MetricTile Grid.Column="1"
                                                      Classes="DetailLineMetric"
@@ -800,8 +793,7 @@
                     </StackPanel>
                 </Border>
 
-                <StackPanel IsVisible="{Binding HealingSection.HasSkills}"
-                            Spacing="6">
+                <StackPanel Spacing="6">
                     <TextBlock Classes="SectionTitle"
                                Text="{markups:Translate Category_Healing}" />
                     <Border Classes="DetailTableCard">
@@ -814,16 +806,15 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="HealingSkillName" />
                                             <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="86" />
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="56" />
                                             <ColumnDefinition Width="72" />
                                         </Grid.ColumnDefinitions>
                                         <controls:SegmentedTableSeparator Grid.Column="0"
-                                                                          Grid.ColumnSpan="9"
+                                                                          Grid.ColumnSpan="8"
                                                                           LineBrush="{StaticResource OverlayBrush.DetailHudLineSoft}"
                                                                           Classes="DetailTableHeaderSeparator" />
                                         <TextBlock Grid.Column="0"
@@ -834,7 +825,7 @@
                                                    Text="{markups:Translate Metric_Total}" />
                                         <TextBlock Grid.Column="2"
                                                    Classes="DetailTableHeader"
-                                                   Text="{markups:Translate MetricShort_Heal}" />
+                                                   Text="{markups:Translate Metric_DirectHealing}" />
                                         <TextBlock Grid.Column="3"
                                                    Classes="DetailTableHeader"
                                                    Text="{markups:Translate MetricShort_Hot}" />
@@ -846,11 +837,8 @@
                                                    Text="{markups:Translate Stat_Regeneration}" />
                                         <TextBlock Grid.Column="6"
                                                    Classes="DetailTableHeader"
-                                                   Text="{markups:Translate Metric_HitCount}" />
-                                        <TextBlock Grid.Column="7"
-                                                   Classes="DetailTableHeader"
                                                    Text="{markups:Translate Column_Share}" />
-                                        <TextBlock Grid.Column="8"
+                                        <TextBlock Grid.Column="7"
                                                    Classes="DetailTableHeader"
                                                    Text="{markups:Translate Column_Events}" />
                                     </Grid>
@@ -867,16 +855,15 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" SharedSizeGroup="HealingSkillName" />
                                                         <ColumnDefinition Width="96" />
-                                                        <ColumnDefinition Width="86" />
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="96" />
-                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="56" />
                                                         <ColumnDefinition Width="72" />
                                                     </Grid.ColumnDefinitions>
                                                     <controls:SegmentedTableSeparator Grid.Column="0"
-                                                                                      Grid.ColumnSpan="9"
+                                                                                      Grid.ColumnSpan="8"
                                                                                       LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
                                                                                       Classes="DetailTableRowSeparator" />
                                                     <controls:SkillDisplay Grid.Column="0"
@@ -902,14 +889,11 @@
                                                                    Value="{Binding RegenerationAmount}" />
                                             <controls:NumericBlock Grid.Column="6"
                                                                    Classes="DetailRowValue"
-                                                                   Value="{Binding Hits}" />
-                                            <controls:NumericBlock Grid.Column="7"
-                                                                   Classes="DetailRowValue"
                                                                    Value="{Binding SharePercent}"
                                                                    FractionDigits="1"
                                                                    TrimTrailingZeros="False"
                                                                    UsePercentageNotation="True" />
-                                            <controls:NumericBlock Grid.Column="8"
+                                            <controls:NumericBlock Grid.Column="7"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding EventCount}" />
                                                 </Grid>
@@ -917,12 +901,15 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                <TextBlock Classes="OverlayMutedText"
+                                           Text="{markups:Translate Empty_Skills}"
+                                           IsVisible="{Binding HealingSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
                             </StackPanel>
                         </ScrollViewer>
                     </Border>
                 </StackPanel>
 
-                <StackPanel IsVisible="{Binding ShieldSection.HasSkills}"
+                <StackPanel x:Name="ShieldSectionPanel"
                             Spacing="6">
                     <TextBlock Classes="SectionTitle"
                                Text="{markups:Translate Category_Shield}" />
@@ -937,12 +924,11 @@
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="ShieldSkillName" />
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="80" />
                                             <ColumnDefinition Width="56" />
                                             <ColumnDefinition Width="72" />
                                         </Grid.ColumnDefinitions>
                                         <controls:SegmentedTableSeparator Grid.Column="0"
-                                                                          Grid.ColumnSpan="6"
+                                                                          Grid.ColumnSpan="5"
                                                                           LineBrush="{StaticResource OverlayBrush.DetailHudLineSoft}"
                                                                           Classes="DetailTableHeaderSeparator" />
                                         <TextBlock Grid.Column="0"
@@ -956,11 +942,8 @@
                                                    Text="{markups:Translate MetricShort_ShieldAbsorbed}" />
                                         <TextBlock Grid.Column="3"
                                                    Classes="DetailTableHeader"
-                                                   Text="{markups:Translate Metric_HitCount}" />
-                                        <TextBlock Grid.Column="4"
-                                                   Classes="DetailTableHeader"
                                                    Text="{markups:Translate Column_Share}" />
-                                        <TextBlock Grid.Column="5"
+                                        <TextBlock Grid.Column="4"
                                                    Classes="DetailTableHeader"
                                                    Text="{markups:Translate Column_Events}" />
                                     </Grid>
@@ -978,12 +961,11 @@
                                                         <ColumnDefinition Width="Auto" SharedSizeGroup="ShieldSkillName" />
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="96" />
-                                                        <ColumnDefinition Width="80" />
                                                         <ColumnDefinition Width="56" />
                                                         <ColumnDefinition Width="72" />
                                                     </Grid.ColumnDefinitions>
                                                     <controls:SegmentedTableSeparator Grid.Column="0"
-                                                                                      Grid.ColumnSpan="6"
+                                                                                      Grid.ColumnSpan="5"
                                                                                       LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
                                                                                       Classes="DetailTableRowSeparator" />
                                                     <controls:SkillDisplay Grid.Column="0"
@@ -1000,14 +982,11 @@
                                                                    Value="{Binding ShieldAbsorbedAmount}" />
                                             <controls:NumericBlock Grid.Column="3"
                                                                    Classes="DetailRowValue"
-                                                                   Value="{Binding Hits}" />
-                                            <controls:NumericBlock Grid.Column="4"
-                                                                   Classes="DetailRowValue"
                                                                    Value="{Binding SharePercent}"
                                                                    FractionDigits="1"
                                                                    TrimTrailingZeros="False"
                                                                    UsePercentageNotation="True" />
-                                            <controls:NumericBlock Grid.Column="5"
+                                            <controls:NumericBlock Grid.Column="4"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding EventCount}" />
                                                 </Grid>
@@ -1015,6 +994,10 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                <TextBlock x:Name="ShieldEmptyState"
+                                           Classes="OverlayMutedText"
+                                           Text="{markups:Translate Empty_Skills}"
+                                           IsVisible="{Binding ShieldSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
                             </StackPanel>
                         </ScrollViewer>
                     </Border>

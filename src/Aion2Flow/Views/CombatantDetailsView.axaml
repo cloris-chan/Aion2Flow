@@ -5,7 +5,6 @@
              xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.CombatantDetailsView"
-             x:Name="Root"
              x:DataType="vm:CombatantDetailsFlyoutViewModel">
     <UserControl.Styles>
         <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
@@ -13,6 +12,7 @@
 
     <Grid RowDefinitions="Auto,*"
           RowSpacing="14"
+          MinHeight="0"
           controls:DisplayContextProvider.DisplayContext="{Binding DisplayContext}">
         <Grid Grid.Row="0"
               ColumnDefinitions="*,Auto"
@@ -38,7 +38,8 @@
 
         <ScrollViewer Grid.Row="1"
                       Classes="DetailContentScroller AppScrollViewer"
-                      VerticalScrollBarVisibility="{Binding VerticalScrollBarVisibility, ElementName=Root}">
+                      MinHeight="0"
+                      VerticalScrollBarVisibility="Auto">
             <Grid>
                 <Border IsVisible="{Binding IsOutgoingSelected}">
                     <views:CombatDirectionDetailView DataContext="{Binding OutgoingDetail}" />

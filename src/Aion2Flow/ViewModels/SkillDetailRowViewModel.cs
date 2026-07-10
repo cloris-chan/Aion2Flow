@@ -5,7 +5,7 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchService) : FrameBatchedObservableObject(frameBatchService)
 {
     public SkillBaseKey BaseKey { get; set; }
-    public int SkillCode { get; set; }
+    public int SkillCode { get; set => SetFrameProperty(ref field, value); }
     public string DisplayName { get; set => SetFrameProperty(ref field, value); } = string.Empty;
 
     public int EventCount { get; set => SetFrameProperty(ref field, value); }

@@ -110,6 +110,30 @@ public sealed class LocalizationServicesTests
     }
 
     [Theory]
+    [InlineData(17270040, "救援", "ICON_CL_SKILL_026.webp")]
+    [InlineData(17270047, "救援", "ICON_CL_SKILL_026.webp")]
+    [InlineData(17280010, "權能爆炸", "ICON_CL_SKILL_027.webp")]
+    [InlineData(17290000, "免罪", "ICON_CL_SKILL_028.webp")]
+    [InlineData(17420010, "尤斯迪埃權能", "ICON_CL_SKILL_042.webp")]
+    public void GameResourceService_Resolves_Cleric_Stigma_Display_Resources(int skillCode, string expectedName, string expectedIcon)
+    {
+        try
+        {
+            var languageService = new LanguageService();
+            languageService.SetLanguage(LanguageService.English);
+            languageService.SetLanguage(LanguageService.TraditionalChinese);
+            using var resources = new GameResourceService(languageService);
+
+            Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
+            Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
+        }
+        finally
+        {
+            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
+        }
+    }
+
+    [Theory]
     [InlineData(1227237, "攻擊", "ICON_TE_SKILL_001.webp")]
     [InlineData(1227265, "亡靈迅殺", "ICON_TE_SKILL_001.webp")]
     public void GameResourceService_Resolves_Client_SkillDat_Display_Names(int skillCode, string expectedName, string expectedIcon)

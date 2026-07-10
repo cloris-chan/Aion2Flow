@@ -196,7 +196,7 @@ public static class CombatEventClassifier
             return false;
         }
 
-        var periodicFacets = semantics.Facets & (SkillSemanticFacet.DamageOverTime | SkillSemanticFacet.HealingOverTime);
+        var periodicFacets = semantics.Facets & (SkillSemanticFacet.DamageOverTime | SkillSemanticFacet.HealingOverTime | SkillSemanticFacet.Shield);
         if (periodicFacets == SkillSemanticFacet.DamageOverTime)
         {
             classification = CreateResourceResolution(CombatEventKind.Damage, CombatValueKind.PeriodicDamage, in observation, in semantics);
@@ -206,6 +206,12 @@ public static class CombatEventClassifier
         if (periodicFacets == SkillSemanticFacet.HealingOverTime)
         {
             classification = CreateResourceResolution(CombatEventKind.Healing, CombatValueKind.PeriodicHealing, in observation, in semantics);
+            return true;
+        }
+
+        if (periodicFacets == SkillSemanticFacet.Shield)
+        {
+            classification = CreateResourceResolution(CombatEventKind.Support, CombatValueKind.Shield, in observation, in semantics);
             return true;
         }
 

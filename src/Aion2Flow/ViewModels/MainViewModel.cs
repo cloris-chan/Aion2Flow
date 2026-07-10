@@ -1026,15 +1026,19 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
         if (!IsViewingArchivedEncounter)
         {
-            if (_latestLiveFrame.DetailCombatantId != SelectedCombatant.Id || _latestLiveFrame.DetailUpdate.CombatantId != SelectedCombatant.Id || forceRefresh)
+            var selectedCombatantId = SelectedCombatant.Id;
+            var detailContextChanged = _latestLiveFrame.DetailCombatantId != selectedCombatantId ||
+                                       _latestLiveFrame.DetailUpdate.CombatantId != selectedCombatantId;
+            var requiresFullDetail = forceRefresh || detailContextChanged;
+            if (requiresFullDetail)
             {
-                _latestLiveFrame = CreateLiveFrame(SelectedCombatant.Id, forceRefresh);
+                _latestLiveFrame = CreateLiveFrame(selectedCombatantId, forceDetailRefresh: true);
                 _latestLiveSnapshot = _latestLiveFrame.Snapshot;
                 _displayedSnapshot = _latestLiveFrame.Snapshot;
                 snapshot = _displayedSnapshot;
             }
 
-            CombatantDetails.SelectLiveSceneEncounterCombatant(encounterContextId, SelectedCombatant.Id, snapshot, _latestLiveFrame.DetailUpdate, forceRefresh);
+            CombatantDetails.SelectLiveSceneEncounterCombatant(snapshot.EncounterId, selectedCombatantId, snapshot, _latestLiveFrame.DetailUpdate, requiresFullDetail);
             return;
         }
 

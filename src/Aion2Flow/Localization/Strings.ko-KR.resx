@@ -119,6 +119,8 @@
   <data name="Metric_Dps" xml:space="preserve"><value>DPS</value></data>
   <data name="Metric_Hps" xml:space="preserve"><value>HPS</value></data>
   <data name="Metric_Duration" xml:space="preserve"><value>전투 시간</value></data>
+  <data name="Metric_TotalHealing" xml:space="preserve"><value>총 치유량</value></data>
+  <data name="Metric_DirectHealing" xml:space="preserve"><value>직접 치유</value></data>
   <data name="Metric_Attacks" xml:space="preserve"><value>공격 횟수</value></data>
   <data name="Metric_HitCount" xml:space="preserve"><value>적중 횟수</value></data>
   <data name="Metric_Skills" xml:space="preserve"><value>스킬</value></data>
