@@ -26,7 +26,6 @@
 
     <Style Selector="Window.PlaybackWindow">
         <Setter Property="Background" Value="{StaticResource PlaybackBrush.Window}" />
-        <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
     </Style>
 
@@ -48,7 +47,7 @@
 
     <Style Selector="TextBlock.PlaybackPanelTitle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -56,20 +55,20 @@
 
     <Style Selector="TextBlock.PlaybackSceneTitle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Title}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackHeaderSubtle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackHeaderStatus">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Accent}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -107,7 +106,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -153,7 +152,7 @@
 
     <Style Selector="TextBlock.PlaybackMetricLabel">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextAlignment" Value="Right" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -161,7 +160,7 @@
 
     <Style Selector="TextBlock.PlaybackMetricValue">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextAlignment" Value="Right" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -257,7 +256,7 @@
 
     <Style Selector="controls|SkillDisplay.PlaybackAuraSkill TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextMuted}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
@@ -273,7 +272,7 @@
 
     <Style Selector="TextBlock.PlaybackHeaderCell, TextBlock.PlaybackHeaderCellRight">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -346,7 +345,7 @@
 
     <Style Selector="TextBlock.PlaybackDetailAmount">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextAlignment" Value="Right" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -355,7 +354,7 @@
 
     <Style Selector="TextBlock.PlaybackDetailSubtle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -363,7 +362,7 @@
 
     <Style Selector="TextBlock.PlaybackDetailSubtleValue">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextMuted}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -382,13 +381,13 @@
 
     <Style Selector="controls|CombatantDisplay.PlaybackCombatantName TextBlock#PART_Text">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackRowValue">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
@@ -401,14 +400,14 @@
 
     <Style Selector="TextBlock.PlaybackRowSubtle">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackTrackName">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextMuted}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -416,34 +415,34 @@
 
     <Style Selector="TextBlock.PlaybackTrackCount">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackEventTime">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Accent}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackEventTrack">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.TextMuted}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackEventText">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style Selector="TextBlock.PlaybackEventAmount">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Green}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />
@@ -463,7 +462,7 @@
 
     <Style Selector="TextBlock.PlaybackHpText">
         <Setter Property="Foreground" Value="{StaticResource PlaybackBrush.Text}" />
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />

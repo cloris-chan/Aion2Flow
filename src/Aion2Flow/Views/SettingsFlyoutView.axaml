@@ -17,33 +17,33 @@
                     </ItemsPanelTemplate>
                 </Menu.ItemsPanel>
                 <MenuItem x:Name="TopmostMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="TopmostMenuItemLoaded" />
                 <MenuItem x:Name="VisibleRowsMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="VisibleRowsMenuItemLoaded" />
                 <MenuItem x:Name="CombatantStatisticsScopeMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="CombatantStatisticsScopeMenuItemLoaded" />
                 <MenuItem x:Name="CombatantSortMetricMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="CombatantSortMetricMenuItemLoaded" />
                 <MenuItem x:Name="SceneKindMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="SceneKindMenuItemLoaded" />
                 <MenuItem x:Name="CompactMainMetricsMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="CompactMainMetricsMenuItemLoaded"
                           Click="CompactMainMetricsMenuItemClicked" />
                 <MenuItem x:Name="FocusStatusBarMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="FocusStatusBarMenuItemLoaded"
                           Click="FocusStatusBarMenuItemClicked" />
                 <MenuItem x:Name="PlayerNameSettingsMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="PlayerNameSettingsMenuItemLoaded" />
                 <MenuItem x:Name="LanguageMenuItem"
-                          Classes="FlyoutMenuItem SettingsRowItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="LanguageMenuItemLoaded" />
             </Menu>
 
@@ -81,7 +81,7 @@
                                Classes="SettingsRowValue"
                                Text="{Binding ResetHotkeyDisplay}" />
                     <Button Grid.Column="2"
-                            Classes="HotkeyClearButton"
+                            Classes="FlyoutInlineButton"
                             Command="{Binding ClearBattleResetHotkeyCommand}"
                             IsVisible="{Binding HasResetHotkey}"
                             ToolTip.Tip="{markups:Translate Settings_Hotkey_Clear}">

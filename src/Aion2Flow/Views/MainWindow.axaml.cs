@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Assets.Icons;
 using Cloris.Aion2Flow.Controls;
@@ -310,6 +311,7 @@ public partial class MainWindow : Window
                 IsEnabled = false
             };
             placeholder.Classes.Add("FlyoutMenuItem");
+            placeholder.Classes.Add("FlyoutPanelRow");
             placeholder.Classes.Add("FlyoutMenuItemPlaceholder");
             menu.Items.Add(placeholder);
             return;
@@ -317,23 +319,38 @@ public partial class MainWindow : Window
 
         foreach (var item in DataContext.EncounterHistory)
         {
-            var header = new StackPanel
+            var header = new Grid
             {
-                Orientation = Orientation.Horizontal,
-                Spacing = 6,
+                ColumnDefinitions =
+                [
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Auto)
+                ],
+                ColumnSpacing = 6,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Center
             };
             DisplayContextProvider.SetDisplayContext(header, item.DisplayContext);
-            header.Children.Add(new TextBlock
+            var sceneName = new TextBlock
             {
                 Text = $"[{item.SceneName}]",
+                TextTrimming = TextTrimming.CharacterEllipsis,
                 VerticalAlignment = VerticalAlignment.Center
-            });
-            header.Children.Add(new TextBlock
+            };
+            sceneName.Classes.Add("SettingsRowLabel");
+            Grid.SetColumn(sceneName, 0);
+            header.Children.Add(sceneName);
+
+            var archivedAt = new TextBlock
             {
                 Text = item.ArchivedAtText,
                 VerticalAlignment = VerticalAlignment.Center
-            });
+            };
+            archivedAt.Classes.Add("SettingsRowValue");
+            Grid.SetColumn(archivedAt, 1);
+            header.Children.Add(archivedAt);
+
             var playbackButton = new Button
             {
                 Tag = item,
@@ -344,7 +361,7 @@ public partial class MainWindow : Window
                 }
             };
             ToolTip.SetTip(playbackButton, DataContext.Localization["Playback_Open"]);
-            playbackButton.Classes.Add("HistoryPlaybackButton");
+            playbackButton.Classes.Add("FlyoutInlineButton");
             if (playbackButton.Content is Avalonia.Controls.Shapes.Path playbackIcon)
             {
                 playbackIcon.Classes.Add("Glyph");
@@ -352,6 +369,7 @@ public partial class MainWindow : Window
             }
 
             playbackButton.Click += EncounterHistoryPlaybackButtonClicked;
+            Grid.SetColumn(playbackButton, 2);
             header.Children.Add(playbackButton);
 
             var menuItem = new MenuItem
@@ -360,6 +378,7 @@ public partial class MainWindow : Window
                 Tag = item
             };
             menuItem.Classes.Add("FlyoutMenuItem");
+            menuItem.Classes.Add("FlyoutPanelRow");
             menuItem.Click += EncounterHistoryMenuItemClicked;
             menu.Items.Add(menuItem);
         }

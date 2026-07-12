@@ -384,6 +384,7 @@ public partial class SettingsFlyoutView : UserControl
         _showPlayerNamesMenuItem = CreateToggleMenuItem(vm.Localization["Settings_ShowPlayerNames"], vm.ShowPlayerNamesDisplay, vm.ShowPlayerNames, ShowPlayerNamesMenuItemClicked);
         _playerSelfMarkerMenuItem = new MenuItem();
         _playerSelfMarkerMenuItem.Classes.Add("FlyoutMenuItem");
+        _playerSelfMarkerMenuItem.Classes.Add("FlyoutPanelRow");
         _playerSelfMarkerMenuItem.Classes.Add("SettingsRowItem");
         RebuildTaggedMenuItems(_playerSelfMarkerMenuItem, vm.PlayerSelfMarkerDisplayModeOptions, mode => vm.Localization[$"Settings_PlayerSelfMarker_{mode}"], mode => mode, mode => mode == vm.PlayerSelfMarkerDisplayMode, PlayerSelfMarkerDisplayModeItemClicked, staysOpenOnClick: true);
 
@@ -704,6 +705,7 @@ public partial class SettingsFlyoutView : UserControl
             StaysOpenOnClick = true
         };
         item.Classes.Add("FlyoutMenuItem");
+        item.Classes.Add("FlyoutPanelRow");
         item.Classes.Add("SettingsRowItem");
         item.Click += click;
         return item;

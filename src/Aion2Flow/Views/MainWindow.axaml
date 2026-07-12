@@ -371,7 +371,7 @@
                         <Button.Flyout>
                             <MenuFlyout Placement="TopEdgeAlignedRight"
                                         ShowMode="Transient"
-                                        FlyoutPresenterClasses="BottomBarMenuFlyout BottomBarHistoryMenuFlyout" />
+                                        FlyoutPresenterClasses="BottomBarHistoryMenuFlyout" />
                         </Button.Flyout>
                     </Button>
                 </StackPanel>
