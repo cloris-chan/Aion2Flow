@@ -251,25 +251,13 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 56688,
-            TargetEntityId = 0,
-            State = new StateObservation { EntityId = 56688, StateCode = 2310108 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 2007,
-            TargetEntityId = 0,
-            State = new StateObservation { EntityId = 2007, StateCode = 0 }
-        });
+        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 56688, 0, new StateObservation { EntityId = 56688, StateCode = 2310108 });
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1 },
+            2007,
+            0,
+            new StateObservation { EntityId = 2007, StateCode = 0 });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -288,25 +276,13 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 56688,
-            TargetEntityId = 0,
-            State = new StateObservation { EntityId = 56688, StateCode = 2310108 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
-            Domain = ObservedEventDomain.Resource,
-            SourceEntityId = 56688,
-            TargetEntityId = 0,
-            Resource = new ResourceObservation { EntityId = 56688, CurrentValue = 22847, MaximumValue = 9000000 }
-        });
+        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 56688, 0, new StateObservation { EntityId = 56688, StateCode = 2310108 });
+        journal.AppendResource(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 1 },
+            56688,
+            0,
+            new ResourceObservation { EntityId = 56688, CurrentValue = 22847, MaximumValue = 9000000 });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -325,15 +301,12 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.Resource,
-            SourceEntityId = 56688,
-            TargetEntityId = 0,
-            Resource = new ResourceObservation { EntityId = 56688, CurrentValue = 3_500_000_000L, MaximumValue = 4_000_000_000L }
-        });
+        journal.AppendResource(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 0 },
+            56688,
+            0,
+            new ResourceObservation { EntityId = 56688, CurrentValue = 3_500_000_000L, MaximumValue = 4_000_000_000L });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -352,15 +325,12 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 314,
-            TargetEntityId = 17755,
-            State = new StateObservation { EntityId = 17755, StateCode = 0, Value0 = 314 }
-        });
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 0 },
+            314,
+            17755,
+            new StateObservation { EntityId = 17755, StateCode = 0, Value0 = 314 });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -383,46 +353,32 @@ public class DomainEventApplierTests
         const int effectSourceId = 73942;
         const int targetId = 180015;
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = ownerId,
-            State = new StateObservation { EntityId = ownerId, StateCode = StateCodes.PlayerIdentity, Text = "Owner" }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_100 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = ownerId,
-            TargetEntityId = 0,
-            Raw = new RawPacketReference { Opcode = 0x0238 },
-            Combat = new CombatObservation { SkillCode = 15281240, BodySkillVariantRaw = 15281240, ChainId = targetId }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_480 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 2 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = effectSourceId,
-            TargetEntityId = 0,
-            Raw = new RawPacketReference { Opcode = 0x0638 },
-            Combat = new CombatObservation { SkillCode = 15281241, BodySkillVariantRaw = 15281241 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_620 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 3 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = effectSourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference { Opcode = 0x0438 },
-            Combat = new CombatObservation
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0 },
+            ownerId,
+            0,
+            new StateObservation { EntityId = ownerId, StateCode = StateCodes.PlayerIdentity, Text = "Owner" });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_100 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1, FlushId = 1 },
+            ownerId,
+            0,
+            new CombatObservation { SkillCode = 15281240, BodySkillVariantRaw = 15281240, ChainId = targetId },
+            new RawPacketReference { Opcode = 0x0238 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_480 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 2 },
+            effectSourceId,
+            0,
+            new CombatObservation { SkillCode = 15281241, BodySkillVariantRaw = 15281241 },
+            new RawPacketReference { Opcode = 0x0638 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_620 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 3 },
+            effectSourceId,
+            targetId,
+            new CombatObservation
             {
                 SkillCode = 15281243,
                 BodySkillVariantRaw = 15281243,
@@ -431,18 +387,14 @@ public class DomainEventApplierTests
                 AttemptCount = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_680 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 4 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = effectSourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference { Opcode = 0x0438 },
-            Combat = new CombatObservation
+            },
+            new RawPacketReference { Opcode = 0x0438 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_680 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 4 },
+            effectSourceId,
+            targetId,
+            new CombatObservation
             {
                 SkillCode = 15281243,
                 BodySkillVariantRaw = 15281243,
@@ -451,8 +403,8 @@ public class DomainEventApplierTests
                 AttemptCount = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            }
-        });
+            },
+            new RawPacketReference { Opcode = 0x0438 });
 
         owner.Refresh();
         var snapshot = owner.CreateSnapshot();
@@ -475,50 +427,37 @@ public class DomainEventApplierTests
         const int effectSourceId = 73942;
         const int targetId = 180015;
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 900 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = ownerId,
-            State = new StateObservation { EntityId = ownerId, StateCode = StateCodes.PlayerIdentity, Text = "Owner" }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 950 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = effectSourceId,
-            State = new StateObservation { EntityId = effectSourceId, StateCode = 2_920_658 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = ownerId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference { Opcode = 0x0438 },
-            Combat = new CombatObservation
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 900 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0 },
+            ownerId,
+            0,
+            new StateObservation { EntityId = ownerId, StateCode = StateCodes.PlayerIdentity, Text = "Owner" });
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 950 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1 },
+            effectSourceId,
+            0,
+            new StateObservation { EntityId = effectSourceId, StateCode = 2_920_658 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 1 },
+            ownerId,
+            targetId,
+            new CombatObservation
             {
                 SkillCode = 15281240,
                 BodySkillVariantRaw = 15281240,
                 Marker = 29,
                 Type = 3
-            }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_240 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 2 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = effectSourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference { Opcode = 0x0438 },
-            Combat = new CombatObservation
+            },
+            new RawPacketReference { Opcode = 0x0438 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_240 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 2 },
+            effectSourceId,
+            targetId,
+            new CombatObservation
             {
                 SkillCode = 15281243,
                 BodySkillVariantRaw = 15281243,
@@ -527,18 +466,14 @@ public class DomainEventApplierTests
                 AttemptCount = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 3 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = effectSourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference { Opcode = 0x0438 },
-            Combat = new CombatObservation
+            },
+            new RawPacketReference { Opcode = 0x0438 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 3 },
+            effectSourceId,
+            targetId,
+            new CombatObservation
             {
                 SkillCode = 15281243,
                 BodySkillVariantRaw = 15281243,
@@ -547,17 +482,14 @@ public class DomainEventApplierTests
                 AttemptCount = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_400 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 5, FlushId = 4 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = effectSourceId,
-            State = new StateObservation { EntityId = effectSourceId, StateCode = 2_920_658 }
-        });
+            },
+            new RawPacketReference { Opcode = 0x0438 });
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_400 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 5, FlushId = 4 },
+            effectSourceId,
+            0,
+            new StateObservation { EntityId = effectSourceId, StateCode = 2_920_658 });
 
         owner.Refresh();
         var snapshot = owner.CreateSnapshot();
@@ -581,46 +513,32 @@ public class DomainEventApplierTests
         const int effectSourceId = 5000;
         const int targetId = 6000;
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 900 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = nonPlayerSourceId,
-            State = new StateObservation { EntityId = nonPlayerSourceId, StateCode = 2_100_001 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = nonPlayerSourceId,
-            TargetEntityId = 0,
-            Raw = new RawPacketReference { Opcode = 0x0238 },
-            Combat = new CombatObservation { SkillCode = 15281240, BodySkillVariantRaw = 15281240, ChainId = targetId }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 2 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = effectSourceId,
-            TargetEntityId = 0,
-            Raw = new RawPacketReference { Opcode = 0x0638 },
-            Combat = new CombatObservation { SkillCode = 15281241, BodySkillVariantRaw = 15281241 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_460 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 3 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = effectSourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference { Opcode = 0x0438 },
-            Combat = new CombatObservation
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 900 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0 },
+            nonPlayerSourceId,
+            0,
+            new StateObservation { EntityId = nonPlayerSourceId, StateCode = 2_100_001 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 1, FlushId = 1 },
+            nonPlayerSourceId,
+            0,
+            new CombatObservation { SkillCode = 15281240, BodySkillVariantRaw = 15281240, ChainId = targetId },
+            new RawPacketReference { Opcode = 0x0238 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_320 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 2, FlushId = 2 },
+            effectSourceId,
+            0,
+            new CombatObservation { SkillCode = 15281241, BodySkillVariantRaw = 15281241 },
+            new RawPacketReference { Opcode = 0x0638 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_460 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 3, FlushId = 3 },
+            effectSourceId,
+            targetId,
+            new CombatObservation
             {
                 SkillCode = 15281243,
                 BodySkillVariantRaw = 15281243,
@@ -629,18 +547,14 @@ public class DomainEventApplierTests
                 AttemptCount = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_520 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 4 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = effectSourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference { Opcode = 0x0438 },
-            Combat = new CombatObservation
+            },
+            new RawPacketReference { Opcode = 0x0438 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_520 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 4, FlushId = 4 },
+            effectSourceId,
+            targetId,
+            new CombatObservation
             {
                 SkillCode = 15281243,
                 BodySkillVariantRaw = 15281243,
@@ -649,8 +563,8 @@ public class DomainEventApplierTests
                 AttemptCount = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            }
-        });
+            },
+            new RawPacketReference { Opcode = 0x0438 });
 
         owner.Refresh();
         var snapshot = owner.CreateSnapshot();
@@ -669,25 +583,13 @@ public class DomainEventApplierTests
         var sceneId = Guid.NewGuid();
         const int reboundId = int.MaxValue - 1;
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = reboundId,
-            TargetEntityId = 0,
-            State = new StateObservation { EntityId = reboundId, StateCode = 2000002 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = 100,
-            TargetEntityId = reboundId,
-            Combat = new CombatObservation { SkillCode = 11000010, Damage = 500, HitCount = 1, AttemptCount = 1 }
-        });
+        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, reboundId, 0, new StateObservation { EntityId = reboundId, StateCode = 2000002 });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 1 },
+            100,
+            reboundId,
+            new CombatObservation { SkillCode = 11000010, Damage = 500, HitCount = 1, AttemptCount = 1 });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -709,55 +611,16 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 4370,
-            TargetEntityId = 0,
-            State = new StateObservation { EntityId = 4370, StateCode = 2136, Value0 = 6, Value1 = 200003 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 4370,
-            TargetEntityId = 0,
-            State = new StateObservation { EntityId = 4370, StateCode = 140, Value0 = 200003 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 2 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 4370,
-            TargetEntityId = 0,
-            State = new StateObservation { EntityId = 4370, StateCode = 240, Value0 = 200003 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 3 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 4370,
-            TargetEntityId = 0,
-            State = new StateObservation { EntityId = 4370, StateCode = 4636, Value0 = 2, Value1 = 79 }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 4 },
-            Domain = ObservedEventDomain.Aura,
-            SourceEntityId = 0,
-            TargetEntityId = 4370,
-            Aura = new AuraObservation { Kind = AuraObservationKind.Result, EntityId = 4370, InstanceSequenceId = 95, ResultCode = 7 }
-        });
+        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 2136, Value0 = 6, Value1 = 200003 });
+        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 1 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 140, Value0 = 200003 });
+        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 2 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 240, Value0 = 200003 });
+        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 3 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 4636, Value0 = 2, Value1 = 79 });
+        journal.AppendAura(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 4 },
+            0,
+            4370,
+            new AuraObservation { Kind = AuraObservationKind.Result, EntityId = 4370, InstanceSequenceId = 95, ResultCode = 7 });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -780,21 +643,8 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.Scene,
-            Scene = new SceneObservation { MapId = 200003, DiagnosticKey = "stage-destination-map" }
-        });
-
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
-            Domain = ObservedEventDomain.Scene,
-            Scene = new SceneObservation { MapInstanceId = 515552, DiagnosticKey = "stage-destination-instance" }
-        });
+        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 200003, DiagnosticKey = "stage-destination-map" });
+        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 1 }, 0, 0, new SceneObservation { MapInstanceId = 515552, DiagnosticKey = "stage-destination-instance" });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -812,13 +662,7 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.Scene,
-            Scene = new SceneObservation { MapId = 910035, DiagnosticKey = "stage-destination-map" }
-        });
+        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 910035, DiagnosticKey = "stage-destination-map" });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -933,15 +777,12 @@ public class CombatStoreTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = 100,
-            TargetEntityId = 200,
-            Combat = new CombatObservation { SkillCode = 1000, Damage = 500, HitCount = 1, AttemptCount = 1 }
-        });
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 0 },
+            100,
+            200,
+            new CombatObservation { SkillCode = 1000, Damage = 500, HitCount = 1, AttemptCount = 1 });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -1603,14 +1444,14 @@ public class SceneReadModelOwnerTests
         GC.Collect();
 
         var beforeBytes = GC.GetAllocatedBytesForCurrentThread();
+        var allCacheHitsReturnedSameInstance = true;
         for (var i = 0; i < 1_000; i++)
-        {
-            Assert.Same(first, scene.Owner.CreateSnapshot());
-        }
+            allCacheHitsReturnedSameInstance &= ReferenceEquals(first, scene.Owner.CreateSnapshot());
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - beforeBytes;
         var afterStats = scene.Owner.ProjectionCacheStats;
 
+        Assert.True(allCacheHitsReturnedSameInstance);
         Assert.Equal(0, allocated);
         Assert.Equal(beforeStats.SnapshotBuilds, afterStats.SnapshotBuilds);
         Assert.Equal(beforeStats.SnapshotCacheHits + 1_000, afterStats.SnapshotCacheHits);
@@ -1738,19 +1579,17 @@ public class SceneReadModelOwnerTests
         var sceneId = Guid.NewGuid();
         var owner = new SceneReadModelOwner(journal);
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 0 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 100,
-            State = new StateObservation
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 0 },
+            100,
+            0,
+            new StateObservation
             {
                 EntityId = 100,
                 StateCode = StateCodes.PlayerIdentity,
                 Text = "Perigee"
-            }
-        });
+            });
 
         owner.Refresh();
 
@@ -1758,15 +1597,12 @@ public class SceneReadModelOwnerTests
         Assert.True(owner.Entities.TryGet(100, out var entity));
         Assert.Equal("Perigee", entity.Nickname);
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { ObservationOrdinal = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = 100,
-            TargetEntityId = 200,
-            Raw = default,
-            Combat = new CombatObservation
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 1 },
+            100,
+            200,
+            new CombatObservation
             {
                 SkillCode = 11000010,
                 Damage = 500,
@@ -1774,8 +1610,7 @@ public class SceneReadModelOwnerTests
                 AttemptCount = 1,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            }
-        });
+            });
 
         owner.Refresh();
 
@@ -1792,15 +1627,12 @@ public class SceneReadModelOwnerTests
         var sceneId = Guid.NewGuid();
         var owner = new SceneReadModelOwner(journal);
 
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0, FlushId = 100 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = 100,
-            TargetEntityId = 200,
-            Raw = new RawPacketReference { Opcode = 0x0438 },
-            Combat = new CombatObservation
+        journal.AppendCombat(
+            sceneId,
+            new TimelineStamp { OffsetTicks = 1_000 * TimeSpan.TicksPerMillisecond, ObservationOrdinal = 0, FlushId = 100 },
+            100,
+            200,
+            new CombatObservation
             {
                 SkillCode = 11000010,
                 BodySkillVariantRaw = 11000010,
@@ -1810,8 +1642,8 @@ public class SceneReadModelOwnerTests
                 Marker = 77,
                 Type = 1,
                 LayoutTag = 0
-            }
-        });
+            },
+            new RawPacketReference { Opcode = 0x0438 });
 
         owner.Refresh();
 
@@ -2095,8 +1927,8 @@ public class SceneReadModelOwnerTests
             Assert.NotEqual(first.EncounterId, second.EncounterId);
             Assert.Equal(nextStarted, scene.SessionStarted);
             Assert.Equal(nextStarted, scene.Owner.SceneStarted);
-            Assert.Equal(resetStartOrdinal, scene.Journal.Read(resetStartOrdinal).Stamp.ObservationOrdinal);
-            Assert.Equal(scene.SessionId, scene.Journal.Read(resetStartOrdinal).SceneSessionId);
+            Assert.Equal(resetStartOrdinal, scene.Journal.ReadSnapshot(resetStartOrdinal).Stamp.ObservationOrdinal);
+            Assert.Equal(scene.SessionId, scene.Journal.ReadSnapshot(resetStartOrdinal).SceneSessionId);
             Assert.Equal(1000, second.Combatants[100].DamageAmount);
             Assert.True(scene.Owner.MetadataRegistry.TryGetPcMetadata(100, out var pc));
             Assert.Equal("Player", pc.Nickname);

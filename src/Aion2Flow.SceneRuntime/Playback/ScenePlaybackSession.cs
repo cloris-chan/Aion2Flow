@@ -235,16 +235,17 @@ public sealed class ScenePlaybackSession
                 var appliedAny = false;
                 var result = _segment.ReadEntries(_cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
                 {
-                    foreach (ref readonly var entry in entries)
+                    for (var i = 0; i < entries.Count; i++)
                     {
-                        var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                        var entry = entries[i];
+                        var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry);
                         if (_timeRange.HasTiming && offset > _targetOffsetMilliseconds)
                         {
                             stoppedAtTarget = true;
                             return;
                         }
 
-                        ApplyEntry(in entry, offset);
+                        ApplyEntry(entry, offset);
                         appliedAny = true;
                     }
                 });
@@ -264,16 +265,17 @@ public sealed class ScenePlaybackSession
                 var appliedAny = false;
                 var result = _segment.ReadEntries(_cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
                 {
-                    foreach (ref readonly var entry in entries)
+                    for (var i = 0; i < entries.Count; i++)
                     {
+                        var entry = entries[i];
                         if (entry.Stamp.ObservationOrdinal >= endObservationOrdinalExclusive)
                         {
                             stoppedAtTarget = true;
                             return;
                         }
 
-                        var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
-                        ApplyEntry(in entry, offset);
+                        var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry);
+                        ApplyEntry(entry, offset);
                         appliedAny = true;
                     }
                 });
@@ -297,22 +299,22 @@ public sealed class ScenePlaybackSession
             var offset = 0L;
             _segment.ReadEntries(new JournalCursor(endObservationOrdinalExclusive - 1), 1, entries =>
             {
-                if (entries.Length > 0)
-                    offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entries[0]);
+                if (entries.Count > 0)
+                    offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(entries[0]);
             });
             _targetOffsetMilliseconds = offset;
             _positionMilliseconds = Math.Max(0, offset);
         }
 
-        private void ApplyEntry(in ObservedEventEnvelope entry, long offset)
+        private void ApplyEntry(ObservedEventEntry entry, long offset)
         {
             var flushId = entry.Stamp.FlushId;
             if (_currentFlushId >= 0 && flushId != _currentFlushId)
                 CompleteFlush(_currentFlushId);
 
             _currentFlushId = flushId;
-            _applier.ApplyEntry(in entry);
-            ApplyFrameTracks(in entry, offset);
+            _applier.ApplyEntry(entry);
+            ApplyFrameTracks(entry, offset);
             _appliedEndOrdinal = entry.Stamp.ObservationOrdinal + 1;
             _cursor = new JournalCursor(_appliedEndOrdinal);
         }
@@ -337,18 +339,19 @@ public sealed class ScenePlaybackSession
             CompleteFlush(_currentFlushId);
         }
 
-        private void ApplyFrameTracks(in ObservedEventEnvelope entry, long offset)
+        private void ApplyFrameTracks(ObservedEventEntry entry, long offset)
         {
-            var lifecycleEventKind = ResolveLifecycleEventKind(in entry);
-            var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, Math.Max(0, offset), lifecycleEventKind);
+            var lifecycleEventKind = ResolveLifecycleEventKind(entry);
+            var marker = ScenePlaybackTrackProjection.CreateMarker(entry, offset, Math.Max(0, offset), lifecycleEventKind);
             var track = marker.Track;
             ref var accumulator = ref CollectionsMarshal.GetValueRefOrAddDefault(_tracks, track, out var exists);
             if (!exists)
                 accumulator = new TrackAccumulator(entry.Stamp.ObservationOrdinal);
             accumulator.Apply(entry.Stamp.ObservationOrdinal);
 
-            if (entry.Domain == ObservedEventDomain.Resource && entry.Resource is { } resource)
+            if (entry.Domain == ObservedEventDomain.Resource)
             {
+                ref readonly var resource = ref entry.Resource;
                 var maximumValue = ResolveResourceMaximum(in resource);
                 marker = marker with { MaximumValue = maximumValue };
                 _resources[resource.EntityId] = new ScenePlaybackResourceState(
@@ -360,8 +363,9 @@ public sealed class ScenePlaybackSession
                     offset,
                     entry.Stamp.ObservationOrdinal);
             }
-            else if (entry.Domain == ObservedEventDomain.Aura && entry.Aura is { } aura)
+            else if (entry.Domain == ObservedEventDomain.Aura)
             {
+                ref readonly var aura = ref entry.Aura;
                 var key = new ScenePlaybackAuraInstanceKey(aura.EntityId, aura.InstanceSequenceId);
                 if (lifecycleEventKind == ScenePlaybackLifecycleEventKind.Result)
                 {
@@ -376,8 +380,9 @@ public sealed class ScenePlaybackSession
                     _auraInstances.Remove(key);
                 }
             }
-            else if (lifecycleEventKind == ScenePlaybackLifecycleEventKind.Renew && entry.Action is { } renewal)
+            else if (lifecycleEventKind == ScenePlaybackLifecycleEventKind.Renew)
             {
+                ref readonly var renewal = ref entry.Action;
                 var key = new ScenePlaybackAuraInstanceKey(renewal.SourceEntityId, renewal.InstanceSequenceId);
                 var active = _auraInstances[key];
                 _auraInstances[key] = active with
@@ -390,10 +395,11 @@ public sealed class ScenePlaybackSession
 
         }
 
-        private ScenePlaybackLifecycleEventKind ResolveLifecycleEventKind(in ObservedEventEnvelope entry)
+        private ScenePlaybackLifecycleEventKind ResolveLifecycleEventKind(ObservedEventEntry entry)
         {
-            if (entry.Aura is { } aura)
+            if (entry.Domain == ObservedEventDomain.Aura)
             {
+                ref readonly var aura = ref entry.Aura;
                 if (aura.Kind == AuraObservationKind.Open)
                     return ScenePlaybackAuraProtocol.IsTrackableOpen(in aura)
                         ? ScenePlaybackLifecycleEventKind.Open
@@ -404,10 +410,11 @@ public sealed class ScenePlaybackSession
                     : ScenePlaybackLifecycleEventKind.None;
             }
 
-            if (entry.Action is not { } action ||
-                !ScenePlaybackAuraProtocol.IsRenewal(in action))
+            if (entry.Domain != ObservedEventDomain.Action ||
+                !ScenePlaybackAuraProtocol.IsRenewal(in entry.Action))
                 return ScenePlaybackLifecycleEventKind.None;
 
+            ref readonly var action = ref entry.Action;
             return _auraInstances.ContainsKey(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId))
                 ? ScenePlaybackLifecycleEventKind.Renew
                 : ScenePlaybackLifecycleEventKind.None;

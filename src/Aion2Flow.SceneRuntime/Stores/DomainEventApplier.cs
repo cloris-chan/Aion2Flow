@@ -10,7 +10,6 @@ namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
 public sealed class DomainEventApplier
 {
-    private readonly ObservedEventEnvelope[] _journalBuffer = new ObservedEventEnvelope[256];
     private readonly EntityStore _entities;
     private readonly SceneBoundaryStore _boundary;
     private readonly RuntimeMetadataRegistry _metadataRegistry;
@@ -88,13 +87,13 @@ public sealed class DomainEventApplier
         var cursor = journal.CreateCursor(0);
         while (true)
         {
-            var result = journal.CopyEntries(cursor, _journalBuffer);
+            var result = journal.ReadEntries(cursor, 256, entries =>
+            {
+                for (var i = 0; i < entries.Count; i++)
+                    ApplyEntry(entries[i]);
+            });
             if (result.Count == 0)
                 break;
-
-            var entries = _journalBuffer.AsSpan(0, result.Count);
-            foreach (ref readonly var entry in entries)
-                ApplyEntry(in entry);
 
             cursor = result.Cursor;
         }
@@ -102,28 +101,29 @@ public sealed class DomainEventApplier
         FlushPendingOutcomeSidecars();
     }
 
-    public void ApplyEntry(in ObservedEventEnvelope entry)
+    public void ApplyEntry(ObservedEventEntry entry)
     {
-        var observedAtMilliseconds = entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
+        var observedAtMilliseconds = entry.ObservedAtMilliseconds;
         switch (entry.Domain)
         {
-            case ObservedEventDomain.Combat when entry.Combat is { } c:
-                ApplyCombat(in entry, in c);
+            case ObservedEventDomain.Combat:
+                ApplyCombat(entry, in entry.Combat);
                 break;
-            case ObservedEventDomain.State when entry.State is { } state:
-                ApplyState(in entry, in state);
+            case ObservedEventDomain.State:
+                ApplyState(entry, in entry.State);
                 break;
-            case ObservedEventDomain.Resource when entry.Resource is { } resource:
+            case ObservedEventDomain.Resource:
+                ref readonly var resource = ref entry.Resource;
                 _entities.ApplyNpcHp(resource.EntityId, resource.CurrentValue ?? 0, resource.MaximumValue ?? 0);
                 if (TrackBossFocus)
                     _bossFocus.ApplyNpcHp(resource.EntityId, resource.CurrentValue ?? 0, resource.MaximumValue ?? 0, observedAtMilliseconds);
                 TryApplyBossCombatActivity(resource.EntityId, observedAtMilliseconds);
                 break;
-            case ObservedEventDomain.Scene when entry.Scene is { } scene:
-                ApplyScene(in scene);
+            case ObservedEventDomain.Scene:
+                ApplyScene(in entry.Scene);
                 break;
-            case ObservedEventDomain.Aura when entry.Aura is { } aura:
-                ApplyAura(in aura);
+            case ObservedEventDomain.Aura:
+                ApplyAura(in entry.Aura);
                 break;
         }
     }
@@ -142,11 +142,11 @@ public sealed class DomainEventApplier
             ApplyStampedCombatResult(in result);
     }
 
-    private void ApplyCombat(in ObservedEventEnvelope entry, in CombatObservation combatObservation)
+    private void ApplyCombat(ObservedEventEntry entry, in CombatObservation combatObservation)
     {
         var stamp = entry.Stamp;
         var observedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
-        ObserveTransientEffectOwnerPacket(in entry, in combatObservation, observedAtMilliseconds);
+        ObserveTransientEffectOwnerPacket(entry, in combatObservation, observedAtMilliseconds);
         if (entry.Raw.Opcode == 0x0238)
         {
             var controlResults = _compactDirectValue.ObserveCompactControl0238(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw);
@@ -160,7 +160,7 @@ public sealed class DomainEventApplier
 
         if (entry.Raw.Opcode == 0x0638)
         {
-            ApplyStampedCombatResults(in entry, _compactDirectValue.ObserveCompactControl0638(entry.SourceEntityId, in combatObservation));
+            ApplyStampedCombatResults(_compactDirectValue.ObserveCompactControl0638(entry.SourceEntityId, in combatObservation));
             return;
         }
 
@@ -169,7 +169,7 @@ public sealed class DomainEventApplier
             var sidecarResults = _compactDirectValue.ObserveCompactValueSidecar0438(entry.SourceEntityId, entry.TargetEntityId, in combatObservation);
             if (sidecarResults.Count > 0)
             {
-                ApplyStampedCombatResults(in entry, sidecarResults);
+                ApplyStampedCombatResults(sidecarResults);
             }
         }
 
@@ -185,7 +185,7 @@ public sealed class DomainEventApplier
             }
             else
             {
-                ApplyStampedCombatResults(in entry, compactResults);
+                ApplyStampedCombatResults(compactResults);
             }
 
             return;
@@ -199,7 +199,7 @@ public sealed class DomainEventApplier
             _ => _compactAvoidance.NormalizeCombat(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw)
         };
 
-        ApplyStampedCombatResults(in entry, rawResults);
+        ApplyStampedCombatResults(rawResults);
     }
 
     private void ApplyStampedCombatResults(StampedCombatCanonicalizationBatch results)
@@ -209,14 +209,6 @@ public sealed class DomainEventApplier
 
         foreach (var result in results)
             ApplyStampedCombatResult(in result);
-    }
-
-    private void ApplyStampedCombatResults(in ObservedEventEnvelope entry, StampedCombatCanonicalizationBatch results)
-    {
-        if (results.Count == 0)
-            return;
-
-        ApplyStampedCombatResults(results);
     }
 
     private void ApplyStampedCombatResult(in StampedCombatCanonicalizationResult rawResult)
@@ -254,9 +246,9 @@ public sealed class DomainEventApplier
         TryApplyBossCombatActivity(result.TargetId, observedAtMilliseconds);
     }
 
-    private void ObserveTransientEffectOwnerPacket(in ObservedEventEnvelope entry, in CombatObservation observation, long observedAtMilliseconds)
+    private void ObserveTransientEffectOwnerPacket(ObservedEventEntry entry, in CombatObservation observation, long observedAtMilliseconds)
     {
-        if (IsTransientEffectOwnerSeed(in entry, in observation) && CanObserveTransientEffectOwnerSeed(entry.SourceEntityId))
+        if (IsTransientEffectOwnerSeed(entry, in observation) && CanObserveTransientEffectOwnerSeed(entry.SourceEntityId))
         {
             _transientEffectOwners.ObserveOwnerSkill(entry.SourceEntityId, in observation, observedAtMilliseconds);
             return;
@@ -278,7 +270,7 @@ public sealed class DomainEventApplier
 
     private bool CanObserveTransientEffectOwnerSeed(int sourceId) => CanOwnTransientEffect(sourceId, 0);
 
-    private static bool IsTransientEffectOwnerSeed(in ObservedEventEnvelope entry, in CombatObservation observation)
+    private static bool IsTransientEffectOwnerSeed(ObservedEventEntry entry, in CombatObservation observation)
     {
         if (entry.Raw.Opcode == 0x0238)
             return true;
@@ -380,7 +372,7 @@ public sealed class DomainEventApplier
         }
     }
 
-    private void ApplyState(in ObservedEventEnvelope entry, in StateObservation state)
+    private void ApplyState(ObservedEventEntry entry, in StateObservation state)
     {
         if (entry.TargetEntityId != 0 && state.EntityId == entry.TargetEntityId && entry.SourceEntityId != entry.TargetEntityId)
         {

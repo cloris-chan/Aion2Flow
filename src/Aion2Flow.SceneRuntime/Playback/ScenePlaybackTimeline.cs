@@ -1,6 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -25,10 +24,11 @@ internal static class ScenePlaybackTimeline
         {
             var result = segment.ReadEntries(cursor, DefaultReadBatchSize, entries =>
             {
-                foreach (ref readonly var entry in entries)
+                for (var i = 0; i < entries.Count; i++)
                 {
+                    var entry = entries[i];
                     hasEntries = true;
-                    end = Math.Max(end, ResolveOffsetMilliseconds(in entry));
+                    end = Math.Max(end, ResolveOffsetMilliseconds(entry));
                 }
             });
 
@@ -49,8 +49,5 @@ internal static class ScenePlaybackTimeline
         return default;
     }
 
-    public static long ResolveOffsetMilliseconds(in ObservedEventEnvelope entry)
-    {
-        return Math.Max(0, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
-    }
+    public static long ResolveOffsetMilliseconds(ObservedEventEntry entry) => Math.Max(0, entry.ObservedAtMilliseconds);
 }

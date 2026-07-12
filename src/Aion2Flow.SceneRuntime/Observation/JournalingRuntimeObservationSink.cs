@@ -77,67 +77,46 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         if (state.NpcCode is int npcCode)
         {
             var stamp = CreateStamp(in packet);
-            journal.Append(new ObservedEventEnvelope
-            {
-                SceneSessionId = sceneSessionId(),
-                Stamp = stamp,
-                Domain = ObservedEventDomain.State,
-                SourceEntityId = instanceId,
-                TargetEntityId = 0,
-                Raw = cached?.NpcCodeRaw ?? packet.Raw,
-                State = new StateObservation
+            journal.Append(
+                CreateHeader(in stamp, instanceId, 0, cached?.NpcCodeRaw ?? packet.Raw),
+                new StateObservation
                 {
                     EntityId = instanceId,
                     StateCode = npcCode,
                     Value0 = 0,
                     Value1 = 0,
                     DetailRaw = 0
-                }
-            });
+                });
         }
 
         if (state.Kind is NpcKind kind)
         {
             var stamp = CreateStamp(in packet);
-            journal.Append(new ObservedEventEnvelope
-            {
-                SceneSessionId = sceneSessionId(),
-                Stamp = stamp,
-                Domain = ObservedEventDomain.State,
-                SourceEntityId = instanceId,
-                TargetEntityId = 0,
-                Raw = cached?.KindRaw ?? packet.Raw,
-                State = new StateObservation
+            journal.Append(
+                CreateHeader(in stamp, instanceId, 0, cached?.KindRaw ?? packet.Raw),
+                new StateObservation
                 {
                     EntityId = instanceId,
                     StateCode = StateCodes.NpcKind,
                     Value0 = (int)kind,
                     Value1 = 0,
                     DetailRaw = 0
-                }
-            });
+                });
         }
 
         if (state.Hp is long hp)
         {
             var stamp = CreateStamp(in packet);
-            journal.Append(new ObservedEventEnvelope
-            {
-                SceneSessionId = sceneSessionId(),
-                Stamp = stamp,
-                Domain = ObservedEventDomain.Resource,
-                SourceEntityId = instanceId,
-                TargetEntityId = 0,
-                Raw = cached?.HpRaw ?? packet.Raw,
-                Resource = new ResourceObservation
+            journal.Append(
+                CreateHeader(in stamp, instanceId, 0, cached?.HpRaw ?? packet.Raw),
+                new ResourceObservation
                 {
                     EntityId = instanceId,
                     CurrentValue = hp,
                     MaximumValue = state.MaxHp,
                     Delta = null,
                     ResourceKind = 0
-                }
-            });
+                });
         }
     }
 
@@ -161,111 +140,76 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     public void ConfirmPendingDestinationMapArrival(in PacketObservationSource packet)
     {
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Scene,
-            SourceEntityId = 0,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Scene = new SceneObservation
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new SceneObservation
             {
                 MapId = 0,
                 MapInstanceId = 0,
                 Value0 = 0,
                 Value1 = 0,
                 DiagnosticKey = "confirm-pending-destination-map-arrival"
-            }
-        });
+            });
     }
 
     private void AppendSceneMapObservation(in PacketObservationSource packet, uint mapId, bool allowSameMapReload, string diagnosticKey)
     {
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Scene,
-            SourceEntityId = 0,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Scene = new SceneObservation
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new SceneObservation
             {
                 MapId = mapId,
                 MapInstanceId = 0,
                 Value0 = allowSameMapReload ? 1 : 0,
                 Value1 = 0,
                 DiagnosticKey = diagnosticKey
-            }
-        });
+            });
     }
 
     public void StageDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
     {
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Scene,
-            SourceEntityId = 0,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Scene = new SceneObservation
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new SceneObservation
             {
                 MapId = 0,
                 MapInstanceId = instanceId,
                 Value0 = 0,
                 Value1 = 0,
                 DiagnosticKey = "stage-destination-instance"
-            }
-        });
+            });
     }
 
     public void ConfirmDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
     {
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Scene,
-            SourceEntityId = 0,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Scene = new SceneObservation
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new SceneObservation
             {
                 MapId = 0,
                 MapInstanceId = instanceId,
                 Value0 = 0,
                 Value1 = 0,
                 DiagnosticKey = "confirm-destination-instance"
-            }
-        });
+            });
     }
 
     public void MarkSceneTransportBoundary(in PacketObservationSource packet)
     {
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Scene,
-            SourceEntityId = 0,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Scene = new SceneObservation
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new SceneObservation
             {
                 MapId = 0,
                 MapInstanceId = 0,
                 Value0 = 0,
                 Value1 = 0,
                 DiagnosticKey = "scene-transport-boundary"
-            }
-        });
+            });
     }
 
     public void AppendCombatObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatObservation observation)
@@ -278,16 +222,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         AddKnownEntity(sourceId);
         AddKnownEntity(targetId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
-            Raw = packet.Raw,
-            Combat = normalized
-        });
+        journal.Append(CreateHeader(in stamp, sourceId, targetId, packet.Raw), in normalized);
     }
 
     public void CompleteFlush(long flushId) => journal.CompleteFlush(MapFlushId(flushId));
@@ -299,15 +234,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
             return;
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
-            Raw = packet.Raw,
-            Combat = new CombatObservation
+        journal.Append(
+            CreateHeader(in stamp, sourceId, targetId, packet.Raw),
+            new CombatObservation
             {
                 SkillCode = bodySkillVariantRaw,
                 BodySkillVariantRaw = bodySkillVariantRaw,
@@ -318,8 +247,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 Marker = marker,
                 Type = type,
                 LayoutTag = layoutTag
-            }
-        });
+            });
     }
 
     public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type, int value)
@@ -329,15 +257,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
             return;
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
-            Raw = packet.Raw,
-            Combat = new CombatObservation
+        journal.Append(
+            CreateHeader(in stamp, sourceId, targetId, packet.Raw),
+            new CombatObservation
             {
                 SkillCode = bodySkillVariantRaw,
                 BodySkillVariantRaw = bodySkillVariantRaw,
@@ -348,8 +270,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 Marker = marker,
                 Type = type,
                 LayoutTag = layoutTag
-            }
-        });
+            });
     }
 
     public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId)
@@ -358,15 +279,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             return;
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Combat = new CombatObservation
+        journal.Append(
+            CreateHeader(in stamp, sourceId, 0, packet.Raw),
+            new CombatObservation
             {
                 SkillCode = 0,
                 BodySkillVariantRaw = 0,
@@ -380,8 +295,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 ChainId = echoSourceId,
                 Type = mode,
                 LayoutTag = 0
-            }
-        });
+            });
     }
 
     public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
@@ -390,15 +304,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             return;
         sourceId = ResolveLifecycleId(sourceId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Combat = new CombatObservation
+        journal.Append(
+            CreateHeader(in stamp, sourceId, 0, packet.Raw),
+            new CombatObservation
             {
                 SkillCode = 0,
                 BodySkillVariantRaw = 0,
@@ -411,8 +319,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 Flag = flag,
                 Type = 0,
                 LayoutTag = 0
-            }
-        });
+            });
     }
 
     public void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64)
@@ -422,15 +329,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         entityId = ResolveLifecycleId(entityId);
         AddKnownEntity(entityId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Aura,
-            SourceEntityId = entityId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Aura = new AuraObservation
+        journal.Append(
+            CreateHeader(in stamp, entityId, 0, packet.Raw),
+            new AuraObservation
             {
                 Kind = AuraObservationKind.Open,
                 EntityId = entityId,
@@ -449,8 +350,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 TailLength = tailLength,
                 TailLow64 = tailLow64,
                 TailHigh64 = tailHigh64
-            }
-        });
+            });
     }
 
     public void RegisterObservation2B38(in PacketObservationSource packet, int sourceId, int sourceIdCopy, int phase, int instanceSequenceId, ResourceEffectRef actionResourceEffectRef, int sequenceValue, int stateValue, int detailValue, int tailLength)
@@ -462,15 +362,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         AddKnownEntity(sourceId);
         AddKnownEntity(sourceIdCopy);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Action,
-            SourceEntityId = sourceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Action = new ActionObservation
+        journal.Append(
+            CreateHeader(in stamp, sourceId, 0, packet.Raw),
+            new ActionObservation
             {
                 SourceEntityId = sourceId,
                 SourceEntityIdCopy = sourceIdCopy,
@@ -481,8 +375,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 StateValue = stateValue,
                 DetailValue = detailValue,
                 TailLength = tailLength
-            }
-        });
+            });
     }
 
     public void RegisterObservation2C38(in PacketObservationSource packet, int entityId, scoped ReadOnlySpan<AuraResultRecord> results)
@@ -498,15 +391,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             ref readonly var result = ref results[resultIndex];
             state.Latest2C38 = (result.InstanceSequenceId, result.ResultCode);
             var stamp = CreateStamp(in packet);
-            journal.Append(new ObservedEventEnvelope
-            {
-                SceneSessionId = sceneSessionId(),
-                Stamp = stamp,
-                Domain = ObservedEventDomain.Aura,
-                SourceEntityId = 0,
-                TargetEntityId = entityId,
-                Raw = packet.Raw,
-                Aura = new AuraObservation
+            journal.Append(
+                CreateHeader(in stamp, 0, entityId, packet.Raw),
+                new AuraObservation
                 {
                     Kind = AuraObservationKind.Result,
                     EntityId = entityId,
@@ -519,8 +406,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                     ResultDetailEntityId = result.DetailEntityId,
                     ResultDetailValue0 = result.DetailValue0,
                     ResultDetailValue1 = result.DetailValue1
-                }
-            });
+                });
         }
     }
 
@@ -529,15 +415,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         uid = ResolveLifecycleId(uid);
         AddKnownEntity(uid);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = uid,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, uid, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = uid,
                 StateCode = StateCodes.PlayerIdentity,
@@ -550,8 +430,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 IsLocalPlayer = isLocalPlayer,
                 OriginServerId = originServerId,
                 LegionName = legionName
-            }
-        });
+            });
     }
 
     public void AppendPlayerGroupMember(in PacketObservationSource packet, int uid, in PlayerGroupMembership membership)
@@ -559,15 +438,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         uid = ResolveLifecycleId(uid);
         AddKnownEntity(uid);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = uid,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, uid, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = uid,
                 StateCode = StateCodes.PlayerGroupMembership,
@@ -575,8 +448,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 Value1 = membership.SubPartyIndex,
                 DetailRaw = ((long)membership.GroupId << 8) | membership.MemberSlotIndex,
                 GroupMembership = membership
-            }
-        });
+            });
     }
 
     public void AppendPlayerGroupProfile(in PacketObservationSource packet, int originServerId, string nickname, in PlayerGroupMembership membership)
@@ -585,15 +457,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             return;
 
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 0,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = 0,
                 StateCode = StateCodes.PlayerGroupMembership,
@@ -603,8 +469,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 Text = nickname,
                 OriginServerId = originServerId,
                 GroupMembership = membership
-            }
-        });
+            });
     }
 
     public void AppendNpcCode(in PacketObservationSource packet, int instanceId, int npcCode)
@@ -615,37 +480,24 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         state.NpcCodeRaw = packet.Raw;
         AddKnownEntity(instanceId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = instanceId,
                 StateCode = npcCode,
                 Value0 = 0,
                 Value1 = 0,
                 DetailRaw = 0
-            }
-        });
+            });
     }
 
     public void AppendNpcName(in PacketObservationSource packet, int npcCode, string name)
     {
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 0,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = npcCode,
                 StateCode = StateCodes.LocalizedNpcName,
@@ -653,8 +505,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 Value1 = 0,
                 DetailRaw = 0,
                 Text = name
-            }
-        });
+            });
     }
 
     public void AppendNpcKind(in PacketObservationSource packet, int instanceId, NpcKind kind)
@@ -665,23 +516,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         state.KindRaw = packet.Raw;
         AddKnownEntity(instanceId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = instanceId,
                 StateCode = StateCodes.NpcKind,
                 Value0 = (int)kind,
                 Value1 = 0,
                 DetailRaw = 0
-            }
-        });
+            });
         collectionPolicy?.OnBossMetadataChanged();
     }
 
@@ -699,23 +543,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             return;
         var stamp = CreateStamp(in packet);
         state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Resource,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Resource = new ResourceObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new ResourceObservation
             {
                 EntityId = instanceId,
                 CurrentValue = hp,
                 MaximumValue = null,
                 Delta = null,
                 ResourceKind = 0
-            }
-        });
+            });
         collectionPolicy?.OnBossMetadataChanged();
     }
 
@@ -734,23 +571,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             return;
         var stamp = CreateStamp(in packet);
         state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.Resource,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            Resource = new ResourceObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new ResourceObservation
             {
                 EntityId = instanceId,
                 CurrentValue = hp,
                 MaximumValue = maxHp,
                 Delta = null,
                 ResourceKind = 0
-            }
-        });
+            });
         collectionPolicy?.OnBossMetadataChanged();
     }
 
@@ -763,23 +593,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
             return;
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = instanceId,
                 StateCode = StateCodes.NpcBattle,
                 Value0 = isActive ? 1 : 0,
                 Value1 = 0,
                 DetailRaw = 0
-            }
-        });
+            });
         collectionPolicy?.OnBossMetadataChanged();
     }
 
@@ -793,23 +616,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
             return;
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = instanceId,
                 StateCode = StateCodes.NpcBattleToggle,
                 Value0 = 0,
                 Value1 = 0,
                 DetailRaw = 0
-            }
-        });
+            });
         collectionPolicy?.OnBossMetadataChanged();
     }
 
@@ -821,23 +637,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         state.Value2136 = value0;
         AddKnownEntity(instanceId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = instanceId,
                 StateCode = 2136,
                 Value0 = sequence,
                 Value1 = value0,
                 DetailRaw = 0
-            }
-        });
+            });
     }
 
     public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0)
@@ -847,23 +656,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         state.Value0140 = value0;
         AddKnownEntity(instanceId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = instanceId,
                 StateCode = 140,
                 Value0 = value0,
                 Value1 = 0,
                 DetailRaw = 0
-            }
-        });
+            });
     }
 
     public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0)
@@ -873,23 +675,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         state.Value0240 = value0;
         AddKnownEntity(instanceId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = instanceId,
                 StateCode = 240,
                 Value0 = value0,
                 Value1 = 0,
                 DetailRaw = 0
-            }
-        });
+            });
     }
 
     public void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1)
@@ -899,23 +694,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         state.State4636 = (state0, state1);
         AddKnownEntity(instanceId);
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = instanceId,
-            TargetEntityId = 0,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, instanceId, 0, packet.Raw),
+            new StateObservation
             {
                 EntityId = instanceId,
                 StateCode = 4636,
                 Value0 = state0,
                 Value1 = state1,
                 DetailRaw = 0
-            }
-        });
+            });
     }
 
     public void AppendSummon(in PacketObservationSource packet, int ownerId, int summonInstanceId)
@@ -927,23 +715,16 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         _summonOwnerByInstance[summonInstanceId] = ownerId;
         GetOrAddNpcState(summonInstanceId).Kind = NpcKind.Summon;
         var stamp = CreateStamp(in packet);
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneSessionId(),
-            Stamp = stamp,
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = ownerId,
-            TargetEntityId = summonInstanceId,
-            Raw = packet.Raw,
-            State = new StateObservation
+        journal.Append(
+            CreateHeader(in stamp, ownerId, summonInstanceId, packet.Raw),
+            new StateObservation
             {
                 EntityId = summonInstanceId,
                 StateCode = 0,
                 Value0 = ownerId,
                 Value1 = 0,
                 DetailRaw = 0
-            }
-        });
+            });
     }
 
     private long MapFlushId(long flushId)
@@ -961,6 +742,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
 
     private TimelineStamp CreateStamp(in PacketObservationSource packet)
         => clock.CreateStamp(packet.CaptureTimestampMilliseconds, MapFlushId(packet.FlushId));
+
+    private ObservedEventHeader CreateHeader(in TimelineStamp stamp, int sourceEntityId, int targetEntityId, RawPacketReference raw)
+        => new(sceneSessionId(), stamp, sourceEntityId, targetEntityId, raw);
 
     private long ResolvePacketOffsetMilliseconds(in PacketObservationSource packet) =>
         Math.Max(0, packet.CaptureTimestampMilliseconds - clock.SceneStartedAtMilliseconds);

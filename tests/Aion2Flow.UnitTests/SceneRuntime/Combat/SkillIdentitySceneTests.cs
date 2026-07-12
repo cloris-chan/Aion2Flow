@@ -336,7 +336,7 @@ public sealed class SkillIdentitySceneTests
 
         sink.RegisterCompactValue0438(in source, targetId, sourceId, 1218810, 3, 0, 1);
 
-        var entry = journal.Read(0);
+        var entry = journal.ReadSnapshot(0);
         Assert.True(entry.Combat.HasValue);
         var combat = entry.Combat.Value;
         Assert.Equal(sourceId, entry.SourceEntityId);
@@ -355,7 +355,7 @@ public sealed class SkillIdentitySceneTests
 
         sink.RegisterCompactControl0238(in source, 100, 0, 30011101, 3, 0, 100);
 
-        var entry = journal.Read(0);
+        var entry = journal.ReadSnapshot(0);
         Assert.True(entry.Combat.HasValue);
         var combat = entry.Combat.Value;
         Assert.Equal(0, combat.SkillCode);
@@ -374,7 +374,7 @@ public sealed class SkillIdentitySceneTests
 
         sink.RegisterCompactControl0638(in source, 100, effectRef, 3, 0);
 
-        var entry = journal.Read(0);
+        var entry = journal.ReadSnapshot(0);
         Assert.True(entry.Combat.HasValue);
         var combat = entry.Combat.Value;
         Assert.Equal(0, combat.SkillCode);

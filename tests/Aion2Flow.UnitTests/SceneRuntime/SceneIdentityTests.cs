@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Identity;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -75,12 +76,7 @@ public sealed class SceneIdentityTests
         var registry = new RuntimeMetadataRegistry();
         var applier = new DomainEventApplier(entities, boundary, registry, new CombatStore());
 
-        applier.ApplyEntry(new ObservedEventEnvelope
-        {
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light)
-        });
+        ApplyState(applier, 100, new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light));
 
         Assert.True(registry.TryGetPcMetadata(100, out var metadata));
         Assert.Equal("Perigee", metadata.Nickname);
@@ -95,18 +91,8 @@ public sealed class SceneIdentityTests
         var registry = new RuntimeMetadataRegistry();
         var applier = new DomainEventApplier(entities, boundary, registry, new CombatStore());
 
-        applier.ApplyEntry(new ObservedEventEnvelope
-        {
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light, CharacterClass.Elementalist, IsLocalPlayer: true)
-        });
-        applier.ApplyEntry(new ObservedEventEnvelope
-        {
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light)
-        });
+        ApplyState(applier, 100, new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light, CharacterClass.Elementalist, IsLocalPlayer: true));
+        ApplyState(applier, 100, new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light));
 
         Assert.True(registry.TryGetPcMetadata(100, out var metadata));
         Assert.True(metadata.IsLocalPlayer);
@@ -121,18 +107,8 @@ public sealed class SceneIdentityTests
         var registry = new RuntimeMetadataRegistry();
         var applier = new DomainEventApplier(entities, boundary, registry, new CombatStore());
 
-        applier.ApplyEntry(new ObservedEventEnvelope
-        {
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light, LegionName: "Aether")
-        });
-        applier.ApplyEntry(new ObservedEventEnvelope
-        {
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = 100,
-            State = new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light)
-        });
+        ApplyState(applier, 100, new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light, LegionName: "Aether"));
+        ApplyState(applier, 100, new StateObservation(100, StateCodes.PlayerIdentity, 0, 0, 0, "Perigee", Faction.Light));
 
         Assert.True(registry.TryGetPcMetadata(100, out var metadata));
         Assert.Equal("Aether", metadata.LegionName);
@@ -249,18 +225,26 @@ public sealed class SceneIdentityTests
         var registry = new RuntimeMetadataRegistry();
         var applier = new DomainEventApplier(new EntityStore(), boundary, registry, new CombatStore());
 
-        applier.ApplyEntry(new ObservedEventEnvelope
-        {
-            Domain = ObservedEventDomain.Scene,
-            Scene = new SceneObservation(200003, 0, 0, 0, "stage-destination-map")
-        });
-        applier.ApplyEntry(new ObservedEventEnvelope
-        {
-            Domain = ObservedEventDomain.Scene,
-            Scene = new SceneObservation(0, 515552, 0, 0, "stage-destination-instance")
-        });
+        ApplyScene(applier, new SceneObservation(200003, 0, 0, 0, "stage-destination-map"));
+        ApplyScene(applier, new SceneObservation(0, 515552, 0, 0, "stage-destination-instance"));
 
         Assert.True(registry.TryGetMapCode(515552, out var mapCode));
         Assert.Equal(200003u, mapCode);
+    }
+
+    private static void ApplyState(DomainEventApplier applier, int sourceEntityId, in StateObservation observation)
+    {
+        var journal = new ObservedEventJournal();
+        var header = new ObservedEventHeader(Guid.Empty, default, sourceEntityId, 0, default);
+        journal.Append(in header, in observation);
+        journal.ReadEntry(0, applier.ApplyEntry);
+    }
+
+    private static void ApplyScene(DomainEventApplier applier, in SceneObservation observation)
+    {
+        var journal = new ObservedEventJournal();
+        var header = new ObservedEventHeader(Guid.Empty, default, 0, 0, default);
+        journal.Append(in header, in observation);
+        journal.ReadEntry(0, applier.ApplyEntry);
     }
 }

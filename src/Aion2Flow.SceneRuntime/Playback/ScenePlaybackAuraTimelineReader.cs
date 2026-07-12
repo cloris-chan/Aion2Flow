@@ -20,12 +20,14 @@ public static class ScenePlaybackAuraTimelineReader
             cancellationToken.ThrowIfCancellationRequested();
             var read = segment.ReadEntries(cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
             {
-                foreach (ref readonly var entry in entries)
+                for (var i = 0; i < entries.Count; i++)
                 {
+                    var entry = entries[i];
                     cancellationToken.ThrowIfCancellationRequested();
-                    var position = Math.Max(0, ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry));
-                    if (entry.Aura is { } aura && aura.EntityId == targetEntityId)
+                    var position = Math.Max(0, ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry));
+                    if (entry.Domain == ObservedEventDomain.Aura && entry.Aura.EntityId == targetEntityId)
                     {
+                        ref readonly var aura = ref entry.Aura;
                         if (ScenePlaybackAuraProtocol.IsTrackableOpen(in aura))
                             ApplyOpen(in aura, position, durationMilliseconds, active, coverages, applications);
                         else if (aura.Kind == AuraObservationKind.Open)
@@ -33,10 +35,11 @@ public static class ScenePlaybackAuraTimelineReader
                         else if (aura.Kind == AuraObservationKind.Result)
                             ApplyResult(in aura, position, durationMilliseconds, active, coverages);
                     }
-                    else if (entry.Action is { } action &&
-                             action.SourceEntityId == targetEntityId &&
-                             ScenePlaybackAuraProtocol.IsRenewal(in action))
+                    else if (entry.Domain == ObservedEventDomain.Action &&
+                             entry.Action.SourceEntityId == targetEntityId &&
+                             ScenePlaybackAuraProtocol.IsRenewal(in entry.Action))
                     {
+                        ref readonly var action = ref entry.Action;
                         ApplyRenew(in action, position, durationMilliseconds, active, coverages, applications);
                     }
                 }

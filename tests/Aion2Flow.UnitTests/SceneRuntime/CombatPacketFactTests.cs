@@ -432,14 +432,14 @@ public class CombatPacketFactTests
     public void ScenePath_PreservesParserAuthoritativeMultiHitFact()
     {
         var journal = new ObservedEventJournal();
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = Guid.NewGuid(),
-            Stamp = new TimelineStamp { ObservationOrdinal = 0, FlushId = 100 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = 8171,
-            TargetEntityId = 42995,
-            Combat = new CombatObservation
+        journal.Append(new ObservedEventTestEntry<CombatObservation>(
+            new ObservedEventHeader(
+                Guid.NewGuid(),
+                new TimelineStamp { ObservationOrdinal = 0, FlushId = 100 },
+                8171,
+                42995,
+                default),
+            new CombatObservation
             {
                 SkillCode = 17010230,
                 Damage = 2400,
@@ -450,8 +450,7 @@ public class CombatPacketFactTests
                 Modifiers = DamageModifiers.MultiHit,
                 EventKind = CombatEventKind.Damage,
                 ValueKind = CombatValueKind.Damage
-            }
-        });
+            }));
 
         var combat = Apply(journal);
 
@@ -535,15 +534,15 @@ public class CombatPacketFactTests
         return combat;
     }
 
-    private static ObservedEventEnvelope CreateCompactControlOpener(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int mode, int flag, int echoSourceId, int scopeId = 100, long flushId = 100) => new()
-    {
-        SceneSessionId = sceneId,
-        Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
-        Domain = ObservedEventDomain.Combat,
-        SourceEntityId = sourceId,
-        TargetEntityId = 0,
-        Raw = new RawPacketReference(0x0238, 0, 0, CreateStructurePath(scopeId)),
-        Combat = new CombatObservation
+    private static ObservedEventTestEntry<CombatObservation> CreateCompactControlOpener(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int mode, int flag, int echoSourceId, int scopeId = 100, long flushId = 100) =>
+        new(
+            new ObservedEventHeader(
+                sceneId,
+                new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
+                sourceId,
+                0,
+                new RawPacketReference(0x0238, 0, 0, CreateStructurePath(scopeId))),
+            new CombatObservation
         {
             BodyCodeRaw = unchecked((uint)bodyCodeRaw),
             Damage = 0,
@@ -555,18 +554,17 @@ public class CombatPacketFactTests
             Flag = flag,
             ChainId = echoSourceId,
             LayoutTag = 0
-        }
-    };
+        });
 
-    private static ObservedEventEnvelope CreateCompactControlCloser(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int flag, int scopeId = 100, long flushId = 100) => new()
-    {
-        SceneSessionId = sceneId,
-        Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
-        Domain = ObservedEventDomain.Combat,
-        SourceEntityId = sourceId,
-        TargetEntityId = 0,
-        Raw = new RawPacketReference(0x0638, 0, 0, CreateStructurePath(scopeId)),
-        Combat = new CombatObservation
+    private static ObservedEventTestEntry<CombatObservation> CreateCompactControlCloser(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int flag, int scopeId = 100, long flushId = 100) =>
+        new(
+            new ObservedEventHeader(
+                sceneId,
+                new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
+                sourceId,
+                0,
+                new RawPacketReference(0x0638, 0, 0, CreateStructurePath(scopeId))),
+            new CombatObservation
         {
             BodyResourceEffectRef = ResourceEffectRef.FromRaw(bodyCodeRaw),
             Damage = 0,
@@ -576,18 +574,17 @@ public class CombatPacketFactTests
             Marker = marker,
             Flag = flag,
             LayoutTag = 0
-        }
-    };
+        });
 
-    private static ObservedEventEnvelope CreateCompactAvoidanceSignal(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int scopeId = 100, long flushId = 100) => new()
-    {
-        SceneSessionId = sceneId,
-        Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
-        Domain = ObservedEventDomain.Combat,
-        SourceEntityId = sourceId,
-        TargetEntityId = targetId,
-        Raw = new RawPacketReference(0x0438, 0, 0, CreateStructurePath(scopeId)),
-        Combat = new CombatObservation
+    private static ObservedEventTestEntry<CombatObservation> CreateCompactAvoidanceSignal(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int scopeId = 100, long flushId = 100) =>
+        new(
+            new ObservedEventHeader(
+                sceneId,
+                new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
+                sourceId,
+                targetId,
+                new RawPacketReference(0x0438, 0, 0, CreateStructurePath(scopeId))),
+            new CombatObservation
         {
             SkillCode = bodyCodeRaw,
             BodySkillVariantRaw = bodyCodeRaw,
@@ -600,18 +597,17 @@ public class CombatPacketFactTests
             Type = 1,
             Loop = 0,
             ChainId = 0
-        }
-    };
+        });
 
-    private static ObservedEventEnvelope CreateDirectValue(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int flag, int type, int chainId, int damage, int scopeId = 100, long flushId = 100, int loop = 1, CombatEventKind eventKind = CombatEventKind.Unknown, CombatValueKind valueKind = CombatValueKind.Unknown, uint detailRef = 0, PacketStructurePath structurePath = default) => new()
-    {
-        SceneSessionId = sceneId,
-        Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
-        Domain = ObservedEventDomain.Combat,
-        SourceEntityId = sourceId,
-        TargetEntityId = targetId,
-        Raw = new RawPacketReference(0x0438, 0, 0, structurePath.IsEmpty ? CreateStructurePath(scopeId) : structurePath),
-        Combat = new CombatObservation
+    private static ObservedEventTestEntry<CombatObservation> CreateDirectValue(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int flag, int type, int chainId, int damage, int scopeId = 100, long flushId = 100, int loop = 1, CombatEventKind eventKind = CombatEventKind.Unknown, CombatValueKind valueKind = CombatValueKind.Unknown, uint detailRef = 0, PacketStructurePath structurePath = default) =>
+        new(
+            new ObservedEventHeader(
+                sceneId,
+                new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
+                sourceId,
+                targetId,
+                new RawPacketReference(0x0438, 0, 0, structurePath.IsEmpty ? CreateStructurePath(scopeId) : structurePath)),
+            new CombatObservation
         {
             SkillCode = bodyCodeRaw,
             BodySkillVariantRaw = bodyCodeRaw,
@@ -627,18 +623,17 @@ public class CombatPacketFactTests
             ChainId = chainId,
             EventKind = eventKind,
             ValueKind = valueKind
-        }
-    };
+        });
 
-    private static ObservedEventEnvelope CreateInlineSidecar(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int type, int scopeId = 100, long flushId = 100) => new()
-    {
-        SceneSessionId = sceneId,
-        Stamp = new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
-        Domain = ObservedEventDomain.Combat,
-        SourceEntityId = sourceId,
-        TargetEntityId = targetId,
-        Raw = new RawPacketReference(0x0438, 0, 0, CreateStructurePath(scopeId)),
-        Combat = new CombatObservation
+    private static ObservedEventTestEntry<CombatObservation> CreateInlineSidecar(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int type, int scopeId = 100, long flushId = 100) =>
+        new(
+            new ObservedEventHeader(
+                sceneId,
+                new TimelineStamp { ObservationOrdinal = ordinal, FlushId = flushId },
+                sourceId,
+                targetId,
+                new RawPacketReference(0x0438, 0, 0, CreateStructurePath(scopeId))),
+            new CombatObservation
         {
             SkillCode = bodyCodeRaw,
             BodySkillVariantRaw = bodyCodeRaw,
@@ -651,8 +646,7 @@ public class CombatPacketFactTests
             Type = type,
             Loop = 0,
             ChainId = 0
-        }
-    };
+        });
 
     private static PacketStructurePath CreateStructurePath(int scopeId)
     {

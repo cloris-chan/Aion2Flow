@@ -52,14 +52,22 @@ public sealed class ScenePlaybackTests
         long[] firstOrdinals = [];
         long[] secondOrdinals = [];
 
-        var first = session.ReadNextTimelineBatch(2, entries => firstOrdinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
-        var second = session.ReadNextTimelineBatch(2, entries => secondOrdinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
+        var first = session.ReadNextTimelineBatch(2, entries => firstOrdinals = CopyOrdinals(entries));
+        var second = session.ReadNextTimelineBatch(2, entries => secondOrdinals = CopyOrdinals(entries));
 
         Assert.Equal(2, first.Count);
         Assert.Equal(2, second.Count);
         Assert.Equal([0L, 1L], firstOrdinals);
         Assert.Equal([2L, 3L], secondOrdinals);
         Assert.Equal(4, session.NextLoadedObservationOrdinal);
+    }
+
+    private static long[] CopyOrdinals(JournalEntryBatch entries)
+    {
+        var ordinals = new long[entries.Count];
+        for (var i = 0; i < entries.Count; i++)
+            ordinals[i] = entries[i].Stamp.ObservationOrdinal;
+        return ordinals;
     }
 
     [Fact]
@@ -1128,52 +1136,31 @@ public sealed class ScenePlaybackTests
 
     private static void AppendState(ObservedEventJournal journal, Guid sceneId, int entityId, int stateCode, int value0, int value1, string? text, long ordinal, long observedAt)
     {
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.State,
-            SourceEntityId = entityId,
-            TargetEntityId = 0,
-            Raw = new RawPacketReference(0, 0, ordinal),
-            State = new StateObservation(entityId, stateCode, value0, value1, 0, text)
-        });
+        var header = CreateHeader(sceneId, entityId, 0, ordinal, observedAt, new RawPacketReference(0, 0, ordinal));
+        var observation = new StateObservation(entityId, stateCode, value0, value1, 0, text);
+        journal.Append(in header, in observation);
     }
 
     private static void AppendResource(ObservedEventJournal journal, Guid sceneId, int entityId, long current, long? maximum, long ordinal, long observedAt)
     {
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Resource,
-            SourceEntityId = entityId,
-            TargetEntityId = 0,
-            Raw = new RawPacketReference(0, 0, ordinal),
-            Resource = new ResourceObservation(entityId, current, maximum, null, 0)
-        });
+        var header = CreateHeader(sceneId, entityId, 0, ordinal, observedAt, new RawPacketReference(0, 0, ordinal));
+        var observation = new ResourceObservation(entityId, current, maximum, null, 0);
+        journal.Append(in header, in observation);
     }
 
     private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int damage, long ordinal, long observedAt, CombatValueKind valueKind = CombatValueKind.Damage, int skillCode = 11000010)
     {
-        journal.Append(new ObservedEventEnvelope
+        var header = CreateHeader(sceneId, sourceId, targetId, ordinal, observedAt, new RawPacketReference(0x0438, 0, ordinal));
+        var observation = new CombatObservation
         {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference(0x0438, 0, ordinal),
-            Combat = new CombatObservation
-            {
-                SkillCode = skillCode,
-                Damage = damage,
-                HitCount = 1,
-                AttemptCount = 1,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = valueKind
-            }
-        });
+            SkillCode = skillCode,
+            Damage = damage,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = valueKind
+        };
+        journal.Append(in header, in observation);
     }
 
     private static void AppendCompactCombatValue(
@@ -1191,30 +1178,29 @@ public sealed class ScenePlaybackTests
         int siblingIndex,
         int parentScopeId)
     {
-        journal.Append(new ObservedEventEnvelope
+        var header = CreateHeader(
+            sceneId,
+            sourceId,
+            targetId,
+            ordinal,
+            observedAt,
+            CreateStructuredRaw(0x0438, ordinal, scopeId, siblingIndex, parentScopeId));
+        var observation = new CombatObservation
         {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
-            Raw = CreateStructuredRaw(0x0438, ordinal, scopeId, siblingIndex, parentScopeId),
-            Combat = new CombatObservation
-            {
-                SkillCode = skillCode,
-                BodySkillVariantRaw = bodySkillVariantRaw,
-                Damage = damage,
-                HitCount = 1,
-                AttemptCount = 1,
-                Marker = marker,
-                Type = 2,
-                LayoutTag = 4,
-                Loop = 1,
-                ChainId = 9001,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = CombatValueKind.Damage
-            }
-        });
+            SkillCode = skillCode,
+            BodySkillVariantRaw = bodySkillVariantRaw,
+            Damage = damage,
+            HitCount = 1,
+            AttemptCount = 1,
+            Marker = marker,
+            Type = 2,
+            LayoutTag = 4,
+            Loop = 1,
+            ChainId = 9001,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        };
+        journal.Append(in header, in observation);
     }
 
     private static void AppendSiblingEffectCombatValue(
@@ -1232,24 +1218,23 @@ public sealed class ScenePlaybackTests
         int siblingIndex,
         int parentScopeId)
     {
-        journal.Append(new ObservedEventEnvelope
+        var header = CreateHeader(
+            sceneId,
+            sourceId,
+            targetId,
+            ordinal,
+            observedAt,
+            CreateStructuredRaw(opcode, ordinal, scopeId, siblingIndex, parentScopeId));
+        var observation = new CombatObservation
         {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
-            Raw = CreateStructuredRaw(opcode, ordinal, scopeId, siblingIndex, parentScopeId),
-            Combat = new CombatObservation
-            {
-                SkillCode = skillCode,
-                Damage = damage,
-                HitCount = valueKind == CombatValueKind.Damage ? 1 : 0,
-                AttemptCount = valueKind == CombatValueKind.Damage ? 1 : 0,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = valueKind
-            }
-        });
+            SkillCode = skillCode,
+            Damage = damage,
+            HitCount = valueKind == CombatValueKind.Damage ? 1 : 0,
+            AttemptCount = valueKind == CombatValueKind.Damage ? 1 : 0,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = valueKind
+        };
+        journal.Append(in header, in observation);
     }
 
     private static void AppendCompactCombatOpener(
@@ -1264,22 +1249,21 @@ public sealed class ScenePlaybackTests
         int siblingIndex,
         int parentScopeId)
     {
-        journal.Append(new ObservedEventEnvelope
+        var header = CreateHeader(
+            sceneId,
+            sourceId,
+            0,
+            ordinal,
+            observedAt,
+            CreateStructuredRaw(0x0238, ordinal, scopeId, siblingIndex, parentScopeId));
+        var observation = new CombatObservation
         {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = 0,
-            Raw = CreateStructuredRaw(0x0238, ordinal, scopeId, siblingIndex, parentScopeId),
-            Combat = new CombatObservation
-            {
-                SkillCode = skillCode,
-                BodyCodeRaw = unchecked((uint)skillCode),
-                Marker = marker,
-                Type = 2
-            }
-        });
+            SkillCode = skillCode,
+            BodyCodeRaw = unchecked((uint)skillCode),
+            Marker = marker,
+            Type = 2
+        };
+        journal.Append(in header, in observation);
     }
 
     private static RawPacketReference CreateStructuredRaw(ushort opcode, long ordinal, int scopeId, int siblingIndex, int parentScopeId)
@@ -1294,47 +1278,33 @@ public sealed class ScenePlaybackTests
 
     private static void AppendAuraOpen(ObservedEventJournal journal, Guid sceneId, int entityId, int originEntityId, int sequenceId, ushort durationMilliseconds, long ordinal, long observedAt, uint displayResourceEffectRefRaw = 0, int groupCode = 19)
     {
-        journal.Append(new ObservedEventEnvelope
+        var header = CreateHeader(sceneId, entityId, 0, ordinal, observedAt, new RawPacketReference(0x2A38, 0, ordinal));
+        var observation = new AuraObservation
         {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Aura,
-            SourceEntityId = entityId,
-            TargetEntityId = 0,
-            Raw = new RawPacketReference(0x2A38, 0, ordinal),
-            Aura = new AuraObservation
-            {
-                Kind = AuraObservationKind.Open,
-                EntityId = entityId,
-                EchoSourceEntityId = originEntityId,
-                InstanceSequenceId = sequenceId,
-                OpenMode = 1,
-                GroupCode = groupCode,
-                HeadValue = durationMilliseconds,
-                StackCount = 1,
-                BuffResourceEffectRef = ResourceEffectRef.FromRaw(displayResourceEffectRefRaw)
-            }
-        });
+            Kind = AuraObservationKind.Open,
+            EntityId = entityId,
+            EchoSourceEntityId = originEntityId,
+            InstanceSequenceId = sequenceId,
+            OpenMode = 1,
+            GroupCode = groupCode,
+            HeadValue = durationMilliseconds,
+            StackCount = 1,
+            BuffResourceEffectRef = ResourceEffectRef.FromRaw(displayResourceEffectRefRaw)
+        };
+        journal.Append(in header, in observation);
     }
 
     private static void AppendAuraRenew(ObservedEventJournal journal, Guid sceneId, int entityId, int originEntityId, int sequenceId, long ordinal, long observedAt, int phase = 19)
     {
-        journal.Append(new ObservedEventEnvelope
+        var header = CreateHeader(sceneId, entityId, 0, ordinal, observedAt, new RawPacketReference(0x2B38, 0, ordinal));
+        var observation = new ActionObservation
         {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Action,
             SourceEntityId = entityId,
-            TargetEntityId = 0,
-            Raw = new RawPacketReference(0x2B38, 0, ordinal),
-            Action = new ActionObservation
-            {
-                SourceEntityId = entityId,
-                SourceEntityIdCopy = originEntityId,
-                Phase = phase,
-                InstanceSequenceId = sequenceId
-            }
-        });
+            SourceEntityIdCopy = originEntityId,
+            Phase = phase,
+            InstanceSequenceId = sequenceId
+        };
+        journal.Append(in header, in observation);
     }
 
     private static void AppendAuraResult(ObservedEventJournal journal, Guid sceneId, int entityId, int sequenceId, int resultCode, long ordinal, long observedAt)
@@ -1342,25 +1312,26 @@ public sealed class ScenePlaybackTests
 
     private static void AppendAuraBatchResult(ObservedEventJournal journal, Guid sceneId, int entityId, int sequenceId, int resultCode, int resultCount, int resultIndex, long ordinal, long observedAt)
     {
-        journal.Append(new ObservedEventEnvelope
+        var header = CreateHeader(sceneId, 0, entityId, ordinal, observedAt, new RawPacketReference(0x2C38, 0, ordinal));
+        var observation = new AuraObservation
         {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Aura,
-            SourceEntityId = 0,
-            TargetEntityId = entityId,
-            Raw = new RawPacketReference(0x2C38, 0, ordinal),
-            Aura = new AuraObservation
-            {
-                Kind = AuraObservationKind.Result,
-                EntityId = entityId,
-                InstanceSequenceId = sequenceId,
-                ResultCount = resultCount,
-                ResultIndex = resultIndex,
-                ResultCode = resultCode
-            }
-        });
+            Kind = AuraObservationKind.Result,
+            EntityId = entityId,
+            InstanceSequenceId = sequenceId,
+            ResultCount = resultCount,
+            ResultIndex = resultIndex,
+            ResultCode = resultCode
+        };
+        journal.Append(in header, in observation);
     }
+
+    private static ObservedEventHeader CreateHeader(Guid sceneId, int sourceId, int targetId, long ordinal, long observedAt, RawPacketReference raw)
+        => new(
+            sceneId,
+            new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
+            sourceId,
+            targetId,
+            raw);
 
     private static ScenePlaybackController CreateController(ArchivedEncounterRecord record)
         => CreateController(record, new ManualTickSourceFactory());

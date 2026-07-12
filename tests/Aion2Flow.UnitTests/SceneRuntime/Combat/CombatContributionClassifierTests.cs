@@ -201,15 +201,12 @@ public sealed class CombatContributionClassifierTests
 
     private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, CombatObservation observation, long ordinal, long observedAt)
     {
-        journal.Append(new ObservedEventEnvelope
-        {
-            SceneSessionId = sceneId,
-            Stamp = new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
-            Domain = ObservedEventDomain.Combat,
-            SourceEntityId = sourceId,
-            TargetEntityId = targetId,
-            Raw = new RawPacketReference(0, 0, ordinal),
-            Combat = observation
-        });
+        var header = new ObservedEventHeader(
+            sceneId,
+            new TimelineStamp { OffsetTicks = observedAt * TimeSpan.TicksPerMillisecond, ObservationOrdinal = ordinal - 1, FlushId = 1 },
+            sourceId,
+            targetId,
+            new RawPacketReference(0, 0, ordinal));
+        journal.Append(in header, in observation);
     }
 }

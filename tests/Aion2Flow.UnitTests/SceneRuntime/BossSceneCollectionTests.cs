@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
@@ -418,12 +419,39 @@ public sealed class BossSceneCollectionTests
     private static PacketObservationSource Source(long offsetMilliseconds, long flushId = 0) =>
         new(Started.ToUnixTimeMilliseconds() + offsetMilliseconds, flushId, 0, 0, offsetMilliseconds, default);
 
-    private static ObservedEventEnvelope[] ReadJournal(SceneLiveReadModel scene)
+    private static JournalEntrySnapshot[] ReadJournal(SceneLiveReadModel scene)
     {
-        var entries = new ObservedEventEnvelope[scene.Journal.Count];
-        var result = scene.Journal.CopyEntries(scene.Journal.CreateCursor(scene.Journal.FirstObservationOrdinal), entries);
-        return entries.AsSpan(0, result.Count).ToArray();
+        var entries = new List<JournalEntrySnapshot>(scene.Journal.Count);
+        var cursor = scene.Journal.CreateCursor(scene.Journal.FirstObservationOrdinal);
+        while (cursor.NextObservationOrdinal < scene.Journal.NextObservationOrdinal)
+        {
+            var result = scene.Journal.ReadEntries(cursor, ObservedEventJournal.SegmentCapacity, batch =>
+            {
+                for (var i = 0; i < batch.Count; i++)
+                {
+                    var entry = batch[i];
+                    entries.Add(new JournalEntrySnapshot(
+                        entry.SceneSessionId,
+                        entry.Stamp,
+                        entry.Domain,
+                        entry.Domain == ObservedEventDomain.State ? entry.State : null,
+                        entry.Domain == ObservedEventDomain.Resource ? entry.Resource : null));
+                }
+            });
+            if (result.Count == 0)
+                break;
+            cursor = result.Cursor;
+        }
+
+        return [.. entries];
     }
+
+    private readonly record struct JournalEntrySnapshot(
+        Guid SceneSessionId,
+        TimelineStamp Stamp,
+        ObservedEventDomain Domain,
+        StateObservation? State,
+        ResourceObservation? Resource);
 
     private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {

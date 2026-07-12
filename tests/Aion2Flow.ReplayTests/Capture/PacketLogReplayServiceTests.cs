@@ -577,9 +577,9 @@ public sealed class PacketLogReplayServiceTests
         }
     }
 
-    private static IReadOnlyList<ObservedEventEnvelope> ReadAllJournalEntries(PacketLogReplayResult replay)
+    private static IReadOnlyList<ReplayJournalEntrySnapshot> ReadAllJournalEntries(PacketLogReplayResult replay)
     {
-        var entries = new List<ObservedEventEnvelope>(replay.SceneJournal.Count);
+        var entries = new List<ReplayJournalEntrySnapshot>(replay.SceneJournal.Count);
         var cursor = replay.SceneJournal.CreateCursor(0);
         while (true)
         {
@@ -587,7 +587,11 @@ public sealed class PacketLogReplayServiceTests
             {
                 foreach (var entry in batch)
                 {
-                    entries.Add(entry);
+                    entries.Add(new ReplayJournalEntrySnapshot(
+                        entry.Stamp,
+                        entry.SourceEntityId,
+                        entry.Raw,
+                        entry.Domain == ObservedEventDomain.State ? entry.State : null));
                 }
             });
 
@@ -674,7 +678,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(faction, metadata.Faction);
     }
 
-    private static void AssertForceRosterProfile(IReadOnlyList<ObservedEventEnvelope> entries, string nickname, int originServerId, byte memberSlotIndex)
+    private static void AssertForceRosterProfile(IReadOnlyList<ReplayJournalEntrySnapshot> entries, string nickname, int originServerId, byte memberSlotIndex)
     {
         Assert.Contains(
             entries,
@@ -698,6 +702,12 @@ public sealed class PacketLogReplayServiceTests
 
     private static int CountHitsWith(SceneReplayPacket packet, DamageModifiers modifier)
         => (packet.Modifiers & modifier) != 0 ? packet.HitContribution : 0;
+
+    private readonly record struct ReplayJournalEntrySnapshot(
+        TimelineStamp Stamp,
+        int SourceEntityId,
+        RawPacketReference Raw,
+        StateObservation? State);
 
     private static int CountHitsWithAny(SceneReplayPacket packet, DamageModifiers modifiers)
         => (packet.Modifiers & modifiers) != 0 ? packet.HitContribution : 0;

@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -39,17 +40,19 @@ public sealed class ScenePlaybackTrackIndex
             cancellationToken.ThrowIfCancellationRequested();
             var result = fixedSegment.ReadEntries(cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
             {
-                foreach (ref readonly var entry in entries)
+                for (var i = 0; i < entries.Count; i++)
                 {
+                    var entry = entries[i];
                     cancellationToken.ThrowIfCancellationRequested();
-                    var position = Math.Max(0, ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry));
+                    var position = Math.Max(0, ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry));
                     if (markerIndex > 0 && position < previousPosition)
                         throw new InvalidDataException($"Playback timeline position moved backwards at observation {entry.Stamp.ObservationOrdinal}.");
 
-                    var lifecycleEventKind = lifecycle.Apply(in entry);
-                    var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, position, position, lifecycleEventKind);
-                    if (entry.Resource is { } resource)
+                    var lifecycleEventKind = lifecycle.Apply(entry);
+                    var marker = ScenePlaybackTrackProjection.CreateMarker(entry, position, position, lifecycleEventKind);
+                    if (entry.Domain == ObservedEventDomain.Resource)
                     {
+                        ref readonly var resource = ref entry.Resource;
                         resourceMaximums ??= [];
                         if (resource.MaximumValue is > 0)
                             resourceMaximums[resource.EntityId] = resource.MaximumValue.Value;

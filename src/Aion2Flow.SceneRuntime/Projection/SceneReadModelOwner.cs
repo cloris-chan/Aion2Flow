@@ -4,7 +4,6 @@ using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -20,7 +19,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
     private readonly Dictionary<BossDamageContributionKey, BossDamageContributionAccumulator> _bossDamageContributionScratch = [];
     private readonly List<BossDamageContribution> _bossDamageContributionBuffer = [];
-    private readonly ObservedEventEnvelope[] _entryBuffer = new ObservedEventEnvelope[256];
+    private JournalEntriesReader? _applyEntriesReader;
     private JournalCursor _cursor = journal.CreateCursor(0);
     private SceneCombatSnapshotAdapter? _adapter;
     private long _lastAppliedFlushId = -1;
@@ -252,36 +251,19 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
 
     private void RefreshCore(long stopBeforeObservationOrdinal, bool completeFlushes)
     {
-        var lastAppliedFlushId = _lastAppliedFlushId;
         while (true)
         {
-            if (_cursor.NextObservationOrdinal >= stopBeforeObservationOrdinal)
+            var availableEndObservationOrdinal = Math.Min(stopBeforeObservationOrdinal, journal.NextObservationOrdinal);
+            if (_cursor.NextObservationOrdinal >= availableEndObservationOrdinal)
                 break;
 
-            var result = journal.CopyEntries(_cursor, _entryBuffer);
+            var result = journal.ReadEntries(_cursor, stopBeforeObservationOrdinal, 256, _applyEntriesReader ??= ApplyEntries);
             if (result.Count == 0)
                 break;
 
-            var entries = _entryBuffer.AsSpan(0, result.Count);
-            var applied = 0;
-            foreach (ref readonly var entry in entries)
-            {
-                if (entry.Stamp.ObservationOrdinal >= stopBeforeObservationOrdinal)
-                    break;
-
-                _applier.ApplyEntry(in entry);
-                AppliedObservationOrdinal++;
-                lastAppliedFlushId = Math.Max(lastAppliedFlushId, entry.Stamp.FlushId);
-                applied++;
-            }
-
-            if (applied == 0)
-                break;
-
-            _cursor = applied == result.Count ? result.Cursor : journal.CreateCursor(entries[applied - 1].Stamp.ObservationOrdinal + 1);
+            _cursor = result.Cursor;
         }
 
-        _lastAppliedFlushId = lastAppliedFlushId;
         if (!completeFlushes)
             return;
 
@@ -290,6 +272,17 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         {
             _applier.CompleteFlush();
             _appliedFlushId = completedFlushId;
+        }
+    }
+
+    private void ApplyEntries(JournalEntryBatch entries)
+    {
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            _applier.ApplyEntry(entry);
+            AppliedObservationOrdinal++;
+            _lastAppliedFlushId = Math.Max(_lastAppliedFlushId, entry.Stamp.FlushId);
         }
     }
 

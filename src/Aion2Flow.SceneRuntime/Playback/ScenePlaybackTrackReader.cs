@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -24,9 +25,10 @@ public static class ScenePlaybackTrackReader
             JournalCursor? nextCursor = null;
             var result = segment.ReadEntries(current, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
             {
-                foreach (ref readonly var entry in entries)
+                for (var i = 0; i < entries.Count; i++)
                 {
-                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                    var entry = entries[i];
+                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry);
                     var position = Math.Max(0, offset);
                     if (position > endPositionMilliseconds)
                     {
@@ -35,11 +37,11 @@ public static class ScenePlaybackTrackReader
                         return;
                     }
 
-                    var lifecycleEventKind = lifecycle.Apply(in entry);
+                    var lifecycleEventKind = lifecycle.Apply(entry);
                     if (position < startPositionMilliseconds)
                         continue;
 
-                    markers.Add(ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, lifecycleEventKind));
+                    markers.Add(ScenePlaybackTrackProjection.CreateMarker(entry, offset, position, lifecycleEventKind));
                     if (markers.Count >= maxMarkers)
                     {
                         hasMore = true;
@@ -76,9 +78,10 @@ public static class ScenePlaybackTrackReader
         {
             var result = segment.ReadEntries(cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
             {
-                foreach (ref readonly var entry in entries)
+                for (var i = 0; i < entries.Count; i++)
                 {
-                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                    var entry = entries[i];
+                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry);
                     var position = Math.Max(0, offset);
                     if (position > endPositionMilliseconds)
                     {
@@ -86,11 +89,11 @@ public static class ScenePlaybackTrackReader
                         return;
                     }
 
-                    var lifecycleEventKind = lifecycle.Apply(in entry);
+                    var lifecycleEventKind = lifecycle.Apply(entry);
                     if (position < startPositionMilliseconds)
                         continue;
 
-                    var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, lifecycleEventKind);
+                    var marker = ScenePlaybackTrackProjection.CreateMarker(entry, offset, position, lifecycleEventKind);
                     var trackIndex = ToTrackIndex(marker.Track);
                     trackCounts[trackIndex]++;
                     var ratio = (position - startPositionMilliseconds) / (double)windowDuration;
@@ -143,9 +146,10 @@ public static class ScenePlaybackTrackReader
         {
             var result = segment.ReadEntries(cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
             {
-                foreach (ref readonly var entry in entries)
+                for (var i = 0; i < entries.Count; i++)
                 {
-                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                    var entry = entries[i];
+                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry);
                     var position = Math.Max(0, offset);
                     if (position > endPositionMilliseconds)
                     {
@@ -153,11 +157,11 @@ public static class ScenePlaybackTrackReader
                         return;
                     }
 
-                    var lifecycleEventKind = lifecycle.Apply(in entry);
+                    var lifecycleEventKind = lifecycle.Apply(entry);
                     if (position < startPositionMilliseconds)
                         continue;
 
-                    var marker = ScenePlaybackTrackProjection.CreateMarker(in entry, offset, position, lifecycleEventKind);
+                    var marker = ScenePlaybackTrackProjection.CreateMarker(entry, offset, position, lifecycleEventKind);
                     AddCombatantSample(combatants, marker.SourceEntityId, in marker, startPositionMilliseconds, windowDuration, maxMarkersPerCombatantTrack);
                     if (marker.TargetEntityId != marker.SourceEntityId)
                         AddCombatantSample(combatants, marker.TargetEntityId, in marker, startPositionMilliseconds, windowDuration, maxMarkersPerCombatantTrack);
@@ -200,9 +204,10 @@ public static class ScenePlaybackTrackReader
         {
             var result = segment.ReadEntries(cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
             {
-                foreach (ref readonly var entry in entries)
+                for (var i = 0; i < entries.Count; i++)
                 {
-                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(in entry);
+                    var entry = entries[i];
+                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry);
                     var position = Math.Max(0, offset);
                     if (position > endPositionMilliseconds)
                     {
@@ -210,9 +215,10 @@ public static class ScenePlaybackTrackReader
                         return;
                     }
 
-                    if (position < startPositionMilliseconds || entry.Combat is not { } combat)
+                    if (position < startPositionMilliseconds || entry.Domain != ObservedEventDomain.Combat)
                         continue;
 
+                    ref readonly var combat = ref entry.Combat;
                     var sourceEntityId = entry.SourceEntityId;
                     var targetEntityId = entry.TargetEntityId;
                     if (sourceEntityId != combatantId && targetEntityId != combatantId)
@@ -292,11 +298,12 @@ public static class ScenePlaybackTrackReader
         {
             var read = segment.ReadEntries(current, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
             {
-                foreach (ref readonly var entry in entries)
+                for (var i = 0; i < entries.Count; i++)
                 {
+                    var entry = entries[i];
                     if (entry.Stamp.ObservationOrdinal >= end)
                         return;
-                    result.Apply(in entry);
+                    result.Apply(entry);
                 }
             });
             if (read.Count == 0)

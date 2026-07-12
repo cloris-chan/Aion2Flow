@@ -410,20 +410,20 @@ public sealed class BossFocusStoreTests
 
         Assert.Equal(4, journal.Count);
 
-        var kind = journal.Read(0);
+        var kind = journal.ReadSnapshot(0);
         Assert.Equal(ObservedEventDomain.State, kind.Domain);
         Assert.Equal(StateCodes.NpcKind, kind.State!.Value.StateCode);
         Assert.Equal((int)NpcKind.Boss, kind.State.Value.Value0);
 
-        var battle = journal.Read(1);
+        var battle = journal.ReadSnapshot(1);
         Assert.Equal(StateCodes.NpcBattle, battle.State!.Value.StateCode);
         Assert.Equal(1, battle.State.Value.Value0);
         Assert.Equal(900, battle.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
 
-        var toggle = journal.Read(2);
+        var toggle = journal.ReadSnapshot(2);
         Assert.Equal(StateCodes.NpcBattleToggle, toggle.State!.Value.StateCode);
 
-        var hp = journal.Read(3);
+        var hp = journal.ReadSnapshot(3);
         Assert.Equal(ObservedEventDomain.Resource, hp.Domain);
         Assert.Equal(22_847, hp.Resource!.Value.CurrentValue);
         Assert.Equal(1_100, hp.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);

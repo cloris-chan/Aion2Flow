@@ -630,7 +630,7 @@ public class PeriodicPoolCanonicalizerTests
 
         sink.AppendCombatPacket(packet);
 
-        Assert.Equal(4676, journal.Read(0).Combat!.Value.Damage);
+        Assert.Equal(4676, journal.ReadSnapshot(0).Combat!.Value.Damage);
         Assert.Equal(4676, packet.Damage);
     }
 

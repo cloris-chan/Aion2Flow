@@ -79,61 +79,55 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void ObservedEventEnvelope_CombatOnlyPopulatesCombatField()
+    public void Journal_CombatEntry_ExposesOnlyTypedCombatPayload()
     {
-        var envelope = new ObservedEventEnvelope(
-            SceneSessionId: Guid.NewGuid(),
-            Stamp: new TimelineStamp(100, 0, 1),
-            Domain: ObservedEventDomain.Combat,
-            SourceEntityId: 100,
-            TargetEntityId: 200,
-            Raw: new RawPacketReference(0x0438, 32, 1),
-            Combat: new CombatObservation { SkillCode = 1234, Damage = 500, HitCount = 1, AttemptCount = 1, DetailRaw = 0 });
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        var raw = new RawPacketReference(0x0438, 32, 1);
+        var header = new ObservedEventHeader(sceneId, new TimelineStamp(100, 0, 1), 100, 200, raw);
+        var combat = new CombatObservation { SkillCode = 1234, Damage = 500, HitCount = 1, AttemptCount = 1 };
 
-        Assert.Equal(ObservedEventDomain.Combat, envelope.Domain);
-        Assert.NotNull(envelope.Combat);
-        Assert.Null(envelope.State);
-        Assert.Null(envelope.Scene);
-        Assert.Null(envelope.Resource);
-        Assert.Null(envelope.Aura);
-        Assert.Equal(1234, envelope.Combat!.Value.SkillCode);
+        journal.Append(in header, in combat);
+
+        journal.ReadEntry(0, entry =>
+        {
+            Assert.Equal(ObservedEventDomain.Combat, entry.Domain);
+            Assert.Equal(sceneId, entry.SceneSessionId);
+            Assert.Equal(raw, entry.Raw);
+            Assert.Equal(1234, entry.Combat.SkillCode);
+            AssertStateAccessThrows(entry);
+        });
     }
 
     [Fact]
-    public void ObservedEventEnvelope_SceneOnlyPopulatesSceneField()
+    public void Journal_SceneEntry_ExposesTypedScenePayload()
     {
-        var envelope = new ObservedEventEnvelope(
-            SceneSessionId: Guid.NewGuid(),
-            Stamp: new TimelineStamp(0, 0, 0),
-            Domain: ObservedEventDomain.Scene,
-            SourceEntityId: 0,
-            TargetEntityId: 0,
-            Raw: default,
-            Scene: new SceneObservation(MapId: 910035, MapInstanceId: 0, Value0: 0, Value1: 0, DiagnosticKey: "test"));
+        var journal = new ObservedEventJournal();
+        var header = CreateHeader(Guid.NewGuid(), 0);
+        var scene = new SceneObservation(910035, 0, 0, 0, "test");
 
-        Assert.Equal(ObservedEventDomain.Scene, envelope.Domain);
-        Assert.NotNull(envelope.Scene);
-        Assert.Equal(910035u, envelope.Scene!.Value.MapId);
-        Assert.Null(envelope.Combat);
-        Assert.Null(envelope.State);
+        journal.Append(in header, in scene);
+
+        journal.ReadEntry(0, entry =>
+        {
+            Assert.Equal(ObservedEventDomain.Scene, entry.Domain);
+            Assert.Equal(910035u, entry.Scene.MapId);
+        });
     }
 
     [Fact]
-    public void ObservedEventEnvelope_DefaultPayloadsAreNull()
+    public void Journal_DiagnosticEntry_HasNoDomainPayload()
     {
-        var envelope = new ObservedEventEnvelope(
-            SceneSessionId: Guid.NewGuid(),
-            Stamp: new TimelineStamp(0, 0, 0),
-            Domain: ObservedEventDomain.Diagnostic,
-            SourceEntityId: 0,
-            TargetEntityId: 0,
-            Raw: default);
+        var journal = new ObservedEventJournal();
+        var header = CreateHeader(Guid.NewGuid(), 0);
 
-        Assert.Null(envelope.Combat);
-        Assert.Null(envelope.State);
-        Assert.Null(envelope.Scene);
-        Assert.Null(envelope.Resource);
-        Assert.Null(envelope.Aura);
+        journal.AppendDiagnostic(in header);
+
+        journal.ReadEntry(0, entry =>
+        {
+            Assert.Equal(ObservedEventDomain.Diagnostic, entry.Domain);
+            AssertCombatAccessThrows(entry);
+        });
     }
 
     [Fact]
@@ -243,11 +237,8 @@ public class SceneTimelineContractTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        for (int i = 0; i < 10; i++)
-        {
-            var stamp = new TimelineStamp(i * 100, i, 0);
-            journal.Append(new ObservedEventEnvelope(sceneId, stamp, ObservedEventDomain.Combat, i, 0, default));
-        }
+        for (var i = 0; i < 10; i++)
+            AppendCombat(journal, sceneId, i);
 
         Assert.Equal(10, journal.Count);
         Assert.Equal(10, journal.NextObservationOrdinal);
@@ -259,37 +250,37 @@ public class SceneTimelineContractTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.Append(new ObservedEventEnvelope(sceneId,
-            new TimelineStamp(0, 0, 0), ObservedEventDomain.Combat, 0, 0, default));
+        AppendCombat(journal, sceneId, 0);
+        var badHeader = CreateHeader(sceneId, 2);
+        var combat = default(CombatObservation);
 
-        var badEntry = new ObservedEventEnvelope(sceneId,
-            new TimelineStamp(100, 2, 0), ObservedEventDomain.Combat, 0, 0, default);
-
-        Assert.Throws<ArgumentException>(() => journal.Append(badEntry));
+        Assert.Throws<ArgumentException>(() => journal.Append(in badHeader, in combat));
     }
 
     [Fact]
-    public void Journal_Read_ReturnsEntryAtOrdinal()
+    public void Journal_ReadEntry_ReturnsEntryAtOrdinal()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
+        var header = new ObservedEventHeader(sceneId, new TimelineStamp(500, 0, 1), 0, 0, default);
+        var scene = new SceneObservation(910035, 0, 0, 0, "test");
+        journal.Append(in header, in scene);
 
-        var entry = new ObservedEventEnvelope(sceneId,
-            new TimelineStamp(500, 0, 1), ObservedEventDomain.Scene, 0, 0, default,
-            Scene: new SceneObservation(910035, 0, 0, 0, "test"));
-        journal.Append(entry);
-
-        var read = journal.Read(0);
-        Assert.Equal(ObservedEventDomain.Scene, read.Domain);
-        Assert.Equal(910035u, read.Scene!.Value.MapId);
+        journal.ReadEntry(0, entry =>
+        {
+            Assert.Equal(ObservedEventDomain.Scene, entry.Domain);
+            Assert.Equal(910035u, entry.Scene.MapId);
+            Assert.Equal(0, entry.Stamp.ObservationOrdinal);
+        });
     }
 
     [Fact]
-    public void Journal_Read_ThrowsOnOutOfBounds()
+    public void Journal_ReadEntry_ThrowsOnOutOfBounds()
     {
         var journal = new ObservedEventJournal();
-        Assert.Throws<ArgumentOutOfRangeException>(() => journal.Read(0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => journal.Read(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => journal.ReadEntry(0, static _ => { }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => journal.ReadEntry(-1, static _ => { }));
+        Assert.False(journal.TryReadEntry(0, static _ => { }));
     }
 
     [Fact]
@@ -311,11 +302,6 @@ public class SceneTimelineContractTests
     public void Journal_CreateCursor_FindsCorrectPosition()
     {
         var journal = new ObservedEventJournal();
-        var sceneId = Guid.NewGuid();
-
-        for (int i = 0; i < 10; i++)
-            journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
 
         var cursor0 = journal.CreateCursor(0);
         Assert.Equal(0, cursor0.NextObservationOrdinal);
@@ -328,59 +314,57 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void Journal_CopyEntries_ReturnsRequestedSliceAndNextCursor()
+    public void Journal_ReadEntries_ReturnsRequestedSliceAndNextCursor()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        for (int i = 0; i < 10; i++)
-            journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
+        for (var i = 0; i < 10; i++)
+            AppendCombat(journal, sceneId, i);
 
         var cursor = journal.CreateCursor(3);
-        var entries = new ObservedEventEnvelope[4];
-        var result = journal.CopyEntries(cursor, entries);
+        long[] ordinals = [];
+        var result = journal.ReadEntries(cursor, 4, entries => ordinals = ReadOrdinals(entries));
 
         Assert.Equal(4, result.Count);
         Assert.Equal(7, result.Cursor.NextObservationOrdinal);
-        Assert.Equal(3, entries[0].Stamp.ObservationOrdinal);
-        Assert.Equal(6, entries[3].Stamp.ObservationOrdinal);
+        Assert.Equal([3L, 4L, 5L, 6L], ordinals);
     }
 
     [Fact]
-    public void Journal_CopyEntries_ClampsAtEnd()
+    public void Journal_ReadEntries_ClampsAtEnd()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        for (int i = 0; i < 3; i++)
-            journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
+        for (var i = 0; i < 3; i++)
+            AppendCombat(journal, sceneId, i);
 
         var cursor = journal.CreateCursor(1);
-        var entries = new ObservedEventEnvelope[100];
-        var result = journal.CopyEntries(cursor, entries);
+        var result = journal.ReadEntries(cursor, 100, static _ => { });
 
         Assert.Equal(2, result.Count);
         Assert.Equal(3, result.Cursor.NextObservationOrdinal);
     }
 
     [Fact]
-    public void Journal_ReadEntries_DoesNotExposeInternalStorage()
+    public void Journal_ReadEntries_DoesNotAllocateAfterWarmup()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        for (int i = 0; i < 3; i++)
-            journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
+        for (var i = 0; i < 32; i++)
+            AppendCombat(journal, sceneId, i);
 
-        ObservedEventEnvelope[] copied = [];
-        var result = journal.ReadEntries(journal.CreateCursor(1), 10, entries => copied = entries.ToArray());
+        _ = journal.ReadEntries(journal.CreateCursor(0), 32, ConsumeJournalEntries);
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var count = 0;
+        for (var i = 0; i < 10_000; i++)
+            count += journal.ReadEntries(journal.CreateCursor(0), 32, ConsumeJournalEntries).Count;
+        var allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
 
-        Assert.Equal(2, result.Count);
-        Assert.Equal(3, result.Cursor.NextObservationOrdinal);
-        Assert.Equal([1L, 2L], copied.Select(static entry => entry.Stamp.ObservationOrdinal));
+        Assert.Equal(320_000, count);
+        Assert.Equal(allocatedBefore, allocatedAfter);
     }
 
     [Fact]
@@ -390,11 +374,10 @@ public class SceneTimelineContractTests
         var sceneId = Guid.NewGuid();
 
         for (var i = 0; i < 10; i++)
-            journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
+            AppendCombat(journal, sceneId, i);
 
         long[] ordinals = [];
-        var result = journal.ReadEntries(journal.CreateCursor(3), 7, 10, entries => ordinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
+        var result = journal.ReadEntries(journal.CreateCursor(3), 7, 10, entries => ordinals = ReadOrdinals(entries));
 
         Assert.Equal(4, result.Count);
         Assert.Equal(7, result.Cursor.NextObservationOrdinal);
@@ -402,28 +385,27 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void Journal_ReadEntries_ReacquiresSliceAfterAppendResize()
+    public void Journal_ReadEntries_CrossesPhysicalSegmentsWithoutCopying()
     {
         var journal = new ObservedEventJournal(1);
         var sceneId = Guid.NewGuid();
 
-        for (var i = 0; i < 3; i++)
-            journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
+        var raw = new RawPacketReference(0x0438, 64, 1);
+        for (var i = 0; i < ObservedEventJournal.SegmentCapacity + 3; i++)
+            AppendCombat(journal, sceneId, i, raw);
 
-        var first = journal.ReadEntries(journal.CreateCursor(0), 2, 10, _ => { });
-        for (var i = 3; i < 20; i++)
-            journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
+        long[] firstOrdinals = [];
+        var first = journal.ReadEntries(journal.CreateCursor(ObservedEventJournal.SegmentCapacity - 2), 10, entries => firstOrdinals = ReadOrdinals(entries));
+        long[] secondOrdinals = [];
+        var second = journal.ReadEntries(first.Cursor, 10, entries => secondOrdinals = ReadOrdinals(entries));
 
-        long[] ordinals = [];
-        var second = journal.ReadEntries(first.Cursor, journal.NextObservationOrdinal, 64, entries => ordinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
-
-        Assert.Equal(2, first.Cursor.NextObservationOrdinal);
-        Assert.Equal(18, second.Count);
-        Assert.Equal(20, second.Cursor.NextObservationOrdinal);
-        Assert.Equal(2, ordinals[0]);
-        Assert.Equal(19, ordinals[^1]);
+        Assert.Equal(2, first.Count);
+        Assert.Equal([510L, 511L], firstOrdinals);
+        Assert.Equal(3, second.Count);
+        Assert.Equal([512L, 513L, 514L], secondOrdinals);
+        Assert.Equal(2, journal.SegmentCount);
+        Assert.Equal(1, journal.RawReferenceCount);
+        Assert.Equal(1, journal.SceneSessionCount);
     }
 
     [Fact]
@@ -433,12 +415,11 @@ public class SceneTimelineContractTests
         var sceneId = Guid.NewGuid();
 
         for (var i = 0; i < 6; i++)
-            journal.Append(new ObservedEventEnvelope(sceneId,
-                new TimelineStamp(i * 100, i, 0), ObservedEventDomain.Combat, i, 0, default));
+            AppendCombat(journal, sceneId, i);
 
         var segment = new SceneJournalSegment(journal, 2, 5, IsLiveGrowing: false);
         long[] ordinals = [];
-        var result = segment.ReadEntries(journal.CreateCursor(0), 10, entries => ordinals = [.. entries.ToArray().Select(static entry => entry.Stamp.ObservationOrdinal)]);
+        var result = segment.ReadEntries(journal.CreateCursor(0), 10, entries => ordinals = ReadOrdinals(entries));
 
         Assert.Equal(3, result.Count);
         Assert.Equal(5, result.Cursor.NextObservationOrdinal);
@@ -532,7 +513,7 @@ public class SceneTimelineContractTests
 
         Assert.True(sink.TryGetNpcRuntimeState(42, out var state));
         Assert.Equal(1_250, state.HpObservedAtMilliseconds);
-        Assert.Equal(TimeSpan.FromMilliseconds(1_250).Ticks, journal.Read(0).Stamp.OffsetTicks);
+        Assert.Equal(TimeSpan.FromMilliseconds(1_250).Ticks, ReadStamp(journal, 0).OffsetTicks);
     }
 
     [Fact]
@@ -544,8 +525,7 @@ public class SceneTimelineContractTests
 
         sink.RegisterObservation2A38(in source, 42, 1, 19, 95, 163_000_001, 3_000, 0x010203040506, 0x10203040, 414, 77, 2, ResourceEffectRef.FromRaw(16_300_243), 13, 0x0102030405060708, 0x090A0B0C0D);
 
-        var entry = journal.Read(0);
-        var aura = Assert.IsType<AuraObservation>(entry.Aura);
+        var aura = ReadAura(journal, 0);
         Assert.Equal(AuraObservationKind.Open, aura.Kind);
         Assert.Equal(42, aura.EntityId);
         Assert.Equal(95, aura.InstanceSequenceId);
@@ -565,8 +545,7 @@ public class SceneTimelineContractTests
 
         sink.RegisterObservation2B38(in source, 42, 77, 19, 95, ResourceEffectRef.FromRaw(16_300_243), 123_456, 1, 2, 20);
 
-        var entry = journal.Read(0);
-        var action = Assert.IsType<ActionObservation>(entry.Action);
+        var action = ReadAction(journal, 0);
         Assert.Equal(42, action.SourceEntityId);
         Assert.Equal(77, action.SourceEntityIdCopy);
         Assert.Equal(95, action.InstanceSequenceId);
@@ -590,10 +569,9 @@ public class SceneTimelineContractTests
         sink.RegisterObservation2C38(in source, 42, results);
 
         Assert.Equal(4, journal.Count);
-        var entry = journal.Read(2);
-        var aura = Assert.IsType<AuraObservation>(entry.Aura);
-        Assert.Equal(0, entry.SourceEntityId);
-        Assert.Equal(42, entry.TargetEntityId);
+        var aura = ReadAura(journal, 2, out var sourceEntityId, out var targetEntityId);
+        Assert.Equal(0, sourceEntityId);
+        Assert.Equal(42, targetEntityId);
         Assert.Equal(AuraObservationKind.Result, aura.Kind);
         Assert.Equal(42, aura.EntityId);
         Assert.Equal(4, aura.ResultCount);
@@ -617,9 +595,8 @@ public class SceneTimelineContractTests
         sink.StageDestinationMap(910035);
 
         Assert.Equal(1, journal.Count);
-        var entry = journal.Read(0);
-        Assert.Equal(ObservedEventDomain.Scene, entry.Domain);
-        Assert.Equal(910035u, entry.Scene!.Value.MapId);
+        Assert.Equal(ObservedEventDomain.Scene, ReadDomain(journal, 0));
+        Assert.Equal(910035u, ReadScene(journal, 0).MapId);
     }
 
     [Fact]
@@ -633,7 +610,7 @@ public class SceneTimelineContractTests
 
         Assert.True(sink.HasSummonOwner(200));
         Assert.Equal(1, journal.Count);
-        Assert.Equal(ObservedEventDomain.State, journal.Read(0).Domain);
+        Assert.Equal(ObservedEventDomain.State, ReadDomain(journal, 0));
     }
 
     [Fact]
@@ -670,9 +647,9 @@ public class SceneTimelineContractTests
         });
 
         Assert.Equal(reboundId, sink.ResolveLifecycleId(3518));
-        Assert.Equal(reboundId, journal.Read(0).SourceEntityId);
-        Assert.Equal(reboundId, journal.Read(0).State!.Value.EntityId);
-        Assert.Equal(reboundId, journal.Read(1).TargetEntityId);
+        Assert.Equal(reboundId, ReadSourceEntityId(journal, 0));
+        Assert.Equal(reboundId, ReadState(journal, 0).EntityId);
+        Assert.Equal(reboundId, ReadTargetEntityId(journal, 1));
     }
 
     [Fact]
@@ -903,5 +880,121 @@ public class SceneTimelineContractTests
         svc.StageDestinationMap(910035);
         Assert.Equal(910035u, svc.CurrentMapId);
         Assert.Equal(516446u, svc.CurrentMapInstanceId);
+    }
+
+    private static long s_observationChecksum;
+    private static readonly JournalEntriesReader ConsumeJournalEntries = static entries =>
+    {
+        var checksum = 0L;
+        for (var i = 0; i < entries.Count; i++)
+            checksum += entries[i].Stamp.ObservationOrdinal;
+        Volatile.Write(ref s_observationChecksum, checksum);
+    };
+
+    private static ObservedEventHeader CreateHeader(Guid sceneId, long ordinal, RawPacketReference raw = default)
+        => new(sceneId, new TimelineStamp(ordinal * 100, ordinal, 0), (int)ordinal, 0, raw);
+
+    private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, long ordinal, RawPacketReference raw = default)
+    {
+        var header = CreateHeader(sceneId, ordinal, raw);
+        var combat = new CombatObservation { SkillCode = (int)ordinal };
+        journal.Append(in header, in combat);
+    }
+
+    private static long[] ReadOrdinals(JournalEntryBatch entries)
+    {
+        var result = new long[entries.Count];
+        for (var i = 0; i < result.Length; i++)
+            result[i] = entries[i].Stamp.ObservationOrdinal;
+        return result;
+    }
+
+    private static TimelineStamp ReadStamp(ObservedEventJournal journal, long ordinal)
+    {
+        var result = default(TimelineStamp);
+        journal.ReadEntry(ordinal, entry => result = entry.Stamp);
+        return result;
+    }
+
+    private static ObservedEventDomain ReadDomain(ObservedEventJournal journal, long ordinal)
+    {
+        var result = default(ObservedEventDomain);
+        journal.ReadEntry(ordinal, entry => result = entry.Domain);
+        return result;
+    }
+
+    private static int ReadSourceEntityId(ObservedEventJournal journal, long ordinal)
+    {
+        var result = 0;
+        journal.ReadEntry(ordinal, entry => result = entry.SourceEntityId);
+        return result;
+    }
+
+    private static int ReadTargetEntityId(ObservedEventJournal journal, long ordinal)
+    {
+        var result = 0;
+        journal.ReadEntry(ordinal, entry => result = entry.TargetEntityId);
+        return result;
+    }
+
+    private static StateObservation ReadState(ObservedEventJournal journal, long ordinal)
+    {
+        var result = default(StateObservation);
+        journal.ReadEntry(ordinal, entry => result = entry.State);
+        return result;
+    }
+
+    private static SceneObservation ReadScene(ObservedEventJournal journal, long ordinal)
+    {
+        var result = default(SceneObservation);
+        journal.ReadEntry(ordinal, entry => result = entry.Scene);
+        return result;
+    }
+
+    private static AuraObservation ReadAura(ObservedEventJournal journal, long ordinal)
+        => ReadAura(journal, ordinal, out _, out _);
+
+    private static AuraObservation ReadAura(ObservedEventJournal journal, long ordinal, out int sourceEntityId, out int targetEntityId)
+    {
+        var result = (Aura: default(AuraObservation), SourceEntityId: 0, TargetEntityId: 0);
+        journal.ReadEntry(ordinal, entry => result = (entry.Aura, entry.SourceEntityId, entry.TargetEntityId));
+        sourceEntityId = result.SourceEntityId;
+        targetEntityId = result.TargetEntityId;
+        return result.Aura;
+    }
+
+    private static ActionObservation ReadAction(ObservedEventJournal journal, long ordinal)
+    {
+        var result = default(ActionObservation);
+        journal.ReadEntry(ordinal, entry => result = entry.Action);
+        return result;
+    }
+
+    private static void AssertStateAccessThrows(ObservedEventEntry entry)
+    {
+        var threw = false;
+        try
+        {
+            _ = entry.State.StateCode;
+        }
+        catch (InvalidOperationException)
+        {
+            threw = true;
+        }
+        Assert.True(threw);
+    }
+
+    private static void AssertCombatAccessThrows(ObservedEventEntry entry)
+    {
+        var threw = false;
+        try
+        {
+            _ = entry.Combat.SkillCode;
+        }
+        catch (InvalidOperationException)
+        {
+            threw = true;
+        }
+        Assert.True(threw);
     }
 }
