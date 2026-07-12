@@ -97,10 +97,11 @@ public sealed class SkillDetailBaseAggregatorTests
     {
         SetSkillBaseResources(
             [new SkillBaseProjection(16300027, 16300000)],
-            [
-                new SkillEffectReference(16300027, 0, SkillEffectReferenceKind.SkillEffectFilterId, 1234),
-                new SkillEffectReference(16300027, 1, SkillEffectReferenceKind.SkillEffectGroupId, 5678)
-            ]);
+            new Dictionary<uint, int>
+            {
+                [1234] = 16300027,
+                [5678] = 16300027
+            });
 
         var actionKey = new CombatEventKey(0, ResourceEffectRef.FromRaw(1234), ResourceEffectRef.FromRaw(5678));
 
@@ -126,15 +127,14 @@ public sealed class SkillDetailBaseAggregatorTests
     }
 
     private static void SetSkillBaseProjections(params SkillBaseProjection[] projections)
-        => SetSkillBaseResources(projections, []);
+        => SetSkillBaseResources(projections, new Dictionary<uint, int>());
 
-    private static void SetSkillBaseResources(SkillBaseProjection[] projections, SkillEffectReference[] effectReferences)
+    private static void SetSkillBaseResources(SkillBaseProjection[] projections, IReadOnlyDictionary<uint, int> effectSkillIds)
     {
         CombatResourceRegistry.SetGameResources(
             [],
             new Dictionary<int, NpcDisplayEntry>(),
-            new Dictionary<int, SkillClientMetadata>(),
             projections.ToDictionary(static projection => projection.SkillCode),
-            effectReferences);
+            effectSkillIds);
     }
 }

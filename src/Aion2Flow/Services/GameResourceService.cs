@@ -16,7 +16,6 @@ public sealed class GameResourceService : IDisposable
     public string CurrentLanguage { get; private set; }
     public SkillDisplayCatalog Skills { get; private set; } = [];
     public IReadOnlyDictionary<int, NpcDisplayEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcDisplayEntry>();
-    public IReadOnlyDictionary<string, LocalizedNpcName> NpcNames { get; private set; } = new Dictionary<string, LocalizedNpcName>(StringComparer.Ordinal);
     public IReadOnlyDictionary<uint, string> Maps { get; private set; } = new Dictionary<uint, string>();
     public IReadOnlyDictionary<int, ServerNameEntry> ServerNames { get; private set; } = new Dictionary<int, ServerNameEntry>();
 
@@ -253,7 +252,6 @@ public sealed class GameResourceService : IDisposable
             _catalog = catalog;
             Skills = catalog.Skills;
             NpcCatalog = catalog.NpcCatalog;
-            NpcNames = catalog.NpcNames;
             Maps = catalog.Maps;
             ServerNames = catalog.ServerNames;
         }

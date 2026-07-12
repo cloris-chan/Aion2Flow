@@ -1259,7 +1259,7 @@ public sealed class MainViewModelCombatantFilterTests
     {
         return
         [
-            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill)
         ];
     }
 }

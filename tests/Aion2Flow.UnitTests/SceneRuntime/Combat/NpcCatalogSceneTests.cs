@@ -223,7 +223,7 @@ public sealed class NpcCatalogSceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
         using var scene = new SceneTestHarness();
         const int npcInstanceId = 19945;
@@ -464,8 +464,8 @@ public sealed class NpcCatalogSceneTests
     {
         return
         [
-            new SkillDisplayEntry(17070000, "Chain of Torment", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(17730000, "Additional Strike", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(17070000, "Chain of Torment", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17730000, "Additional Strike", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ];
     }
 

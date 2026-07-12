@@ -12,7 +12,7 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill")
+            new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         var packet = new ParsedCombatPacket
@@ -34,7 +34,7 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill, "skill")
+            new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         var packet = new ParsedCombatPacket
@@ -127,9 +127,9 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>(), new Dictionary<int, SkillBaseProjection>
         {
             [12240039] = new(12240039, 12240000)
@@ -176,7 +176,7 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
@@ -280,7 +280,7 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(17000000, "Should not be used", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(17000000, "Should not be used", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
@@ -325,7 +325,7 @@ public sealed class SkillIdentitySceneTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ClientSkill, "npc")
+            new SkillDisplayEntry(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ClientSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         var journal = new ObservedEventJournal();

@@ -780,7 +780,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(13060250, "突襲", SkillCategory.Assassin, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(13060250, "突襲", SkillCategory.Assassin, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
@@ -826,8 +826,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(17010230, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(17730000, "主神恩寵", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(17010230, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17730000, "主神恩寵", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
@@ -945,9 +945,9 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(17010010, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(17020010, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(17010010, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17020010, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
@@ -1013,8 +1013,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown, "npc")
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
@@ -1070,7 +1070,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc")
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
@@ -1115,8 +1115,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         CombatResourceRegistry.SetGameResources(
         [
-            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc")
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
@@ -1160,12 +1160,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     {
         return
         [
-            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(12000010, "Second Wind", SkillCategory.Gladiator, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(13000010, "Support Heal", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(14000010, "Barrier Ward", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill, "pc"),
-            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown, "npc")
+            new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(12000010, "Second Wind", SkillCategory.Gladiator, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(13000010, "Support Heal", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(14000010, "Barrier Ward", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17730000, "Empyrean Lord's Grace", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown)
         ];
     }
 

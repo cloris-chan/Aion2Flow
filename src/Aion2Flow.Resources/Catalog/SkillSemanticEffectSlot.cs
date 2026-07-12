@@ -31,7 +31,7 @@ public readonly record struct SkillSemanticResourceResolution(
     int NodeId,
     SkillSemanticFacet DirectFacets,
     SkillSemanticFacet Facets,
-    SkillSemanticEffectSlot? Slot,
+    SkillSemanticRuntimeSlot? Slot,
     int CandidateSlotCount)
 {
     public bool HasUnambiguousSlot => Slot is not null;

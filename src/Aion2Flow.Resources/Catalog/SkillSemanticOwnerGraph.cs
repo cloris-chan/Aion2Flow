@@ -297,7 +297,10 @@ public sealed class SkillSemanticOwnerGraph
             facets = slot.Facets;
         }
 
-        return new SkillSemanticResourceResolution(rawId, nodeKind, nodeId, directFacets, facets, slot, candidateSlotCount);
+        SkillSemanticRuntimeSlot? runtimeSlot = slot is null
+            ? null
+            : new SkillSemanticRuntimeSlot(slot.SkillId, slot.Slot, slot.DirectFacets, slot.Facets);
+        return new SkillSemanticResourceResolution(rawId, nodeKind, nodeId, directFacets, facets, runtimeSlot, candidateSlotCount);
     }
 
     private static SkillSemanticEffectSlot? SelectUnambiguousSlot(
