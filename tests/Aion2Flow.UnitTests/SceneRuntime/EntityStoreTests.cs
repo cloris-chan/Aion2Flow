@@ -99,6 +99,36 @@ public class EntityStoreTests
     }
 
     [Fact]
+    public void EntityStore_Revisions_SeparateIdentityFromVolatileRuntimeState()
+    {
+        var store = new EntityStore();
+
+        store.ApplyNickname(100, "Player");
+
+        Assert.Equal(1, store.IdentityRevision);
+        Assert.Equal(0, store.VolatileStateRevision);
+
+        store.ApplyNpcHp(200, 4_000, 5_000);
+        store.ApplyBattleToggle(200, true);
+        store.ApplyNpc2136State(200, 1, 2);
+
+        Assert.Equal(1, store.IdentityRevision);
+        Assert.Equal(3, store.VolatileStateRevision);
+
+        store.ApplyNpcCode(200, 2_100_001);
+        store.ApplySummon(100, 300);
+
+        Assert.Equal(3, store.IdentityRevision);
+        Assert.Equal(3, store.VolatileStateRevision);
+
+        store.Clear();
+
+        Assert.Equal(4, store.IdentityRevision);
+        Assert.Equal(4, store.VolatileStateRevision);
+        Assert.Null(typeof(EntityStore).GetProperty("Revision"));
+    }
+
+    [Fact]
     public void EntityStore_IsKnownEntity_ReturnsTrueForExisting()
     {
         var store = new EntityStore();
@@ -1257,6 +1287,45 @@ public class SceneCombatSnapshotAdapterTests
 public class SceneReadModelOwnerTests
 {
     [Fact]
+    public void Owner_HasPendingProjectionChanges_TracksJournalAndStoreRevisions()
+    {
+        var journal = new ObservedEventJournal();
+        var owner = new SceneReadModelOwner(journal);
+
+        Assert.True(owner.HasPendingProjectionChanges);
+
+        _ = owner.CreateSnapshot();
+
+        Assert.False(owner.HasPendingProjectionChanges);
+
+        journal.AppendState(
+            Guid.NewGuid(),
+            new TimelineStamp { ObservationOrdinal = 0 },
+            100,
+            0,
+            new StateObservation
+            {
+                EntityId = 100,
+                StateCode = StateCodes.PlayerIdentity,
+                Text = "Player"
+            });
+
+        Assert.True(owner.HasPendingProjectionChanges);
+
+        _ = owner.CreateSnapshot();
+
+        Assert.False(owner.HasPendingProjectionChanges);
+
+        owner.Entities.ApplyNpcHp(200, 4_000, 5_000);
+
+        Assert.True(owner.HasPendingProjectionChanges);
+
+        _ = owner.CreateSnapshot();
+
+        Assert.False(owner.HasPendingProjectionChanges);
+    }
+
+    [Fact]
     public void Owner_CreateSnapshot_ReusesProjectionUntilInputRevisionChanges()
     {
         CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
@@ -1582,8 +1651,10 @@ public class SceneReadModelOwnerTests
 
         Assert.Same(first, second);
         Assert.Single(second.BossFocuses);
+        Assert.False(scene.Owner.HasPendingProjectionChanges);
 
         timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(11_001));
+        Assert.True(scene.Owner.HasPendingProjectionChanges);
         var expired = scene.Owner.CreateSnapshot();
 
         Assert.NotSame(second, expired);

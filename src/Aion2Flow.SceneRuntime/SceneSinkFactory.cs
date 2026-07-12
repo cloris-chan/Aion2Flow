@@ -63,6 +63,14 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
                 return _bossState;
         }
     }
+    public bool HasPendingProjectionChanges
+    {
+        get
+        {
+            lock (_gate)
+                return _pendingArchives.Count > 0 || Owner.HasPendingProjectionChanges;
+        }
+    }
 
     public SceneLiveReadModel() : this(DateTimeOffset.Now)
     {

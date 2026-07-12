@@ -7,6 +7,7 @@ using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
@@ -938,6 +939,35 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void FrameTick_Capturing_ProjectsDirtyStateAtTwentyFiveHertz()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.ViewModel.IsCapturing = true;
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.ProcessUiFrameForTesting(TimeSpan.Zero);
+
+        var row = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(400, row.Damage);
+        Assert.Equal(1, fixture.ProjectionCacheStats.SnapshotBuilds);
+
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 100, 6_000, 3);
+        fixture.ViewModel.ProcessUiFrameForTesting(TimeSpan.FromMilliseconds(20));
+
+        Assert.Equal(400, row.Damage);
+        Assert.Equal(1, fixture.ProjectionCacheStats.SnapshotBuilds);
+
+        fixture.ViewModel.ProcessUiFrameForTesting(MainViewModel.LiveProjectionInterval);
+
+        Assert.Equal(500, row.Damage);
+        Assert.Equal(2, fixture.ProjectionCacheStats.SnapshotBuilds);
+
+        fixture.ViewModel.ProcessUiFrameForTesting(TimeSpan.FromMilliseconds(80));
+
+        Assert.Equal(2, fixture.ProjectionCacheStats.SnapshotBuilds);
+    }
+
+    [Fact]
     public void FrameTick_Capturing_RefreshesMapWithoutCombat()
     {
         var fixture = MainViewModelFixture.Create();
@@ -1023,6 +1053,7 @@ public sealed class MainViewModelCombatantFilterTests
         public SettingsFlyoutViewModel Settings => ViewModel.SettingsFlyout;
         public EncounterArchiveService Archive { get; }
         public RuntimeMetadataRegistry MetadataRegistry => _captureService.Scene.Owner.MetadataRegistry;
+        public ProjectionCacheStats ProjectionCacheStats => _captureService.Scene.Owner.ProjectionCacheStats;
         public long SceneStartedMilliseconds => _captureService.Scene.SessionStarted.ToUnixTimeMilliseconds();
 
         public static MainViewModelFixture Create()

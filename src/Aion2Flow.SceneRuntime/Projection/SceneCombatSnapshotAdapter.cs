@@ -23,17 +23,17 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private readonly Dictionary<int, bool> _knownSummons = [];
     private readonly Dictionary<int, TargetInfo> _targetInfos = [];
     private long _ownerInferenceCombatRevision = -1;
-    private long _ownerInferenceEntityRevision = -1;
+    private long _ownerInferenceIdentityRevision = -1;
     private long _ownerInferenceSkillMapRevision = -1;
     private long _ownerInferenceSkillClassificationRevision = -1;
     private long _ownerInferenceVersion;
     private int _ownerInferenceScannedEventCount;
     private long _classEvidenceCombatRevision = -1;
-    private long _classEvidenceEntityRevision = -1;
+    private long _classEvidenceIdentityRevision = -1;
     private long _classEvidenceOwnerVersion = -1;
     private long _classEvidenceSkillMapRevision = -1;
     private int _classEvidenceScannedEventCount;
-    private long _resolveCacheEntityRevision = -1;
+    private long _resolveCacheIdentityRevision = -1;
     private long _resolveCacheOwnerVersion = -1;
     private bool _ownerInferenceReady;
     private bool _hasProjectionBaseline;
@@ -60,12 +60,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             CreateOwnerCandidateSnapshot(),
             CreateDirectOwnerCandidateSnapshot(),
             _ownerInferenceCombatRevision,
-            _ownerInferenceEntityRevision,
+            _ownerInferenceIdentityRevision,
             _ownerInferenceSkillMapRevision,
             _ownerInferenceVersion,
             _ownerInferenceReady,
             _classEvidenceCombatRevision,
-            _classEvidenceEntityRevision,
+            _classEvidenceIdentityRevision,
             _classEvidenceOwnerVersion,
             _classEvidenceSkillMapRevision);
     }
@@ -774,13 +774,13 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
 
         _ownerInferenceCombatRevision = snapshot.OwnerInferenceCombatRevision;
-        _ownerInferenceEntityRevision = snapshot.OwnerInferenceEntityRevision;
+        _ownerInferenceIdentityRevision = snapshot.OwnerInferenceIdentityRevision;
         _ownerInferenceSkillMapRevision = snapshot.OwnerInferenceSkillMapRevision;
         _ownerInferenceVersion = snapshot.OwnerInferenceVersion;
         _ownerInferenceReady = snapshot.OwnerInferenceReady;
         _ownerInferenceScannedEventCount = 0;
         _classEvidenceCombatRevision = snapshot.ClassEvidenceCombatRevision;
-        _classEvidenceEntityRevision = snapshot.ClassEvidenceEntityRevision;
+        _classEvidenceIdentityRevision = snapshot.ClassEvidenceIdentityRevision;
         _classEvidenceOwnerVersion = snapshot.ClassEvidenceOwnerVersion;
         _classEvidenceSkillMapRevision = snapshot.ClassEvidenceSkillMapRevision;
         _classEvidenceScannedEventCount = 0;
@@ -804,13 +804,13 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private void EnsureClassEvidence()
     {
         var combatRevision = combat.Revision;
-        var entityRevision = entities.Revision;
+        var identityRevision = entities.IdentityRevision;
         var ownerVersion = _ownerInferenceVersion;
         var skillMapRevision = CombatResourceRegistry.SkillMapRevision;
         var events = combat.EventSpan;
         var rebuildFromStart = combatRevision < _classEvidenceCombatRevision ||
                                (!_hasProjectionBaseline &&
-                                (_classEvidenceEntityRevision != entityRevision ||
+                                (_classEvidenceIdentityRevision != identityRevision ||
                                  _classEvidenceOwnerVersion != ownerVersion ||
                                  _classEvidenceSkillMapRevision != skillMapRevision ||
                                  _classEvidenceScannedEventCount > events.Length));
@@ -828,7 +828,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
 
         _classEvidenceCombatRevision = combatRevision;
-        _classEvidenceEntityRevision = entityRevision;
+        _classEvidenceIdentityRevision = identityRevision;
         _classEvidenceOwnerVersion = ownerVersion;
         _classEvidenceSkillMapRevision = skillMapRevision;
     }
@@ -836,7 +836,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private void EnsureOwnerInference()
     {
         var combatRevision = combat.Revision;
-        var entityRevision = entities.Revision;
+        var identityRevision = entities.IdentityRevision;
         var skillMapRevision = CombatResourceRegistry.SkillMapRevision;
         if (_ownerInferenceSkillClassificationRevision != skillMapRevision)
         {
@@ -846,7 +846,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         if (_ownerInferenceReady &&
             _ownerInferenceCombatRevision == combatRevision &&
-            (_hasProjectionBaseline || _ownerInferenceEntityRevision == entityRevision) &&
+            (_hasProjectionBaseline || _ownerInferenceIdentityRevision == identityRevision) &&
             (_hasProjectionBaseline || _ownerInferenceSkillMapRevision == skillMapRevision))
         {
             return;
@@ -856,7 +856,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         var rebuildFromStart = combatRevision < _ownerInferenceCombatRevision ||
                                (!_hasProjectionBaseline &&
                                 (!_ownerInferenceReady ||
-                                 _ownerInferenceEntityRevision != entityRevision ||
+                                 _ownerInferenceIdentityRevision != identityRevision ||
                                  _ownerInferenceSkillMapRevision != skillMapRevision ||
                                  _ownerInferenceScannedEventCount > events.Length));
 
@@ -873,14 +873,14 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             RebuildInferredSummonOwners();
 
         _ownerInferenceCombatRevision = combatRevision;
-        _ownerInferenceEntityRevision = entityRevision;
+        _ownerInferenceIdentityRevision = identityRevision;
         _ownerInferenceSkillMapRevision = skillMapRevision;
         _ownerInferenceReady = true;
     }
 
     private void EnsureResolveCaches()
     {
-        if (_resolveCacheEntityRevision == entities.Revision &&
+        if (_resolveCacheIdentityRevision == entities.IdentityRevision &&
             _resolveCacheOwnerVersion == _ownerInferenceVersion)
         {
             return;
@@ -888,7 +888,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         _resolvedCombatantIds.Clear();
         _knownSummons.Clear();
-        _resolveCacheEntityRevision = entities.Revision;
+        _resolveCacheIdentityRevision = entities.IdentityRevision;
         _resolveCacheOwnerVersion = _ownerInferenceVersion;
     }
 
@@ -1316,12 +1316,12 @@ internal sealed record SceneCombatSnapshotAdapterSnapshot(
     SceneCombatSnapshotOwnerCandidateEntry[] OwnerCandidates,
     SceneCombatSnapshotDirectOwnerCandidateEntry[] DirectOwnerCandidates,
     long OwnerInferenceCombatRevision,
-    long OwnerInferenceEntityRevision,
+    long OwnerInferenceIdentityRevision,
     long OwnerInferenceSkillMapRevision,
     long OwnerInferenceVersion,
     bool OwnerInferenceReady,
     long ClassEvidenceCombatRevision,
-    long ClassEvidenceEntityRevision,
+    long ClassEvidenceIdentityRevision,
     long ClassEvidenceOwnerVersion,
     long ClassEvidenceSkillMapRevision);
 

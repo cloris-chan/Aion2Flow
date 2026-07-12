@@ -21,6 +21,7 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsyncDisposable
 {
+    internal static readonly TimeSpan LiveProjectionInterval = TimeSpan.FromMilliseconds(40);
     private static readonly BossDamageContribution[] EmptyBossDamageContributions = [];
     private static readonly IBrush BossRemainingHpBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF0, 0xDF, 0x21, 0x4A));
 
@@ -59,6 +60,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private uint _barBrushSeed;
     private int _barBrushBaseHue;
     private int _nextBarHueIndex;
+    private long _lastLiveProjectionPollTimestampTicks = long.MinValue;
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
 
@@ -204,6 +206,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
         _captureService.StatusChanged += OnCaptureStatusChanged;
         _captureService.RttResolved += OnRttResolved;
+        _processPortDiscoveryService.Discovered += OnProcessPortChanged;
+        _processPortDiscoveryService.Removed += OnProcessPortChanged;
         _languageService.LanguageChanged += OnLanguageChanged;
         _gameResourceService.ResourcesChanged += OnResourcesChanged;
         _encounterArchiveService.HistoryChanged += OnEncounterHistoryChanged;
@@ -217,6 +221,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     public Task InitializeAsync() => StartCaptureAsync();
 
     private void OnRttResolved(double rtt)
+    {
+        Dispatcher.UIThread.Post(RefreshCaptureIndicators);
+    }
+
+    private void OnProcessPortChanged(uint processId, ushort port)
     {
         Dispatcher.UIThread.Post(RefreshCaptureIndicators);
     }
@@ -394,17 +403,32 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         ApplySnapshot(_displayedSnapshot);
     }
 
-    public void ProcessUiFrame()
+    public void ProcessUiFrame(TimeSpan timestamp)
     {
-        if (!_isDisposed && IsCapturing)
+        if (_isDisposed || !IsCapturing || _suppressRefresh)
+            return;
+
+        var timestampTicks = timestamp.Ticks;
+        if (_lastLiveProjectionPollTimestampTicks != long.MinValue &&
+            timestampTicks >= _lastLiveProjectionPollTimestampTicks &&
+            timestampTicks - _lastLiveProjectionPollTimestampTicks < LiveProjectionInterval.Ticks)
         {
-            RefreshCombatStats();
+            return;
         }
+
+        _lastLiveProjectionPollTimestampTicks = timestampTicks;
+        ProcessPendingProjectionChanges();
     }
 
     internal void RefreshCombatStatsForTesting() => RefreshCombatStats();
 
-    internal void ProcessUiFrameForTesting() => ProcessUiFrame();
+    internal void ProcessUiFrameForTesting()
+    {
+        if (!_isDisposed && IsCapturing && !_suppressRefresh)
+            ProcessPendingProjectionChanges();
+    }
+
+    internal void ProcessUiFrameForTesting(TimeSpan timestamp) => ProcessUiFrame(timestamp);
 
     internal void ResetLiveModelsForTesting() => ResetLiveModels(static () => DateTimeOffset.Now);
 
@@ -412,6 +436,12 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         detailCombatantId > 0
             ? _captureService.Scene.CreateFrame(detailCombatantId, _combatantDetails, forceDetailRefresh)
             : _captureService.Scene.CreateFrame();
+
+    private void ProcessPendingProjectionChanges()
+    {
+        if (_captureService.Scene.HasPendingProjectionChanges)
+            RefreshCombatStats();
+    }
 
     private void ApplySnapshot(SceneCombatSnapshot snapshot, bool forceDetailRefresh = false)
     {
@@ -768,6 +798,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _isDisposed = true;
         _captureService.StatusChanged -= OnCaptureStatusChanged;
         _captureService.RttResolved -= OnRttResolved;
+        _processPortDiscoveryService.Discovered -= OnProcessPortChanged;
+        _processPortDiscoveryService.Removed -= OnProcessPortChanged;
         _languageService.LanguageChanged -= OnLanguageChanged;
         _gameResourceService.ResourcesChanged -= OnResourcesChanged;
         _encounterArchiveService.HistoryChanged -= OnEncounterHistoryChanged;

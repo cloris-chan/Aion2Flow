@@ -77,7 +77,7 @@ public partial class MainWindow : Window
 
     private void OnAnimationFrame(object? sender, AvaloniaFrameEventArgs e)
     {
-        DataContext.ProcessUiFrame();
+        DataContext.ProcessUiFrame(e.Timestamp);
     }
 
     private void AttachGlobalHotkeyHook()

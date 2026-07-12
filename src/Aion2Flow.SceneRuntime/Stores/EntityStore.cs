@@ -9,11 +9,13 @@ namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 public sealed class EntityStore
 {
     private readonly Dictionary<int, EntityRecord> _entities = [];
-    private long _revision;
+    private long _identityRevision;
+    private long _volatileStateRevision;
 
     public IReadOnlyDictionary<int, EntityRecord> Entities => _entities;
     public int Count => _entities.Count;
-    public long Revision => _revision;
+    public long IdentityRevision => _identityRevision;
+    public long VolatileStateRevision => _volatileStateRevision;
 
     public EntityRecord GetOrAdd(int entityId)
     {
@@ -37,7 +39,7 @@ public sealed class EntityStore
 
         entity.NpcCode = npcCode;
         entity.LastObservedOrdinal++;
-        _revision++;
+        _identityRevision++;
     }
 
     public void ApplyNpcKind(int instanceId, NpcKind kind)
@@ -48,7 +50,7 @@ public sealed class EntityStore
             return;
 
         entity.Kind = kind;
-        _revision++;
+        _identityRevision++;
     }
 
     public void ApplyNickname(int entityId, string nickname)
@@ -61,7 +63,7 @@ public sealed class EntityStore
         entity.Nickname = nickname;
         entity.IsPlayer = true;
         entity.LastObservedOrdinal++;
-        _revision++;
+        _identityRevision++;
     }
 
     public void ApplyPlayerIdentity(int entityId)
@@ -73,7 +75,7 @@ public sealed class EntityStore
 
         entity.IsPlayer = true;
         entity.LastObservedOrdinal++;
-        _revision++;
+        _identityRevision++;
     }
 
     public bool ApplyCharacterClassEvidence(int entityId, in CombatObservation observation)
@@ -100,7 +102,7 @@ public sealed class EntityStore
             return false;
 
         entity.CharacterClass = nextClass;
-        _revision++;
+        _identityRevision++;
         return true;
     }
 
@@ -117,7 +119,7 @@ public sealed class EntityStore
         entity.CharacterClass = characterClass;
         entity.IsPlayer = true;
         entity.LastObservedOrdinal++;
-        _revision++;
+        _identityRevision++;
         return true;
     }
 
@@ -130,7 +132,7 @@ public sealed class EntityStore
         entity.OwnerEntityId = ownerId;
         entity.OwnerKind = EntityOwnerKind.Summon;
         entity.Kind = NpcKind.Summon;
-        _revision++;
+        _identityRevision++;
     }
 
     public bool ApplyTransientEffectOwner(int ownerId, int effectInstanceId)
@@ -147,7 +149,7 @@ public sealed class EntityStore
 
         entity.OwnerEntityId = ownerId;
         entity.OwnerKind = EntityOwnerKind.TransientEffect;
-        _revision++;
+        _identityRevision++;
         return true;
     }
 
@@ -163,7 +165,7 @@ public sealed class EntityStore
         entity.MaxHp = resolvedMaxHp;
         if (hp == 0)
             entity.NpcCombatActive = false;
-        _revision++;
+        _volatileStateRevision++;
     }
 
     public void ApplyBattleToggle(int instanceId, bool isActive)
@@ -173,7 +175,7 @@ public sealed class EntityStore
             return;
 
         entity.NpcCombatActive = isActive;
-        _revision++;
+        _volatileStateRevision++;
     }
 
     public void ApplyNpc2136State(int instanceId, long sequence, long value0)
@@ -184,7 +186,7 @@ public sealed class EntityStore
 
         entity.Sequence2136 = sequence;
         entity.Value2136 = value0;
-        _revision++;
+        _volatileStateRevision++;
     }
 
     public void ApplyNpc0140Value(int instanceId, long value0)
@@ -194,7 +196,7 @@ public sealed class EntityStore
             return;
 
         entity.Value0140 = value0;
-        _revision++;
+        _volatileStateRevision++;
     }
 
     public void ApplyNpc0240Value(int instanceId, long value0)
@@ -204,7 +206,7 @@ public sealed class EntityStore
             return;
 
         entity.Value0240 = value0;
-        _revision++;
+        _volatileStateRevision++;
     }
 
     public void ApplyNpc4636State(int instanceId, byte state0, byte state1)
@@ -214,7 +216,7 @@ public sealed class EntityStore
             return;
 
         entity.State4636 = (state0, state1);
-        _revision++;
+        _volatileStateRevision++;
     }
 
     public void ApplyNpc2C38State(int instanceId, int sequenceId, int resultCode)
@@ -224,38 +226,11 @@ public sealed class EntityStore
             return;
 
         entity.Latest2C38 = (sequenceId, resultCode);
-        _revision++;
+        _volatileStateRevision++;
     }
 
     public bool IsKnownEntity(int entityId) =>
         _entities.ContainsKey(entityId);
-
-    internal EntityStoreSnapshot CreateSnapshot()
-    {
-        if (_entities.Count == 0)
-            return new EntityStoreSnapshot([], _revision);
-
-        var records = new EntityRecordSnapshot[_entities.Count];
-        var index = 0;
-        foreach (var record in _entities.Values)
-            records[index++] = EntityRecordSnapshot.From(record);
-        return new EntityStoreSnapshot(records, _revision);
-    }
-
-    internal static EntityStore FromSnapshot(EntityStoreSnapshot snapshot)
-    {
-        var store = new EntityStore
-        {
-            _revision = snapshot.Revision
-        };
-        for (var i = 0; i < snapshot.Records.Length; i++)
-        {
-            var record = snapshot.Records[i].ToRecord();
-            store._entities[record.EntityId] = record;
-        }
-
-        return store;
-    }
 
     public void Clear()
     {
@@ -263,7 +238,8 @@ public sealed class EntityStore
             return;
 
         _entities.Clear();
-        _revision++;
+        _identityRevision++;
+        _volatileStateRevision++;
     }
 
     private static bool ClearTransientOwner(EntityRecord entity)
@@ -283,74 +259,6 @@ public enum EntityOwnerKind
     None,
     Summon,
     TransientEffect
-}
-
-internal sealed record EntityStoreSnapshot(EntityRecordSnapshot[] Records, long Revision);
-
-internal readonly record struct EntityRecordSnapshot(
-    int EntityId,
-    int? NpcCode,
-    NpcKind Kind,
-    string? Nickname,
-    bool IsPlayer,
-    CharacterClass? CharacterClass,
-    CombatantClassEvidence ClassEvidence,
-    int? OwnerEntityId,
-    EntityOwnerKind OwnerKind,
-    long? CurrentHp,
-    long? MaxHp,
-    bool NpcCombatActive,
-    long? Value2136,
-    long? Sequence2136,
-    long? Value0140,
-    long? Value0240,
-    (byte State0, byte State1)? State4636,
-    (int SequenceId, int ResultCode)? Latest2C38,
-    long LastObservedOrdinal)
-{
-    public static EntityRecordSnapshot From(EntityRecord record) => new(
-        record.EntityId,
-        record.NpcCode,
-        record.Kind,
-        record.Nickname,
-        record.IsPlayer,
-        record.CharacterClass,
-        record.ClassEvidence,
-        record.OwnerEntityId,
-        record.OwnerKind,
-        record.CurrentHp,
-        record.MaxHp,
-        record.NpcCombatActive,
-        record.Value2136,
-        record.Sequence2136,
-        record.Value0140,
-        record.Value0240,
-        record.State4636,
-        record.Latest2C38,
-        record.LastObservedOrdinal);
-
-    public EntityRecord ToRecord() => new()
-    {
-        EntityId = EntityId,
-        NpcCode = NpcCode,
-        Kind = Kind,
-        Nickname = Nickname,
-        IsPlayer = IsPlayer,
-        CharacterClass = CharacterClass,
-        ClassEvidence = ClassEvidence,
-        OwnerEntityId = OwnerEntityId,
-        OwnerKind = OwnerKind,
-        CurrentHp = CurrentHp,
-        MaxHp = MaxHp,
-        NpcCombatActive = NpcCombatActive,
-        Value2136 = Value2136,
-        Sequence2136 = Sequence2136,
-        Value0140 = Value0140,
-        Value0240 = Value0240,
-        State4636 = State4636,
-        Latest2C38 = Latest2C38,
-        LastObservedOrdinal = LastObservedOrdinal
-    };
 }
 
 public sealed class EntityRecord
