@@ -57,6 +57,22 @@ internal static class PacketIdentityHandler
         return context.MarkParsed();
     }
 
+    public static bool ParsePartyStatusPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        if (!PacketPlayerGroupParser.TryParsePartyStatusMember(packet, out var member))
+        {
+            return false;
+        }
+
+        if (context.TryRegisterPartyStatusMember(member.EntityId))
+        {
+            var source = context.CreateObservationSource(0x1B92, packet.Length);
+            AppendPlayerGroupMember(context, in source, in member);
+        }
+
+        return context.MarkParsed();
+    }
+
     public static bool ParseForceMemberPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (!PacketPlayerGroupParser.TryParseForceMember(packet, out var parsed))

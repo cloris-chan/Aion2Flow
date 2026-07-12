@@ -28,6 +28,7 @@ internal static class PacketPlayerGroupParser
     private const int ProfileListMinimumRowStride = 112;
     private const int ProfileListNameLengthOffset = 56;
     private const int CompactProfileNameLengthOffset = 55;
+    private const int PartyStatusFixedTailLength = 25;
     private const int ForceRosterServerOffset = 14;
     private const int ForceRosterUuidMarkerOffset = 18;
     private const int ForceRosterRepeatedServerOffset = ForceRosterUuidMarkerOffset + 1 + ExpectedUuidLength + 6;
@@ -40,6 +41,27 @@ internal static class PacketPlayerGroupParser
             return false;
 
         return TryReadDirectPartyMemberRow(body, 0, out member, out _);
+    }
+
+    public static bool TryParsePartyStatusMember(ReadOnlySpan<byte> packet, out PacketPlayerGroupMember member)
+    {
+        member = default;
+        if (!TryReadPayload(packet, 0x1B, 0x92, out var body))
+            return false;
+
+        var reader = new PacketSpanReader(body);
+        if (!reader.TryReadVarInt(out var entityId) || entityId <= 0 ||
+            !reader.TryReadVarInt(out var currentPrimaryResource) ||
+            !reader.TryReadVarInt(out var maximumPrimaryResource) ||
+            currentPrimaryResource < 0 || maximumPrimaryResource <= 0 || currentPrimaryResource > maximumPrimaryResource ||
+            reader.Remaining != PartyStatusFixedTailLength ||
+            reader.RemainingSpan[^1] > 1)
+        {
+            return false;
+        }
+
+        member = new PacketPlayerGroupMember(PacketPlayerGroupKind.Party, entityId, 0, 0, 0);
+        return true;
     }
 
     public static bool TryParsePartyProfile(ReadOnlySpan<byte> packet, out PacketPlayerGroupProfile profile)

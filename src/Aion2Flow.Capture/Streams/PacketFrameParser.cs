@@ -10,6 +10,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
     private const int MaxRetainedDecompressionBufferSize = 512 * 1024;
     private readonly SceneObservationWriter _writer = new(sink);
     private readonly PacketFlushState _flushState = new();
+    private readonly PacketPlayerGroupState _playerGroupState = new();
     private byte[]? _decompressionBuffer;
 
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
@@ -31,7 +32,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
 
     public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, long timestampMilliseconds)
     {
-        var context = new PacketParseContext(sink, _writer, _flushState, connection, timestampMilliseconds);
+        var context = new PacketParseContext(sink, _writer, _flushState, _playerGroupState, connection, timestampMilliseconds);
         var previous = context.EnterStructure(PacketStructureKind.TransportPacket, 0, packet.Length, 0, packet.Length, 0);
         try
         {

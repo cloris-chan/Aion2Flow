@@ -234,7 +234,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260704002230_Parses_CrossServerMatchedPartyRelationsFromExplicitPackets()
+    public void Replay_20260704002230_Parses_CrossServerMatchedPartyRelationsFromCurrentPackets()
     {
         SetResources();
 
@@ -246,13 +246,49 @@ public sealed class PacketLogReplayServiceTests
             static entry => entry.Raw.Opcode == 0x0092 &&
                             entry.State is { EntityId: 10780, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
 
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x1B92 &&
+                            entry.State is { EntityId: 14000, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party, GroupMembership.MemberSlotIndex: 0 });
+
         Assert.DoesNotContain(
             entries,
             static entry => entry.Raw.Opcode == 0x048D &&
                             entry.State is { StateCode: StateCodes.PlayerGroupMembership });
 
-        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 9975, 10780, 14819);
-        AssertGroupRelations(replay, PlayerGroupRelation.Unknown, 12478, 14000);
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 9975, 10780, 14000, 14819);
+        AssertGroupRelation(replay, 12478, PlayerGroupRelation.Unknown);
+    }
+
+    [Fact]
+    public void Replay_20260712211428_RecognizesPartyMembersFromEarlyStatusFrames()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentPartyStatusRelation}"));
+        var entries = ReadAllJournalEntries(replay);
+        var statusMembers = entries
+            .Where(static entry => entry.Raw.Opcode == 0x1B92 && entry.State is { StateCode: StateCodes.PlayerGroupMembership })
+            .OrderBy(static entry => entry.SourceEntityId)
+            .ToArray();
+
+        Assert.Equal([4327, 9183, 9429, 16102], statusMembers.Select(static entry => entry.SourceEntityId));
+        Assert.All(
+            statusMembers,
+            static entry =>
+            {
+                Assert.True(entry.Stamp.OffsetTicks < TimeSpan.FromSeconds(30).Ticks, $"party member {entry.SourceEntityId} was first recognized at {TimeSpan.FromTicks(entry.Stamp.OffsetTicks)}");
+                Assert.Equal(PlayerGroupKind.Party, entry.State!.Value.GroupMembership.Kind);
+                Assert.Equal(0, entry.State.Value.GroupMembership.MemberSlotIndex);
+            });
+
+        var firstRosterRelation = Assert.Single(
+            entries.Where(static entry => entry.Raw.Opcode == 0x0092 && entry.State is { StateCode: StateCodes.PlayerGroupMembership }),
+            static entry => entry.SourceEntityId == 16102);
+        Assert.True(firstRosterRelation.Stamp.OffsetTicks > TimeSpan.FromMinutes(3).Ticks);
+
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 4327, 9183, 9429, 16102);
+        AssertGroupRelation(replay, 13028, PlayerGroupRelation.Unknown);
     }
 
     [Fact]
@@ -317,11 +353,11 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260704155002_DoesNotPromoteCombat048DFramesToGroupRelations()
+    public void Replay_20260704155002_UsesPartyStatusFramesWithoutPromotingCombat048D()
     {
         SetResources();
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentForceDungeonWithoutExplicitRelationPackets}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentForceDungeonPartyStatusRelations}"));
         var entries = ReadAllJournalEntries(replay);
 
         Assert.DoesNotContain(
@@ -329,7 +365,13 @@ public sealed class PacketLogReplayServiceTests
             static entry => entry.Raw.Opcode == 0x048D &&
                             entry.State is { StateCode: StateCodes.PlayerGroupMembership });
 
-        AssertGroupRelations(replay, PlayerGroupRelation.Unknown, 1339, 3316, 4110, 4909, 7740, 10984, 11101, 12588, 15338, 15481);
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x1B92 &&
+                            entry.State is { EntityId: 3316, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
+
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 3316, 4909, 7740, 15338);
+        AssertGroupRelations(replay, PlayerGroupRelation.Unknown, 1339, 4110, 10984, 11101, 12588, 15481);
     }
 
     [Fact]
@@ -339,7 +381,7 @@ public sealed class PacketLogReplayServiceTests
 
         var replay = ReplayCombinedFixtures(
             ReplayScenarioCatalog.CurrentForceDungeonPreInstanceRoster,
-            ReplayScenarioCatalog.CurrentForceDungeonWithoutExplicitRelationPackets);
+            ReplayScenarioCatalog.CurrentForceDungeonPartyStatusRelations);
 
         AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 3316, 4909, 7740, 15338);
         AssertGroupRelations(replay, PlayerGroupRelation.ForceMember, 1339, 4110, 10984, 11101, 12588);

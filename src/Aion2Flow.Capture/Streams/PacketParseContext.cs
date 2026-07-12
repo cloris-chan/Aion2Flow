@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObservationWriter writer, PacketFlushState flushState, in TcpConnection connection, long timestampMilliseconds)
+internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObservationWriter writer, PacketFlushState flushState, PacketPlayerGroupState playerGroupState, in TcpConnection connection, long timestampMilliseconds)
 {
     public readonly IRuntimeObservationSink Sink = sink;
     public readonly SceneObservationWriter Writer = writer;
@@ -11,6 +11,8 @@ internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObserv
     public bool Parsed;
     public PacketStructurePath CurrentStructurePath { get; private set; }
     public readonly PacketStructureReference CurrentStructure => CurrentStructurePath.Leaf;
+
+    public readonly bool TryRegisterPartyStatusMember(int entityId) => playerGroupState.TryRegisterPartyStatusMember(entityId);
 
     public readonly long FlushId => flushState.CurrentFlushId;
 
