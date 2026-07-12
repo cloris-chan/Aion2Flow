@@ -183,7 +183,7 @@ public sealed class PlaybackTimelineView : Control
         var start = Math.Max(0d, centerX - markerWidth * 0.5d);
         var end = Math.Min(bounds.Width, centerX + markerWidth * 0.5d);
         var y = Math.Round(bounds.Height * 0.5d) + 0.5d;
-        context.DrawLine(new Pen(marker.Brush, 1d), new Point(start, y), new Point(Math.Max(start + 1d, end), y));
+        context.FillRectangle(marker.Brush, new Rect(start, y - 0.5d, Math.Max(1d, end - start), 1d));
     }
 
     private static void DrawSpan(DrawingContext context, PlaybackTimelineSpan span, double duration, Rect bounds)
@@ -195,7 +195,7 @@ public sealed class PlaybackTimelineView : Control
         var y = Math.Round((bounds.Height - thickness) * 0.5d) + 0.5d;
         var rect = new Rect(start, y, width, thickness);
         context.FillRectangle(span.FillBrush, rect);
-        context.DrawLine(new Pen(span.BorderBrush, 1d), new Point(start, y + thickness * 0.5d), new Point(start + width, y + thickness * 0.5d));
+        context.FillRectangle(span.BorderBrush, new Rect(start, y + thickness * 0.5d - 0.5d, width, 1d));
     }
 
     private void RequestSeek(double x)

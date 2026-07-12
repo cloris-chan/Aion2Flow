@@ -527,7 +527,7 @@ public sealed class NumericBlock : Control
     {
         var fontFamily = FontFamily ?? FontFamily.Default;
         var key = new TypefaceCacheKey(
-            fontFamily.ToString() ?? string.Empty,
+            fontFamily,
             fontSize,
             FontStyle,
             FontWeight,
@@ -737,7 +737,7 @@ public sealed class NumericBlock : Control
     }
 
     private readonly record struct TypefaceCacheKey(
-        string FontFamily,
+        FontFamily FontFamily,
         double FontSize,
         FontStyle FontStyle,
         FontWeight FontWeight,

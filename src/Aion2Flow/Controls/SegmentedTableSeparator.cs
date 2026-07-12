@@ -46,11 +46,10 @@ public sealed class SegmentedTableSeparator : Control
         if (brush is null || thickness <= 0 || Bounds.Width <= 0 || Bounds.Height <= 0)
             return;
 
-        var y = Math.Max(0d, Bounds.Height - thickness / 2d);
-        var pen = new Pen(brush, thickness);
+        var top = Math.Max(0d, Bounds.Height - thickness);
         if (Parent is not Grid grid || grid.ColumnDefinitions.Count <= 1)
         {
-            context.DrawLine(pen, new Point(0, y), new Point(Bounds.Width, y));
+            context.FillRectangle(brush, new Rect(0d, top, Bounds.Width, thickness));
             return;
         }
 
@@ -65,13 +64,13 @@ public sealed class SegmentedTableSeparator : Control
             var gapCenter = x + spacing / 2d;
             var gapStart = Math.Clamp(gapCenter - halfGap, segmentStart, Bounds.Width);
             if (gapStart > segmentStart)
-                context.DrawLine(pen, new Point(segmentStart, y), new Point(gapStart, y));
+                context.FillRectangle(brush, new Rect(segmentStart, top, gapStart - segmentStart, thickness));
 
             x += spacing;
             segmentStart = Math.Clamp(gapCenter + halfGap, 0d, Bounds.Width);
         }
 
         if (Bounds.Width > segmentStart)
-            context.DrawLine(pen, new Point(segmentStart, y), new Point(Bounds.Width, y));
+            context.FillRectangle(brush, new Rect(segmentStart, top, Bounds.Width - segmentStart, thickness));
     }
 }

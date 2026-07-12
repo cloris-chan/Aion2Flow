@@ -409,6 +409,23 @@ public sealed class DetailProjectionAllocationGuardTests
         Assert.Equal(2, fieldCount);
     }
 
+    [Fact]
+    public void AnimatedRenderHotPaths_DoNotCreatePerFramePensOrStreamGeometry()
+    {
+        var root = FindRepositoryRoot();
+        var timeline = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Controls", "PlaybackTimelineView.cs"));
+        var timelineStrip = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Controls", "PlaybackTimelineStripView.cs"));
+        var separator = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Controls", "SegmentedTableSeparator.cs"));
+        var progress = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Controls", "SlantedProgressBar.cs"));
+        var selection = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Controls", "QuestSelectionHighlight.cs"));
+
+        Assert.DoesNotContain("context.DrawLine(new Pen", timeline, StringComparison.Ordinal);
+        Assert.DoesNotContain("var pen = new Pen", timelineStrip, StringComparison.Ordinal);
+        Assert.DoesNotContain("new Pen", separator, StringComparison.Ordinal);
+        Assert.DoesNotContain("StreamGeometry", progress, StringComparison.Ordinal);
+        Assert.DoesNotContain("var pen = new", selection, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

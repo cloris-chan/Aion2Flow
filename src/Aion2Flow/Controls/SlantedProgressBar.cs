@@ -1,4 +1,3 @@
-using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -19,11 +18,7 @@ public sealed class SlantedProgressBar : Control
         AvaloniaProperty.Register<SlantedProgressBar, double>(nameof(SlantWidth), 7d);
 
     private ImmutableSolidColorBrush _fillBrush = new(Colors.Transparent);
-    private StreamGeometry? _fillGeometry;
     private SlantedProgressBarVisualState _cachedState;
-    private Size _geometrySize;
-    private float _geometrySlant = float.NaN;
-    private float _geometryRatio = float.NaN;
     private bool _hasCachedState;
 
     static SlantedProgressBar()
@@ -46,9 +41,13 @@ public sealed class SlantedProgressBar : Control
     public override void Render(DrawingContext context)
     {
         var state = CreateVisualState();
-        EnsureDrawingResources(state);
-        if (state.Ratio > 0f)
-            context.DrawGeometry(_fillBrush, null, _fillGeometry!);
+        EnsureFillBrush(state);
+        var fill = SlantedProgressBarFill.Create(Bounds.Size, state.SlantWidth, state.Ratio);
+        if (!fill.IsVisible)
+            return;
+
+        using (context.PushTransform(fill.Transform))
+            context.FillRectangle(_fillBrush, fill.LocalBounds);
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -73,43 +72,14 @@ public sealed class SlantedProgressBar : Control
             (float)Math.Max(0d, SlantWidth));
     }
 
-    private void EnsureDrawingResources(SlantedProgressBarVisualState state)
+    private void EnsureFillBrush(SlantedProgressBarVisualState state)
     {
         if (!_hasCachedState || state.FillColor != _cachedState.FillColor)
             _fillBrush = new ImmutableSolidColorBrush(state.FillColor);
 
-        var size = Bounds.Size;
-        if (size != _geometrySize || state.SlantWidth != _geometrySlant || state.Ratio != _geometryRatio)
-        {
-            var bounds = SlantedProgressBarVertices.Create(
-                0f,
-                0f,
-                (float)size.Width,
-                (float)size.Height,
-                state.SlantWidth);
-            _fillGeometry = CreateGeometry(SlantedProgressBarVertices.CreateFill(bounds, state.Ratio));
-            _geometrySize = size;
-            _geometrySlant = state.SlantWidth;
-            _geometryRatio = state.Ratio;
-        }
-
         _cachedState = state;
         _hasCachedState = true;
     }
-
-    private static StreamGeometry CreateGeometry(SlantedProgressBarVertices vertices)
-    {
-        var geometry = new StreamGeometry();
-        using var context = geometry.Open();
-        context.BeginFigure(ToPoint(vertices.TopLeft), isFilled: true);
-        context.LineTo(ToPoint(vertices.TopRight));
-        context.LineTo(ToPoint(vertices.BottomRight));
-        context.LineTo(ToPoint(vertices.BottomLeft));
-        context.EndFigure(isClosed: true);
-        return geometry;
-    }
-
-    private static Point ToPoint(Vector2 point) => new(point.X, point.Y);
 }
 
 internal readonly record struct SlantedProgressBarVisualState(
@@ -117,33 +87,22 @@ internal readonly record struct SlantedProgressBarVisualState(
     Color FillColor,
     float SlantWidth);
 
-internal readonly record struct SlantedProgressBarVertices(
-    Vector2 TopLeft,
-    Vector2 TopRight,
-    Vector2 BottomRight,
-    Vector2 BottomLeft)
+internal readonly record struct SlantedProgressBarFill(
+    Matrix Transform,
+    Rect LocalBounds)
 {
-    internal static SlantedProgressBarVertices Create(float x, float y, float width, float height, float slantWidth)
-    {
-        var resolvedWidth = Math.Max(0f, width);
-        var resolvedHeight = Math.Max(0f, height);
-        var resolvedSlant = Math.Clamp(slantWidth, 0f, resolvedWidth);
-        return new SlantedProgressBarVertices(
-            new Vector2(x + resolvedSlant, y),
-            new Vector2(x + resolvedWidth, y),
-            new Vector2(x + resolvedWidth - resolvedSlant, y + resolvedHeight),
-            new Vector2(x, y + resolvedHeight));
-    }
+    internal bool IsVisible => LocalBounds.Width > 0d && LocalBounds.Height > 0d;
 
-    internal static SlantedProgressBarVertices CreateFill(SlantedProgressBarVertices bounds, float ratio)
+    internal static SlantedProgressBarFill Create(Size size, float slantWidth, float ratio)
     {
-        var resolvedRatio = Math.Clamp(ratio, 0f, 1f);
-        var topWidth = Math.Max(0f, bounds.TopRight.X - bounds.TopLeft.X) * resolvedRatio;
-        var bottomWidth = Math.Max(0f, bounds.BottomRight.X - bounds.BottomLeft.X) * resolvedRatio;
-        return new SlantedProgressBarVertices(
-            bounds.TopLeft,
-            new Vector2(bounds.TopLeft.X + topWidth, bounds.TopLeft.Y),
-            new Vector2(bounds.BottomLeft.X + bottomWidth, bounds.BottomLeft.Y),
-            bounds.BottomLeft);
+        var width = Math.Max(0d, size.Width);
+        var height = Math.Max(0d, size.Height);
+        var slant = Math.Clamp(slantWidth, 0d, width);
+        var fillWidth = Math.Max(0d, width - slant) * Math.Clamp(ratio, 0f, 1f);
+        if (height <= 0d || fillWidth <= 0d)
+            return default;
+
+        var transform = new Matrix(1d, 0d, -slant / height, 1d, slant, 0d);
+        return new SlantedProgressBarFill(transform, new Rect(0d, 0d, fillWidth, height));
     }
 }

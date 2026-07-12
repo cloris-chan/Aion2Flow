@@ -21,6 +21,8 @@ public sealed class QuestSelectionHighlight : Control
         AvaloniaProperty.Register<QuestSelectionHighlight, IBrush?>(nameof(SelectionBackground));
 
     private CompositionCustomVisual? _compositionVisual;
+    private ImmutableSolidColorBrush _fallbackBackgroundBrush = new(Colors.Transparent);
+    private Color _fallbackBackgroundColor = Colors.Transparent;
     private QuestSelectionHighlightVisualState _publishedState;
     private bool _hasPublishedState;
 
@@ -46,7 +48,17 @@ public sealed class QuestSelectionHighlight : Control
         if (_compositionVisual is not null)
             return;
 
-        QuestSelectionHighlightVisualHandler.RenderStatic(context, new Rect(Bounds.Size), CreateVisualState());
+        var state = CreateVisualState();
+        if (!state.IsActive)
+            return;
+
+        if (state.BackgroundColor != _fallbackBackgroundColor)
+        {
+            _fallbackBackgroundColor = state.BackgroundColor;
+            _fallbackBackgroundBrush = new ImmutableSolidColorBrush(state.BackgroundColor);
+        }
+
+        QuestSelectionHighlightVisualHandler.RenderStatic(context, new Rect(Bounds.Size), _fallbackBackgroundBrush);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -133,6 +145,7 @@ internal sealed class QuestSelectionHighlightVisualHandler : CompositionCustomVi
 {
     internal const float FlowLayerScale = 1.5f;
     internal static readonly object StopMessage = new();
+    private static readonly ImmutablePen EdgeBaselinePen = new(new ImmutableSolidColorBrush(QuestCompletionEdgeSkiaProgram.BaselineColor), 1d);
 
     private QuestSelectionHighlightVisualState _state;
     private ImmutableSolidColorBrush _backgroundBrush = new(Colors.Transparent);
@@ -201,16 +214,15 @@ internal sealed class QuestSelectionHighlightVisualHandler : CompositionCustomVi
         RenderSkia(lease.SkCanvas, (float)size.X, (float)size.Y);
     }
 
-    internal static void RenderStatic(DrawingContext context, Rect bounds, QuestSelectionHighlightVisualState state)
+    internal static void RenderStatic(DrawingContext context, Rect bounds, IImmutableBrush background)
     {
-        if (!state.IsActive || bounds.Width <= 0d || bounds.Height <= 0d)
+        if (bounds.Width <= 0d || bounds.Height <= 0d)
             return;
 
-        context.FillRectangle(new ImmutableSolidColorBrush(state.BackgroundColor), bounds);
-        var pen = new Pen(new ImmutableSolidColorBrush(QuestCompletionEdgeSkiaProgram.BaselineColor), 1d);
+        context.FillRectangle(background, bounds);
         const double inset = 0.5d;
-        context.DrawLine(pen, new Point(bounds.Left, bounds.Top + inset), new Point(bounds.Right, bounds.Top + inset));
-        context.DrawLine(pen, new Point(bounds.Left, bounds.Bottom - inset), new Point(bounds.Right, bounds.Bottom - inset));
+        context.DrawLine(EdgeBaselinePen, new Point(bounds.Left, bounds.Top + inset), new Point(bounds.Right, bounds.Top + inset));
+        context.DrawLine(EdgeBaselinePen, new Point(bounds.Left, bounds.Bottom - inset), new Point(bounds.Right, bounds.Bottom - inset));
     }
 
     internal static SKRuntimeEffect CompileWaveShaderForDiagnostics() => QuestFlowMaterialSkiaProgram.CompileEffect();
@@ -229,10 +241,9 @@ internal sealed class QuestSelectionHighlightVisualHandler : CompositionCustomVi
         IImmutableBrush background)
     {
         context.FillRectangle(background, bounds);
-        var pen = new ImmutablePen(new ImmutableSolidColorBrush(QuestCompletionEdgeSkiaProgram.BaselineColor), 1d);
         const double inset = 0.5d;
-        context.DrawLine(pen, new Point(bounds.Left, bounds.Top + inset), new Point(bounds.Right, bounds.Top + inset));
-        context.DrawLine(pen, new Point(bounds.Left, bounds.Bottom - inset), new Point(bounds.Right, bounds.Bottom - inset));
+        context.DrawLine(EdgeBaselinePen, new Point(bounds.Left, bounds.Top + inset), new Point(bounds.Right, bounds.Top + inset));
+        context.DrawLine(EdgeBaselinePen, new Point(bounds.Left, bounds.Bottom - inset), new Point(bounds.Right, bounds.Bottom - inset));
     }
 
     private void RenderSkia(SKCanvas canvas, float width, float height)

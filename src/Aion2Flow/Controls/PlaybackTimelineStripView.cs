@@ -145,19 +145,18 @@ public sealed class PlaybackTimelineStripView : Control
                 continue;
 
             var y = Math.Round(step * (bandIndex + 1)) + 0.5d;
-            var pen = new Pen(band.Brush, 1d);
             for (var markerIndex = 0; markerIndex < markers.Count; markerIndex++)
-                DrawMarker(context, markers[markerIndex], duration, bounds.Width, y, pen);
+                DrawMarker(context, markers[markerIndex], duration, bounds.Width, y, band.Brush);
         }
     }
 
-    private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, double duration, double width, double y, Pen pen)
+    private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, double duration, double width, double y, IBrush brush)
     {
         var x = PlaybackTimelineGeometry.PositionToX(marker.PositionMilliseconds, duration, width);
         var halfWidth = Math.Clamp(marker.Weight * 1.8d, 6d, 42d) * 0.5d;
         var start = Math.Max(0d, x - halfWidth);
         var end = Math.Min(width, x + halfWidth);
-        context.DrawLine(pen, new Point(start, y), new Point(Math.Max(start + 1d, end), y));
+        context.FillRectangle(brush, new Rect(start, y - 0.5d, Math.Max(1d, end - start), 1d));
     }
 
     private void RequestSeek(double x)
