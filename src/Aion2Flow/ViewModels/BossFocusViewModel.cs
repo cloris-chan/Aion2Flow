@@ -4,8 +4,6 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed class BossFocusViewModel : FrameBatchedObservableObject
 {
-    private static readonly ProgressSegment[] EmptySegments = [];
-
     public BossFocusViewModel(UiFrameBatchService frameBatchService, long displayKey, int instanceId, int npcCode, int instanceCount, long hp, long maxHp, bool hasHp, bool hasMaxHp)
         : base(frameBatchService)
     {
@@ -102,11 +100,11 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
 
     public bool IsHpUnknown => !HasHp;
 
-    public IReadOnlyList<ProgressSegment> BarSegments
+    public ProgressSegment? BarSegment
     {
         get;
         private set => SetFrameProperty(ref field, value);
-    } = EmptySegments;
+    }
 
     public void Update(int instanceId, int npcCode, int instanceCount, long hp, long maxHp, bool hasHp, bool hasMaxHp)
     {
@@ -116,11 +114,7 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         Apply(hp, maxHp, hasHp, hasMaxHp);
     }
 
-    public void UpdateSegments(IReadOnlyList<ProgressSegment> segments)
-    {
-        if (!AreSameSegments(BarSegments, segments))
-            BarSegments = segments.Count == 0 ? EmptySegments : [.. segments];
-    }
+    public void UpdateSegment(ProgressSegment? segment) => BarSegment = segment;
 
     private void Apply(long hp, long maxHp, bool hasHp, bool hasMaxHp)
     {
@@ -148,19 +142,5 @@ public sealed class BossFocusViewModel : FrameBatchedObservableObject
         HasHp = hasHp;
         HasMaxHp = hasMaxHp;
         HpRatio = hpRatio;
-    }
-
-    private static bool AreSameSegments(IReadOnlyList<ProgressSegment> left, IReadOnlyList<ProgressSegment> right)
-    {
-        if (left.Count != right.Count)
-            return false;
-
-        for (var i = 0; i < left.Count; i++)
-        {
-            if (Math.Abs(left[i].Ratio - right[i].Ratio) > 0.000_001 || !ReferenceEquals(left[i].Brush, right[i].Brush))
-                return false;
-        }
-
-        return true;
     }
 }

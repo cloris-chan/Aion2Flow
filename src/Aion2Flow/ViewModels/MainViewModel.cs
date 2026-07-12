@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
@@ -21,13 +22,13 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsyncDisposable
 {
     private static readonly BossDamageContribution[] EmptyBossDamageContributions = [];
+    private static readonly IBrush BossRemainingHpBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF0, 0xDF, 0x21, 0x4A));
 
     private const string IndicatorIdleColor = "#6F7A8A";
     private const string IndicatorOkColor = "#6FD38A";
     private const string IndicatorWarnColor = "#F3C969";
     private const string IndicatorErrorColor = "#F07C82";
     private const string IndicatorInfoColor = "#8DD6FF";
-    private const double BarColorAlpha = 0x70 / 255d;
     private const double BarColorMinSaturation = 0.52d;
     private const double BarColorSaturationRange = 0.16d;
     private const double BarColorMinLightness = 0.52d;
@@ -49,8 +50,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private SceneCombatSnapshot? _displayContextSnapshot;
     private ArchivedEncounterRecord? _displayContextArchivedRecord;
     private readonly Dictionary<int, IBrush> _combatantBarBrushes = [];
-    private readonly Dictionary<long, IBrush> _bossHpBarBrushes = [];
-    private readonly List<ProgressSegment> _bossSegmentScratch = [];
     private readonly List<BossFocusDisplayGroup> _bossFocusDisplayGroups = [];
     private int _displayContextVersion;
     private int _displayContextBuiltVersion = -1;
@@ -510,7 +509,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             _bossFocusDisplayGroups);
         if (SettingsFlyout.ShowFocusStatusBar)
         {
-            SyncBossFocuses(snapshot.EncounterId, damageContributions);
+            SyncBossFocuses();
         }
         else
         {
@@ -519,7 +518,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         RefreshCombatantBossShares(damageContributions);
     }
 
-    private void SyncBossFocuses(Guid encounterId, IReadOnlyList<BossDamageContribution> damageContributions)
+    private void SyncBossFocuses()
     {
         for (var i = BossFocuses.Count - 1; i >= 0; i--)
         {
@@ -578,57 +577,20 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                     group.Representative.HasMaxHp);
             }
 
-            var hpBrush = ResolveBossHpBrush(encounterId, group.DisplayKey);
-            row.UpdateSegments(CreateBossSegments(group.Representative, damageContributions, hpBrush, encounterId));
+            row.UpdateSegment(CreateBossSegment(group.Representative));
         }
     }
 
-    private List<ProgressSegment> CreateBossSegments(SceneBossFocusSnapshot boss, IReadOnlyList<BossDamageContribution> damageContributions, IBrush hpBrush, Guid encounterId)
+    private static ProgressSegment? CreateBossSegment(SceneBossFocusSnapshot boss)
     {
-        _bossSegmentScratch.Clear();
         if (!boss.HasHp || !boss.HasMaxHp)
-            return _bossSegmentScratch;
+            return null;
 
         var maxHp = Math.Max(1, boss.MaxHp);
         var hpRatio = Math.Clamp(Math.Max(0, boss.Hp) / (double)maxHp, 0d, 1d);
-        if (hpRatio > 0)
-            _bossSegmentScratch.Add(new ProgressSegment(hpRatio, hpBrush));
-
-        var lostRatio = 1d - hpRatio;
-        if (lostRatio <= 0)
-            return _bossSegmentScratch;
-
-        var start = BossFocusDisplayBuilder.FindContributionStart(damageContributions, boss.InstanceId);
-        if (start < 0)
-            return _bossSegmentScratch;
-
-        var end = start;
-        while (end < damageContributions.Count && damageContributions[end].BossId == boss.InstanceId)
-            end++;
-
-        var totalDamage = 0L;
-        for (var i = start; i < end; i++)
-        {
-            var contribution = damageContributions[i];
-            if (contribution.DamageAmount > 0 && Combatants.ContainsKey(contribution.SourceCombatantId))
-                totalDamage += contribution.DamageAmount;
-        }
-
-        if (totalDamage <= 0)
-            return _bossSegmentScratch;
-
-        for (var i = start; i < end; i++)
-        {
-            var contribution = damageContributions[i];
-            if (contribution.DamageAmount <= 0 || !Combatants.ContainsKey(contribution.SourceCombatantId))
-                continue;
-
-            var ratio = lostRatio * contribution.DamageAmount / totalDamage;
-            if (ratio > 0)
-                _bossSegmentScratch.Add(new ProgressSegment(ratio, ResolveCombatantBarBrush(encounterId, contribution.SourceCombatantId)));
-        }
-
-        return _bossSegmentScratch;
+        return hpRatio > 0
+            ? new ProgressSegment(hpRatio, BossRemainingHpBrush)
+            : null;
     }
 
     private void RefreshCombatantBossShares(IReadOnlyList<BossDamageContribution> damageContributions)
@@ -693,7 +655,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _barBrushBaseHue = (int)(_barBrushSeed % 360);
         _nextBarHueIndex = 0;
         _combatantBarBrushes.Clear();
-        _bossHpBarBrushes.Clear();
     }
 
     private IBrush ResolveCombatantBarBrush(Guid encounterId, int combatantId)
@@ -707,24 +668,13 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         return brush;
     }
 
-    private IBrush ResolveBossHpBrush(Guid encounterId, long bossId)
-    {
-        EnsureBarBrushScope(encounterId);
-        if (_bossHpBarBrushes.TryGetValue(bossId, out var brush))
-            return brush;
-
-        brush = CreateGeneratedBrush(_nextBarHueIndex++);
-        _bossHpBarBrushes.Add(bossId, brush);
-        return brush;
-    }
-
     private SolidColorBrush CreateGeneratedBrush(int index)
     {
         var hue = AllocateBarHue(index);
         var variant = MixHash(_barBrushSeed, unchecked((uint)index));
         var saturation = BarColorMinSaturation + BarColorSaturationRange * ((variant & 0xffff) / 65_535d);
         var lightness = BarColorMinLightness + BarColorLightnessRange * (((variant >> 16) & 0xffff) / 65_535d);
-        return new SolidColorBrush(HslColor.ToRgb(hue, saturation, lightness, BarColorAlpha));
+        return new SolidColorBrush(HslColor.ToRgb(hue, saturation, lightness, 1d));
     }
 
     private int AllocateBarHue(int index)

@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using Cloris.Aion2Flow.Capture;
+using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
@@ -445,11 +446,13 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.Equal([300, 301], fixture.ViewModel.Combatants.Select(static row => row.Id));
-        Assert.Single(fixture.ViewModel.Combatants[0].BarSegments);
-        Assert.Single(fixture.ViewModel.Combatants[1].BarSegments);
-        Assert.Equal(1d, fixture.ViewModel.Combatants[0].BarSegments[0].Ratio, 6);
-        Assert.Equal(0.5d, fixture.ViewModel.Combatants[1].BarSegments[0].Ratio, 6);
-        Assert.NotNull(fixture.ViewModel.Combatants[0].BarSegments[0].Brush);
+        var firstBar = fixture.ViewModel.Combatants[0].BarSegment;
+        var secondBar = fixture.ViewModel.Combatants[1].BarSegment;
+        Assert.True(firstBar.HasValue);
+        Assert.True(secondBar.HasValue);
+        Assert.Equal(1d, firstBar.Value.Ratio, 6);
+        Assert.Equal(0.5d, secondBar.Value.Ratio, 6);
+        Assert.NotNull(firstBar.Value.Brush);
     }
 
     [Fact]
@@ -465,16 +468,16 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.AppendSceneDamage(301, 900_002, 11000010, 250, 5_000, 4);
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
-        var firstColor = fixture.ViewModel.Combatants[0].BarSegments[0].Brush;
-        var secondColor = fixture.ViewModel.Combatants[1].BarSegments[0].Brush;
+        var firstColor = fixture.ViewModel.Combatants[0].BarSegment!.Value.Brush;
+        var secondColor = fixture.ViewModel.Combatants[1].BarSegment!.Value.Brush;
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.Equal([300, 301], fixture.ViewModel.Combatants.Select(static row => row.Id));
-        Assert.Equal(1d, fixture.ViewModel.Combatants[0].BarSegments[0].Ratio, 6);
-        Assert.Equal(0.5d, fixture.ViewModel.Combatants[1].BarSegments[0].Ratio, 6);
-        Assert.Same(firstColor, fixture.ViewModel.Combatants[0].BarSegments[0].Brush);
-        Assert.Same(secondColor, fixture.ViewModel.Combatants[1].BarSegments[0].Brush);
+        Assert.Equal(1d, fixture.ViewModel.Combatants[0].BarSegment!.Value.Ratio, 6);
+        Assert.Equal(0.5d, fixture.ViewModel.Combatants[1].BarSegment!.Value.Ratio, 6);
+        Assert.Same(firstColor, fixture.ViewModel.Combatants[0].BarSegment!.Value.Brush);
+        Assert.Same(secondColor, fixture.ViewModel.Combatants[1].BarSegment!.Value.Brush);
     }
 
     [Fact]
@@ -490,8 +493,8 @@ public sealed class MainViewModelCombatantFilterTests
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        var colors = fixture.ViewModel.Combatants.Select(static row => Assert.IsType<SolidColorBrush>(row.BarSegments[0].Brush).Color).ToArray();
-        Assert.All(colors, static color => Assert.Equal(0x70, color.A));
+        var colors = fixture.ViewModel.Combatants.Select(static row => Assert.IsType<SolidColorBrush>(row.BarSegment!.Value.Brush).Color).ToArray();
+        Assert.All(colors, static color => Assert.Equal(byte.MaxValue, color.A));
         Assert.All(colors, static color =>
         {
             var (_, saturation, lightness) = GetHsl(color);
@@ -504,7 +507,7 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_BossSegments_DistributeLostHpByPlayerDamage()
+    public void RefreshCombatStats_SceneMode_BossBarRendersOnlyRemainingHp()
     {
         var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneNickname(300, "First");
@@ -518,16 +521,13 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var focus = Assert.Single(fixture.ViewModel.BossFocuses);
-        Assert.Equal(3, focus.BarSegments.Count);
-        Assert.Equal(0.7d, focus.BarSegments[0].Ratio, 6);
-        Assert.Equal(0.2d, focus.BarSegments[1].Ratio, 6);
-        Assert.Equal(0.1d, focus.BarSegments[2].Ratio, 6);
-        Assert.Same(fixture.ViewModel.Combatants[0].BarSegments[0].Brush, focus.BarSegments[1].Brush);
-        Assert.Same(fixture.ViewModel.Combatants[1].BarSegments[0].Brush, focus.BarSegments[2].Brush);
+        var remainingHp = Assert.IsType<ProgressSegment>(focus.BarSegment);
+        Assert.Equal(0.7d, remainingHp.Ratio, 6);
+        Assert.Equal(Color.FromArgb(0xF0, 0xDF, 0x21, 0x4A), Assert.IsAssignableFrom<ISolidColorBrush>(remainingHp.Brush).Color);
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_BossSegments_ArePerBoss()
+    public void RefreshCombatStats_SceneMode_BossBarsIgnoreDamageContributionDistribution()
     {
         var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneNickname(300, "First");
@@ -544,13 +544,12 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal(2, fixture.ViewModel.BossFocuses.Count);
         var firstBoss = fixture.ViewModel.BossFocuses.Single(static boss => boss.InstanceId == 900_002);
         var secondBoss = fixture.ViewModel.BossFocuses.Single(static boss => boss.InstanceId == 900_003);
-        Assert.Equal([0.5d, 0.45d, 0.05d], firstBoss.BarSegments.Select(static segment => Math.Round(segment.Ratio, 6)));
-        Assert.Equal([0.5d, 0.45d, 0.05d], secondBoss.BarSegments.Select(static segment => Math.Round(segment.Ratio, 6)));
-        Assert.NotSame(firstBoss.BarSegments[1].Brush, secondBoss.BarSegments[1].Brush);
+        Assert.Equal(0.5d, Assert.IsType<ProgressSegment>(firstBoss.BarSegment).Ratio, 6);
+        Assert.Equal(0.5d, Assert.IsType<ProgressSegment>(secondBoss.BarSegment).Ratio, 6);
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_BossSegments_HideDamageWhenHpUnknown()
+    public void RefreshCombatStats_SceneMode_BossBarIsEmptyWhenHpUnknown()
     {
         var fixture = MainViewModelFixture.Create();
         fixture.AppendSceneNickname(300, "First");
@@ -561,7 +560,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         var focus = Assert.Single(fixture.ViewModel.BossFocuses);
         Assert.False(focus.HasHp);
-        Assert.Empty(focus.BarSegments);
+        Assert.Null(focus.BarSegment);
     }
 
     [Fact]

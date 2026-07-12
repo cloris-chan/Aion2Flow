@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-	
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -21,18 +21,18 @@
     </PackageReference>
     <PackageReference Include="Velopack" />
   </ItemGroup>
-	
+
   <ItemGroup>
     <ProjectReference Include="..\Aion2Flow.Capture\Aion2Flow.Capture.csproj" />
     <ProjectReference Include="..\Aion2Flow.Resources\Aion2Flow.Resources.csproj" />
     <ProjectReference Include="..\Aion2Flow.SceneRuntime\Aion2Flow.SceneRuntime.csproj" />
     <ProjectReference Include="..\Aion2Flow.WinDivert\Aion2Flow.WinDivert.csproj" />
   </ItemGroup>
-	
+
   <ItemGroup>
     <AvaloniaResource Include="Assets\Images\**" />
   </ItemGroup>
-	
+
   <ItemGroup>
     <Compile Update="Localization\Strings.Designer.cs">
       <DesignTime>True</DesignTime>
@@ -44,5 +44,5 @@
       <LastGenOutput>Strings.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
-	
+
 </Project>

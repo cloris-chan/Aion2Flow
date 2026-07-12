@@ -8,8 +8,8 @@
         x:DataType="vm:MainViewModel"
         Classes="OverlayWindow"
         WindowDecorations="None"
-        TransparencyLevelHint="AcrylicBlur"
-        Width="280"
+        TransparencyLevelHint="Transparent"
+        Width="320"
         SizeToContent="Height"
         CanResize="False"
         CanMaximize="False"
@@ -21,63 +21,67 @@
         <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
-          RowSpacing="2"
-          Margin="3"
+    <Grid Classes="MainHudShell"
+          RowDefinitions="Auto,Auto,Auto,Auto"
+          RowSpacing="0"
           controls:DisplayContextProvider.DisplayContext="{Binding DisplayContext}">
-        <Grid Grid.Row="0"
-              ColumnDefinitions="Auto,*,Auto"
-              ColumnSpacing="2"
-              Margin="1,0,1,2">
-            <Button Grid.Column="0"
-                    Classes="WindowBtn RefreshBtn"
-                    Command="{Binding ResetCommand}"
-                    IsEnabled="{Binding IsCapturing}"
-                    VerticalAlignment="Center"
-                    ToolTip.Tip="{markups:Translate Action_BattleReset}">
-                <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
-            </Button>
+        <Border Grid.Row="0"
+                Classes="MainHudHeader">
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="2"
+                  Margin="1,0">
+                <Button Grid.Column="0"
+                        Classes="WindowBtn RefreshBtn"
+                        Command="{Binding ResetCommand}"
+                        IsEnabled="{Binding IsCapturing}"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="{markups:Translate Action_BattleReset}">
+                    <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
+                </Button>
 
-            <Border Grid.Column="1"
-                    Classes="TitleBarDragRegion"
-                    PointerPressed="TitleBarDragRegionPointerPressed">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="6"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            IsHitTestVisible="False">
-                    <TextBlock Classes="OverlayHeaderScene"
-                               Text="{Binding SceneName, StringFormat='[{0}]'}"
-                               VerticalAlignment="Center" />
-                    <controls:NumericBlock Classes="OverlayHeaderMetric"
-                                           Value="{Binding EncounterTimeSeconds}"
-                                           FractionDigits="1"
-                                           TrimTrailingZeros="False"
-                                           Suffix="s"
-                                           TextAlignment="Right"
-                                           StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
-                                           IsHitTestVisible="False"
-                                           VerticalAlignment="Center" />
+                <Border Grid.Column="1"
+                        Classes="TitleBarDragRegion"
+                        PointerPressed="TitleBarDragRegionPointerPressed">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="8"
+                          IsHitTestVisible="False">
+                        <TextBlock Grid.Column="0"
+                                   Classes="OverlayHeaderScene"
+                                   Text="{Binding SceneName}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center" />
+                        <controls:NumericBlock Grid.Column="1"
+                                               Classes="OverlayHeaderMetric"
+                                               Value="{Binding EncounterTimeSeconds}"
+                                               FractionDigits="1"
+                                               TrimTrailingZeros="False"
+                                               Suffix="s"
+                                               TextAlignment="Right"
+                                               StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
+                                               VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Column="2"
+                            Classes="TitleBarActions"
+                            Orientation="Horizontal"
+                            Spacing="2">
+                    <Button Classes="WindowBtn MinBtn"
+                            Click="Minimize">
+                        <Path Classes="Glyph GlyphSm" Data="{StaticResource minus}" />
+                    </Button>
+
+                    <Button Classes="WindowBtn CloseBtn"
+                            Click="Exit">
+                        <Path Classes="Glyph GlyphSm" Data="{StaticResource x}" />
+                    </Button>
                 </StackPanel>
-            </Border>
-
-            <StackPanel Grid.Column="2"
-                        Classes="TitleBarActions"
-                        Orientation="Horizontal"
-                        Spacing="2">
-                <Button Classes="WindowBtn MinBtn"
-                        Click="Minimize">
-                    <Path Classes="Glyph GlyphSm" Data="{StaticResource minus}" />
-                </Button>
-
-                <Button Classes="WindowBtn CloseBtn"
-                        Click="Exit">
-                    <Path Classes="Glyph GlyphSm" Data="{StaticResource x}" />
-                </Button>
-            </StackPanel>
-        </Grid>
+            </Grid>
+        </Border>
 
         <ItemsControl Grid.Row="1"
+                      Classes="BossFocusList"
+                      Grid.IsSharedSizeScope="True"
                       ItemsSource="{Binding BossFocuses}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -87,14 +91,22 @@
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:BossFocusViewModel">
                     <Border Classes="BossFocusPanel">
-                        <Grid>
-                            <controls:SegmentedProgressBar Classes="BossFocusHpBar"
-                                                           Segments="{Binding BarSegments}"
+                        <Grid Height="26"
+                              Margin="4,2,4,4">
+                            <controls:BossFocusProgressBar Classes="BossFocusHpBar"
+                                                           Segment="{Binding BarSegment}"
                                                            IsHitTestVisible="False" />
 
-                            <Grid ColumnDefinitions="*,Auto"
-                                  ColumnSpacing="8"
-                                  Margin="8,2,8,2">
+                            <Grid Margin="16,0"
+                                  IsHitTestVisible="False">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossFocusCurrentHp" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossFocusMaxHp" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossFocusHpPercent" />
+                                </Grid.ColumnDefinitions>
                                 <Grid Grid.Column="0"
                                       ColumnDefinitions="*,Auto"
                                       ColumnSpacing="4"
@@ -102,9 +114,11 @@
                                       VerticalAlignment="Center">
                                     <controls:NpcDisplay Grid.Column="0"
                                                          Classes="BossFocusName"
-                                                         IconSize="26"
+                                                         ShowIcon="False"
+                                                         IconSpacing="0"
                                                          EntityId="{Binding InstanceId}"
                                                          NpcCode="{Binding NpcCode}"
+                                                         HorizontalAlignment="Stretch"
                                                          VerticalAlignment="Center" />
                                     <Border Grid.Column="1"
                                             Classes="BossFocusCountBadge"
@@ -115,65 +129,60 @@
                                     </Border>
                                 </Grid>
 
-                                <Grid Grid.Column="1"
-                                      ColumnDefinitions="Auto,Auto,Auto"
-                                      ColumnSpacing="2"
-                                      MinWidth="100"
-                                      HorizontalAlignment="Right"
-                                      VerticalAlignment="Center">
-                                    <controls:NumericBlock Classes="BossFocusHp"
-                                                           Grid.Column="0"
-                                                           MinWidth="44"
-                                                           Value="{Binding Hp}"
-                                                           UseGrouping="True"
-                                                           HorizontalAlignment="Right"
-                                                           TextAlignment="Right"
-                                                           IsVisible="{Binding IsHpVisible}"
-                                                           VerticalAlignment="Center" />
-                                    <TextBlock Classes="BossFocusHpMuted"
-                                               Grid.Column="0"
-                                               MinWidth="44"
-                                               Text="--"
-                                               HorizontalAlignment="Right"
-                                               TextAlignment="Right"
-                                               IsVisible="{Binding IsHpUnknown}"
-                                               VerticalAlignment="Center" />
-                                    <TextBlock Classes="BossFocusHpSlash"
-                                               Grid.Column="1"
-                                               Text="/"
-                                               IsVisible="{Binding IsHpVisible}"
-                                               VerticalAlignment="Center" />
-                                    <TextBlock Classes="BossFocusHpSlash"
-                                               Grid.Column="1"
-                                               Text="/"
-                                               IsVisible="{Binding IsHpUnknown}"
-                                               VerticalAlignment="Center" />
-                                    <controls:NumericBlock Classes="BossFocusHpMuted"
-                                                           Grid.Column="2"
-                                                           MinWidth="52"
-                                                           Value="{Binding MaxHp}"
-                                                           UseGrouping="True"
-                                                           HorizontalAlignment="Right"
-                                                           TextAlignment="Right"
-                                                           IsVisible="{Binding IsMaxHpVisible}"
-                                                           VerticalAlignment="Center" />
-                                    <TextBlock Classes="BossFocusHpMuted"
-                                               Grid.Column="2"
-                                               MinWidth="52"
-                                               Text="--"
-                                               HorizontalAlignment="Right"
-                                               TextAlignment="Right"
-                                               IsVisible="{Binding IsMaxHpUnknown}"
-                                               VerticalAlignment="Center" />
-                                    <TextBlock Classes="BossFocusHpMuted"
-                                               Grid.Column="2"
-                                               MinWidth="52"
-                                               Text="--"
-                                               HorizontalAlignment="Right"
-                                               TextAlignment="Right"
-                                               IsVisible="{Binding IsHpUnknown}"
-                                               VerticalAlignment="Center" />
-                                </Grid>
+                                <controls:NumericBlock Grid.Column="1"
+                                                       Classes="BossFocusHp"
+                                                       Value="{Binding Hp}"
+                                                       UseGrouping="True"
+                                                       HorizontalAlignment="Right"
+                                                       TextAlignment="Right"
+                                                       IsVisible="{Binding IsHpVisible}"
+                                                       VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Classes="BossFocusHpMuted"
+                                           Text="--"
+                                           HorizontalAlignment="Right"
+                                           TextAlignment="Right"
+                                           IsVisible="{Binding IsHpUnknown}"
+                                           VerticalAlignment="Center" />
+
+                                <TextBlock Grid.Column="2"
+                                           Classes="BossFocusHpSlash"
+                                           Text="/"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+
+                                <controls:NumericBlock Grid.Column="3"
+                                                       Classes="BossFocusHpMuted"
+                                                       Value="{Binding MaxHp}"
+                                                       UseGrouping="True"
+                                                       HorizontalAlignment="Right"
+                                                       TextAlignment="Right"
+                                                       IsVisible="{Binding IsMaxHpVisible}"
+                                                       VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="3"
+                                           Classes="BossFocusHpMuted"
+                                           Text="--"
+                                           HorizontalAlignment="Right"
+                                           TextAlignment="Right"
+                                           IsVisible="{Binding IsMaxHpUnknown}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="3"
+                                           Classes="BossFocusHpMuted"
+                                           Text="--"
+                                           HorizontalAlignment="Right"
+                                           TextAlignment="Right"
+                                           IsVisible="{Binding IsHpUnknown}"
+                                           VerticalAlignment="Center" />
+
+                                <controls:NumericBlock Grid.Column="5"
+                                                       Classes="BossFocusPercent"
+                                                       Value="{Binding HpRatio}"
+                                                       UsePercentageNotation="True"
+                                                       FractionDigits="0"
+                                                       HorizontalAlignment="Right"
+                                                       TextAlignment="Right"
+                                                       IsVisible="{Binding IsMaxHpVisible}"
+                                                       VerticalAlignment="Center" />
                             </Grid>
                         </Grid>
                     </Border>
@@ -182,10 +191,13 @@
         </ItemsControl>
 
         <controls:AnimatedItemsView Grid.Row="2"
-                                     ItemSpacing="1"
+                                     ItemSpacing="2"
                                      ItemsSource="{Binding Combatants}"
                                      SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}"
-                                     MaxVisibleItems="{Binding SettingsFlyout.MaxVisibleCombatantRows}">
+                                     MaxVisibleItems="{Binding SettingsFlyout.MaxVisibleCombatantRows}"
+                                     MoveDuration="0:0:0.16"
+                                     AddRemoveDuration="0:0:0.14"
+                                     AddRemoveOffset="16">
             <controls:AnimatedItemsView.EmptyTemplate>
                 <DataTemplate x:DataType="vm:MainViewModel">
                     <Border Padding="0,10">
@@ -203,26 +215,27 @@
                             Classes="OverlayRowCard"
                             Tapped="CombatantRowTapped">
                         <Grid>
-                            <controls:SegmentedProgressBar Classes="CombatantRowBar"
-                                                           Segments="{Binding BarSegments}"
-                                                           IsHitTestVisible="False" />
+                            <controls:QuestSelectionHighlight Classes="CombatantRowSelection"
+                                                              IsActive="{Binding $parent[controls:AnimatedItemsViewItem].IsSelected}"
+                                                              IsHitTestVisible="False" />
 
-                            <Grid ColumnDefinitions="2,*,Auto,Auto,Auto"
-                                  ColumnSpacing="5"
-                                  Margin="3,2">
-                                <Border Grid.Column="0"
-                                        Name="RowAccent"
-                                        Classes="MainRowAccent" />
+                            <controls:SlantedProgressBar Classes="CombatantRowBar"
+                                                         Segment="{Binding BarSegment}"
+                                                         IsHitTestVisible="False" />
 
-                                <controls:PcDisplay Grid.Column="1"
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto"
+                                  ColumnSpacing="7"
+                                  Margin="5,3">
+                                <controls:PcDisplay Grid.Column="0"
                                                     Classes="OverlayRowName"
-                                                    IconSize="26"
+                                                    IconSize="40"
+                                                    IconSpacing="5"
                                                     EntityId="{Binding Id}"
-                                                    VerticalAlignment="Center" />
+                                                    VerticalAlignment="Stretch" />
 
-                                <controls:NumericBlock Grid.Column="2"
+                                <controls:NumericBlock Grid.Column="1"
                                                        Classes="OverlayRowMetricStrong"
-                                                       MinWidth="46"
+                                                       MinWidth="58"
                                                        Value="{Binding DamagePerSecond}"
                                                        IsVisible="{Binding Columns.ShowDamagePerSecondColumn}"
                                                        VerticalAlignment="Center"
@@ -234,9 +247,9 @@
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3" />
 
-                                <controls:NumericBlock Grid.Column="3"
+                                <controls:NumericBlock Grid.Column="2"
                                                        Classes="OverlayRowMetric"
-                                                       MinWidth="54"
+                                                       MinWidth="68"
                                                        Value="{Binding Damage}"
                                                        IsVisible="{Binding Columns.ShowDamageColumn}"
                                                        VerticalAlignment="Center"
@@ -248,7 +261,7 @@
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3" />
 
-                                <controls:NumericBlock Grid.Column="4"
+                                <controls:NumericBlock Grid.Column="3"
                                                        Classes="CombatantBossShareValue"
                                                        Value="{Binding BossShareRatio}"
                                                        IsVisible="{Binding HasBossShare}"
@@ -264,116 +277,106 @@
             </controls:AnimatedItemsView.ItemTemplate>
         </controls:AnimatedItemsView>
 
-        <Grid Grid.Row="3"
-              ColumnDefinitions="Auto,*,Auto"
-              ColumnSpacing="6"
-              Margin="1,2,1,0">
-            <Button Grid.Column="0"
-                    Classes="BottomBarButton"
-                    MinWidth="26"
-                    VerticalAlignment="Center"
-                    ToolTip.Tip="{markups:Translate Settings_Title}">
-                <Path Classes="Glyph GlyphMd" Data="{StaticResource settings}" />
-                <Button.Flyout>
-                    <Flyout Placement="TopEdgeAlignedLeft"
-                            ShowMode="Transient">
-                        <Flyout.FlyoutPresenterTheme>
-                            <ControlTheme TargetType="FlyoutPresenter">
-                                <Setter Property="Background" Value="Transparent" />
-                                <Setter Property="BorderThickness" Value="0" />
-                                <Setter Property="Padding" Value="0" />
-                                <Setter Property="Template">
-                                    <ControlTemplate>
-                                        <ContentPresenter Content="{TemplateBinding Content}" />
-                                    </ControlTemplate>
-                                </Setter>
-                            </ControlTheme>
-                        </Flyout.FlyoutPresenterTheme>
-                        <views:SettingsFlyoutView DataContext="{Binding SettingsFlyout}" />
-                    </Flyout>
-                </Button.Flyout>
-            </Button>
-
-            <StackPanel Grid.Column="1"
-                        Orientation="Horizontal"
-                        Spacing="6"
-                        VerticalAlignment="Center"
-                        ToolTip.Tip="{Binding Status}">
-                <StackPanel Orientation="Horizontal"
-                            Spacing="4"
-                            VerticalAlignment="Center">
-                    <Ellipse Classes="BottomBarStatusDot"
-                             Fill="{Binding DriverIndicatorColor}"
-                             ToolTip.Tip="{Binding DriverIndicatorToolTip}" />
-                    <Ellipse Classes="BottomBarStatusDot"
-                             Fill="{Binding GamePortIndicatorColor}"
-                             ToolTip.Tip="{Binding GamePortIndicatorToolTip}" />
-                    <Ellipse Classes="BottomBarStatusDot"
-                             Fill="{Binding CaptureLockIndicatorColor}"
-                             ToolTip.Tip="{Binding CaptureLockIndicatorToolTip}" />
-                </StackPanel>
-
-                <Border Classes="BottomBarDivider" />
-
-                <StackPanel Orientation="Horizontal"
-                            Spacing="4"
-                            VerticalAlignment="Center"
-                            ToolTip.Tip="{Binding LatencyToolTip}">
-                    <Path Classes="Glyph GlyphMd BottomBarSignalGlyph"
-                          Data="{StaticResource wifi}"
-                          Stroke="{Binding LatencyIndicatorColor}" />
-                    <controls:NumericBlock Classes="BottomBarMetric"
-                                           Value="{Binding RoundTripTimeMilliseconds}"
-                                           Suffix=" ms"
-                                           TextAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Right" />
-                </StackPanel>
-            </StackPanel>
-
-            <StackPanel Grid.Column="2"
-                        Orientation="Horizontal"
-                        Spacing="0"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Right">
-                <Button Classes="BottomBarButton"
-                        CornerRadius="999,0,0,999"
-                        MinWidth="26"
-                        IsEnabled="{Binding IsViewingArchivedEncounter}"
-                        Command="{Binding ReturnToLiveCommand}"
-                        ToolTip.Tip="{markups:Translate Action_Live}">
-                    <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
-                </Button>
-
-                <Border Classes="BottomBarDivider"
-                        IsHitTestVisible="False" />
-
-                <Button Classes="BottomBarButton"
-                        MinWidth="26"
-                        IsEnabled="{Binding IsViewingArchivedEncounter}"
-                        Click="OpenSelectedPlayback"
-                        ToolTip.Tip="{markups:Translate Playback_Open}">
-                    <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
-                </Button>
-
-                <Border Classes="BottomBarDivider"
-                        IsHitTestVisible="False" />
-
-                <Button x:Name="EncounterHistoryButton"
+        <Border Grid.Row="3"
+                Classes="MainHudFooter">
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="6"
+                  Margin="2,0">
+                <Button Grid.Column="0"
                         Classes="BottomBarButton"
-                        CornerRadius="0,999,999,0"
-                        MinWidth="26"
-                        IsEnabled="{Binding HasArchivedEncounters}"
-                        ToolTip.Tip="{markups:Translate Column_History}">
-                    <Path Classes="Glyph GlyphMd" Data="{StaticResource history}" />
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="{markups:Translate Settings_Title}">
+                    <Path Classes="Glyph GlyphMd" Data="{StaticResource settings}" />
                     <Button.Flyout>
-                        <MenuFlyout Placement="TopEdgeAlignedRight"
-                                    ShowMode="Transient"
-                                    FlyoutPresenterClasses="BottomBarMenuFlyout BottomBarHistoryMenuFlyout" />
+                        <Flyout Placement="TopEdgeAlignedLeft"
+                                ShowMode="Transient">
+                            <Flyout.FlyoutPresenterTheme>
+                                <ControlTheme TargetType="FlyoutPresenter">
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Template">
+                                        <ControlTemplate>
+                                            <ContentPresenter Content="{TemplateBinding Content}" />
+                                        </ControlTemplate>
+                                    </Setter>
+                                </ControlTheme>
+                            </Flyout.FlyoutPresenterTheme>
+                            <views:SettingsFlyoutView DataContext="{Binding SettingsFlyout}" />
+                        </Flyout>
                     </Button.Flyout>
                 </Button>
-            </StackPanel>
-        </Grid>
+
+                <StackPanel Orientation="Horizontal"
+                            Grid.Column="1"
+                            Spacing="6"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="{Binding Status}">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="4"
+                                VerticalAlignment="Center">
+                        <Border Classes="BottomBarStatusIndicator"
+                                Background="{Binding DriverIndicatorColor}"
+                                ToolTip.Tip="{Binding DriverIndicatorToolTip}" />
+                        <Border Classes="BottomBarStatusIndicator"
+                                Background="{Binding GamePortIndicatorColor}"
+                                ToolTip.Tip="{Binding GamePortIndicatorToolTip}" />
+                        <Border Classes="BottomBarStatusIndicator"
+                                Background="{Binding CaptureLockIndicatorColor}"
+                                ToolTip.Tip="{Binding CaptureLockIndicatorToolTip}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="4"
+                                VerticalAlignment="Center"
+                                ToolTip.Tip="{Binding LatencyToolTip}">
+                        <Path Classes="Glyph GlyphMd BottomBarSignalGlyph"
+                              Data="{StaticResource wifi}"
+                              Stroke="{Binding LatencyIndicatorColor}" />
+                        <controls:NumericBlock Classes="BottomBarMetric"
+                                               Value="{Binding RoundTripTimeMilliseconds}"
+                                               Suffix=" ms"
+                                               TextAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Right" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="3"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right">
+                    <Button Classes="BottomBarButton"
+                            IsVisible="{Binding IsViewingArchivedEncounter}"
+                            IsEnabled="{Binding IsViewingArchivedEncounter}"
+                            Command="{Binding ReturnToLiveCommand}"
+                            ToolTip.Tip="{markups:Translate Action_Live}">
+                        <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
+                    </Button>
+
+                    <Button Classes="BottomBarButton"
+                            IsVisible="{Binding IsViewingArchivedEncounter}"
+                            IsEnabled="{Binding IsViewingArchivedEncounter}"
+                            Click="OpenSelectedPlayback"
+                            ToolTip.Tip="{markups:Translate Playback_Open}">
+                        <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
+                    </Button>
+
+                    <Button x:Name="EncounterHistoryButton"
+                            Classes="BottomBarButton"
+                            IsEnabled="{Binding HasArchivedEncounters}"
+                            ToolTip.Tip="{markups:Translate Column_History}">
+                        <Path Classes="Glyph GlyphMd" Data="{StaticResource history}" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="TopEdgeAlignedRight"
+                                        ShowMode="Transient"
+                                        FlyoutPresenterClasses="BottomBarMenuFlyout BottomBarHistoryMenuFlyout" />
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 
     <FlyoutBase.AttachedFlyout>

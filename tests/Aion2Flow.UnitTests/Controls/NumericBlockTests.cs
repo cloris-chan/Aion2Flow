@@ -1,19 +1,18 @@
-using System.Reflection;
 using Avalonia;
-using Avalonia.Threading;
+using Avalonia.Media;
+using Avalonia.Styling;
 using Cloris.Aion2Flow.Controls;
+using Cloris.Aion2Flow.Presentation;
 
 namespace Cloris.Aion2Flow.Tests.Controls;
 
 public sealed class NumericBlockTests
 {
     private static readonly Size InfiniteSize = new(double.PositiveInfinity, double.PositiveInfinity);
-    private static readonly Lock s_avaloniaGate = new();
-    private static bool s_avaloniaInitialized;
 
     public NumericBlockTests()
     {
-        EnsureAvalonia();
+        AvaloniaTestHost.EnsureInitialized();
     }
 
     [Theory]
@@ -143,32 +142,24 @@ public sealed class NumericBlockTests
         Assert.Equal(0, second.GetDiagnostics().TypefaceResolveCount);
     }
 
-    private static void EnsureAvalonia()
+    [Fact]
+    public void ApplicationTextRenderingPolicy_UsesUnhintedGrayscaleRendering()
     {
-        if (Application.Current is not null || s_avaloniaInitialized)
-        {
-            return;
-        }
+        var options = AppTextRenderingPolicy.ApplicationOptions;
 
-        lock (s_avaloniaGate)
-        {
-            if (Application.Current is not null || s_avaloniaInitialized)
-            {
-                return;
-            }
-
-            typeof(Dispatcher)
-                .GetMethod("ResetBeforeUnitTests", BindingFlags.Static | BindingFlags.NonPublic)
-                ?.Invoke(null, null);
-
-            AppBuilder
-                .Configure<TestApplication>()
-                .UsePlatformDetect()
-                .SetupWithoutStarting();
-
-            s_avaloniaInitialized = true;
-        }
+        Assert.Equal(TextRenderingMode.Antialias, options.TextRenderingMode);
+        Assert.Equal(TextHintingMode.None, options.TextHintingMode);
+        Assert.Equal(BaselinePixelAlignment.Unaligned, options.BaselinePixelAlignment);
     }
 
-    private sealed class TestApplication : Application;
+    [Fact]
+    public void ApplicationTextRenderingPolicy_CreatesTopLevelStyleWithApplicationOptions()
+    {
+        var style = AppTextRenderingPolicy.CreateTopLevelStyle();
+        var setter = Assert.IsType<Setter>(Assert.Single(style.Setters));
+
+        Assert.Equal(AppTextRenderingPolicy.OptionsProperty, setter.Property);
+        Assert.Equal(AppTextRenderingPolicy.ApplicationOptions, setter.Value);
+    }
+
 }

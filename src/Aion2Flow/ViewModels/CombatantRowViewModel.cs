@@ -6,8 +6,6 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService, CombatantColumnLayoutViewModel columns, int id, CharacterClass? characterClass, double damagePerSecond, double healingPerSecond, double damage, double healing) : FrameBatchedObservableObject(frameBatchService)
 {
-    private static readonly ProgressSegment[] EmptySegments = [];
-
     public CombatantColumnLayoutViewModel Columns { get; } = columns;
 
     public int Id { get; set; } = id;
@@ -42,11 +40,11 @@ public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService,
         set => SetFrameProperty(ref field, value);
     } = healing;
 
-    public IReadOnlyList<ProgressSegment> BarSegments
+    public ProgressSegment? BarSegment
     {
         get;
         private set => SetFrameProperty(ref field, value);
-    } = EmptySegments;
+    }
 
     public bool HasBossShare
     {
@@ -65,16 +63,16 @@ public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService,
         var resolvedRatio = Math.Clamp(ratio, 0d, 1d);
         if (resolvedRatio <= 0)
         {
-            if (BarSegments.Count != 0)
-                BarSegments = EmptySegments;
+            if (BarSegment.HasValue)
+                BarSegment = null;
             return;
         }
 
-        var segments = BarSegments;
-        if (segments.Count == 1 && Math.Abs(segments[0].Ratio - resolvedRatio) <= 0.000_001 && ReferenceEquals(segments[0].Brush, brush))
+        var segment = BarSegment;
+        if (segment.HasValue && Math.Abs(segment.Value.Ratio - resolvedRatio) <= 0.000_001 && ReferenceEquals(segment.Value.Brush, brush))
             return;
 
-        BarSegments = [new ProgressSegment(resolvedRatio, brush)];
+        BarSegment = new ProgressSegment(resolvedRatio, brush);
     }
 
     public void UpdateBossShare(double ratio, bool isVisible)
