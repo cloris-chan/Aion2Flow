@@ -18,9 +18,18 @@
         <SolidColorBrush x:Key="OverlayBrush.RowMetricText">#C4D1DC</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainAccent">#E3C78C</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainHudBackdrop">#A80A0D0F</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.MainHudContentBackdrop">#780A0D0F</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainHudPanelHover">#24192225</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainHudPanelSelected">#321A2528</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainHudGold">#E6D39A</SolidColorBrush>
+        <LinearGradientBrush x:Key="OverlayBrush.MainHudFooterSeparator"
+                             StartPoint="0%,50%"
+                             EndPoint="100%,50%">
+            <GradientStop Color="#00A6C4DD" Offset="0" />
+            <GradientStop Color="#58A6C4DD" Offset="0.16" />
+            <GradientStop Color="#58A6C4DD" Offset="0.84" />
+            <GradientStop Color="#00A6C4DD" Offset="1" />
+        </LinearGradientBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailBackdrop">#9E060A0D</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSurface">#52060A0D</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSurfaceStrong">#6A070B0E</SolidColorBrush>
@@ -40,20 +49,33 @@
     </Style>
 
     <Style Selector="Grid.MainHudShell">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.MainHudBackdrop}" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
     <Style Selector="Border.MainHudHeader">
-        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.MainHudBackdrop}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="MinHeight" Value="30" />
+    </Style>
+
+    <Style Selector="Border.MainHudContentBackdrop">
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.MainHudContentBackdrop}" />
+        <Setter Property="BorderThickness" Value="0" />
     </Style>
 
     <Style Selector="Border.MainHudFooter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="MinHeight" Value="28" />
+    </Style>
+
+    <Style Selector="Border.MainHudFooterSeparator">
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.MainHudFooterSeparator}" />
+        <Setter Property="Height" Value="1" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
 
     <Style Selector="FlyoutPresenter">

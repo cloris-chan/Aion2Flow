@@ -79,6 +79,11 @@
             </Grid>
         </Border>
 
+        <Border Grid.Row="1"
+                Grid.RowSpan="3"
+                Classes="MainHudContentBackdrop"
+                IsHitTestVisible="False" />
+
         <ItemsControl Grid.Row="1"
                       Classes="BossFocusList"
                       Grid.IsSharedSizeScope="True"
@@ -276,6 +281,10 @@
                 </DataTemplate>
             </controls:AnimatedItemsView.ItemTemplate>
         </controls:AnimatedItemsView>
+
+        <Border Grid.Row="3"
+                Classes="MainHudFooterSeparator"
+                IsHitTestVisible="False" />
 
         <Border Grid.Row="3"
                 Classes="MainHudFooter">
