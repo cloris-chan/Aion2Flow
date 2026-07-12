@@ -33,15 +33,20 @@ public sealed class PlaybackTimelineView : Control
 
     public static readonly StyledProperty<double> PlayheadThicknessProperty = AvaloniaProperty.Register<PlaybackTimelineView, double>(nameof(PlayheadThickness), 2d);
 
+    public static readonly StyledProperty<bool> IsPlayheadVisibleProperty = AvaloniaProperty.Register<PlaybackTimelineView, bool>(nameof(IsPlayheadVisible), true);
+
     static PlaybackTimelineView()
     {
-        AffectsRender<PlaybackTimelineView>(MarkersProperty, SpansProperty, DurationMillisecondsProperty, PositionMillisecondsProperty, TrackBrushProperty, ProgressBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty);
+        AffectsRender<PlaybackTimelineView>(MarkersProperty, SpansProperty, DurationMillisecondsProperty, PositionMillisecondsProperty, TrackBrushProperty, ProgressBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty, IsPlayheadVisibleProperty);
     }
 
     private IReadOnlyList<PlaybackTimelineMarker>? _markers;
     private IReadOnlyList<PlaybackTimelineSpan>? _spans;
     private double _durationMilliseconds;
     private double _positionMilliseconds;
+    private IBrush? _cachedPlayheadBrush;
+    private double _cachedPlayheadThickness;
+    private Pen? _playheadPen;
 
     public event EventHandler<PlaybackSeekRequestedEventArgs>? SeekRequested;
 
@@ -93,6 +98,12 @@ public sealed class PlaybackTimelineView : Control
         set => SetValue(PlayheadThicknessProperty, value);
     }
 
+    public bool IsPlayheadVisible
+    {
+        get => GetValue(IsPlayheadVisibleProperty);
+        set => SetValue(IsPlayheadVisibleProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         var bounds = new Rect(Bounds.Size);
@@ -125,9 +136,8 @@ public sealed class PlaybackTimelineView : Control
                 DrawMarker(context, markers[i], duration, bounds);
         }
 
-        var playhead = PlayheadBrush ?? Brushes.White;
-        var thickness = Math.Max(1d, PlayheadThickness);
-        context.DrawLine(new Pen(playhead, thickness), new Point(playheadX, 0), new Point(playheadX, bounds.Height));
+        if (IsPlayheadVisible)
+            context.DrawLine(GetPlayheadPen(), new Point(playheadX, 0), new Point(playheadX, bounds.Height));
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -196,5 +206,19 @@ public sealed class PlaybackTimelineView : Control
             return;
 
         SeekRequested?.Invoke(this, new PlaybackSeekRequestedEventArgs(PlaybackTimelineGeometry.XToPosition(x, duration, width)));
+    }
+
+    private Pen GetPlayheadPen()
+    {
+        var brush = PlayheadBrush ?? Brushes.White;
+        var thickness = Math.Max(1d, PlayheadThickness);
+        if (_playheadPen is null || !ReferenceEquals(_cachedPlayheadBrush, brush) || Math.Abs(_cachedPlayheadThickness - thickness) > double.Epsilon)
+        {
+            _cachedPlayheadBrush = brush;
+            _cachedPlayheadThickness = thickness;
+            _playheadPen = new Pen(brush, thickness);
+        }
+
+        return _playheadPen;
     }
 }

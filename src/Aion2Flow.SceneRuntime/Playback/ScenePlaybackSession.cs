@@ -11,7 +11,6 @@ namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
 public sealed class ScenePlaybackSession
 {
-    private const int DefaultRecentMarkerCapacity = 512;
     private readonly IScenePlaybackSource _source;
     private FrameProjector? _projector;
     private long _nextLoadedObservationOrdinal;
@@ -29,6 +28,9 @@ public sealed class ScenePlaybackSession
     public long NextLoadedObservationOrdinal => _nextLoadedObservationOrdinal;
 
     public long PositionMilliseconds => _positionMilliseconds;
+
+    public ScenePlaybackTrackIndex CreateTrackIndex(CancellationToken cancellationToken = default)
+        => ScenePlaybackTrackIndex.Build(_source.CreateTimelineSegment(), cancellationToken);
 
     public void ResetLoadedCursor()
     {
@@ -126,9 +128,6 @@ public sealed class ScenePlaybackSession
         private readonly Dictionary<int, ScenePlaybackResourceState> _resources;
         private readonly Dictionary<ScenePlaybackAuraInstanceKey, ScenePlaybackAuraState> _auraInstances;
         private readonly Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks;
-        private readonly Queue<ScenePlaybackTrackMarker> _recentMarkers;
-        private ScenePlaybackTrackMarker[] _recentMarkerSnapshot = [];
-        private bool _recentMarkerSnapshotDirty;
         private SceneJournalSegment _segment;
         private ScenePlaybackTimeRange _timeRange;
         private JournalCursor _cursor;
@@ -153,7 +152,6 @@ public sealed class ScenePlaybackSession
             _resources = [];
             _auraInstances = [];
             _tracks = [];
-            _recentMarkers = new Queue<ScenePlaybackTrackMarker>(DefaultRecentMarkerCapacity);
             _cursor = segment.CreateCursor();
             _targetOffsetMilliseconds = timeRange.HasTiming ? timeRange.StartOffsetMilliseconds : 0;
             _positionMilliseconds = 0;
@@ -222,8 +220,7 @@ public sealed class ScenePlaybackSession
                 CombatTotals = totals,
                 Resources = CreateResourceSnapshot(),
                 ActiveAuras = CreateActiveAuraSnapshot(),
-                Tracks = CreateTrackSnapshot(),
-                RecentMarkers = CreateRecentMarkerSnapshot()
+                Tracks = CreateTrackSnapshot()
             };
         }
 
@@ -391,7 +388,6 @@ public sealed class ScenePlaybackSession
                 };
             }
 
-            AddRecentMarker(marker);
         }
 
         private ScenePlaybackLifecycleEventKind ResolveLifecycleEventKind(in ObservedEventEnvelope entry)
@@ -424,14 +420,6 @@ public sealed class ScenePlaybackSession
                 maximumValue = maximumValue.HasValue ? Math.Max(maximumValue.Value, entityMaxHp) : entityMaxHp;
 
             return maximumValue;
-        }
-
-        private void AddRecentMarker(ScenePlaybackTrackMarker marker)
-        {
-            _recentMarkers.Enqueue(marker);
-            while (_recentMarkers.Count > DefaultRecentMarkerCapacity)
-                _recentMarkers.Dequeue();
-            _recentMarkerSnapshotDirty = true;
         }
 
         private static long? ResolveExpiration(long renewedAtMilliseconds, ushort durationMilliseconds)
@@ -533,19 +521,6 @@ public sealed class ScenePlaybackSession
                 result[index++] = accumulator.ToWindow(track);
             Array.Sort(result, static (left, right) => left.Track.CompareTo(right.Track));
             return result;
-        }
-
-        private ScenePlaybackTrackMarker[] CreateRecentMarkerSnapshot()
-        {
-            if (_recentMarkers.Count == 0)
-                return [];
-
-            if (!_recentMarkerSnapshotDirty)
-                return _recentMarkerSnapshot;
-
-            _recentMarkerSnapshot = _recentMarkers.ToArray();
-            _recentMarkerSnapshotDirty = false;
-            return _recentMarkerSnapshot;
         }
 
         private sealed class PlaybackDetailEventWriter : ICombatDetailEventWriter

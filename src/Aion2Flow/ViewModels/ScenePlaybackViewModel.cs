@@ -20,6 +20,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private const int MaxSkillTimelineEventKeys = 96;
     private const int MaxSkillTimelineMarkersPerTrack = 96;
     private const long EventWindowRadiusMilliseconds = 4_000;
+    private const long EventWindowRefreshIntervalMilliseconds = 100;
     private const long StepMilliseconds = 1_000;
     private const long CombatantRefreshIntervalMilliseconds = 250;
 
@@ -33,24 +34,28 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private readonly HashSet<long> _eventWindowOrdinals = [];
     private readonly Dictionary<SkillBaseKey, IReadOnlyList<PlaybackTimelineMarker>> _skillTimelineMarkersByBaseKey = [];
     private CancellationTokenSource? _detailCancellation;
+    private CancellationTokenSource? _eventIndexCancellation;
     private CancellationTokenSource? _skillTimelineCancellation;
     private CancellationTokenSource? _auraTimelineCancellation;
     private Task? _detailTask;
+    private Task? _eventIndexTask;
     private Task? _skillTimelineTask;
     private Task? _auraTimelineTask;
     private ScenePlaybackFrame _currentFrame;
+    private ScenePlaybackTrackIndex? _eventIndex;
     private ScenePlaybackFrameChangedEventArgs? _pendingFrameChanged;
     private PlaybackTimelineStrip _globalTimeline = PlaybackTimelineStrip.Empty;
     private Dictionary<int, PlaybackTimelineStrip> _combatantTimelines = [];
     private IReadOnlyList<PlaybackAuraTimelineLane> _auraTimelineTracks = [];
     private double _timelineMarkerDuration = -1;
     private long _lastCombatantRefreshTick;
-    private long _lastEventWindowEndObservationOrdinal = long.MinValue;
+    private long _lastEventWindowRefreshTick;
     private long _displayTextRevision;
     private bool _isApplyingFrame;
     private bool _isDisposed;
     private bool _frameApplyQueued;
     private bool _forceNextCombatantRefresh = true;
+    private bool _forceNextEventWindowRefresh = true;
     private bool _detailRefreshQueued;
     private bool _detailRequestPending;
     private bool _timelineMarkersInitialized;
@@ -90,6 +95,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], SceneName);
         ArchivedAtText = record.ArchivedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
         _currentFrame = _controller.CurrentFrame;
+        RequestEventIndex();
         ApplyFrame(_currentFrame, _controller.State);
     }
 
@@ -280,6 +286,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         var duration = DurationMilliseconds;
         var target = duration > 0 ? Math.Clamp(positionMilliseconds, 0d, duration) : Math.Max(0d, positionMilliseconds);
         _forceNextCombatantRefresh = true;
+        _forceNextEventWindowRefresh = true;
         _ = SeekCoreAsync((long)Math.Round(target, MidpointRounding.AwayFromZero));
     }
 
@@ -298,6 +305,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private async Task StopAsync()
     {
         _forceNextCombatantRefresh = true;
+        _forceNextEventWindowRefresh = true;
         var frame = await _controller.StopAsync().ConfigureAwait(true);
         ApplyFrame(frame, _controller.State);
     }
@@ -346,6 +354,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         try
         {
             _forceNextCombatantRefresh = true;
+            _forceNextEventWindowRefresh = true;
             IsLoading = true;
             await _controller.StepEventAsync(direction).ConfigureAwait(false);
         }
@@ -435,7 +444,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (ShouldRefreshEventWindow(frame, state))
         {
             RefreshEventWindow(frame);
-            _lastEventWindowEndObservationOrdinal = frame.AppliedSegment.EndObservationOrdinalExclusive;
+            _lastEventWindowRefreshTick = Environment.TickCount64;
+            _forceNextEventWindowRefresh = false;
         }
 
         if (!ShouldRefreshCombatants(frame, state))
@@ -464,10 +474,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     private bool ShouldRefreshEventWindow(ScenePlaybackFrame frame, ScenePlaybackControllerState state)
     {
-        if (_forceNextCombatantRefresh || !state.IsPlaying)
+        if (_eventIndex is null)
+            return false;
+
+        if (_forceNextEventWindowRefresh || !state.IsPlaying)
             return true;
 
-        return frame.AppliedSegment.EndObservationOrdinalExclusive != _lastEventWindowEndObservationOrdinal;
+        if (frame.TimeRange.DurationMilliseconds > 0 && frame.PositionMilliseconds >= frame.TimeRange.DurationMilliseconds)
+            return true;
+
+        return Environment.TickCount64 - _lastEventWindowRefreshTick >= EventWindowRefreshIntervalMilliseconds;
     }
 
     private void RefreshCombatants(ScenePlaybackFrame frame)
@@ -988,10 +1004,60 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
     }
 
+    private void RequestEventIndex()
+    {
+        var cancellation = new CancellationTokenSource();
+        _eventIndexCancellation = cancellation;
+        _eventIndexTask = BuildEventIndexAsync(cancellation);
+    }
+
+    private async Task BuildEventIndexAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            var index = await Task.Run(
+                () => _controller.Session.CreateTrackIndex(cancellation.Token),
+                cancellation.Token).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_isDisposed || cancellation.IsCancellationRequested)
+                    return;
+
+                _eventIndex = index;
+                _forceNextEventWindowRefresh = true;
+                if (ShouldRefreshEventWindow(_currentFrame, _controller.State))
+                {
+                    RefreshEventWindow(_currentFrame);
+                    _lastEventWindowRefreshTick = Environment.TickCount64;
+                    _forceNextEventWindowRefresh = false;
+                }
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => StatusText = ex.Message);
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ReferenceEquals(_eventIndexCancellation, cancellation))
+                    return;
+
+                cancellation.Dispose();
+                _eventIndexCancellation = null;
+                _eventIndexTask = null;
+            });
+        }
+    }
+
     private void RefreshEventWindow(ScenePlaybackFrame frame)
     {
-        var markers = CreateEventWindowMarkers(frame);
-        if (markers.Count == 0)
+        var markers = CreateEventWindowMarkers(frame).AsSpan();
+        if (markers.Length == 0)
         {
             if (EventWindow.Count > 0)
                 EventWindow.Clear();
@@ -999,7 +1065,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
 
         _eventWindowOrdinals.Clear();
-        for (var i = 0; i < markers.Count; i++)
+        for (var i = 0; i < markers.Length; i++)
             _eventWindowOrdinals.Add(markers[i].ObservationOrdinal);
 
         using var deferral = EventWindow.SuspendNotifications();
@@ -1009,9 +1075,9 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                 EventWindow.Remove(row.ObservationOrdinal);
         }
 
-        for (var i = 0; i < markers.Count; i++)
+        for (var i = 0; i < markers.Length; i++)
         {
-            var marker = markers[i];
+            ref readonly var marker = ref markers[i];
             if (!EventWindow.TryGetValue(marker.ObservationOrdinal, out var row))
             {
                 row = new PlaybackEventRowViewModel(_frameBatchService, marker.ObservationOrdinal);
@@ -1019,45 +1085,26 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             }
 
             if (row.DisplayTextRevision != _displayTextRevision)
-                ApplyEventRow(row, marker);
+                ApplyEventRow(row, in marker);
         }
 
         EventWindow.Sort(CompareEventRows);
     }
 
-    private IReadOnlyList<ScenePlaybackTrackMarker> CreateEventWindowMarkers(ScenePlaybackFrame frame)
+    private ScenePlaybackTrackMarkerWindow CreateEventWindowMarkers(ScenePlaybackFrame frame)
     {
+        if (_eventIndex is null)
+            return default;
+
         var position = frame.PositionMilliseconds;
         var start = Math.Max(0, position - EventWindowRadiusMilliseconds);
         var end = frame.TimeRange.DurationMilliseconds > 0
             ? Math.Min(frame.TimeRange.DurationMilliseconds, position + EventWindowRadiusMilliseconds)
             : position + EventWindowRadiusMilliseconds;
-        if (frame.RecentMarkers.Count > 0)
-            return FilterRecentMarkers(frame.RecentMarkers, start, end);
-
-        var segment = _controller.CreateTimelineSegment(start, end);
-        var read = ScenePlaybackTrackReader.Read(segment, start, end, MaxEventWindowMarkers);
-        return read.Markers;
+        return _eventIndex.ReadWindow(start, end, frame.AppliedSegment.EndObservationOrdinalExclusive, MaxEventWindowMarkers);
     }
 
-    private static List<ScenePlaybackTrackMarker> FilterRecentMarkers(IReadOnlyList<ScenePlaybackTrackMarker> markers, long start, long end)
-    {
-        var result = new List<ScenePlaybackTrackMarker>(Math.Min(markers.Count, MaxEventWindowMarkers));
-        for (var i = 0; i < markers.Count; i++)
-        {
-            var marker = markers[i];
-            if (marker.PositionMilliseconds < start || marker.PositionMilliseconds > end)
-                continue;
-
-            result.Add(marker);
-            if (result.Count > MaxEventWindowMarkers)
-                result.RemoveAt(0);
-        }
-
-        return result;
-    }
-
-    private void ApplyEventRow(PlaybackEventRowViewModel row, ScenePlaybackTrackMarker marker)
+    private void ApplyEventRow(PlaybackEventRowViewModel row, in ScenePlaybackTrackMarker marker)
     {
         row.PositionMilliseconds = marker.PositionMilliseconds;
         row.TimeText = FormatTime(marker.PositionMilliseconds);
@@ -1181,6 +1228,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
         _isDisposed = true;
         _detailCancellation?.Cancel();
+        _eventIndexCancellation?.Cancel();
         _skillTimelineCancellation?.Cancel();
         _auraTimelineCancellation?.Cancel();
         Localization.LanguageChanged -= OnLanguageChanged;
@@ -1190,6 +1238,17 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             try
             {
                 await _detailTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        if (_eventIndexTask is not null)
+        {
+            try
+            {
+                await _eventIndexTask.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -1219,6 +1278,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
 
         _detailCancellation?.Dispose();
+        _eventIndexCancellation?.Dispose();
         _skillTimelineCancellation?.Dispose();
         _auraTimelineCancellation?.Dispose();
         await _controller.DisposeAsync().ConfigureAwait(false);
@@ -1231,6 +1291,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], SceneName);
         _timelineMarkersInitialized = false;
         _forceNextCombatantRefresh = true;
+        _forceNextEventWindowRefresh = true;
         if (SelectedCombatantId > 0)
         {
             _detailRefreshQueued = true;

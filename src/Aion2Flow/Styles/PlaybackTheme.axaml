@@ -249,6 +249,32 @@
         <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
 
+    <Style Selector="controls|PlaybackTimelineStripView.PlaybackEventPlayheadOverlay">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="TrackBrush" Value="Transparent" />
+        <Setter Property="PlayheadBrush" Value="#A0EEF4F8" />
+        <Setter Property="PlayheadThickness" Value="1" />
+        <Setter Property="Opacity" Value="0.62" />
+    </Style>
+
+    <Style Selector="ListBox.PlaybackEventList ListBoxItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="ListBox.PlaybackEventList ListBoxItem:selected">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="ListBox.PlaybackEventList /template/ ScrollBar">
+        <Setter Property="Theme" Value="{StaticResource CommonScrollbarTheme}" />
+    </Style>
+
     <Style Selector="controls|SkillDisplay.PlaybackAuraSkill">
         <Setter Property="IconSpacing" Value="4" />
         <Setter Property="VerticalAlignment" Value="Center" />

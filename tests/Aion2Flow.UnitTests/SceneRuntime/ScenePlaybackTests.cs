@@ -91,23 +91,28 @@ public sealed class ScenePlaybackTests
         Assert.Equal(300, first.CombatTotals.TotalDamage);
         Assert.Equal(600, second.CombatTotals.TotalDamage);
         Assert.Equal(5, second.AppliedSegment.EndObservationOrdinalExclusive);
-        Assert.Equal([0L, 1L, 2L, 3L, 4L], second.RecentMarkers.Select(static marker => marker.ObservationOrdinal));
+        Assert.Equal([0L, 1L, 2L, 3L, 4L], ReadAppliedMarkers(record, second).Select(static marker => marker.ObservationOrdinal));
     }
 
     [Fact]
-    public void Session_AdvanceTo_ReusesRecentMarkerSnapshotWhenNoMarkersWereApplied()
+    public void TrackIndex_ReadWindow_DoesNotAllocateOrCopyMarkers()
     {
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var index = session.CreateTrackIndex(TestContext.Current.CancellationToken);
 
-        var first = session.Seek(1_500);
-        var samePosition = session.AdvanceTo(1_500);
-        var advanced = session.AdvanceTo(2_500);
-        var sameAdvancedPosition = session.AdvanceTo(2_500);
+        var window = index.ReadWindow(0, 2_500, 5, 3);
+        Assert.Equal([2L, 3L, 4L], window.AsSpan().ToArray().Select(static marker => marker.ObservationOrdinal));
 
-        Assert.Same(first.RecentMarkers, samePosition.RecentMarkers);
-        Assert.NotSame(samePosition.RecentMarkers, advanced.RecentMarkers);
-        Assert.Same(advanced.RecentMarkers, sameAdvancedPosition.RecentMarkers);
+        _ = index.ReadWindow(0, 2_500, 5, 3).AsSpan().Length;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var total = 0;
+        for (var i = 0; i < 10_000; i++)
+            total += index.ReadWindow(0, 2_500, 5, 3).AsSpan().Length;
+        var allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
+
+        Assert.Equal(30_000, total);
+        Assert.Equal(allocatedBefore, allocatedAfter);
     }
 
     [Fact]
@@ -174,7 +179,8 @@ public sealed class ScenePlaybackTests
         AppendCompactCombatValue(journal, sceneId, sourceId, targetId, secondContributionSkillCode, headerSkillCode, marker, 250, 2, 1_100, scopeId: 42, siblingIndex: 1, parentScopeId: 900);
         AppendCompactCombatOpener(journal, sceneId, sourceId, headerSkillCode, marker, 3, 1_200, scopeId: 43, siblingIndex: 2, parentScopeId: 900);
         journal.CompleteFlush(1);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+        var record = CreateArchiveRecord(journal, sceneId);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
         session.Seek(1_200);
         var projection = session.CreateCombatantDetail(sourceId);
@@ -207,7 +213,7 @@ public sealed class ScenePlaybackTests
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
         var frame = session.Seek(1_200);
-        var combatMarkers = frame.RecentMarkers.Where(static marker => marker.Track == ScenePlaybackTrack.Combat).ToArray();
+        var combatMarkers = ReadAppliedMarkers(record, frame).Where(static marker => marker.Track == ScenePlaybackTrack.Combat).ToArray();
         var readMarkers = ScenePlaybackTrackReader.Read(record.ScenePayload.TimelineSegment, 0, 1_500, 10).Markers.Where(static marker => marker.Track == ScenePlaybackTrack.Combat).ToArray();
 
         var combatTrack = Assert.Single(frame.Tracks, static track => track.Track == ScenePlaybackTrack.Combat);
@@ -246,7 +252,7 @@ public sealed class ScenePlaybackTests
         var resource = Assert.Single(frame.Resources);
         Assert.Equal(30_000, resource.CurrentValue);
         Assert.Equal(50_000, resource.MaximumValue);
-        var marker = Assert.Single(frame.RecentMarkers, static marker => marker.Track == ScenePlaybackTrack.Resource && marker.ObservationOrdinal == 1);
+        var marker = Assert.Single(ReadAppliedMarkers(record, frame), static marker => marker.Track == ScenePlaybackTrack.Resource && marker.ObservationOrdinal == 1);
         Assert.Equal(30_000, marker.CurrentValue);
         Assert.Equal(50_000, marker.MaximumValue);
     }
@@ -274,7 +280,7 @@ public sealed class ScenePlaybackTests
         var resource = Assert.Single(frame.Resources);
         Assert.Equal(50_000, resource.CurrentValue);
         Assert.Equal(30_000, resource.MaximumValue);
-        var marker = Assert.Single(frame.RecentMarkers, static marker => marker.Track == ScenePlaybackTrack.Resource);
+        var marker = Assert.Single(ReadAppliedMarkers(record, frame), static marker => marker.Track == ScenePlaybackTrack.Resource);
         Assert.Equal(50_000, marker.CurrentValue);
         Assert.Equal(30_000, marker.MaximumValue);
     }
@@ -456,7 +462,8 @@ public sealed class ScenePlaybackTests
         AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
         AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 800);
         AppendCombat(journal, sceneId, 100, 200, 1, 3, 2_000);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+        var record = CreateArchiveRecord(journal, sceneId);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
         var beforeOriginalExpiry = session.Seek(999);
         var afterOriginalExpiry = session.Seek(1_799);
@@ -606,12 +613,13 @@ public sealed class ScenePlaybackTests
         AppendAuraOpen(journal, sceneId, 200, 100, 8, 5_000, 2, 100);
         AppendAuraBatchResult(journal, sceneId, 200, 7, 7, 2, 0, 3, 1_000);
         AppendAuraBatchResult(journal, sceneId, 200, 8, 7, 2, 1, 4, 1_000);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+        var record = CreateArchiveRecord(journal, sceneId);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
         var frame = session.Seek(1_000);
 
         Assert.Empty(frame.ActiveAuras);
-        var results = frame.RecentMarkers.Where(static marker => marker.LifecycleEventKind == ScenePlaybackLifecycleEventKind.Result).ToArray();
+        var results = ReadAppliedMarkers(record, frame).Where(static marker => marker.LifecycleEventKind == ScenePlaybackLifecycleEventKind.Result).ToArray();
         Assert.Equal(2, results.Length);
         Assert.Equal([7, 8], results.Select(static marker => marker.InstanceSequenceId));
     }
@@ -645,13 +653,14 @@ public sealed class ScenePlaybackTests
         AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
         AppendAuraRenew(journal, sceneId, 200, 100, 8, 2, 250);
         AppendAuraRenew(journal, sceneId, 200, 100, 7, 3, 500);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+        var record = CreateArchiveRecord(journal, sceneId);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
         var frame = session.Seek(500);
 
         var aura = Assert.Single(frame.ActiveAuras);
         Assert.Equal(1_500, aura.ExpiresAtMilliseconds);
-        Assert.Equal([ScenePlaybackTrack.Aura, ScenePlaybackTrack.Action, ScenePlaybackTrack.Aura], frame.RecentMarkers.Select(static marker => marker.Track));
+        Assert.Equal([ScenePlaybackTrack.Aura, ScenePlaybackTrack.Action, ScenePlaybackTrack.Aura], ReadAppliedMarkers(record, frame).Select(static marker => marker.Track));
     }
 
     [Fact]
@@ -661,13 +670,14 @@ public sealed class ScenePlaybackTests
         var sceneId = Guid.NewGuid();
         AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
         AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 500, phase: 17);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+        var record = CreateArchiveRecord(journal, sceneId);
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
         var frame = session.Seek(500);
 
         var aura = Assert.Single(frame.ActiveAuras);
         Assert.Equal(1_000, aura.ExpiresAtMilliseconds);
-        Assert.Equal([ScenePlaybackTrack.Aura, ScenePlaybackTrack.Action], frame.RecentMarkers.Select(static marker => marker.Track));
+        Assert.Equal([ScenePlaybackTrack.Aura, ScenePlaybackTrack.Action], ReadAppliedMarkers(record, frame).Select(static marker => marker.Track));
     }
 
     [Fact]
@@ -747,21 +757,25 @@ public sealed class ScenePlaybackTests
         var second = await controller.StepEventAsync(1, TestContext.Current.CancellationToken);
         var third = await controller.StepEventAsync(1, TestContext.Current.CancellationToken);
         var previous = await controller.StepEventAsync(-1, TestContext.Current.CancellationToken);
+        var firstMarkers = ReadAppliedMarkers(record, first);
+        var secondMarkers = ReadAppliedMarkers(record, second);
+        var thirdMarkers = ReadAppliedMarkers(record, third);
+        var previousMarkers = ReadAppliedMarkers(record, previous);
 
         Assert.Equal(1, first.AppliedSegment.EndObservationOrdinalExclusive);
-        Assert.Equal(0, first.RecentMarkers[^1].ObservationOrdinal);
+        Assert.Equal(0, firstMarkers[^1].ObservationOrdinal);
         Assert.Equal(500, first.PositionMilliseconds);
         Assert.Equal(2, second.AppliedSegment.EndObservationOrdinalExclusive);
-        Assert.Equal(1, second.RecentMarkers[^1].ObservationOrdinal);
-        Assert.Equal(100, second.RecentMarkers[^1].Amount);
+        Assert.Equal(1, secondMarkers[^1].ObservationOrdinal);
+        Assert.Equal(100, secondMarkers[^1].Amount);
         Assert.Equal(1_000, second.PositionMilliseconds);
         Assert.Equal(3, third.AppliedSegment.EndObservationOrdinalExclusive);
-        Assert.Equal(2, third.RecentMarkers[^1].ObservationOrdinal);
-        Assert.Equal(200, third.RecentMarkers[^1].Amount);
+        Assert.Equal(2, thirdMarkers[^1].ObservationOrdinal);
+        Assert.Equal(200, thirdMarkers[^1].Amount);
         Assert.Equal(1_000, third.PositionMilliseconds);
         Assert.Equal(2, previous.AppliedSegment.EndObservationOrdinalExclusive);
-        Assert.Equal(1, previous.RecentMarkers[^1].ObservationOrdinal);
-        Assert.Equal(100, previous.RecentMarkers[^1].Amount);
+        Assert.Equal(1, previousMarkers[^1].ObservationOrdinal);
+        Assert.Equal(100, previousMarkers[^1].Amount);
         Assert.Equal(1_000, previous.PositionMilliseconds);
     }
 
@@ -1100,6 +1114,16 @@ public sealed class ScenePlaybackTests
             Snapshot = snapshot,
             ScenePayload = payload
         };
+    }
+
+    private static ScenePlaybackTrackMarker[] ReadAppliedMarkers(ArchivedEncounterRecord record, ScenePlaybackFrame frame)
+    {
+        var index = ScenePlaybackTrackIndex.Build(record.ScenePayload.TimelineSegment, TestContext.Current.CancellationToken);
+        return index.ReadWindow(
+            0,
+            frame.PositionMilliseconds,
+            frame.AppliedSegment.EndObservationOrdinalExclusive,
+            int.MaxValue).AsSpan().ToArray();
     }
 
     private static void AppendState(ObservedEventJournal journal, Guid sceneId, int entityId, int stateCode, int value0, int value1, string? text, long ordinal, long observedAt)

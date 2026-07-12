@@ -470,11 +470,22 @@
                                Classes="PlaybackHeaderCellRight"
                                Text="{markups:Translate Playback_Column_Amount}" />
                 </Grid>
-                <ScrollViewer Grid.Row="2"
-                              Classes="PlaybackPanelScroller AppScrollViewer"
-                              VerticalScrollBarVisibility="Visible">
-                    <ItemsControl ItemsSource="{Binding EventWindow}">
-                        <ItemsControl.ItemTemplate>
+                <Grid Grid.Row="2">
+                    <ListBox Name="EventWindowList"
+                             Classes="PlaybackEventList"
+                             ItemsSource="{Binding EventWindow}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             Focusable="False"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Visible">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel CacheLength="0.5" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:PlaybackEventRowViewModel">
                                 <Grid Classes="PlaybackEventRow PlaybackAlignedTimelineGrid"
                                       ColumnDefinitions="320,32,*,72,10"
@@ -483,7 +494,7 @@
                                                                    Classes="PlaybackTimelineRail PlaybackEventTimelineLane PlaybackTimelineBackgroundRail"
                                                                    Markers="{Binding TimelineMarkers}"
                                                                    DurationMilliseconds="{Binding $parent[Window].DataContext.DurationMilliseconds}"
-                                                                   PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}"
+                                                                   IsPlayheadVisible="False"
                                                                    SeekRequested="TimelineSeekRequested" />
                                     <Grid ColumnDefinitions="64,62,*,*,*"
                                           ColumnSpacing="8">
@@ -507,9 +518,13 @@
                                                Text="{Binding AmountText}" />
                                 </Grid>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <controls:PlaybackTimelineStripView Classes="PlaybackEventPlayheadOverlay PlaybackScrollbarGutter"
+                                                        DurationMilliseconds="{Binding DurationMilliseconds}"
+                                                        PositionMilliseconds="{Binding PositionMilliseconds}"
+                                                        IsHitTestVisible="False" />
+                </Grid>
             </Grid>
         </Border>
         </Grid>

@@ -2,7 +2,6 @@ using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
-using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -17,7 +16,6 @@ public sealed class ScenePlaybackFrame
     public IReadOnlyList<ScenePlaybackResourceState> Resources { get; init; } = [];
     public IReadOnlyList<ScenePlaybackAuraState> ActiveAuras { get; init; } = [];
     public IReadOnlyList<ScenePlaybackTrackWindow> Tracks { get; init; } = [];
-    public IReadOnlyList<ScenePlaybackTrackMarker> RecentMarkers { get; init; } = [];
 }
 
 public readonly record struct ScenePlaybackTimeRange(long StartOffsetMilliseconds, long EndOffsetMilliseconds, long DurationMilliseconds, bool HasTiming);

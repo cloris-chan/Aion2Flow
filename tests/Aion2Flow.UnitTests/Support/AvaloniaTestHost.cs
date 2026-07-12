@@ -1,5 +1,6 @@
 using System.Reflection;
 using Avalonia;
+using Avalonia.Themes.Simple;
 using Avalonia.Threading;
 
 namespace Cloris.Aion2Flow.Tests.Support;
@@ -11,26 +12,32 @@ internal static class AvaloniaTestHost
 
     public static void EnsureInitialized()
     {
-        if (Application.Current is not null || s_initialized)
-            return;
-
         lock (s_gate)
         {
-            if (Application.Current is not null || s_initialized)
-                return;
+            if (Application.Current is null && !s_initialized)
+            {
+                typeof(Dispatcher)
+                    .GetMethod("ResetBeforeUnitTests", BindingFlags.Static | BindingFlags.NonPublic)
+                    ?.Invoke(null, null);
 
-            typeof(Dispatcher)
-                .GetMethod("ResetBeforeUnitTests", BindingFlags.Static | BindingFlags.NonPublic)
-                ?.Invoke(null, null);
+                AppBuilder
+                    .Configure<TestApplication>()
+                    .UsePlatformDetect()
+                    .SetupWithoutStarting();
 
-            AppBuilder
-                .Configure<TestApplication>()
-                .UsePlatformDetect()
-                .SetupWithoutStarting();
+                s_initialized = true;
+            }
 
-            s_initialized = true;
+            if (Application.Current is { } application && !application.Styles.OfType<SimpleTheme>().Any())
+                application.Styles.Add(new SimpleTheme());
         }
     }
 
-    private sealed class TestApplication : Application;
+    private sealed class TestApplication : Application
+    {
+        public override void Initialize()
+        {
+            Styles.Add(new SimpleTheme());
+        }
+    }
 }
