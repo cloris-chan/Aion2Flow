@@ -162,6 +162,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return TryCreateDetailEventCached(snapshot, combatantId, in record, CombatDetailProjectionScope.EncounterWindow, out detailEvent);
     }
 
+    internal bool TryResolveDetailEventSource(SceneCombatSnapshot snapshot, in CombatEventRecord record, out int sourceId)
+    {
+        PrepareProjectionCaches();
+        return TryResolveDetailEventSourceCached(snapshot, in record, CombatDetailProjectionScope.EncounterWindow, out sourceId);
+    }
+
     private bool TryCreateDetailEventCached(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, CombatDetailProjectionScope scope, out CombatDetailEvent detailEvent)
     {
         var eventSourceId = ResolveCombatantIdCached(record.SourceId);
@@ -171,15 +177,33 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return false;
         }
 
+        return TryCreateDetailEventCached(snapshot, in record, eventSourceId, scope, out detailEvent);
+    }
+
+    private bool TryCreateDetailEventCached(SceneCombatSnapshot snapshot, in CombatEventRecord record, int eventSourceId, CombatDetailProjectionScope scope, out CombatDetailEvent detailEvent)
+    {
         if (!ShouldIncludeDetailEvent(in record, eventSourceId, record.TargetId, snapshot, scope))
         {
             detailEvent = default;
             return false;
         }
 
-        detailEvent = new CombatDetailEvent(record.Observation, eventSourceId, record.TargetId, ObservedAt(record), record.Revision, record.EventKey, record.Raw, record.Contribution, record.Canonicalization);
+        detailEvent = CreateDetailEvent(in record, eventSourceId);
         return true;
     }
+
+    private bool TryResolveDetailEventSourceCached(SceneCombatSnapshot snapshot, in CombatEventRecord record, CombatDetailProjectionScope scope, out int sourceId)
+    {
+        sourceId = ResolveCombatantIdCached(record.SourceId);
+        if (ShouldIncludeDetailEvent(in record, sourceId, record.TargetId, snapshot, scope))
+            return true;
+
+        sourceId = 0;
+        return false;
+    }
+
+    private static CombatDetailEvent CreateDetailEvent(in CombatEventRecord record, int sourceId)
+        => new(record.Observation, sourceId, record.TargetId, ObservedAt(record), record.Revision, record.EventKey, record.Raw, record.Contribution, record.Canonicalization);
 
     public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId)
     {
@@ -295,7 +319,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private void ProcessClassEvidenceEvents(ReadOnlySpan<CombatEventRecord> events)
+    private void ProcessClassEvidenceEvents(CombatEventRange events)
     {
         foreach (ref readonly var record in events)
         {
@@ -561,7 +585,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return _classEvidence.TryGetValue(entityId, out var evidence) ? evidence.Resolve() : null;
     }
 
-    private void ProcessOwnerInferenceEvents(ReadOnlySpan<CombatEventRecord> events)
+    private void ProcessOwnerInferenceEvents(CombatEventRange events)
     {
         if (CombatResourceRegistry.SkillMap.Count == 0)
             return;

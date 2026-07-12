@@ -755,6 +755,26 @@ public class CombatStoreTests
     }
 
     [Fact]
+    public void CombatStore_FrozenEventSegment_CrossesStorageBoundary_AndSurvivesAppendAndClear()
+    {
+        var store = new CombatStore();
+        for (var i = 0; i < CombatEventJournal.SegmentCapacity + 1; i++)
+            store.ApplyCombat(100, 200, i + 1, 1, 1, i + 1);
+
+        var segment = store.FreezeEventSegment();
+        store.ApplyCombat(100, 200, 900, 1, 1, 2_000);
+        store.Clear();
+        store.ApplyCombat(100, 200, 999, 1, 1, 3_000);
+
+        Assert.Equal(CombatEventJournal.SegmentCapacity + 1, segment.Count);
+        Assert.Equal(1, segment.GetEvent(segment.StartEventOrdinal).Observation.Damage);
+        Assert.Equal(CombatEventJournal.SegmentCapacity, segment.GetEvent(CombatEventJournal.SegmentCapacity - 1).Observation.Damage);
+        Assert.Equal(CombatEventJournal.SegmentCapacity + 1, segment.GetEvent(CombatEventJournal.SegmentCapacity).Observation.Damage);
+        Assert.Single(store.Events);
+        Assert.Equal(999, store.Events[0].Observation.Damage);
+    }
+
+    [Fact]
     public void CombatStore_DetailRevision_TracksAffectedCombatantsOnly()
     {
         var store = new CombatStore();
@@ -1821,7 +1841,7 @@ public class SceneReadModelOwnerTests
                 var archive = scene.Owner.CreateArchiveCapture();
                 if (archive.Snapshot.EncounterTime > 0 && archive.Snapshot.Combatants.Count > 0)
                 {
-                    Assert.NotEmpty(archive.Payload.Events);
+                    Assert.False(archive.Payload.CombatEvents.IsEmpty);
                     Assert.True(archive.Snapshot.EncounterEndTime >= archive.Snapshot.EncounterStartTime);
                 }
             }

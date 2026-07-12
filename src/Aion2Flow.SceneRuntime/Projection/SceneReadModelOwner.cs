@@ -115,6 +115,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 boundary,
                 metadataRegistry,
                 _applier.BossFocus,
+                combat,
                 CreateAdapter(),
                 CreateTimelineSegment(isLiveGrowing: false));
         }
@@ -133,6 +134,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 boundary,
                 metadataRegistry,
                 _applier.BossFocus,
+                combat,
                 CreateAdapter(),
                 CreateTimelineSegment(isLiveGrowing: false));
         }
@@ -156,7 +158,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 RefreshCore(endObservationOrdinalExclusive, completeFlushes: true);
             }
             var snapshot = CreateSnapshotCore();
-            var payload = SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, boundary, metadataRegistry, _applier.BossFocus, CreateAdapter(), CreateTimelineSegment(isLiveGrowing: false, endObservationOrdinalExclusive));
+            var payload = SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, boundary, metadataRegistry, _applier.BossFocus, combat, CreateAdapter(), CreateTimelineSegment(isLiveGrowing: false, endObservationOrdinalExclusive));
             return new SceneArchiveCapture(snapshot, payload);
         }
     }

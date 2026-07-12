@@ -480,14 +480,6 @@ public readonly struct SceneIdentityScope
         mapCode = 0;
         return false;
     }
-
-    public SceneIdentityScope DeepClone()
-    {
-        var pcs = PcMetadataSpan.ToArray();
-        var npcs = NpcCodeSpan.ToArray();
-        var maps = MapCodeSpan.ToArray();
-        return new SceneIdentityScope(pcs, npcs, maps);
-    }
 }
 
 public sealed class SceneIdentityScopeBuilder

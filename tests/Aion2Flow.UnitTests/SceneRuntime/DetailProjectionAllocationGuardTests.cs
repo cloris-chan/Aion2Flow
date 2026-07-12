@@ -57,6 +57,20 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
+    public void ArchivePayload_UsesSharedCombatSegmentsAndOrdinalIndexes()
+    {
+        var root = FindRepositoryRoot();
+        var archive = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Archive", "SceneArchivePayload.cs"));
+
+        Assert.Contains("CombatEventSegment CombatEvents", archive, StringComparison.Ordinal);
+        Assert.Contains("Dictionary<int, long[]>", archive, StringComparison.Ordinal);
+        Assert.Contains("TryResolveDetailEventSource", archive, StringComparison.Ordinal);
+        Assert.DoesNotContain("SceneArchiveCombatEvent", archive, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreateDetailEvents(", archive, StringComparison.Ordinal);
+        Assert.DoesNotContain("DeepClone()", archive, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DetailSkillTables_ExposeEventCountsOnly()
     {
         var root = FindRepositoryRoot();

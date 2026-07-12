@@ -12,7 +12,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
     private readonly Dictionary<int, CombatantRecord> _combatants = combatantCapacity > 0 ? new(combatantCapacity) : [];
     private readonly Dictionary<int, HashSet<(int, int)>> _outgoingBySource = combatantCapacity > 0 ? new(combatantCapacity) : [];
     private readonly Dictionary<int, HashSet<(int, int)>> _incomingByTarget = combatantCapacity > 0 ? new(combatantCapacity) : [];
-    private readonly List<CombatEventRecord> _events = eventCapacity > 0 ? new(eventCapacity) : [];
+    private CombatEventJournal _events = new(eventCapacity);
     private readonly List<CombatSnapshotChange> _changeLog = eventCapacity > 0 ? new(ResolveChangeCapacity(eventCapacity)) : [];
     private readonly Dictionary<int, long> _detailRevisionByCombatant = combatantCapacity > 0 ? new(combatantCapacity) : [];
     private long _revision;
@@ -20,7 +20,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
     public IReadOnlyDictionary<(int Source, int Target), CombatPairRecord> Pairs => _pairs;
     public IReadOnlyDictionary<int, CombatantRecord> Combatants => _combatants;
     public IReadOnlyList<CombatEventRecord> Events => _events;
-    public ReadOnlySpan<CombatEventRecord> EventSpan => CollectionsMarshal.AsSpan(_events);
+    public CombatEventRange EventSpan => _events.AsRange();
     public long Revision => _revision;
 
     public void EnsureCapacity(int eventCapacity, int combatantCapacity = 0, int pairCapacity = 0)
@@ -76,7 +76,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             Contribution = contribution,
             Canonicalization = canonicalization
         };
-        _events.Add(eventRecord);
+        _events.Append(in eventRecord);
         var totalHealing = contribution.HealingAmount;
         var periodicHealing = observation.ValueKind == CombatValueKind.PeriodicHealing ? contribution.HealingAmount : 0;
         var drainDamage = observation.ValueKind == CombatValueKind.DrainDamage ? contribution.DamageAmount : 0;
@@ -226,7 +226,9 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         return hasActivity;
     }
 
-    public ref readonly CombatEventRecord GetEvent(int index) => ref CollectionsMarshal.AsSpan(_events)[index];
+    public ref readonly CombatEventRecord GetEvent(int index) => ref _events.GetEvent(index);
+
+    internal CombatEventSegment FreezeEventSegment() => _events.Freeze();
 
     public bool TryGetEventByRevision(long revision, out CombatEventRecord record)
     {
@@ -294,7 +296,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         }
 
         for (var i = 0; i < snapshot.Events.Length; i++)
-            store._events.Add(snapshot.Events[i]);
+            store._events.Append(in snapshot.Events[i]);
 
         for (var i = 0; i < snapshot.DetailRevisions.Length; i++)
         {
@@ -366,7 +368,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         _combatants.Clear();
         _outgoingBySource.Clear();
         _incomingByTarget.Clear();
-        _events.Clear();
+        _events = new CombatEventJournal();
         _changeLog.Clear();
         _detailRevisionByCombatant.Clear();
         _revision = 0;

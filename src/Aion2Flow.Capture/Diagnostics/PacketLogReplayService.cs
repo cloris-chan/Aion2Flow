@@ -271,7 +271,7 @@ public sealed class PacketLogReplayService
     private static CombatEventSpan EnumerateSummaryEvents(CombatStore combat, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
     {
         if (snapshot.EncounterEndTime < snapshot.EncounterStartTime)
-            return new CombatEventSpan([], []);
+            return new CombatEventSpan(default, []);
 
         var events = combat.EventSpan;
         var indices = new List<int>();
@@ -311,10 +311,10 @@ public sealed class PacketLogReplayService
 
     private readonly ref struct CombatEventSpan
     {
-        private readonly ReadOnlySpan<CombatEventRecord> _events;
+        private readonly CombatEventRange _events;
         private readonly List<int> _indices;
 
-        public CombatEventSpan(ReadOnlySpan<CombatEventRecord> events, List<int> indices)
+        public CombatEventSpan(CombatEventRange events, List<int> indices)
         {
             _events = events;
             _indices = indices;
@@ -324,10 +324,10 @@ public sealed class PacketLogReplayService
 
         public ref struct Enumerator
         {
-            private readonly ReadOnlySpan<CombatEventRecord> _events;
+            private readonly CombatEventRange _events;
             private List<int>.Enumerator _indices;
 
-            public Enumerator(ReadOnlySpan<CombatEventRecord> events, List<int> indices)
+            public Enumerator(CombatEventRange events, List<int> indices)
             {
                 _events = events;
                 _indices = indices.GetEnumerator();

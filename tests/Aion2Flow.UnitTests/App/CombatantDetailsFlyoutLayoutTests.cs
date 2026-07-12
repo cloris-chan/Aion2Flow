@@ -18,9 +18,18 @@ public sealed class CombatantDetailsFlyoutLayoutTests
     private static UiFrameBatchService? s_frameBatch;
 
     [Fact]
-    public void ConstrainedViewport_ConfiguresVerticalScrollingForShieldSection()
+    public void DetailsLayout_PreservesScrollingRecoveryColumnsAndSupportBreakdown()
     {
-        AvaloniaTestHost.EnsureInitialized();
+        AvaloniaTestHost.Run(() =>
+        {
+            AssertConstrainedViewportConfiguresVerticalScrollingForShieldSection();
+            AssertRecoverySkillTablesDoNotExposeDamageHitCountColumns();
+            AssertSupportBannerShowsAggregateHealingAndTableShowsBreakdown();
+        });
+    }
+
+    private static void AssertConstrainedViewportConfiguresVerticalScrollingForShieldSection()
+    {
         var (localization, frameBatch) = CreateViewServices();
         var viewModel = new CombatantDetailsFlyoutViewModel(localization, frameBatch)
         {
@@ -55,10 +64,8 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         Assert.True(detailLayout.RowDefinitions[1].Height.IsStar);
     }
 
-    [Fact]
-    public void RecoverySkillTables_DoNotExposeDamageHitCountColumns()
+    private static void AssertRecoverySkillTablesDoNotExposeDamageHitCountColumns()
     {
-        AvaloniaTestHost.EnsureInitialized();
         var (localization, frameBatch) = CreateViewServices();
         var view = new CombatDirectionDetailView
         {
@@ -75,10 +82,8 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         Assert.Single(hitCountHeaders);
     }
 
-    [Fact]
-    public void SupportBanner_ShowsAggregateHealingAndTableShowsBreakdown()
+    private static void AssertSupportBannerShowsAggregateHealingAndTableShowsBreakdown()
     {
-        AvaloniaTestHost.EnsureInitialized();
         var (localization, frameBatch) = CreateViewServices();
         var view = new CombatDirectionDetailView
         {

@@ -10,5 +10,5 @@ public sealed class ArchivedEncounterRecord
     public string Trigger { get; init; } = string.Empty;
     public bool IsAutomatic { get; init; }
     public SceneCombatSnapshot Snapshot { get; init; } = new();
-    public SceneArchivePayload ScenePayload { get; init; } = new();
+    public required SceneArchivePayload ScenePayload { get; init; }
 }

@@ -110,7 +110,7 @@ public sealed class EncounterArchiveServiceTests
         var timelineCount = 0;
         var timelineRead = payload.TimelineSegment.ReadEntries(payload.TimelineSegment.CreateCursor(), 64, entries => timelineCount = entries.Count);
 
-        Assert.Equal(2, payload.Events.Count);
+        Assert.Equal(2, payload.CombatEvents.Count);
         Assert.Equal(8, timelineCount);
         Assert.Equal(8, timelineRead.Cursor.NextObservationOrdinal);
         Assert.Equal(playerId, delta.CombatantId);
@@ -134,7 +134,7 @@ public sealed class EncounterArchiveServiceTests
         var delta = payload.CreateDetailDelta(bossId);
 
         Assert.False(snapshot.Combatants.ContainsKey(bossId));
-        Assert.Equal(2, payload.EventIndicesByCombatant[bossId].Length);
+        Assert.Equal(2, payload.EventOrdinalsByCombatant[bossId].Length);
         Assert.Equal(2, delta.Events.Count);
         Assert.Equal(bossId, delta.CombatantId);
         Assert.Equal(751, delta.Combatant!.Value.IncomingDamage);
@@ -144,49 +144,29 @@ public sealed class EncounterArchiveServiceTests
     }
 
     [Fact]
-    public void SceneArchivePayload_Detail_Index_Selects_Combatant_Events_And_Survives_Clone()
+    public void SceneArchivePayload_Detail_Index_Selects_Combatant_Events_In_Journal_Order()
     {
         const int playerId = 100;
         const int bossId = 200;
         const int addId = 300;
-        var payload = new SceneArchivePayload
-        {
-            Events =
-            [
-                CreateArchiveEvent(addId, bossId, 400, 3, 3_000),
-                CreateArchiveEvent(playerId, bossId, 100, 1, 1_000),
-                CreateArchiveEvent(bossId, playerId, 75, 2, 2_000)
-            ],
-            Pairs =
-            [
-                CreatePair(playerId, bossId, 100, 1_000, 1_000, 1),
-                CreatePair(bossId, playerId, 75, 2_000, 2_000, 2),
-                CreatePair(addId, bossId, 400, 3_000, 3_000, 3)
-            ],
-            Combatants =
-            [
-                new CombatantSummary { CombatantId = playerId, OutgoingDamage = 100, IncomingDamage = 75, Revision = 2 },
-                new CombatantSummary { CombatantId = bossId, OutgoingDamage = 75, IncomingDamage = 500, Revision = 3 },
-                new CombatantSummary { CombatantId = addId, OutgoingDamage = 400, Revision = 3 }
-            ]
-        };
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        AppendCombat(journal, sceneId, playerId, bossId, 100, 1, 1_000);
+        AppendCombat(journal, sceneId, bossId, playerId, 75, 2, 2_000);
+        AppendCombat(journal, sceneId, addId, bossId, 400, 3, 3_000);
+        journal.CompleteFlush(1);
+        var owner = new SceneReadModelOwner(journal, Guid.NewGuid(), DateTimeOffset.Now);
+        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
 
         var delta = payload.CreateDetailDelta(playerId);
-        var clone = payload.DeepClone();
-        var cloneDelta = clone.CreateDetailDelta(playerId);
 
         Assert.Equal([1L, 2L], delta.Events.Select(static e => e.Revision));
-        Assert.All(delta.Events, static e => Assert.Equal(CombatContributionCanonicalization.CompactAvoidance, e.Canonicalization));
-        Assert.Equal([1, 2], payload.EventIndicesByCombatant[playerId]);
+        Assert.Equal([0L, 1L], payload.EventOrdinalsByCombatant[playerId]);
         Assert.Equal([new DirectedPairKey(playerId, bossId)], delta.OutgoingPairs);
         Assert.Equal([new DirectedPairKey(bossId, playerId)], delta.IncomingPairs);
         Assert.Equal(2, delta.Revision);
         Assert.Equal(100, delta.Combatant!.Value.OutgoingDamage);
         Assert.Equal(75, delta.Combatant.Value.IncomingDamage);
-        Assert.Equal([1L, 2L], cloneDelta.Events.Select(static e => e.Revision));
-        Assert.All(cloneDelta.Events, static e => Assert.Equal(CombatContributionCanonicalization.CompactAvoidance, e.Canonicalization));
-        Assert.Equal([1, 2], clone.EventIndicesByCombatant[playerId]);
-        Assert.Equal(payload.Events[1], clone.Events[1]);
     }
 
     [Fact]
@@ -216,22 +196,6 @@ public sealed class EncounterArchiveServiceTests
     }
 
     [Fact]
-    public void SceneArchivePayload_DeepClone_ReusesTimelineSegment()
-    {
-        const int playerId = 100;
-        const int bossId = 200;
-        var owner = CreateSceneOwner(playerId, bossId);
-        var payload = owner.CreateArchivePayload(owner.CreateSnapshot());
-
-        var clone = payload.DeepClone();
-
-        Assert.Same(payload.TimelineSegment.Journal, clone.TimelineSegment.Journal);
-        Assert.Equal(payload.TimelineSegment.StartObservationOrdinal, clone.TimelineSegment.StartObservationOrdinal);
-        Assert.Equal(payload.TimelineSegment.EndObservationOrdinalExclusive, clone.TimelineSegment.EndObservationOrdinalExclusive);
-        Assert.Equal(payload.TimelineSegment.IsLiveGrowing, clone.TimelineSegment.IsLiveGrowing);
-    }
-
-    [Fact]
     public void SceneArchivePayload_Is_Independent_Of_Live_Scene_Mutations()
     {
         const int playerId = 100;
@@ -252,14 +216,26 @@ public sealed class EncounterArchiveServiceTests
             ValueKind = CombatValueKind.Damage
         }, 2_000);
 
+        owner.Combat.Clear();
+        owner.Combat.ApplyCombat(playerId, bossId, new CombatObservation
+        {
+            SkillCode = 11000011,
+            Damage = 500,
+            HitCount = 1,
+            AttemptCount = 1,
+            EventKind = CombatEventKind.Damage,
+            ValueKind = CombatValueKind.Damage
+        }, 3_000);
+
         var delta = payload.CreateDetailDelta(playerId);
 
         Assert.Equal(bossId, snapshot.TargetObservation?.InstanceId);
         Assert.True(payload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
         Assert.Equal("Tester", archivedPc.Nickname);
-        Assert.Equal(2, payload.Events.Count);
+        Assert.Equal(2, payload.CombatEvents.Count);
         Assert.Equal(2, delta.Events.Count);
         Assert.Equal(750, delta.Events[0].Amount);
+        Assert.Single(owner.Combat.Events);
     }
 
     [Fact]
@@ -317,7 +293,7 @@ public sealed class EncounterArchiveServiceTests
 
         Assert.NotNull(record);
         Assert.Same(payload, record!.ScenePayload);
-        Assert.Equal(payload.Events.Count, record.ScenePayload.Events.Count);
+        Assert.Equal(payload.CombatEvents.Count, record.ScenePayload.CombatEvents.Count);
         Assert.Equal(snapshot.EncounterId, record.EncounterId);
     }
 
@@ -386,39 +362,4 @@ public sealed class EncounterArchiveServiceTests
             targetId,
             new RawPacketReference(opcode, 0, ordinal));
 
-    private static SceneArchiveCombatEvent CreateArchiveEvent(int sourceId, int targetId, int damage, long revision, long timestamp)
-    {
-        var observation = new CombatObservation
-        {
-            SkillCode = 11000010,
-            Damage = damage,
-            HitCount = 1,
-            AttemptCount = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        };
-
-        return new SceneArchiveCombatEvent
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            Revision = revision,
-            ObservedAtMilliseconds = timestamp,
-            Observation = observation,
-            EventKey = CombatEventKey.FromObservation(in observation),
-            Contribution = CombatContributionClassifier.Evaluate(in observation),
-            Canonicalization = CombatContributionCanonicalization.CompactAvoidance
-        };
-    }
-
-    private static DirectedPairSnapshot CreatePair(int sourceId, int targetId, long damage, long firstObserved, long lastObserved, long revision) => new()
-    {
-        Key = new DirectedPairKey(sourceId, targetId),
-        TotalDamage = damage,
-        HitCount = 1,
-        AttemptCount = 1,
-        FirstObserved = firstObserved,
-        LastObserved = lastObserved,
-        Revision = revision
-    };
 }
