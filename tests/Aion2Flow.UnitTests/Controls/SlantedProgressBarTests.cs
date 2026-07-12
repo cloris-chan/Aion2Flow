@@ -5,6 +5,7 @@ using Cloris.Aion2Flow.Presentation;
 
 namespace Cloris.Aion2Flow.Tests.Controls;
 
+[Collection(AvaloniaTestCollection.Name)]
 public sealed class SlantedProgressBarTests
 {
     public SlantedProgressBarTests()

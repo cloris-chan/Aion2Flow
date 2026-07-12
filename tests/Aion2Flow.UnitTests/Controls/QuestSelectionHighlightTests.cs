@@ -6,6 +6,7 @@ using SkiaSharp;
 
 namespace Cloris.Aion2Flow.Tests.Controls;
 
+[Collection(AvaloniaTestCollection.Name)]
 public sealed class QuestSelectionHighlightTests
 {
     public QuestSelectionHighlightTests()

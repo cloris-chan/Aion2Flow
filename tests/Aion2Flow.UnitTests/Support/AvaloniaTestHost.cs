@@ -16,9 +16,7 @@ internal static class AvaloniaTestHost
         {
             if (Application.Current is null && !s_initialized)
             {
-                typeof(Dispatcher)
-                    .GetMethod("ResetBeforeUnitTests", BindingFlags.Static | BindingFlags.NonPublic)
-                    ?.Invoke(null, null);
+                ResetDispatcher();
 
                 AppBuilder
                     .Configure<TestApplication>()
@@ -27,11 +25,20 @@ internal static class AvaloniaTestHost
 
                 s_initialized = true;
             }
+            else
+            {
+                ResetDispatcher();
+            }
 
             if (Application.Current is { } application && !application.Styles.OfType<SimpleTheme>().Any())
                 application.Styles.Add(new SimpleTheme());
         }
     }
+
+    private static void ResetDispatcher()
+        => typeof(Dispatcher)
+            .GetMethod("ResetBeforeUnitTests", BindingFlags.Static | BindingFlags.NonPublic)
+            ?.Invoke(null, null);
 
     private sealed class TestApplication : Application
     {

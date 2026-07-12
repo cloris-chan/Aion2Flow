@@ -4,16 +4,13 @@ using Avalonia.Threading;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
+[Collection(AvaloniaTestCollection.Name)]
 public sealed class PlaybackEventListVirtualizationTests
 {
-    public PlaybackEventListVirtualizationTests()
-    {
-        AvaloniaTestHost.EnsureInitialized();
-    }
-
     [Fact]
     public void EventList_RealizesOnlyViewportRows()
     {
+        AvaloniaTestHost.EnsureInitialized();
         const int itemCount = 96;
         var list = new ListBox
         {

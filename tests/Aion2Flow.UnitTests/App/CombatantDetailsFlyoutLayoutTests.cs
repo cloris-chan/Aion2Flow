@@ -1,10 +1,6 @@
-using System.Reflection;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.LogicalTree;
-using Avalonia.Themes.Simple;
-using Avalonia.Threading;
 using Cloris.Aion2Flow.Controls;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.ViewModels;
@@ -14,21 +10,17 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
+[Collection(AvaloniaTestCollection.Name)]
 public sealed class CombatantDetailsFlyoutLayoutTests
 {
-    private static readonly object AvaloniaGate = new();
-    private static bool s_avaloniaInitialized;
+    private static readonly Lock AvaloniaGate = new();
     private static LocalizationService? s_localization;
     private static UiFrameBatchService? s_frameBatch;
-
-    public CombatantDetailsFlyoutLayoutTests()
-    {
-        EnsureAvalonia();
-    }
 
     [Fact]
     public void ConstrainedViewport_ConfiguresVerticalScrollingForShieldSection()
     {
+        AvaloniaTestHost.EnsureInitialized();
         var (localization, frameBatch) = CreateViewServices();
         var viewModel = new CombatantDetailsFlyoutViewModel(localization, frameBatch)
         {
@@ -66,6 +58,7 @@ public sealed class CombatantDetailsFlyoutLayoutTests
     [Fact]
     public void RecoverySkillTables_DoNotExposeDamageHitCountColumns()
     {
+        AvaloniaTestHost.EnsureInitialized();
         var (localization, frameBatch) = CreateViewServices();
         var view = new CombatDirectionDetailView
         {
@@ -85,6 +78,7 @@ public sealed class CombatantDetailsFlyoutLayoutTests
     [Fact]
     public void SupportBanner_ShowsAggregateHealingAndTableShowsBreakdown()
     {
+        AvaloniaTestHost.EnsureInitialized();
         var (localization, frameBatch) = CreateViewServices();
         var view = new CombatDirectionDetailView
         {
@@ -154,46 +148,4 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         }
     }
 
-    private static void EnsureAvalonia()
-    {
-        if (Application.Current is null && !s_avaloniaInitialized)
-        {
-            lock (AvaloniaGate)
-            {
-                if (Application.Current is null && !s_avaloniaInitialized)
-                {
-                    ResetDispatcher();
-
-                    AppBuilder
-                        .Configure<TestApplication>()
-                        .UsePlatformDetect()
-                        .SetupWithoutStarting();
-
-                    s_avaloniaInitialized = true;
-                }
-            }
-        }
-        else
-        {
-            ResetDispatcher();
-        }
-
-        if (Application.Current is { } application && !application.Styles.OfType<SimpleTheme>().Any())
-            application.Styles.Add(new SimpleTheme());
-    }
-
-    private static void ResetDispatcher()
-    {
-        typeof(Dispatcher)
-            .GetMethod("ResetBeforeUnitTests", BindingFlags.Static | BindingFlags.NonPublic)
-            ?.Invoke(null, null);
-    }
-
-    private sealed class TestApplication : Application
-    {
-        public override void Initialize()
-        {
-            Styles.Add(new SimpleTheme());
-        }
-    }
 }
