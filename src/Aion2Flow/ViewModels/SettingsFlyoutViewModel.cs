@@ -227,6 +227,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public string TopmostModeDisplay => Localization[$"Settings_Topmost_{TopmostMode}"];
 
+    internal void RefreshTargetProcessForegroundState() => IsTopMost = _processForegroundWatcher.IsTargetProcessForeground();
+
     public string MaxVisibleCombatantRowsDisplay => MaxVisibleCombatantRows.ToString();
 
     public string CombatantSortMetricDisplay => Localization[$"Settings_CombatantSortMetric_{CombatantSortMetric}"];
@@ -528,10 +530,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         });
     }
 
-    private void OnForegroundChanged(bool isTopMost)
-    {
-        Dispatcher.UIThread.Post(() => IsTopMost = isTopMost);
-    }
+    private void OnForegroundChanged() => Dispatcher.UIThread.Post(RefreshTargetProcessForegroundState);
 
     private void OnLanguageServiceLanguageChanged(object? sender, string language)
     {

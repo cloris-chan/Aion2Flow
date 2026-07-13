@@ -194,7 +194,6 @@ public sealed class SettingsFlyoutHotkeyTests
         private readonly LocalizationService _localization;
         private readonly PlayerNameDisplayService _playerNameDisplay;
         private readonly UiScaleService _uiScale;
-        private readonly ProcessPortDiscoveryService _processPortDiscovery;
         private readonly ProcessForegroundWatcher _processForegroundWatcher;
 
         public SettingsViewModelFixture(Action<AppSettings>? configureSettings = null)
@@ -208,8 +207,7 @@ public sealed class SettingsFlyoutHotkeyTests
             }
             _playerNameDisplay = new PlayerNameDisplayService(settings, _localization);
             _uiScale = new UiScaleService(settings);
-            _processPortDiscovery = new ProcessPortDiscoveryService();
-            _processForegroundWatcher = new ProcessForegroundWatcher(_processPortDiscovery);
+            _processForegroundWatcher = new ProcessForegroundWatcher();
             HotkeyPlatform = new TestGlobalHotkeyPlatform();
             HotkeyService = new GlobalHotkeyService(HotkeyPlatform);
             ViewModel = new SettingsFlyoutViewModel(
@@ -235,7 +233,6 @@ public sealed class SettingsFlyoutHotkeyTests
         {
             HotkeyService.DetachWindow();
             _processForegroundWatcher.Dispose();
-            _processPortDiscovery.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _uiScale.Dispose();
             _playerNameDisplay.Dispose();
             _localization.Dispose();

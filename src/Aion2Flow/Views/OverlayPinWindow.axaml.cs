@@ -74,7 +74,7 @@ public partial class OverlayPinWindow : Window
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == ClientSizeProperty || change.Property == TopmostProperty)
+        if (change.Property == ClientSizeProperty)
         {
             InvalidatePlacement();
         }

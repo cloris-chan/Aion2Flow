@@ -18,7 +18,6 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
     private enum PortEventType { Add, Remove }
     internal readonly record struct PortPair(ushort LocalPort, ushort RemotePort);
 
-    private const string ProcessName = "Aion2";
     private const int SearchPollInterval = 1000;
     private const int KnownProcessPollInterval = 1000;
     private const int KnownProcessRefreshInterval = 5000;
@@ -157,7 +156,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
                     if (knownPids.Count == 0 || now >= nextProcessRefreshAt)
                     {
                         currentPids.Clear();
-                        if (TryGetPidsByProcessName(ProcessName, currentPids))
+                        if (TryGetPidsByProcessName(currentPids))
                         {
                             nextProcessRefreshAt = now + (currentPids.Count == 0 ? SearchPollInterval : KnownProcessRefreshInterval);
 
@@ -416,7 +415,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
         return true;
     }
 
-    private static unsafe bool TryGetPidsByProcessName(string targetName, HashSet<uint> pids)
+    private static unsafe bool TryGetPidsByProcessName(HashSet<uint> pids)
     {
         var snapshot = PInvoke.CreateToolhelp32Snapshot_SafeHandle(CREATE_TOOLHELP_SNAPSHOT_FLAGS.TH32CS_SNAPPROCESS, 0);
 
@@ -439,8 +438,7 @@ public sealed class ProcessPortDiscoveryService : IAsyncDisposable
                     if (processName.IndexOf('\0') is int length and not -1)
                         processName = processName[..length];
 
-                    if (processName.StartsWith(targetName, StringComparison.OrdinalIgnoreCase)
-                        && (processName.Length == targetName.Length || processName[targetName.Length..].Equals(".exe", StringComparison.OrdinalIgnoreCase)))
+                    if (Aion2ProcessIdentity.MatchesExecutableName(processName))
                     {
                         pids.Add(entry.th32ProcessID);
                     }

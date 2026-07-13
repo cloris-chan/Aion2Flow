@@ -10,6 +10,8 @@ Process32NextW
 SetWinEventHook
 
 GetWindowThreadProcessId
+GetForegroundWindow
+GetWindow
 
 RegisterHotKey
 UnregisterHotKey

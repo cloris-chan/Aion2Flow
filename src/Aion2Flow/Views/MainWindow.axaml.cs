@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -23,6 +24,7 @@ public partial class MainWindow : Window
     private const uint WmEnterSizeMove = 0x0231;
     private const uint WmExitSizeMove = 0x0232;
     private const int MaxPinNativeRetries = 3;
+    private const int MaxNativeStyleRetries = 3;
     private static readonly TimeSpan CursorProbeInterval = TimeSpan.FromMilliseconds(33);
 
     private readonly GlobalHotkeyService _globalHotkeyService;
@@ -43,6 +45,7 @@ public partial class MainWindow : Window
     private bool _hasCursorProbeTimestamp;
     private bool _hasOverlayScreenBounds;
     private int _pinNativeRetryCount;
+    private int _nativeStyleRetryCount;
     private TimeSpan _lastCursorProbeTimestamp;
     private OverlayInteractionMode _appliedOverlayInteractionMode;
     private OverlayWindowInputState _windowInputState;
@@ -66,6 +69,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _overlayRoot = Content as Control;
         DataContext.EncounterHistory.CollectionChanged += OnEncounterHistoryCollectionChanged;
+        DataContext.SettingsFlyout.PropertyChanged += OnSettingsFlyoutPropertyChanged;
         RebuildEncounterHistoryMenuItems();
         _globalHotkeyService.Triggered += OnGlobalHotkeyTriggered;
         _overlayInteractionController.ModeChanged += OnOverlayInteractionModeChanged;
@@ -80,6 +84,7 @@ public partial class MainWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
+        DataContext.SettingsFlyout.RefreshTargetProcessForegroundState();
         _uiScale.RegisterWindow(this);
         RebuildEncounterHistoryMenuItems();
         AttachGlobalHotkeyHook();
@@ -166,6 +171,7 @@ public partial class MainWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         DataContext.EncounterHistory.CollectionChanged -= OnEncounterHistoryCollectionChanged;
+        DataContext.SettingsFlyout.PropertyChanged -= OnSettingsFlyoutPropertyChanged;
         _globalHotkeyService.Triggered -= OnGlobalHotkeyTriggered;
         _overlayInteractionController.ModeChanged -= OnOverlayInteractionModeChanged;
         PositionChanged -= OnWindowPositionChanged;
@@ -201,10 +207,6 @@ public partial class MainWindow : Window
         {
             InvalidateOverlayScreenGeometry();
         }
-        else if (change.Property == TopmostProperty)
-        {
-            RefreshPinWindowTopmost();
-        }
         else if (change.Property == WindowStateProperty)
         {
             InvalidateOverlayScreenGeometry();
@@ -225,8 +227,11 @@ public partial class MainWindow : Window
         var pinWindow = new OverlayPinWindow(_overlayInteractionController, _localization, _uiScale);
         pinWindow.PlacementInvalidated += OnPinWindowPlacementInvalidated;
         _pinWindow = pinWindow;
-        RefreshPinWindowTopmost();
         pinWindow.Show(this);
+        if (!SynchronizeOverlayTopmostBand())
+        {
+            ScheduleNativeStyleRefresh();
+        }
         ScheduleOverlayGeometryRefresh();
     }
 
@@ -317,6 +322,12 @@ public partial class MainWindow : Window
 
     private void ScheduleNativeStyleRefresh()
     {
+        _nativeStyleRetryCount = 0;
+        QueueNativeStyleRefresh();
+    }
+
+    private void QueueNativeStyleRefresh()
+    {
         if (_nativeStyleRefreshQueued)
         {
             return;
@@ -341,13 +352,30 @@ public partial class MainWindow : Window
             {
                 _overlayInteractionController.SetMode(OverlayInteractionMode.Interactive);
             }
+            ScheduleNativeStyleRetry();
             return;
         }
 
-        if (_pinWindow is { } pinWindow && !pinWindow.ApplyNativeWindowStyle())
+        var pinStyleApplied = _pinWindow is not { } pinWindow || pinWindow.ApplyNativeWindowStyle();
+        var topmostApplied = SynchronizeOverlayTopmostBand();
+        if (!pinStyleApplied || !topmostApplied)
         {
-            SchedulePinNativeRetry();
+            ScheduleNativeStyleRetry();
+            return;
         }
+
+        _nativeStyleRetryCount = 0;
+    }
+
+    private void ScheduleNativeStyleRetry()
+    {
+        if (_nativeStyleRetryCount >= MaxNativeStyleRetries)
+        {
+            return;
+        }
+
+        _nativeStyleRetryCount++;
+        QueueNativeStyleRefresh();
     }
 
     private void SchedulePinNativeRetry()
@@ -385,14 +413,36 @@ public partial class MainWindow : Window
         CommitWindowInputState(nextInputState);
         _appliedOverlayInteractionMode = mode;
         _hasAppliedOverlayInteractionMode = true;
-        RefreshPinWindowTopmost();
     }
 
-    private void RefreshPinWindowTopmost()
+    private bool SynchronizeOverlayTopmostBand()
     {
-        if (_pinWindow is { } pinWindow)
+        if (PlatformImpl is null)
         {
-            pinWindow.Topmost = Topmost || _overlayInteractionController.Mode != OverlayInteractionMode.Interactive;
+            return false;
+        }
+
+        var isTopmost = DataContext.SettingsFlyout.IsAlwaysOnTop;
+        if (!NativeOverlayWindowStyles.SetTopmostBand(this, isTopmost))
+        {
+            return false;
+        }
+
+        if (_pinWindow is not { PlatformImpl: not null } pinWindow)
+        {
+            return true;
+        }
+
+        return NativeOverlayWindowStyles.SetTopmostBand(pinWindow, isTopmost)
+            && NativeOverlayWindowStyles.IsImmediatelyAbove(pinWindow, this);
+    }
+
+    private void OnSettingsFlyoutPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SettingsFlyoutViewModel.IsAlwaysOnTop) &&
+            !SynchronizeOverlayTopmostBand())
+        {
+            ScheduleNativeStyleRefresh();
         }
     }
 

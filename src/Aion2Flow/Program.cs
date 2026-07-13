@@ -44,6 +44,7 @@ internal static class Program
         }
         finally
         {
+            serviceProvider.GetRequiredService<ProcessForegroundWatcher>().Dispose();
             await ShutdownAsync(serviceProvider, mainViewModel).ConfigureAwait(false);
         }
     }

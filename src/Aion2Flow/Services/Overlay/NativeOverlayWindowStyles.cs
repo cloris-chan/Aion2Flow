@@ -12,10 +12,13 @@ namespace Cloris.Aion2Flow.Services.Overlay;
 internal static class NativeOverlayWindowStyles
 {
     private const int WsPopup = unchecked((int)0x80000000);
+    private const int WsExTopmost = 0x00000008;
     private const int WsExLayered = 0x00080000;
     private const int WsExTransparent = 0x00000020;
     private const int WsExNoActivate = 0x08000000;
     private const int InputTransparentStyles = WsExLayered | WsExTransparent;
+    private static readonly HWND TopmostBand = new(-1);
+    private static readonly HWND NonTopmostBand = new(-2);
     private static readonly ConditionalWeakTable<Window, InputTransparencyState> InputTransparencyStates = new();
 
     public static bool SetInputTransparent(Window window, bool enabled)
@@ -67,6 +70,34 @@ internal static class NativeOverlayWindowStyles
 
     public static bool SetPopupStyle(Window window, bool enabled) =>
         SetWindowStyle(window, WINDOW_LONG_PTR_INDEX.GWL_STYLE, WsPopup, enabled);
+
+    public static bool SetTopmostBand(Window window, bool enabled)
+    {
+        if (!TryGetExtendedStyles(window, out _, out var hwnd, out _))
+        {
+            return false;
+        }
+
+        Marshal.SetLastPInvokeError(0);
+        if (!PInvoke.SetWindowPos(
+            hwnd,
+            enabled ? TopmostBand : NonTopmostBand, 0, 0, 0, 0, SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER))
+        {
+            var error = Marshal.GetLastPInvokeError();
+            AppLog.Write(AppLogLevel.Warning, $"Failed to update overlay topmost band: Win32 error {error}");
+            return false;
+        }
+
+        var styles = PInvoke.GetWindowLong(hwnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        return ((styles & WsExTopmost) != 0) == enabled;
+    }
+
+    public static bool IsImmediatelyAbove(Window window, Window reference)
+    {
+        var handle = window.TryGetPlatformHandle()?.Handle ?? 0;
+        var referenceHandle = reference.TryGetPlatformHandle()?.Handle ?? 0;
+        return handle != 0 && referenceHandle != 0 && PInvoke.GetWindow(new HWND(referenceHandle), GET_WINDOW_CMD.GW_HWNDPREV) == new HWND(handle);
+    }
 
     public static bool TryGetCursorPosition(out PixelPoint position)
     {
@@ -123,6 +154,18 @@ internal static class NativeOverlayWindowStyles
 
         isLayered = (styles & WsExLayered) != 0;
         isTransparent = (styles & WsExTransparent) != 0;
+        return true;
+    }
+
+    public static bool TryGetTopmostBand(Window window, out bool isTopmost)
+    {
+        if (!TryGetExtendedStyles(window, out _, out _, out var styles))
+        {
+            isTopmost = false;
+            return false;
+        }
+
+        isTopmost = (styles & WsExTopmost) != 0;
         return true;
     }
 

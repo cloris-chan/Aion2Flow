@@ -13,9 +13,9 @@
         SizeToContent="Height"
         CanResize="False"
         CanMaximize="False"
+        ShowActivated="False"
         Title="Aion2Flow"
-        Icon="/Assets/Images/Aion2Flow.png"
-        Topmost="{Binding SettingsFlyout.IsAlwaysOnTop}">
+        Icon="/Assets/Images/Aion2Flow.png">
 
     <Window.Styles>
         <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
