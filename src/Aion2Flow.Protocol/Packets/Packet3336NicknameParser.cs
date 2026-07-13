@@ -7,6 +7,7 @@ internal readonly record struct Packet3336Nickname(int PlayerId, string Nickname
 internal static class Packet3336NicknameParser
 {
     private const byte CurrentNamePrefix = 0x5f;
+    private const byte CurrentContinuedNamePrefix = 0xdf;
     private const byte CurrentExtendedNamePrefix = 0x5e;
     private const byte CurrentNameMarker = 0x37;
     private const byte CurrentCrossServerNameMarker = 0x3f;
@@ -54,6 +55,7 @@ internal static class Packet3336NicknameParser
         switch (prefix)
         {
             case CurrentNamePrefix:
+            case CurrentContinuedNamePrefix:
                 break;
             case CurrentExtendedNamePrefix:
                 if (!reader.TryReadByte(out _))
