@@ -750,31 +750,40 @@ public partial class SettingsFlyoutView : UserControl
         return path;
     }
 
-    private void BattleResetHotkeyRowPressed(object? sender, PointerPressedEventArgs e)
+    private void HotkeyRowPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Border border || ViewModel is not { } vm)
+        if (sender is not Border border || ViewModel is not { } vm || !TryGetHotkeyAction(border, out var action))
         {
             return;
         }
 
         border.Focus();
-        if (!vm.IsCapturingResetHotkey)
-        {
-            vm.BeginCaptureBattleResetHotkeyCommand.Execute(null);
-        }
+        vm.BeginCaptureHotkey(action);
         e.Handled = true;
     }
 
-    private void BattleResetHotkeyRowKeyDown(object? sender, KeyEventArgs e)
+    private void HotkeyRowKeyDown(object? sender, KeyEventArgs e)
     {
-        if (ViewModel is not { } vm || !vm.IsCapturingResetHotkey)
+        if (sender is not Border border
+            || ViewModel is not { } vm
+            || !TryGetHotkeyAction(border, out var action))
         {
+            return;
+        }
+
+        if (vm.CapturingHotkeyAction != action)
+        {
+            if ((e.Key is Key.Enter or Key.Space) && e.KeyModifiers == KeyModifiers.None)
+            {
+                vm.BeginCaptureHotkey(action);
+                e.Handled = true;
+            }
             return;
         }
 
         if (e.Key is Key.Escape)
         {
-            vm.CancelCaptureBattleResetHotkeyCommand.Execute(null);
+            vm.CancelCaptureHotkey(action);
             e.Handled = true;
             return;
         }
@@ -793,15 +802,29 @@ public partial class SettingsFlyoutView : UserControl
             return;
         }
 
-        vm.ApplyCapturedHotkey(definition);
+        vm.ApplyCapturedHotkey(action, definition);
         e.Handled = true;
     }
 
-    private void BattleResetHotkeyRowLostFocus(object? sender, FocusChangedEventArgs e)
+    private void HotkeyRowLostFocus(object? sender, FocusChangedEventArgs e)
     {
-        if (ViewModel is { IsCapturingResetHotkey: true } vm)
+        if (sender is Border border
+            && ViewModel is { } vm
+            && TryGetHotkeyAction(border, out var action))
         {
-            vm.CancelCaptureBattleResetHotkeyCommand.Execute(null);
+            vm.CancelCaptureHotkey(action);
         }
+    }
+
+    private static bool TryGetHotkeyAction(Border border, out GlobalHotkeyAction action)
+    {
+        if (border.Tag is GlobalHotkeyAction value)
+        {
+            action = value;
+            return true;
+        }
+
+        action = default;
+        return false;
     }
 }

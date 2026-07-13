@@ -20,6 +20,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     private readonly ProcessForegroundWatcher _processForegroundWatcher;
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly bool _isApplyingPersistedSettings;
+    private bool _hasObservedHotkeyRegistrationState;
+    private bool _isHotkeyRegistrationWindowAttached;
 
     public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNameDisplayService playerNameDisplay, UiScaleService uiScale, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
     {
@@ -54,9 +56,11 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             ShowPlayerLegionName = persisted.ShowPlayerLegionName;
             TintPlayerNamesByFaction = persisted.TintPlayerNamesByFaction;
             UiScalePercent = persisted.UiScalePercent;
-            if (persisted.BattleResetHotkeyVirtualKey is { } vk && persisted.BattleResetHotkeyModifiers is { } mods)
+            BattleResetHotkey = CreateHotkey(persisted.BattleResetHotkeyModifiers, persisted.BattleResetHotkeyVirtualKey);
+            OverlayInteractionHotkey = CreateHotkey(persisted.OverlayInteractionHotkeyModifiers, persisted.OverlayInteractionHotkeyVirtualKey);
+            if (BattleResetHotkey is not null && BattleResetHotkey == OverlayInteractionHotkey)
             {
-                BattleResetHotkey = new HotkeyDefinition((HotkeyModifiers)mods, vk);
+                OverlayInteractionHotkey = null;
             }
         }
         finally
@@ -64,7 +68,14 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             _isApplyingPersistedSettings = false;
         }
 
-        _globalHotkeyService.SetHotkey(BattleResetHotkey);
+        if (!_globalHotkeyService.TrySetHotkey(GlobalHotkeyAction.BattleReset, BattleResetHotkey))
+        {
+            BattleResetHotkey = null;
+        }
+        if (!_globalHotkeyService.TrySetHotkey(GlobalHotkeyAction.CycleOverlayInteraction, OverlayInteractionHotkey))
+        {
+            OverlayInteractionHotkey = null;
+        }
 
         RebuildLanguageOptions();
         SelectedLanguage = Languages.FirstOrDefault(x => string.Equals(x.Code, _languageService.CurrentLanguage, StringComparison.Ordinal));
@@ -155,11 +166,23 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ResetHotkeyDisplay))]
     [NotifyPropertyChangedFor(nameof(HasResetHotkey))]
-    public partial HotkeyDefinition? BattleResetHotkey { get; set; }
+    public partial HotkeyDefinition? BattleResetHotkey { get; private set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ResetHotkeyDisplay))]
-    public partial bool IsCapturingResetHotkey { get; set; }
+    [NotifyPropertyChangedFor(nameof(OverlayInteractionHotkeyDisplay))]
+    [NotifyPropertyChangedFor(nameof(IsCapturingResetHotkey))]
+    [NotifyPropertyChangedFor(nameof(IsCapturingOverlayInteractionHotkey))]
+    public partial GlobalHotkeyAction? CapturingHotkeyAction { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OverlayInteractionHotkeyDisplay))]
+    [NotifyPropertyChangedFor(nameof(HasOverlayInteractionHotkey))]
+    public partial HotkeyDefinition? OverlayInteractionHotkey { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HotkeyRegistrationErrorText))]
+    public partial bool HasHotkeyRegistrationError { get; private set; }
 
     public string ResetHotkeyDisplay
     {
@@ -174,6 +197,26 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     }
 
     public bool HasResetHotkey => BattleResetHotkey is not null;
+
+    public bool IsCapturingResetHotkey => CapturingHotkeyAction == GlobalHotkeyAction.BattleReset;
+
+    public string OverlayInteractionHotkeyDisplay
+    {
+        get
+        {
+            if (IsCapturingOverlayInteractionHotkey)
+            {
+                return Localization["Settings_Hotkey_PressKeys"];
+            }
+            return OverlayInteractionHotkey?.Display ?? Localization["Settings_Hotkey_None"];
+        }
+    }
+
+    public bool HasOverlayInteractionHotkey => OverlayInteractionHotkey is not null;
+
+    public bool IsCapturingOverlayInteractionHotkey => CapturingHotkeyAction == GlobalHotkeyAction.CycleOverlayInteraction;
+
+    public string HotkeyRegistrationErrorText => Localization["Settings_Hotkey_RegistrationUnavailable"];
 
     public bool IsAlwaysOnTop => TopmostMode switch
     {
@@ -324,30 +367,136 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         }
     }
 
-    partial void OnBattleResetHotkeyChanged(HotkeyDefinition? value)
+    public void BeginCaptureHotkey(GlobalHotkeyAction action)
     {
-        _globalHotkeyService.SetHotkey(value);
+        ValidateAction(action);
+        CapturingHotkeyAction = action;
+    }
+
+    public void CancelCaptureHotkey(GlobalHotkeyAction action)
+    {
+        ValidateAction(action);
+        if (CapturingHotkeyAction == action)
+        {
+            CapturingHotkeyAction = null;
+        }
+    }
+
+    [RelayCommand]
+    public void ClearHotkey(GlobalHotkeyAction action)
+    {
+        CancelCaptureHotkey(action);
+        if (GetHotkey(action) is null)
+        {
+            return;
+        }
+
+        if (!_globalHotkeyService.TrySetHotkey(action, null))
+        {
+            HasHotkeyRegistrationError = true;
+            return;
+        }
+
+        SetHotkeyValue(action, null);
+        RefreshHotkeyRegistrationError();
         PersistSettings();
     }
 
-    [RelayCommand]
-    private void BeginCaptureBattleResetHotkey() => IsCapturingResetHotkey = true;
-
-    [RelayCommand]
-    private void CancelCaptureBattleResetHotkey() => IsCapturingResetHotkey = false;
-
-    [RelayCommand]
-    private void ClearBattleResetHotkey()
+    public bool ApplyCapturedHotkey(GlobalHotkeyAction action, HotkeyDefinition definition)
     {
-        IsCapturingResetHotkey = false;
-        BattleResetHotkey = null;
+        ValidateAction(action);
+        ArgumentNullException.ThrowIfNull(definition);
+        if (CapturingHotkeyAction != action)
+        {
+            return false;
+        }
+
+        CapturingHotkeyAction = null;
+        var conflictingAction = OtherAction(action);
+        var hasConflict = definition == GetHotkey(conflictingAction);
+        var changed = definition != GetHotkey(action) || hasConflict;
+        if (!_globalHotkeyService.TrySetHotkey(action, definition))
+        {
+            HasHotkeyRegistrationError = true;
+            return false;
+        }
+
+        if (!changed)
+        {
+            RefreshHotkeyRegistrationError();
+            return true;
+        }
+
+        if (hasConflict)
+        {
+            SetHotkeyValue(conflictingAction, null);
+        }
+        SetHotkeyValue(action, definition);
+        RefreshHotkeyRegistrationError();
+        PersistSettings();
+        return true;
     }
 
-    public void ApplyCapturedHotkey(HotkeyDefinition definition)
+    public void RefreshHotkeyRegistrationState(bool isRegistrationWindowAttached)
     {
-        IsCapturingResetHotkey = false;
-        BattleResetHotkey = definition;
+        _hasObservedHotkeyRegistrationState = true;
+        _isHotkeyRegistrationWindowAttached = isRegistrationWindowAttached;
+        RefreshHotkeyRegistrationError();
     }
+
+    private void SetHotkeyValue(GlobalHotkeyAction action, HotkeyDefinition? definition)
+    {
+        switch (action)
+        {
+            case GlobalHotkeyAction.BattleReset:
+                BattleResetHotkey = definition;
+                break;
+            case GlobalHotkeyAction.CycleOverlayInteraction:
+                OverlayInteractionHotkey = definition;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(action), action, "Unsupported global hotkey action.");
+        }
+    }
+
+    private HotkeyDefinition? GetHotkey(GlobalHotkeyAction action) => action switch
+    {
+        GlobalHotkeyAction.BattleReset => BattleResetHotkey,
+        GlobalHotkeyAction.CycleOverlayInteraction => OverlayInteractionHotkey,
+        _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Unsupported global hotkey action.")
+    };
+
+    private static GlobalHotkeyAction OtherAction(GlobalHotkeyAction action) => action switch
+    {
+        GlobalHotkeyAction.BattleReset => GlobalHotkeyAction.CycleOverlayInteraction,
+        GlobalHotkeyAction.CycleOverlayInteraction => GlobalHotkeyAction.BattleReset,
+        _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Unsupported global hotkey action.")
+    };
+
+    private static void ValidateAction(GlobalHotkeyAction action) => _ = OtherAction(action);
+
+    private static HotkeyDefinition? CreateHotkey(uint? modifiers, uint? virtualKey) =>
+        modifiers is { } mods && virtualKey is { } vk
+            ? HotkeyDefinition.TryCreate((HotkeyModifiers)mods, vk)
+            : null;
+
+    private void RefreshHotkeyRegistrationError()
+    {
+        if (_hasObservedHotkeyRegistrationState)
+        {
+            HasHotkeyRegistrationError =
+                (!_isHotkeyRegistrationWindowAttached && (BattleResetHotkey is not null || OverlayInteractionHotkey is not null)) ||
+                HasUnavailableRegisteredHotkey();
+        }
+        else
+        {
+            HasHotkeyRegistrationError = false;
+        }
+    }
+
+    private bool HasUnavailableRegisteredHotkey() =>
+        (BattleResetHotkey is not null && !_globalHotkeyService.IsRegistered(GlobalHotkeyAction.BattleReset)) ||
+        (OverlayInteractionHotkey is not null && !_globalHotkeyService.IsRegistered(GlobalHotkeyAction.CycleOverlayInteraction));
 
     private void PersistSettings()
     {
@@ -374,6 +523,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
             s.BattleResetHotkeyVirtualKey = BattleResetHotkey?.VirtualKey;
+            s.OverlayInteractionHotkeyModifiers = OverlayInteractionHotkey is null ? null : (uint)OverlayInteractionHotkey.Modifiers;
+            s.OverlayInteractionHotkeyVirtualKey = OverlayInteractionHotkey?.VirtualKey;
         });
     }
 
@@ -405,6 +556,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(CurrentVersionText));
         OnPropertyChanged(nameof(ResetHotkeyDisplay));
+        OnPropertyChanged(nameof(OverlayInteractionHotkeyDisplay));
+        OnPropertyChanged(nameof(HotkeyRegistrationErrorText));
     }
 
     private void RebuildLanguageOptions()

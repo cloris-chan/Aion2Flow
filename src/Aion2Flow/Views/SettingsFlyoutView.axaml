@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:hotkeys="clr-namespace:Cloris.Aion2Flow.Services.Hotkeys"
              xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.SettingsFlyoutView"
@@ -69,10 +70,11 @@
             </Border>
 
             <Border Classes="SettingsHotkeyRow"
+                    Tag="{x:Static hotkeys:GlobalHotkeyAction.BattleReset}"
                     Focusable="True"
-                    PointerPressed="BattleResetHotkeyRowPressed"
-                    KeyDown="BattleResetHotkeyRowKeyDown"
-                    LostFocus="BattleResetHotkeyRowLostFocus">
+                    PointerPressed="HotkeyRowPressed"
+                    KeyDown="HotkeyRowKeyDown"
+                    LostFocus="HotkeyRowLostFocus">
                 <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
                     <TextBlock Grid.Column="0"
                                Classes="SettingsRowLabel"
@@ -82,13 +84,42 @@
                                Text="{Binding ResetHotkeyDisplay}" />
                     <Button Grid.Column="2"
                             Classes="FlyoutInlineButton"
-                            Command="{Binding ClearBattleResetHotkeyCommand}"
+                            Command="{Binding ClearHotkeyCommand}"
+                            CommandParameter="{x:Static hotkeys:GlobalHotkeyAction.BattleReset}"
                             IsVisible="{Binding HasResetHotkey}"
                             ToolTip.Tip="{markups:Translate Settings_Hotkey_Clear}">
                         <Path Classes="Glyph GlyphSm" Data="{StaticResource x}" />
                     </Button>
                 </Grid>
             </Border>
+
+            <Border Classes="SettingsHotkeyRow"
+                    Tag="{x:Static hotkeys:GlobalHotkeyAction.CycleOverlayInteraction}"
+                    Focusable="True"
+                    PointerPressed="HotkeyRowPressed"
+                    KeyDown="HotkeyRowKeyDown"
+                    LostFocus="HotkeyRowLostFocus">
+                <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+                    <TextBlock Grid.Column="0"
+                               Classes="SettingsRowLabel"
+                               Text="{markups:Translate Settings_DisplayModeHotkey}" />
+                    <TextBlock Grid.Column="1"
+                               Classes="SettingsRowValue"
+                               Text="{Binding OverlayInteractionHotkeyDisplay}" />
+                    <Button Grid.Column="2"
+                            Classes="FlyoutInlineButton"
+                            Command="{Binding ClearHotkeyCommand}"
+                            CommandParameter="{x:Static hotkeys:GlobalHotkeyAction.CycleOverlayInteraction}"
+                            IsVisible="{Binding HasOverlayInteractionHotkey}"
+                            ToolTip.Tip="{markups:Translate Settings_Hotkey_Clear}">
+                        <Path Classes="Glyph GlyphSm" Data="{StaticResource x}" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <TextBlock Classes="SettingsHotkeyError"
+                       Text="{Binding HotkeyRegistrationErrorText}"
+                       IsVisible="{Binding HasHotkeyRegistrationError}" />
 
             <Border Classes="SettingsDivider"
                     IsVisible="{Binding IsUpdateSectionVisible}" />

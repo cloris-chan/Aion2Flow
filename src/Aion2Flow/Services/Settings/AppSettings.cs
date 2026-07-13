@@ -38,5 +38,9 @@ public sealed class AppSettings
 
     public uint? BattleResetHotkeyVirtualKey { get; set; }
 
+    public uint? OverlayInteractionHotkeyModifiers { get; set; }
+
+    public uint? OverlayInteractionHotkeyVirtualKey { get; set; }
+
     public Point? MainWindowPosition { get; set; }
 }

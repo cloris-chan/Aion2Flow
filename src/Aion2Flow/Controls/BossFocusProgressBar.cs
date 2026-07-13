@@ -312,6 +312,7 @@ internal sealed class BossFocusProgressBarVisualHandler : CompositionCustomVisua
     private SKPaint? _fillPaint;
     private SKPaint? _flowPaint;
     private SKPaint? _edgePaint;
+    private SKPaint? _opacityLayerPaint;
     private SKPath? _outerPath;
     private SKPath? _innerPath;
     private BossFocusProgressBarGeometry _geometry;
@@ -371,7 +372,7 @@ internal sealed class BossFocusProgressBarVisualHandler : CompositionCustomVisua
         }
 
         using var lease = skiaFeature.Lease();
-        RenderSkia(lease.SkCanvas, (float)size.X, (float)size.Y, state);
+        RenderSkia(lease.SkCanvas, (float)size.X, (float)size.Y, state, lease.CurrentOpacity);
     }
 
     internal static void RenderStatic(DrawingContext context, Rect bounds, BossFocusProgressBarVisualState state)
@@ -428,10 +429,11 @@ internal sealed class BossFocusProgressBarVisualHandler : CompositionCustomVisua
             context.FillRectangle(fill, new Rect(contentBounds.Left, contentBounds.Top, fillWidth, contentBounds.Height));
     }
 
-    private void RenderSkia(SKCanvas canvas, float width, float height, BossFocusProgressBarVisualState state)
+    private void RenderSkia(SKCanvas canvas, float width, float height, BossFocusProgressBarVisualState state, double opacity)
     {
         EnsureSkiaResources();
         EnsureGeometry(width, height, state.ChamferWidth, state.FrameThickness);
+        using var opacityScope = HudSkiaOpacityScope.Push(canvas, _opacityLayerPaint!, new SKRect(0f, 0f, width, height), opacity);
 
         _outerShadowPaint!.Color = ToSkColor(state.OuterShadowColor);
         canvas.DrawPath(_outerPath!, _outerShadowPaint);
@@ -516,6 +518,7 @@ internal sealed class BossFocusProgressBarVisualHandler : CompositionCustomVisua
         _fillPaint = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
         _flowPaint = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill, Blender = program.Blender };
         _edgePaint = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 0.8f };
+        _opacityLayerPaint = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
         _outerPath = new SKPath();
         _innerPath = new SKPath();
     }
@@ -541,6 +544,8 @@ internal sealed class BossFocusProgressBarVisualHandler : CompositionCustomVisua
 
     private void DisposeSkiaResources()
     {
+        _opacityLayerPaint?.Dispose();
+        _opacityLayerPaint = null;
         _outerPath?.Dispose();
         _outerPath = null;
         _innerPath?.Dispose();

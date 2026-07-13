@@ -13,3 +13,8 @@ GetWindowThreadProcessId
 
 RegisterHotKey
 UnregisterHotKey
+
+GetWindowLong
+SetWindowLong
+SetWindowPos
+GetCursorPos

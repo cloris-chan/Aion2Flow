@@ -473,7 +473,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_DirectHealing", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Looks up a localized string similar to DPS.
         /// </summary>
@@ -572,7 +572,7 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Metric_TotalHealing", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Looks up a localized string similar to DMG.
         /// </summary>
@@ -633,6 +633,33 @@ namespace Cloris.Aion2Flow.Localization {
         internal static string MetricShort_ShieldAbsorbed {
             get {
                 return ResourceManager.GetString("MetricShort_ShieldAbsorbed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Enable click-through.
+        /// </summary>
+        internal static string Overlay_Action_EnableClickThrough {
+            get {
+                return ResourceManager.GetString("Overlay_Action_EnableClickThrough", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hide overlay.
+        /// </summary>
+        internal static string Overlay_Action_Hide {
+            get {
+                return ResourceManager.GetString("Overlay_Action_Hide", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Restore overlay.
+        /// </summary>
+        internal static string Overlay_Action_Restore {
+            get {
+                return ResourceManager.GetString("Overlay_Action_Restore", resourceCulture);
             }
         }
         
@@ -1258,6 +1285,15 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Display mode shortcut.
+        /// </summary>
+        internal static string Settings_DisplayModeHotkey {
+            get {
+                return ResourceManager.GetString("Settings_DisplayModeHotkey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Target status bar.
         /// </summary>
         internal static string Settings_FocusStatusBar {
@@ -1317,6 +1353,15 @@ namespace Cloris.Aion2Flow.Localization {
         internal static string Settings_Hotkey_PressKeys {
             get {
                 return ResourceManager.GetString("Settings_Hotkey_PressKeys", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Shortcut unavailable. Choose another key combination..
+        /// </summary>
+        internal static string Settings_Hotkey_RegistrationUnavailable {
+            get {
+                return ResourceManager.GetString("Settings_Hotkey_RegistrationUnavailable", resourceCulture);
             }
         }
         

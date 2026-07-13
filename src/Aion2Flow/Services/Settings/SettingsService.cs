@@ -97,6 +97,8 @@ public sealed class SettingsService
         Language = source.Language,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,
         BattleResetHotkeyVirtualKey = source.BattleResetHotkeyVirtualKey,
+        OverlayInteractionHotkeyModifiers = source.OverlayInteractionHotkeyModifiers,
+        OverlayInteractionHotkeyVirtualKey = source.OverlayInteractionHotkeyVirtualKey,
         MainWindowPosition = source.MainWindowPosition
     };
 }

@@ -159,6 +159,7 @@ internal sealed class QuestSelectionHighlightVisualHandler : CompositionCustomVi
     private SKPaint? _particlePaint;
     private SKPaint? _edgePaint;
     private SKPaint? _edgeBaselinePaint;
+    private SKPaint? _opacityLayerPaint;
     private bool _hasState;
     private bool _stopped;
 
@@ -211,7 +212,7 @@ internal sealed class QuestSelectionHighlightVisualHandler : CompositionCustomVi
         }
 
         using var lease = skiaFeature.Lease();
-        RenderSkia(lease.SkCanvas, (float)size.X, (float)size.Y);
+        RenderSkia(lease.SkCanvas, (float)size.X, (float)size.Y, lease.CurrentOpacity);
     }
 
     internal static void RenderStatic(DrawingContext context, Rect bounds, IImmutableBrush background)
@@ -246,9 +247,10 @@ internal sealed class QuestSelectionHighlightVisualHandler : CompositionCustomVi
         context.DrawLine(EdgeBaselinePen, new Point(bounds.Left, bounds.Bottom - inset), new Point(bounds.Right, bounds.Bottom - inset));
     }
 
-    private void RenderSkia(SKCanvas canvas, float width, float height)
+    private void RenderSkia(SKCanvas canvas, float width, float height, double opacity)
     {
         EnsureSkiaResources();
+        using var opacityScope = HudSkiaOpacityScope.Push(canvas, _opacityLayerPaint!, new SKRect(0f, 0f, width, height), opacity);
 
         _backgroundPaint!.Color = ToSkColor(_state.BackgroundColor);
         canvas.DrawRect(0f, 0f, width, height, _backgroundPaint);
@@ -374,10 +376,13 @@ internal sealed class QuestSelectionHighlightVisualHandler : CompositionCustomVi
         _particlePaint = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Blender = waveProgram.Blender };
         _edgePaint = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Blender = waveProgram.Blender };
         _edgeBaselinePaint = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
+        _opacityLayerPaint = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
     }
 
     private void DisposeSkiaResources()
     {
+        _opacityLayerPaint?.Dispose();
+        _opacityLayerPaint = null;
         _edgeBaselinePaint?.Dispose();
         _edgeBaselinePaint = null;
         _edgePaint?.Dispose();

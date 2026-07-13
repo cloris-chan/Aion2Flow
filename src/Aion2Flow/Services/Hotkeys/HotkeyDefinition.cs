@@ -15,7 +15,11 @@ public enum HotkeyModifiers : uint
 
 public sealed record HotkeyDefinition(HotkeyModifiers Modifiers, uint VirtualKey)
 {
+    private const HotkeyModifiers AllowedModifiers = HotkeyModifiers.Alt | HotkeyModifiers.Control | HotkeyModifiers.Shift | HotkeyModifiers.Win;
+
     public string Display => Format(Modifiers, VirtualKey);
+
+    public bool IsValid => IsValidCombination(Modifiers, VirtualKey);
 
     public static HotkeyDefinition? FromKeyEvent(KeyModifiers keyModifiers, Key key)
     {
@@ -36,8 +40,18 @@ public sealed record HotkeyDefinition(HotkeyModifiers Modifiers, uint VirtualKey
             return null;
         }
 
-        return new HotkeyDefinition(mods, vk.Value);
+        return TryCreate(mods, vk.Value);
     }
+
+    public static HotkeyDefinition? TryCreate(HotkeyModifiers modifiers, uint virtualKey) =>
+        IsValidCombination(modifiers, virtualKey)
+            ? new HotkeyDefinition(modifiers, virtualKey)
+            : null;
+
+    public static bool IsValidCombination(HotkeyModifiers modifiers, uint virtualKey) =>
+        modifiers != HotkeyModifiers.None &&
+        (modifiers & ~AllowedModifiers) == 0 &&
+        IsSupportedVirtualKey(virtualKey);
 
     public static string Format(HotkeyModifiers modifiers, uint virtualKey)
     {
@@ -81,6 +95,17 @@ public sealed record HotkeyDefinition(HotkeyModifiers Modifiers, uint VirtualKey
         Key.OemSemicolon => 0xBA,
         Key.OemQuotes => 0xDE,
         _ => null
+    };
+
+    private static bool IsSupportedVirtualKey(uint virtualKey) => virtualKey switch
+    {
+        >= 0x41 and <= 0x5A => true,
+        >= 0x30 and <= 0x39 => true,
+        >= 0x60 and <= 0x69 => true,
+        >= 0x70 and <= 0x87 => true,
+        0x20 or 0x09 or 0x0D or 0x2D or 0x2E or 0x24 or 0x23 or 0x21 or 0x22 or 0x26 or 0x28 or 0x25 or 0x27 => true,
+        0xBB or 0xBD or 0xBC or 0xBE or 0xBF or 0xC0 or 0xDB or 0xDD or 0xDC or 0xBA or 0xDE => true,
+        _ => false
     };
 
     private static string VirtualKeyName(uint vk) => vk switch

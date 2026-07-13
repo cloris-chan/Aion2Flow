@@ -54,14 +54,55 @@
     </Style>
 
     <Style Selector="Border.MainHudHeader">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.MainHudBackdrop}" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="MinHeight" Value="30" />
+    </Style>
+
+    <Style Selector="Border.MainHudHeaderBackdrop">
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.MainHudBackdrop}" />
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.10" />
+            </Transitions>
+        </Setter>
     </Style>
 
     <Style Selector="Border.MainHudContentBackdrop">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.MainHudContentBackdrop}" />
         <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.10" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector=".MainHudForeground"
+           x:SetterTargetType="Control">
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.10" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Grid.MainHudShell.click-through Border.MainHudHeaderBackdrop,
+                     Grid.MainHudShell.click-through Border.MainHudContentBackdrop">
+        <Setter Property="Opacity" Value="0.18" />
+    </Style>
+
+    <Style Selector="Grid.MainHudShell.click-through.cursor-over Border.MainHudHeaderBackdrop,
+                     Grid.MainHudShell.click-through.cursor-over Border.MainHudContentBackdrop">
+        <Setter Property="Opacity" Value="0" />
+    </Style>
+
+    <Style Selector="Grid.MainHudShell.click-through.cursor-over .MainHudForeground"
+           x:SetterTargetType="Control">
+        <Setter Property="Opacity" Value="0.4" />
     </Style>
 
     <Style Selector="Border.MainHudFooter">
@@ -365,6 +406,18 @@
         <Setter Property="Opacity" Value="0.45" />
     </Style>
 
+    <Style Selector="Button.OverlayPinButton Path.Glyph">
+        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextSubtle}" />
+    </Style>
+
+    <Style Selector="Button.OverlayPinButton.click-through Path.Glyph">
+        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
+    </Style>
+
+    <Style Selector="Button.OverlayPinButton.hidden Path.Glyph">
+        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.MainHudGold}" />
+    </Style>
+
     <Style Selector="Button.FlyoutInlineButton">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -586,6 +639,13 @@
     <Style Selector="Border.SettingsHotkeyRow:focus">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanel}" />
         <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.BorderStrong}" />
+    </Style>
+
+    <Style Selector="TextBlock.SettingsHotkeyError">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.MainAccent}" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
+        <Setter Property="Margin" Value="10,5,10,7" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
     <Style Selector="Border.SettingsUpdatePanel">

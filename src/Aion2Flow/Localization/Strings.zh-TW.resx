@@ -60,9 +60,14 @@
   <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
   <data name="Settings_UiScale" xml:space="preserve"><value>介面縮放</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戰鬥重置快捷鍵</value></data>
+  <data name="Settings_DisplayModeHotkey" xml:space="preserve"><value>顯示模式快捷鍵</value></data>
   <data name="Settings_Hotkey_None" xml:space="preserve"><value>未設定</value></data>
   <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>請按下按鍵…</value></data>
+  <data name="Settings_Hotkey_RegistrationUnavailable" xml:space="preserve"><value>快捷鍵不可用，請改用其他按鍵組合。</value></data>
   <data name="Settings_Hotkey_Clear" xml:space="preserve"><value>清除熱鍵</value></data>
+  <data name="Overlay_Action_EnableClickThrough" xml:space="preserve"><value>啟用點擊穿透</value></data>
+  <data name="Overlay_Action_Hide" xml:space="preserve"><value>隱藏懸浮窗</value></data>
+  <data name="Overlay_Action_Restore" xml:space="preserve"><value>恢復懸浮窗</value></data>
   <data name="Settings_Update_Check" xml:space="preserve"><value>檢查更新</value></data>
   <data name="Settings_Update_Restart" xml:space="preserve"><value>重啟以更新</value></data>
   <data name="Settings_Update_Checking" xml:space="preserve"><value>正在檢查更新…</value></data>

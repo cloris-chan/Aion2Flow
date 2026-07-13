@@ -21,61 +21,75 @@
         <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
     </Window.Styles>
 
-    <Grid Classes="MainHudShell"
+    <Grid x:Name="MainHudShell"
+          Classes="MainHudShell"
           RowDefinitions="Auto,Auto,Auto,Auto"
           RowSpacing="0"
+          PointerEntered="MainHudShellPointerEntered"
           controls:DisplayContextProvider.DisplayContext="{Binding DisplayContext}">
         <Border Grid.Row="0"
                 Classes="MainHudHeader">
-            <Grid ColumnDefinitions="Auto,*,Auto"
-                  ColumnSpacing="2"
-                  Margin="1,0">
-                <Button Grid.Column="0"
-                        Classes="WindowBtn RefreshBtn"
-                        Command="{Binding ResetCommand}"
-                        IsEnabled="{Binding IsCapturing}"
-                        VerticalAlignment="Center"
-                        ToolTip.Tip="{markups:Translate Action_BattleReset}">
-                    <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
-                </Button>
+            <Grid>
+                <Border Classes="MainHudHeaderBackdrop"
+                        IsHitTestVisible="False" />
 
-                <Border Grid.Column="1"
-                        Classes="TitleBarDragRegion"
-                        PointerPressed="TitleBarDragRegionPointerPressed">
-                    <Grid ColumnDefinitions="*,Auto"
-                          ColumnSpacing="8"
-                          IsHitTestVisible="False">
-                        <TextBlock Grid.Column="0"
-                                   Classes="OverlayHeaderScene"
-                                   Text="{Binding SceneName}"
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center" />
-                        <controls:NumericBlock Grid.Column="1"
-                                               Classes="OverlayHeaderMetric"
-                                               Value="{Binding EncounterTimeSeconds}"
-                                               FractionDigits="1"
-                                               TrimTrailingZeros="False"
-                                               Suffix="s"
-                                               TextAlignment="Right"
-                                               StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
-                                               VerticalAlignment="Center" />
-                    </Grid>
-                </Border>
-
-                <StackPanel Grid.Column="2"
-                            Classes="TitleBarActions"
-                            Orientation="Horizontal"
-                            Spacing="2">
-                    <Button Classes="WindowBtn MinBtn"
-                            Click="Minimize">
-                        <Path Classes="Glyph GlyphSm" Data="{StaticResource minus}" />
+                <Grid Classes="MainHudForeground"
+                      ColumnDefinitions="Auto,*,Auto"
+                      ColumnSpacing="2"
+                      Margin="1,0">
+                    <Button Grid.Column="0"
+                            Classes="WindowBtn RefreshBtn"
+                            Command="{Binding ResetCommand}"
+                            IsEnabled="{Binding IsCapturing}"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="{markups:Translate Action_BattleReset}">
+                        <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
                     </Button>
 
-                    <Button Classes="WindowBtn CloseBtn"
-                            Click="Exit">
-                        <Path Classes="Glyph GlyphSm" Data="{StaticResource x}" />
-                    </Button>
-                </StackPanel>
+                    <Border Grid.Column="1"
+                            Classes="TitleBarDragRegion"
+                            PointerPressed="TitleBarDragRegionPointerPressed">
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="8"
+                              IsHitTestVisible="False">
+                            <TextBlock Grid.Column="0"
+                                       Classes="OverlayHeaderScene"
+                                       Text="{Binding SceneName}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                            <controls:NumericBlock Grid.Column="1"
+                                                   Classes="OverlayHeaderMetric"
+                                                   Value="{Binding EncounterTimeSeconds}"
+                                                   FractionDigits="1"
+                                                   TrimTrailingZeros="False"
+                                                   Suffix="s"
+                                                   TextAlignment="Right"
+                                                   StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
+                                                   VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Grid.Column="2"
+                                Classes="TitleBarActions"
+                                Orientation="Horizontal"
+                                Spacing="2">
+                        <Border x:Name="OverlayPinSlot"
+                                Width="26"
+                                Height="26"
+                                VerticalAlignment="Center"
+                                IsHitTestVisible="False" />
+
+                        <Button Classes="WindowBtn MinBtn"
+                                Click="Minimize">
+                            <Path Classes="Glyph GlyphSm" Data="{StaticResource minus}" />
+                        </Button>
+
+                        <Button Classes="WindowBtn CloseBtn"
+                                Click="Exit">
+                            <Path Classes="Glyph GlyphSm" Data="{StaticResource x}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
 
@@ -85,7 +99,7 @@
                 IsHitTestVisible="False" />
 
         <ItemsControl Grid.Row="1"
-                      Classes="BossFocusList"
+                      Classes="BossFocusList MainHudForeground"
                       Grid.IsSharedSizeScope="True"
                       ItemsSource="{Binding BossFocuses}">
             <ItemsControl.ItemsPanel>
@@ -196,6 +210,7 @@
         </ItemsControl>
 
         <controls:AnimatedItemsView Grid.Row="2"
+                                     Classes="MainHudForeground"
                                      ItemSpacing="2"
                                      ItemsSource="{Binding Combatants}"
                                      SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}"
@@ -283,15 +298,16 @@
         </controls:AnimatedItemsView>
 
         <Border Grid.Row="3"
-                Classes="MainHudFooterSeparator"
+                Classes="MainHudFooterSeparator MainHudForeground"
                 IsHitTestVisible="False" />
 
         <Border Grid.Row="3"
-                Classes="MainHudFooter">
+                Classes="MainHudFooter MainHudForeground">
             <Grid ColumnDefinitions="Auto,*,Auto"
                   ColumnSpacing="6"
                   Margin="2,0">
-                <Button Grid.Column="0"
+                <Button x:Name="SettingsButton"
+                        Grid.Column="0"
                         Classes="BottomBarButton"
                         VerticalAlignment="Center"
                         ToolTip.Tip="{markups:Translate Settings_Title}">
@@ -384,6 +400,7 @@
                         </Button.Flyout>
                     </Button>
                 </StackPanel>
+
             </Grid>
         </Border>
     </Grid>

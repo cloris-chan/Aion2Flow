@@ -60,9 +60,14 @@
   <data name="Settings_Language" xml:space="preserve"><value>Language</value></data>
   <data name="Settings_UiScale" xml:space="preserve"><value>UI scale</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>Battle reset hotkey</value></data>
+  <data name="Settings_DisplayModeHotkey" xml:space="preserve"><value>Display mode shortcut</value></data>
   <data name="Settings_Hotkey_None" xml:space="preserve"><value>None</value></data>
   <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>Press keys…</value></data>
+  <data name="Settings_Hotkey_RegistrationUnavailable" xml:space="preserve"><value>Shortcut unavailable. Choose another key combination.</value></data>
   <data name="Settings_Hotkey_Clear" xml:space="preserve"><value>Clear hotkey</value></data>
+  <data name="Overlay_Action_EnableClickThrough" xml:space="preserve"><value>Enable click-through</value></data>
+  <data name="Overlay_Action_Hide" xml:space="preserve"><value>Hide overlay</value></data>
+  <data name="Overlay_Action_Restore" xml:space="preserve"><value>Restore overlay</value></data>
   <data name="Settings_Update_Check" xml:space="preserve"><value>Check for updates</value></data>
   <data name="Settings_Update_Restart" xml:space="preserve"><value>Restart to update</value></data>
   <data name="Settings_Update_Checking" xml:space="preserve"><value>Checking for updates…</value></data>
