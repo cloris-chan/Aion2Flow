@@ -766,8 +766,8 @@
 
     <Style Selector="controls|SlantedProgressBar.CombatantRowBar">
         <Setter Property="SlantWidth" Value="7" />
-        <Setter Property="Height" Value="5" />
-        <Setter Property="Margin" Value="45,0,14,7" />
+        <Setter Property="Height" Value="4" />
+        <Setter Property="Margin" Value="40,0,12,4" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Bottom" />
     </Style>

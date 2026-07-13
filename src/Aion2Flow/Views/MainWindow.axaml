@@ -9,7 +9,7 @@
         Classes="OverlayWindow"
         WindowDecorations="None"
         TransparencyLevelHint="Transparent"
-        Width="320"
+        Width="300"
         SizeToContent="Height"
         CanResize="False"
         CanMaximize="False"
@@ -211,7 +211,7 @@
 
         <controls:AnimatedItemsView Grid.Row="2"
                                      Classes="MainHudForeground"
-                                     ItemSpacing="2"
+                                     ItemSpacing="1"
                                      ItemsSource="{Binding Combatants}"
                                      SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}"
                                      MaxVisibleItems="{Binding SettingsFlyout.MaxVisibleCombatantRows}"
@@ -244,18 +244,17 @@
                                                          IsHitTestVisible="False" />
 
                             <Grid ColumnDefinitions="*,Auto,Auto,Auto"
-                                  ColumnSpacing="7"
-                                  Margin="5,3">
+                                  ColumnSpacing="4"
+                                  Margin="5,0">
                                 <controls:PcDisplay Grid.Column="0"
                                                     Classes="OverlayRowName"
-                                                    IconSize="40"
-                                                    IconSpacing="5"
+                                                    IconSize="36"
+                                                    IconSpacing="4"
                                                     EntityId="{Binding Id}"
                                                     VerticalAlignment="Stretch" />
 
                                 <controls:NumericBlock Grid.Column="1"
                                                        Classes="OverlayRowMetricStrong"
-                                                       MinWidth="58"
                                                        Value="{Binding DamagePerSecond}"
                                                        IsVisible="{Binding Columns.ShowDamagePerSecondColumn}"
                                                        VerticalAlignment="Center"
@@ -269,7 +268,6 @@
 
                                 <controls:NumericBlock Grid.Column="2"
                                                        Classes="OverlayRowMetric"
-                                                       MinWidth="68"
                                                        Value="{Binding Damage}"
                                                        IsVisible="{Binding Columns.ShowDamageColumn}"
                                                        VerticalAlignment="Center"
