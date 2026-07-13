@@ -93,6 +93,12 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         set => SetFrameProperty(ref field, value);
     }
 
+    public double TotalFilteredDamagePerSecond
+    {
+        get;
+        private set => SetFrameProperty(ref field, value);
+    }
+
     public Guid NumericStableWidthScopeKey
     {
         get;
@@ -498,6 +504,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
         RefreshCombatantBars(snapshot.EncounterId);
         Combatants.Sort(CompareCombatantRows);
+        RefreshTotalFilteredDamagePerSecond();
 
         var liveFrame = IsViewingArchivedEncounter ? (SceneReadModelFrame?)null : _latestLiveFrame;
         RefreshBossFocus(liveFrame, snapshot);
@@ -674,6 +681,15 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         SettingsFlyout.CombatantSortMetric == CombatantSortMetric.TotalDamage
             ? row.Damage
             : row.DamagePerSecond;
+
+    private void RefreshTotalFilteredDamagePerSecond()
+    {
+        var total = 0d;
+        for (var i = 0; i < Combatants.Count; i++)
+            total += Combatants[i].DamagePerSecond;
+
+        TotalFilteredDamagePerSecond = total;
+    }
 
     private void EnsureBarBrushScope(Guid encounterId)
     {
@@ -974,6 +990,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _displayedSnapshot = new SceneCombatSnapshot();
         _latestLiveFrame = new SceneReadModelFrame();
         Combatants.Clear();
+        TotalFilteredDamagePerSecond = 0;
         CombatantDetails.Clear();
         BossFocuses.Clear();
         CombatantColumns.Update(hasBossColumn: false);

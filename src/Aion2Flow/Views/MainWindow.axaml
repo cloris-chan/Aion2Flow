@@ -23,6 +23,7 @@
 
     <Grid x:Name="MainHudShell"
           Classes="MainHudShell"
+          Grid.IsSharedSizeScope="True"
           RowDefinitions="Auto,Auto,Auto,Auto"
           RowSpacing="0"
           PointerEntered="MainHudShellPointerEntered"
@@ -100,7 +101,6 @@
 
         <ItemsControl Grid.Row="1"
                       Classes="BossFocusList MainHudForeground"
-                      Grid.IsSharedSizeScope="True"
                       ItemsSource="{Binding BossFocuses}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -116,15 +116,14 @@
                                                            Segment="{Binding BarSegment}"
                                                            IsHitTestVisible="False" />
 
-                            <Grid Margin="16,0"
+                            <Grid Margin="16,0,5,0"
+                                  ColumnSpacing="4"
                                   IsHitTestVisible="False">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossFocusCurrentHp" />
-                                    <ColumnDefinition Width="14" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossFocusMaxHp" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossFocusHpPercent" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricPrimary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricSecondary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricTertiary" />
                                 </Grid.ColumnDefinitions>
                                 <Grid Grid.Column="0"
                                       ColumnDefinitions="*,Auto"
@@ -152,10 +151,14 @@
                                                        Classes="BossFocusHp"
                                                        Value="{Binding Hp}"
                                                        UseGrouping="True"
+                                                       UseCompactNotation="{Binding $parent[Window].DataContext.CombatantColumns.UseCompactMainMetrics}"
+                                                       CompactThreshold="1000"
+                                                       CompactSignificantDigits="3"
                                                        HorizontalAlignment="Right"
                                                        TextAlignment="Right"
                                                        IsVisible="{Binding IsHpVisible}"
-                                                       VerticalAlignment="Center" />
+                                                       VerticalAlignment="Center"
+                                                       Suffix=" /" />
                                 <TextBlock Grid.Column="1"
                                            Classes="BossFocusHpMuted"
                                            Text="--"
@@ -164,28 +167,25 @@
                                            IsVisible="{Binding IsHpUnknown}"
                                            VerticalAlignment="Center" />
 
-                                <TextBlock Grid.Column="2"
-                                           Classes="BossFocusHpSlash"
-                                           Text="/"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center" />
-
-                                <controls:NumericBlock Grid.Column="3"
+                                <controls:NumericBlock Grid.Column="2"
                                                        Classes="BossFocusHpMuted"
                                                        Value="{Binding MaxHp}"
                                                        UseGrouping="True"
+                                                       UseCompactNotation="{Binding $parent[Window].DataContext.CombatantColumns.UseCompactMainMetrics}"
+                                                       CompactThreshold="1000"
+                                                       CompactSignificantDigits="3"
                                                        HorizontalAlignment="Right"
                                                        TextAlignment="Right"
                                                        IsVisible="{Binding IsMaxHpVisible}"
                                                        VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="3"
+                                <TextBlock Grid.Column="2"
                                            Classes="BossFocusHpMuted"
                                            Text="--"
                                            HorizontalAlignment="Right"
                                            TextAlignment="Right"
                                            IsVisible="{Binding IsMaxHpUnknown}"
                                            VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="3"
+                                <TextBlock Grid.Column="2"
                                            Classes="BossFocusHpMuted"
                                            Text="--"
                                            HorizontalAlignment="Right"
@@ -193,7 +193,7 @@
                                            IsVisible="{Binding IsHpUnknown}"
                                            VerticalAlignment="Center" />
 
-                                <controls:NumericBlock Grid.Column="5"
+                                <controls:NumericBlock Grid.Column="3"
                                                        Classes="BossFocusPercent"
                                                        Value="{Binding HpRatio}"
                                                        UsePercentageNotation="True"
@@ -243,9 +243,14 @@
                                                          Segment="{Binding BarSegment}"
                                                          IsHitTestVisible="False" />
 
-                            <Grid ColumnDefinitions="*,Auto,Auto,Auto"
-                                  ColumnSpacing="4"
+                            <Grid ColumnSpacing="4"
                                   Margin="5,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricPrimary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricSecondary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricTertiary" />
+                                </Grid.ColumnDefinitions>
                                 <controls:PcDisplay Grid.Column="0"
                                                     Classes="OverlayRowName"
                                                     IconSize="36"
@@ -264,7 +269,8 @@
                                                        UseCompactNotation="{Binding Columns.UseCompactMainMetrics}"
                                                        UseGrouping="True"
                                                        CompactThreshold="1000"
-                                                       CompactSignificantDigits="3" />
+                                                       CompactSignificantDigits="3"
+                                                       Suffix="/s" />
 
                                 <controls:NumericBlock Grid.Column="2"
                                                        Classes="OverlayRowMetric"
@@ -385,6 +391,18 @@
                             ToolTip.Tip="{markups:Translate Playback_Open}">
                         <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
                     </Button>
+
+                    <controls:NumericBlock Classes="BottomBarMetric BottomBarTotalDps"
+                                           Value="{Binding TotalFilteredDamagePerSecond}"
+                                           Suffix="/s"
+                                           UseGrouping="True"
+                                           UseCompactNotation="{Binding CombatantColumns.UseCompactMainMetrics}"
+                                           CompactThreshold="1000"
+                                           CompactSignificantDigits="3"
+                                           StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
+                                           HorizontalAlignment="Right"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center" />
 
                     <Button x:Name="EncounterHistoryButton"
                             Classes="BottomBarButton"

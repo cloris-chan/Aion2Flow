@@ -238,13 +238,6 @@
         <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
-    <Style Selector="TextBlock.BossFocusHpSlash">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Opacity" Value="0.72" />
-    </Style>
-
     <Style Selector="controls|BossFocusProgressBar.BossFocusHpBar">
         <Setter Property="Background" Value="#FF000000" />
         <Setter Property="OuterShadowBrush" Value="#B8000000" />
@@ -734,6 +727,11 @@
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="controls|NumericBlock.BottomBarTotalDps">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
     <Style Selector="controls|PcDisplay">
