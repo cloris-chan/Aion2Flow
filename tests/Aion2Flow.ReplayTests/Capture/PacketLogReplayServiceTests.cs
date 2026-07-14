@@ -292,6 +292,53 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260715000443_ParsesCompleteTenPlayerForceRosterSnapshot()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentTenPlayerForceRoster}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 3446, 3817, 13319, 15591);
+        AssertGroupRelations(replay, PlayerGroupRelation.ForceMember, 1307, 1549, 5142, 5193, 5927);
+        AssertGroupRelation(replay, 2204, PlayerGroupRelation.Unknown);
+
+        Assert.All(
+            new[] { 1549, 5142, 5927 },
+            entityId => Assert.Contains(
+                entries,
+                entry => entry.Raw.Opcode == 0x0296 &&
+                         entry.SourceEntityId == entityId &&
+                         entry.State is { StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Force }));
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x0296 &&
+                            entry.SourceEntityId == 0 &&
+                            entry.State is { StateCode: StateCodes.PlayerGroupMembership, Text: "艾小露", OriginServerId: 2003, GroupMembership.Kind: PlayerGroupKind.Force });
+    }
+
+    [Fact]
+    public void Replay_20260715002239_RecognizesCompleteForceFromCurrentStatusFrames()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentTenPlayerForceStatus}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 7771, 9372, 10544, 12203);
+        AssertGroupRelations(replay, PlayerGroupRelation.ForceMember, 1656, 8088, 10250, 10550, 14375);
+        AssertGroupRelation(replay, 1134, PlayerGroupRelation.Unknown);
+
+        Assert.All(
+            new[] { 1656, 8088, 10250, 10550, 14375 },
+            entityId => Assert.Contains(
+                entries,
+                entry => entry.Raw.Opcode == 0x2B96 &&
+                         entry.SourceEntityId == entityId &&
+                         entry.State is { StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Force }));
+    }
+
+    [Fact]
     public void Replay_20260704005035_Parses_ForceDungeonInitialRelations()
     {
         SetResources();
@@ -353,7 +400,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260704155002_UsesPartyStatusFramesWithoutPromotingCombat048D()
+    public void Replay_20260704155002_UsesPartyAndForceStatusFramesWithoutPromotingCombat048D()
     {
         SetResources();
 
@@ -369,19 +416,10 @@ public sealed class PacketLogReplayServiceTests
             entries,
             static entry => entry.Raw.Opcode == 0x1B92 &&
                             entry.State is { EntityId: 3316, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
-
-        AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 3316, 4909, 7740, 15338);
-        AssertGroupRelations(replay, PlayerGroupRelation.Unknown, 1339, 4110, 10984, 11101, 12588, 15481);
-    }
-
-    [Fact]
-    public void Replay_20260704153057_And_20260704155002_ResolvesForceDungeonRosterProfilesThroughGlobalRegistry()
-    {
-        SetResources();
-
-        var replay = ReplayCombinedFixtures(
-            ReplayScenarioCatalog.CurrentForceDungeonPreInstanceRoster,
-            ReplayScenarioCatalog.CurrentForceDungeonPartyStatusRelations);
+        Assert.Contains(
+            entries,
+            static entry => entry.Raw.Opcode == 0x2B96 &&
+                            entry.State is { EntityId: 1339, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Force });
 
         AssertGroupRelations(replay, PlayerGroupRelation.PartyMember, 3316, 4909, 7740, 15338);
         AssertGroupRelations(replay, PlayerGroupRelation.ForceMember, 1339, 4110, 10984, 11101, 12588);
@@ -553,29 +591,6 @@ public sealed class PacketLogReplayServiceTests
             $"{row.SourceId}|{row.TargetId}|{row.EventKey.SkillCode}|{row.EventKey.BodyResourceEffectRef.RawId}|{row.EventKey.DetailResourceEffectRef.RawId}|{row.Observation.ChainId}|{row.Observation.Damage}");
 
     private static bool HasCanonicalization(in CombatEventRecord row, CombatContributionCanonicalization flag) => (row.Canonicalization & flag) == flag;
-
-    private static PacketLogReplayResult ReplayCombinedFixtures(params string[] fixtureNames)
-    {
-        var path = Path.Combine(Path.GetTempPath(), $"aion2flow-replay-{Guid.NewGuid():N}.stream.log");
-        try
-        {
-            using (var writer = File.CreateText(path))
-            {
-                for (var i = 0; i < fixtureNames.Length; i++)
-                {
-                    foreach (var line in File.ReadLines(FixtureHelper.GetPath($"logs/{fixtureNames[i]}")))
-                        writer.WriteLine(line);
-                }
-            }
-
-            return PacketLogReplayService.Replay(path);
-        }
-        finally
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-    }
 
     private static IReadOnlyList<ReplayJournalEntrySnapshot> ReadAllJournalEntries(PacketLogReplayResult replay)
     {

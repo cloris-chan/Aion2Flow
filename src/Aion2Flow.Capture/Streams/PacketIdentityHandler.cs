@@ -73,6 +73,20 @@ internal static class PacketIdentityHandler
         return context.MarkParsed();
     }
 
+    public static bool ParseForceStatusPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        if (!PacketPlayerGroupParser.TryParseForceStatusMember(packet, out var member))
+            return false;
+
+        if (context.TryRegisterForceStatusMember(member.EntityId))
+        {
+            var source = context.CreateObservationSource(0x2B96, packet.Length);
+            AppendPlayerGroupMember(context, in source, in member);
+        }
+
+        return context.MarkParsed();
+    }
+
     public static bool ParseForceMemberPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (!PacketPlayerGroupParser.TryParseForceMember(packet, out var parsed))
@@ -106,6 +120,24 @@ internal static class PacketIdentityHandler
 
         var source = context.CreateObservationSource(0x0A96, packet.Length);
         AppendPlayerGroupProfile(context, in source, in profile);
+        return context.MarkParsed();
+    }
+
+    public static bool ParseForceRosterSnapshotPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        var members = new PacketPlayerGroupMember[32];
+        var profiles = new PacketPlayerGroupProfile[32];
+        var result = PacketPlayerGroupParser.ParseForceRosterSnapshot(packet, members, profiles);
+        if (!result.IsValid)
+            return false;
+
+        var source = context.CreateObservationSource(0x0296, packet.Length);
+        for (var i = 0; i < result.ProfileCount; i++)
+            AppendPlayerGroupProfile(context, in source, in profiles[i]);
+
+        for (var i = 0; i < result.MemberCount; i++)
+            AppendPlayerGroupMember(context, in source, in members[i]);
+
         return context.MarkParsed();
     }
 

@@ -16,6 +16,11 @@ internal readonly record struct PacketPlayerGroupMember(PacketPlayerGroupKind Ki
 
 internal readonly record struct PacketPlayerGroupProfile(PacketPlayerGroupKind Kind, int OriginServerId, string Nickname, uint GroupId, byte SubPartyIndex, byte MemberSlotIndex);
 
+internal readonly record struct PacketPlayerGroupRosterParseResult(int MemberCount, int ProfileCount)
+{
+    public bool IsValid => ProfileCount > 0;
+}
+
 internal static class PacketPlayerGroupParser
 {
     private const int ForceRowFixedNamePrefixLength = 100;
@@ -28,7 +33,9 @@ internal static class PacketPlayerGroupParser
     private const int ProfileListMinimumRowStride = 112;
     private const int ProfileListNameLengthOffset = 56;
     private const int CompactProfileNameLengthOffset = 55;
-    private const int PartyStatusFixedTailLength = 25;
+    private const int ForceRosterSnapshotCountOffset = 18;
+    private const int ForceRosterSnapshotRowsOffset = ForceRosterSnapshotCountOffset + sizeof(int);
+    private const int GroupStatusFixedTailLength = 25;
     private const int ForceRosterServerOffset = 14;
     private const int ForceRosterUuidMarkerOffset = 18;
     private const int ForceRosterRepeatedServerOffset = ForceRosterUuidMarkerOffset + 1 + ExpectedUuidLength + 6;
@@ -44,9 +51,15 @@ internal static class PacketPlayerGroupParser
     }
 
     public static bool TryParsePartyStatusMember(ReadOnlySpan<byte> packet, out PacketPlayerGroupMember member)
+        => TryParseGroupStatusMember(packet, 0x1B, 0x92, PacketPlayerGroupKind.Party, out member);
+
+    public static bool TryParseForceStatusMember(ReadOnlySpan<byte> packet, out PacketPlayerGroupMember member)
+        => TryParseGroupStatusMember(packet, 0x2B, 0x96, PacketPlayerGroupKind.Force, out member);
+
+    private static bool TryParseGroupStatusMember(ReadOnlySpan<byte> packet, byte opcode0, byte opcode1, PacketPlayerGroupKind kind, out PacketPlayerGroupMember member)
     {
         member = default;
-        if (!TryReadPayload(packet, 0x1B, 0x92, out var body))
+        if (!TryReadPayload(packet, opcode0, opcode1, out var body))
             return false;
 
         var reader = new PacketSpanReader(body);
@@ -54,13 +67,13 @@ internal static class PacketPlayerGroupParser
             !reader.TryReadVarInt(out var currentPrimaryResource) ||
             !reader.TryReadVarInt(out var maximumPrimaryResource) ||
             currentPrimaryResource < 0 || maximumPrimaryResource <= 0 || currentPrimaryResource > maximumPrimaryResource ||
-            reader.Remaining != PartyStatusFixedTailLength ||
+            reader.Remaining != GroupStatusFixedTailLength ||
             reader.RemainingSpan[^1] > 1)
         {
             return false;
         }
 
-        member = new PacketPlayerGroupMember(PacketPlayerGroupKind.Party, entityId, 0, 0, 0);
+        member = new PacketPlayerGroupMember(kind, entityId, 0, 0, 0);
         return true;
     }
 
@@ -98,6 +111,53 @@ internal static class PacketPlayerGroupParser
             return false;
 
         return TryReadForceRosterProfileRow(body, 0, out profile, out _);
+    }
+
+    public static PacketPlayerGroupRosterParseResult ParseForceRosterSnapshot(
+        ReadOnlySpan<byte> packet,
+        Span<PacketPlayerGroupMember> members,
+        Span<PacketPlayerGroupProfile> profiles)
+    {
+        if (members.Length == 0 || profiles.Length == 0 || !TryReadPayload(packet, 0x02, 0x96, out var body) || body.Length < ForceRosterSnapshotRowsOffset)
+            return default;
+
+        var declaredProfileCount = BinaryPrimitives.ReadInt32LittleEndian(body[ForceRosterSnapshotCountOffset..]);
+        if (declaredProfileCount is <= 0 or > MaxForceMemberRows || profiles.Length < declaredProfileCount)
+            return default;
+
+        var memberCount = 0;
+        var profileCount = 0;
+        var offset = ForceRosterSnapshotRowsOffset;
+        while (profileCount < declaredProfileCount && offset <= body.Length - CompactProfileNameLengthOffset - 1)
+        {
+            if (!TryReadCompactForceRosterRow(body, offset, out var row, out var rowTailOffset))
+            {
+                offset++;
+                continue;
+            }
+
+            profiles[profileCount++] = new PacketPlayerGroupProfile(
+                PacketPlayerGroupKind.Force,
+                row.OriginServerId,
+                row.Nickname,
+                0,
+                0,
+                row.MemberSlotIndex);
+
+            if (row.EntityId > 0)
+            {
+                if (memberCount >= members.Length)
+                    return default;
+
+                members[memberCount++] = row;
+            }
+
+            offset = Math.Max(rowTailOffset, offset + 1);
+        }
+
+        return profileCount == declaredProfileCount
+            ? new PacketPlayerGroupRosterParseResult(memberCount, profileCount)
+            : default;
     }
 
     public static int ParsePartyMemberList(ReadOnlySpan<byte> packet, Span<PacketPlayerGroupMember> destination)
@@ -399,6 +459,18 @@ internal static class PacketPlayerGroupParser
 
     private static bool TryReadCompactForceProfileRow(ReadOnlySpan<byte> body, int rowOffset, out PacketPlayerGroupMember member, out int rowTailOffset)
     {
+        if (!TryReadCompactForceRosterRow(body, rowOffset, out member, out rowTailOffset) || member.EntityId <= 0)
+        {
+            member = default;
+            rowTailOffset = 0;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadCompactForceRosterRow(ReadOnlySpan<byte> body, int rowOffset, out PacketPlayerGroupMember member, out int rowTailOffset)
+    {
         member = default;
         rowTailOffset = 0;
         if (rowOffset < 0 || rowOffset + CompactProfileNameLengthOffset + 1 > body.Length)
@@ -410,7 +482,7 @@ internal static class PacketPlayerGroupParser
 
         var entityId = BinaryPrimitives.ReadInt32LittleEndian(body[(rowOffset + 2)..]);
         var originServerId = BinaryPrimitives.ReadUInt16LittleEndian(body[(rowOffset + 6)..]);
-        if (entityId <= 0 ||
+        if (entityId < 0 ||
             !IsKnownServerId(originServerId) ||
             body[rowOffset + 10] != ExpectedUuidLength ||
             !IsUuidText(body.Slice(rowOffset + 11, ExpectedUuidLength)) ||

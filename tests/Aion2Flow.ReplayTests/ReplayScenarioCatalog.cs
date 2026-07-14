@@ -19,4 +19,6 @@ public static class ReplayScenarioCatalog
     public const string CurrentCrossServerSelfIdentityMarker3F = "aion2flow.stream.20260705015611.log";
     public const string CurrentOwnerSystemCanonicalization = "aion2flow.stream.20260705051242.log";
     public const string CurrentPartyStatusRelation = "aion2flow.stream.20260712211428.log";
+    public const string CurrentTenPlayerForceRoster = "aion2flow.stream.20260715000443.log";
+    public const string CurrentTenPlayerForceStatus = "aion2flow.stream.20260715002239.log";
 }

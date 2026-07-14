@@ -14,6 +14,8 @@ internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObserv
 
     public readonly bool TryRegisterPartyStatusMember(int entityId) => playerGroupState.TryRegisterPartyStatusMember(entityId);
 
+    public readonly bool TryRegisterForceStatusMember(int entityId) => playerGroupState.TryRegisterForceStatusMember(entityId);
+
     public readonly long FlushId => flushState.CurrentFlushId;
 
     public readonly PacketObservationSource CreateObservationSource(ushort opcode, int payloadLength, long captureSequence = 0)
