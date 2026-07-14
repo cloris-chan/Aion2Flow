@@ -11,8 +11,8 @@ public sealed class PlaybackTimelineStripView : Control
     public static readonly DirectProperty<PlaybackTimelineStripView, IReadOnlyList<PlaybackTimelineBand>?> BandsProperty =
         AvaloniaProperty.RegisterDirect<PlaybackTimelineStripView, IReadOnlyList<PlaybackTimelineBand>?>(nameof(Bands), view => view.Bands, (view, value) => view.Bands = value);
 
-    public static readonly DirectProperty<PlaybackTimelineStripView, double> DurationMillisecondsProperty =
-        AvaloniaProperty.RegisterDirect<PlaybackTimelineStripView, double>(nameof(DurationMilliseconds), view => view.DurationMilliseconds, (view, value) => view.DurationMilliseconds = value);
+    public static readonly DirectProperty<PlaybackTimelineStripView, PlaybackTimelineViewport> ViewportProperty =
+        AvaloniaProperty.RegisterDirect<PlaybackTimelineStripView, PlaybackTimelineViewport>(nameof(Viewport), view => view.Viewport, (view, value) => view.Viewport = value);
 
     public static readonly DirectProperty<PlaybackTimelineStripView, double> PositionMillisecondsProperty =
         AvaloniaProperty.RegisterDirect<PlaybackTimelineStripView, double>(nameof(PositionMilliseconds), view => view.PositionMilliseconds, (view, value) => view.PositionMilliseconds = value);
@@ -27,11 +27,11 @@ public sealed class PlaybackTimelineStripView : Control
 
     static PlaybackTimelineStripView()
     {
-        AffectsRender<PlaybackTimelineStripView>(BandsProperty, DurationMillisecondsProperty, PositionMillisecondsProperty, TrackBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty, IsPlayheadVisibleProperty);
+        AffectsRender<PlaybackTimelineStripView>(BandsProperty, ViewportProperty, PositionMillisecondsProperty, TrackBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty, IsPlayheadVisibleProperty);
     }
 
     private IReadOnlyList<PlaybackTimelineBand>? _bands;
-    private double _durationMilliseconds;
+    private PlaybackTimelineViewport _viewport;
     private double _positionMilliseconds;
     private IBrush? _cachedPlayheadBrush;
     private double _cachedPlayheadThickness;
@@ -45,10 +45,10 @@ public sealed class PlaybackTimelineStripView : Control
         set => SetAndRaise(BandsProperty, ref _bands, value);
     }
 
-    public double DurationMilliseconds
+    public PlaybackTimelineViewport Viewport
     {
-        get => _durationMilliseconds;
-        set => SetAndRaise(DurationMillisecondsProperty, ref _durationMilliseconds, value);
+        get => _viewport;
+        set => SetAndRaise(ViewportProperty, ref _viewport, value);
     }
 
     public double PositionMilliseconds
@@ -90,18 +90,19 @@ public sealed class PlaybackTimelineStripView : Control
         using var clip = context.PushClip(bounds);
         context.FillRectangle(TrackBrush ?? Brushes.Transparent, bounds);
 
-        var duration = DurationMilliseconds;
-        if (duration <= 0)
+        var viewport = Viewport;
+        if (viewport.IsEmpty)
             return;
 
         var bands = Bands;
         if (bands is not null && bands.Count > 0)
-            DrawBands(context, bands, duration, bounds);
+            DrawBands(context, bands, viewport, bounds);
 
-        if (!IsPlayheadVisible)
+        var positionMilliseconds = PositionMilliseconds;
+        if (!IsPlayheadVisible || !viewport.Contains(positionMilliseconds))
             return;
 
-        var playheadX = PlaybackTimelineGeometry.PositionToX(PositionMilliseconds, duration, bounds.Width);
+        var playheadX = PlaybackTimelineGeometry.PositionToX(positionMilliseconds, viewport, bounds.Width);
         context.DrawLine(GetPlayheadPen(), new Point(playheadX, 0), new Point(playheadX, bounds.Height));
     }
 
@@ -133,7 +134,7 @@ public sealed class PlaybackTimelineStripView : Control
             e.Pointer.Capture(null);
     }
 
-    private static void DrawBands(DrawingContext context, IReadOnlyList<PlaybackTimelineBand> bands, double duration, Rect bounds)
+    private static void DrawBands(DrawingContext context, IReadOnlyList<PlaybackTimelineBand> bands, PlaybackTimelineViewport viewport, Rect bounds)
     {
         var bandCount = Math.Max(1, bands.Count);
         var step = bounds.Height / (bandCount + 1);
@@ -146,13 +147,16 @@ public sealed class PlaybackTimelineStripView : Control
 
             var y = Math.Round(step * (bandIndex + 1)) + 0.5d;
             for (var markerIndex = 0; markerIndex < markers.Count; markerIndex++)
-                DrawMarker(context, markers[markerIndex], duration, bounds.Width, y, band.Brush);
+                DrawMarker(context, markers[markerIndex], viewport, bounds.Width, y, band.Brush);
         }
     }
 
-    private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, double duration, double width, double y, IBrush brush)
+    private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, PlaybackTimelineViewport viewport, double width, double y, IBrush brush)
     {
-        var x = PlaybackTimelineGeometry.PositionToX(marker.PositionMilliseconds, duration, width);
+        if (!viewport.Contains(marker.PositionMilliseconds))
+            return;
+
+        var x = PlaybackTimelineGeometry.PositionToX(marker.PositionMilliseconds, viewport, width);
         var halfWidth = Math.Clamp(marker.Weight * 1.8d, 6d, 42d) * 0.5d;
         var start = Math.Max(0d, x - halfWidth);
         var end = Math.Min(width, x + halfWidth);
@@ -162,11 +166,11 @@ public sealed class PlaybackTimelineStripView : Control
     private void RequestSeek(double x)
     {
         var width = Bounds.Width;
-        var duration = DurationMilliseconds;
-        if (width <= 0 || duration <= 0)
+        var viewport = Viewport;
+        if (width <= 0d || viewport.IsEmpty)
             return;
 
-        SeekRequested?.Invoke(this, new PlaybackSeekRequestedEventArgs(PlaybackTimelineGeometry.XToPosition(x, duration, width)));
+        SeekRequested?.Invoke(this, new PlaybackSeekRequestedEventArgs(PlaybackTimelineGeometry.XToPosition(x, viewport, width)));
     }
 
     private Pen GetPlayheadPen()

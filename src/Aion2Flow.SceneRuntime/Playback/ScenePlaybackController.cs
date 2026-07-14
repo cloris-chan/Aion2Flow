@@ -227,6 +227,30 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
+    public async ValueTask<ScenePlaybackEventReadResult> CopyLatestCombatEventsAsync(
+        ScenePlaybackEventScope scope,
+        long startPositionMilliseconds,
+        long endPositionMilliseconds,
+        Memory<ScenePlaybackEventMarker> destination,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Session.CopyLatestCombatEvents(
+                scope,
+                startPositionMilliseconds,
+                endPositionMilliseconds,
+                destination.Span);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
+    }
+
     public void SetSpeed(double speed)
     {
         ThrowIfDisposed();

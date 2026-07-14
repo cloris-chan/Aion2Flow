@@ -1,7 +1,7 @@
 using System.Globalization;
 using Avalonia.Media;
 using Cloris.Aion2Flow.Presentation;
-using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.Services;
 
@@ -32,15 +32,6 @@ internal static class ScenePlaybackTimelineBuilder
     private static readonly IBrush ActionBrush = Brush.Parse("#65A7FF");
     private static readonly IBrush DiagnosticBrush = Brush.Parse("#9AA8B4");
     private static readonly IBrush OtherBrush = Brush.Parse("#D4DCE5");
-    private static readonly IBrush[] SkillAccentBrushes =
-    [
-        Brush.Parse("#18D7F4"),
-        Brush.Parse("#89D66B"),
-        Brush.Parse("#FFD166"),
-        Brush.Parse("#FF8A65"),
-        Brush.Parse("#C98EFF"),
-        Brush.Parse("#65A7FF")
-    ];
     private static readonly IBrush[] AuraAccentBrushes =
     [
         Brush.Parse("#22D3EE"),
@@ -60,18 +51,30 @@ internal static class ScenePlaybackTimelineBuilder
         Brush.Parse("#4065A7FF")
     ];
 
-    public static PlaybackTimelineBuildResult BuildTimelineStrips(SceneJournalSegment segment, long durationMilliseconds, Func<ScenePlaybackTrackMarker, string> createMarkerText)
+    public static PlaybackTimelineBuildResult BuildTimelineStrips(
+        ScenePlaybackTrackMarkerWindow window,
+        PlaybackTimelineViewport viewport,
+        Func<ScenePlaybackTrackMarker, string> createMarkerText,
+        CancellationToken cancellationToken)
     {
-        if (segment.IsEmpty || durationMilliseconds <= 0)
+        if (window.Count == 0 || viewport.IsEmpty)
             return new PlaybackTimelineBuildResult(PlaybackTimelineStrip.Empty, []);
 
-        var read = ScenePlaybackTrackReader.ReadSampled(segment, 0, durationMilliseconds, MaxTimelineMarkersPerTrack);
-        var combatantRead = ScenePlaybackTrackReader.ReadCombatantSampled(segment, 0, durationMilliseconds, MaxCombatantTimelineMarkersPerTrack);
-        var global = CreateTimelineStrip(CreateTimelineGroups(read.Samples, createMarkerText), read.TrackCounts);
-        var combatants = new Dictionary<int, PlaybackTimelineStrip>(combatantRead.Combatants.Count);
-        for (var i = 0; i < combatantRead.Combatants.Count; i++)
+        var startMilliseconds = (long)Math.Floor(viewport.StartMilliseconds);
+        var endMilliseconds = (long)Math.Ceiling(viewport.EndMilliseconds);
+        var read = ScenePlaybackTrackReader.SampleTimeline(
+            window.AsSpan(),
+            startMilliseconds,
+            endMilliseconds,
+            MaxTimelineMarkersPerTrack,
+            MaxCombatantTimelineMarkersPerTrack,
+            cancellationToken);
+        var global = CreateTimelineStrip(CreateTimelineGroups(read.Global.Samples, createMarkerText), read.Global.TrackCounts);
+        var combatants = new Dictionary<int, PlaybackTimelineStrip>(read.Combatants.Combatants.Count);
+        for (var i = 0; i < read.Combatants.Combatants.Count; i++)
         {
-            var samples = combatantRead.Combatants[i];
+            cancellationToken.ThrowIfCancellationRequested();
+            var samples = read.Combatants.Combatants[i];
             var strip = CreateTimelineStrip(CreateTimelineGroups(samples.Samples, createMarkerText), samples.TrackCounts);
             if (strip.Bands.Count > 0)
                 combatants[samples.CombatantId] = strip;
@@ -85,34 +88,32 @@ internal static class ScenePlaybackTimelineBuilder
         if (timeline.Coverages.Count == 0 && timeline.Applications.Count == 0)
             return [];
 
-        var groups = new Dictionary<AuraTimelineDisplayKey, AuraTimelineLaneBuilder>();
+        var groups = new Dictionary<ScenePlaybackAuraIdentity, AuraTimelineLaneBuilder>();
         for (var i = 0; i < timeline.Coverages.Count; i++)
         {
             var coverage = timeline.Coverages[i];
-            var key = AuraTimelineDisplayKey.Create(coverage.DisplayResourceEffectRef.RawId, coverage.InstanceSequenceId);
-            GetAuraTimelineBuilder(groups, key, coverage.DisplayResourceEffectRef.RawId, coverage.InstanceSequenceId)
+            var identity = ScenePlaybackAuraIdentity.Create(coverage.DisplayResourceEffectRef, coverage.InstanceSequenceId);
+            GetAuraTimelineBuilder(groups, identity)
                 .Coverages.Add((coverage.StartMilliseconds, coverage.EndMilliseconds));
         }
 
         for (var i = 0; i < timeline.Applications.Count; i++)
         {
             var application = timeline.Applications[i];
-            var key = AuraTimelineDisplayKey.Create(application.DisplayResourceEffectRef.RawId, application.InstanceSequenceId);
-            GetAuraTimelineBuilder(groups, key, application.DisplayResourceEffectRef.RawId, application.InstanceSequenceId)
+            var identity = ScenePlaybackAuraIdentity.Create(application.DisplayResourceEffectRef, application.InstanceSequenceId);
+            GetAuraTimelineBuilder(groups, identity)
                 .Applications.Add((application.PositionMilliseconds, application.Kind));
         }
 
         var result = new List<PlaybackAuraTimelineLane>(groups.Count);
         foreach (var builder in groups.Values)
         {
-            var paletteIndex = ResolveAuraPaletteIndex(builder.DisplayResourceEffectRefRaw, builder.InstanceSequenceId);
+            var displayResourceEffectRefRaw = builder.DisplayResourceEffectRef.RawId;
+            var paletteIndex = ResolveAuraPaletteIndex(displayResourceEffectRefRaw, builder.InstanceSequenceId);
             var accent = AuraAccentBrushes[paletteIndex];
             var fill = AuraFillBrushes[paletteIndex];
-            var skillCode = builder.DisplayResourceEffectRefRaw is > 0 and <= int.MaxValue
-                ? (int)builder.DisplayResourceEffectRefRaw
-                : 0;
-            var fallback = builder.DisplayResourceEffectRefRaw > 0
-                ? builder.DisplayResourceEffectRefRaw.ToString(CultureInfo.InvariantCulture)
+            var fallback = displayResourceEffectRefRaw > 0
+                ? displayResourceEffectRefRaw.ToString(CultureInfo.InvariantCulture)
                 : string.Format(CultureInfo.CurrentCulture, localization["Playback_AuraUnknownFormat"], builder.InstanceSequenceId);
             var markers = new PlaybackTimelineMarker[builder.Applications.Count];
             builder.Applications.Sort(static (left, right) => left.PositionMilliseconds.CompareTo(right.PositionMilliseconds));
@@ -128,7 +129,7 @@ internal static class ScenePlaybackTimelineBuilder
             var spans = MergeAuraCoverages(builder.Coverages, fill, accent);
             var activeMilliseconds = SumSpanDuration(spans);
             var coverage = durationMilliseconds > 0 ? activeMilliseconds / (double)durationMilliseconds : 0d;
-            result.Add(new PlaybackAuraTimelineLane(skillCode, fallback, markers, spans, builder.Applications.Count, coverage.ToString("P1", CultureInfo.CurrentCulture), FormatDuration(activeMilliseconds)));
+            result.Add(new PlaybackAuraTimelineLane(builder.Identity, fallback, markers, spans, builder.Applications.Count, coverage.ToString("P1", CultureInfo.CurrentCulture), FormatDuration(activeMilliseconds)));
         }
 
         result.Sort((left, right) =>
@@ -181,16 +182,14 @@ internal static class ScenePlaybackTimelineBuilder
     }
 
     private static AuraTimelineLaneBuilder GetAuraTimelineBuilder(
-        Dictionary<AuraTimelineDisplayKey, AuraTimelineLaneBuilder> groups,
-        AuraTimelineDisplayKey key,
-        uint displayResourceEffectRefRaw,
-        int instanceSequenceId)
+        Dictionary<ScenePlaybackAuraIdentity, AuraTimelineLaneBuilder> groups,
+        ScenePlaybackAuraIdentity identity)
     {
-        if (groups.TryGetValue(key, out var builder))
+        if (groups.TryGetValue(identity, out var builder))
             return builder;
 
-        builder = new AuraTimelineLaneBuilder(displayResourceEffectRefRaw, instanceSequenceId);
-        groups.Add(key, builder);
+        builder = new AuraTimelineLaneBuilder(identity);
+        groups.Add(identity, builder);
         return builder;
     }
 
@@ -230,25 +229,6 @@ internal static class ScenePlaybackTimelineBuilder
         var value = displayResourceEffectRefRaw != 0 ? displayResourceEffectRefRaw : unchecked((uint)instanceSequenceId);
         value ^= value >> 16;
         return (int)(value % AuraAccentBrushes.Length);
-    }
-
-    private static int ResolveSkillPaletteIndex(int skillCode)
-    {
-        var value = unchecked((uint)skillCode);
-        value ^= value >> 16;
-        return (int)(value % SkillAccentBrushes.Length);
-    }
-
-    public static IBrush ResolveSkillBrush(SkillBaseKey key)
-        => SkillAccentBrushes[ResolveSkillPaletteIndex(key.SkillCode)];
-
-    private static double ResolveSkillMarkerWeight(long amount, int eventCount)
-    {
-        var magnitude = amount >= 0 ? (double)amount : -(double)(amount + 1) + 1d;
-        var baseWeight = magnitude > 0
-            ? Math.Clamp(Math.Log10(magnitude + 1) * 2.2d, 3d, 12d)
-            : 5d;
-        return Math.Clamp(baseWeight + Math.Log2(Math.Max(1, eventCount)) * 0.75d, 3d, 12d);
     }
 
     private static double ResolveMarkerWeight(ScenePlaybackTrackMarker marker, int eventCount)
@@ -299,19 +279,13 @@ internal static class ScenePlaybackTimelineBuilder
     }
 }
 
-internal readonly record struct AuraTimelineDisplayKey(uint DisplayResourceEffectRefRaw, int InstanceSequenceId)
+internal sealed class AuraTimelineLaneBuilder(ScenePlaybackAuraIdentity identity)
 {
-    public static AuraTimelineDisplayKey Create(uint displayResourceEffectRefRaw, int instanceSequenceId)
-        => displayResourceEffectRefRaw != 0
-            ? new AuraTimelineDisplayKey(displayResourceEffectRefRaw, 0)
-            : new AuraTimelineDisplayKey(0, instanceSequenceId);
-}
+    public ScenePlaybackAuraIdentity Identity { get; } = identity;
 
-internal sealed class AuraTimelineLaneBuilder(uint displayResourceEffectRefRaw, int instanceSequenceId)
-{
-    public uint DisplayResourceEffectRefRaw { get; } = displayResourceEffectRefRaw;
+    public ResourceEffectRef DisplayResourceEffectRef => Identity.DisplayResourceEffectRef;
 
-    public int InstanceSequenceId { get; } = instanceSequenceId;
+    public int InstanceSequenceId => Identity.InstanceSequenceId;
 
     public List<(long StartMilliseconds, long EndMilliseconds)> Coverages { get; } = [];
 

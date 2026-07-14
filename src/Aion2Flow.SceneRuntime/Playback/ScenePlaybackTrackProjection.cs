@@ -1,9 +1,18 @@
+using Cloris.Aion2Flow.Protocol.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
 internal readonly record struct ScenePlaybackAuraInstanceKey(int EntityId, int InstanceSequenceId);
+
+internal readonly record struct ScenePlaybackLifecycleProjection(
+    ScenePlaybackLifecycleEventKind Kind,
+    ResourceEffectRef DisplayResourceEffectRef)
+{
+    public static ScenePlaybackLifecycleProjection None { get; } = default;
+}
 
 internal static class ScenePlaybackAuraProtocol
 {
@@ -20,9 +29,9 @@ internal static class ScenePlaybackAuraProtocol
 
 internal sealed class ScenePlaybackLifecycleTrackState
 {
-    private readonly HashSet<ScenePlaybackAuraInstanceKey> _instances = [];
+    private readonly Dictionary<ScenePlaybackAuraInstanceKey, ResourceEffectRef> _instances = [];
 
-    public ScenePlaybackLifecycleEventKind Apply(ObservedEventEntry entry)
+    public ScenePlaybackLifecycleProjection Apply(ObservedEventEntry entry)
     {
         if (entry.Domain == ObservedEventDomain.Aura)
         {
@@ -32,36 +41,45 @@ internal sealed class ScenePlaybackLifecycleTrackState
             {
                 _instances.Remove(key);
                 if (!ScenePlaybackAuraProtocol.IsTrackableOpen(in aura))
-                    return ScenePlaybackLifecycleEventKind.None;
+                    return ScenePlaybackLifecycleProjection.None;
 
-                _instances.Add(key);
-                return ScenePlaybackLifecycleEventKind.Open;
+                _instances.Add(key, aura.BuffResourceEffectRef);
+                return new ScenePlaybackLifecycleProjection(ScenePlaybackLifecycleEventKind.Open, aura.BuffResourceEffectRef);
             }
 
-            return _instances.Remove(key)
-                ? ScenePlaybackLifecycleEventKind.Result
-                : ScenePlaybackLifecycleEventKind.None;
+            return _instances.Remove(key, out var displayResourceEffectRef)
+                ? new ScenePlaybackLifecycleProjection(ScenePlaybackLifecycleEventKind.Result, displayResourceEffectRef)
+                : ScenePlaybackLifecycleProjection.None;
         }
 
         if (entry.Domain != ObservedEventDomain.Action)
-            return ScenePlaybackLifecycleEventKind.None;
+            return ScenePlaybackLifecycleProjection.None;
 
         ref readonly var action = ref entry.Action;
         if (!ScenePlaybackAuraProtocol.IsRenewal(in action))
-            return ScenePlaybackLifecycleEventKind.None;
+            return ScenePlaybackLifecycleProjection.None;
 
-        return _instances.Contains(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId))
-            ? ScenePlaybackLifecycleEventKind.Renew
-            : ScenePlaybackLifecycleEventKind.None;
+        var renewalKey = new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId);
+        if (!_instances.TryGetValue(renewalKey, out var renewalDisplayResourceEffectRef))
+            return ScenePlaybackLifecycleProjection.None;
+
+        if (renewalDisplayResourceEffectRef.IsEmpty && !action.ActionResourceEffectRef.IsEmpty)
+        {
+            renewalDisplayResourceEffectRef = action.ActionResourceEffectRef;
+            _instances[renewalKey] = renewalDisplayResourceEffectRef;
+        }
+
+        return new ScenePlaybackLifecycleProjection(ScenePlaybackLifecycleEventKind.Renew, renewalDisplayResourceEffectRef);
     }
 }
 
 internal static class ScenePlaybackTrackProjection
 {
-    public static ScenePlaybackTrackMarker CreateMarker(ObservedEventEntry entry, long offset, long position, ScenePlaybackLifecycleEventKind lifecycleEventKind)
+    public static ScenePlaybackTrackMarker CreateMarker(ObservedEventEntry entry, long offset, long position, ScenePlaybackLifecycleProjection lifecycle)
     {
-        var track = ResolveTrack(entry.Domain, lifecycleEventKind);
-        var skillCode = 0;
+        var track = ResolveTrack(entry.Domain, lifecycle.Kind);
+        var eventKey = default(CombatEventKey);
+        var combatEventFlags = ScenePlaybackCombatEventFlags.None;
         var amount = 0L;
         long? currentValue = null;
         long? maximumValue = null;
@@ -69,7 +87,7 @@ internal static class ScenePlaybackTrackProjection
         var resultCode = 0;
         var instanceSequenceId = 0;
         var durationMilliseconds = 0;
-        var displayResourceEffectRefRaw = 0u;
+        var displayResourceEffectRef = default(ResourceEffectRef);
         var sourceEntityId = entry.SourceEntityId;
         var targetEntityId = entry.TargetEntityId;
         switch (entry.Domain)
@@ -77,8 +95,10 @@ internal static class ScenePlaybackTrackProjection
             case ObservedEventDomain.Combat:
             {
                 ref readonly var combat = ref entry.Combat;
-                skillCode = combat.SkillCode;
-                amount = combat.Damage;
+                eventKey = CombatEventKey.FromObservation(in combat);
+                var contribution = CombatContributionClassifier.Evaluate(in combat);
+                combatEventFlags = ResolveCombatEventFlags(in contribution);
+                amount = ResolvePrimaryCombatAmount(in combat, in contribution);
                 break;
             }
             case ObservedEventDomain.Resource:
@@ -95,27 +115,73 @@ internal static class ScenePlaybackTrackProjection
                 ref readonly var aura = ref entry.Aura;
                 sourceEntityId = aura.Kind == AuraObservationKind.Open ? aura.EchoSourceEntityId : 0;
                 targetEntityId = aura.EntityId;
-                if (lifecycleEventKind != ScenePlaybackLifecycleEventKind.None)
+                if (lifecycle.Kind != ScenePlaybackLifecycleEventKind.None)
                 {
                     resultCode = aura.ResultCode;
                     instanceSequenceId = aura.InstanceSequenceId;
                     durationMilliseconds = aura.Kind == AuraObservationKind.Open ? aura.HeadValue : 0;
-                    displayResourceEffectRefRaw = aura.BuffResourceEffectRef.RawId;
+                    displayResourceEffectRef = aura.BuffResourceEffectRef.IsEmpty
+                        ? lifecycle.DisplayResourceEffectRef
+                        : aura.BuffResourceEffectRef;
                 }
                 break;
             }
-            case ObservedEventDomain.Action when lifecycleEventKind == ScenePlaybackLifecycleEventKind.Renew:
+            case ObservedEventDomain.Action when lifecycle.Kind == ScenePlaybackLifecycleEventKind.Renew:
             {
                 ref readonly var action = ref entry.Action;
                 sourceEntityId = action.SourceEntityIdCopy;
                 targetEntityId = action.SourceEntityId;
                 instanceSequenceId = action.InstanceSequenceId;
-                displayResourceEffectRefRaw = action.ActionResourceEffectRef.RawId;
+                displayResourceEffectRef = action.ActionResourceEffectRef.IsEmpty
+                    ? lifecycle.DisplayResourceEffectRef
+                    : action.ActionResourceEffectRef;
                 break;
             }
         }
 
-        return new ScenePlaybackTrackMarker(track, position, offset, entry.Stamp.ObservationOrdinal, sourceEntityId, targetEntityId, skillCode, amount, currentValue, maximumValue, resourceKind, resultCode, lifecycleEventKind, instanceSequenceId, durationMilliseconds, displayResourceEffectRefRaw);
+        return new ScenePlaybackTrackMarker(
+            track,
+            position,
+            offset,
+            entry.Stamp.ObservationOrdinal,
+            sourceEntityId,
+            targetEntityId,
+            eventKey,
+            combatEventFlags,
+            amount,
+            currentValue,
+            maximumValue,
+            resourceKind,
+            resultCode,
+            lifecycle.Kind,
+            instanceSequenceId,
+            durationMilliseconds,
+            displayResourceEffectRef);
+    }
+
+    private static ScenePlaybackCombatEventFlags ResolveCombatEventFlags(in CombatContribution contribution)
+    {
+        var flags = ScenePlaybackCombatEventFlags.None;
+        if (contribution.CountsAsDamage)
+            flags |= ScenePlaybackCombatEventFlags.Damage;
+        if (contribution.CountsAsHealing)
+            flags |= ScenePlaybackCombatEventFlags.Healing;
+        if (contribution.CountsAsShieldGrant || contribution.CountsAsShieldAbsorbed)
+            flags |= ScenePlaybackCombatEventFlags.Shield;
+        return flags;
+    }
+
+    private static long ResolvePrimaryCombatAmount(in CombatObservation observation, in CombatContribution contribution)
+    {
+        if (contribution.CountsAsDamage)
+            return contribution.DamageAmount;
+        if (contribution.CountsAsHealing)
+            return contribution.HealingAmount;
+        if (contribution.CountsAsShieldGrant)
+            return contribution.ShieldGrantAmount;
+        if (contribution.CountsAsShieldAbsorbed)
+            return contribution.ShieldAbsorbedAmount;
+        return observation.Damage;
     }
 
     private static ScenePlaybackTrack ResolveTrack(ObservedEventDomain domain, ScenePlaybackLifecycleEventKind lifecycleEventKind) => domain switch

@@ -194,25 +194,16 @@
   <data name="Playback_NextSecond" xml:space="preserve"><value>Forward 1 second</value></data>
   <data name="Playback_NextEvent" xml:space="preserve"><value>Next event</value></data>
   <data name="Playback_Label_Speed" xml:space="preserve"><value>Speed</value></data>
+  <data name="Playback_Label_Zoom" xml:space="preserve"><value>Zoom</value></data>
+  <data name="Playback_ZoomIn" xml:space="preserve"><value>Zoom in</value></data>
+  <data name="Playback_ZoomOut" xml:space="preserve"><value>Zoom out</value></data>
+  <data name="Playback_ZoomReset" xml:space="preserve"><value>Reset zoom</value></data>
+  <data name="Playback_SelectCombatant" xml:space="preserve"><value>Select a combatant to inspect</value></data>
+  <data name="Playback_NoData" xml:space="preserve"><value>No data for this view</value></data>
   <data name="Playback_Combatants" xml:space="preserve"><value>Combatants</value></data>
-  <data name="Playback_CombatantDetails" xml:space="preserve"><value>Combatant Details</value></data>
-  <data name="Playback_Inspector" xml:space="preserve"><value>Playback Inspector</value></data>
   <data name="Playback_EventWindow" xml:space="preserve"><value>Event Window</value></data>
-  <data name="Playback_OutgoingDamage" xml:space="preserve"><value>Outgoing Damage</value></data>
-  <data name="Playback_OutgoingHealing" xml:space="preserve"><value>Outgoing Healing</value></data>
-  <data name="Playback_OutgoingShield" xml:space="preserve"><value>Outgoing Shield</value></data>
-  <data name="Playback_IncomingDamage" xml:space="preserve"><value>Incoming Damage</value></data>
-  <data name="Playback_IncomingHealing" xml:space="preserve"><value>Incoming Healing</value></data>
-  <data name="Playback_IncomingShield" xml:space="preserve"><value>Incoming Shield</value></data>
-  <data name="Playback_Metric_PerSecond" xml:space="preserve"><value>Per Sec</value></data>
-  <data name="Playback_Metric_Share" xml:space="preserve"><value>Share</value></data>
+  <data name="Playback_EventScope_All" xml:space="preserve"><value>All events</value></data>
   <data name="Playback_Metric_Count" xml:space="preserve"><value>Count</value></data>
-  <data name="Playback_Metric_Direct" xml:space="preserve"><value>Direct</value></data>
-  <data name="Playback_Metric_Periodic" xml:space="preserve"><value>Periodic</value></data>
-  <data name="Playback_Metric_Hit" xml:space="preserve"><value>Hit</value></data>
-  <data name="Playback_Metric_Direction" xml:space="preserve"><value>Front / Back</value></data>
-  <data name="Playback_Metric_Avoidance" xml:space="preserve"><value>Avoid</value></data>
-  <data name="Playback_Metric_Guard" xml:space="preserve"><value>Guard</value></data>
   <data name="Playback_Metric_Coverage" xml:space="preserve"><value>Coverage</value></data>
   <data name="Playback_Metric_ActiveTime" xml:space="preserve"><value>Active</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>Combatant</value></data>

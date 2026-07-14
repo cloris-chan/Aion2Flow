@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, ICombatDetailEventWriter
+public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, ICombatDetailEventWriter, IDisposable
 {
     private readonly List<CombatDetailEvent> _detailEvents = [];
     private readonly DetailCounterpartOptionBuilder _counterpartOptionBuilder = new();
@@ -27,6 +27,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     private Guid _encounterContextId;
     private int? _combatantId;
     private long _detailRevision = -1;
+    private bool _disposed;
 
     public CombatantDetailsFlyoutViewModel(LocalizationService localization, UiFrameBatchService frameBatchService)
     {
@@ -54,6 +55,38 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     public SkillDetailSectionViewModel IncomingHealing => IncomingDetail.HealingSection;
 
     public SkillDetailSectionViewModel IncomingShield => IncomingDetail.ShieldSection;
+
+    public void SynchronizeSkillSelection(bool isOutgoing, CombatContributionCategory category, SkillBaseKey baseKey)
+    {
+        OutgoingDamage.SelectRowByKey(isOutgoing && category == CombatContributionCategory.Damage ? baseKey : null);
+        OutgoingHealing.SelectRowByKey(isOutgoing && category == CombatContributionCategory.Healing ? baseKey : null);
+        OutgoingShield.SelectRowByKey(isOutgoing && category == CombatContributionCategory.Shield ? baseKey : null);
+        IncomingDamage.SelectRowByKey(!isOutgoing && category == CombatContributionCategory.Damage ? baseKey : null);
+        IncomingHealing.SelectRowByKey(!isOutgoing && category == CombatContributionCategory.Healing ? baseKey : null);
+        IncomingShield.SelectRowByKey(!isOutgoing && category == CombatContributionCategory.Shield ? baseKey : null);
+    }
+
+    public void ClearSkillSelection()
+    {
+        OutgoingDamage.SelectRowByKey(null);
+        OutgoingHealing.SelectRowByKey(null);
+        OutgoingShield.SelectRowByKey(null);
+        IncomingDamage.SelectRowByKey(null);
+        IncomingHealing.SelectRowByKey(null);
+        IncomingShield.SelectRowByKey(null);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        DisposeCounterpartFilter(OutgoingDetail.DamageCounterpartFilter);
+        DisposeCounterpartFilter(OutgoingDetail.SupportCounterpartFilter);
+        DisposeCounterpartFilter(IncomingDetail.DamageCounterpartFilter);
+        DisposeCounterpartFilter(IncomingDetail.SupportCounterpartFilter);
+    }
 
     [ObservableProperty]
     public partial SceneDisplayContext? DisplayContext { get; set; }
@@ -136,6 +169,12 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     void ICombatDetailEventWriter.Clear() => _detailEvents.Clear();
 
     void ICombatDetailEventWriter.Add(in CombatDetailEvent detailEvent) => _detailEvents.Add(detailEvent);
+
+    private void DisposeCounterpartFilter(DetailCounterpartFilterViewModel filter)
+    {
+        filter.SelectionChanged -= HandleCounterpartSelectionChanged;
+        filter.Dispose();
+    }
 
     private void HandleCounterpartSelectionChanged(object? sender, EventArgs e)
     {

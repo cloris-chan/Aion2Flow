@@ -15,11 +15,17 @@ namespace Cloris.Aion2Flow.Capture.Diagnostics;
 public sealed class PacketLogReplayService
 {
     public static PacketLogReplayResult Replay(string path)
+        => ReplayFile(path, CancellationToken.None);
+
+    public static PacketLogReplayResult ReplayCancellable(string path, CancellationToken cancellationToken)
+        => ReplayFile(path, cancellationToken);
+
+    private static PacketLogReplayResult ReplayFile(string path, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         using var reader = File.OpenText(path);
-        return Replay(reader, path);
+        return ReplayCore(reader, path, cancellationToken);
     }
 
     public static IReadOnlyList<PacketLogReplayResult> ReplayMany(IEnumerable<string> paths)
@@ -28,14 +34,15 @@ public sealed class PacketLogReplayService
 
         var results = new List<PacketLogReplayResult>();
         foreach (var path in paths)
-        {
             results.Add(Replay(path));
-        }
 
         return results;
     }
 
     public static PacketLogReplayResult Replay(TextReader reader, string sourceName)
+        => ReplayCore(reader, sourceName, CancellationToken.None);
+
+    private static PacketLogReplayResult ReplayCore(TextReader reader, string sourceName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
@@ -44,7 +51,7 @@ public sealed class PacketLogReplayService
         {
             return sourceLogKind switch
             {
-                ReplayLogKind.Stream => ReplayStreamLines(ReadLines(reader), sourceName),
+                ReplayLogKind.Stream => ReplayStreamLines(ReadLines(reader), sourceName, cancellationToken),
                 ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
                 _ => throw new InvalidOperationException($"Unsupported replay log kind: {sourceLogKind}.")
             };
@@ -53,13 +60,14 @@ public sealed class PacketLogReplayService
         var lines = new List<string>();
         while (reader.ReadLine() is { } line)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lines.Add(line);
         }
 
         var logKind = DetectLogKind(lines, sourceName);
         return logKind switch
         {
-            ReplayLogKind.Stream => ReplayStreamLines(lines, sourceName),
+            ReplayLogKind.Stream => ReplayStreamLines(lines, sourceName, cancellationToken),
             ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
             _ => throw new NotSupportedException("Only stream log replay is supported. Raw logs are not supported yet.")
         };
@@ -73,7 +81,7 @@ public sealed class PacketLogReplayService
         }
     }
 
-    private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName)
+    private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName, CancellationToken cancellationToken)
     {
         var journal = new ObservedEventJournal(lines is ICollection<string> collection ? ResolveJournalCapacity(collection.Count) : 16_384);
         var sceneId = Guid.NewGuid();
@@ -96,6 +104,7 @@ public sealed class PacketLogReplayService
 
         foreach (var line in lines)
         {
+            ThrowIfReplayCancellationRequested(cancellationToken, inboundProcessors);
             totalLines++;
             if (!TryParseStreamEntry(line, out var entry))
             {
@@ -177,6 +186,7 @@ public sealed class PacketLogReplayService
             }
         }
 
+        ThrowIfReplayCancellationRequested(cancellationToken, inboundProcessors);
         journal.CompleteFlush(long.MaxValue);
         foreach (var processor in inboundProcessors.Values)
             processor.Dispose();
@@ -208,6 +218,19 @@ public sealed class PacketLogReplayService
                 snapshotCounter,
                 summaryCounter),
         };
+    }
+
+    private static void ThrowIfReplayCancellationRequested(
+        CancellationToken cancellationToken,
+        Dictionary<TcpConnection, ReplayConnectionProcessor> processors)
+    {
+        if (!cancellationToken.IsCancellationRequested)
+            return;
+
+        foreach (var processor in processors.Values)
+            processor.Dispose();
+        processors.Clear();
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private static BaselineStart CaptureBaselineStart()

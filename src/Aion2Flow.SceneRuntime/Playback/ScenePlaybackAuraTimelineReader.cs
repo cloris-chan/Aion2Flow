@@ -33,7 +33,7 @@ public static class ScenePlaybackAuraTimelineReader
                         else if (aura.Kind == AuraObservationKind.Open)
                             ApplyReplacement(in aura, position, durationMilliseconds, active, coverages);
                         else if (aura.Kind == AuraObservationKind.Result)
-                            ApplyResult(in aura, position, durationMilliseconds, active, coverages);
+                            ApplyResult(in aura, position, durationMilliseconds, active, coverages, applications);
                     }
                     else if (entry.Domain == ObservedEventDomain.Action &&
                              entry.Action.SourceEntityId == targetEntityId &&
@@ -107,7 +107,10 @@ public static class ScenePlaybackAuraTimelineReader
             return;
 
         if (aura.DisplayResourceEffectRef.IsEmpty && !observation.ActionResourceEffectRef.IsEmpty)
+        {
             aura.DisplayResourceEffectRef = observation.ActionResourceEffectRef;
+            BackfillApplications(aura, applications);
+        }
         var previousEnd = ResolveCoverageEnd(aura, durationMilliseconds);
         if (positionMilliseconds > previousEnd)
         {
@@ -125,10 +128,17 @@ public static class ScenePlaybackAuraTimelineReader
         long positionMilliseconds,
         long durationMilliseconds,
         Dictionary<int, ActiveAura> active,
-        List<ScenePlaybackAuraCoverage> coverages)
+        List<ScenePlaybackAuraCoverage> coverages,
+        List<ScenePlaybackAuraApplication> applications)
     {
         if (!active.Remove(observation.InstanceSequenceId, out var aura))
             return;
+
+        if (aura.DisplayResourceEffectRef.IsEmpty && !observation.BuffResourceEffectRef.IsEmpty)
+        {
+            aura.DisplayResourceEffectRef = observation.BuffResourceEffectRef;
+            BackfillApplications(aura, applications);
+        }
 
         AddCoverage(aura, Math.Min(positionMilliseconds, ResolveCoverageEnd(aura, durationMilliseconds)), durationMilliseconds, coverages);
     }
@@ -143,6 +153,7 @@ public static class ScenePlaybackAuraTimelineReader
         if (positionMilliseconds > durationMilliseconds)
             return;
 
+        var applicationIndex = applications.Count;
         applications.Add(new ScenePlaybackAuraApplication(
             aura.EntityId,
             aura.OriginEntityId,
@@ -150,6 +161,25 @@ public static class ScenePlaybackAuraTimelineReader
             aura.DisplayResourceEffectRef,
             Math.Clamp(positionMilliseconds, 0, durationMilliseconds),
             kind));
+        if (aura.DisplayResourceEffectRef.IsEmpty)
+            aura.AddUnresolvedApplication(applicationIndex);
+    }
+
+    private static void BackfillApplications(ActiveAura aura, List<ScenePlaybackAuraApplication> applications)
+    {
+        if (aura.DisplayResourceEffectRef.IsEmpty || aura.UnresolvedApplicationIndexes is not { Count: > 0 } indexes)
+            return;
+
+        for (var i = 0; i < indexes.Count; i++)
+        {
+            var applicationIndex = indexes[i];
+            applications[applicationIndex] = applications[applicationIndex] with
+            {
+                DisplayResourceEffectRef = aura.DisplayResourceEffectRef
+            };
+        }
+
+        aura.ClearUnresolvedApplications();
     }
 
     private static void AddCoverage(ActiveAura aura, long endMilliseconds, long durationMilliseconds, List<ScenePlaybackAuraCoverage> coverages)
@@ -197,6 +227,15 @@ public static class ScenePlaybackAuraTimelineReader
         public ushort DurationMilliseconds { get; } = durationMilliseconds;
         public long CoverageStartMilliseconds { get; set; } = coverageStartMilliseconds;
         public long? ExpirationMilliseconds { get; set; } = expirationMilliseconds;
+        public List<int>? UnresolvedApplicationIndexes { get; private set; }
+
+        public void AddUnresolvedApplication(int applicationIndex)
+        {
+            UnresolvedApplicationIndexes ??= [];
+            UnresolvedApplicationIndexes.Add(applicationIndex);
+        }
+
+        public void ClearUnresolvedApplications() => UnresolvedApplicationIndexes = null;
     }
 
     private sealed class ScenePlaybackAuraCoverageComparer : IComparer<ScenePlaybackAuraCoverage>

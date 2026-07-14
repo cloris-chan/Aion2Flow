@@ -820,6 +820,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _gameResourceService.ResourcesChanged -= OnResourcesChanged;
         _encounterArchiveService.HistoryChanged -= OnEncounterHistoryChanged;
         SettingsFlyout.PropertyChanged -= OnSettingsFlyoutPropertyChanged;
+        _combatantDetails.Dispose();
         await StopCaptureAsync().ConfigureAwait(false);
         await _processPortDiscoveryService.DisposeAsync().ConfigureAwait(false);
     }

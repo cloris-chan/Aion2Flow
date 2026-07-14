@@ -6,11 +6,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed class DetailCounterpartFilterViewModel : ObservableObject
+public sealed class DetailCounterpartFilterViewModel : ObservableObject, IDisposable
 {
     private readonly Dictionary<int, bool> _previousSelections = [];
     private readonly Dictionary<int, DetailCounterpartSelectionViewModel> _existingByCombatantId = [];
     private readonly HashSet<int> _expectedCombatantIds = [];
+    private bool _disposed;
     private bool _suppressSelectionChanged;
 
     public DetailCounterpartFilterViewModel(LocalizationService localization, string counterpartTitleKey)
@@ -88,6 +89,17 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject
     }
 
     public event EventHandler? SelectionChanged;
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        Localization.PropertyChanged -= HandleLocalizationPropertyChanged;
+        foreach (var counterpart in Counterparts)
+            counterpart.SelectionChanged -= HandleCounterpartSelectionChanged;
+    }
 
     public void CopySelectedCounterpartIds(HashSet<int> destination)
     {

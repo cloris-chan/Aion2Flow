@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
+             xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
+             x:Class="Cloris.Aion2Flow.Views.PlaybackEventWindowView"
+             x:DataType="vm:ScenePlaybackViewModel">
+    <Grid RowDefinitions="36,26,*" MinHeight="0">
+        <Border Classes="PlaybackEventScopeBar">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18">
+                <TextBlock Classes="PlaybackPanelTitle"
+                           Text="{markups:Translate Playback_EventWindow}" />
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="2"
+                            VerticalAlignment="Center">
+                    <Button Classes="PlaybackBreadcrumbButton"
+                            Classes.PlaybackSelected="{Binding IsEventScopeAll}"
+                            Content="{markups:Translate Playback_EventScope_All}"
+                            Command="{Binding ShowAllEventsCommand}" />
+
+                    <Path Classes="PlaybackBreadcrumbSeparator"
+                          Data="{StaticResource chevron-right}"
+                          IsVisible="{Binding HasEventScopeCombatant}" />
+                    <Button Classes="PlaybackBreadcrumbButton"
+                            Content="{Binding EventScopeCombatantText}"
+                            Command="{Binding ShowCombatantEventsCommand}"
+                            IsVisible="{Binding HasEventScopeCombatant}" />
+
+                    <Path Classes="PlaybackBreadcrumbSeparator"
+                          Data="{StaticResource chevron-right}"
+                          IsVisible="{Binding HasEventScopeRelation}" />
+                    <Button Classes="PlaybackBreadcrumbButton"
+                            Content="{Binding EventScopeRelationText}"
+                            Command="{Binding ShowRelationEventsCommand}"
+                            IsVisible="{Binding HasEventScopeRelation}" />
+
+                    <Path Classes="PlaybackBreadcrumbSeparator"
+                          Data="{StaticResource chevron-right}"
+                          IsVisible="{Binding HasEventScopeCategory}" />
+                    <Button Classes="PlaybackBreadcrumbButton"
+                            Content="{Binding EventScopeCategoryText}"
+                            Command="{Binding ShowCategoryEventsCommand}"
+                            IsVisible="{Binding HasEventScopeCategory}" />
+
+                    <Path Classes="PlaybackBreadcrumbSeparator"
+                          Data="{StaticResource chevron-right}"
+                          IsVisible="{Binding HasEventScopeSkill}" />
+                    <TextBlock Classes="PlaybackBreadcrumbCurrent"
+                               Text="{Binding EventScopeSkillText}"
+                               IsVisible="{Binding HasEventScopeSkill}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1"
+              Classes="PlaybackTableHeader"
+              ColumnDefinitions="80,86,*,*,*,90"
+              ColumnSpacing="10"
+              Margin="10,0,30,0">
+            <TextBlock Classes="PlaybackHeaderCell"
+                       Text="{markups:Translate Playback_Column_Time}" />
+            <TextBlock Grid.Column="1"
+                       Classes="PlaybackHeaderCell"
+                       Text="{markups:Translate Playback_Column_Track}" />
+            <TextBlock Grid.Column="2"
+                       Classes="PlaybackHeaderCell"
+                       Text="{markups:Translate Playback_Column_Source}" />
+            <TextBlock Grid.Column="3"
+                       Classes="PlaybackHeaderCell"
+                       Text="{markups:Translate Playback_Column_Target}" />
+            <TextBlock Grid.Column="4"
+                       Classes="PlaybackHeaderCell"
+                       Text="{markups:Translate Playback_Column_Skill}" />
+            <TextBlock Grid.Column="5"
+                       Classes="PlaybackHeaderCellRight"
+                       Text="{markups:Translate Playback_Column_Amount}" />
+        </Grid>
+
+        <ListBox Grid.Row="2"
+                 Classes="PlaybackEventList AppScrollViewer"
+                 ItemsSource="{Binding EventWindow}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Visible">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel CacheLength="0.5" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:PlaybackEventRowViewModel">
+                    <Grid Classes="PlaybackEventRow"
+                          ColumnDefinitions="80,86,*,*,*,90"
+                          ColumnSpacing="10"
+                          Margin="10,0"
+                          Tapped="EventRowTapped">
+                        <TextBlock Classes="PlaybackEventTime" Text="{Binding TimeText}" />
+                        <TextBlock Grid.Column="1" Classes="PlaybackEventTrack" Text="{Binding TrackText}" />
+                        <TextBlock Grid.Column="2" Classes="PlaybackEventText" Text="{Binding SourceText}" />
+                        <TextBlock Grid.Column="3" Classes="PlaybackEventText" Text="{Binding TargetText}" />
+                        <TextBlock Grid.Column="4" Classes="PlaybackEventText" Text="{Binding SkillText}" />
+                        <TextBlock Grid.Column="5" Classes="PlaybackEventAmount" Text="{Binding AmountText}" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <TextBlock Grid.Row="2"
+                   Classes="PlaybackEmptyState"
+                   IsVisible="{Binding IsEventsWorkspaceEmpty}"
+                   Text="{markups:Translate Playback_NoData}" />
+    </Grid>
+</UserControl>

@@ -107,6 +107,16 @@ public sealed class ScenePlaybackSession
         return projector.CreateCombatantDetail(combatantId);
     }
 
+    internal ScenePlaybackEventReadResult CopyLatestCombatEvents(
+        ScenePlaybackEventScope scope,
+        long startPositionMilliseconds,
+        long endPositionMilliseconds,
+        Span<ScenePlaybackEventMarker> destination)
+    {
+        var projector = _projector ??= CreateProjector();
+        return projector.CopyLatestCombatEvents(scope, startPositionMilliseconds, endPositionMilliseconds, destination);
+    }
+
     private FrameProjector CreateProjector()
     {
         var segment = _source.CreateTimelineSegment();
@@ -125,6 +135,7 @@ public sealed class ScenePlaybackSession
         private readonly CombatStore _combat;
         private readonly DomainEventApplier _applier;
         private readonly SceneCombatSnapshotAdapter _adapter;
+        private readonly ScenePlaybackCombatEventIndex _combatEventIndex;
         private readonly Dictionary<int, ScenePlaybackResourceState> _resources;
         private readonly Dictionary<ScenePlaybackAuraInstanceKey, ScenePlaybackAuraState> _auraInstances;
         private readonly Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks;
@@ -160,6 +171,7 @@ public sealed class ScenePlaybackSession
             _completedFlushId = -1;
             _applier = new DomainEventApplier(_entities, _boundary, _metadata, _combat);
             _adapter = new SceneCombatSnapshotAdapter(_entities, _combat, _boundary, _applier.BossFocus, _encounterId);
+            _combatEventIndex = new ScenePlaybackCombatEventIndex();
         }
 
         public SceneJournalSegment Segment => _segment;
@@ -179,6 +191,20 @@ public sealed class ScenePlaybackSession
             var update = _detailSubscription!.CreateSnapshotUpdate(_adapter, snapshot, CombatDetailProjectionScope.CurrentFrame, writer);
             return new ScenePlaybackCombatantDetail(_positionMilliseconds, _appliedEndOrdinal, snapshot, update, writer.Events);
         }
+
+        public ScenePlaybackEventReadResult CopyLatestCombatEvents(
+            ScenePlaybackEventScope scope,
+            long startPositionMilliseconds,
+            long endPositionMilliseconds,
+            Span<ScenePlaybackEventMarker> destination)
+            => _combatEventIndex.CopyLatest(
+                _combat,
+                _adapter,
+                scope,
+                startPositionMilliseconds,
+                endPositionMilliseconds,
+                _appliedEndOrdinal,
+                destination);
 
         public ScenePlaybackFrame AdvanceTo(long positionMilliseconds, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
         {
@@ -341,8 +367,9 @@ public sealed class ScenePlaybackSession
 
         private void ApplyFrameTracks(ObservedEventEntry entry, long offset)
         {
-            var lifecycleEventKind = ResolveLifecycleEventKind(entry);
-            var marker = ScenePlaybackTrackProjection.CreateMarker(entry, offset, Math.Max(0, offset), lifecycleEventKind);
+            var lifecycleProjection = ResolveLifecycleProjection(entry);
+            var marker = ScenePlaybackTrackProjection.CreateMarker(entry, offset, Math.Max(0, offset), lifecycleProjection);
+            var lifecycleEventKind = lifecycleProjection.Kind;
             var track = marker.Track;
             ref var accumulator = ref CollectionsMarshal.GetValueRefOrAddDefault(_tracks, track, out var exists);
             if (!exists)
@@ -387,6 +414,7 @@ public sealed class ScenePlaybackSession
                 var active = _auraInstances[key];
                 _auraInstances[key] = active with
                 {
+                    DisplayResourceEffectRef = lifecycleProjection.DisplayResourceEffectRef,
                     RenewedAtMilliseconds = offset,
                     ExpiresAtMilliseconds = ResolveExpiration(offset, active.DurationMilliseconds),
                     LastObservationOrdinal = entry.Stamp.ObservationOrdinal
@@ -395,29 +423,33 @@ public sealed class ScenePlaybackSession
 
         }
 
-        private ScenePlaybackLifecycleEventKind ResolveLifecycleEventKind(ObservedEventEntry entry)
+        private ScenePlaybackLifecycleProjection ResolveLifecycleProjection(ObservedEventEntry entry)
         {
             if (entry.Domain == ObservedEventDomain.Aura)
             {
                 ref readonly var aura = ref entry.Aura;
                 if (aura.Kind == AuraObservationKind.Open)
                     return ScenePlaybackAuraProtocol.IsTrackableOpen(in aura)
-                        ? ScenePlaybackLifecycleEventKind.Open
-                        : ScenePlaybackLifecycleEventKind.None;
+                        ? new ScenePlaybackLifecycleProjection(ScenePlaybackLifecycleEventKind.Open, aura.BuffResourceEffectRef)
+                        : ScenePlaybackLifecycleProjection.None;
 
-                return _auraInstances.ContainsKey(new ScenePlaybackAuraInstanceKey(aura.EntityId, aura.InstanceSequenceId))
-                    ? ScenePlaybackLifecycleEventKind.Result
-                    : ScenePlaybackLifecycleEventKind.None;
+                return _auraInstances.TryGetValue(new ScenePlaybackAuraInstanceKey(aura.EntityId, aura.InstanceSequenceId), out var activeAura)
+                    ? new ScenePlaybackLifecycleProjection(ScenePlaybackLifecycleEventKind.Result, activeAura.DisplayResourceEffectRef)
+                    : ScenePlaybackLifecycleProjection.None;
             }
 
             if (entry.Domain != ObservedEventDomain.Action ||
                 !ScenePlaybackAuraProtocol.IsRenewal(in entry.Action))
-                return ScenePlaybackLifecycleEventKind.None;
+                return ScenePlaybackLifecycleProjection.None;
 
             ref readonly var action = ref entry.Action;
-            return _auraInstances.ContainsKey(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId))
-                ? ScenePlaybackLifecycleEventKind.Renew
-                : ScenePlaybackLifecycleEventKind.None;
+            if (!_auraInstances.TryGetValue(new ScenePlaybackAuraInstanceKey(action.SourceEntityId, action.InstanceSequenceId), out var renewedAura))
+                return ScenePlaybackLifecycleProjection.None;
+
+            var displayResourceEffectRef = action.ActionResourceEffectRef.IsEmpty
+                ? renewedAura.DisplayResourceEffectRef
+                : action.ActionResourceEffectRef;
+            return new ScenePlaybackLifecycleProjection(ScenePlaybackLifecycleEventKind.Renew, displayResourceEffectRef);
         }
 
         private long? ResolveResourceMaximum(in ResourceObservation resource)

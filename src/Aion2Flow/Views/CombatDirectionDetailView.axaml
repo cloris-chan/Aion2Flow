@@ -22,7 +22,8 @@
                 <Border Classes="DetailSummaryPanel">
                     <StackPanel Orientation="Vertical"
                                 Spacing="0">
-                        <Border Classes="DetailSummaryBanner">
+                        <Border Classes="DetailSummaryBanner"
+                                Tapped="DamageSectionTapped">
                             <Grid ColumnDefinitions="Auto,*,Auto"
                                   ColumnSpacing="12">
                                 <TextBlock Grid.Column="0"
@@ -795,6 +796,7 @@
 
                 <StackPanel Spacing="6">
                     <TextBlock Classes="SectionTitle"
+                               Tapped="HealingSectionTapped"
                                Text="{markups:Translate Category_Healing}" />
                     <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
@@ -912,6 +914,7 @@
                 <StackPanel x:Name="ShieldSectionPanel"
                             Spacing="6">
                     <TextBlock Classes="SectionTitle"
+                               Tapped="ShieldSectionTapped"
                                Text="{markups:Translate Category_Shield}" />
                     <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller AppScrollViewer">

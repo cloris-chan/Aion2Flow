@@ -10,6 +10,20 @@
         <x:Double x:Key="AppFontSize.Emphasis">15</x:Double>
         <x:Double x:Key="AppFontSize.Title">18</x:Double>
 
+        <SolidColorBrush x:Key="AppBrush.Canvas">#080C10</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.Band">#0C1217</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.Surface">#111920</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.SurfaceRaised">#151F27</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.SurfaceHover">#1A2730</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.SurfaceSelected">#222B2E</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.Separator">#2B3944</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.SeparatorStrong">#526676</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.Text">#F1F6FB</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.TextMuted">#B0C1D0</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.TextSubtle">#8595A2</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.Accent">#E3C78C</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBrush.AccentStrong">#F0DCA8</SolidColorBrush>
+
         <SolidColorBrush x:Key="CommonBrush.ScrollbarTrack">#3403080C</SolidColorBrush>
         <SolidColorBrush x:Key="CommonBrush.ScrollbarThumb">#688AA4B6</SolidColorBrush>
         <SolidColorBrush x:Key="CommonBrush.ScrollbarThumbHover">#86B5C9D6</SolidColorBrush>
@@ -138,6 +152,10 @@
     </Style>
 
     <Style Selector="ScrollViewer.AppScrollViewer /template/ ScrollBar">
+        <Setter Property="Theme" Value="{StaticResource CommonScrollbarTheme}" />
+    </Style>
+
+    <Style Selector="ListBox.AppScrollViewer /template/ ScrollViewer /template/ ScrollBar">
         <Setter Property="Theme" Value="{StaticResource CommonScrollbarTheme}" />
     </Style>
 

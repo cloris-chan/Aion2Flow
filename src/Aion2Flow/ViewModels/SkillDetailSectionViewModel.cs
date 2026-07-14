@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Collections;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -177,6 +178,8 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
 
     [RelayCommand]
     public void SelectRow(SkillDetailRowViewModel? row) => SetSelectedRow(row);
+
+    public void SelectRowByKey(SkillBaseKey? baseKey) => SetSelectedRow(FindRow(baseKey));
 
     public void Clear()
     {

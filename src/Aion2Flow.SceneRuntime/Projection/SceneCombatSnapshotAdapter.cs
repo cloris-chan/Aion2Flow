@@ -234,6 +234,25 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return ResolveCombatantIdCached(entityId);
     }
 
+    internal CombatDetailProjectionVersion PrepareCurrentFrameEventProjection()
+    {
+        PrepareProjectionCaches();
+        return new CombatDetailProjectionVersion(
+            entities.IdentityRevision,
+            _ownerInferenceVersion,
+            CombatResourceRegistry.SkillMapRevision);
+    }
+
+    internal bool TryResolveCurrentFrameEventSourcePrepared(in CombatEventRecord record, out int sourceId)
+    {
+        sourceId = ResolveCombatantIdCached(record.SourceId);
+        if (!IsSummonDamageTargetCached(in record))
+            return true;
+
+        sourceId = 0;
+        return false;
+    }
+
     internal bool IsSummonDamageTarget(int sourceId, int targetId, long damage)
     {
         PrepareProjectionCaches();

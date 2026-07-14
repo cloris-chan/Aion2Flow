@@ -87,3 +87,8 @@ public readonly record struct CombatPacketContext(
             false);
     }
 }
+
+internal readonly record struct CombatDetailProjectionVersion(
+    long IdentityRevision,
+    long OwnerInferenceVersion,
+    long SkillMapRevision);

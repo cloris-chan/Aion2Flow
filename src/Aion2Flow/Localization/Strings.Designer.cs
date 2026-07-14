@@ -772,15 +772,6 @@ namespace Cloris.Aion2Flow.Localization {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Combatant Details.
-        /// </summary>
-        internal static string Playback_CombatantDetails {
-            get {
-                return ResourceManager.GetString("Playback_CombatantDetails", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Combatants.
         /// </summary>
         internal static string Playback_Combatants {
@@ -797,43 +788,16 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_EventWindow", resourceCulture);
             }
         }
-        
+
         /// <summary>
-        ///   Looks up a localized string similar to Incoming Damage.
+        ///   Looks up a localized string similar to All events.
         /// </summary>
-        internal static string Playback_IncomingDamage {
+        internal static string Playback_EventScope_All {
             get {
-                return ResourceManager.GetString("Playback_IncomingDamage", resourceCulture);
+                return ResourceManager.GetString("Playback_EventScope_All", resourceCulture);
             }
         }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Incoming Healing.
-        /// </summary>
-        internal static string Playback_IncomingHealing {
-            get {
-                return ResourceManager.GetString("Playback_IncomingHealing", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Incoming Shield.
-        /// </summary>
-        internal static string Playback_IncomingShield {
-            get {
-                return ResourceManager.GetString("Playback_IncomingShield", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Playback Inspector.
-        /// </summary>
-        internal static string Playback_Inspector {
-            get {
-                return ResourceManager.GetString("Playback_Inspector", resourceCulture);
-            }
-        }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Speed.
         /// </summary>
@@ -842,7 +806,16 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Label_Speed", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Zoom.
+        /// </summary>
+        internal static string Playback_Label_Zoom {
+            get {
+                return ResourceManager.GetString("Playback_Label_Zoom", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Apply {0} ms.
         /// </summary>
@@ -888,14 +861,6 @@ namespace Cloris.Aion2Flow.Localization {
             }
         }
         
-        /// <summary>
-        ///   Looks up a localized string similar to Avoid.
-        /// </summary>
-        internal static string Playback_Metric_Avoidance {
-            get {
-                return ResourceManager.GetString("Playback_Metric_Avoidance", resourceCulture);
-            }
-        }
         
         /// <summary>
         ///   Looks up a localized string similar to Count.
@@ -914,70 +879,16 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_Metric_Coverage", resourceCulture);
             }
         }
-        
+
         /// <summary>
-        ///   Looks up a localized string similar to Direct.
+        ///   Looks up a localized string similar to No data for this view.
         /// </summary>
-        internal static string Playback_Metric_Direct {
+        internal static string Playback_NoData {
             get {
-                return ResourceManager.GetString("Playback_Metric_Direct", resourceCulture);
+                return ResourceManager.GetString("Playback_NoData", resourceCulture);
             }
         }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Front / Back.
-        /// </summary>
-        internal static string Playback_Metric_Direction {
-            get {
-                return ResourceManager.GetString("Playback_Metric_Direction", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Guard.
-        /// </summary>
-        internal static string Playback_Metric_Guard {
-            get {
-                return ResourceManager.GetString("Playback_Metric_Guard", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Hit.
-        /// </summary>
-        internal static string Playback_Metric_Hit {
-            get {
-                return ResourceManager.GetString("Playback_Metric_Hit", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Periodic.
-        /// </summary>
-        internal static string Playback_Metric_Periodic {
-            get {
-                return ResourceManager.GetString("Playback_Metric_Periodic", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Per Sec.
-        /// </summary>
-        internal static string Playback_Metric_PerSecond {
-            get {
-                return ResourceManager.GetString("Playback_Metric_PerSecond", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Share.
-        /// </summary>
-        internal static string Playback_Metric_Share {
-            get {
-                return ResourceManager.GetString("Playback_Metric_Share", resourceCulture);
-            }
-        }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Next event.
         /// </summary>
@@ -1005,32 +916,8 @@ namespace Cloris.Aion2Flow.Localization {
             }
         }
         
-        /// <summary>
-        ///   Looks up a localized string similar to Outgoing Damage.
-        /// </summary>
-        internal static string Playback_OutgoingDamage {
-            get {
-                return ResourceManager.GetString("Playback_OutgoingDamage", resourceCulture);
-            }
-        }
         
-        /// <summary>
-        ///   Looks up a localized string similar to Outgoing Healing.
-        /// </summary>
-        internal static string Playback_OutgoingHealing {
-            get {
-                return ResourceManager.GetString("Playback_OutgoingHealing", resourceCulture);
-            }
-        }
         
-        /// <summary>
-        ///   Looks up a localized string similar to Outgoing Shield.
-        /// </summary>
-        internal static string Playback_OutgoingShield {
-            get {
-                return ResourceManager.GetString("Playback_OutgoingShield", resourceCulture);
-            }
-        }
         
         /// <summary>
         ///   Looks up a localized string similar to Previous event.
@@ -1049,7 +936,16 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_PreviousSecond", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Select a combatant to inspect.
+        /// </summary>
+        internal static string Playback_SelectCombatant {
+            get {
+                return ResourceManager.GetString("Playback_SelectCombatant", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Loading frame.
         /// </summary>
@@ -1157,7 +1053,34 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Playback_WindowTitleFormat", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Zoom in.
+        /// </summary>
+        internal static string Playback_ZoomIn {
+            get {
+                return ResourceManager.GetString("Playback_ZoomIn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Zoom out.
+        /// </summary>
+        internal static string Playback_ZoomOut {
+            get {
+                return ResourceManager.GetString("Playback_ZoomOut", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Reset zoom.
+        /// </summary>
+        internal static string Playback_ZoomReset {
+            get {
+                return ResourceManager.GetString("Playback_ZoomReset", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Player.
         /// </summary>

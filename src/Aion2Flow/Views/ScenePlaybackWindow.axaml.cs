@@ -59,18 +59,24 @@ public partial class ScenePlaybackWindow : Window
         DataContext?.RequestSeek(e.PositionMilliseconds);
     }
 
-    private void CombatantRowTapped(object? sender, TappedEventArgs e)
+    private void CombatDetailSelectionRequested(object? sender, CombatDetailSelectionRequestedEventArgs e)
     {
-        if (sender is Control { DataContext: PlaybackCombatantRowViewModel combatant })
-            DataContext?.SelectCombatant(combatant);
+        DataContext?.SelectCombatDetail(e.Category, e.SkillBaseKey, e.SkillDisplayName);
     }
 
-    private void CombatantExpandClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void TimelinePointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        if (sender is Control { DataContext: PlaybackCombatantRowViewModel combatant })
-        {
-            DataContext?.ToggleCombatantExpansion(combatant);
-            e.Handled = true;
-        }
+        var viewModel = DataContext;
+        if (viewModel is null || sender is not Control control || control.Bounds.Width <= 0d || Math.Abs(e.Delta.Y) <= double.Epsilon)
+            return;
+
+        var viewport = viewModel.TimelineViewport;
+        if (viewport.IsEmpty)
+            return;
+
+        var ratio = Math.Clamp(e.GetPosition(control).X / control.Bounds.Width, 0d, 1d);
+        var anchor = viewport.StartMilliseconds + viewport.DurationMilliseconds * ratio;
+        viewModel.ZoomTimelineAt(e.Delta.Y > 0d ? 0.5d : 2d, anchor);
+        e.Handled = true;
     }
 }

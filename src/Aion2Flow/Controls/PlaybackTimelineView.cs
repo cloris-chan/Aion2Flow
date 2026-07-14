@@ -19,8 +19,8 @@ public sealed class PlaybackTimelineView : Control
     public static readonly DirectProperty<PlaybackTimelineView, IReadOnlyList<PlaybackTimelineSpan>?> SpansProperty =
         AvaloniaProperty.RegisterDirect<PlaybackTimelineView, IReadOnlyList<PlaybackTimelineSpan>?>(nameof(Spans), view => view.Spans, (view, value) => view.Spans = value);
 
-    public static readonly DirectProperty<PlaybackTimelineView, double> DurationMillisecondsProperty =
-        AvaloniaProperty.RegisterDirect<PlaybackTimelineView, double>(nameof(DurationMilliseconds), view => view.DurationMilliseconds, (view, value) => view.DurationMilliseconds = value);
+    public static readonly DirectProperty<PlaybackTimelineView, PlaybackTimelineViewport> ViewportProperty =
+        AvaloniaProperty.RegisterDirect<PlaybackTimelineView, PlaybackTimelineViewport>(nameof(Viewport), view => view.Viewport, (view, value) => view.Viewport = value);
 
     public static readonly DirectProperty<PlaybackTimelineView, double> PositionMillisecondsProperty =
         AvaloniaProperty.RegisterDirect<PlaybackTimelineView, double>(nameof(PositionMilliseconds), view => view.PositionMilliseconds, (view, value) => view.PositionMilliseconds = value);
@@ -37,12 +37,12 @@ public sealed class PlaybackTimelineView : Control
 
     static PlaybackTimelineView()
     {
-        AffectsRender<PlaybackTimelineView>(MarkersProperty, SpansProperty, DurationMillisecondsProperty, PositionMillisecondsProperty, TrackBrushProperty, ProgressBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty, IsPlayheadVisibleProperty);
+        AffectsRender<PlaybackTimelineView>(MarkersProperty, SpansProperty, ViewportProperty, PositionMillisecondsProperty, TrackBrushProperty, ProgressBrushProperty, PlayheadBrushProperty, PlayheadThicknessProperty, IsPlayheadVisibleProperty);
     }
 
     private IReadOnlyList<PlaybackTimelineMarker>? _markers;
     private IReadOnlyList<PlaybackTimelineSpan>? _spans;
-    private double _durationMilliseconds;
+    private PlaybackTimelineViewport _viewport;
     private double _positionMilliseconds;
     private IBrush? _cachedPlayheadBrush;
     private double _cachedPlayheadThickness;
@@ -62,10 +62,10 @@ public sealed class PlaybackTimelineView : Control
         set => SetAndRaise(SpansProperty, ref _spans, value);
     }
 
-    public double DurationMilliseconds
+    public PlaybackTimelineViewport Viewport
     {
-        get => _durationMilliseconds;
-        set => SetAndRaise(DurationMillisecondsProperty, ref _durationMilliseconds, value);
+        get => _viewport;
+        set => SetAndRaise(ViewportProperty, ref _viewport, value);
     }
 
     public double PositionMilliseconds
@@ -113,30 +113,31 @@ public sealed class PlaybackTimelineView : Control
         using var clip = context.PushClip(bounds);
         context.FillRectangle(TrackBrush ?? Brushes.Transparent, bounds);
 
-        var duration = DurationMilliseconds;
-        if (duration <= 0)
+        var viewport = Viewport;
+        if (viewport.IsEmpty)
             return;
 
-        var playheadX = PlaybackTimelineGeometry.PositionToX(PositionMilliseconds, duration, bounds.Width);
+        var positionMilliseconds = PositionMilliseconds;
+        var playheadX = PlaybackTimelineGeometry.PositionToX(positionMilliseconds, viewport, bounds.Width);
         var progress = ProgressBrush;
-        if (progress is not null && playheadX > 0)
+        if (progress is not null && positionMilliseconds > viewport.StartMilliseconds && playheadX > 0d)
             context.FillRectangle(progress, new Rect(0, 0, playheadX, bounds.Height));
 
         var spans = Spans;
         if (spans is not null)
         {
             for (var i = 0; i < spans.Count; i++)
-                DrawSpan(context, spans[i], duration, bounds);
+                DrawSpan(context, spans[i], viewport, bounds);
         }
 
         var markers = Markers;
         if (markers is not null)
         {
             for (var i = 0; i < markers.Count; i++)
-                DrawMarker(context, markers[i], duration, bounds);
+                DrawMarker(context, markers[i], viewport, bounds);
         }
 
-        if (IsPlayheadVisible)
+        if (IsPlayheadVisible && viewport.Contains(positionMilliseconds))
             context.DrawLine(GetPlayheadPen(), new Point(playheadX, 0), new Point(playheadX, bounds.Height));
     }
 
@@ -168,14 +169,16 @@ public sealed class PlaybackTimelineView : Control
             e.Pointer.Capture(null);
     }
 
-    private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, double duration, Rect bounds)
+    private static void DrawMarker(DrawingContext context, PlaybackTimelineMarker marker, PlaybackTimelineViewport viewport, Rect bounds)
     {
-        var centerX = PlaybackTimelineGeometry.PositionToX(marker.PositionMilliseconds, duration, bounds.Width);
+        if (!viewport.Contains(marker.PositionMilliseconds))
+            return;
+
+        var centerX = PlaybackTimelineGeometry.PositionToX(marker.PositionMilliseconds, viewport, bounds.Width);
         if (marker.IsApplication)
         {
             var radius = Math.Clamp(bounds.Height * 0.26d, 1.6d, 3d);
-            var x = Math.Clamp(centerX, radius, Math.Max(radius, bounds.Width - radius));
-            context.DrawEllipse(marker.Brush, null, new Point(x, bounds.Height * 0.5d), radius, radius);
+            context.DrawEllipse(marker.Brush, null, new Point(centerX, bounds.Height * 0.5d), radius, radius);
             return;
         }
 
@@ -186,10 +189,13 @@ public sealed class PlaybackTimelineView : Control
         context.FillRectangle(marker.Brush, new Rect(start, y - 0.5d, Math.Max(1d, end - start), 1d));
     }
 
-    private static void DrawSpan(DrawingContext context, PlaybackTimelineSpan span, double duration, Rect bounds)
+    private static void DrawSpan(DrawingContext context, PlaybackTimelineSpan span, PlaybackTimelineViewport viewport, Rect bounds)
     {
-        var start = PlaybackTimelineGeometry.PositionToX(span.StartMilliseconds, duration, bounds.Width);
-        var end = PlaybackTimelineGeometry.PositionToX(span.EndMilliseconds, duration, bounds.Width);
+        if (!PlaybackTimelineGeometry.TryClipSpan(span.StartMilliseconds, span.EndMilliseconds, viewport, out var clippedStartMilliseconds, out var clippedEndMilliseconds))
+            return;
+
+        var start = PlaybackTimelineGeometry.PositionToX(clippedStartMilliseconds, viewport, bounds.Width);
+        var end = PlaybackTimelineGeometry.PositionToX(clippedEndMilliseconds, viewport, bounds.Width);
         var width = Math.Max(1d, end - start);
         var thickness = Math.Clamp(bounds.Height * 0.28d, 1d, 2d);
         var y = Math.Round((bounds.Height - thickness) * 0.5d) + 0.5d;
@@ -201,11 +207,11 @@ public sealed class PlaybackTimelineView : Control
     private void RequestSeek(double x)
     {
         var width = Bounds.Width;
-        var duration = DurationMilliseconds;
-        if (width <= 0 || duration <= 0)
+        var viewport = Viewport;
+        if (width <= 0d || viewport.IsEmpty)
             return;
 
-        SeekRequested?.Invoke(this, new PlaybackSeekRequestedEventArgs(PlaybackTimelineGeometry.XToPosition(x, duration, width)));
+        SeekRequested?.Invoke(this, new PlaybackSeekRequestedEventArgs(PlaybackTimelineGeometry.XToPosition(x, viewport, width)));
     }
 
     private Pen GetPlayheadPen()
