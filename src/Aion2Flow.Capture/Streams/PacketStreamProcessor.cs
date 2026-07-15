@@ -2,11 +2,23 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDisposable
+public sealed class PacketStreamProcessor : IDisposable
 {
     private readonly PacketTailBuffer _tail = new(CaptureBufferLimits.StreamTailBufferSize);
-    private readonly PacketFrameParser _parser = new(sink);
+    private readonly IRuntimeObservationSink _sink;
+    private readonly PacketFrameParser _parser;
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
+
+    public PacketStreamProcessor(IRuntimeObservationSink sink)
+        : this(sink, null)
+    {
+    }
+
+    internal PacketStreamProcessor(IRuntimeObservationSink sink, Action<ProtocolRoundTripObservation>? protocolRoundTripObserver)
+    {
+        _sink = sink;
+        _parser = new PacketFrameParser(sink, protocolRoundTripObserver);
+    }
 
     public void Dispose()
     {
@@ -16,7 +28,7 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
 
     public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection, long captureTimestampMilliseconds)
     {
-        if (sink is IRuntimeObservationSynchronization synchronization)
+        if (_sink is IRuntimeObservationSynchronization synchronization)
         {
             lock (synchronization.Gate)
                 return AppendAndProcessCore(payload, in connection, captureTimestampMilliseconds);
@@ -64,7 +76,7 @@ public sealed class PacketStreamProcessor(IRuntimeObservationSink sink) : IDispo
             }
             else
             {
-                sink.CompleteFlush(_parser.CurrentAppendFlushId);
+                _sink.CompleteFlush(_parser.CurrentAppendFlushId);
             }
 
             return hasParsed;

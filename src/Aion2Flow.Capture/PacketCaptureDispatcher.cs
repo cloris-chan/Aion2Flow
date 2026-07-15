@@ -4,13 +4,32 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture;
 
-public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFactory)
+public sealed class PacketCaptureDispatcher
 {
+    private readonly Func<IRuntimeObservationSink> _sinkFactory;
+    private readonly Action<ProtocolRoundTripObservation>? _protocolRoundTripObserver;
+    private readonly Action<TcpConnection>? _connectionLockedObserver;
     private readonly Dictionary<TcpConnection, TcpCaptureStreamState> _tcpStreams = [];
     private TcpConnection _lastParsedConnection;
     private bool _hasLastParsedConnection;
     private Task? _worker;
     private CancellationTokenSource? _cts;
+
+    public PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFactory)
+        : this(sinkFactory, null, null)
+    {
+    }
+
+    internal PacketCaptureDispatcher(
+        Func<IRuntimeObservationSink> sinkFactory,
+        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
+        Action<TcpConnection>? connectionLockedObserver)
+    {
+        ArgumentNullException.ThrowIfNull(sinkFactory);
+        _sinkFactory = sinkFactory;
+        _protocolRoundTripObserver = protocolRoundTripObserver;
+        _connectionLockedObserver = connectionLockedObserver;
+    }
 
     public async Task StartAsync(CancellationToken token)
     {
@@ -72,18 +91,26 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
     internal bool DispatchCapturedPacket(CapturedPacket packet)
     {
         var connection = packet.Connection;
+        var admission = packet.Admission;
+        if (!CaptureConnectionGate.IsAdmissionCurrent(in connection, in admission))
+        {
+            return false;
+        }
+
         if (!_tcpStreams.TryGetValue(connection, out var tcpStream))
         {
-            tcpStream = TcpCaptureStreamState.Create(sinkFactory);
+            tcpStream = TcpCaptureStreamState.Create(_sinkFactory, _protocolRoundTripObserver);
             _tcpStreams[connection] = tcpStream;
         }
 
         var context = new DispatchContext(tcpStream, connection);
         tcpStream.Reassembler.Feed(packet.SequenceNumber, packet.Payload, packet.CaptureTimestampMilliseconds, ref context, HandleReassembledChunk);
 
-        if (context.HasParsed && ShouldLockParsedConnection(in connection))
+        if (context.HasParsed &&
+            CaptureConnectionGate.TryLock(in connection, admission.Generation, out var acquired) &&
+            acquired)
         {
-            if (_hasLastParsedConnection && !_lastParsedConnection.IsSameConnection(in connection, out _))
+            if (_hasLastParsedConnection && _lastParsedConnection != connection)
             {
                 var source = new PacketObservationSource(context.LastParsedTimestampMilliseconds, 0, 0, 0, packet.SequenceNumber, default);
                 tcpStream.Sink.MarkSceneTransportBoundary(in source);
@@ -91,19 +118,11 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
 
             _lastParsedConnection = connection;
             _hasLastParsedConnection = true;
-            CaptureConnectionGate.LockOn(connection);
             DisposeOtherStreams(connection);
+            _connectionLockedObserver?.Invoke(connection);
         }
 
         return context.HasParsed;
-    }
-
-    private static bool ShouldLockParsedConnection(in TcpConnection connection)
-    {
-        if (!CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection))
-            return true;
-
-        return !lockedConnection.IsSameConnection(in connection, out _);
     }
 
     private static void HandleReassembledChunk(uint sequenceNumber, ReadOnlySpan<byte> chunk, long captureTimestampMilliseconds, ref DispatchContext context)
@@ -208,12 +227,14 @@ public sealed class PacketCaptureDispatcher(Func<IRuntimeObservationSink> sinkFa
             Reassembler.Dispose();
         }
 
-        public static TcpCaptureStreamState Create(Func<IRuntimeObservationSink> sinkFactory)
+        public static TcpCaptureStreamState Create(
+            Func<IRuntimeObservationSink> sinkFactory,
+            Action<ProtocolRoundTripObservation>? protocolRoundTripObserver)
         {
             var sink = sinkFactory();
             return new TcpCaptureStreamState(
                 new TcpStreamReassembler(),
-                new PacketStreamProcessor(sink),
+                new PacketStreamProcessor(sink, protocolRoundTripObserver),
                 sink);
         }
     }

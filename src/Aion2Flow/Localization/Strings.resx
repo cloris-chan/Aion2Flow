@@ -91,11 +91,9 @@
   <data name="Status_PortWaiting" xml:space="preserve"><value>Waiting for game ports</value></data>
   <data name="Status_PortIdle" xml:space="preserve"><value>Game ports are not being monitored</value></data>
   <data name="Status_Locked" xml:space="preserve"><value>Battle connection locked</value></data>
-  <data name="Status_LockedProxy" xml:space="preserve"><value>Battle connection locked (proxy mode)</value></data>
   <data name="Status_Unlocked" xml:space="preserve"><value>Battle connection not locked</value></data>
-  <data name="Status_RttEstimated" xml:space="preserve"><value>TCP round-trip estimate</value></data>
-  <data name="Status_LatencyEstimatedFromCombat" xml:space="preserve"><value>Latency estimated from combat packets (proxy mode)</value></data>
-  <data name="Status_RttUnavailable" xml:space="preserve"><value>No RTT estimate yet</value></data>
+  <data name="Status_LatencyMeasured" xml:space="preserve"><value>Game round-trip latency</value></data>
+  <data name="Status_LatencyUnavailable" xml:space="preserve"><value>No latency sample yet</value></data>
 
   <!-- Direction (Outgoing/Incoming and their counterpart aliases) -->
   <data name="Direction_Outgoing" xml:space="preserve"><value>Outgoing</value></data>

@@ -4,7 +4,7 @@ using K4os.Compression.LZ4;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposable
+internal sealed class PacketFrameParser(IRuntimeObservationSink sink, Action<ProtocolRoundTripObservation>? protocolRoundTripObserver) : IDisposable
 {
     private const int MaxDecompressedSize = 4 * 1024 * 1024;
     private const int MaxRetainedDecompressionBufferSize = 512 * 1024;
@@ -32,7 +32,7 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink) : IDisposa
 
     public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, long timestampMilliseconds)
     {
-        var context = new PacketParseContext(sink, _writer, _flushState, _playerGroupState, connection, timestampMilliseconds);
+        var context = new PacketParseContext(sink, _writer, _flushState, _playerGroupState, protocolRoundTripObserver, connection, timestampMilliseconds);
         var previous = context.EnterStructure(PacketStructureKind.TransportPacket, 0, packet.Length, 0, packet.Length, 0);
         try
         {

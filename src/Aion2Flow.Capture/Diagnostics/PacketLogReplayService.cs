@@ -168,7 +168,7 @@ public sealed class PacketLogReplayService
             {
                 inboundProcessor.MarkGameStream();
                 var connection = entry.Connection;
-                if (hasLastParsedConnection && !lastParsedConnection.IsSameConnection(in connection, out _))
+                if (hasLastParsedConnection && lastParsedConnection != connection)
                 {
                     var source = new PacketObservationSource(entry.Timestamp.ToUnixTimeMilliseconds(), 0, 0, entry.Payload.Length, 0, default);
                     inboundProcessor.Sink.MarkSceneTransportBoundary(in source);

@@ -21,6 +21,7 @@ internal static class PacketOpcodeDispatcher
 
         return (opcode0, opcode1) switch
         {
+            (0x03, 0x36) => PacketTelemetryHandler.ParseRoundTripEcho0336Packet(packet, ref context),
             (0x02, 0x38) => PacketCombatHandler.ParseCompactControl0238Packet(packet, ref context),
             (0x04, 0x38) => PacketCombatHandler.Parse0438ValuePacket(packet, ref context),
             (0x05, 0x38) => PacketCombatHandler.ParsePeriodicValuePacket(packet, ref context),

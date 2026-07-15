@@ -91,11 +91,9 @@
   <data name="Status_PortWaiting" xml:space="preserve"><value>等待遊戲連線埠</value></data>
   <data name="Status_PortIdle" xml:space="preserve"><value>未監視遊戲連線埠</value></data>
   <data name="Status_Locked" xml:space="preserve"><value>已鎖定戰鬥連線</value></data>
-  <data name="Status_LockedProxy" xml:space="preserve"><value>已鎖定戰鬥連線（代理模式）</value></data>
   <data name="Status_Unlocked" xml:space="preserve"><value>尚未鎖定戰鬥連線</value></data>
-  <data name="Status_RttEstimated" xml:space="preserve"><value>TCP 往返延遲</value></data>
-  <data name="Status_LatencyEstimatedFromCombat" xml:space="preserve"><value>基於戰鬥封包推算的延遲（代理模式）</value></data>
-  <data name="Status_RttUnavailable" xml:space="preserve"><value>尚未取得延遲估計</value></data>
+  <data name="Status_LatencyMeasured" xml:space="preserve"><value>遊戲往返延遲</value></data>
+  <data name="Status_LatencyUnavailable" xml:space="preserve"><value>尚未取得延遲樣本</value></data>
 
   <!-- Direction -->
   <data name="Direction_Outgoing" xml:space="preserve"><value>造成</value></data>

@@ -13,6 +13,7 @@ public sealed class CapturedPacket
     private int _payloadOffset;
     private int _payloadLength;
     public TcpConnection Connection { get; private set; }
+    public CapturePacketAdmission Admission { get; private set; }
     public uint SequenceNumber { get; private set; }
     public long CaptureTimestampMilliseconds { get; private set; }
 
@@ -27,10 +28,11 @@ public sealed class CapturedPacket
         _pool.Return(this);
     }
 
-    public static CapturedPacket Create(TcpConnection connection, IMemoryOwner<byte> bufferOwner, int payloadOffset, int payloadLength, uint sequenceNumber, long captureTimestampMilliseconds)
+    public static CapturedPacket Create(TcpConnection connection, CapturePacketAdmission admission, IMemoryOwner<byte> bufferOwner, int payloadOffset, int payloadLength, uint sequenceNumber, long captureTimestampMilliseconds)
     {
         var instance = _pool.Get();
         instance.Connection = connection;
+        instance.Admission = admission;
         instance._bufferOwner = bufferOwner;
         instance._payloadOffset = payloadOffset;
         instance._payloadLength = payloadLength;
@@ -39,11 +41,11 @@ public sealed class CapturedPacket
         return instance;
     }
 
-    public static CapturedPacket CreateCopy(TcpConnection connection, ReadOnlySpan<byte> payload, uint sequenceNumber, long captureTimestampMilliseconds)
+    public static CapturedPacket CreateCopy(TcpConnection connection, CapturePacketAdmission admission, ReadOnlySpan<byte> payload, uint sequenceNumber, long captureTimestampMilliseconds)
     {
         var owner = MemoryPool<byte>.Shared.Rent(payload.Length);
         payload.CopyTo(owner.Memory.Span);
-        return Create(connection, owner, 0, payload.Length, sequenceNumber, captureTimestampMilliseconds);
+        return Create(connection, admission, owner, 0, payload.Length, sequenceNumber, captureTimestampMilliseconds);
     }
 
     sealed class PooledCapturedPacketPolicy : PooledObjectPolicy<CapturedPacket>

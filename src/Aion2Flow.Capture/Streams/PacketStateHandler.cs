@@ -1,5 +1,4 @@
 using System.Buffers;
-using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -65,7 +64,6 @@ internal sealed class PacketStateHandler
 
         context.Sink.RegisterObservation2A38(context.CreateObservationSource(0x2A38, packet.Length), parsed.EntityId, parsed.Mode, parsed.GroupCode, parsed.InstanceSequenceId, parsed.HeadCode, parsed.HeadValue, parsed.HeadMiddleRaw, parsed.TimelineValue, parsed.StableValue, parsed.EchoSourceId, parsed.StackValue, parsed.BuffResourceEffectRef, parsed.TailLength, parsed.TailLow64, parsed.TailHigh64);
 
-        RawPacketDump.ObserveParsedPacket("aux-2a38", context.Connection);
         return context.MarkParsed();
     }
 
@@ -98,7 +96,6 @@ internal sealed class PacketStateHandler
                 ArrayPool<AuraResultRecord>.Shared.Return(rented);
         }
 
-        RawPacketDump.ObserveParsedPacket("aux-2c38", context.Connection);
         return context.MarkParsed();
     }
 
@@ -109,7 +106,6 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        RawPacketDump.ObserveParsedPacket("state-1d37", context.Connection);
         return context.MarkParsed();
     }
 
@@ -315,11 +311,6 @@ internal sealed class PacketStateHandler
         if (isHealth)
         {
             context.Sink.AppendNpcHp(context.CreateObservationSource(0x008D, packet.Length), parsed.NpcId, parsed.Hp);
-        }
-
-        if (isHealth)
-        {
-            RawPacketDump.ObserveParsedPacket("remain-hp", context.Connection);
         }
 
         return context.MarkParsed();

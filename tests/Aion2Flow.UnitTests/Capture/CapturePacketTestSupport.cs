@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -61,6 +62,14 @@ internal static class CapturePacketTestData
         payload.Add(0x03);
         AppendUInt64Le(payload, 0x0000019F21876F5C);
         AppendUInt64Le(payload, 0x0000019F2190C0E8);
+        return BuildFrame(payload);
+    }
+
+    public static byte[] BuildRoundTrip0336Frame(long clientSentUnixMilliseconds, long serverUnixMilliseconds)
+    {
+        var payload = new List<byte> { 0x03, 0x36, 0x00, 0x00 };
+        AppendUInt64Le(payload, checked((ulong)(clientSentUnixMilliseconds + Packet0336RoundTripParser.UnixEpochOffsetMilliseconds)));
+        AppendUInt64Le(payload, checked((ulong)serverUnixMilliseconds));
         return BuildFrame(payload);
     }
 

@@ -22,6 +22,7 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsyncDisposable
 {
     internal static readonly TimeSpan LiveProjectionInterval = TimeSpan.FromMilliseconds(40);
+    internal static readonly TimeSpan CaptureIndicatorRefreshInterval = TimeSpan.FromSeconds(1);
     private static readonly BossDamageContribution[] EmptyBossDamageContributions = [];
     private static readonly IBrush BossRemainingHpBrush = new ImmutableSolidColorBrush(Color.FromArgb(0xF0, 0xDF, 0x21, 0x4A));
 
@@ -29,7 +30,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private const string IndicatorOkColor = "#6FD38A";
     private const string IndicatorWarnColor = "#F3C969";
     private const string IndicatorErrorColor = "#F07C82";
-    private const string IndicatorInfoColor = "#8DD6FF";
+    private const int GoodLatencyUpperBoundMilliseconds = 100;
+    private const int WarningLatencyUpperBoundMilliseconds = 200;
     private const double BarColorMinSaturation = 0.52d;
     private const double BarColorSaturationRange = 0.16d;
     private const double BarColorMinLightness = 0.52d;
@@ -64,6 +66,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private int _nextBarHueIndex;
     private Guid _bossShareEncounterId;
     private long _lastLiveProjectionPollTimestampTicks = long.MinValue;
+    private long _lastCaptureIndicatorRefreshTimestampTicks = long.MinValue;
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
 
@@ -429,6 +432,14 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
         _lastLiveProjectionPollTimestampTicks = timestampTicks;
         ProcessPendingProjectionChanges();
+
+        if (_lastCaptureIndicatorRefreshTimestampTicks == long.MinValue ||
+            timestampTicks < _lastCaptureIndicatorRefreshTimestampTicks ||
+            timestampTicks - _lastCaptureIndicatorRefreshTimestampTicks >= CaptureIndicatorRefreshInterval.Ticks)
+        {
+            _lastCaptureIndicatorRefreshTimestampTicks = timestampTicks;
+            RefreshCaptureIndicators();
+        }
     }
 
     internal void RefreshCombatStatsForTesting() => RefreshCombatStats();
@@ -1178,17 +1189,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         }
 
         var isCaptureLocked = CaptureConnectionGate.IsLocked;
-        var isProxied = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) && lockedConnection.SourceIsLocal;
         if (!isCaptureLocked)
         {
-            RoundTripTimeMilliseconds = 0;
             CaptureLockIndicatorColor = IndicatorIdleColor;
             CaptureLockIndicatorToolTip = Localization["Status_Unlocked"];
-        }
-        else if (isProxied)
-        {
-            CaptureLockIndicatorColor = IndicatorWarnColor;
-            CaptureLockIndicatorToolTip = Localization["Status_LockedProxy"];
         }
         else
         {
@@ -1201,21 +1205,18 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         {
             RoundTripTimeMilliseconds = 0;
             LatencyIndicatorColor = IndicatorIdleColor;
-            LatencyToolTip = Localization["Status_RttUnavailable"];
+            LatencyToolTip = Localization["Status_LatencyUnavailable"];
             return;
         }
 
         RoundTripTimeMilliseconds = Math.Max(1, (int)Math.Round(currentRttMilliseconds.Value));
-        if (isProxied)
+        LatencyIndicatorColor = RoundTripTimeMilliseconds switch
         {
-            LatencyIndicatorColor = IndicatorWarnColor;
-            LatencyToolTip = Localization["Status_LatencyEstimatedFromCombat"];
-        }
-        else
-        {
-            LatencyIndicatorColor = IndicatorInfoColor;
-            LatencyToolTip = Localization["Status_RttEstimated"];
-        }
+            <= GoodLatencyUpperBoundMilliseconds => IndicatorOkColor,
+            <= WarningLatencyUpperBoundMilliseconds => IndicatorWarnColor,
+            _ => IndicatorErrorColor
+        };
+        LatencyToolTip = Localization["Status_LatencyMeasured"];
     }
 
 }

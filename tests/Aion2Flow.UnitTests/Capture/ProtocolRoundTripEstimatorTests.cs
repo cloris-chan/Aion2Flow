@@ -1,160 +1,85 @@
 using System.Diagnostics;
 using Cloris.Aion2Flow.Capture;
+using Cloris.Aion2Flow.Capture.Streams;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
 
 public sealed class ProtocolRoundTripEstimatorTests
 {
+    private static readonly TcpConnection Connection = new(1, 2, 3, 4);
+
     [Fact]
-    public void Resolves_Candidate_Frame_Length_To_Inbound_Event_Sample()
+    public void ObserveEcho_Uses_Echoed_Client_Timestamp_Directly()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var startedAt = Stopwatch.GetTimestamp();
-        var resolvedAt = startedAt + (Stopwatch.Frequency / 40);
+        var observedTimestamp = Stopwatch.GetTimestamp();
 
-        estimator.TrackOutboundFrame(frameLength: 31, startedAt);
-
-        var resolved = estimator.TryResolveInboundEvent("state-1d37", resolvedAt, out var smoothedMilliseconds);
+        var resolved = estimator.TryObserveEcho(in Connection, 1_000, 1_078, observedTimestamp, out var roundTripMilliseconds);
 
         Assert.True(resolved);
-        Assert.True(smoothedMilliseconds >= 20d);
-        Assert.True(estimator.CurrentMilliseconds >= 20d);
+        Assert.Equal(78, roundTripMilliseconds);
+        Assert.Equal(78, estimator.GetCurrentMilliseconds(in Connection, observedTimestamp));
     }
 
     [Fact]
-    public void Ignores_NonCandidate_Frame_Lengths_And_Events()
+    public void ObserveEcho_Replaces_Previous_Sample_Without_Smoothing()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var startedAt = Stopwatch.GetTimestamp();
-        var checkedAt = startedAt + (Stopwatch.Frequency / 40);
+        var observedTimestamp = Stopwatch.GetTimestamp();
+        estimator.TryObserveEcho(in Connection, 1_000, 1_120, observedTimestamp, out _);
 
-        estimator.TrackOutboundFrame(frameLength: 29, startedAt);
+        estimator.TryObserveEcho(in Connection, 11_000, 11_055, observedTimestamp + 1, out var roundTripMilliseconds);
 
-        var resolved = estimator.TryResolveInboundEvent("compressed-container", checkedAt, out _);
+        Assert.Equal(55, roundTripMilliseconds);
+        Assert.Equal(55, estimator.GetCurrentMilliseconds(in Connection, observedTimestamp + 1));
+    }
+
+    [Theory]
+    [InlineData(1_001, 1_000)]
+    [InlineData(1_000, 11_001)]
+    [InlineData(-1, 1_000)]
+    public void ObserveEcho_Rejects_Implausible_Time_Ranges(long clientSentUnixMilliseconds, long arrivalUnixMilliseconds)
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var observedTimestamp = Stopwatch.GetTimestamp();
+
+        var resolved = estimator.TryObserveEcho(in Connection, clientSentUnixMilliseconds, arrivalUnixMilliseconds, observedTimestamp, out _);
 
         Assert.False(resolved);
-        Assert.Null(estimator.CurrentMilliseconds);
+        Assert.Null(estimator.GetCurrentMilliseconds(in Connection, observedTimestamp));
     }
 
     [Fact]
-    public void Resolves_Aux_Events()
+    public void CurrentSample_Expires_After_Thirty_Seconds()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var startedAt = Stopwatch.GetTimestamp();
-        var resolvedAt = startedAt + (Stopwatch.Frequency / 20);
+        var observedTimestamp = Stopwatch.GetTimestamp();
+        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, out _);
 
-        estimator.TrackOutboundFrame(frameLength: 41, startedAt);
-
-        var resolved = estimator.TryResolveInboundEvent("aux-2c38", resolvedAt, out var smoothedMilliseconds);
-
-        Assert.True(resolved);
-        Assert.True(smoothedMilliseconds >= 40d);
+        Assert.Equal(80, estimator.GetCurrentMilliseconds(in Connection, observedTimestamp + 30 * Stopwatch.Frequency));
+        Assert.Null(estimator.GetCurrentMilliseconds(in Connection, observedTimestamp + 30 * Stopwatch.Frequency + 1));
     }
 
     [Fact]
-    public void Ignores_NonCandidate_Frame_Length()
+    public void Clear_Removes_Current_Sample()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var startedAt = Stopwatch.GetTimestamp();
-
-        estimator.TrackOutboundFrame(frameLength: 99, startedAt);
-
-        var resolved = estimator.TryResolveInboundEvent("remain-hp", startedAt + Stopwatch.Frequency / 40, out _);
-
-        Assert.False(resolved);
-        Assert.Null(estimator.CurrentMilliseconds);
-    }
-
-    [Fact]
-    public void Clears_Current_Value()
-    {
-        var estimator = new ProtocolRoundTripEstimator();
-        var startedAt = Stopwatch.GetTimestamp();
-        var resolvedAt = startedAt + (Stopwatch.Frequency / 40);
-
-        estimator.TrackOutboundFrame(frameLength: 31, startedAt);
-        estimator.TryResolveInboundEvent("remain-hp", resolvedAt, out _);
+        var observedTimestamp = Stopwatch.GetTimestamp();
+        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, out _);
 
         estimator.Clear();
 
-        Assert.Null(estimator.CurrentMilliseconds);
+        Assert.Null(estimator.GetCurrentMilliseconds(in Connection, observedTimestamp));
     }
 
     [Fact]
-    public void TrackOutboundFrame_Tracks_Local_Outbound_Payload_Length_For_Protocol_Rtt()
+    public void CurrentSample_Is_Not_Reused_For_Another_Connection()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var startedAt = Stopwatch.GetTimestamp();
-        var resolvedAt = startedAt + (Stopwatch.Frequency / 40);
+        var observedTimestamp = Stopwatch.GetTimestamp();
+        var otherConnection = new TcpConnection(5, 6, 7, 8);
+        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, out _);
 
-        estimator.TrackOutboundFrame(frameLength: 31, startedAt);
-
-        var resolved = estimator.TryResolveInboundEvent("compact-0638", resolvedAt, out var smoothedMilliseconds);
-
-        Assert.True(resolved);
-        Assert.True(smoothedMilliseconds >= 20d);
-    }
-
-    [Fact]
-    public void TrackOutboundFrame_Ignores_Zero_Length_Local_Outbound_Payload()
-    {
-        var estimator = new ProtocolRoundTripEstimator();
-        var startedAt = Stopwatch.GetTimestamp();
-
-        estimator.TrackOutboundFrame(frameLength: 0, startedAt);
-
-        var resolved = estimator.TryResolveInboundEvent("remain-hp", startedAt + Stopwatch.Frequency / 40, out _);
-
-        Assert.False(resolved);
-        Assert.Null(estimator.CurrentMilliseconds);
-    }
-
-    [Theory]
-    [InlineData(29)]
-    [InlineData(30)]
-    [InlineData(31)]
-    [InlineData(40)]
-    [InlineData(41)]
-    [InlineData(42)]
-    public void Accepts_All_Candidate_Frame_Lengths(int frameLength)
-    {
-        Assert.True(ProtocolRoundTripEstimator.IsCandidateOutboundFrameLength(frameLength));
-    }
-
-    [Fact]
-    public void Rejects_Heartbeat_Length_Outbound_Frame()
-    {
-        Assert.False(ProtocolRoundTripEstimator.IsCandidateOutboundFrameLength(11));
-    }
-
-    [Fact]
-    public void Resolves_Newest_Pending_When_Multiple_Outbound_Frames_Are_Queued()
-    {
-        var estimator = new ProtocolRoundTripEstimator();
-        var t0 = Stopwatch.GetTimestamp();
-        var olderSampleAt = t0;
-        var newerSampleAt = t0 + (Stopwatch.Frequency / 50);
-        var inboundAt = newerSampleAt + (Stopwatch.Frequency / 100);
-
-        estimator.TrackOutboundFrame(frameLength: 31, olderSampleAt);
-        estimator.TrackOutboundFrame(frameLength: 31, newerSampleAt);
-
-        var resolved = estimator.TryResolveInboundEvent("state-1d37", inboundAt, out var smoothedMilliseconds);
-
-        Assert.True(resolved);
-        Assert.True(smoothedMilliseconds < 20d, $"expected smoothed < 20 ms, got {smoothedMilliseconds}");
-    }
-
-    [Theory]
-    [InlineData("state-1d37")]
-    [InlineData("remain-hp")]
-    [InlineData("compact-value")]
-    [InlineData("compact-0238")]
-    [InlineData("compact-0638")]
-    [InlineData("aux-2a38")]
-    [InlineData("aux-2c38")]
-    public void Accepts_All_Candidate_Inbound_Events(string eventName)
-    {
-        Assert.True(ProtocolRoundTripEstimator.IsCandidateInboundEvent(eventName));
+        Assert.Null(estimator.GetCurrentMilliseconds(in otherConnection, observedTimestamp));
     }
 }

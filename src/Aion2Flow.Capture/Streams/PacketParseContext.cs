@@ -2,7 +2,7 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObservationWriter writer, PacketFlushState flushState, PacketPlayerGroupState playerGroupState, in TcpConnection connection, long timestampMilliseconds)
+internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObservationWriter writer, PacketFlushState flushState, PacketPlayerGroupState playerGroupState, Action<ProtocolRoundTripObservation>? protocolRoundTripObserver, in TcpConnection connection, long timestampMilliseconds)
 {
     public readonly IRuntimeObservationSink Sink = sink;
     public readonly SceneObservationWriter Writer = writer;
@@ -20,6 +20,13 @@ internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObserv
 
     public readonly PacketObservationSource CreateObservationSource(ushort opcode, int payloadLength, long captureSequence = 0)
         => new(TimestampMilliseconds, FlushId, opcode, payloadLength, captureSequence, CurrentStructurePath);
+
+    public readonly void ObserveProtocolRoundTrip(long clientSentUnixMilliseconds, long serverUnixMilliseconds)
+        => protocolRoundTripObserver?.Invoke(new ProtocolRoundTripObservation(
+            Connection,
+            clientSentUnixMilliseconds,
+            serverUnixMilliseconds,
+            TimestampMilliseconds));
 
     public PacketStructurePath EnterStructure(PacketStructureKind kind, int offset, int length, int bodyOffset, int bodyLength, int siblingIndex)
     {

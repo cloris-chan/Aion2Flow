@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.Protocol.Readers;
@@ -78,14 +77,12 @@ internal static class PacketCombatHandler
         if (Packet0438ImplicitDetailSidecarParser.TryParse(packet, out var implicitDetailSidecar))
         {
             context.Sink.RegisterCompactValue0438(context.CreateObservationSource(0x0438, packet.Length), implicitDetailSidecar.TargetId, implicitDetailSidecar.SourceId, implicitDetailSidecar.BodySkillVariantRaw, implicitDetailSidecar.Marker, implicitDetailSidecar.LayoutTag, implicitDetailSidecar.Type);
-            RawPacketDump.ObserveParsedPacket("implicit-detail-sidecar", context.Connection);
             return context.MarkParsed();
         }
 
         if (Packet0438CompactValueParser.TryParse(packet, out var compact))
         {
             context.Sink.RegisterCompactValue0438(context.CreateObservationSource(0x0438, packet.Length), compact.TargetId, compact.SourceId, compact.BodySkillVariantRaw, compact.Marker, compact.LayoutTag, compact.Type, compact.Value);
-            RawPacketDump.ObserveParsedPacket("compact-value", context.Connection);
             return context.MarkParsed();
         }
 
@@ -185,7 +182,6 @@ internal static class PacketCombatHandler
         }
 
         context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, packet.Length), parsed.SourceId, parsed.Mode, parsed.BodyCodeRaw, parsed.Marker, parsed.Flag, parsed.EchoSourceId);
-        RawPacketDump.ObserveParsedPacket("compact-0238", context.Connection);
         return context.MarkParsed();
     }
 
@@ -197,7 +193,6 @@ internal static class PacketCombatHandler
         }
 
         context.Sink.RegisterCompactControl0638(context.CreateObservationSource(0x0638, packet.Length), parsed.SourceId, parsed.BodyResourceEffectRef, parsed.Marker, parsed.Flag);
-        RawPacketDump.ObserveParsedPacket("compact-0638", context.Connection);
         return context.MarkParsed();
     }
 

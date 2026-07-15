@@ -91,11 +91,9 @@
   <data name="Status_PortWaiting" xml:space="preserve"><value>게임 포트 대기 중</value></data>
   <data name="Status_PortIdle" xml:space="preserve"><value>게임 포트를 감시하지 않음</value></data>
   <data name="Status_Locked" xml:space="preserve"><value>전투 연결 잠금됨</value></data>
-  <data name="Status_LockedProxy" xml:space="preserve"><value>전투 연결 잠금됨 (프록시 모드)</value></data>
   <data name="Status_Unlocked" xml:space="preserve"><value>전투 연결이 아직 잠기지 않음</value></data>
-  <data name="Status_RttEstimated" xml:space="preserve"><value>TCP 왕복 추정</value></data>
-  <data name="Status_LatencyEstimatedFromCombat" xml:space="preserve"><value>전투 패킷 기반 지연 추정 (프록시 모드)</value></data>
-  <data name="Status_RttUnavailable" xml:space="preserve"><value>RTT 추정값 없음</value></data>
+  <data name="Status_LatencyMeasured" xml:space="preserve"><value>게임 왕복 지연 시간</value></data>
+  <data name="Status_LatencyUnavailable" xml:space="preserve"><value>지연 시간 샘플 없음</value></data>
 
   <!-- Direction -->
   <data name="Direction_Outgoing" xml:space="preserve"><value>가한 것</value></data>

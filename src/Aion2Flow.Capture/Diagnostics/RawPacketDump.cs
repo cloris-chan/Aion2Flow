@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using Cloris.Aion2Flow.Capture.Streams;
@@ -20,8 +19,6 @@ internal static class RawPacketDump
     private static StreamWriter? _rawWriter;
     private static StreamWriter? _streamWriter;
     private static DateTimeOffset _currentSessionStarted = DateTimeOffset.Now;
-
-    public static event Action<ParsedPacketObservation>? ParsedPacketObserved;
 
     public static string RawLogPath => _rawLogPath;
     public static string StreamLogPath => _streamLogPath;
@@ -101,29 +98,6 @@ internal static class RawPacketDump
         }
     }
 
-    public static void ObserveParsedPacket(string eventName, in TcpConnection connection)
-    {
-        if (ParsedPacketObserved is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var timestampTicks = Stopwatch.GetTimestamp();
-            try
-            {
-                ParsedPacketObserved?.Invoke(new ParsedPacketObservation(timestampTicks, eventName, connection));
-            }
-            catch
-            {
-            }
-        }
-        catch
-        {
-        }
-    }
-
     private static StreamWriter CreateWriter(string path)
     {
         var directory = Path.GetDirectoryName(path);
@@ -169,6 +143,4 @@ internal static class RawPacketDump
 
     private static string ResolveDumpLogDirectory(string logDirectory, DateTimeOffset timestamp)
         => Path.Combine(logDirectory, "dumps", timestamp.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture));
-
-    public readonly record struct ParsedPacketObservation(long TimestampTicks, string EventName, TcpConnection Connection);
 }
