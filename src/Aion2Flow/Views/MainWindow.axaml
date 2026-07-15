@@ -117,13 +117,13 @@
                                                            IsHitTestVisible="False" />
 
                             <Grid Margin="16,0,5,0"
-                                  ColumnSpacing="4"
+                                  ColumnSpacing="6"
                                   IsHitTestVisible="False">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricPrimary" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricSecondary" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricTertiary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossMetricPrimary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossMetricSecondary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="BossMetricTertiary" />
                                 </Grid.ColumnDefinitions>
                                 <Grid Grid.Column="0"
                                       ColumnDefinitions="*,Auto"
@@ -154,16 +154,11 @@
                                                        UseCompactNotation="{Binding $parent[Window].DataContext.CombatantColumns.UseCompactMainMetrics}"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3"
-                                                       HorizontalAlignment="Right"
-                                                       TextAlignment="Right"
                                                        IsVisible="{Binding IsHpVisible}"
-                                                       VerticalAlignment="Center"
-                                                       Suffix=" /" />
+                                                       VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="1"
                                            Classes="BossFocusHpMuted"
                                            Text="--"
-                                           HorizontalAlignment="Right"
-                                           TextAlignment="Right"
                                            IsVisible="{Binding IsHpUnknown}"
                                            VerticalAlignment="Center" />
 
@@ -174,22 +169,16 @@
                                                        UseCompactNotation="{Binding $parent[Window].DataContext.CombatantColumns.UseCompactMainMetrics}"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3"
-                                                       HorizontalAlignment="Right"
-                                                       TextAlignment="Right"
                                                        IsVisible="{Binding IsMaxHpVisible}"
                                                        VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="2"
                                            Classes="BossFocusHpMuted"
                                            Text="--"
-                                           HorizontalAlignment="Right"
-                                           TextAlignment="Right"
                                            IsVisible="{Binding IsMaxHpUnknown}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="2"
                                            Classes="BossFocusHpMuted"
                                            Text="--"
-                                           HorizontalAlignment="Right"
-                                           TextAlignment="Right"
                                            IsVisible="{Binding IsHpUnknown}"
                                            VerticalAlignment="Center" />
 
@@ -198,8 +187,6 @@
                                                        Value="{Binding HpRatio}"
                                                        UsePercentageNotation="True"
                                                        FractionDigits="0"
-                                                       HorizontalAlignment="Right"
-                                                       TextAlignment="Right"
                                                        IsVisible="{Binding IsMaxHpVisible}"
                                                        VerticalAlignment="Center" />
                             </Grid>
@@ -243,13 +230,12 @@
                                                          Segment="{Binding BarSegment}"
                                                          IsHitTestVisible="False" />
 
-                            <Grid ColumnSpacing="4"
-                                  Margin="5,0">
+                            <Grid Margin="5,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricPrimary" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricSecondary" />
-                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MainMetricTertiary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="CombatantMetricPrimary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="CombatantMetricSecondary" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="CombatantMetricTertiary" />
                                 </Grid.ColumnDefinitions>
                                 <controls:PcDisplay Grid.Column="0"
                                                     Classes="OverlayRowName"
@@ -263,13 +249,12 @@
                                                        Value="{Binding DamagePerSecond}"
                                                        IsVisible="{Binding Columns.ShowDamagePerSecondColumn}"
                                                        VerticalAlignment="Center"
-                                                       HorizontalAlignment="Stretch"
-                                                       TextAlignment="Right"
                                                        StableWidthScopeKey="{Binding Id}"
                                                        UseCompactNotation="{Binding Columns.UseCompactMainMetrics}"
                                                        UseGrouping="True"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3"
+                                                       Margin="6,0,0,0"
                                                        Suffix="/s" />
 
                                 <controls:NumericBlock Grid.Column="2"
@@ -277,22 +262,21 @@
                                                        Value="{Binding Damage}"
                                                        IsVisible="{Binding Columns.ShowDamageColumn}"
                                                        VerticalAlignment="Center"
-                                                       HorizontalAlignment="Stretch"
-                                                       TextAlignment="Right"
                                                        StableWidthScopeKey="{Binding Id}"
                                                        UseCompactNotation="{Binding Columns.UseCompactMainMetrics}"
                                                        UseGrouping="True"
                                                        CompactThreshold="1000"
-                                                       CompactSignificantDigits="3" />
+                                                       CompactSignificantDigits="3"
+                                                       Margin="6,0,0,0" />
 
                                 <controls:NumericBlock Grid.Column="3"
                                                        Classes="CombatantBossShareValue"
                                                        Value="{Binding BossShareRatio}"
-                                                       IsVisible="{Binding HasBossShare}"
+                                                       IsVisible="{Binding Columns.ShowBossShareColumn}"
                                                        UsePercentageNotation="True"
                                                        FractionDigits="1"
                                                        TrimTrailingZeros="False"
-                                                       TextAlignment="Right"
+                                                       Margin="6,0,0,0"
                                                        VerticalAlignment="Center" />
                             </Grid>
                         </Grid>
@@ -393,6 +377,7 @@
                     </Button>
 
                     <controls:NumericBlock Classes="BottomBarMetric BottomBarTotalDps"
+                                           IsVisible="{Binding CombatantColumns.ShowTotalDamagePerSecond}"
                                            Value="{Binding TotalFilteredDamagePerSecond}"
                                            Suffix="/s"
                                            UseGrouping="True"

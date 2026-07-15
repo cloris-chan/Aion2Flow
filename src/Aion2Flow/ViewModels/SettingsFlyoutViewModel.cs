@@ -49,6 +49,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             CombatantStatisticsScope = persisted.CombatantStatisticsScope;
             SceneKind = persisted.SceneKind;
             UseCompactMainMetrics = persisted.UseCompactMainMetrics;
+            ShowDamagePerSecondColumn = persisted.ShowDamagePerSecondColumn;
+            ShowDamageColumn = persisted.ShowDamageColumn;
+            ShowTotalDamagePerSecond = persisted.ShowTotalDamagePerSecond;
             ShowFocusStatusBar = persisted.ShowFocusStatusBar;
             ShowPlayerNames = persisted.ShowPlayerNames;
             PlayerSelfMarkerDisplayMode = persisted.PlayerSelfMarkerDisplayMode;
@@ -130,6 +133,21 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UseCompactMainMetricsDisplay))]
     public partial bool UseCompactMainMetrics { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDamagePerSecondColumnDisplay))]
+    [NotifyPropertyChangedFor(nameof(MainMetricVisibilityDisplay))]
+    public partial bool ShowDamagePerSecondColumn { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDamageColumnDisplay))]
+    [NotifyPropertyChangedFor(nameof(MainMetricVisibilityDisplay))]
+    public partial bool ShowDamageColumn { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowTotalDamagePerSecondDisplay))]
+    [NotifyPropertyChangedFor(nameof(MainMetricVisibilityDisplay))]
+    public partial bool ShowTotalDamagePerSecond { get; set; } = true;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowFocusStatusBarDisplay))]
@@ -239,6 +257,14 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public string UseCompactMainMetricsDisplay => Localization[UseCompactMainMetrics ? "Settings_MainMetricsCompact_On" : "Settings_MainMetricsCompact_Off"];
 
+    public string ShowDamagePerSecondColumnDisplay => ResolveMainMetricVisibilityDisplay(ShowDamagePerSecondColumn);
+
+    public string ShowDamageColumnDisplay => ResolveMainMetricVisibilityDisplay(ShowDamageColumn);
+
+    public string ShowTotalDamagePerSecondDisplay => ResolveMainMetricVisibilityDisplay(ShowTotalDamagePerSecond);
+
+    public string MainMetricVisibilityDisplay => $"{Convert.ToInt32(ShowDamagePerSecondColumn) + Convert.ToInt32(ShowDamageColumn) + Convert.ToInt32(ShowTotalDamagePerSecond)}/3";
+
     public string ShowFocusStatusBarDisplay => Localization[ShowFocusStatusBar ? "Settings_FocusStatusBar_On" : "Settings_FocusStatusBar_Off"];
 
     public string ShowPlayerNamesDisplay => Localization[ShowPlayerNames ? "Settings_ShowPlayerNames_On" : "Settings_ShowPlayerNames_Off"];
@@ -313,6 +339,12 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     partial void OnSceneKindChanged(SceneKind value) => PersistSettings();
 
     partial void OnUseCompactMainMetricsChanged(bool value) => PersistSettings();
+
+    partial void OnShowDamagePerSecondColumnChanged(bool value) => PersistSettings();
+
+    partial void OnShowDamageColumnChanged(bool value) => PersistSettings();
+
+    partial void OnShowTotalDamagePerSecondChanged(bool value) => PersistSettings();
 
     partial void OnShowFocusStatusBarChanged(bool value) => PersistSettings();
 
@@ -515,6 +547,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.CombatantStatisticsScope = CombatantStatisticsScope;
             s.SceneKind = SceneKind;
             s.UseCompactMainMetrics = UseCompactMainMetrics;
+            s.ShowDamagePerSecondColumn = ShowDamagePerSecondColumn;
+            s.ShowDamageColumn = ShowDamageColumn;
+            s.ShowTotalDamagePerSecond = ShowTotalDamagePerSecond;
             s.ShowFocusStatusBar = ShowFocusStatusBar;
             s.ShowPlayerNames = ShowPlayerNames;
             s.PlayerSelfMarkerDisplayMode = PlayerSelfMarkerDisplayMode;
@@ -544,6 +579,10 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(CombatantStatisticsScopeDisplay));
         OnPropertyChanged(nameof(SceneKindDisplay));
         OnPropertyChanged(nameof(UseCompactMainMetricsDisplay));
+        OnPropertyChanged(nameof(ShowDamagePerSecondColumnDisplay));
+        OnPropertyChanged(nameof(ShowDamageColumnDisplay));
+        OnPropertyChanged(nameof(ShowTotalDamagePerSecondDisplay));
+        OnPropertyChanged(nameof(MainMetricVisibilityDisplay));
         OnPropertyChanged(nameof(ShowFocusStatusBarDisplay));
         OnPropertyChanged(nameof(ShowPlayerNamesDisplay));
         OnPropertyChanged(nameof(PlayerSelfMarkerDisplayModeDisplay));
@@ -558,6 +597,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(OverlayInteractionHotkeyDisplay));
         OnPropertyChanged(nameof(HotkeyRegistrationErrorText));
     }
+
+    private string ResolveMainMetricVisibilityDisplay(bool isVisible) => Localization[isVisible ? "Settings_MainMetricVisibility_Show" : "Settings_MainMetricVisibility_Hide"];
 
     private void RebuildLanguageOptions()
     {

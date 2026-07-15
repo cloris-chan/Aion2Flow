@@ -273,19 +273,19 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.Single(fixture.ViewModel.BossFocuses);
-        Assert.True(Assert.Single(fixture.ViewModel.Combatants).HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
 
         fixture.Settings.ShowFocusStatusBar = false;
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.Empty(fixture.ViewModel.BossFocuses);
-        Assert.True(Assert.Single(fixture.ViewModel.Combatants).HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
 
         fixture.Settings.ShowFocusStatusBar = true;
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.Single(fixture.ViewModel.BossFocuses);
-        Assert.True(Assert.Single(fixture.ViewModel.Combatants).HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
     }
 
     [Fact]
@@ -321,8 +321,7 @@ public sealed class MainViewModelCombatantFilterTests
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Equal(100, row.Id);
         Assert.Empty(fixture.ViewModel.BossFocuses);
-        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.False(row.HasBossShare);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
     }
 
     [Fact]
@@ -343,8 +342,7 @@ public sealed class MainViewModelCombatantFilterTests
         var focus = Assert.Single(fixture.ViewModel.BossFocuses);
         Assert.Equal(100, row.Id);
         Assert.Equal(900_002, focus.InstanceId);
-        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.True(row.HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
     }
 
     [Fact]
@@ -364,8 +362,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal(100, row.Id);
         Assert.Null(row.CharacterClass);
         Assert.Equal(900_002, focus.InstanceId);
-        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.True(row.HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
     }
 
     [Fact]
@@ -384,8 +381,7 @@ public sealed class MainViewModelCombatantFilterTests
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Equal(100, row.Id);
         Assert.Empty(fixture.ViewModel.BossFocuses);
-        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.False(row.HasBossShare);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
     }
 
     [Fact]
@@ -428,8 +424,7 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.False(row.HasBossShare);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
         Assert.Equal(0d, row.BossShareRatio);
     }
 
@@ -576,9 +571,44 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Same(fixture.ViewModel.CombatantColumns, row.Columns);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
-        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.False(row.HasBossShare);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
         Assert.Equal(0d, row.BossShareRatio);
+    }
+
+    [Fact]
+    public void MainMetricVisibility_UpdatesImmediatelyWithoutChangingTotals()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        var totalDamagePerSecond = fixture.ViewModel.TotalFilteredDamagePerSecond;
+
+        fixture.Settings.ShowDamagePerSecondColumn = false;
+        fixture.Settings.ShowDamageColumn = false;
+        fixture.Settings.ShowTotalDamagePerSecond = false;
+
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowTotalDamagePerSecond);
+        Assert.True(totalDamagePerSecond > 0);
+        Assert.Equal(totalDamagePerSecond, fixture.ViewModel.TotalFilteredDamagePerSecond);
+    }
+
+    [Theory]
+    [InlineData(SceneKind.Boss, true)]
+    [InlineData(SceneKind.Standard, false)]
+    public void ArchivedEncounter_BossShareColumnUsesArchivedSceneKind(SceneKind archivedSceneKind, bool expectedVisible)
+    {
+        var fixture = MainViewModelFixture.Create(archivedSceneKind);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        fixture.ViewModel.ArchiveCurrentEncounterCommand.Execute(null);
+        var history = Assert.Single(fixture.ViewModel.EncounterHistory);
+
+        fixture.ViewModel.ReturnToLiveCommand.Execute(null);
+        fixture.ViewModel.SelectedEncounterHistory = history;
+
+        Assert.Equal(expectedVisible, fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
     }
 
     [Fact]
@@ -596,8 +626,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Same(fixture.ViewModel.CombatantColumns, row.Columns);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
-        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.True(row.HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
         Assert.Equal(0.5d, row.BossShareRatio, 6);
     }
 
@@ -617,8 +646,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Same(fixture.ViewModel.CombatantColumns, row.Columns);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamagePerSecondColumn);
         Assert.True(fixture.ViewModel.CombatantColumns.ShowDamageColumn);
-        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
-        Assert.True(row.HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
         Assert.Equal(0.25d, row.BossShareRatio, 6);
     }
 
@@ -634,9 +662,8 @@ public sealed class MainViewModelCombatantFilterTests
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossColumn);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
         var zeroShareRow = fixture.ViewModel.Combatants.Single(static row => row.Id == 301);
-        Assert.True(zeroShareRow.HasBossShare);
         Assert.Equal(0d, zeroShareRow.BossShareRatio);
     }
 
@@ -654,7 +681,7 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.True(row.HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
         Assert.Equal(0.5d, row.BossShareRatio, 6);
     }
 
@@ -671,7 +698,7 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var row = Assert.Single(fixture.ViewModel.Combatants);
-        Assert.True(row.HasBossShare);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
         Assert.Equal(0.1d, row.BossShareRatio, 6);
     }
 
@@ -1056,11 +1083,12 @@ public sealed class MainViewModelCombatantFilterTests
         public ProjectionCacheStats ProjectionCacheStats => _captureService.Scene.Owner.ProjectionCacheStats;
         public long SceneStartedMilliseconds => _captureService.Scene.SessionStarted.ToUnixTimeMilliseconds();
 
-        public static MainViewModelFixture Create()
+        public static MainViewModelFixture Create(SceneKind sceneKind = SceneKind.Standard)
         {
             CombatResourceRegistry.SetGameResources(BuildSkillMap(), ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
             var settingsPath = Path.Combine(Path.GetTempPath(), $"aion2flow-test-{Guid.NewGuid():N}.json");
             var settings = new SettingsService(settingsPath);
+            settings.Update(s => s.SceneKind = sceneKind);
             var language = new LanguageService();
             language.SetLanguage(LanguageService.TraditionalChinese);
             var localization = new LocalizationService(language);

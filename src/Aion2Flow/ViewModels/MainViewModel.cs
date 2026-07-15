@@ -52,6 +52,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private ArchivedEncounterRecord? _displayContextArchivedRecord;
     private readonly Dictionary<int, IBrush> _combatantBarBrushes = [];
     private readonly List<BossFocusDisplayGroup> _bossFocusDisplayGroups = [];
+    private readonly List<SceneBossFocusSnapshot> _archivedBossFocusSnapshots = [];
+    private readonly List<BossDamageContribution> _archivedBossDamageContributions = [];
     private int _displayContextVersion;
     private int _displayContextBuiltVersion = -1;
     private long _displayContextMetadataRevision = -1;
@@ -60,6 +62,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private uint _barBrushSeed;
     private int _barBrushBaseHue;
     private int _nextBarHueIndex;
+    private Guid _bossShareEncounterId;
     private long _lastLiveProjectionPollTimestampTicks = long.MinValue;
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
@@ -203,10 +206,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         SettingsFlyout = settingsFlyout;
         if (_captureService.Scene.Kind != SettingsFlyout.SceneKind)
             _captureService.Scene.ChangeKind(SettingsFlyout.SceneKind, _captureService.Scene.SessionStarted, archiveCurrent: false);
-        CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService)
-        {
-            UseCompactMainMetrics = SettingsFlyout.UseCompactMainMetrics
-        };
+        CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService);
+        ApplyCombatantMetricDisplaySettings();
+        CombatantColumns.SetBossShareColumnVisibility(SettingsFlyout.SceneKind == SceneKind.Boss);
         DisplayContext = CreateLiveDisplayContext(_displayedSnapshot);
         _combatantDetails.DisplayContext = DisplayContext;
 
@@ -278,8 +280,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
         else if (e.PropertyName == nameof(SettingsFlyoutViewModel.SceneKind))
             Dispatcher.UIThread.Post(ChangeSceneKind);
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.UseCompactMainMetrics))
-            Dispatcher.UIThread.Post(() => CombatantColumns.UseCompactMainMetrics = SettingsFlyout.UseCompactMainMetrics);
+        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.UseCompactMainMetrics) ||
+                 e.PropertyName == nameof(SettingsFlyoutViewModel.ShowDamagePerSecondColumn) ||
+                 e.PropertyName == nameof(SettingsFlyoutViewModel.ShowDamageColumn) ||
+                 e.PropertyName == nameof(SettingsFlyoutViewModel.ShowTotalDamagePerSecond))
+            ApplyCombatantMetricDisplaySettings();
         else if (e.PropertyName == nameof(SettingsFlyoutViewModel.ShowFocusStatusBar) ||
                  e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantStatisticsScope))
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
@@ -529,9 +534,24 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         if (IsViewingArchivedEncounter)
         {
-            _bossFocusDisplayGroups.Clear();
             BossFocuses.Clear();
-            RefreshCombatantBossShares(EmptyBossDamageContributions);
+            if (SelectedEncounterHistory is { Record.ScenePayload: var payload })
+            {
+                BuildArchivedBossShareProjection(payload);
+                BossFocusDisplayBuilder.Build(
+                    _archivedBossFocusSnapshots,
+                    _archivedBossDamageContributions,
+                    DisplayContext,
+                    SettingsFlyout.CombatantStatisticsScope,
+                    Combatants.ContainsKey,
+                    _bossFocusDisplayGroups);
+                RefreshCombatantBossShares(snapshot.EncounterId, snapshot.Kind, _archivedBossDamageContributions);
+            }
+            else
+            {
+                _bossFocusDisplayGroups.Clear();
+                RefreshCombatantBossShares(snapshot.EncounterId, snapshot.Kind, EmptyBossDamageContributions);
+            }
             return;
         }
 
@@ -552,7 +572,71 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         {
             BossFocuses.Clear();
         }
-        RefreshCombatantBossShares(damageContributions);
+        RefreshCombatantBossShares(snapshot.EncounterId, snapshot.Kind, damageContributions);
+    }
+
+    private void BuildArchivedBossShareProjection(SceneArchivePayload payload)
+    {
+        _archivedBossFocusSnapshots.Clear();
+        _archivedBossDamageContributions.Clear();
+        if (payload.Bosses.Count == 0)
+            return;
+
+        var latestObservedAtMilliseconds = 0L;
+        for (var i = 0; i < payload.Bosses.Count; i++)
+            latestObservedAtMilliseconds = Math.Max(latestObservedAtMilliseconds, payload.Bosses[i].LastObservedAtMilliseconds);
+
+        var activeBossIds = new HashSet<int>();
+        for (var i = 0; i < payload.Bosses.Count; i++)
+        {
+            var boss = payload.Bosses[i];
+            if (Math.Max(0, latestObservedAtMilliseconds - boss.LastObservedAtMilliseconds) > SceneReadModelOwner.BossFocusVisibilityTimeoutMilliseconds)
+                continue;
+
+            activeBossIds.Add(boss.InstanceId);
+            _archivedBossFocusSnapshots.Add(new SceneBossFocusSnapshot
+            {
+                InstanceId = boss.InstanceId,
+                Kind = ResolveArchivedBossKind(payload, boss.InstanceId),
+                Hp = boss.Hp,
+                MaxHp = boss.MaxHp,
+                CumulativeLostHp = boss.CumulativeLostHp,
+                LastObservedAtMilliseconds = boss.LastObservedAtMilliseconds,
+                HasHp = boss.HasHp,
+                HasMaxHp = boss.HasMaxHp
+            });
+        }
+
+        for (var i = 0; i < payload.Pairs.Count; i++)
+        {
+            var pair = payload.Pairs[i];
+            if (pair.TotalDamage <= 0 || !activeBossIds.Contains(pair.Key.TargetId))
+                continue;
+
+            _archivedBossDamageContributions.Add(new BossDamageContribution(
+                pair.Key.TargetId,
+                pair.Key.SourceId,
+                pair.TotalDamage,
+                pair.LastObserved));
+        }
+
+        _archivedBossDamageContributions.Sort(static (left, right) =>
+        {
+            var comparison = left.BossId.CompareTo(right.BossId);
+            return comparison != 0 ? comparison : left.SourceCombatantId.CompareTo(right.SourceCombatantId);
+        });
+    }
+
+    private static NpcKind ResolveArchivedBossKind(SceneArchivePayload payload, int instanceId)
+    {
+        for (var i = 0; i < payload.Entities.Count; i++)
+        {
+            var entity = payload.Entities[i];
+            if (entity.EntityId == instanceId)
+                return entity.Kind;
+        }
+
+        return NpcKind.Boss;
     }
 
     private void SyncBossFocuses()
@@ -630,18 +714,27 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             : null;
     }
 
-    private void RefreshCombatantBossShares(IReadOnlyList<BossDamageContribution> damageContributions)
+    private void RefreshCombatantBossShares(
+        Guid encounterId,
+        SceneKind displayedSceneKind,
+        IReadOnlyList<BossDamageContribution> damageContributions)
     {
         var scope = BossFocusDisplayBuilder.CreateShareScope(_bossFocusDisplayGroups);
-        var hasBossColumn = scope.EffectiveHp > 0;
-        CombatantColumns.Update(hasBossColumn);
-        if (!hasBossColumn)
+        var hasBossShareScope = scope.EffectiveHp > 0;
+        var isBossScene = displayedSceneKind == SceneKind.Boss;
+        CombatantColumns.SetBossShareColumnVisibility(isBossScene || hasBossShareScope);
+        if (!hasBossShareScope)
         {
+            if (isBossScene && _bossShareEncounterId == encounterId)
+                return;
+
+            _bossShareEncounterId = encounterId;
             for (var i = 0; i < Combatants.Count; i++)
-                Combatants[i].UpdateBossShare(0, isVisible: false);
+                Combatants[i].UpdateBossShare(0);
             return;
         }
 
+        _bossShareEncounterId = encounterId;
         for (var i = 0; i < Combatants.Count; i++)
         {
             var row = Combatants[i];
@@ -649,8 +742,17 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                 _bossFocusDisplayGroups,
                 damageContributions,
                 row.Id);
-            row.UpdateBossShare(damage > 0 ? damage / (double)scope.EffectiveHp : 0, isVisible: true);
+            row.UpdateBossShare(damage > 0 ? damage / (double)scope.EffectiveHp : 0);
         }
+    }
+
+    private void ApplyCombatantMetricDisplaySettings()
+    {
+        CombatantColumns.ApplyMetricDisplaySettings(
+            SettingsFlyout.ShowDamagePerSecondColumn,
+            SettingsFlyout.ShowDamageColumn,
+            SettingsFlyout.ShowTotalDamagePerSecond,
+            SettingsFlyout.UseCompactMainMetrics);
     }
 
     private void RefreshCombatantBars(Guid encounterId)
@@ -994,7 +1096,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         TotalFilteredDamagePerSecond = 0;
         CombatantDetails.Clear();
         BossFocuses.Clear();
-        CombatantColumns.Update(hasBossColumn: false);
+        ApplyCombatantMetricDisplaySettings();
+        CombatantColumns.SetBossShareColumnVisibility(SettingsFlyout.SceneKind == SceneKind.Boss);
         SelectedCombatant = null;
         SelectedEncounterHistory = null;
         IsViewingArchivedEncounter = false;

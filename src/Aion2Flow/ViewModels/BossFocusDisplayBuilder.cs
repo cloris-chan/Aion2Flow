@@ -9,13 +9,14 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 internal static class BossFocusDisplayBuilder
 {
-    public static void Build(
-        SnapshotList<SceneBossFocusSnapshot> snapshots,
+    public static void Build<TSnapshots>(
+        TSnapshots snapshots,
         IReadOnlyList<BossDamageContribution> damageContributions,
         SceneDisplayContext? displayContext,
         CombatantStatisticsScope statisticsScope,
         Func<int, bool> isDisplayedCombatant,
         List<BossFocusDisplayGroup> groups)
+        where TSnapshots : IReadOnlyList<SceneBossFocusSnapshot>
     {
         groups.Clear();
         for (var i = 0; i < snapshots.Count; i++)

@@ -217,6 +217,30 @@ public sealed class PlayerNameDisplayServiceTests
     }
 
     [Fact]
+    public void SettingsService_PersistsMainMetricVisibility()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "Aion2Flow.Tests", $"{Guid.NewGuid():N}.json");
+        var settings = new SettingsService(path);
+
+        Assert.True(settings.Current.ShowDamagePerSecondColumn);
+        Assert.True(settings.Current.ShowDamageColumn);
+        Assert.True(settings.Current.ShowTotalDamagePerSecond);
+
+        settings.Update(static s =>
+        {
+            s.ShowDamagePerSecondColumn = false;
+            s.ShowDamageColumn = false;
+            s.ShowTotalDamagePerSecond = false;
+        });
+        settings.Update(static s => s.ShowFocusStatusBar = false);
+
+        var loaded = new SettingsService(path).Current;
+        Assert.False(loaded.ShowDamagePerSecondColumn);
+        Assert.False(loaded.ShowDamageColumn);
+        Assert.False(loaded.ShowTotalDamagePerSecond);
+    }
+
+    [Fact]
     public void SettingsService_PersistsAndClampsUiScalePercent()
     {
         var path = Path.Combine(Path.GetTempPath(), "Aion2Flow.Tests", $"{Guid.NewGuid():N}.json");

@@ -18,6 +18,12 @@ public sealed class AppSettings
 
     public bool UseCompactMainMetrics { get; set; } = true;
 
+    public bool ShowDamagePerSecondColumn { get; set; } = true;
+
+    public bool ShowDamageColumn { get; set; } = true;
+
+    public bool ShowTotalDamagePerSecond { get; set; } = true;
+
     public bool ShowFocusStatusBar { get; set; } = true;
 
     public bool ShowPlayerNames { get; set; } = true;

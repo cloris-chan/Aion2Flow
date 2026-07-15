@@ -59,10 +59,10 @@ public abstract class IconTextDisplay : UserControl
         Classes.Add("IconTextDisplay");
         Effect = new DropShadowDirectionEffect
         {
-            BlurRadius = 4,
+            BlurRadius = 1,
             ShadowDepth = 0,
             Opacity = 0.95,
-            Color = Color.Parse("#D0000000")
+            Color = Color.Parse("#000000")
         };
 
         _textPresenter = new MarqueeTextPresenter();

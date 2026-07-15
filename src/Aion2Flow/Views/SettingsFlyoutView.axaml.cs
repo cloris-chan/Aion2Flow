@@ -18,6 +18,10 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _visibleRowsMenuItem;
     private MenuItem? _combatantStatisticsScopeMenuItem;
     private MenuItem? _combatantSortMetricMenuItem;
+    private MenuItem? _mainMetricVisibilityMenuItem;
+    private MenuItem? _showDamagePerSecondColumnMenuItem;
+    private MenuItem? _showDamageColumnMenuItem;
+    private MenuItem? _showTotalDamagePerSecondMenuItem;
     private MenuItem? _sceneKindMenuItem;
     private MenuItem? _compactMainMetricsMenuItem;
     private MenuItem? _focusStatusBarMenuItem;
@@ -85,6 +89,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildVisibleRowsMenuItems();
         RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
+        RebuildMainMetricVisibilityMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
@@ -98,6 +103,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildVisibleRowsMenuItems();
         RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
+        RebuildMainMetricVisibilityMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
@@ -128,6 +134,15 @@ public partial class SettingsFlyoutView : UserControl
             case nameof(SettingsFlyoutViewModel.CombatantSortMetricDisplay):
                 RefreshCombatantSortMetricHeader();
                 RefreshCombatantSortMetricCheckmarks();
+                break;
+            case nameof(SettingsFlyoutViewModel.ShowDamagePerSecondColumn):
+            case nameof(SettingsFlyoutViewModel.ShowDamagePerSecondColumnDisplay):
+            case nameof(SettingsFlyoutViewModel.ShowDamageColumn):
+            case nameof(SettingsFlyoutViewModel.ShowDamageColumnDisplay):
+            case nameof(SettingsFlyoutViewModel.ShowTotalDamagePerSecond):
+            case nameof(SettingsFlyoutViewModel.ShowTotalDamagePerSecondDisplay):
+            case nameof(SettingsFlyoutViewModel.MainMetricVisibilityDisplay):
+                RefreshMainMetricVisibilityMenuItems();
                 break;
             case nameof(SettingsFlyoutViewModel.SceneKind):
             case nameof(SettingsFlyoutViewModel.SceneKindDisplay):
@@ -169,6 +184,7 @@ public partial class SettingsFlyoutView : UserControl
         RebuildTopmostMenuItems();
         RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
+        RebuildMainMetricVisibilityMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
@@ -226,6 +242,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _sceneKindMenuItem = mi;
             RebuildSceneKindMenuItems();
+        }
+    }
+
+    private void MainMetricVisibilityMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _mainMetricVisibilityMenuItem != mi)
+        {
+            _mainMetricVisibilityMenuItem = mi;
+            RebuildMainMetricVisibilityMenuItems();
         }
     }
 
@@ -346,6 +371,38 @@ public partial class SettingsFlyoutView : UserControl
         }
 
         RefreshTaggedMenuCheckmarks<CombatantSortMetric>(_combatantSortMetricMenuItem, metric => metric == vm.CombatantSortMetric);
+    }
+
+    private void RebuildMainMetricVisibilityMenuItems()
+    {
+        var vm = ViewModel;
+        RefreshMainMetricVisibilityHeader();
+        if (_mainMetricVisibilityMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        _mainMetricVisibilityMenuItem.Items.Clear();
+        _showDamagePerSecondColumnMenuItem = CreateToggleMenuItem(vm.Localization["Settings_MainMetricVisibility_DamagePerSecond"], vm.ShowDamagePerSecondColumnDisplay, vm.ShowDamagePerSecondColumn, ShowDamagePerSecondColumnMenuItemClicked);
+        _showDamageColumnMenuItem = CreateToggleMenuItem(vm.Localization["Settings_MainMetricVisibility_Damage"], vm.ShowDamageColumnDisplay, vm.ShowDamageColumn, ShowDamageColumnMenuItemClicked);
+        _showTotalDamagePerSecondMenuItem = CreateToggleMenuItem(vm.Localization["Settings_MainMetricVisibility_TotalDamagePerSecond"], vm.ShowTotalDamagePerSecondDisplay, vm.ShowTotalDamagePerSecond, ShowTotalDamagePerSecondMenuItemClicked);
+        _mainMetricVisibilityMenuItem.Items.Add(_showDamagePerSecondColumnMenuItem);
+        _mainMetricVisibilityMenuItem.Items.Add(_showDamageColumnMenuItem);
+        _mainMetricVisibilityMenuItem.Items.Add(_showTotalDamagePerSecondMenuItem);
+    }
+
+    private void RefreshMainMetricVisibilityMenuItems()
+    {
+        var vm = ViewModel;
+        RefreshMainMetricVisibilityHeader();
+        if (vm is null)
+        {
+            return;
+        }
+
+        RefreshToggleMenuItem(_showDamagePerSecondColumnMenuItem, vm.Localization["Settings_MainMetricVisibility_DamagePerSecond"], vm.ShowDamagePerSecondColumnDisplay, vm.ShowDamagePerSecondColumn);
+        RefreshToggleMenuItem(_showDamageColumnMenuItem, vm.Localization["Settings_MainMetricVisibility_Damage"], vm.ShowDamageColumnDisplay, vm.ShowDamageColumn);
+        RefreshToggleMenuItem(_showTotalDamagePerSecondMenuItem, vm.Localization["Settings_MainMetricVisibility_TotalDamagePerSecond"], vm.ShowTotalDamagePerSecondDisplay, vm.ShowTotalDamagePerSecond);
     }
 
     private void RebuildSceneKindMenuItems()
@@ -585,6 +642,36 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
+    private void ShowDamagePerSecondColumnMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.ShowDamagePerSecondColumn = !vm.ShowDamagePerSecondColumn;
+        }
+
+        e.Handled = true;
+    }
+
+    private void ShowDamageColumnMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.ShowDamageColumn = !vm.ShowDamageColumn;
+        }
+
+        e.Handled = true;
+    }
+
+    private void ShowTotalDamagePerSecondMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.ShowTotalDamagePerSecond = !vm.ShowTotalDamagePerSecond;
+        }
+
+        e.Handled = true;
+    }
+
     private void LanguageItemClicked(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm && sender is MenuItem { Tag: string code })
@@ -630,6 +717,13 @@ public partial class SettingsFlyoutView : UserControl
         var vm = ViewModel;
         if (_sceneKindMenuItem is null || vm is null) return;
         _sceneKindMenuItem.Header = CreateRowHeader(vm.Localization["Settings_SceneKind"], vm.SceneKindDisplay);
+    }
+
+    private void RefreshMainMetricVisibilityHeader()
+    {
+        var vm = ViewModel;
+        if (_mainMetricVisibilityMenuItem is null || vm is null) return;
+        _mainMetricVisibilityMenuItem.Header = CreateRowHeader(vm.Localization["Settings_MainMetricVisibility"], vm.MainMetricVisibilityDisplay);
     }
 
     private void RefreshLanguageHeader()

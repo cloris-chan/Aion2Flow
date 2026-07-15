@@ -28,6 +28,12 @@
   <data name="Settings_SceneKind" xml:space="preserve"><value>場景模式</value></data>
   <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>標準</value></data>
   <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>僅 Boss 戰</value></data>
+  <data name="Settings_MainMetricVisibility" xml:space="preserve"><value>主窗口數值</value></data>
+  <data name="Settings_MainMetricVisibility_DamagePerSecond" xml:space="preserve"><value>秒傷列</value></data>
+  <data name="Settings_MainMetricVisibility_Damage" xml:space="preserve"><value>總傷列</value></data>
+  <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>底部總秒傷</value></data>
+  <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>顯示</value></data>
+  <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>隱藏</value></data>
   <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>主數值緊湊顯示</value></data>
   <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>開啟</value></data>
   <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>關閉</value></data>

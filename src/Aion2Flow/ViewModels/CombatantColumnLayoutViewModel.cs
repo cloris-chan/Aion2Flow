@@ -14,22 +14,31 @@ public sealed class CombatantColumnLayoutViewModel(UiFrameBatchService frameBatc
         private set => SetFrameProperty(ref field, value);
     } = true;
 
-    public bool ShowBossColumn
+    public bool ShowBossShareColumn
     {
         get;
         private set => SetFrameProperty(ref field, value);
     }
 
+    public bool ShowTotalDamagePerSecond
+    {
+        get;
+        private set => SetFrameProperty(ref field, value);
+    } = true;
+
     public bool UseCompactMainMetrics
     {
         get;
-        set => SetFrameProperty(ref field, value);
+        private set => SetFrameProperty(ref field, value);
     } = true;
 
-    public void Update(bool hasBossColumn)
+    public void ApplyMetricDisplaySettings(bool showDamagePerSecondColumn, bool showDamageColumn, bool showTotalDamagePerSecond, bool useCompactMainMetrics)
     {
-        ShowDamagePerSecondColumn = true;
-        ShowDamageColumn = true;
-        ShowBossColumn = hasBossColumn;
+        ShowDamagePerSecondColumn = showDamagePerSecondColumn;
+        ShowDamageColumn = showDamageColumn;
+        ShowTotalDamagePerSecond = showTotalDamagePerSecond;
+        UseCompactMainMetrics = useCompactMainMetrics;
     }
+
+    public void SetBossShareColumnVisibility(bool isVisible) => ShowBossShareColumn = isVisible;
 }

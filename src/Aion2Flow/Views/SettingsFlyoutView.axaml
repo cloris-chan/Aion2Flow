@@ -29,6 +29,9 @@
                 <MenuItem x:Name="CombatantSortMetricMenuItem"
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="CombatantSortMetricMenuItemLoaded" />
+                <MenuItem x:Name="MainMetricVisibilityMenuItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
+                          Loaded="MainMetricVisibilityMenuItemLoaded" />
                 <MenuItem x:Name="SceneKindMenuItem"
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="SceneKindMenuItemLoaded" />

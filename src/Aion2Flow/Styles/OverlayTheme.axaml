@@ -15,7 +15,7 @@
         <SolidColorBrush x:Key="OverlayBrush.TextMuted">#B0C1D0</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.TextSubtle">#8595A2</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.EmptyStateText">#D7E4EF</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.RowMetricText">#C4D1DC</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.RowMetricText">#DEE8F0</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainAccent">#E3C78C</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainHudBackdrop">#A80A0D0F</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainHudContentBackdrop">#780A0D0F</SolidColorBrush>
@@ -127,19 +127,19 @@
 
     <Style Selector="TextBlock">
         <Setter Property="Effect">
-            <media:DropShadowDirectionEffect BlurRadius="3"
+            <media:DropShadowDirectionEffect BlurRadius="1"
                                              ShadowDepth="0"
-                                             Opacity="0.8"
-                                             Color="#B0000000" />
+                                             Opacity="0.95"
+                                             Color="#000000" />
         </Setter>
     </Style>
 
     <Style Selector="controls|NumericBlock">
         <Setter Property="Effect">
-            <media:DropShadowDirectionEffect BlurRadius="3"
+            <media:DropShadowDirectionEffect BlurRadius="1"
                                              ShadowDepth="0"
-                                             Opacity="0.8"
-                                             Color="#B0000000" />
+                                             Opacity="0.95"
+                                             Color="#000000" />
         </Setter>
     </Style>
 
@@ -218,8 +218,8 @@
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="Bold" />
-        <Setter Property="HorizontalAlignment" Value="Right" />
-        <Setter Property="TextAlignment" Value="Right" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
     <Style Selector="TextBlock.BossFocusHpMuted">
@@ -227,6 +227,8 @@
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.88" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|NumericBlock.BossFocusHpMuted">
@@ -234,8 +236,8 @@
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.88" />
-        <Setter Property="HorizontalAlignment" Value="Right" />
-        <Setter Property="TextAlignment" Value="Right" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|BossFocusProgressBar.BossFocusHpBar">
@@ -257,9 +259,9 @@
         <Setter Property="Foreground" Value="#F8FFFFFF" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="Bold" />
-        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="TextAlignment" Value="Right" />
+        <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
     <Style Selector="Border.TitleBarDragRegion">
@@ -786,27 +788,30 @@
     </Style>
 
     <Style Selector="controls|NumericBlock.OverlayRowMetric">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.RowMetricText}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="TextAlignment" Value="Right" />
+        <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|NumericBlock.OverlayRowMetricStrong">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="TextAlignment" Value="Right" />
+        <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|NumericBlock.CombatantBossShareValue">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.RowMetricText}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="TextAlignment" Value="Right" />
+        <Setter Property="TextAlignment" Value="Center" />
     </Style>
 
     <Style Selector="Border.DetailFlyoutCard">

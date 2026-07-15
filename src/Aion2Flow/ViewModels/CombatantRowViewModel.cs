@@ -46,12 +46,6 @@ public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService,
         private set => SetFrameProperty(ref field, value);
     }
 
-    public bool HasBossShare
-    {
-        get;
-        private set => SetFrameProperty(ref field, value);
-    }
-
     public double BossShareRatio
     {
         get;
@@ -75,21 +69,10 @@ public sealed class CombatantRowViewModel(UiFrameBatchService frameBatchService,
         BarSegment = new ProgressSegment(resolvedRatio, brush);
     }
 
-    public void UpdateBossShare(double ratio, bool isVisible)
+    public void UpdateBossShare(double ratio)
     {
         var resolvedRatio = Math.Max(0d, ratio);
-        if (!isVisible)
-        {
-            if (BossShareRatio != 0)
-                BossShareRatio = 0;
-            if (HasBossShare)
-                HasBossShare = false;
-            return;
-        }
-
         if (Math.Abs(BossShareRatio - resolvedRatio) > 0.000_001)
             BossShareRatio = resolvedRatio;
-        if (!HasBossShare)
-            HasBossShare = true;
     }
 }

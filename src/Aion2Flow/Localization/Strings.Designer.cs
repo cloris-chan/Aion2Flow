@@ -1323,6 +1323,60 @@ namespace Cloris.Aion2Flow.Localization {
                 return ResourceManager.GetString("Settings_MainMetricsCompact_On", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Main window metrics.
+        /// </summary>
+        internal static string Settings_MainMetricVisibility {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricVisibility", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Total damage column.
+        /// </summary>
+        internal static string Settings_MainMetricVisibility_Damage {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricVisibility_Damage", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to DPS column.
+        /// </summary>
+        internal static string Settings_MainMetricVisibility_DamagePerSecond {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricVisibility_DamagePerSecond", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Hide.
+        /// </summary>
+        internal static string Settings_MainMetricVisibility_Hide {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricVisibility_Hide", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Show.
+        /// </summary>
+        internal static string Settings_MainMetricVisibility_Show {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricVisibility_Show", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Bottom total DPS.
+        /// </summary>
+        internal static string Settings_MainMetricVisibility_TotalDamagePerSecond {
+            get {
+                return ResourceManager.GetString("Settings_MainMetricVisibility_TotalDamagePerSecond", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Faction tint.
