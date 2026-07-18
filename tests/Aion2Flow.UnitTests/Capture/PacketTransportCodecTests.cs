@@ -11,7 +11,7 @@ public sealed class PacketTransportCodecTests
     [InlineData(128)]
     [InlineData(16_384)]
     [InlineData(1_048_575)]
-    public void VarInt_RoundTrips_Transport_Length_Prefix(int value)
+    public void VarIntRoundTripsCurrentTransportBoundaries(int value)
     {
         Span<byte> bytes = stackalloc byte[5];
         Assert.True(PacketTransportCodec.TryWriteVarInt(value, bytes, out var written));
@@ -22,7 +22,7 @@ public sealed class PacketTransportCodecTests
     }
 
     [Fact]
-    public void Transport_Length_Uses_Decoded_Value_Plus_Prefix_Minus_Header()
+    public void TransportLengthAccountsForPrefixAndHeader()
     {
         Span<byte> bytes = stackalloc byte[5];
         Assert.True(PacketTransportCodec.TryWriteVarInt(35, bytes, out var written));

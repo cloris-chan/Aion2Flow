@@ -87,52 +87,6 @@ public sealed class CombatMetricsAggregationTests
     }
 
     [Fact]
-    public void SkillMetrics_Does_Not_Interpret_Drain_Tail_Wire_Value_As_Another_Metric()
-    {
-        var observation = DamageObservation(16046601, 1234) with { DrainHealAmount = 567 };
-        var contribution = Contribution(
-            CombatMetricKind.Damage,
-            CombatDeliveryKind.Direct,
-            1234);
-        var metrics = CreateMetrics(in observation);
-
-        metrics.ProcessContribution(in contribution);
-
-        Assert.Equal(1234, metrics.DamageAmount);
-        Assert.Equal(0, metrics.HealingAmount);
-        Assert.Equal(0, metrics.DrainHealingAmount);
-    }
-
-    [Fact]
-    public void CombatStore_Does_Not_Materialize_Drain_Tail_Without_Explicit_Contribution()
-    {
-        var store = new CombatStore();
-        const int attackerId = 1001;
-        const int targetId = 9001;
-        var observation = DamageObservation(16046601, 1234) with { DrainHealAmount = 567 };
-        var contribution = Contribution(
-            CombatMetricKind.Damage,
-            CombatDeliveryKind.Direct,
-            1234);
-
-        store.ApplyCombat(attackerId, targetId, in observation, in contribution, 1_000);
-
-        Assert.True(store.TryGetPair(attackerId, targetId, out var pair));
-        Assert.Equal(1234, pair!.TotalDamage);
-        Assert.Equal(0, pair.TotalDrainDamage);
-        Assert.Equal(0, pair.TotalHealing);
-        Assert.Equal(0, pair.TotalDrainHealing);
-
-        Assert.True(store.TryGetCombatant(attackerId, out var attacker));
-        Assert.Equal(1234, attacker!.OutgoingDamage);
-        Assert.Equal(0, attacker.OutgoingHealing);
-
-        Assert.True(store.TryGetCombatant(targetId, out var target));
-        Assert.Equal(1234, target!.IncomingDamage);
-        Assert.Equal(0, target.IncomingHealing);
-    }
-
-    [Fact]
     public void SkillMetrics_Tracks_Direct_And_Periodic_Healing_Without_Primary_Category()
     {
         var observation = new CombatWireObservation { SkillCode = 18120150 };

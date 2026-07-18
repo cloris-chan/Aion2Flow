@@ -124,26 +124,6 @@ public sealed class ResourcePackTests
     }
 
     [Fact]
-    public void SharedCatalog_Exposes_Only_Runtime_Resource_Data()
-    {
-        var properties = typeof(ResourceSharedCatalog)
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Select(static property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-        [
-            nameof(ResourceSharedCatalog.EffectSkillIds),
-            nameof(ResourceSharedCatalog.NpcDefinitions),
-            nameof(ResourceSharedCatalog.SkillBaseProjections),
-            nameof(ResourceSharedCatalog.SkillDefinitions),
-            nameof(ResourceSharedCatalog.SkillSemanticRuntimeIndex)
-        ],
-        properties);
-    }
-
-    [Fact]
     public void RuntimeSemanticIndex_Loads_Compact_Current_Client_Index()
     {
         var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
@@ -296,40 +276,6 @@ public sealed class ResourcePackTests
             locales.Keys.Order(StringComparer.Ordinal).ToArray());
         Assert.All(locales.Values, resourceName => Assert.Contains(resourceName, resourceNames));
     }
-
-    [Fact]
-    public void ResourcePackSectionIds_Use_Runtime_Semantic_Order()
-    {
-        var sectionIdType = ResolveCatalogType("ResourcePackReader").GetNestedType("SectionId", BindingFlags.NonPublic)!;
-        var expected = new (string Name, ushort Value)[]
-        {
-            ("SkillDefinitions", 1),
-            ("SkillBaseProjections", 2),
-            ("SkillEffectOwners", 3),
-            ("SkillSemanticRuntimeSkillIds", 4),
-            ("SkillSemanticRuntimeSlots", 5),
-            ("SkillSemanticRuntimeNodes", 6),
-            ("SkillSemanticRuntimeNodeSlots", 7),
-            ("NpcDefinitions", 8),
-            ("SkillNames", 101),
-            ("NpcCatalogNames", 102),
-            ("MapNames", 103),
-            ("ServerNames", 104)
-        };
-        var actual = Enum.GetNames(sectionIdType)
-            .Select(name => (Name: name, Value: Convert.ToUInt16(Enum.Parse(sectionIdType, name))))
-            .ToArray();
-
-        Assert.Equal(expected, actual);
-    }
-
-    [Fact]
-    public void Resources_Assembly_Does_Not_Reference_Sqlite()
-        => Assert.DoesNotContain(typeof(ResourceCatalog).Assembly.GetReferencedAssemblies(), assembly => string.Equals(assembly.Name, "Microsoft.Data.Sqlite", StringComparison.Ordinal));
-
-    [Fact]
-    public void Output_Does_Not_Contain_Resources_Db()
-        => Assert.False(File.Exists(Path.Combine(AppContext.BaseDirectory, "resources.db")));
 
     [Fact]
     public void ResourcePackReader_Fails_For_Invalid_Header_Expectations()

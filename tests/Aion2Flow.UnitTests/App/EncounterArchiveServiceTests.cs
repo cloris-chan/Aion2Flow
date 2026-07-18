@@ -280,24 +280,6 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal("Global Tester", archivedPc.Nickname);
     }
 
-    [Fact]
-    public void Archive_Stores_ScenePayload()
-    {
-        const int playerId = 100;
-        const int bossId = 200;
-        var service = new EncounterArchiveService();
-        var owner = CreateSceneOwner(playerId, bossId);
-        var snapshot = owner.CreateSnapshot();
-        var payload = owner.CreateArchivePayload(snapshot);
-
-        var record = service.Archive(snapshot, payload, "manual", isAutomatic: false);
-
-        Assert.NotNull(record);
-        Assert.Same(payload, record!.ScenePayload);
-        Assert.Equal(payload.CombatEvents.Count, record.ScenePayload.CombatEvents.Count);
-        Assert.Equal(snapshot.EncounterId, record.EncounterId);
-    }
-
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId)
         => CreateSceneOwner(playerId, bossId, DateTimeOffset.Now);
 

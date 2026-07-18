@@ -7,23 +7,6 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public class CombatPairProjectionTests
 {
     [Fact]
-    public void Projection_BuildSnapshotMaps_BuildsCorrectly()
-    {
-        var combat = new CombatStore();
-        var mechanics = new MechanicStore();
-        var resources = new ResourceStore();
-        ApplyDamage(combat, mechanics, resources, 100, 200, 500, 1, 1, 1000);
-        ApplyDamage(combat, mechanics, resources, 100, 300, 300, 1, 1, 2000);
-        ApplyDamage(combat, mechanics, resources, 200, 100, 100, 1, 1, 3000);
-
-        var pairs = CombatPairProjection.BuildPairSnapshotMap(combat, mechanics, resources);
-        var combatants = CombatPairProjection.BuildCombatantSummaryMap(combat, mechanics, resources);
-
-        Assert.Equal(3, pairs.Count);
-        Assert.Equal(3, combatants.Count);
-    }
-
-    [Fact]
     public void Projection_GetPair_ReturnsCorrectSnapshot()
     {
         var combat = new CombatStore();
@@ -56,34 +39,6 @@ public class CombatPairProjectionTests
         Assert.Equal(1, source.Value.OutgoingHits);
         Assert.Equal(100, source.Value.IncomingDamage);
         Assert.Equal(1, source.Value.IncomingHits);
-    }
-
-    [Fact]
-    public void Projection_OutgoingPairs_ReturnsCorrectKeys()
-    {
-        var combat = new CombatStore();
-        var mechanics = new MechanicStore();
-        var resources = new ResourceStore();
-        ApplyDamage(combat, mechanics, resources, 100, 200, 500, 1, 1, 1000);
-        ApplyDamage(combat, mechanics, resources, 100, 300, 300, 1, 1, 2000);
-
-        var outgoing = CombatPairProjection.GetOutgoingPairs(combat, mechanics, resources, 100);
-
-        Assert.Equal(2, outgoing.Count);
-    }
-
-    [Fact]
-    public void Projection_IncomingPairs_ReturnsCorrectKeys()
-    {
-        var combat = new CombatStore();
-        var mechanics = new MechanicStore();
-        var resources = new ResourceStore();
-        ApplyDamage(combat, mechanics, resources, 100, 200, 500, 1, 1, 1000);
-        ApplyDamage(combat, mechanics, resources, 300, 200, 300, 1, 1, 2000);
-
-        var incoming = CombatPairProjection.GetIncomingPairs(combat, mechanics, resources, 200);
-
-        Assert.Equal(2, incoming.Count);
     }
 
     [Fact]

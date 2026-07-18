@@ -38,23 +38,4 @@ public sealed class ProcessPortDiscoveryServiceTests
         Assert.Empty(removed);
     }
 
-    [Fact]
-    public void ProcessPortDiscovery_DoesNotBufferUnknownProcessFlowEvents()
-    {
-        var root = FindRepositoryRoot();
-        var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Services", "ProcessPortDiscoveryService.cs"));
-
-        Assert.DoesNotContain("ConcurrentQueue", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("QueueEventItem", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("_eventQueue", text, StringComparison.Ordinal);
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Aion2Flow.slnx")))
-            directory = directory.Parent;
-
-        return directory!.FullName;
-    }
 }

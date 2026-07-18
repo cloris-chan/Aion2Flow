@@ -56,6 +56,11 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(24, player.IncomingAttempts);
         Assert.Equal(3, player.IncomingEvades);
         Assert.Equal(4, player.IncomingInvincibles);
+        Assert.Equal(200_003u, replay.Snapshot.MapId);
+        Assert.Equal(644u, replay.Snapshot.MapInstanceId);
+        Assert.True(replay.SceneOwner.EntityVitals.TryGet(18_551, out var npcVital));
+        Assert.Equal(20_000_000, npcVital.CurrentHp);
+        Assert.Equal(20_000_000, npcVital.MaxHp);
 
         var packets = SceneReplayTestView.Packets(replay);
         var regenerationHealing = packets

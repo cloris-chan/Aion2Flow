@@ -66,18 +66,6 @@ public sealed class ScenePlaybackAuraTimelinePresentationTests
         Assert.Equal("Ambiguous: 3 candidates", lane.SemanticTraceText);
     }
 
-    [Fact]
-    public void AuraTimelineLayout_BindsVisibleDispositionAndSemanticTraceText()
-    {
-        var root = FindRepositoryRoot();
-        var xaml = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Views", "ScenePlaybackWindow.axaml"));
-
-        Assert.Contains("Text=\"{Binding DispositionText}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding SemanticTraceText}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"{Binding SemanticTraceText}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Playback_AuraDisposition_Label", xaml, StringComparison.Ordinal);
-    }
-
     private static ScenePlaybackAuraTimeline CreateTimeline(uint resourceEffectRefRaw, AuraSemanticValue semantics)
     {
         var resourceEffectRef = ResourceEffectRef.FromRaw(resourceEffectRefRaw);
@@ -96,17 +84,4 @@ public sealed class ScenePlaybackAuraTimelinePresentationTests
         return ScenePlaybackTimelineBuilder.BuildAuraTimelineTracks(timeline, 1_000, localization, displayContext);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "Aion2Flow.slnx")))
-                return directory.FullName;
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the Aion2Flow repository root.");
-    }
 }

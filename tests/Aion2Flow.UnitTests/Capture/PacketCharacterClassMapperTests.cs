@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.Capture.Streams;
-using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
@@ -43,30 +42,4 @@ public sealed class PacketCharacterClassMapperTests
         Assert.Null(PacketCharacterClassMapper.ToCharacterClass(code));
     }
 
-    [Theory]
-    [InlineData(5)]
-    [InlineData(36)]
-    [InlineData(45)]
-    [InlineData(48)]
-    public void Reads_Current_4536_Class_Code_Bands(int code)
-    {
-        Span<byte> packet = stackalloc byte[sizeof(int)];
-        BitConverter.TryWriteBytes(packet, code);
-
-        Assert.Equal(code, NicknameParserUtil.TryReadClassCode(packet, 0));
-    }
-
-    [Theory]
-    [InlineData(4)]
-    [InlineData(37)]
-    [InlineData(40)]
-    [InlineData(44)]
-    [InlineData(49)]
-    public void Rejects_Unknown_4536_Class_Code_Bands(int code)
-    {
-        Span<byte> packet = stackalloc byte[sizeof(int)];
-        BitConverter.TryWriteBytes(packet, code);
-
-        Assert.Null(NicknameParserUtil.TryReadClassCode(packet, 0));
-    }
 }

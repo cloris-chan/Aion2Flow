@@ -7,8 +7,8 @@ internal readonly record struct Packet0336RoundTrip(long ClientSentUnixMilliseco
 
 internal static class Packet0336RoundTripParser
 {
-    internal const long UnixEpochOffsetMilliseconds = 62_135_596_800_000;
-    internal const long MaximumRoundTripMilliseconds = 10_000;
+    private const long UnixEpochOffsetMilliseconds = 62_135_596_800_000;
+    private const long MaximumRoundTripMilliseconds = 10_000;
     private const int FrameLength = 21;
     private const int DeclaredLength = 24;
 

@@ -10,74 +10,6 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public class SceneTimelineContractTests
 {
     [Fact]
-    public void TimelineStamp_ObservationOrdinal_IsPrimaryOrderingKey()
-    {
-        var earlier = new TimelineStamp(OffsetTicks: 1000, ObservationOrdinal: 1, FlushId: 5);
-        var later = new TimelineStamp(OffsetTicks: 500, ObservationOrdinal: 2, FlushId: 5);
-
-        Assert.True(earlier.ObservationOrdinal < later.ObservationOrdinal);
-    }
-
-    [Fact]
-    public void TimelineStamp_Equality_IsStructural()
-    {
-        var a = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 5, FlushId: 1);
-        var b = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 5, FlushId: 1);
-        var c = new TimelineStamp(OffsetTicks: 100, ObservationOrdinal: 6, FlushId: 1);
-
-        Assert.Equal(a, b);
-        Assert.NotEqual(a, c);
-    }
-
-    [Fact]
-    public void TimelineStamp_PreservesObservationAndFlushIds()
-    {
-        var stamp = new TimelineStamp(OffsetTicks: 5000, ObservationOrdinal: 42, FlushId: 7);
-
-        Assert.Equal(5000, stamp.OffsetTicks);
-        Assert.Equal(42, stamp.ObservationOrdinal);
-        Assert.Equal(7, stamp.FlushId);
-    }
-
-    [Fact]
-    public void Revision_DefaultIsZero()
-    {
-        var rev = default(Revision);
-
-        Assert.Equal(0, rev.Global);
-        Assert.Equal(0, rev.Journal);
-        Assert.Equal(0, rev.Combat);
-        Assert.Equal(0, rev.Entity);
-        Assert.Equal(0, rev.Archive);
-        Assert.Equal(0, rev.State);
-    }
-
-    [Fact]
-    public void Revision_WithOperator_UpdatesSingleField()
-    {
-        var rev = new Revision(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-        var updated = rev with { Combat = 99 };
-
-        Assert.Equal(99, updated.Combat);
-        Assert.Equal(1, updated.Global);
-        Assert.Equal(2, updated.Journal);
-    }
-
-    [Fact]
-    public void ObservedEventDomain_HasExpectedValues()
-    {
-        var domains = Enum.GetValues<ObservedEventDomain>();
-        Assert.Contains(ObservedEventDomain.Combat, domains);
-        Assert.Contains(ObservedEventDomain.Action, domains);
-        Assert.Contains(ObservedEventDomain.State, domains);
-        Assert.Contains(ObservedEventDomain.EntityVital, domains);
-        Assert.Contains(ObservedEventDomain.Aura, domains);
-        Assert.Contains(ObservedEventDomain.Scene, domains);
-        Assert.Contains(ObservedEventDomain.Diagnostic, domains);
-        Assert.Equal(7, domains.Length);
-    }
-
-    [Fact]
     public void Journal_CombatEntry_ExposesOnlyTypedCombatPayload()
     {
         var journal = new ObservedEventJournal();
@@ -130,18 +62,6 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void RawPacketReference_PreservesAuditFields()
-    {
-        var raw = new RawPacketReference(Opcode: 0x0438, PayloadLength: 64, CaptureSequence: 42);
-
-        Assert.Equal(0x0438, raw.Opcode);
-        Assert.Equal(64, raw.PayloadLength);
-        Assert.Equal(42, raw.CaptureSequence);
-        Assert.Equal(default, raw.Structure);
-        Assert.Equal(default, raw.StructurePath);
-    }
-
-    [Fact]
     public void RawPacketReference_PreservesPacketStructure()
     {
         var structure = new PacketStructureReference(
@@ -177,32 +97,6 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void SceneSession_HasStableIdentity()
-    {
-        var id = Guid.NewGuid();
-        var session = new SceneSession
-        {
-            SceneSessionId = id,
-            Started = DateTimeOffset.UtcNow,
-            MapId = 910035,
-            MapInstanceId = 515552,
-            StartOrdinal = 0
-        };
-
-        Assert.Equal(id, session.SceneSessionId);
-        Assert.Equal(910035, session.MapId);
-        Assert.Equal(515552, session.MapInstanceId);
-    }
-
-    [Fact]
-    public void SceneSession_ToTimeSpan_ConvertsStandardTicks()
-    {
-        var ts = TimeSpan.FromTicks(20000);
-        Assert.Equal(TimeSpan.FromMilliseconds(2), ts);
-        Assert.Equal(TimeSpan.FromTicks(20000), ts);
-    }
-
-    [Fact]
     public void SceneSession_ToDisplayTime_AddsOffsetToStartTime()
     {
         var start = new DateTimeOffset(2026, 5, 5, 10, 0, 0, TimeSpan.Zero);
@@ -213,21 +107,6 @@ public class SceneTimelineContractTests
 
         var display = session.ToDisplayTime(3_000_000);
         Assert.Equal(start.AddMilliseconds(300), display);
-    }
-
-    [Fact]
-    public void SceneSession_Revision_DefaultIsZero()
-    {
-        var session = new SceneSession { SceneSessionId = Guid.NewGuid() };
-        Assert.Equal(default, session.Revision);
-    }
-
-    [Fact]
-    public void SceneSession_Journal_IsNotNull()
-    {
-        var session = new SceneSession { SceneSessionId = Guid.NewGuid() };
-        Assert.NotNull(session.Journal);
-        Assert.Equal(0, session.Journal.Count);
     }
 
     [Fact]

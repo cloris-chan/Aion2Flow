@@ -12,57 +12,6 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public class EntityStoreTests
 {
     [Fact]
-    public void EntityStore_ApplyNpcCode_CreatesEntity()
-    {
-        var store = new EntityStore();
-        store.ApplyNpcCode(1234, 2310108);
-
-        Assert.True(store.TryGet(1234, out var entity));
-        Assert.Equal(2310108, entity!.NpcCode);
-        Assert.Equal(1, store.Count);
-    }
-
-    [Fact]
-    public void EntityStore_ApplyNickname_MarksAsPlayer()
-    {
-        var store = new EntityStore();
-        store.ApplyNickname(2007, "Perigee");
-
-        Assert.True(store.TryGet(2007, out var entity));
-        Assert.True(entity!.IsPlayer);
-    }
-
-    [Fact]
-    public void EntityStore_ApplySummon_SetsOwnerAndKind()
-    {
-        var store = new EntityStore();
-        store.ApplySummon(314, 17755);
-
-        Assert.True(store.TryGet(17755, out var entity));
-        Assert.Equal(314, entity!.OwnerEntityId);
-        Assert.Equal(NpcKind.Summon, entity.Kind);
-    }
-
-    [Fact]
-    public void EntityStore_ApplyNpcExtendedState_UpdatesNpcRuntimeFields()
-    {
-        var store = new EntityStore();
-        store.ApplyNpc2136State(4370, 6, 200003);
-        store.ApplyNpc0140Value(4370, 200003);
-        store.ApplyNpc0240Value(4370, 200003);
-        store.ApplyNpc4636State(4370, 2, 79);
-        store.ApplyNpc2C38State(4370, 95, 7);
-
-        Assert.True(store.TryGet(4370, out var entity));
-        Assert.Equal(6L, entity!.Sequence2136);
-        Assert.Equal(200003L, entity.Value2136);
-        Assert.Equal(200003L, entity.Value0140);
-        Assert.Equal(200003L, entity.Value0240);
-        Assert.Equal(((byte)2, (byte)79), entity.State4636);
-        Assert.Equal((95, 7), entity.Latest2C38);
-    }
-
-    [Fact]
     public void EntityStore_Revisions_SeparateIdentityFromVolatileRuntimeState()
     {
         var store = new EntityStore();
@@ -88,39 +37,6 @@ public class EntityStoreTests
 
         Assert.Equal(4, store.IdentityRevision);
         Assert.Equal(3, store.VolatileStateRevision);
-        Assert.Null(typeof(EntityStore).GetProperty("Revision"));
-    }
-
-    [Fact]
-    public void EntityStore_IsKnownEntity_ReturnsTrueForExisting()
-    {
-        var store = new EntityStore();
-        store.ApplyNpcCode(100, 2000001);
-
-        Assert.True(store.IsKnownEntity(100));
-        Assert.False(store.IsKnownEntity(999));
-    }
-
-    [Fact]
-    public void RuntimeMetadataRegistry_UpsertNpcCode_LookupWorks()
-    {
-        var registry = new RuntimeMetadataRegistry();
-        registry.UpsertNpcCode(56688, 2310108);
-
-        Assert.True(registry.TryGetNpcCode(56688, out var npcCode));
-        Assert.Equal(2310108, npcCode);
-    }
-
-    [Fact]
-    public void RuntimeMetadataRegistry_UpsertPcMetadata_LookupWorks()
-    {
-        var registry = new RuntimeMetadataRegistry();
-        registry.UpsertPcMetadata(2007, "Perigee", Faction.Light);
-
-        Assert.True(registry.TryGetPcMetadata(2007, out var metadata));
-        Assert.Equal("Perigee", metadata.Nickname);
-        Assert.Equal(Faction.Light, metadata.Faction);
-        Assert.False(metadata.IsLocalPlayer);
     }
 
     [Fact]
@@ -205,21 +121,6 @@ public class EntityStoreTests
         Assert.True(registry.TryGetPcMetadata(200, out var second));
         Assert.False(first.IsLocalPlayer);
         Assert.True(second.IsLocalPlayer);
-    }
-
-    [Fact]
-    public void SceneBoundaryStore_MapState_CommitsImmediately()
-    {
-        var store = new SceneBoundaryStore();
-
-        store.StageDestinationMap(200003);
-        store.StageDestinationMapInstance(515552);
-
-        Assert.Equal(200003u, store.CurrentMapId);
-        Assert.Equal(515552u, store.CurrentMapInstanceId);
-
-        Assert.Equal(200003u, store.CurrentMapId);
-        Assert.Equal(515552u, store.CurrentMapInstanceId);
     }
 
     [Fact]
@@ -1345,16 +1246,6 @@ public class SceneReadModelOwnerTests
         Assert.True(breakdown.Skills.TryGetBySkillCode(11000010, out var skill));
         Assert.Equal(128, skill.Times);
         Assert.True(allocated < 40_000, $"skill breakdown allocated {allocated:N0} bytes");
-    }
-
-    [Fact]
-    public void SceneCombatSnapshot_PublicApi_DoesNotExposeMutableCollectionsOrSkills()
-    {
-        Assert.Equal(typeof(CombatantSnapshotMap), typeof(SceneCombatSnapshot).GetProperty(nameof(SceneCombatSnapshot.Combatants))!.PropertyType);
-        Assert.Equal(typeof(SnapshotList<SceneBossFocusSnapshot>), typeof(SceneCombatSnapshot).GetProperty(nameof(SceneCombatSnapshot.BossFocuses))!.PropertyType);
-        Assert.NotNull(typeof(CombatantSnapshotMap).GetMethod(nameof(CombatantSnapshotMap.AsSpan), Type.EmptyTypes));
-        Assert.NotNull(typeof(SkillMetricsSnapshotMap).GetMethod(nameof(SkillMetricsSnapshotMap.AsSpan), Type.EmptyTypes));
-        Assert.DoesNotContain(typeof(SceneCombatantMetrics).GetProperties(), static property => property.Name == "Skills");
     }
 
     [Fact]

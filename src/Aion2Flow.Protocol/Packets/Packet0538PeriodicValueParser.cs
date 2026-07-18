@@ -25,7 +25,7 @@ internal static class Packet0538PeriodicValueParser
         return TryParsePayload(packet.Slice(reader.Offset, payloadLength), out result);
     }
 
-    internal static bool TryParsePayload(ReadOnlySpan<byte> payload, out Packet0538PeriodicValue result)
+    private static bool TryParsePayload(ReadOnlySpan<byte> payload, out Packet0538PeriodicValue result)
     {
         result = default;
 

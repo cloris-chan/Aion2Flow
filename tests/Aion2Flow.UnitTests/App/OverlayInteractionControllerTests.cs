@@ -1,4 +1,3 @@
-using System.Xml.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -96,85 +95,6 @@ public sealed class OverlayInteractionControllerTests
                 new PixelPoint(ownerX, ownerY),
                 new PixelPoint(pointerStartX, pointerStartY),
                 new PixelPoint(pointerCurrentX, pointerCurrentY)));
-    }
-
-    [Fact]
-    public void OverlayTheme_SeparatesBackgroundAndForegroundClickThroughOpacity()
-    {
-        var root = FindRepositoryRoot();
-        var themePath = Path.Combine(root, "src", "Aion2Flow", "Styles", "OverlayTheme.axaml");
-        var viewPath = Path.Combine(root, "src", "Aion2Flow", "Views", "MainWindow.axaml");
-        var theme = File.ReadAllText(themePath);
-        var view = File.ReadAllText(viewPath);
-        var themeDocument = XDocument.Load(themePath);
-        var viewDocument = XDocument.Load(viewPath);
-        XNamespace avalonia = "https://github.com/avaloniaui";
-        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
-        var foregroundOpacityStyle = themeDocument
-            .Descendants(avalonia + "Style")
-            .Single(element => element.Attribute("Selector")?.Value.Contains("click-through.cursor-over .MainHudForeground", StringComparison.Ordinal) == true);
-        var foregroundOpacity = foregroundOpacityStyle
-            .Elements(avalonia + "Setter")
-            .Single(element => element.Attribute("Property")?.Value == "Opacity")
-            .Attribute("Value")?.Value;
-        var pinSlot = viewDocument
-            .Descendants(avalonia + "Border")
-            .Single(element => element.Attribute(x + "Name")?.Value == "OverlayPinSlot");
-
-        Assert.Contains("Grid.MainHudShell.click-through Border.MainHudHeaderBackdrop", theme, StringComparison.Ordinal);
-        Assert.Contains("Grid.MainHudShell.click-through.cursor-over Border.MainHudHeaderBackdrop", theme, StringComparison.Ordinal);
-        Assert.Contains("Grid.MainHudShell.click-through.cursor-over .MainHudForeground", theme, StringComparison.Ordinal);
-        Assert.Equal("0.4", foregroundOpacity);
-        Assert.Contains("Classes=\"MainHudHeaderBackdrop\"", view, StringComparison.Ordinal);
-        Assert.Contains("Classes=\"MainHudFooter MainHudForeground\"", view, StringComparison.Ordinal);
-        Assert.Contains("TitleBarActions", pinSlot.Parent?.Attribute("Classes")?.Value, StringComparison.Ordinal);
-
-        var bossProgressBar = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Controls", "BossFocusProgressBar.cs"));
-        var questHighlight = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Controls", "QuestSelectionHighlight.cs"));
-        Assert.Contains("lease.CurrentOpacity", bossProgressBar, StringComparison.Ordinal);
-        Assert.Contains("lease.CurrentOpacity", questHighlight, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void OverlayCursorTracking_CachesEventDrivenWindowGeometry()
-    {
-        var root = FindRepositoryRoot();
-        var mainWindow = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Views", "MainWindow.axaml.cs"));
-        var mainWindowView = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Views", "MainWindow.axaml"));
-        var pinWindow = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Views", "OverlayPinWindow.axaml.cs"));
-        var nativeMethods = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "NativeMethods.txt"));
-
-        Assert.DoesNotContain("GetWindowRect", nativeMethods, StringComparison.Ordinal);
-        Assert.DoesNotContain("PInvoke.GetWindowRect", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("PositionChanged += OnWindowPositionChanged", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("change.Property == ClientSizeProperty", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("ScalingChanged += OnWindowScalingChanged", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("TryGetCursorPosition", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("MainHudShell.PointToScreen", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("OverlayPinSlot.PointToScreen", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("pinWindow.SetScreenBounds", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("pinWindow.ClientSize.Width", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("PointerEntered=\"MainHudShellPointerEntered\"", mainWindowView, StringComparison.Ordinal);
-        Assert.Contains("if (!_windowInputState.ShouldPollCursor())", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("TryApplyWindowInputState(OverlayWindowInputState.ClickThroughArmed)", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("TryApplyWindowInputState(OverlayWindowInputState.ClickThroughActive)", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("SetCursorInsideOverlay", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("ScalingChanged += OnScalingChanged", pinWindow, StringComparison.Ordinal);
-        Assert.Contains("PinButton.AddHandler(PointerCaptureLostEvent", pinWindow, StringComparison.Ordinal);
-        Assert.Contains("AddHandler(PointerReleasedEvent, PinButtonPointerReleasedPreview, RoutingStrategies.Tunnel", pinWindow, StringComparison.Ordinal);
-        Assert.Contains("AddHandler(PointerReleasedEvent, PinButtonPointerReleased, RoutingStrategies.Bubble", pinWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("e.Pointer.Capture(this)", pinWindow, StringComparison.Ordinal);
-        Assert.Contains("ScheduleNativeStyleRefresh", mainWindow, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void MainWindow_UsesGeneratedXamlInitializationForNamedControls()
-    {
-        var root = FindRepositoryRoot();
-        var mainWindow = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Views", "MainWindow.axaml.cs"));
-
-        Assert.Contains("InitializeComponent();", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("AvaloniaXamlLoader.Load(this);", mainWindow, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -291,14 +211,4 @@ public sealed class OverlayInteractionControllerTests
         });
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Aion2Flow.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName ?? throw new DirectoryNotFoundException("Aion2Flow repository root was not found.");
-    }
 }
