@@ -143,7 +143,7 @@ internal static class SkillDetailRowBuilder
     private static int ResolveEventCount(Dictionary<CombatEventKey, int> eventCounts, CombatEventKey eventKey)
         => eventCounts.TryGetValue(eventKey, out var eventCount) ? eventCount : 0;
 
-    private static DetailSkillBaseProjection ResolveSkillBaseProjection(CombatEventKey eventKey, SceneDisplayContext? displayContext, LocalizationService localization)
+    internal static DetailSkillBaseProjection ResolveSkillBaseProjection(CombatEventKey eventKey, SceneDisplayContext? displayContext, LocalizationService localization)
     {
         var key = SkillBaseKey.FromEventKey(eventKey);
         var skillCode = key.SkillCode == eventKey.SkillCode || displayContext?.ContainsSkill(key.SkillCode) == true
@@ -153,7 +153,7 @@ internal static class SkillDetailRowBuilder
         return new DetailSkillBaseProjection(key, skillCode, ResolveEventDisplayName(displayEventKey, displayContext, localization));
     }
 
-    private readonly record struct DetailSkillBaseProjection(SkillBaseKey Key, int SkillCode, string DisplayName);
+    internal readonly record struct DetailSkillBaseProjection(SkillBaseKey Key, int SkillCode, string DisplayName);
 
     private static string ResolveEventDisplayName(CombatEventKey eventKey, SceneDisplayContext? displayContext, LocalizationService localization)
     {

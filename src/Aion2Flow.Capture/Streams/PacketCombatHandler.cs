@@ -2,7 +2,6 @@ using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.Protocol.Readers;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
@@ -13,7 +12,7 @@ internal static class PacketCombatHandler
     {
         if (Packet0438DamageParser.TryParse(packet, out var parsed))
         {
-            var observation = new CombatObservation
+            var observation = new CombatWireObservation
             {
                 SkillCode = parsed.BodySkillVariantRaw,
                 BodySkillVariantRaw = parsed.BodySkillVariantRaw,
@@ -35,41 +34,7 @@ internal static class PacketCombatHandler
                 ChainId = parsed.Unknown
             };
 
-            context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0438, packet.Length), parsed.SourceId, parsed.TargetId, in observation);
-
-            if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId, context.Sink))
-            {
-                var regenObservation = new CombatObservation
-                {
-                    SkillCode = parsed.BodySkillVariantRaw,
-                    BodySkillVariantRaw = parsed.BodySkillVariantRaw,
-                    Damage = parsed.RegenerationAmount,
-                    HitCount = 1,
-                    AttemptCount = 1,
-                    DetailResourceEffectRef = parsed.DetailResourceEffectRef,
-                    EventKind = CombatEventKind.Healing,
-                    ValueKind = CombatValueKind.Healing,
-                    EffectTag = PacketEffectTag.RegenerationHealing
-                };
-                context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0438, packet.Length), parsed.TargetId, parsed.TargetId, in regenObservation);
-            }
-
-            if (ShouldStoreDrainHealing(parsed))
-            {
-                var drainObservation = new CombatObservation
-                {
-                    SkillCode = parsed.BodySkillVariantRaw,
-                    BodySkillVariantRaw = parsed.BodySkillVariantRaw,
-                    Damage = parsed.DrainHealAmount,
-                    HitCount = 1,
-                    AttemptCount = 1,
-                    DrainHealAmount = parsed.DrainHealAmount,
-                    DetailResourceEffectRef = parsed.DetailResourceEffectRef,
-                    EventKind = CombatEventKind.Healing,
-                    ValueKind = CombatValueKind.DrainHealing
-                };
-                context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0438, packet.Length), parsed.SourceId, parsed.SourceId, in drainObservation);
-            }
+            context.Sink.AppendCombatWireObservation(context.CreateObservationSource(0x0438, packet.Length), parsed.SourceId, parsed.TargetId, in observation);
 
             return context.MarkParsed();
         }
@@ -107,7 +72,7 @@ internal static class PacketCombatHandler
             if (parsed.LinkId > 0 && parsed.TargetId > 0 && parsed.LinkId != parsed.TargetId)
             {
                 context.Sink.RememberNpcObservationSource(parsed.TargetId);
-                var invincibleObservation = new CombatObservation
+                var invincibleObservation = new CombatWireObservation
                 {
                     SkillCode = parsed.TailSkillCodeRaw,
                     BodyResourceEffectRef = parsed.BodyResourceEffectRef,
@@ -121,11 +86,9 @@ internal static class PacketCombatHandler
                     PeriodicTailPrefixValue = parsed.TailPrefixValue,
                     PeriodicTailLength = parsed.TailLength,
                     Modifiers = DamageModifiers.Invincible,
-                    EventKind = CombatEventKind.Damage,
-                    ValueKind = CombatValueKind.Damage,
-                    EffectTag = PacketEffectTag.PeriodicLinkInvincible
+                    OutcomeKind = CombatWireOutcomeKind.PeriodicLinkInvincible
                 };
-                context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0538, packet.Length), parsed.LinkId, parsed.TargetId, in invincibleObservation);
+                context.Sink.AppendCombatWireObservation(context.CreateObservationSource(0x0538, packet.Length), parsed.LinkId, parsed.TargetId, in invincibleObservation);
             }
 
             return context.MarkParsed();
@@ -133,7 +96,7 @@ internal static class PacketCombatHandler
 
         if (IsActiveSkillInvincible(parsed.Mode, parsed.TargetId, parsed.SourceId, parsed.Damage))
         {
-            var invincibleObservation = new CombatObservation
+            var invincibleObservation = new CombatWireObservation
             {
                 SkillCode = parsed.TailSkillCodeRaw,
                 BodyResourceEffectRef = parsed.BodyResourceEffectRef,
@@ -147,15 +110,13 @@ internal static class PacketCombatHandler
                 PeriodicTailPrefixValue = parsed.TailPrefixValue,
                 PeriodicTailLength = parsed.TailLength,
                 Modifiers = DamageModifiers.Invincible,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = CombatValueKind.Damage,
-                EffectTag = PacketEffectTag.ActiveSkillInvincible
+                OutcomeKind = CombatWireOutcomeKind.ActiveSkillInvincible
             };
-            context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0538, packet.Length), parsed.SourceId, parsed.TargetId, in invincibleObservation);
+            context.Sink.AppendCombatWireObservation(context.CreateObservationSource(0x0538, packet.Length), parsed.SourceId, parsed.TargetId, in invincibleObservation);
             return context.MarkParsed();
         }
 
-        var observation = new CombatObservation
+        var observation = new CombatWireObservation
         {
             SkillCode = parsed.TailSkillCodeRaw,
             BodyResourceEffectRef = parsed.BodyResourceEffectRef,
@@ -170,7 +131,7 @@ internal static class PacketCombatHandler
             PeriodicTailLength = parsed.TailLength
         };
 
-        context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0538, packet.Length), parsed.SourceId, parsed.TargetId, in observation);
+        context.Sink.AppendCombatWireObservation(context.CreateObservationSource(0x0538, packet.Length), parsed.SourceId, parsed.TargetId, in observation);
         return context.MarkParsed();
     }
 
@@ -293,7 +254,7 @@ internal static class PacketCombatHandler
         var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, opcodeOffset, consumed, 2, Math.Max(0, consumed - 2), 0);
         try
         {
-            var observation = new CombatObservation
+            var observation = new CombatWireObservation
             {
                 SkillCode = parsed.BodySkillVariantRaw,
                 BodySkillVariantRaw = parsed.BodySkillVariantRaw,
@@ -315,41 +276,7 @@ internal static class PacketCombatHandler
                 ResourceKind = parsed.ResourceKind
             };
 
-            context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0438, consumed), parsed.SourceId, parsed.TargetId, in observation);
-
-            if (parsed.RegenerationAmount > 0 && ShouldStoreRegenerationHealing(parsed.TargetId, context.Sink))
-            {
-                var regenObservation = new CombatObservation
-                {
-                    SkillCode = parsed.BodySkillVariantRaw,
-                    BodySkillVariantRaw = parsed.BodySkillVariantRaw,
-                    Damage = parsed.RegenerationAmount,
-                    HitCount = 1,
-                    AttemptCount = 1,
-                    DetailResourceEffectRef = parsed.DetailResourceEffectRef,
-                    EventKind = CombatEventKind.Healing,
-                    ValueKind = CombatValueKind.Healing,
-                    EffectTag = PacketEffectTag.RegenerationHealing
-                };
-                context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0438, consumed), parsed.TargetId, parsed.TargetId, in regenObservation);
-            }
-
-            if (ShouldStoreDrainHealing(parsed))
-            {
-                var drainObservation = new CombatObservation
-                {
-                    SkillCode = parsed.BodySkillVariantRaw,
-                    BodySkillVariantRaw = parsed.BodySkillVariantRaw,
-                    Damage = parsed.DrainHealAmount,
-                    HitCount = 1,
-                    AttemptCount = 1,
-                    DrainHealAmount = parsed.DrainHealAmount,
-                    DetailResourceEffectRef = parsed.DetailResourceEffectRef,
-                    EventKind = CombatEventKind.Healing,
-                    ValueKind = CombatValueKind.DrainHealing
-                };
-                context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0438, consumed), parsed.SourceId, parsed.SourceId, in drainObservation);
-            }
+            context.Sink.AppendCombatWireObservation(context.CreateObservationSource(0x0438, consumed), parsed.SourceId, parsed.TargetId, in observation);
 
             return context.MarkParsed();
         }
@@ -401,7 +328,7 @@ internal static class PacketCombatHandler
         {
             if (IsActiveSkillInvincible(mode, targetId, sourceId, damage))
             {
-                var invincibleObservation = new CombatObservation
+                var invincibleObservation = new CombatWireObservation
                 {
                     ChainId = unknownInfo,
                     Damage = 0,
@@ -411,15 +338,13 @@ internal static class PacketCombatHandler
                     Type = mode,
                     BodyResourceEffectRef = bodyResourceEffectRef,
                     Modifiers = DamageModifiers.Invincible,
-                    EventKind = CombatEventKind.Damage,
-                    ValueKind = CombatValueKind.Damage,
-                    EffectTag = PacketEffectTag.ActiveSkillInvincible
+                    OutcomeKind = CombatWireOutcomeKind.ActiveSkillInvincible
                 };
-                context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0538, consumed), sourceId, targetId, in invincibleObservation);
+                context.Sink.AppendCombatWireObservation(context.CreateObservationSource(0x0538, consumed), sourceId, targetId, in invincibleObservation);
                 return context.MarkParsed();
             }
 
-            var observation = new CombatObservation
+            var observation = new CombatWireObservation
             {
                 ChainId = unknownInfo,
                 BodyResourceEffectRef = bodyResourceEffectRef,
@@ -430,38 +355,13 @@ internal static class PacketCombatHandler
                 PeriodicMode = mode
             };
 
-            context.Sink.AppendCombatObservation(context.CreateObservationSource(0x0538, consumed), sourceId, targetId, in observation);
+            context.Sink.AppendCombatWireObservation(context.CreateObservationSource(0x0538, consumed), sourceId, targetId, in observation);
             return context.MarkParsed();
         }
         finally
         {
             context.RestoreStructure(previous);
         }
-    }
-
-    private static bool ShouldStoreRegenerationHealing(int targetId, IRuntimeObservationSink sink)
-    {
-        if (targetId <= 0)
-        {
-            return false;
-        }
-
-        if (sink.HasSummonOwner(targetId))
-        {
-            return false;
-        }
-
-        return !sink.TryGetNpcRuntimeState(targetId, out var state) || state.Kind != NpcKind.Summon;
-    }
-
-    private static bool ShouldStoreDrainHealing(Packet0438Damage parsed)
-    {
-        if (parsed.DrainHealAmount <= 0 || parsed.SourceId == parsed.TargetId)
-        {
-            return false;
-        }
-
-        return true;
     }
 
     internal static bool IsCurrentEmbedded0438DamageShape(int layoutTag, int flag, int type) =>

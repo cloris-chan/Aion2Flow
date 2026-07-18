@@ -3,11 +3,13 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
+public sealed class CombatDetailSubscription(CombatStore store, MechanicStore mechanics, ResourceStore resources, int combatantId)
 {
     private const int ChangeBufferSize = 64;
 
-    private SnapshotChangeCursor _cursor = store.CreateCursor(0);
+    private SnapshotChangeCursor _combatCursor = store.CreateCursor(0);
+    private SnapshotChangeCursor _mechanicCursor = mechanics.CreateCursor(0);
+    private SnapshotChangeCursor _resourceCursor = resources.CreateCursor(0);
     private long _lastAppliedRevision;
     private CombatDetailContextKey _liveContextKey;
     private bool _hasLiveContext;
@@ -24,45 +26,23 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
     private CombatDetailDelta? PollCore(SceneCombatSnapshotAdapter? adapter, SceneCombatSnapshot? snapshot)
     {
         Span<CombatSnapshotChange> changes = stackalloc CombatSnapshotChange[ChangeBufferSize];
-        var batch = store.CopyChanges(_cursor, changes);
-        if (batch.Count == 0)
-            return null;
-
-        bool affected = false;
-        var detailRevision = _lastAppliedRevision;
-        while (true)
-        {
-            for (var i = 0; i < batch.Count; i++)
-            {
-                var change = changes[i];
-                if (IsRelevant(in change, adapter))
-                {
-                    affected = true;
-                    detailRevision = Math.Max(detailRevision, change.Revision);
-                }
-            }
-
-            _cursor = batch.Cursor;
-            if (!batch.HasMore)
-                break;
-
-            batch = store.CopyChanges(_cursor, changes);
-            if (batch.Count == 0)
-                break;
-        }
-
+        var affected = ConsumeChanges(store, ref _combatCursor, changes, adapter);
+        affected |= ConsumeChanges(mechanics, ref _mechanicCursor, changes, adapter);
+        affected |= ConsumeChanges(resources, ref _resourceCursor, changes, adapter);
         if (!affected)
             return null;
 
-        var delta = CreateDelta(detailRevision, adapter, snapshot);
+        var delta = CreateDelta(GetDetailRevision(), adapter, snapshot);
         _lastAppliedRevision = delta.Revision;
         return delta;
     }
 
     public CombatDetailDelta CreateSnapshotDelta(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
     {
-        var detailRevision = store.GetCombatantDetailRevision(combatantId);
-        _cursor = store.CreateCursor(store.Revision);
+        var detailRevision = GetDetailRevision();
+        _combatCursor = store.CreateCursor(store.Revision);
+        _mechanicCursor = mechanics.CreateCursor(mechanics.Revision);
+        _resourceCursor = resources.CreateCursor(resources.Revision);
         var delta = CreateDelta(detailRevision, adapter, snapshot);
         _lastAppliedRevision = delta.Revision;
         return delta;
@@ -89,10 +69,12 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
     private CombatDetailUpdateResult CreateSnapshotUpdate(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, CombatDetailContextKey context, CombatDetailProjectionScope scope, ICombatDetailEventWriter writer)
     {
         writer.Clear();
-        var detailRevision = store.GetCombatantDetailRevision(combatantId);
+        var detailRevision = GetDetailRevision();
         var write = adapter.WriteDetailEvents(snapshot, combatantId, writer, scope);
         detailRevision = Math.Max(detailRevision, write.Revision);
-        _cursor = store.CreateCursor(store.Revision);
+        _combatCursor = store.CreateCursor(store.Revision);
+        _mechanicCursor = mechanics.CreateCursor(mechanics.Revision);
+        _resourceCursor = resources.CreateCursor(resources.Revision);
         _lastAppliedRevision = detailRevision;
         _liveContextKey = context;
         _hasLiveContext = true;
@@ -103,17 +85,25 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
             Revision = detailRevision,
             IsFullSnapshot = true,
             HasChanges = true,
-            AddedEventCount = write.Count,
-            Combatant = CombatPairProjection.GetCombatant(store, combatantId)
+            AddedMetricEventCount = write.MetricEventCount,
+            AddedMechanicEventCount = write.MechanicEventCount,
+            AddedResourceEventCount = write.ResourceEventCount,
+            Combatant = CombatPairProjection.GetCombatant(store, mechanics, resources, combatantId)
         };
     }
 
     private CombatDetailUpdateResult PollUpdate(SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot, ICombatDetailEventWriter writer)
     {
         Span<CombatSnapshotChange> changes = stackalloc CombatSnapshotChange[ChangeBufferSize];
-        var batch = store.CopyChanges(_cursor, changes);
+        var mechanicChanged = ConsumeChanges(mechanics, ref _mechanicCursor, changes, adapter);
+        var resourceChanged = ConsumeChanges(resources, ref _resourceCursor, changes, adapter);
+        var batch = store.CopyChanges(_combatCursor, changes);
         if (batch.Count == 0)
-            return CombatDetailUpdateResult.None(combatantId, _lastAppliedRevision, CombatPairProjection.GetCombatant(store, combatantId));
+        {
+            return mechanicChanged || resourceChanged
+                ? CreateSnapshotUpdate(adapter, snapshot, CombatDetailContextKey.From(snapshot, combatantId), writer)
+                : CombatDetailUpdateResult.None(combatantId, _lastAppliedRevision, CombatPairProjection.GetCombatant(store, mechanics, resources, combatantId));
+        }
 
         var affected = false;
         var addedEventCount = 0;
@@ -130,54 +120,118 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
                 detailRevision = Math.Max(detailRevision, change.Revision);
                 if (change.Kind != CombatSnapshotChangeKind.PairUpdated ||
                     !store.TryGetEventByRevision(change.Revision, out var record) ||
-                    !adapter.TryCreateDetailEvent(snapshot, combatantId, in record, out var detailEvent))
+                    !adapter.TryCreateMetricDetailEvent(snapshot, combatantId, in record, out var detailEvent))
                 {
                     continue;
                 }
 
-                writer.Add(in detailEvent);
+                writer.AddMetric(in detailEvent);
                 addedEventCount++;
             }
 
-            _cursor = batch.Cursor;
+            _combatCursor = batch.Cursor;
             if (!batch.HasMore)
                 break;
 
-            batch = store.CopyChanges(_cursor, changes);
+            batch = store.CopyChanges(_combatCursor, changes);
             if (batch.Count == 0)
                 break;
         }
 
-        if (!affected)
-            return CombatDetailUpdateResult.None(combatantId, _lastAppliedRevision, CombatPairProjection.GetCombatant(store, combatantId));
+        if (mechanicChanged || resourceChanged)
+            return CreateSnapshotUpdate(adapter, snapshot, CombatDetailContextKey.From(snapshot, combatantId), writer);
 
-        _lastAppliedRevision = detailRevision;
+        if (!affected)
+            return CombatDetailUpdateResult.None(combatantId, _lastAppliedRevision, CombatPairProjection.GetCombatant(store, mechanics, resources, combatantId));
+
+        _lastAppliedRevision = Math.Max(detailRevision, GetDetailRevision());
         return new CombatDetailUpdateResult
         {
             CombatantId = combatantId,
-            Revision = detailRevision,
+            Revision = _lastAppliedRevision,
             HasChanges = true,
-            AddedEventCount = addedEventCount,
-            Combatant = CombatPairProjection.GetCombatant(store, combatantId)
+            AddedMetricEventCount = addedEventCount,
+            Combatant = CombatPairProjection.GetCombatant(store, mechanics, resources, combatantId)
         };
     }
 
     private CombatDetailDelta CreateDelta(long revision, SceneCombatSnapshotAdapter? adapter, SceneCombatSnapshot? snapshot)
     {
         var events = adapter is not null && snapshot is not null
-            ? CombatPairProjection.GetDetailEvents(adapter, snapshot, combatantId)
-            : [];
-        var detailRevision = Math.Max(revision, ResolveDetailRevision(events));
+            ? CombatPairProjection.GetDetailEventSet(adapter, snapshot, combatantId)
+            : CombatDetailEventSet.Empty;
+        var detailRevision = Math.Max(revision, ResolveDetailRevision(in events));
 
         return new CombatDetailDelta
         {
             CombatantId = combatantId,
             Revision = detailRevision,
-            OutgoingPairs = CombatPairProjection.GetOutgoingPairs(store, combatantId),
-            IncomingPairs = CombatPairProjection.GetIncomingPairs(store, combatantId),
-            Events = events,
-            Combatant = CombatPairProjection.GetCombatant(store, combatantId)
+            OutgoingPairs = CombatPairProjection.GetOutgoingPairs(store, mechanics, resources, combatantId),
+            IncomingPairs = CombatPairProjection.GetIncomingPairs(store, mechanics, resources, combatantId),
+            MetricEvents = events.MetricEvents,
+            MechanicEvents = events.MechanicEvents,
+            ResourceEvents = events.ResourceEvents,
+            Combatant = CombatPairProjection.GetCombatant(store, mechanics, resources, combatantId)
         };
+    }
+
+    private bool ConsumeChanges(CombatStore source, ref SnapshotChangeCursor cursor, Span<CombatSnapshotChange> changes, SceneCombatSnapshotAdapter? adapter)
+    {
+        var affected = false;
+        while (true)
+        {
+            var batch = source.CopyChanges(cursor, changes);
+            if (batch.Count == 0)
+                return affected;
+
+            for (var i = 0; i < batch.Count; i++)
+                affected |= IsRelevant(in changes[i], adapter);
+            cursor = batch.Cursor;
+            if (!batch.HasMore)
+                return affected;
+        }
+    }
+
+    private bool ConsumeChanges(MechanicStore source, ref SnapshotChangeCursor cursor, Span<CombatSnapshotChange> changes, SceneCombatSnapshotAdapter? adapter)
+    {
+        var affected = false;
+        while (true)
+        {
+            var batch = source.CopyChanges(cursor, changes);
+            if (batch.Count == 0)
+                return affected;
+
+            for (var i = 0; i < batch.Count; i++)
+                affected |= IsRelevant(in changes[i], adapter);
+            cursor = batch.Cursor;
+            if (!batch.HasMore)
+                return affected;
+        }
+    }
+
+    private bool ConsumeChanges(ResourceStore source, ref SnapshotChangeCursor cursor, Span<CombatSnapshotChange> changes, SceneCombatSnapshotAdapter? adapter)
+    {
+        var affected = false;
+        while (true)
+        {
+            var batch = source.CopyChanges(cursor, changes);
+            if (batch.Count == 0)
+                return affected;
+
+            for (var i = 0; i < batch.Count; i++)
+                affected |= IsRelevant(in changes[i], adapter);
+            cursor = batch.Cursor;
+            if (!batch.HasMore)
+                return affected;
+        }
+    }
+
+    private long GetDetailRevision()
+    {
+        var combatRevision = store.GetCombatantDetailRevision(combatantId);
+        var mechanicRevision = mechanics.GetCombatantDetailRevision(combatantId);
+        var resourceRevision = resources.GetCombatantDetailRevision(combatantId);
+        return SaturatingAdd(combatRevision, mechanicRevision, resourceRevision);
     }
 
     private bool IsRelevant(in CombatSnapshotChange change, SceneCombatSnapshotAdapter? adapter)
@@ -192,13 +246,23 @@ public sealed class CombatDetailSubscription(CombatStore store, int combatantId)
     private static int ResolveDetailCombatantId(int entityId, SceneCombatSnapshotAdapter? adapter)
         => entityId > 0 && adapter is not null ? adapter.ResolveDetailCombatantId(entityId) : entityId;
 
-    private static long ResolveDetailRevision(IReadOnlyList<CombatDetailEvent> events)
+    private static long ResolveDetailRevision(in CombatDetailEventSet events)
     {
         var revision = 0L;
-        for (var i = 0; i < events.Count; i++)
-            revision = Math.Max(revision, events[i].Revision);
+        for (var i = 0; i < events.MetricEvents.Count; i++)
+            revision = Math.Max(revision, events.MetricEvents[i].Revision);
+        for (var i = 0; i < events.MechanicEvents.Count; i++)
+            revision = Math.Max(revision, events.MechanicEvents[i].Revision);
+        for (var i = 0; i < events.ResourceEvents.Count; i++)
+            revision = Math.Max(revision, events.ResourceEvents[i].Revision);
 
         return revision;
+    }
+
+    private static long SaturatingAdd(long first, long second, long third)
+    {
+        var sum = first > long.MaxValue - second ? long.MaxValue : first + second;
+        return sum > long.MaxValue - third ? long.MaxValue : sum + third;
     }
 }
 
@@ -208,6 +272,8 @@ public sealed class CombatDetailDelta
     public long Revision { get; init; }
     public IReadOnlyList<DirectedPairKey> OutgoingPairs { get; init; } = [];
     public IReadOnlyList<DirectedPairKey> IncomingPairs { get; init; } = [];
-    public IReadOnlyList<CombatDetailEvent> Events { get; init; } = [];
+    public IReadOnlyList<CombatMetricDetailEvent> MetricEvents { get; init; } = [];
+    public IReadOnlyList<CombatMechanicDetailEvent> MechanicEvents { get; init; } = [];
+    public IReadOnlyList<CombatResourceDetailEvent> ResourceEvents { get; init; } = [];
     public CombatantSummary? Combatant { get; init; }
 }

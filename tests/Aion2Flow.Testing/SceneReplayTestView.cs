@@ -7,47 +7,9 @@ namespace Cloris.Aion2Flow.Tests;
 public static class SceneReplayTestView
 {
     public static IReadOnlyList<SceneReplayPacket> Packets(PacketLogReplayResult replay) =>
-        replay.SceneOwner.Combat.Events.Select(static e =>
-        {
-            var observation = e.Observation;
-            return new SceneReplayPacket
-            {
-                SourceId = e.SourceId,
-                TargetId = e.TargetId,
-                SkillCode = observation.SkillCode,
-                BodySkillVariantRaw = observation.BodySkillVariantRaw,
-                BodyCodeRaw = observation.BodyCodeRaw,
-                BodyResourceEffectRef = observation.BodyResourceEffectRef,
-                Damage = observation.Damage,
-                HitContribution = observation.HitCount,
-                AttemptContribution = observation.AttemptCount,
-                DetailRaw = observation.DetailRaw,
-                DetailResourceEffectRef = observation.DetailResourceEffectRef,
-                Marker = observation.Marker,
-                Unknown = observation.ChainId,
-                Type = observation.Type,
-                Flag = observation.Flag,
-                LayoutTag = observation.LayoutTag,
-                Loop = observation.Loop,
-                MultiHitCount = observation.MultiHitCount,
-                DrainHealAmount = observation.DrainHealAmount,
-                RegenerationAmount = observation.RegenerationAmount,
-                Modifiers = observation.Modifiers,
-                EventKind = observation.EventKind,
-                ValueKind = observation.ValueKind,
-                EffectTag = observation.EffectTag,
-                PeriodicRelation = observation.PeriodicRelation,
-                PeriodicMode = observation.PeriodicMode,
-                PeriodicTailSkillCodeRaw = observation.PeriodicTailSkillCodeRaw,
-                PeriodicTailPrefixValue = observation.PeriodicTailPrefixValue,
-                PeriodicTailLength = observation.PeriodicTailLength,
-                Timestamp = e.ObservedAtMilliseconds,
-                ContributesDamage = e.ContributesDamage,
-                ContributesHealing = e.ContributesHealing,
-                ContributesShieldGrant = e.ContributesShieldGrant,
-                ContributesShieldAbsorbed = e.ContributesShieldAbsorbed
-            };
-        }).ToArray();
+        replay.SceneOwner.Combat.Events
+            .Select(static e => new SceneReplayPacket(e.SourceId, e.TargetId, e.Observation, e.Contribution, e.ObservedAtMilliseconds))
+            .ToArray();
 
     public static Dictionary<int, List<SceneReplayPacket>> BySource(PacketLogReplayResult replay) =>
         Packets(replay)
@@ -71,7 +33,8 @@ public static class SceneReplayTestView
     {
         if (replay.SceneOwner.Entities.TryGet(entityId, out var entity))
         {
-            state = new RuntimeNpcStateSnapshot(entity.NpcCode, entity.CurrentHp, entity.MaxHp, null, entity.NpcCombatActive, entity.Kind, entity.Value2136, entity.Sequence2136, entity.Value0140, entity.Value0240, entity.State4636, entity.Latest2C38);
+            replay.SceneOwner.EntityVitals.TryGet(entityId, out var vital);
+            state = new RuntimeNpcStateSnapshot(entity.NpcCode, vital.EntityId > 0 ? vital.CurrentHp : null, vital.MaxHp, vital.EntityId > 0 ? vital.ObservedAtMilliseconds : null, entity.NpcCombatActive, entity.Kind, entity.Value2136, entity.Sequence2136, entity.Value0140, entity.Value0240, entity.State4636, entity.Latest2C38);
             return true;
         }
 
@@ -95,40 +58,41 @@ public static class SceneReplayTestView
     }
 }
 
-public readonly record struct SceneReplayPacket
+public readonly record struct SceneReplayPacket(
+    int SourceId,
+    int TargetId,
+    CombatWireObservation Observation,
+    CombatContribution Contribution,
+    long Timestamp)
 {
-    public int SourceId { get; init; }
-    public int TargetId { get; init; }
-    public int SkillCode { get; init; }
-    public int BodySkillVariantRaw { get; init; }
-    public uint BodyCodeRaw { get; init; }
-    public ResourceEffectRef BodyResourceEffectRef { get; init; }
-    public long Damage { get; init; }
-    public int HitContribution { get; init; }
-    public int AttemptContribution { get; init; }
-    public long DetailRaw { get; init; }
-    public ResourceEffectRef DetailResourceEffectRef { get; init; }
-    public int Marker { get; init; }
-    public int Unknown { get; init; }
-    public int Type { get; init; }
-    public int Flag { get; init; }
-    public int LayoutTag { get; init; }
-    public int Loop { get; init; }
-    public int MultiHitCount { get; init; }
-    public int DrainHealAmount { get; init; }
-    public int RegenerationAmount { get; init; }
-    public DamageModifiers Modifiers { get; init; }
-    public CombatEventKind EventKind { get; init; }
-    public CombatValueKind ValueKind { get; init; }
-    public PacketEffectTag EffectTag { get; init; }
-    public PeriodicEffectRelation PeriodicRelation { get; init; }
-    public int PeriodicMode { get; init; }
-    public int PeriodicTailSkillCodeRaw { get; init; }
-    public int PeriodicTailPrefixValue { get; init; }
-    public int PeriodicTailLength { get; init; }
-    public long Timestamp { get; init; }
-    public bool ContributesDamage { get; init; }
-    public bool ContributesHealing { get; init; }
-    public bool ContributesShieldGrant { get; init; }
-    public bool ContributesShieldAbsorbed { get; init; }
+    public int SkillCode => Observation.SkillCode;
+    public int BodySkillVariantRaw => Observation.BodySkillVariantRaw;
+    public uint BodyCodeRaw => Observation.BodyCodeRaw;
+    public ResourceEffectRef BodyResourceEffectRef => Observation.BodyResourceEffectRef;
+    public long Damage => Observation.Damage;
+    public int HitCount => Observation.HitCount;
+    public int AttemptCount => Observation.AttemptCount;
+    public long DetailRaw => Observation.DetailRaw;
+    public ResourceEffectRef DetailResourceEffectRef => Observation.DetailResourceEffectRef;
+    public int Marker => Observation.Marker;
+    public int ChainId => Observation.ChainId;
+    public int Type => Observation.Type;
+    public int Flag => Observation.Flag;
+    public int LayoutTag => Observation.LayoutTag;
+    public int Loop => Observation.Loop;
+    public int MultiHitCount => Observation.MultiHitCount;
+    public int DrainHealAmount => Observation.DrainHealAmount;
+    public int RegenerationAmount => Observation.RegenerationAmount;
+    public DamageModifiers Modifiers => Observation.Modifiers;
+    public CombatResourceKind ResourceKind => Observation.ResourceKind;
+    public CombatWireOutcomeKind OutcomeKind => Observation.OutcomeKind;
+    public PeriodicEffectRelation PeriodicRelation => Observation.PeriodicRelation;
+    public int PeriodicMode => Observation.PeriodicMode;
+    public int PeriodicTailSkillCodeRaw => Observation.PeriodicTailSkillCodeRaw;
+    public int PeriodicTailPrefixValue => Observation.PeriodicTailPrefixValue;
+    public int PeriodicTailLength => Observation.PeriodicTailLength;
+    public CombatMetricKind Metric => Contribution.Metric;
+    public CombatDeliveryKind Delivery => Contribution.Delivery;
+    public long Amount => Contribution.Amount;
+    public CombatResolutionTrace Resolution => Contribution.Resolution;
 }

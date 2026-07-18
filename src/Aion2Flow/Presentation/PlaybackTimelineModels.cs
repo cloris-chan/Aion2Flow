@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.Presentation;
 
@@ -49,11 +50,18 @@ public sealed record PlaybackAuraTimelineLane(
     IReadOnlyList<PlaybackTimelineSpan> Spans,
     int Count,
     string CoverageText,
-    string ActiveTimeText)
+    string ActiveTimeText,
+    AuraSemanticValue Semantics,
+    string DispositionText,
+    string SemanticTraceText)
 {
     public ResourceEffectRef DisplayResourceEffectRef => AuraIdentity.DisplayResourceEffectRef;
 
     public int InstanceSequenceId => AuraIdentity.InstanceSequenceId;
+
+    public AuraDisposition Disposition => Semantics.Disposition;
+
+    public AuraSemanticTrace SemanticTrace => Semantics.Trace;
 
     public int SkillCode => DisplayResourceEffectRef.RawId is > 0 and <= int.MaxValue
         ? unchecked((int)DisplayResourceEffectRef.RawId)

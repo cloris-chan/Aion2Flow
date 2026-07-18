@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.Protocol.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -109,13 +108,11 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             var stamp = CreateStamp(in packet);
             journal.Append(
                 CreateHeader(in stamp, instanceId, 0, cached?.HpRaw ?? packet.Raw),
-                new ResourceObservation
+                new EntityVitalObservation
                 {
                     EntityId = instanceId,
-                    CurrentValue = hp,
-                    MaximumValue = state.MaxHp,
-                    Delta = null,
-                    ResourceKind = 0
+                    CurrentHp = hp,
+                    MaxHp = state.MaxHp
                 });
         }
     }
@@ -212,9 +209,8 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             });
     }
 
-    public void AppendCombatObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatObservation observation)
+    public void AppendCombatWireObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatWireObservation observation)
     {
-        var normalized = CombatResourceRegistry.NormalizeObservationForStorage(sourceId, targetId, in observation);
         sourceId = ResolveLifecycleId(sourceId);
         targetId = ResolveLifecycleId(targetId);
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
@@ -222,7 +218,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         AddKnownEntity(sourceId);
         AddKnownEntity(targetId);
         var stamp = CreateStamp(in packet);
-        journal.Append(CreateHeader(in stamp, sourceId, targetId, packet.Raw), in normalized);
+        journal.Append(CreateHeader(in stamp, sourceId, targetId, packet.Raw), in observation);
     }
 
     public void CompleteFlush(long flushId) => journal.CompleteFlush(MapFlushId(flushId));
@@ -236,7 +232,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, sourceId, targetId, packet.Raw),
-            new CombatObservation
+            new CombatWireObservation
             {
                 SkillCode = bodySkillVariantRaw,
                 BodySkillVariantRaw = bodySkillVariantRaw,
@@ -259,7 +255,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, sourceId, targetId, packet.Raw),
-            new CombatObservation
+            new CombatWireObservation
             {
                 SkillCode = bodySkillVariantRaw,
                 BodySkillVariantRaw = bodySkillVariantRaw,
@@ -281,7 +277,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, sourceId, 0, packet.Raw),
-            new CombatObservation
+            new CombatWireObservation
             {
                 SkillCode = 0,
                 BodySkillVariantRaw = 0,
@@ -306,7 +302,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, sourceId, 0, packet.Raw),
-            new CombatObservation
+            new CombatWireObservation
             {
                 SkillCode = 0,
                 BodySkillVariantRaw = 0,
@@ -539,19 +535,17 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         if (hp == 0)
             state.BattleToggledOn = false;
         AddKnownEntity(instanceId);
-        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendResourceObservation())
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendEntityVitalObservation())
             return;
         var stamp = CreateStamp(in packet);
         state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         journal.Append(
             CreateHeader(in stamp, instanceId, 0, packet.Raw),
-            new ResourceObservation
+            new EntityVitalObservation
             {
                 EntityId = instanceId,
-                CurrentValue = hp,
-                MaximumValue = null,
-                Delta = null,
-                ResourceKind = 0
+                CurrentHp = hp,
+                MaxHp = null
             });
         collectionPolicy?.OnBossMetadataChanged();
     }
@@ -567,19 +561,17 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         if (hp == 0)
             state.BattleToggledOn = false;
         AddKnownEntity(instanceId);
-        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendResourceObservation())
+        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendEntityVitalObservation())
             return;
         var stamp = CreateStamp(in packet);
         state.HpObservedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         journal.Append(
             CreateHeader(in stamp, instanceId, 0, packet.Raw),
-            new ResourceObservation
+            new EntityVitalObservation
             {
                 EntityId = instanceId,
-                CurrentValue = hp,
-                MaximumValue = maxHp,
-                Delta = null,
-                ResourceKind = 0
+                CurrentHp = hp,
+                MaxHp = maxHp
             });
         collectionPolicy?.OnBossMetadataChanged();
     }

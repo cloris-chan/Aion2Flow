@@ -4,7 +4,6 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
-using ParsedCombatPacket = Cloris.Aion2Flow.SceneRuntime.Combat.ParsedCombatPacket;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
@@ -71,7 +70,7 @@ public class SceneTimelineContractTests
         Assert.Contains(ObservedEventDomain.Combat, domains);
         Assert.Contains(ObservedEventDomain.Action, domains);
         Assert.Contains(ObservedEventDomain.State, domains);
-        Assert.Contains(ObservedEventDomain.Resource, domains);
+        Assert.Contains(ObservedEventDomain.EntityVital, domains);
         Assert.Contains(ObservedEventDomain.Aura, domains);
         Assert.Contains(ObservedEventDomain.Scene, domains);
         Assert.Contains(ObservedEventDomain.Diagnostic, domains);
@@ -85,7 +84,7 @@ public class SceneTimelineContractTests
         var sceneId = Guid.NewGuid();
         var raw = new RawPacketReference(0x0438, 32, 1);
         var header = new ObservedEventHeader(sceneId, new TimelineStamp(100, 0, 1), 100, 200, raw);
-        var combat = new CombatObservation { SkillCode = 1234, Damage = 500, HitCount = 1, AttemptCount = 1 };
+        var combat = new CombatWireObservation { SkillCode = 1234, Damage = 500, HitCount = 1, AttemptCount = 1 };
 
         journal.Append(in header, in combat);
 
@@ -252,7 +251,7 @@ public class SceneTimelineContractTests
 
         AppendCombat(journal, sceneId, 0);
         var badHeader = CreateHeader(sceneId, 2);
-        var combat = default(CombatObservation);
+        var combat = default(CombatWireObservation);
 
         Assert.Throws<ArgumentException>(() => journal.Append(in badHeader, in combat));
     }
@@ -478,21 +477,52 @@ public class SceneTimelineContractTests
     public void CombatProjection_PreservesZeroSceneOffset()
     {
         var entities = new EntityStore();
+        var entityVitals = new EntityVitalStore();
         var combat = new CombatStore();
-        var observation = new CombatObservation
+        var mechanics = new MechanicStore();
+        var resources = new ResourceStore();
+        var observation = new CombatWireObservation
         {
             Damage = 100,
             HitCount = 1,
-            AttemptCount = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
+            AttemptCount = 1
         };
+        var resolution = new CombatResolutionTrace(
+            PacketRule: CombatPacketRule.DirectFallbackDamage,
+            SemanticMatch: CombatSemanticMatchKind.None,
+            Authority: CombatResolutionAuthority.PacketDefault,
+            Materialization: CombatMaterializationKind.Primary,
+            Association: CombatAssociationKind.None,
+            DirectSemantics: default,
+            Semantics: default,
+            ResourceEffectRef: default,
+            ResourceNodeKind: default,
+            ResourceNodeId: 0,
+            ResourceSkillId: 0,
+            EffectSlot: -1,
+            ResourceCandidateSlotCount: 0);
+        var contribution = new CombatContribution(
+            Metric: CombatMetricKind.Damage,
+            Delivery: CombatDeliveryKind.Direct,
+            Amount: 100,
+            Resolution: resolution);
+        var mechanic = new CombatMechanicOccurrence(
+            Modifiers: default,
+            HitCount: 1,
+            AttemptCount: 1,
+            EvadeCount: 0,
+            InvincibleCount: 0,
+            MultiHitCount: 0,
+            MultiHitSubCount: 0,
+            Resolution: resolution);
 
-        combat.ApplyCombat(10, 20, in observation, 0);
-        combat.ApplyCombat(10, 20, in observation, 1_000);
+        combat.ApplyCombat(10, 20, in observation, in contribution, 0);
+        mechanics.Apply(10, 20, in observation, in mechanic, 0, CombatStore.UnknownSourceObservationOrdinal, default);
+        combat.ApplyCombat(10, 20, in observation, in contribution, 1_000);
+        mechanics.Apply(10, 20, in observation, in mechanic, 1_000, CombatStore.UnknownSourceObservationOrdinal, default);
 
         var pair = Assert.Single(combat.Pairs).Value;
-        var snapshot = new SceneCombatSnapshotAdapter(entities, combat, new SceneBoundaryStore()).CreateSnapshot();
+        var snapshot = new SceneCombatSnapshotAdapter(entities, entityVitals, combat, mechanics, resources, new SceneBoundaryStore()).CreateSnapshot();
 
         Assert.Equal(0, pair.FirstObserved);
         Assert.Equal(1_000, pair.LastObserved);
@@ -635,16 +665,15 @@ public class SceneTimelineContractTests
         var reboundId = sink.RebindInstanceLifecycle(3518);
 
         sink.AppendNpcCode(3518, 2000002);
-        sink.AppendCombatPacket(new ParsedCombatPacket
+        var combatSource = new PacketObservationSource(1_000, 0, 0x0438, 0, 0, default);
+        var combat = new CombatWireObservation
         {
-            SourceId = 100,
-            TargetId = 3518,
             SkillCode = 11000010,
             Damage = 500,
-            HitContribution = 1,
-            AttemptContribution = 1,
-            Timestamp = 1_000
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        sink.AppendCombatWireObservation(in combatSource, 100, 3518, in combat);
 
         Assert.Equal(reboundId, sink.ResolveLifecycleId(3518));
         Assert.Equal(reboundId, ReadSourceEntityId(journal, 0));
@@ -897,7 +926,7 @@ public class SceneTimelineContractTests
     private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, long ordinal, RawPacketReference raw = default)
     {
         var header = CreateHeader(sceneId, ordinal, raw);
-        var combat = new CombatObservation { SkillCode = (int)ordinal };
+        var combat = new CombatWireObservation { SkillCode = (int)ordinal };
         journal.Append(in header, in combat);
     }
 

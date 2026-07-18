@@ -3,6 +3,7 @@ using Avalonia.Media;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Services;
 
 namespace Cloris.Aion2Flow.ViewModels;
@@ -15,7 +16,9 @@ internal static class ScenePlaybackTimelineBuilder
     private static readonly ScenePlaybackTrack[] TrackOrder =
     [
         ScenePlaybackTrack.Combat,
+        ScenePlaybackTrack.Mechanic,
         ScenePlaybackTrack.Resource,
+        ScenePlaybackTrack.EntityVital,
         ScenePlaybackTrack.Aura,
         ScenePlaybackTrack.State,
         ScenePlaybackTrack.Scene,
@@ -25,7 +28,9 @@ internal static class ScenePlaybackTimelineBuilder
     ];
 
     private static readonly IBrush CombatBrush = Brush.Parse("#18D7F4");
-    public static readonly IBrush ResourceBrush = Brush.Parse("#8CE271");
+    private static readonly IBrush MechanicBrush = Brush.Parse("#FFD166");
+    private static readonly IBrush ResourceBrush = Brush.Parse("#55D6BE");
+    public static readonly IBrush EntityVitalBrush = Brush.Parse("#8CE271");
     private static readonly IBrush AuraBrush = Brush.Parse("#C98EFF");
     private static readonly IBrush StateBrush = Brush.Parse("#FFD166");
     private static readonly IBrush SceneBrush = Brush.Parse("#FF8A65");
@@ -93,16 +98,18 @@ internal static class ScenePlaybackTimelineBuilder
         {
             var coverage = timeline.Coverages[i];
             var identity = ScenePlaybackAuraIdentity.Create(coverage.DisplayResourceEffectRef, coverage.InstanceSequenceId);
-            GetAuraTimelineBuilder(groups, identity)
-                .Coverages.Add((coverage.StartMilliseconds, coverage.EndMilliseconds));
+            var builder = GetAuraTimelineBuilder(groups, identity);
+            builder.ApplySemantics(coverage.Semantics);
+            builder.Coverages.Add((coverage.StartMilliseconds, coverage.EndMilliseconds));
         }
 
         for (var i = 0; i < timeline.Applications.Count; i++)
         {
             var application = timeline.Applications[i];
             var identity = ScenePlaybackAuraIdentity.Create(application.DisplayResourceEffectRef, application.InstanceSequenceId);
-            GetAuraTimelineBuilder(groups, identity)
-                .Applications.Add((application.PositionMilliseconds, application.Kind));
+            var builder = GetAuraTimelineBuilder(groups, identity);
+            builder.ApplySemantics(application.Semantics);
+            builder.Applications.Add((application.PositionMilliseconds, application.Kind));
         }
 
         var result = new List<PlaybackAuraTimelineLane>(groups.Count);
@@ -120,7 +127,7 @@ internal static class ScenePlaybackTimelineBuilder
             for (var i = 0; i < builder.Applications.Count; i++)
             {
                 var application = builder.Applications[i];
-                var text = application.Kind == ScenePlaybackLifecycleEventKind.Renew
+                var text = application.Kind == AuraLifecycleEventKind.Renew
                     ? localization["Playback_Lifecycle_Renew"]
                     : localization["Playback_Lifecycle_OpenIndefinite"];
                 markers[i] = new PlaybackTimelineMarker(application.PositionMilliseconds, 16d, accent, text, IsApplication: true);
@@ -129,7 +136,18 @@ internal static class ScenePlaybackTimelineBuilder
             var spans = MergeAuraCoverages(builder.Coverages, fill, accent);
             var activeMilliseconds = SumSpanDuration(spans);
             var coverage = durationMilliseconds > 0 ? activeMilliseconds / (double)durationMilliseconds : 0d;
-            result.Add(new PlaybackAuraTimelineLane(builder.Identity, fallback, markers, spans, builder.Applications.Count, coverage.ToString("P1", CultureInfo.CurrentCulture), FormatDuration(activeMilliseconds)));
+            var semantics = builder.Semantics;
+            result.Add(new PlaybackAuraTimelineLane(
+                builder.Identity,
+                fallback,
+                markers,
+                spans,
+                builder.Applications.Count,
+                coverage.ToString("P1", CultureInfo.CurrentCulture),
+                FormatDuration(activeMilliseconds),
+                semantics,
+                FormatAuraDisposition(semantics.Disposition, localization),
+                FormatAuraSemanticTrace(semantics.Trace, localization)));
         }
 
         result.Sort((left, right) =>
@@ -254,7 +272,9 @@ internal static class ScenePlaybackTimelineBuilder
     public static IBrush ResolveTrackBrush(ScenePlaybackTrack track) => track switch
     {
         ScenePlaybackTrack.Combat => CombatBrush,
+        ScenePlaybackTrack.Mechanic => MechanicBrush,
         ScenePlaybackTrack.Resource => ResourceBrush,
+        ScenePlaybackTrack.EntityVital => EntityVitalBrush,
         ScenePlaybackTrack.Aura => AuraBrush,
         ScenePlaybackTrack.State => StateBrush,
         ScenePlaybackTrack.Scene => SceneBrush,
@@ -277,6 +297,34 @@ internal static class ScenePlaybackTimelineBuilder
         var value = TimeSpan.FromMilliseconds(Math.Max(0, milliseconds));
         return value.TotalHours >= 1 ? value.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture) : value.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
     }
+
+    private static string FormatAuraDisposition(AuraDisposition disposition, LocalizationService localization) => disposition switch
+    {
+        AuraDisposition.Buff => localization["Playback_AuraDisposition_Buff"],
+        AuraDisposition.Debuff => localization["Playback_AuraDisposition_Debuff"],
+        _ => localization["Playback_AuraDisposition_Unknown"]
+    };
+
+    private static string FormatAuraSemanticTrace(AuraSemanticTrace trace, LocalizationService localization)
+    {
+        return trace.Match switch
+        {
+            AuraSemanticMatchKind.ExactNode => string.Format(
+                CultureInfo.CurrentCulture,
+                localization["Playback_AuraEvidence_ExactNodeFormat"],
+                trace.ResourceNodeId),
+            AuraSemanticMatchKind.UnambiguousSlot => string.Format(
+                CultureInfo.CurrentCulture,
+                localization["Playback_AuraEvidence_UnambiguousSlotFormat"],
+                trace.ResourceSkillId,
+                trace.EffectSlot),
+            _ when trace.HasResourceEvidence && trace.ResourceCandidateSlotCount > 1 => string.Format(
+                CultureInfo.CurrentCulture,
+                localization["Playback_AuraEvidence_AmbiguousFormat"],
+                trace.ResourceCandidateSlotCount),
+            _ => localization["Playback_AuraEvidence_None"]
+        };
+    }
 }
 
 internal sealed class AuraTimelineLaneBuilder(ScenePlaybackAuraIdentity identity)
@@ -289,7 +337,34 @@ internal sealed class AuraTimelineLaneBuilder(ScenePlaybackAuraIdentity identity
 
     public List<(long StartMilliseconds, long EndMilliseconds)> Coverages { get; } = [];
 
-    public List<(long PositionMilliseconds, ScenePlaybackLifecycleEventKind Kind)> Applications { get; } = [];
+    public List<(long PositionMilliseconds, AuraLifecycleEventKind Kind)> Applications { get; } = [];
+
+    public AuraSemanticValue Semantics { get; private set; }
+
+    private bool HasSemantics { get; set; }
+
+    public void ApplySemantics(AuraSemanticValue semantics)
+    {
+        if (!HasSemantics || ResolveEvidenceScore(semantics) > ResolveEvidenceScore(Semantics))
+        {
+            Semantics = semantics;
+            HasSemantics = true;
+        }
+    }
+
+    private static int ResolveEvidenceScore(AuraSemanticValue semantics)
+    {
+        var score = semantics.Disposition == AuraDisposition.Unknown ? 0 : 8;
+        score += semantics.Trace.Match switch
+        {
+            AuraSemanticMatchKind.ExactNode => 4,
+            AuraSemanticMatchKind.UnambiguousSlot => 3,
+            _ when semantics.Trace.HasResourceEvidence => 2,
+            _ when !semantics.Trace.ResourceEffectRef.IsEmpty => 1,
+            _ => 0
+        };
+        return score;
+    }
 }
 
 internal readonly record struct PlaybackTimelineBuildResult(PlaybackTimelineStrip Global, Dictionary<int, PlaybackTimelineStrip> Combatants);

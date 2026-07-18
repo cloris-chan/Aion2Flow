@@ -45,8 +45,7 @@ public sealed class EntityStore
     public void ApplyNpcKind(int instanceId, NpcKind kind)
     {
         var entity = GetOrAdd(instanceId);
-        var ownershipChanged = kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.TrainingDummy && ClearTransientOwner(entity);
-        if (entity.Kind == kind && !ownershipChanged)
+        if (entity.Kind == kind)
             return;
 
         entity.Kind = kind;
@@ -56,8 +55,7 @@ public sealed class EntityStore
     public void ApplyNickname(int entityId, string nickname)
     {
         var entity = GetOrAdd(entityId);
-        var ownershipChanged = ClearTransientOwner(entity);
-        if (entity.Nickname == nickname && entity.IsPlayer && !ownershipChanged)
+        if (entity.Nickname == nickname && entity.IsPlayer)
             return;
 
         entity.Nickname = nickname;
@@ -69,8 +67,7 @@ public sealed class EntityStore
     public void ApplyPlayerIdentity(int entityId)
     {
         var entity = GetOrAdd(entityId);
-        var ownershipChanged = ClearTransientOwner(entity);
-        if (entity.IsPlayer && !ownershipChanged)
+        if (entity.IsPlayer)
             return;
 
         entity.IsPlayer = true;
@@ -78,10 +75,16 @@ public sealed class EntityStore
         _identityRevision++;
     }
 
-    public bool ApplyCharacterClassEvidence(int entityId, in CombatObservation observation)
+    public bool ApplyCharacterClassEvidence(
+        int entityId,
+        in CombatWireObservation observation,
+        in CombatContribution contribution)
     {
-        if (entityId <= 0 || !CombatantClassEvidence.TryCreate(in observation, out var characterClass, out var score))
+        if (entityId <= 0 ||
+            !CombatantClassEvidence.TryCreate(in observation, in contribution, out var characterClass, out var score))
+        {
             return false;
+        }
 
         var entity = GetOrAdd(entityId);
         if (entity.OwnerEntityId.HasValue || entity.NpcCode.HasValue || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy)
@@ -112,8 +115,7 @@ public sealed class EntityStore
             return false;
 
         var entity = GetOrAdd(entityId);
-        var ownershipChanged = ClearTransientOwner(entity);
-        if (entity.CharacterClass == characterClass && entity.IsPlayer && !ownershipChanged)
+        if (entity.CharacterClass == characterClass && entity.IsPlayer)
             return false;
 
         entity.CharacterClass = characterClass;
@@ -133,39 +135,6 @@ public sealed class EntityStore
         entity.OwnerKind = EntityOwnerKind.Summon;
         entity.Kind = NpcKind.Summon;
         _identityRevision++;
-    }
-
-    public bool ApplyTransientEffectOwner(int ownerId, int effectInstanceId)
-    {
-        if (ownerId <= 0 || effectInstanceId <= 0 || ownerId == effectInstanceId)
-            return false;
-
-        var entity = GetOrAdd(effectInstanceId);
-        if (entity.IsPlayer || entity.OwnerKind == EntityOwnerKind.Summon || entity.Kind is NpcKind.Monster or NpcKind.Boss or NpcKind.Friendly or NpcKind.Summon or NpcKind.TrainingDummy)
-            return false;
-
-        if (entity.OwnerEntityId == ownerId && entity.OwnerKind == EntityOwnerKind.TransientEffect)
-            return false;
-
-        entity.OwnerEntityId = ownerId;
-        entity.OwnerKind = EntityOwnerKind.TransientEffect;
-        _identityRevision++;
-        return true;
-    }
-
-    public void ApplyNpcHp(int instanceId, long hp, long maxHp)
-    {
-        var entity = GetOrAdd(instanceId);
-        var resolvedMaxHp = maxHp > 0 ? maxHp : entity.MaxHp;
-        var combatActive = hp != 0 && entity.NpcCombatActive;
-        if (entity.CurrentHp == hp && entity.MaxHp == resolvedMaxHp && entity.NpcCombatActive == combatActive)
-            return;
-
-        entity.CurrentHp = hp;
-        entity.MaxHp = resolvedMaxHp;
-        if (hp == 0)
-            entity.NpcCombatActive = false;
-        _volatileStateRevision++;
     }
 
     public void ApplyBattleToggle(int instanceId, bool isActive)
@@ -242,23 +211,12 @@ public sealed class EntityStore
         _volatileStateRevision++;
     }
 
-    private static bool ClearTransientOwner(EntityRecord entity)
-    {
-        if (entity.OwnerKind != EntityOwnerKind.TransientEffect)
-            return false;
-
-        entity.OwnerEntityId = null;
-        entity.OwnerKind = EntityOwnerKind.None;
-        return true;
-    }
-
 }
 
 public enum EntityOwnerKind
 {
     None,
-    Summon,
-    TransientEffect
+    Summon
 }
 
 public sealed class EntityRecord
@@ -272,8 +230,6 @@ public sealed class EntityRecord
     public CombatantClassEvidence ClassEvidence { get; set; }
     public int? OwnerEntityId { get; set; }
     public EntityOwnerKind OwnerKind { get; set; }
-    public long? CurrentHp { get; set; }
-    public long? MaxHp { get; set; }
     public bool NpcCombatActive { get; set; }
     public long? Value2136 { get; set; }
     public long? Sequence2136 { get; set; }

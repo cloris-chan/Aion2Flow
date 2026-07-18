@@ -10,6 +10,7 @@ public sealed partial class DetailCounterpartSelectionViewModel(
     double healingShare,
     long shieldAmount,
     double shieldShare,
+    long manaChange,
     bool initiallySelected) : ObservableObject
 {
     public int CombatantId { get; } = combatantId;
@@ -33,6 +34,9 @@ public sealed partial class DetailCounterpartSelectionViewModel(
     public partial double ShieldShare { get; set; } = shieldShare;
 
     [ObservableProperty]
+    public partial long ManaChange { get; set; } = manaChange;
+
+    [ObservableProperty]
     public partial bool IsSelected { get; set; } = initiallySelected;
 
     public void ApplyFrom(DetailCounterpartOption option)
@@ -43,6 +47,7 @@ public sealed partial class DetailCounterpartSelectionViewModel(
         HealingShare = option.HealingShare;
         ShieldAmount = option.ShieldAmount;
         ShieldShare = option.ShieldShare;
+        ManaChange = option.ManaChange;
     }
 
     public event EventHandler? SelectionChanged;

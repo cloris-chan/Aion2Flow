@@ -132,7 +132,7 @@ public sealed class SkillDetailBaseAggregatorTests
 
     private static void SetSkillBaseResources(SkillBaseProjection[] projections, IReadOnlyDictionary<uint, int> effectSkillIds)
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
             [],
             new Dictionary<int, NpcDisplayEntry>(),
             projections.ToDictionary(static projection => projection.SkillCode),

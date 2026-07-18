@@ -6,13 +6,13 @@ internal static class ResourcePackManifest
 {
     public const string SharedResourceName = "Cloris.Aion2Flow.Resources.Packs.shared.bin";
     public const int SharedUncompressedLength = 2586253;
-    public const ulong SharedChecksum = 17818282897520701280UL;
+    public const ulong SharedChecksum = 11522381128136174139UL;
 
     public static IReadOnlyList<ResourceLocalePackEntry> Locales { get; } =
     [
-        new("en-US", "Cloris.Aion2Flow.Resources.Packs.en-US.bin", 625741, 1176945838471248458UL),
-        new("ko-KR", "Cloris.Aion2Flow.Resources.Packs.ko-KR.bin", 671028, 15735228942973616230UL),
-        new("zh-TW", "Cloris.Aion2Flow.Resources.Packs.zh-TW.bin", 627088, 15443964832106552023UL)
+        new("en-US", "Cloris.Aion2Flow.Resources.Packs.en-US.bin", 625741, 15824076144882425811UL),
+        new("ko-KR", "Cloris.Aion2Flow.Resources.Packs.ko-KR.bin", 671028, 7870066905366654851UL),
+        new("zh-TW", "Cloris.Aion2Flow.Resources.Packs.zh-TW.bin", 627088, 7233397571065124459UL)
     ];
 
     public static ResourceLocalePackEntry GetLocale(string language)

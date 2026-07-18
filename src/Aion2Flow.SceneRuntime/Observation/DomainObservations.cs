@@ -79,7 +79,7 @@ public readonly record struct RawPacketReference
     }
 }
 
-public readonly record struct CombatObservation
+public readonly record struct CombatWireObservation
 {
     public int SkillCode { get; init; }
     public int BodySkillVariantRaw { get; init; }
@@ -100,9 +100,7 @@ public readonly record struct CombatObservation
     public int RegenerationAmount { get; init; }
     public DamageModifiers Modifiers { get; init; }
     public CombatResourceKind ResourceKind { get; init; }
-    public CombatEventKind EventKind { get; init; }
-    public CombatValueKind ValueKind { get; init; }
-    public PacketEffectTag EffectTag { get; init; }
+    public CombatWireOutcomeKind OutcomeKind { get; init; }
     public PeriodicEffectRelation PeriodicRelation { get; init; }
     public int PeriodicMode { get; init; }
     public int PeriodicTailSkillCodeRaw { get; init; }
@@ -115,7 +113,7 @@ public readonly record struct StateObservation(int EntityId, int StateCode, long
 
 public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, int Value0, int Value1, string? DiagnosticKey);
 
-public readonly record struct ResourceObservation(int EntityId, long? CurrentValue, long? MaximumValue, long? Delta, int ResourceKind);
+public readonly record struct EntityVitalObservation(int EntityId, long CurrentHp, long? MaxHp);
 
 public enum AuraObservationKind : byte
 {

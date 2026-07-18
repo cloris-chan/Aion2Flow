@@ -39,7 +39,7 @@ public sealed class BossSceneCollectionTests
         Assert.Equal("Player", player.Nickname);
         Assert.True(scene.Owner.MetadataRegistry.TryGetNpcCode(300, out var bossCode));
         Assert.Equal(2_100_002, bossCode);
-        Assert.DoesNotContain(ReadJournal(scene), static entry => entry.Domain is ObservedEventDomain.Combat or ObservedEventDomain.Resource or ObservedEventDomain.Aura or ObservedEventDomain.Action);
+        Assert.DoesNotContain(ReadJournal(scene), static entry => entry.Domain is ObservedEventDomain.Combat or ObservedEventDomain.EntityVital or ObservedEventDomain.Aura or ObservedEventDomain.Action);
         Assert.DoesNotContain(ReadJournal(scene), static entry => entry.State?.StateCode is StateCodes.NpcBattle or StateCodes.NpcBattleToggle);
     }
 
@@ -104,11 +104,11 @@ public sealed class BossSceneCollectionTests
         Assert.True(focus.HasHp);
         Assert.True(focus.HasMaxHp);
         Assert.Equal(243_750_000, focus.MaxHp);
-        Assert.True(scene.Owner.Entities.TryGet(300, out var entity));
-        Assert.Equal(243_750_000, entity.MaxHp);
+        Assert.True(scene.Owner.EntityVitals.TryGet(300, out var vital));
+        Assert.Equal(243_750_000, vital.MaxHp);
         Assert.Contains(
             ReadJournal(scene).Where(entry => entry.Stamp.ObservationOrdinal >= scene.Owner.SceneStartObservationOrdinal),
-            static entry => entry.Resource is { EntityId: 300, CurrentValue: 243_719_813, MaximumValue: 243_750_000 });
+            static entry => entry.EntityVital is { EntityId: 300, CurrentHp: 243_719_813, MaxHp: 243_750_000 });
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public sealed class BossSceneCollectionTests
     public void FirstCatalogResolvedCityTrainingDummyCombatStartsBossModeScene()
     {
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceRegistry.SetGameResources([], catalog);
+        CombatResourceTestFixture.SetResources([], catalog);
         var scene = CreateBossScene();
         var waitingEncounterId = scene.SessionId;
         var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -404,16 +404,14 @@ public sealed class BossSceneCollectionTests
     private static void AppendDamage(IRuntimeObservationSink sink, int sourceId, int targetId, int damage, long offsetMilliseconds, long flushId)
     {
         var source = Source(offsetMilliseconds, flushId);
-        var observation = new CombatObservation
+        var observation = new CombatWireObservation
         {
             SkillCode = 11_000_010,
             Damage = damage,
             HitCount = 1,
-            AttemptCount = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
+            AttemptCount = 1
         };
-        sink.AppendCombatObservation(in source, sourceId, targetId, in observation);
+        sink.AppendCombatWireObservation(in source, sourceId, targetId, in observation);
     }
 
     private static PacketObservationSource Source(long offsetMilliseconds, long flushId = 0) =>
@@ -435,7 +433,7 @@ public sealed class BossSceneCollectionTests
                         entry.Stamp,
                         entry.Domain,
                         entry.Domain == ObservedEventDomain.State ? entry.State : null,
-                        entry.Domain == ObservedEventDomain.Resource ? entry.Resource : null));
+                        entry.Domain == ObservedEventDomain.EntityVital ? entry.EntityVital : null));
                 }
             });
             if (result.Count == 0)
@@ -451,7 +449,7 @@ public sealed class BossSceneCollectionTests
         TimelineStamp Stamp,
         ObservedEventDomain Domain,
         StateObservation? State,
-        ResourceObservation? Resource);
+        EntityVitalObservation? EntityVital);
 
     private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {

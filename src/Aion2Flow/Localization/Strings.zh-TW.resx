@@ -105,7 +105,6 @@
   <data name="Category_Damage" xml:space="preserve"><value>傷害</value></data>
   <data name="Category_Healing" xml:space="preserve"><value>治療</value></data>
   <data name="Category_Shield" xml:space="preserve"><value>屏障</value></data>
-  <data name="Category_Support" xml:space="preserve"><value>支援</value></data>
 
   <!-- Empty-state placeholders -->
   <data name="Empty_History" xml:space="preserve"><value>沒有歸檔戰鬥</value></data>
@@ -221,10 +220,20 @@
   <data name="Playback_Column_Skill" xml:space="preserve"><value>技能</value></data>
   <data name="Playback_Column_Amount" xml:space="preserve"><value>數值</value></data>
   <data name="Playback_Track_Combat" xml:space="preserve"><value>戰鬥</value></data>
+  <data name="Playback_Track_Mechanic" xml:space="preserve"><value>戰鬥機制</value></data>
+  <data name="Playback_Track_Resource" xml:space="preserve"><value>資源</value></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>剩餘 HP</value></data>
   <data name="Playback_Track_Aura" xml:space="preserve"><value>效果生命週期</value></data>
   <data name="Playback_AuraCoverage" xml:space="preserve"><value>Buff / Debuff</value></data>
   <data name="Playback_AuraUnknownFormat" xml:space="preserve"><value>效果 #{0}</value></data>
+  <data name="Playback_AuraDisposition_Label" xml:space="preserve"><value>效果分類</value></data>
+  <data name="Playback_AuraDisposition_Buff" xml:space="preserve"><value>增益</value></data>
+  <data name="Playback_AuraDisposition_Debuff" xml:space="preserve"><value>減益</value></data>
+  <data name="Playback_AuraDisposition_Unknown" xml:space="preserve"><value>未知</value></data>
+  <data name="Playback_AuraEvidence_ExactNodeFormat" xml:space="preserve"><value>精確節點 #{0}</value></data>
+  <data name="Playback_AuraEvidence_UnambiguousSlotFormat" xml:space="preserve"><value>技能 {0}，欄位 {1}</value></data>
+  <data name="Playback_AuraEvidence_AmbiguousFormat" xml:space="preserve"><value>語意不明：{0} 個候選</value></data>
+  <data name="Playback_AuraEvidence_None" xml:space="preserve"><value>無明確語意對應</value></data>
   <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>套用 {0} ms</value></data>
   <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>套用</value></data>
   <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>刷新</value></data>
@@ -234,10 +243,18 @@
   <data name="Playback_Track_Action" xml:space="preserve"><value>動作</value></data>
   <data name="Playback_Track_Diagnostic" xml:space="preserve"><value>診斷</value></data>
   <data name="Playback_Track_Other" xml:space="preserve"><value>其他</value></data>
+  <data name="Playback_Mechanic_HitAttemptFormat" xml:space="preserve"><value>命中 {0}/{1}</value></data>
 
   <data name="Scene_Activation" xml:space="preserve"><value>場景啟動</value></data>
   <data name="Scene_Combat" xml:space="preserve"><value>戰鬥場景</value></data>
   <data name="Scene_Teardown" xml:space="preserve"><value>場景結束</value></data>
   <data name="Scene_Archive" xml:space="preserve"><value>場景歸檔</value></data>
   <data name="Scene_Unknown" xml:space="preserve"><value>未知場景</value></data>
+  <data name="Category_Resource" xml:space="preserve"><value>資源</value></data>
+  <data name="Metric_ManaChange" xml:space="preserve"><value>魔力變動</value></data>
+  <data name="Metric_DirectEvents" xml:space="preserve"><value>直接事件</value></data>
+  <data name="Metric_PeriodicEvents" xml:space="preserve"><value>持續事件</value></data>
+  <data name="Metric_ResourceSkills" xml:space="preserve"><value>資源技能</value></data>
+  <data name="Metric_ResourceEvents" xml:space="preserve"><value>資源事件</value></data>
+  <data name="Empty_ResourceEvents" xml:space="preserve"><value>沒有資源事件</value></data>
 </root>

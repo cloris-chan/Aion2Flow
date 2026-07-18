@@ -6,7 +6,7 @@ internal interface ILiveSceneCollectionPolicy
 
     bool ShouldAppendExtendedObservation();
 
-    bool ShouldAppendResourceObservation();
+    bool ShouldAppendEntityVitalObservation();
 
     void OnBossMetadataChanged();
 }

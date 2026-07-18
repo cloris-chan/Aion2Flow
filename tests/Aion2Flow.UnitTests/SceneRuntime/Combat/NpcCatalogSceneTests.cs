@@ -46,7 +46,7 @@ public sealed class NpcCatalogSceneTests
     {
         const int summonId = 81994;
         const int summonNpcCode = 2920190;
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>
+        CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>
         {
             [summonNpcCode] = new(summonNpcCode, "古代精靈", NpcCatalogKind.Summon, NpcHpDisplayScale.Normal)
         });
@@ -70,26 +70,12 @@ public sealed class NpcCatalogSceneTests
         const int npcCode = 2400032;
         const int playerId = 2007;
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
+        CombatResourceTestFixture.SetResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(npcInstanceId, npcCode);
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcInstanceId,
-            SkillCode = 17070000,
-            Damage = 1_000,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcInstanceId,
-            SkillCode = 17070000,
-            Damage = 1,
-            Timestamp = 1_050
-        });
+        AppendDamage(scene, playerId, npcInstanceId, 17070000, 1_000, 1_000);
+        AppendDamage(scene, playerId, npcInstanceId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
@@ -110,28 +96,14 @@ public sealed class NpcCatalogSceneTests
         const int targetNpcCode = 2400032;
         const int playerId = 2007;
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
+        CombatResourceTestFixture.SetResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(playbackOnlyEntityId, playbackOnlyNpcCode);
         scene.AppendNpcKind(playbackOnlyEntityId, CombatResourceRegistry.ResolveNpcKind(catalog[playbackOnlyNpcCode].Kind));
         scene.AppendNpcCode(targetEntityId, targetNpcCode);
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = targetEntityId,
-            SkillCode = 17070000,
-            Damage = 1_000,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = targetEntityId,
-            SkillCode = 17070000,
-            Damage = 1,
-            Timestamp = 1_050
-        });
+        AppendDamage(scene, playerId, targetEntityId, 17070000, 1_000, 1_000);
+        AppendDamage(scene, playerId, targetEntityId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
@@ -149,27 +121,13 @@ public sealed class NpcCatalogSceneTests
         const int npcInstanceId = 5555;
         const int unknownNpcCode = 2999999;
         const int playerId = 2007;
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(npcInstanceId, unknownNpcCode);
         scene.AppendNpcName(unknownNpcCode, "CustomNpcName");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcInstanceId,
-            SkillCode = 17070000,
-            Damage = 1_000,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcInstanceId,
-            SkillCode = 17070000,
-            Damage = 1,
-            Timestamp = 1_050
-        });
+        AppendDamage(scene, playerId, npcInstanceId, 17070000, 1_000, 1_000);
+        AppendDamage(scene, playerId, npcInstanceId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
@@ -186,27 +144,13 @@ public sealed class NpcCatalogSceneTests
         const int npcCode = 2400032;
         const int playerId = 2007;
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
+        CombatResourceTestFixture.SetResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(npcInstanceId, npcCode);
         scene.AppendNickname(npcInstanceId, "PlayerNick");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcInstanceId,
-            SkillCode = 17070000,
-            Damage = 1_000,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcInstanceId,
-            SkillCode = 17070000,
-            Damage = 1,
-            Timestamp = 1_050
-        });
+        AppendDamage(scene, playerId, npcInstanceId, 17070000, 1_000, 1_000);
+        AppendDamage(scene, playerId, npcInstanceId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
@@ -221,7 +165,7 @@ public sealed class NpcCatalogSceneTests
     [Fact]
     public void SceneSnapshot_Clears_Previously_Inferred_Class_When_Combatant_Is_Identified_As_Npc()
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
             new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
@@ -229,22 +173,8 @@ public sealed class NpcCatalogSceneTests
         const int npcInstanceId = 19945;
         const int targetId = 14037;
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = npcInstanceId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 1_841,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = npcInstanceId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 1,
-            Timestamp = 1_050
-        });
+        AppendDamage(scene, npcInstanceId, targetId, 16010000, 1_841, 1_000);
+        AppendDamage(scene, npcInstanceId, targetId, 16010000, 1, 1_050);
 
         var beforeNpcIdentity = scene.CreateSnapshot();
         Assert.True(beforeNpcIdentity.Combatants.TryGetValue(npcInstanceId, out var initiallyInferred));
@@ -261,27 +191,13 @@ public sealed class NpcCatalogSceneTests
     [Fact]
     public void SceneSnapshot_Keeps_Combatant_Facts_Without_DisplayName()
     {
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
         using var scene = new SceneTestHarness();
         const int sourceId = 12345;
         const int targetId = 54321;
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 17070000,
-            Damage = 1_000,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 17070000,
-            Damage = 1,
-            Timestamp = 1_050
-        });
+        AppendDamage(scene, sourceId, targetId, 17070000, 1_000, 1_000);
+        AppendDamage(scene, sourceId, targetId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -296,33 +212,15 @@ public sealed class NpcCatalogSceneTests
         const int npcCode = 2980179;
         const int playerId = 9206;
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
+        CombatResourceTestFixture.SetResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(npcEntityId, npcCode);
         scene.AppendNpcName(npcCode, catalog[npcCode].Name);
         scene.AppendNpcKind(npcEntityId, NpcKind.Monster);
         scene.AppendNickname(playerId, "TestPlayer");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcEntityId,
-            SkillCode = 17070000,
-            Damage = 36_358,
-            Timestamp = 1_000,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcEntityId,
-            SkillCode = 17070000,
-            Damage = 1,
-            Timestamp = 1_050,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
+        AppendDamage(scene, playerId, npcEntityId, 17070000, 36_358, 1_000);
+        AppendDamage(scene, playerId, npcEntityId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
@@ -343,20 +241,11 @@ public sealed class NpcCatalogSceneTests
         const int playerId = 11616;
         const int battle1Target = 33541;
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceRegistry.SetGameResources(BuildSkillMap(), catalog);
+        CombatResourceTestFixture.SetResources(BuildSkillMap(), catalog);
         using var scene = new SceneTestHarness();
 
         scene.AppendNickname(playerId, "TestPlayer");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = battle1Target,
-            SkillCode = 17070000,
-            Damage = 50_000,
-            Timestamp = 1_000,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
+        AppendDamage(scene, playerId, battle1Target, 17070000, 50_000, 1_000);
         scene.AppendNpcCode(npcEntityId, npcCode);
         scene.AppendNpcName(npcCode, catalog[npcCode].Name);
         scene.AppendNpcKind(npcEntityId, CombatResourceRegistry.ResolveNpcKind(catalog[npcCode].Kind));
@@ -369,26 +258,8 @@ public sealed class NpcCatalogSceneTests
         Assert.True(scene.TryGetNpcRuntimeState(npcEntityId, out var postResetState));
         Assert.Equal(npcCode, postResetState.NpcCode);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcEntityId,
-            SkillCode = 17070000,
-            Damage = 14_547,
-            Timestamp = 10_000,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcEntityId,
-            SkillCode = 17730000,
-            Damage = 4_092,
-            Timestamp = 10_100,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
+        AppendDamage(scene, playerId, npcEntityId, 17070000, 14_547, 10_000);
+        AppendDamage(scene, playerId, npcEntityId, 17730000, 4_092, 10_100);
 
         var snapshot = scene.CreateSnapshot();
         var archive = scene.Owner.CreateArchivePayload(snapshot);
@@ -409,7 +280,7 @@ public sealed class NpcCatalogSceneTests
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
         Assert.True(catalog.ContainsKey(npcCode));
         Assert.False(catalog.ContainsKey(sceneStateValue));
-        CombatResourceRegistry.SetGameResources([], catalog);
+        CombatResourceTestFixture.SetResources([], catalog);
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(entityId, npcCode);
@@ -427,31 +298,13 @@ public sealed class NpcCatalogSceneTests
     public void Scene_NpcSpawn_And_Damage_Resolves_Npc_Identity(int entityId, int npcCode, int sourceId, int damage)
     {
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, catalog);
+        CombatResourceTestFixture.SetResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills, catalog);
         using var scene = new SceneTestHarness();
 
         scene.AppendNpcCode(entityId, npcCode);
         scene.AppendNpcKind(entityId, CombatResourceRegistry.ResolveNpcKind(catalog[npcCode].Kind));
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = entityId,
-            SkillCode = 17070000,
-            Damage = damage,
-            Timestamp = 1_000,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = entityId,
-            SkillCode = 17070000,
-            Damage = 1,
-            Timestamp = 1_050,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
+        AppendDamage(scene, sourceId, entityId, 17070000, damage, 1_000);
+        AppendDamage(scene, sourceId, entityId, 17070000, 1, 1_050);
 
         Assert.True(scene.TryGetNpcRuntimeState(entityId, out var state), $"Scene missing NPC state for entity {entityId}");
         Assert.Equal(npcCode, state.NpcCode);
@@ -467,6 +320,24 @@ public sealed class NpcCatalogSceneTests
             new SkillDisplayEntry(17070000, "Chain of Torment", SkillCategory.Cleric, SkillSourceType.PcSkill),
             new SkillDisplayEntry(17730000, "Additional Strike", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ];
+    }
+
+    private static void AppendDamage(
+        SceneTestHarness scene,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int damage,
+        long timestamp)
+    {
+        var observation = new CombatWireObservation
+        {
+            SkillCode = skillCode,
+            Damage = damage,
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(sourceId, targetId, in observation, timestamp);
     }
 
     private static PacketObservationSource Source(long timestamp) =>

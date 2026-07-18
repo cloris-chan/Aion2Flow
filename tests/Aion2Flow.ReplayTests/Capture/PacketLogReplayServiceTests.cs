@@ -1,9 +1,9 @@
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
-using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
@@ -59,14 +59,19 @@ public sealed class PacketLogReplayServiceTests
 
         var packets = SceneReplayTestView.Packets(replay);
         var regenerationHealing = packets
-            .Where(static packet => packet.SourceId == playerId && packet.TargetId == playerId && packet.EffectTag == PacketEffectTag.RegenerationHealing)
+            .Where(static packet =>
+                packet.SourceId == playerId &&
+                packet.TargetId == playerId &&
+                packet.Metric == CombatMetricKind.Healing &&
+                packet.Delivery == CombatDeliveryKind.Regeneration)
             .ToArray();
         Assert.Equal(2, regenerationHealing.Length);
-        Assert.Equal(1_209, regenerationHealing.Sum(static packet => packet.Damage));
+        Assert.Equal(1_209, regenerationHealing.Sum(static packet => packet.Amount));
 
-        AssertSkillValueKind(replay, skillCode: 12_350_150, CombatEventKind.Healing, CombatValueKind.Healing, expectedCount: 3, expectedAmount: 7_808);
-        Assert.Equal(48_912, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911 && packet.ValueKind == CombatValueKind.Healing).Sum(static packet => packet.Damage));
-        Assert.Equal(6_329, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911 && packet.ValueKind == CombatValueKind.Support).Sum(static packet => packet.Damage));
+        AssertSkillContribution(replay, skillCode: 12_350_150, CombatMetricKind.Healing, CombatDeliveryKind.Direct, expectedCount: 3, expectedAmount: 7_808);
+        var skill1900911 = packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911).ToArray();
+        Assert.Equal(48_912, skill1900911.Where(static packet => packet.Metric == CombatMetricKind.Healing).Sum(static packet => packet.Amount));
+        Assert.Equal(48_912, skill1900911.Sum(static packet => packet.Amount));
     }
 
     [Fact]
@@ -76,25 +81,9 @@ public sealed class PacketLogReplayServiceTests
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerSystemCanonicalization}"));
 
-        var ownerRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.OwnerTargetSummonResource, expectedCount: 148);
-        Assert.All(ownerRows, static row =>
-        {
-            Assert.Equal(CombatEventKind.Support, row.Observation.EventKind);
-            Assert.Equal(CombatValueKind.Support, row.Observation.ValueKind);
-        });
-        AssertDirectSemanticHealsBypassOwnerCanonicalization(replay);
-        var systemSeedRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.SystemPeriodicRecoverySeed, expectedCount: 9);
-        var systemHealingRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.SystemPeriodicRecoveryHealing, expectedCount: 9);
-        Assert.All(systemSeedRows, static e =>
-        {
-            Assert.Equal(CombatEventKind.Support, e.Observation.EventKind);
-            Assert.Equal(CombatValueKind.Support, e.Observation.ValueKind);
-        });
-        Assert.All(systemHealingRows, static e =>
-        {
-            Assert.Equal(CombatEventKind.Healing, e.Observation.EventKind);
-            Assert.Equal(CombatValueKind.PeriodicHealing, e.Observation.ValueKind);
-        });
+        var ownerRows = AssertOwnerTargetCandidateRows(replay, expectedCount: 345);
+        AssertDirectSemanticHealsPassOwnerPostParseGate(replay);
+        var (systemSeedRows, systemHealingRows) = AssertSystemPeriodicRecoveryRows(replay, expectedCount: 9);
         AssertBalancedSystemPeriodicRecoveryPairs(systemSeedRows, systemHealingRows);
     }
 
@@ -105,13 +94,8 @@ public sealed class PacketLogReplayServiceTests
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerTargetCanonicalizationEdge}"));
 
-        var ownerRows = AssertCanonicalizedRows(replay, CombatContributionCanonicalization.OwnerTargetSummonResource, expectedCount: 8);
-        Assert.All(ownerRows, static row =>
-        {
-            Assert.Equal(CombatEventKind.Support, row.Observation.EventKind);
-            Assert.Equal(CombatValueKind.Support, row.Observation.ValueKind);
-        });
-        AssertDirectSemanticHealsBypassOwnerCanonicalization(replay);
+        var ownerRows = AssertOwnerTargetCandidateRows(replay, expectedCount: 127);
+        AssertDirectSemanticHealsPassOwnerPostParseGate(replay);
         Assert.All(ownerRows, static row => Assert.Equal((ushort)0x0438, row.Raw.Opcode));
     }
 
@@ -435,14 +419,20 @@ public sealed class PacketLogReplayServiceTests
 
         const int playerId = 11190;
         var player = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == playerId);
+        var mechanicDump = string.Join(
+            Environment.NewLine,
+            replay.SceneOwner.Mechanics.Events
+                .Where(static e => e.TargetId == playerId)
+                .Select(static e => $"t={e.ObservedAtMilliseconds} source={e.SourceId} skill={e.Observation.SkillCode} damage={e.Observation.Damage} hits={e.Mechanic.HitCount} attempts={e.Mechanic.AttemptCount} evades={e.Mechanic.EvadeCount} invincibles={e.Mechanic.InvincibleCount} mods={e.Mechanic.Modifiers} rule={e.Mechanic.Resolution.PacketRule} materialization={e.Mechanic.Resolution.Materialization} association={e.Mechanic.Resolution.Association}"));
+        Assert.Equal(186_174, replay.Snapshot.EncounterStartTime);
         Assert.Equal(6, player.IncomingDamage);
         Assert.Equal(6, player.IncomingHits);
-        Assert.Equal(14, player.IncomingAttempts);
-        Assert.Equal(8, player.IncomingEvades);
+        AssertMetric(player.IncomingAttempts, 14, "attempts", mechanicDump);
+        AssertMetric(player.IncomingEvades, 8, "evades", mechanicDump);
 
         var packets = SceneReplayTestView.Packets(replay);
         var incomingHits = packets
-            .Where(static packet => packet.SourceId == 18722 && packet.TargetId == playerId && packet.SkillCode == 1_100_020 && packet.LayoutTag == 0x46 && packet.HitContribution > 0)
+            .Where(static packet => packet.SourceId == 18722 && packet.TargetId == playerId && packet.SkillCode == 1_100_020 && packet.LayoutTag == 0x46 && packet.HitCount > 0)
             .OrderBy(static packet => packet.Timestamp)
             .ThenBy(static packet => packet.Marker)
             .ToArray();
@@ -472,13 +462,13 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(0, player.IncomingInvincibles);
 
         var incomingHits = SceneReplayTestView.Packets(replay)
-            .Where(static packet => packet.TargetId == playerId && packet.LayoutTag == 0x46 && packet.HitContribution > 0)
+            .Where(static packet => packet.TargetId == playerId && packet.LayoutTag == 0x46 && packet.HitCount > 0)
             .ToArray();
         var dump = string.Join(
             Environment.NewLine,
-            incomingHits.Select(static packet => $"t={packet.Timestamp} detailRef={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} mods={packet.Modifiers}"));
+            incomingHits.Select(static packet => $"t={packet.Timestamp} detailRef={packet.DetailResourceEffectRef.RawId} amount={packet.Amount} mods={packet.Modifiers}"));
 
-        AssertMetric(incomingHits.Sum(static packet => packet.HitContribution), 32, "hits", dump);
+        AssertMetric(incomingHits.Sum(static packet => packet.HitCount), 32, "hits", dump);
         AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Front)), 32, "fronts", dump);
         AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Back)), 0, "backs", dump);
         AssertMetric(incomingHits.Sum(static packet => CountHitsWithAny(packet, DamageModifiers.Block | DamageModifiers.Parry)), 23, "defensiveBlocks", dump);
@@ -514,18 +504,18 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(CharacterClass.Cleric, entity.CharacterClass);
 
         var packets = SceneReplayTestView.Packets(replay);
-        Assert.Equal(813_802, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_060_233 && packet.ContributesDamage).Sum(static packet => packet.Damage));
-        Assert.Equal(719, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_720_001 && packet.ValueKind == CombatValueKind.Healing).Sum(static packet => packet.Damage));
-        Assert.Equal(5_846, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_800_001 && packet.ValueKind == CombatValueKind.Healing).Sum(static packet => packet.Damage));
+        Assert.Equal(813_802, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_060_233 && packet.Metric == CombatMetricKind.Damage).Sum(static packet => packet.Amount));
+        Assert.Equal(719, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_720_001 && packet.Metric == CombatMetricKind.Healing).Sum(static packet => packet.Amount));
+        Assert.Equal(5_846, packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 17_800_001 && packet.Metric == CombatMetricKind.Healing).Sum(static packet => packet.Amount));
 
         var incomingHits = packets
-            .Where(static packet => packet.TargetId == playerId && packet.LayoutTag == 0x46 && packet.HitContribution > 0)
+            .Where(static packet => packet.TargetId == playerId && packet.LayoutTag == 0x46 && packet.HitCount > 0)
             .ToArray();
         var dump = string.Join(
             Environment.NewLine,
-            incomingHits.Select(static packet => $"t={packet.Timestamp} detailRef={packet.DetailResourceEffectRef.RawId} damage={packet.Damage} mods={packet.Modifiers}"));
+            incomingHits.Select(static packet => $"t={packet.Timestamp} detailRef={packet.DetailResourceEffectRef.RawId} amount={packet.Amount} mods={packet.Modifiers}"));
 
-        AssertMetric(incomingHits.Sum(static packet => packet.HitContribution), 7, "hits", dump);
+        AssertMetric(incomingHits.Sum(static packet => packet.HitCount), 7, "hits", dump);
         AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Front)), 6, "fronts", dump);
         AssertMetric(incomingHits.Sum(static packet => CountHitsWithAny(packet, DamageModifiers.Block | DamageModifiers.Parry)), 6, "defensiveBlocks", dump);
         AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Block)), 4, "shieldBlocks", dump);
@@ -537,60 +527,93 @@ public sealed class PacketLogReplayServiceTests
 
     private static void SetResources() => CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese));
 
-    private static CombatEventRecord[] AssertCanonicalizedRows(PacketLogReplayResult replay, CombatContributionCanonicalization flag, int expectedCount)
+    private static CanonicalizationProbeRow[] AssertOwnerTargetCandidateRows(PacketLogReplayResult replay, int expectedCount)
     {
-        var rows = replay.SceneOwner.Combat.Events
-            .Where(e => HasCanonicalization(in e, flag))
-            .ToArray();
-        var dump = string.Join(
-            Environment.NewLine,
-            replay.SceneOwner.Combat.Events
-                .Where(static e => e.Canonicalization != CombatContributionCanonicalization.None)
-                .GroupBy(static e => e.Canonicalization)
-                .OrderBy(static group => group.Key)
-                .Select(static group => $"{group.Key}: {group.Count()}"));
+        var canonicalizer = new OwnerTargetSummonResourceCanonicalizer(replay.SceneOwner.Entities);
+        var matches = new List<CanonicalizationProbeRow>();
+        foreach (var entry in ReadCombatWireEntries(replay))
+        {
+            var observation = entry.Observation;
+            var result = canonicalizer.Normalize(entry.SourceId, entry.TargetId, in observation);
+            if (result.Resolution.Suppression != CombatSuppressionReason.OwnerTargetSummonResource)
+                continue;
 
-        Assert.True(rows.Length == expectedCount, $"{flag} rows={rows.Length} expected={expectedCount}\n{dump}");
+            matches.Add(new CanonicalizationProbeRow(
+                entry.SourceId,
+                entry.TargetId,
+                observation,
+                entry.Raw,
+                result.Resolution));
+        }
+
+        var rows = matches.ToArray();
+        Assert.Equal(expectedCount, rows.Length);
         return rows;
     }
 
-    private static void AssertBalancedSystemPeriodicRecoveryPairs(IReadOnlyList<CombatEventRecord> seedRows, IReadOnlyList<CombatEventRecord> healingRows)
+    private static (CanonicalizationProbeRow[] Seeds, CanonicalizationProbeRow[] Healing) AssertSystemPeriodicRecoveryRows(
+        PacketLogReplayResult replay,
+        int expectedCount)
+    {
+        var canonicalizer = new SystemPeriodicRecoveryCanonicalizer();
+        var seeds = new List<CanonicalizationProbeRow>();
+        var healing = new List<CanonicalizationProbeRow>();
+        foreach (var entry in ReadCombatWireEntries(replay))
+        {
+            var observation = entry.Observation;
+            var result = canonicalizer.Normalize(entry.SourceId, entry.TargetId, in observation);
+            var row = new CanonicalizationProbeRow(entry.SourceId, entry.TargetId, result.Observation, entry.Raw, result.Resolution);
+            if (result.Resolution.Suppression == CombatSuppressionReason.SystemPeriodicRecoverySeed)
+                seeds.Add(row);
+            else if (result.Resolution.PacketRule == CombatPacketRule.PeriodicRecovery)
+                healing.Add(row);
+        }
+
+        Assert.Equal(expectedCount, seeds.Count);
+        Assert.Equal(expectedCount, healing.Count);
+        return (seeds.ToArray(), healing.ToArray());
+    }
+
+    private static void AssertBalancedSystemPeriodicRecoveryPairs(IReadOnlyList<CanonicalizationProbeRow> seedRows, IReadOnlyList<CanonicalizationProbeRow> healingRows)
     {
         var seeds = seedRows.Select(static row => CreateSystemRecoveryPairKey(in row)).Order().ToArray();
         var healing = healingRows.Select(static row => CreateSystemRecoveryPairKey(in row)).Order().ToArray();
         Assert.Equal(seeds, healing);
     }
 
-    private static void AssertDirectSemanticHealsBypassOwnerCanonicalization(PacketLogReplayResult replay)
+    private static void AssertDirectSemanticHealsPassOwnerPostParseGate(PacketLogReplayResult replay)
     {
-        var rows = replay.SceneOwner.Combat.Events
-            .Where(static row => IsDirectSemanticHeal(in row))
-            .ToArray();
-
-        Assert.NotEmpty(rows);
-        Assert.All(rows, static row =>
+        var canonicalizer = new OwnerTargetSummonResourceCanonicalizer(replay.SceneOwner.Entities);
+        var admitted = new List<CombatContribution>();
+        foreach (var row in ReadCombatWireEntries(replay))
         {
-            Assert.Equal(CombatEventKind.Healing, row.Observation.EventKind);
-            Assert.Equal(CombatValueKind.Healing, row.Observation.ValueKind);
-            Assert.False(HasCanonicalization(in row, CombatContributionCanonicalization.OwnerTargetSummonResource));
-        });
+            var observation = row.Observation;
+            var result = canonicalizer.Normalize(row.SourceId, row.TargetId, in observation);
+            if (result.Resolution.Suppression != CombatSuppressionReason.OwnerTargetSummonResource)
+                continue;
+
+            var occurrence = result.Resolution;
+            var materialization = CombatOccurrenceMaterializer.Resolve(
+                row.SourceId,
+                row.TargetId,
+                in observation,
+                in occurrence);
+            if (materialization.Contribution is not { Metric: CombatMetricKind.Healing, Resolution.Authority: CombatResolutionAuthority.SkillSemantic } contribution)
+                continue;
+
+            Assert.True(materialization.IsAdmitted);
+            Assert.Equal(CombatPacketRule.DirectSemantic, contribution.Resolution.PacketRule);
+            Assert.True(contribution.Resolution.SemanticMatch is CombatSemanticMatchKind.ExactNode or CombatSemanticMatchKind.UnambiguousSlot);
+            admitted.Add(contribution);
+        }
+
+        Assert.NotEmpty(admitted);
     }
 
-    private static bool IsDirectSemanticHeal(in CombatEventRecord row)
-    {
-        var observation = row.Observation;
-        return observation.PeriodicRelation == PeriodicEffectRelation.None &&
-            observation.ResourceKind != CombatResourceKind.Mana &&
-            CombatResourceRegistry.TryResolveDirectCombatEffectSemantics(in observation, out var semantics) &&
-            (semantics.DirectFacets & SkillSemanticFacet.Healing) != 0;
-    }
-
-    private static string CreateSystemRecoveryPairKey(in CombatEventRecord row)
+    private static string CreateSystemRecoveryPairKey(in CanonicalizationProbeRow row)
         => string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
-            $"{row.SourceId}|{row.TargetId}|{row.EventKey.SkillCode}|{row.EventKey.BodyResourceEffectRef.RawId}|{row.EventKey.DetailResourceEffectRef.RawId}|{row.Observation.ChainId}|{row.Observation.Damage}");
-
-    private static bool HasCanonicalization(in CombatEventRecord row, CombatContributionCanonicalization flag) => (row.Canonicalization & flag) == flag;
+            $"{row.SourceId}|{row.TargetId}|{row.Observation.SkillCode}|{row.Observation.BodyResourceEffectRef.RawId}|{row.Observation.DetailResourceEffectRef.RawId}|{row.Observation.ChainId}|{row.Observation.Damage}");
 
     private static IReadOnlyList<ReplayJournalEntrySnapshot> ReadAllJournalEntries(PacketLogReplayResult replay)
     {
@@ -619,6 +642,34 @@ public sealed class PacketLogReplayServiceTests
         }
     }
 
+    private static IReadOnlyList<CombatWireEntrySnapshot> ReadCombatWireEntries(PacketLogReplayResult replay)
+    {
+        var entries = new List<CombatWireEntrySnapshot>();
+        var cursor = replay.SceneJournal.CreateCursor(0);
+        while (true)
+        {
+            var result = replay.SceneJournal.ReadEntries(cursor, 1024, batch =>
+            {
+                foreach (var entry in batch)
+                {
+                    if (entry.Domain == ObservedEventDomain.Combat)
+                    {
+                        entries.Add(new CombatWireEntrySnapshot(
+                            entry.SourceEntityId,
+                            entry.TargetEntityId,
+                            entry.Combat,
+                            entry.Raw));
+                    }
+                }
+            });
+
+            if (result.Count == 0)
+                return entries;
+
+            cursor = result.Cursor;
+        }
+    }
+
     private static void AssertDamageSkill(
         IReadOnlyList<SceneReplayPacket> packets,
         int sourceId,
@@ -633,15 +684,15 @@ public sealed class PacketLogReplayServiceTests
         int expectedMultiHits)
     {
         var matching = packets
-            .Where(packet => packet.SourceId == sourceId && packet.SkillCode == skillCode && packet.ContributesDamage)
+            .Where(packet => packet.SourceId == sourceId && packet.SkillCode == skillCode && packet.Metric == CombatMetricKind.Damage)
             .ToArray();
         var dump = string.Join(
             Environment.NewLine,
             matching.Select(static packet =>
-                $"t={packet.Timestamp} skill={packet.SkillCode} damage={packet.Damage} hits={packet.HitContribution} mods={packet.Modifiers} multi={packet.MultiHitCount} layout={packet.LayoutTag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16}"));
+                $"t={packet.Timestamp} skill={packet.SkillCode} amount={packet.Amount} hits={packet.HitCount} mods={packet.Modifiers} multi={packet.MultiHitCount} layout={packet.LayoutTag} type={packet.Type} loop={packet.Loop} detail=0x{packet.DetailRaw:X16}"));
 
-        AssertMetric(matching.Sum(static packet => packet.Damage), expectedDamage, "damage", dump);
-        AssertMetric(matching.Sum(static packet => packet.HitContribution), expectedHits, "hits", dump);
+        AssertMetric(matching.Sum(static packet => packet.Amount), expectedDamage, "damage", dump);
+        AssertMetric(matching.Sum(static packet => packet.HitCount), expectedHits, "hits", dump);
         AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.Critical)), expectedCriticals, "criticals", dump);
         AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.Perfect)), expectedPerfects, "perfects", dump);
         AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.Smite)), expectedSmites, "smites", dump);
@@ -650,27 +701,31 @@ public sealed class PacketLogReplayServiceTests
         AssertMetric(matching.Sum(static packet => CountHitsWith(packet, DamageModifiers.MultiHit)), expectedMultiHits, "multiHits", dump);
     }
 
-    private static void AssertSkillValueKind(PacketLogReplayResult replay, int skillCode, CombatEventKind eventKind, CombatValueKind valueKind, int expectedCount, long expectedAmount)
+    private static void AssertSkillContribution(
+        PacketLogReplayResult replay,
+        int skillCode,
+        CombatMetricKind metric,
+        CombatDeliveryKind delivery,
+        int expectedCount,
+        long expectedAmount)
     {
         var matching = replay.SceneOwner.Combat.Events
             .Where(e => e.Observation.SkillCode == skillCode &&
                         e.Observation.BodySkillVariantRaw == skillCode &&
-                        e.Observation.EventKind == eventKind &&
-                        e.Observation.ValueKind == valueKind)
+                        e.Contribution.Metric == metric &&
+                        e.Contribution.Delivery == delivery)
             .ToArray();
         var skillDump = string.Join(
             Environment.NewLine,
             replay.SceneOwner.Combat.Events
                 .Where(e => e.Observation.SkillCode == skillCode || e.Observation.BodySkillVariantRaw == skillCode)
-                .GroupBy(e => new { e.Observation.SkillCode, e.Observation.BodySkillVariantRaw, e.Observation.EventKind, e.Observation.ValueKind, e.ContributesDamage, e.ContributesHealing })
-                .OrderByDescending(group => group.Sum(e => e.Observation.Damage))
+                .GroupBy(e => new { e.Observation.SkillCode, e.Observation.BodySkillVariantRaw, e.Contribution.Metric, e.Contribution.Delivery })
+                .OrderByDescending(group => group.Sum(e => e.Contribution.Amount))
                 .Select(group =>
-                    $"skill={group.Key.SkillCode} body={group.Key.BodySkillVariantRaw} event={group.Key.EventKind} value={group.Key.ValueKind} contribD={group.Key.ContributesDamage} contribH={group.Key.ContributesHealing} count={group.Count()} amount={group.Sum(e => e.Observation.Damage)}"));
+                    $"skill={group.Key.SkillCode} body={group.Key.BodySkillVariantRaw} metric={group.Key.Metric} delivery={group.Key.Delivery} count={group.Count()} amount={group.Sum(e => e.Contribution.Amount)}"));
 
         Assert.True(matching.Length == expectedCount, $"count={matching.Length} expected={expectedCount}\n{skillDump}");
-        Assert.True(matching.Sum(e => e.Observation.Damage) == expectedAmount, $"amount={matching.Sum(e => e.Observation.Damage)} expected={expectedAmount}\n{skillDump}");
-        Assert.All(matching, e => Assert.False(e.ContributesDamage));
-        Assert.All(matching, e => Assert.True(e.ContributesHealing));
+        Assert.True(matching.Sum(e => e.Contribution.Amount) == expectedAmount, $"amount={matching.Sum(e => e.Contribution.Amount)} expected={expectedAmount}\n{skillDump}");
     }
 
     private static void AssertGroupRelations(PacketLogReplayResult replay, PlayerGroupRelation expectedRelation, params int[] entityIds)
@@ -716,7 +771,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     private static int CountHitsWith(SceneReplayPacket packet, DamageModifiers modifier)
-        => (packet.Modifiers & modifier) != 0 ? packet.HitContribution : 0;
+        => (packet.Modifiers & modifier) != 0 ? packet.HitCount : 0;
 
     private readonly record struct ReplayJournalEntrySnapshot(
         TimelineStamp Stamp,
@@ -724,8 +779,21 @@ public sealed class PacketLogReplayServiceTests
         RawPacketReference Raw,
         StateObservation? State);
 
+    private readonly record struct CombatWireEntrySnapshot(
+        int SourceId,
+        int TargetId,
+        CombatWireObservation Observation,
+        RawPacketReference Raw);
+
+    private readonly record struct CanonicalizationProbeRow(
+        int SourceId,
+        int TargetId,
+        CombatWireObservation Observation,
+        RawPacketReference Raw,
+        CombatOccurrenceResolution Resolution);
+
     private static int CountHitsWithAny(SceneReplayPacket packet, DamageModifiers modifiers)
-        => (packet.Modifiers & modifiers) != 0 ? packet.HitContribution : 0;
+        => (packet.Modifiers & modifiers) != 0 ? packet.HitCount : 0;
 
     private static void AssertDefensiveHit(SceneReplayPacket packet, uint expectedDetailRef, DamageModifiers expectedPresent, DamageModifiers expectedAbsent)
     {

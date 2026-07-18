@@ -1,4 +1,6 @@
 using System.Globalization;
+using Cloris.Aion2Flow.Protocol.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
 
@@ -6,52 +8,100 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 internal sealed class DetailCounterpartOptionBuilder
 {
+    private enum CounterpartSortGroup : byte
+    {
+        Damage,
+        Healing,
+        Shield,
+        Resource
+    }
+
     private struct CounterpartAggregateMetrics
     {
         public long DamageAmount;
         public long HealingAmount;
         public long ShieldAmount;
+        public long ManaChange;
     }
 
     private readonly Dictionary<int, CounterpartAggregateMetrics> _outgoingDamageMetrics = [];
-    private readonly Dictionary<int, CounterpartAggregateMetrics> _outgoingSupportMetrics = [];
+    private readonly Dictionary<int, CounterpartAggregateMetrics> _outgoingHealingMetrics = [];
+    private readonly Dictionary<int, CounterpartAggregateMetrics> _outgoingShieldMetrics = [];
+    private readonly Dictionary<int, CounterpartAggregateMetrics> _outgoingResourceMetrics = [];
     private readonly Dictionary<int, CounterpartAggregateMetrics> _incomingDamageMetrics = [];
-    private readonly Dictionary<int, CounterpartAggregateMetrics> _incomingSupportMetrics = [];
+    private readonly Dictionary<int, CounterpartAggregateMetrics> _incomingHealingMetrics = [];
+    private readonly Dictionary<int, CounterpartAggregateMetrics> _incomingShieldMetrics = [];
+    private readonly Dictionary<int, CounterpartAggregateMetrics> _incomingResourceMetrics = [];
     private readonly List<int> _optionIds = [];
     private readonly List<DetailCounterpartOption> _options = [];
 
-    public void Accumulate(ReadOnlySpan<CombatDetailEvent> detailEvents, int combatantId)
+    public void Accumulate(
+        ReadOnlySpan<CombatMetricDetailEvent> metricEvents,
+        ReadOnlySpan<CombatMechanicDetailEvent> mechanicEvents,
+        ReadOnlySpan<CombatResourceDetailEvent> resourceEvents,
+        int combatantId)
     {
         _outgoingDamageMetrics.Clear();
-        _outgoingSupportMetrics.Clear();
+        _outgoingHealingMetrics.Clear();
+        _outgoingShieldMetrics.Clear();
+        _outgoingResourceMetrics.Clear();
         _incomingDamageMetrics.Clear();
-        _incomingSupportMetrics.Clear();
+        _incomingHealingMetrics.Clear();
+        _incomingShieldMetrics.Clear();
+        _incomingResourceMetrics.Clear();
 
-        foreach (ref readonly var detailEvent in detailEvents)
+        foreach (ref readonly var detailEvent in metricEvents)
         {
             TryAccumulate(_outgoingDamageMetrics, in detailEvent, DetailSectionKind.OutgoingDamage, combatantId);
-            if (!TryAccumulate(_outgoingSupportMetrics, in detailEvent, DetailSectionKind.OutgoingHealing, combatantId))
-                TryAccumulate(_outgoingSupportMetrics, in detailEvent, DetailSectionKind.OutgoingShield, combatantId);
+            TryAccumulate(_outgoingHealingMetrics, in detailEvent, DetailSectionKind.OutgoingHealing, combatantId);
+            TryAccumulate(_outgoingShieldMetrics, in detailEvent, DetailSectionKind.OutgoingShield, combatantId);
 
             TryAccumulate(_incomingDamageMetrics, in detailEvent, DetailSectionKind.IncomingDamage, combatantId);
-            if (!TryAccumulate(_incomingSupportMetrics, in detailEvent, DetailSectionKind.IncomingHealing, combatantId))
-                TryAccumulate(_incomingSupportMetrics, in detailEvent, DetailSectionKind.IncomingShield, combatantId);
+            TryAccumulate(_incomingHealingMetrics, in detailEvent, DetailSectionKind.IncomingHealing, combatantId);
+            TryAccumulate(_incomingShieldMetrics, in detailEvent, DetailSectionKind.IncomingShield, combatantId);
+        }
+
+        foreach (ref readonly var detailEvent in mechanicEvents)
+        {
+            TryAccumulateMechanic(_outgoingDamageMetrics, in detailEvent, DetailSectionKind.OutgoingDamage, combatantId);
+            TryAccumulateMechanic(_incomingDamageMetrics, in detailEvent, DetailSectionKind.IncomingDamage, combatantId);
+        }
+
+        foreach (ref readonly var detailEvent in resourceEvents)
+        {
+            TryAccumulateResource(_outgoingResourceMetrics, in detailEvent, DetailSectionKind.OutgoingResource, combatantId);
+            TryAccumulateResource(_incomingResourceMetrics, in detailEvent, DetailSectionKind.IncomingResource, combatantId);
         }
     }
 
     public IReadOnlyCollection<DetailCounterpartOption> BuildOutgoingDamageOptions(SceneDisplayContext? displayContext)
-        => BuildOptions(_outgoingDamageMetrics, displayContext);
+        => BuildOptions(_outgoingDamageMetrics, CounterpartSortGroup.Damage, displayContext);
 
-    public IReadOnlyCollection<DetailCounterpartOption> BuildOutgoingSupportOptions(SceneDisplayContext? displayContext)
-        => BuildOptions(_outgoingSupportMetrics, displayContext);
+    public IReadOnlyCollection<DetailCounterpartOption> BuildOutgoingHealingOptions(SceneDisplayContext? displayContext)
+        => BuildOptions(_outgoingHealingMetrics, CounterpartSortGroup.Healing, displayContext);
+
+    public IReadOnlyCollection<DetailCounterpartOption> BuildOutgoingShieldOptions(SceneDisplayContext? displayContext)
+        => BuildOptions(_outgoingShieldMetrics, CounterpartSortGroup.Shield, displayContext);
+
+    public IReadOnlyCollection<DetailCounterpartOption> BuildOutgoingResourceOptions(SceneDisplayContext? displayContext)
+        => BuildOptions(_outgoingResourceMetrics, CounterpartSortGroup.Resource, displayContext);
 
     public IReadOnlyCollection<DetailCounterpartOption> BuildIncomingDamageOptions(SceneDisplayContext? displayContext)
-        => BuildOptions(_incomingDamageMetrics, displayContext);
+        => BuildOptions(_incomingDamageMetrics, CounterpartSortGroup.Damage, displayContext);
 
-    public IReadOnlyCollection<DetailCounterpartOption> BuildIncomingSupportOptions(SceneDisplayContext? displayContext)
-        => BuildOptions(_incomingSupportMetrics, displayContext);
+    public IReadOnlyCollection<DetailCounterpartOption> BuildIncomingHealingOptions(SceneDisplayContext? displayContext)
+        => BuildOptions(_incomingHealingMetrics, CounterpartSortGroup.Healing, displayContext);
 
-    private IReadOnlyCollection<DetailCounterpartOption> BuildOptions(Dictionary<int, CounterpartAggregateMetrics> metricsByCombatantId, SceneDisplayContext? displayContext)
+    public IReadOnlyCollection<DetailCounterpartOption> BuildIncomingShieldOptions(SceneDisplayContext? displayContext)
+        => BuildOptions(_incomingShieldMetrics, CounterpartSortGroup.Shield, displayContext);
+
+    public IReadOnlyCollection<DetailCounterpartOption> BuildIncomingResourceOptions(SceneDisplayContext? displayContext)
+        => BuildOptions(_incomingResourceMetrics, CounterpartSortGroup.Resource, displayContext);
+
+    private IReadOnlyCollection<DetailCounterpartOption> BuildOptions(
+        Dictionary<int, CounterpartAggregateMetrics> metricsByCombatantId,
+        CounterpartSortGroup sortGroup,
+        SceneDisplayContext? displayContext)
     {
         _optionIds.Clear();
         _options.Clear();
@@ -69,20 +119,7 @@ internal sealed class DetailCounterpartOptionBuilder
         {
             var leftMetrics = metricsByCombatantId[left];
             var rightMetrics = metricsByCombatantId[right];
-            var cmp = (rightMetrics.DamageAmount + rightMetrics.HealingAmount + rightMetrics.ShieldAmount)
-                .CompareTo(leftMetrics.DamageAmount + leftMetrics.HealingAmount + leftMetrics.ShieldAmount);
-            if (cmp != 0)
-                return cmp;
-
-            cmp = rightMetrics.DamageAmount.CompareTo(leftMetrics.DamageAmount);
-            if (cmp != 0)
-                return cmp;
-
-            cmp = rightMetrics.HealingAmount.CompareTo(leftMetrics.HealingAmount);
-            if (cmp != 0)
-                return cmp;
-
-            cmp = rightMetrics.ShieldAmount.CompareTo(leftMetrics.ShieldAmount);
+            var cmp = CompareMetrics(in leftMetrics, in rightMetrics, sortGroup);
             if (cmp != 0)
                 return cmp;
 
@@ -101,13 +138,31 @@ internal sealed class DetailCounterpartOptionBuilder
                 metrics.HealingAmount,
                 totalHealing > 0 ? metrics.HealingAmount / (double)totalHealing : 0d,
                 metrics.ShieldAmount,
-                totalShield > 0 ? metrics.ShieldAmount / (double)totalShield : 0d));
+                totalShield > 0 ? metrics.ShieldAmount / (double)totalShield : 0d,
+                metrics.ManaChange));
         }
 
         return _options;
     }
 
-    private static bool TryAccumulate(Dictionary<int, CounterpartAggregateMetrics> metricsByCombatantId, in CombatDetailEvent detailEvent, DetailSectionKind sectionKind, int combatantId)
+    private static int CompareMetrics(
+        in CounterpartAggregateMetrics left,
+        in CounterpartAggregateMetrics right,
+        CounterpartSortGroup sortGroup)
+    {
+        if (sortGroup == CounterpartSortGroup.Damage)
+            return right.DamageAmount.CompareTo(left.DamageAmount);
+
+        if (sortGroup == CounterpartSortGroup.Healing)
+            return right.HealingAmount.CompareTo(left.HealingAmount);
+
+        if (sortGroup == CounterpartSortGroup.Shield)
+            return right.ShieldAmount.CompareTo(left.ShieldAmount);
+
+        return right.ManaChange.CompareTo(left.ManaChange);
+    }
+
+    private static bool TryAccumulate(Dictionary<int, CounterpartAggregateMetrics> metricsByCombatantId, in CombatMetricDetailEvent detailEvent, DetailSectionKind sectionKind, int combatantId)
     {
         if (!SkillDetailSectionRules.Matches(in detailEvent, sectionKind, combatantId) ||
             !SkillDetailSectionRules.Contributes(in detailEvent, sectionKind))
@@ -139,5 +194,41 @@ internal sealed class DetailCounterpartOptionBuilder
 
         metricsByCombatantId[counterpartCombatantId] = metrics;
         return true;
+    }
+
+    private static void TryAccumulateMechanic(
+        Dictionary<int, CounterpartAggregateMetrics> metricsByCombatantId,
+        in CombatMechanicDetailEvent detailEvent,
+        DetailSectionKind sectionKind,
+        int combatantId)
+    {
+        if (!SkillDetailSectionRules.Matches(in detailEvent, sectionKind, combatantId))
+            return;
+
+        var counterpartCombatantId = SkillDetailSectionRules.GetCounterpartCombatantId(in detailEvent, sectionKind);
+        if (counterpartCombatantId > 0)
+            metricsByCombatantId.TryAdd(counterpartCombatantId, default);
+    }
+
+    private static void TryAccumulateResource(
+        Dictionary<int, CounterpartAggregateMetrics> metricsByCombatantId,
+        in CombatResourceDetailEvent detailEvent,
+        DetailSectionKind sectionKind,
+        int combatantId)
+    {
+        if (!SkillDetailSectionRules.Matches(in detailEvent, sectionKind, combatantId))
+            return;
+
+        if (detailEvent.Resource.Resource != CombatResourceKind.Mana)
+            return;
+
+        var counterpartCombatantId = SkillDetailSectionRules.GetCounterpartCombatantId(in detailEvent, sectionKind);
+        if (counterpartCombatantId <= 0)
+            return;
+
+        metricsByCombatantId.TryGetValue(counterpartCombatantId, out var metrics);
+        metrics.ManaChange += detailEvent.Amount;
+
+        metricsByCombatantId[counterpartCombatantId] = metrics;
     }
 }

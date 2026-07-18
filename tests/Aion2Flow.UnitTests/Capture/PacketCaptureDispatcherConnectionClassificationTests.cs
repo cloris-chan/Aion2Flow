@@ -41,7 +41,7 @@ public sealed class PacketCaptureDispatcherConnectionClassificationTests
 
             Assert.True(Dispatch(dispatcher, firstConnection, firstAdmission, sequenceNumber: 100, CapturePacketTestData.Build0438Frame(), 1_000));
             Assert.False(Dispatch(dispatcher, queuedConnection, queuedAdmission, sequenceNumber: 200, CapturePacketTestData.Build0438Frame(), 1_001));
-            Assert.Equal(1, sink.CombatObservationCount);
+            Assert.Equal(1, sink.CombatWireObservationCount);
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
             Assert.Equal(firstConnection, lockedConnection);
         }
@@ -63,7 +63,7 @@ public sealed class PacketCaptureDispatcherConnectionClassificationTests
         var parsed = Dispatch(dispatcher, connection, staleAdmission, sequenceNumber: 100, CapturePacketTestData.Build0438Frame(), 1_000);
 
         Assert.False(parsed);
-        Assert.Equal(0, sink.CombatObservationCount);
+        Assert.Equal(0, sink.CombatWireObservationCount);
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public sealed class PacketCaptureDispatcherConnectionClassificationTests
 
         Assert.False(parsedTls);
         Assert.False(parsedFollowup);
-        Assert.Equal(0, sink.CombatObservationCount);
+        Assert.Equal(0, sink.CombatWireObservationCount);
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class PacketCaptureDispatcherConnectionClassificationTests
         Assert.False(parsedPrefix);
         Assert.False(parsedRest);
         Assert.False(parsedFollowup);
-        Assert.Equal(0, sink.CombatObservationCount);
+        Assert.Equal(0, sink.CombatWireObservationCount);
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public sealed class PacketCaptureDispatcherConnectionClassificationTests
             var parsed = Dispatch(dispatcher, connection, sequenceNumber: 200, CapturePacketTestData.Build0438Frame(), 1_000);
 
             Assert.True(parsed);
-            Assert.Equal(1, sink.CombatObservationCount);
+            Assert.Equal(1, sink.CombatWireObservationCount);
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
             Assert.Equal(connection, lockedConnection);
         }

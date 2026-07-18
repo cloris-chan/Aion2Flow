@@ -5,8 +5,8 @@ namespace Cloris.Aion2Flow.Resources.Catalog;
 public sealed record SkillSemanticEffectSlot(
     int SkillId,
     int Slot,
-    SkillSemanticFacet DirectFacets,
-    SkillSemanticFacet Facets,
+    SkillSemanticValue DirectSemantics,
+    SkillSemanticValue Semantics,
     IReadOnlyList<int> EffectFilterIds,
     IReadOnlyList<int> EffectGroupIds,
     IReadOnlyList<int> EffectIds,
@@ -29,8 +29,8 @@ public readonly record struct SkillSemanticResourceResolution(
     uint RawId,
     SkillSemanticResourceNodeKind NodeKind,
     int NodeId,
-    SkillSemanticFacet DirectFacets,
-    SkillSemanticFacet Facets,
+    SkillSemanticValue DirectSemantics,
+    SkillSemanticValue Semantics,
     SkillSemanticRuntimeSlot? Slot,
     int CandidateSlotCount)
 {
@@ -48,8 +48,8 @@ internal sealed class SkillSemanticEffectSlotIndex
         IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> slotsByProjectileId,
         IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> slotsByAbnormalId,
         IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> slotsByAbnormalEffectId,
-        IReadOnlyDictionary<int, SkillSemanticFacet> directFacetsByEffectGroupId,
-        IReadOnlyDictionary<int, SkillSemanticFacet> directFacetsByProjectileId)
+        IReadOnlyDictionary<int, SkillSemanticValue> directSemanticsByEffectGroupId,
+        IReadOnlyDictionary<int, SkillSemanticValue> directSemanticsByProjectileId)
     {
         Slots = slots;
         SlotsBySkillId = slotsBySkillId;
@@ -59,8 +59,8 @@ internal sealed class SkillSemanticEffectSlotIndex
         SlotsByProjectileId = slotsByProjectileId;
         SlotsByAbnormalId = slotsByAbnormalId;
         SlotsByAbnormalEffectId = slotsByAbnormalEffectId;
-        DirectFacetsByEffectGroupId = directFacetsByEffectGroupId;
-        DirectFacetsByProjectileId = directFacetsByProjectileId;
+        DirectSemanticsByEffectGroupId = directSemanticsByEffectGroupId;
+        DirectSemanticsByProjectileId = directSemanticsByProjectileId;
     }
 
     public IReadOnlyList<SkillSemanticEffectSlot> Slots { get; }
@@ -71,13 +71,13 @@ internal sealed class SkillSemanticEffectSlotIndex
     public IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> SlotsByProjectileId { get; }
     public IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> SlotsByAbnormalId { get; }
     public IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> SlotsByAbnormalEffectId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> DirectFacetsByEffectGroupId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> DirectFacetsByProjectileId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> DirectSemanticsByEffectGroupId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> DirectSemanticsByProjectileId { get; }
 
     public static SkillSemanticEffectSlotIndex Build(
         SkillSemanticCatalog semantics,
         IReadOnlyList<SkillEffectReference> references,
-        SkillSemanticFacetIndex facets)
+        SkillSemanticValueIndex semanticValues)
     {
         var accumulators = new Dictionary<(int SkillId, int Slot), SlotAccumulator>();
         foreach (var reference in references)
@@ -96,7 +96,7 @@ internal sealed class SkillSemanticEffectSlotIndex
         var index = 0;
         foreach (var accumulator in accumulators.Values.OrderBy(static value => value.SkillId).ThenBy(static value => value.Slot))
         {
-            slots[index++] = accumulator.Build(semantics, facets);
+            slots[index++] = accumulator.Build(semantics, semanticValues);
         }
 
         return new SkillSemanticEffectSlotIndex(
@@ -108,8 +108,8 @@ internal sealed class SkillSemanticEffectSlotIndex
             BuildLookup(slots, static slot => slot.ProjectileIds),
             BuildLookup(slots, static slot => slot.AbnormalIds),
             BuildLookup(slots, static slot => slot.AbnormalEffectIds),
-            BuildDirectEffectGroupFacets(semantics, facets),
-            BuildDirectProjectileFacets(semantics, facets));
+            BuildDirectEffectGroupSemantics(semantics, semanticValues),
+            BuildDirectProjectileSemantics(semantics, semanticValues));
     }
 
     private static IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> BuildLookup(
@@ -136,35 +136,33 @@ internal sealed class SkillSemanticEffectSlotIndex
             static pair => (IReadOnlyList<SkillSemanticEffectSlot>)pair.Value.ToArray());
     }
 
-    private static IReadOnlyDictionary<int, SkillSemanticFacet> BuildDirectEffectGroupFacets(
+    private static IReadOnlyDictionary<int, SkillSemanticValue> BuildDirectEffectGroupSemantics(
         SkillSemanticCatalog semantics,
-        SkillSemanticFacetIndex facets)
+        SkillSemanticValueIndex semanticValues)
     {
-        var result = new Dictionary<int, SkillSemanticFacet>(semantics.EffectsByGroupId.Count);
+        var result = new Dictionary<int, SkillSemanticValue>(semantics.EffectsByGroupId.Count);
         foreach (var (groupId, effects) in semantics.EffectsByGroupId)
         {
-            var directFacets = SkillSemanticFacet.None;
+            var directSemantics = SkillSemanticValue.Empty;
             foreach (var effect in effects)
-            {
-                directFacets |= facets.DirectEffectFacets.GetValueOrDefault(effect.Id);
-            }
+                directSemantics |= semanticValues.DirectEffectSemantics.GetValueOrDefault(effect.Id);
 
-            result.Add(groupId, directFacets);
+            result.Add(groupId, directSemantics);
         }
 
         return result.ToFrozenDictionary();
     }
 
-    private static IReadOnlyDictionary<int, SkillSemanticFacet> BuildDirectProjectileFacets(
+    private static IReadOnlyDictionary<int, SkillSemanticValue> BuildDirectProjectileSemantics(
         SkillSemanticCatalog semantics,
-        SkillSemanticFacetIndex facets)
+        SkillSemanticValueIndex semanticValues)
     {
-        var result = new Dictionary<int, SkillSemanticFacet>(semantics.Projectiles.Count);
+        var result = new Dictionary<int, SkillSemanticValue>(semantics.Projectiles.Count);
         foreach (var projectileId in semantics.Projectiles.Keys)
         {
-            var visitor = new SlotNodeVisitor(semantics, facets);
+            var visitor = new SlotNodeVisitor(semantics, semanticValues);
             visitor.TraverseProjectile(projectileId);
-            result.Add(projectileId, visitor.DirectFacets);
+            result.Add(projectileId, visitor.DirectSemantics);
         }
 
         return result.ToFrozenDictionary();
@@ -201,9 +199,9 @@ internal sealed class SkillSemanticEffectSlotIndex
             }
         }
 
-        public SkillSemanticEffectSlot Build(SkillSemanticCatalog semantics, SkillSemanticFacetIndex facets)
+        public SkillSemanticEffectSlot Build(SkillSemanticCatalog semantics, SkillSemanticValueIndex semanticValues)
         {
-            var visitor = new SlotNodeVisitor(semantics, facets);
+            var visitor = new SlotNodeVisitor(semantics, semanticValues);
             visitor.AddEffectFilter(_effectFilterId);
             visitor.TraverseEffectGroup(_effectGroupId);
             visitor.TraverseProjectile(_projectileId);
@@ -223,7 +221,7 @@ internal sealed class SkillSemanticEffectSlotIndex
         }
     }
 
-    private sealed class SlotNodeVisitor(SkillSemanticCatalog semantics, SkillSemanticFacetIndex facets)
+    private sealed class SlotNodeVisitor(SkillSemanticCatalog semantics, SkillSemanticValueIndex semanticValues)
     {
         private readonly SortedSet<int> _effectFilterIds = [];
         private readonly SortedSet<int> _effectGroupIds = [];
@@ -235,8 +233,8 @@ internal sealed class SkillSemanticEffectSlotIndex
         private readonly HashSet<int> _visitedAbnormals = [];
         private bool _hasUnresolvedReferences;
 
-        public SkillSemanticFacet DirectFacets { get; private set; }
-        public SkillSemanticFacet Facets { get; private set; }
+        public SkillSemanticValue DirectSemantics { get; private set; }
+        public SkillSemanticValue Semantics { get; private set; }
 
         public void AddEffectFilter(int filterId)
         {
@@ -262,12 +260,12 @@ internal sealed class SkillSemanticEffectSlotIndex
                 return;
             }
 
-            Facets |= facets.EffectGroupFacets.GetValueOrDefault(groupId);
+            Semantics |= semanticValues.EffectGroupSemantics.GetValueOrDefault(groupId);
             foreach (var effect in effects)
             {
                 _effectIds.Add(effect.Id);
-                DirectFacets |= facets.DirectEffectFacets.GetValueOrDefault(effect.Id);
-                Facets |= facets.EffectFacets.GetValueOrDefault(effect.Id);
+                DirectSemantics |= semanticValues.DirectEffectSemantics.GetValueOrDefault(effect.Id);
+                Semantics |= semanticValues.EffectSemantics.GetValueOrDefault(effect.Id);
                 TraverseAbnormal(effect.Links.AppliedAbnormalId);
             }
         }
@@ -286,7 +284,7 @@ internal sealed class SkillSemanticEffectSlotIndex
                 return;
             }
 
-            Facets |= facets.ProjectileFacets.GetValueOrDefault(projectileId);
+            Semantics |= semanticValues.ProjectileSemantics.GetValueOrDefault(projectileId);
             TraverseProjectile(projectile.ChainProjectileId);
             AddEffectFilter(projectile.ChainSkillEffectFilterId);
             TraverseEffectGroup(projectile.ChainSkillEffectGroupId);
@@ -306,7 +304,7 @@ internal sealed class SkillSemanticEffectSlotIndex
                 return;
             }
 
-            Facets |= facets.AbnormalFacets.GetValueOrDefault(abnormalId);
+            Semantics |= semanticValues.AbnormalSemantics.GetValueOrDefault(abnormalId);
             if (!semantics.AbnormalEffectsByAbnormalId.TryGetValue(abnormalId, out var effects))
             {
                 return;
@@ -315,24 +313,18 @@ internal sealed class SkillSemanticEffectSlotIndex
             foreach (var effect in effects)
             {
                 _abnormalEffectIds.Add(effect.Id);
-                Facets |= facets.AbnormalEffectFacets.GetValueOrDefault(effect.Id);
+                Semantics |= semanticValues.AbnormalEffectSemantics.GetValueOrDefault(effect.Id);
                 TraverseAbnormal(effect.Links.LinkedAbnormalId);
             }
         }
 
         public SkillSemanticEffectSlot Build(int skillId, int slot)
         {
-            if (Facets == SkillSemanticFacet.None &&
-                (_effectFilterIds.Count > 0 || _effectGroupIds.Count > 0 || _projectileIds.Count > 0 || _abnormalIds.Count > 0))
-            {
-                Facets = SkillSemanticFacet.Support;
-            }
-
             return new SkillSemanticEffectSlot(
                 skillId,
                 slot,
-                DirectFacets,
-                Facets,
+                DirectSemantics,
+                Semantics,
                 _effectFilterIds.ToArray(),
                 _effectGroupIds.ToArray(),
                 _effectIds.ToArray(),

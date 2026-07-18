@@ -17,10 +17,13 @@ public sealed class SceneArchivePayload
         DateTimeOffset sceneStarted,
         SceneJournalSegment timelineSegment,
         CombatEventSegment combatEvents,
+        CombatMechanicEventRecord[] mechanicEvents,
+        CombatResourceEventRecord[] resourceEvents,
         SceneIdentityScope identityScope,
         DirectedPairSnapshot[] pairs,
         CombatantSummary[] combatants,
         SceneArchiveEntityIdentity[] entities,
+        SceneArchiveEntityVital[] entityVitals,
         SceneArchiveBossFocus[] bosses,
         int[] bossNpcCodes,
         ArchivePayloadIndex detailIndex)
@@ -29,10 +32,13 @@ public sealed class SceneArchivePayload
         SceneStarted = sceneStarted;
         TimelineSegment = timelineSegment;
         CombatEvents = combatEvents;
+        MechanicEvents = new SnapshotList<CombatMechanicEventRecord>(mechanicEvents);
+        ResourceEvents = new SnapshotList<CombatResourceEventRecord>(resourceEvents);
         IdentityScope = identityScope;
         Pairs = new SnapshotList<DirectedPairSnapshot>(pairs);
         Combatants = new SnapshotList<CombatantSummary>(combatants);
         Entities = new SnapshotList<SceneArchiveEntityIdentity>(entities);
+        EntityVitals = new SnapshotList<SceneArchiveEntityVital>(entityVitals);
         Bosses = new SnapshotList<SceneArchiveBossFocus>(bosses);
         BossNpcCodes = new SnapshotList<int>(bossNpcCodes);
         _detailIndex = detailIndex;
@@ -42,21 +48,26 @@ public sealed class SceneArchivePayload
     public DateTimeOffset SceneStarted { get; }
     public SceneJournalSegment TimelineSegment { get; }
     public CombatEventSegment CombatEvents { get; }
+    public SnapshotList<CombatMechanicEventRecord> MechanicEvents { get; }
+    public SnapshotList<CombatResourceEventRecord> ResourceEvents { get; }
     public SceneIdentityScope IdentityScope { get; }
     public SnapshotList<DirectedPairSnapshot> Pairs { get; }
     public SnapshotList<CombatantSummary> Combatants { get; }
     public SnapshotList<SceneArchiveEntityIdentity> Entities { get; }
+    public SnapshotList<SceneArchiveEntityVital> EntityVitals { get; }
     public SnapshotList<SceneArchiveBossFocus> Bosses { get; }
     public SnapshotList<int> BossNpcCodes { get; }
 
-    internal IReadOnlyDictionary<int, long[]> EventOrdinalsByCombatant => DetailIndex.EventOrdinalsByCombatant;
+    internal IReadOnlyDictionary<int, long[]> MetricEventOrdinalsByCombatant => DetailIndex.MetricEventOrdinalsByCombatant;
+    internal IReadOnlyDictionary<int, int[]> MechanicEventIndexesByCombatant => DetailIndex.MechanicEventIndexesByCombatant;
+    internal IReadOnlyDictionary<int, int[]> ResourceEventIndexesByCombatant => DetailIndex.ResourceEventIndexesByCombatant;
     internal IReadOnlyDictionary<int, DirectedPairKey[]> OutgoingPairsByCombatant => DetailIndex.OutgoingPairsByCombatant;
     internal IReadOnlyDictionary<int, DirectedPairKey[]> IncomingPairsByCombatant => DetailIndex.IncomingPairsByCombatant;
     internal IReadOnlyDictionary<int, CombatantSummary> CombatantsById => DetailIndex.CombatantsById;
 
     private ArchivePayloadIndex DetailIndex => _detailIndex;
 
-    internal static SceneArchivePayload CreateLocked(SceneCombatSnapshot snapshot, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, BossFocusStore bossFocus, CombatStore combat, SceneCombatSnapshotAdapter adapter, SceneJournalSegment timelineSegment)
+    internal static SceneArchivePayload CreateLocked(SceneCombatSnapshot snapshot, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, BossFocusStore bossFocus, EntityVitalStore entityVitals, CombatStore combat, MechanicStore mechanics, ResourceStore resources, SceneCombatSnapshotAdapter adapter, SceneJournalSegment timelineSegment)
     {
         var archivedSnapshot = snapshot;
         var entityIds = new HashSet<int>();
@@ -72,25 +83,41 @@ public sealed class SceneArchivePayload
             AddEntity(entityIds, targetId);
 
         var combatEvents = combat.FreezeEventSegment();
-        var combatArchive = BuildCombatArchive(archivedSnapshot, combatEvents, adapter, entityIds);
+        var mechanicEvents = mechanics.Events.ToArray();
+        var resourceEvents = resources.Events.ToArray();
+        var combatArchive = BuildCombatArchive(archivedSnapshot, combatEvents, mechanicEvents, resourceEvents, adapter, entityIds);
+        AddResourceEventEntities(entityIds, resourceEvents);
         AddKnownEntities(entityIds, entities);
+        AddKnownEntityVitals(entityIds, entityVitals);
 
         var identities = BuildIdentities(entities, entityIds);
+        var vitals = BuildEntityVitals(entityVitals, entityIds);
         var identityScope = BuildIdentityScope(entityIds, identities, boundary, metadataRegistry);
         var pairs = combatArchive.Pairs;
-        var combatants = BuildCombatants(pairs);
+        var combatants = BuildCombatants(pairs, combatArchive.ResourceEventIndexesByCombatant, resourceEvents);
         var bosses = BuildBosses(bossFocus);
-        var detailIndex = ArchivePayloadIndex.Create(combatArchive.EventOrdinalsByCombatant, combatArchive.ProjectedSourcesByEventOrdinal, pairs, combatants);
+        var detailIndex = ArchivePayloadIndex.Create(
+            combatArchive.MetricEventOrdinalsByCombatant,
+            combatArchive.MechanicEventIndexesByCombatant,
+            combatArchive.ResourceEventIndexesByCombatant,
+            combatArchive.ProjectedMetricSources,
+            combatArchive.ProjectedMechanicSources,
+            combatArchive.ProjectedResourceSources,
+            pairs,
+            combatants);
 
         return new SceneArchivePayload(
             archivedSnapshot.Kind,
             sceneStarted,
             timelineSegment,
             combatEvents,
+            mechanicEvents,
+            resourceEvents,
             identityScope,
             pairs,
             combatants,
             identities,
+            vitals,
             bosses,
             archivedSnapshot.BossNpcCodes.AsSpan().ToArray(),
             detailIndex);
@@ -107,9 +134,14 @@ public sealed class SceneArchivePayload
         }
 
         var detailIndex = DetailIndex;
-        var eventOrdinals = detailIndex.GetEventOrdinals(combatantId);
+        var metricEventOrdinals = detailIndex.GetMetricEventOrdinals(combatantId);
+        var mechanicEventIndexes = detailIndex.GetMechanicEventIndexes(combatantId);
+        var resourceEventIndexes = detailIndex.GetResourceEventIndexes(combatantId);
         var combatant = detailIndex.GetCombatant(combatantId);
-        if (eventOrdinals.Length == 0 && combatant is null)
+        if (metricEventOrdinals.Length == 0 &&
+            mechanicEventIndexes.Length == 0 &&
+            resourceEventIndexes.Length == 0 &&
+            combatant is null)
         {
             return new CombatDetailDelta
             {
@@ -117,35 +149,86 @@ public sealed class SceneArchivePayload
             };
         }
 
-        var events = new CombatDetailEvent[eventOrdinals.Length];
-        var revision = 0L;
-        for (var i = 0; i < eventOrdinals.Length; i++)
+        var metricEvents = new CombatMetricDetailEvent[metricEventOrdinals.Length];
+        var metricRevision = 0L;
+        for (var i = 0; i < metricEventOrdinals.Length; i++)
         {
-            var eventOrdinal = eventOrdinals[i];
+            var eventOrdinal = metricEventOrdinals[i];
             ref readonly var record = ref CombatEvents.GetEvent(eventOrdinal);
-            var sourceId = detailIndex.ResolveSourceId(eventOrdinal, record.SourceId);
-            events[i] = new CombatDetailEvent(
-                record.Observation,
-                sourceId,
-                record.TargetId,
-                record.ObservedAtMilliseconds,
-                record.Revision,
-                record.EventKey,
-                record.Raw,
-                record.Contribution,
-                record.Canonicalization);
-            revision = Math.Max(revision, record.Revision);
+            var sourceId = detailIndex.ResolveMetricSourceId(eventOrdinal, record.SourceId);
+            metricEvents[i] = new CombatMetricDetailEvent(
+                CombatDetailFact.Create(
+                    record.Observation,
+                    sourceId,
+                    record.TargetId,
+                    record.ObservedAtMilliseconds,
+                    record.SourceObservationOrdinal,
+                    record.Revision,
+                    record.EventKey,
+                    record.Raw),
+                record.Contribution);
+            metricRevision = Math.Max(metricRevision, record.Revision);
+        }
+
+        var mechanicEvents = new CombatMechanicDetailEvent[mechanicEventIndexes.Length];
+        var mechanicRevision = 0L;
+        for (var i = 0; i < mechanicEventIndexes.Length; i++)
+        {
+            var eventIndex = mechanicEventIndexes[i];
+            var record = MechanicEvents[eventIndex];
+            var sourceId = detailIndex.ResolveMechanicSourceId(eventIndex, record.SourceId);
+            mechanicEvents[i] = new CombatMechanicDetailEvent(
+                CombatDetailFact.Create(
+                    record.Observation,
+                    sourceId,
+                    record.TargetId,
+                    record.ObservedAtMilliseconds,
+                    record.SourceObservationOrdinal,
+                    record.Revision,
+                    record.EventKey,
+                    record.Raw),
+                record.Mechanic);
+            mechanicRevision = Math.Max(mechanicRevision, record.Revision);
+        }
+
+        var resourceEvents = new CombatResourceDetailEvent[resourceEventIndexes.Length];
+        var resourceRevision = 0L;
+        for (var i = 0; i < resourceEventIndexes.Length; i++)
+        {
+            var eventIndex = resourceEventIndexes[i];
+            var record = ResourceEvents[eventIndex];
+            var sourceId = detailIndex.ResolveResourceSourceId(eventIndex, record.SourceId);
+            resourceEvents[i] = new CombatResourceDetailEvent(
+                CombatDetailFact.Create(
+                    record.Observation,
+                    sourceId,
+                    record.TargetId,
+                    record.ObservedAtMilliseconds,
+                    record.SourceObservationOrdinal,
+                    record.Revision,
+                    record.EventKey,
+                    record.Raw),
+                record.Resource);
+            resourceRevision = Math.Max(resourceRevision, record.Revision);
         }
 
         return new CombatDetailDelta
         {
             CombatantId = combatantId,
-            Revision = revision,
+            Revision = SaturatingAdd(metricRevision, mechanicRevision, resourceRevision),
             OutgoingPairs = detailIndex.GetOutgoingPairs(combatantId),
             IncomingPairs = detailIndex.GetIncomingPairs(combatantId),
-            Events = events,
+            MetricEvents = metricEvents,
+            MechanicEvents = mechanicEvents,
+            ResourceEvents = resourceEvents,
             Combatant = combatant
         };
+    }
+
+    private static long SaturatingAdd(long first, long second, long third)
+    {
+        var sum = first > long.MaxValue - second ? long.MaxValue : first + second;
+        return sum > long.MaxValue - third ? long.MaxValue : sum + third;
     }
 
     private static void AddEntity(HashSet<int> entityIds, int entityId)
@@ -158,6 +241,42 @@ public sealed class SceneArchivePayload
     {
         foreach (var entityId in entities.Entities.Keys)
             AddEntity(entityIds, entityId);
+    }
+
+    private static void AddKnownEntityVitals(HashSet<int> entityIds, EntityVitalStore entityVitals)
+    {
+        foreach (var entityId in entityVitals.States.Keys)
+            AddEntity(entityIds, entityId);
+    }
+
+    private static void AddResourceEventEntities(HashSet<int> entityIds, CombatResourceEventRecord[] resourceEvents)
+    {
+        for (var i = 0; i < resourceEvents.Length; i++)
+        {
+            AddEntity(entityIds, resourceEvents[i].SourceId);
+            AddEntity(entityIds, resourceEvents[i].TargetId);
+        }
+    }
+
+    private static SceneArchiveEntityVital[] BuildEntityVitals(EntityVitalStore entityVitals, HashSet<int> entityIds)
+    {
+        if (entityVitals.States.Count == 0 || entityIds.Count == 0)
+            return [];
+
+        var result = new SceneArchiveEntityVital[Math.Min(entityVitals.States.Count, entityIds.Count)];
+        var count = 0;
+        foreach (var entityId in entityIds)
+        {
+            if (!entityVitals.TryGet(entityId, out var vital))
+                continue;
+
+            result[count++] = SceneArchiveEntityVital.From(in vital);
+        }
+
+        if (count != result.Length)
+            Array.Resize(ref result, count);
+        Array.Sort(result, static (left, right) => left.EntityId.CompareTo(right.EntityId));
+        return result;
     }
 
     private static SceneArchiveEntityIdentity[] BuildIdentities(EntityStore entities, HashSet<int> entityIds)
@@ -215,26 +334,36 @@ public sealed class SceneArchivePayload
         return builder.ToScope();
     }
 
-    private static CombatArchiveBuild BuildCombatArchive(SceneCombatSnapshot snapshot, CombatEventSegment events, SceneCombatSnapshotAdapter adapter, HashSet<int> entityIds)
+    private static CombatArchiveBuild BuildCombatArchive(
+        SceneCombatSnapshot snapshot,
+        CombatEventSegment events,
+        CombatMechanicEventRecord[] mechanicEvents,
+        CombatResourceEventRecord[] resourceEvents,
+        SceneCombatSnapshotAdapter adapter,
+        HashSet<int> entityIds)
     {
-        var eventOrdinalBuilders = new Dictionary<int, LongArrayBuilder>();
-        var projectedSourcesByEventOrdinal = new Dictionary<long, int>();
+        var metricEventOrdinalBuilders = new Dictionary<int, LongArrayBuilder>();
+        var mechanicEventIndexBuilders = new Dictionary<int, IntArrayBuilder>();
+        var resourceEventIndexBuilders = new Dictionary<int, IntArrayBuilder>();
+        var projectedMetricSources = new Dictionary<long, int>();
+        var projectedMechanicSources = new Dictionary<int, int>();
+        var projectedResourceSources = new Dictionary<int, int>();
         var pairs = new Dictionary<DirectedPairKey, PairAccumulator>();
         for (var eventOrdinal = events.StartEventOrdinal; eventOrdinal < events.EndEventOrdinalExclusive; eventOrdinal++)
         {
             ref readonly var record = ref events.GetEvent(eventOrdinal);
-            if (!adapter.TryResolveDetailEventSource(snapshot, in record, out var sourceId))
+            if (!adapter.TryResolveMetricDetailEventSource(snapshot, in record, out var sourceId))
                 continue;
 
             var targetId = record.TargetId;
             AddEntity(entityIds, sourceId);
             AddEntity(entityIds, targetId);
-            AddEventOrdinal(eventOrdinalBuilders, sourceId, eventOrdinal);
+            AddEventOrdinal(metricEventOrdinalBuilders, sourceId, eventOrdinal);
             if (targetId != sourceId)
-                AddEventOrdinal(eventOrdinalBuilders, targetId, eventOrdinal);
+                AddEventOrdinal(metricEventOrdinalBuilders, targetId, eventOrdinal);
 
             if (sourceId != record.SourceId)
-                projectedSourcesByEventOrdinal.Add(eventOrdinal, sourceId);
+                projectedMetricSources.Add(eventOrdinal, sourceId);
 
             if (sourceId <= 0 || targetId <= 0)
                 continue;
@@ -249,9 +378,72 @@ public sealed class SceneArchivePayload
             pair.Apply(in record);
         }
 
-        var eventOrdinalsByCombatant = new Dictionary<int, long[]>(eventOrdinalBuilders.Count);
-        foreach (var (combatantId, builder) in eventOrdinalBuilders)
-            eventOrdinalsByCombatant.Add(combatantId, builder.ToArray());
+        for (var i = 0; i < mechanicEvents.Length; i++)
+        {
+            ref readonly var record = ref mechanicEvents[i];
+            if (record.ObservedAtMilliseconds < snapshot.EncounterStartTime ||
+                record.ObservedAtMilliseconds > snapshot.EncounterEndTime ||
+                adapter.IsSummonMechanicTarget(record.SourceId, record.TargetId, record.Mechanic))
+            {
+                continue;
+            }
+
+            var sourceId = adapter.ResolveDetailCombatantId(record.SourceId);
+            var targetId = record.TargetId;
+            AddEntity(entityIds, sourceId);
+            AddEntity(entityIds, targetId);
+            AddEventIndex(mechanicEventIndexBuilders, sourceId, i);
+            if (targetId != sourceId)
+                AddEventIndex(mechanicEventIndexBuilders, targetId, i);
+            if (sourceId != record.SourceId)
+                projectedMechanicSources.Add(i, sourceId);
+            if (sourceId <= 0 || targetId <= 0)
+                continue;
+
+            var key = new DirectedPairKey(sourceId, targetId);
+            if (!pairs.TryGetValue(key, out var pair))
+            {
+                pair = new PairAccumulator(key);
+                pairs[key] = pair;
+            }
+
+            pair.Apply(in record);
+        }
+
+        for (var i = 0; i < resourceEvents.Length; i++)
+        {
+            ref readonly var record = ref resourceEvents[i];
+            if (record.ObservedAtMilliseconds < snapshot.EncounterStartTime ||
+                record.ObservedAtMilliseconds > snapshot.EncounterEndTime)
+            {
+                continue;
+            }
+
+            var sourceId = adapter.ResolveDetailCombatantId(record.SourceId);
+            var targetId = record.TargetId;
+            AddEntity(entityIds, sourceId);
+            AddEntity(entityIds, targetId);
+            AddEventIndex(resourceEventIndexBuilders, sourceId, i);
+            if (targetId != sourceId)
+                AddEventIndex(resourceEventIndexBuilders, targetId, i);
+            if (sourceId != record.SourceId)
+                projectedResourceSources.Add(i, sourceId);
+            if (sourceId <= 0 || targetId <= 0)
+                continue;
+
+            var key = new DirectedPairKey(sourceId, targetId);
+            if (!pairs.TryGetValue(key, out var pair))
+            {
+                pair = new PairAccumulator(key);
+                pairs[key] = pair;
+            }
+
+            pair.Apply(in record);
+        }
+
+        var metricEventOrdinalsByCombatant = FreezeEventOrdinals(metricEventOrdinalBuilders);
+        var mechanicEventIndexesByCombatant = FreezeEventIndexes(mechanicEventIndexBuilders);
+        var resourceEventIndexesByCombatant = FreezeEventIndexes(resourceEventIndexBuilders);
 
         DirectedPairSnapshot[] pairSnapshots;
         if (pairs.Count == 0)
@@ -272,7 +464,14 @@ public sealed class SceneArchivePayload
             });
         }
 
-        return new CombatArchiveBuild(pairSnapshots, eventOrdinalsByCombatant, projectedSourcesByEventOrdinal);
+        return new CombatArchiveBuild(
+            pairSnapshots,
+            metricEventOrdinalsByCombatant,
+            mechanicEventIndexesByCombatant,
+            resourceEventIndexesByCombatant,
+            projectedMetricSources,
+            projectedMechanicSources,
+            projectedResourceSources);
     }
 
     private static void AddEventOrdinal(Dictionary<int, LongArrayBuilder> builders, int combatantId, long eventOrdinal)
@@ -284,7 +483,35 @@ public sealed class SceneArchivePayload
         builder.Add(eventOrdinal);
     }
 
-    private static CombatantSummary[] BuildCombatants(DirectedPairSnapshot[] pairs)
+    private static void AddEventIndex(Dictionary<int, IntArrayBuilder> builders, int combatantId, int eventIndex)
+    {
+        if (combatantId <= 0)
+            return;
+
+        ref var builder = ref CollectionsMarshal.GetValueRefOrAddDefault(builders, combatantId, out _);
+        builder.Add(eventIndex);
+    }
+
+    private static Dictionary<int, long[]> FreezeEventOrdinals(Dictionary<int, LongArrayBuilder> builders)
+    {
+        var result = new Dictionary<int, long[]>(builders.Count);
+        foreach (var (combatantId, builder) in builders)
+            result.Add(combatantId, builder.ToArray());
+        return result;
+    }
+
+    private static Dictionary<int, int[]> FreezeEventIndexes(Dictionary<int, IntArrayBuilder> builders)
+    {
+        var result = new Dictionary<int, int[]>(builders.Count);
+        foreach (var (combatantId, builder) in builders)
+            result.Add(combatantId, builder.ToArray());
+        return result;
+    }
+
+    private static CombatantSummary[] BuildCombatants(
+        DirectedPairSnapshot[] pairs,
+        IReadOnlyDictionary<int, int[]> resourceEventIndexesByCombatant,
+        CombatResourceEventRecord[] resourceEvents)
     {
         var combatants = new Dictionary<int, CombatantAccumulator>();
         for (var i = 0; i < pairs.Length; i++)
@@ -311,6 +538,17 @@ public sealed class SceneArchivePayload
 
                 target.ApplyIncoming(pair);
             }
+        }
+
+        foreach (var (combatantId, eventIndexes) in resourceEventIndexesByCombatant)
+        {
+            if (!combatants.TryGetValue(combatantId, out var combatant))
+            {
+                combatant = new CombatantAccumulator(combatantId);
+                combatants.Add(combatantId, combatant);
+            }
+            for (var i = 0; i < eventIndexes.Length; i++)
+                combatant.Apply(in resourceEvents[eventIndexes[i]]);
         }
 
         if (combatants.Count == 0)
@@ -363,6 +601,7 @@ public sealed class SceneArchivePayload
         private int _evadeCount;
         private int _invincibleCount;
         private int _multiHitCount;
+        private int _multiHitSubCount;
         private int _lastSkillCode;
         private long _firstObserved;
         private long _lastObserved;
@@ -374,20 +613,51 @@ public sealed class SceneArchivePayload
             var observation = e.Observation;
             var contribution = e.Contribution;
 
-            _totalDamage += contribution.DamageAmount;
-            _totalHealing += contribution.HealingAmount;
-            _totalShield += contribution.ShieldGrantAmount;
-            _totalShieldAbsorbed += contribution.ShieldAbsorbedAmount;
-            _shieldCount += contribution.ShieldGrantCount;
-            _shieldAbsorbedCount += contribution.ShieldAbsorbedCount;
-            _hitCount += contribution.HitCount;
-            _attemptCount += contribution.AttemptCount;
-            _evadeCount += contribution.EvadeCount;
-            _invincibleCount += contribution.InvincibleCount;
-            _multiHitCount += contribution.MultiHitCount;
+            switch (contribution.Metric)
+            {
+                case CombatMetricKind.Damage:
+                    _totalDamage += contribution.Amount;
+                    break;
+                case CombatMetricKind.Healing:
+                    _totalHealing += contribution.Amount;
+                    break;
+                case CombatMetricKind.ShieldGranted:
+                    _totalShield += contribution.Amount;
+                    _shieldCount++;
+                    break;
+                case CombatMetricKind.ShieldAbsorbed:
+                    _totalShieldAbsorbed += contribution.Amount;
+                    _shieldAbsorbedCount++;
+                    break;
+            }
             _lastSkillCode = observation.SkillCode;
             _revision = Math.Max(_revision, e.Revision);
-            var observedAt = e.ObservedAtMilliseconds;
+            ApplyObserved(e.ObservedAtMilliseconds);
+        }
+
+        public void Apply(in CombatMechanicEventRecord e)
+        {
+            var mechanic = e.Mechanic;
+            _hitCount += mechanic.HitCount;
+            _attemptCount += mechanic.AttemptCount;
+            _evadeCount += mechanic.EvadeCount;
+            _invincibleCount += mechanic.InvincibleCount;
+            _multiHitCount += mechanic.MultiHitCount;
+            _multiHitSubCount += mechanic.MultiHitSubCount;
+            _lastSkillCode = e.Observation.SkillCode;
+            _revision = Math.Max(_revision, e.Revision);
+            ApplyObserved(e.ObservedAtMilliseconds);
+        }
+
+        public void Apply(in CombatResourceEventRecord e)
+        {
+            _lastSkillCode = e.Observation.SkillCode;
+            _revision = Math.Max(_revision, e.Revision);
+            ApplyObserved(e.ObservedAtMilliseconds);
+        }
+
+        private void ApplyObserved(long observedAt)
+        {
             if (_hasObserved)
             {
                 _firstObserved = Math.Min(_firstObserved, observedAt);
@@ -415,6 +685,7 @@ public sealed class SceneArchivePayload
             EvadeCount = _evadeCount,
             InvincibleCount = _invincibleCount,
             MultiHitCount = _multiHitCount,
+            MultiHitSubCount = _multiHitSubCount,
             LastSkillCode = _lastSkillCode,
             FirstObserved = _firstObserved,
             LastObserved = _lastObserved,
@@ -483,6 +754,9 @@ public sealed class SceneArchivePayload
             ApplyObserved(pair);
         }
 
+        public void Apply(in CombatResourceEventRecord resourceEvent) =>
+            ApplyObserved(resourceEvent.ObservedAtMilliseconds, resourceEvent.ObservedAtMilliseconds, resourceEvent.Revision);
+
         public CombatantSummary ToSummary() => new()
         {
             CombatantId = combatantId,
@@ -513,61 +787,87 @@ public sealed class SceneArchivePayload
             Revision = _revision
         };
 
-        private void ApplyObserved(DirectedPairSnapshot pair)
+        private void ApplyObserved(DirectedPairSnapshot pair) =>
+            ApplyObserved(pair.FirstObserved, pair.LastObserved, pair.Revision);
+
+        private void ApplyObserved(long firstObserved, long lastObserved, long revision)
         {
             if (_hasObserved)
             {
-                _firstObserved = Math.Min(_firstObserved, pair.FirstObserved);
-                _lastObserved = Math.Max(_lastObserved, pair.LastObserved);
+                _firstObserved = Math.Min(_firstObserved, firstObserved);
+                _lastObserved = Math.Max(_lastObserved, lastObserved);
             }
             else
             {
-                _firstObserved = pair.FirstObserved;
-                _lastObserved = pair.LastObserved;
+                _firstObserved = firstObserved;
+                _lastObserved = lastObserved;
                 _hasObserved = true;
             }
-            _revision = Math.Max(_revision, pair.Revision);
+            _revision = Math.Max(_revision, revision);
         }
     }
 
     private readonly record struct CombatArchiveBuild(
         DirectedPairSnapshot[] Pairs,
-        Dictionary<int, long[]> EventOrdinalsByCombatant,
-        Dictionary<long, int> ProjectedSourcesByEventOrdinal);
+        Dictionary<int, long[]> MetricEventOrdinalsByCombatant,
+        Dictionary<int, int[]> MechanicEventIndexesByCombatant,
+        Dictionary<int, int[]> ResourceEventIndexesByCombatant,
+        Dictionary<long, int> ProjectedMetricSources,
+        Dictionary<int, int> ProjectedMechanicSources,
+        Dictionary<int, int> ProjectedResourceSources);
 
     private sealed class ArchivePayloadIndex
     {
         private static readonly long[] EmptyEventOrdinals = [];
+        private static readonly int[] EmptyEventIndexes = [];
         private static readonly DirectedPairKey[] EmptyPairs = [];
 
-        private readonly Dictionary<int, long[]> _eventOrdinalsByCombatant;
-        private readonly Dictionary<long, int> _projectedSourcesByEventOrdinal;
+        private readonly Dictionary<int, long[]> _metricEventOrdinalsByCombatant;
+        private readonly Dictionary<int, int[]> _mechanicEventIndexesByCombatant;
+        private readonly Dictionary<int, int[]> _resourceEventIndexesByCombatant;
+        private readonly Dictionary<long, int> _projectedMetricSources;
+        private readonly Dictionary<int, int> _projectedMechanicSources;
+        private readonly Dictionary<int, int> _projectedResourceSources;
         private readonly Dictionary<int, DirectedPairKey[]> _outgoingPairsByCombatant;
         private readonly Dictionary<int, DirectedPairKey[]> _incomingPairsByCombatant;
         private readonly Dictionary<int, CombatantSummary> _combatantsById;
 
         private ArchivePayloadIndex(
-            Dictionary<int, long[]> eventOrdinalsByCombatant,
-            Dictionary<long, int> projectedSourcesByEventOrdinal,
+            Dictionary<int, long[]> metricEventOrdinalsByCombatant,
+            Dictionary<int, int[]> mechanicEventIndexesByCombatant,
+            Dictionary<int, int[]> resourceEventIndexesByCombatant,
+            Dictionary<long, int> projectedMetricSources,
+            Dictionary<int, int> projectedMechanicSources,
+            Dictionary<int, int> projectedResourceSources,
             Dictionary<int, DirectedPairKey[]> outgoingPairsByCombatant,
             Dictionary<int, DirectedPairKey[]> incomingPairsByCombatant,
             Dictionary<int, CombatantSummary> combatantsById)
         {
-            _eventOrdinalsByCombatant = eventOrdinalsByCombatant;
-            _projectedSourcesByEventOrdinal = projectedSourcesByEventOrdinal;
+            _metricEventOrdinalsByCombatant = metricEventOrdinalsByCombatant;
+            _mechanicEventIndexesByCombatant = mechanicEventIndexesByCombatant;
+            _resourceEventIndexesByCombatant = resourceEventIndexesByCombatant;
+            _projectedMetricSources = projectedMetricSources;
+            _projectedMechanicSources = projectedMechanicSources;
+            _projectedResourceSources = projectedResourceSources;
             _outgoingPairsByCombatant = outgoingPairsByCombatant;
             _incomingPairsByCombatant = incomingPairsByCombatant;
             _combatantsById = combatantsById;
         }
 
-        public IReadOnlyDictionary<int, long[]> EventOrdinalsByCombatant => _eventOrdinalsByCombatant;
+        public IReadOnlyDictionary<int, long[]> MetricEventOrdinalsByCombatant => _metricEventOrdinalsByCombatant;
+        public IReadOnlyDictionary<int, int[]> MechanicEventIndexesByCombatant => _mechanicEventIndexesByCombatant;
+        public IReadOnlyDictionary<int, int[]> ResourceEventIndexesByCombatant => _resourceEventIndexesByCombatant;
         public IReadOnlyDictionary<int, DirectedPairKey[]> OutgoingPairsByCombatant => _outgoingPairsByCombatant;
         public IReadOnlyDictionary<int, DirectedPairKey[]> IncomingPairsByCombatant => _incomingPairsByCombatant;
         public IReadOnlyDictionary<int, CombatantSummary> CombatantsById => _combatantsById;
 
         public static ArchivePayloadIndex Create(
-            Dictionary<int, long[]> eventOrdinalsByCombatant,
-            Dictionary<long, int> projectedSourcesByEventOrdinal,
+            Dictionary<int, long[]> metricEventOrdinalsByCombatant,
+            Dictionary<int, int[]> mechanicEventIndexesByCombatant,
+            Dictionary<int, int[]> resourceEventIndexesByCombatant,
+            Dictionary<long, int> projectedMetricSources,
+            Dictionary<int, int> projectedMechanicSources,
+            Dictionary<int, int> projectedResourceSources,
             IReadOnlyList<DirectedPairSnapshot> pairs,
             IReadOnlyList<CombatantSummary> combatants)
         {
@@ -586,14 +886,35 @@ public sealed class SceneArchivePayload
                     combatantsById[combatant.CombatantId] = combatant;
             }
 
-            return new ArchivePayloadIndex(eventOrdinalsByCombatant, projectedSourcesByEventOrdinal, outgoingPairsByCombatant, incomingPairsByCombatant, combatantsById);
+            return new ArchivePayloadIndex(
+                metricEventOrdinalsByCombatant,
+                mechanicEventIndexesByCombatant,
+                resourceEventIndexesByCombatant,
+                projectedMetricSources,
+                projectedMechanicSources,
+                projectedResourceSources,
+                outgoingPairsByCombatant,
+                incomingPairsByCombatant,
+                combatantsById);
         }
 
-        public long[] GetEventOrdinals(int combatantId)
-            => _eventOrdinalsByCombatant.TryGetValue(combatantId, out var ordinals) ? ordinals : EmptyEventOrdinals;
+        public long[] GetMetricEventOrdinals(int combatantId)
+            => _metricEventOrdinalsByCombatant.TryGetValue(combatantId, out var ordinals) ? ordinals : EmptyEventOrdinals;
 
-        public int ResolveSourceId(long eventOrdinal, int sourceId)
-            => _projectedSourcesByEventOrdinal.TryGetValue(eventOrdinal, out var projectedSourceId) ? projectedSourceId : sourceId;
+        public int[] GetMechanicEventIndexes(int combatantId)
+            => _mechanicEventIndexesByCombatant.TryGetValue(combatantId, out var indexes) ? indexes : EmptyEventIndexes;
+
+        public int[] GetResourceEventIndexes(int combatantId)
+            => _resourceEventIndexesByCombatant.TryGetValue(combatantId, out var indexes) ? indexes : EmptyEventIndexes;
+
+        public int ResolveMetricSourceId(long eventOrdinal, int sourceId)
+            => _projectedMetricSources.TryGetValue(eventOrdinal, out var projectedSourceId) ? projectedSourceId : sourceId;
+
+        public int ResolveMechanicSourceId(int eventIndex, int sourceId)
+            => _projectedMechanicSources.TryGetValue(eventIndex, out var projectedSourceId) ? projectedSourceId : sourceId;
+
+        public int ResolveResourceSourceId(int eventIndex, int sourceId)
+            => _projectedResourceSources.TryGetValue(eventIndex, out var projectedSourceId) ? projectedSourceId : sourceId;
 
         public DirectedPairKey[] GetOutgoingPairs(int combatantId)
             => _outgoingPairsByCombatant.TryGetValue(combatantId, out var pairs) ? pairs : EmptyPairs;
@@ -708,6 +1029,41 @@ public sealed class SceneArchivePayload
             return result;
         }
     }
+
+    private struct IntArrayBuilder
+    {
+        private int[]? _items;
+        private int _count;
+
+        public void Add(int value)
+        {
+            var items = _items;
+            if (items is null)
+            {
+                _items = [value];
+                _count = 1;
+                return;
+            }
+
+            if (_count == items.Length)
+            {
+                Array.Resize(ref items, items.Length << 1);
+                _items = items;
+            }
+
+            items[_count++] = value;
+        }
+
+        public readonly int[] ToArray()
+        {
+            if (_count == 0)
+                return [];
+
+            var result = new int[_count];
+            Array.Copy(_items!, result, _count);
+            return result;
+        }
+    }
 }
 
 public readonly record struct SceneArchiveEntityIdentity
@@ -717,8 +1073,6 @@ public readonly record struct SceneArchiveEntityIdentity
     public NpcKind Kind { get; init; }
     public int? OwnerEntityId { get; init; }
     public EntityOwnerKind OwnerKind { get; init; }
-    public long? CurrentHp { get; init; }
-    public long? MaxHp { get; init; }
     public bool NpcCombatActive { get; init; }
     public long? Value2136 { get; init; }
     public long? Sequence2136 { get; init; }
@@ -735,8 +1089,6 @@ public readonly record struct SceneArchiveEntityIdentity
         Kind = e.Kind,
         OwnerEntityId = e.OwnerEntityId,
         OwnerKind = e.OwnerKind,
-        CurrentHp = e.CurrentHp,
-        MaxHp = e.MaxHp,
         NpcCombatActive = e.NpcCombatActive,
         Value2136 = e.Value2136,
         Sequence2136 = e.Sequence2136,
@@ -745,6 +1097,24 @@ public readonly record struct SceneArchiveEntityIdentity
         State4636 = e.State4636,
         Latest2C38 = e.Latest2C38,
         LastObservedOrdinal = e.LastObservedOrdinal
+    };
+}
+
+public readonly record struct SceneArchiveEntityVital
+{
+    public int EntityId { get; init; }
+    public long CurrentHp { get; init; }
+    public long? MaxHp { get; init; }
+    public long ObservedAtMilliseconds { get; init; }
+    public long ObservationOrdinal { get; init; }
+
+    public static SceneArchiveEntityVital From(in EntityVitalState state) => new()
+    {
+        EntityId = state.EntityId,
+        CurrentHp = state.CurrentHp,
+        MaxHp = state.MaxHp,
+        ObservedAtMilliseconds = state.ObservedAtMilliseconds,
+        ObservationOrdinal = state.ObservationOrdinal
     };
 }
 

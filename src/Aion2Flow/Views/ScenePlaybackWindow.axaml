@@ -40,6 +40,20 @@
                         <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_Metric_Count}" />
                         <TextBlock Classes="PlaybackDetailSubtleValue" Text="{Binding Count}" />
                     </StackPanel>
+                    <Grid Grid.Column="4"
+                          ColumnDefinitions="Auto,Auto,*"
+                          ColumnSpacing="4"
+                          VerticalAlignment="Center">
+                        <TextBlock Classes="PlaybackDetailSubtle" Text="{markups:Translate Playback_AuraDisposition_Label}" />
+                        <TextBlock Grid.Column="1"
+                                   Classes="PlaybackDetailSubtleValue"
+                                   Text="{Binding DispositionText}" />
+                        <TextBlock Grid.Column="2"
+                                   Classes="PlaybackDetailSubtle"
+                                   Text="{Binding SemanticTraceText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding SemanticTraceText}" />
+                    </Grid>
                     <controls:PlaybackTimelineView Grid.Row="1"
                                                    Grid.ColumnSpan="5"
                                                    Classes="PlaybackTimelineRail PlaybackAuraTimelineLane PlaybackTimelineBackgroundRail"
@@ -173,7 +187,15 @@
                             <TextBlock Classes="PlaybackTrackName" Text="{markups:Translate Playback_Track_Combat}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="4" Margin="8,0">
+                            <Border Classes="PlaybackTrackAccent" Background="{StaticResource PlaybackBrush.TimelineMechanic}" />
+                            <TextBlock Classes="PlaybackTrackName" Text="{markups:Translate Playback_Track_Mechanic}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="8,0">
                             <Border Classes="PlaybackTrackAccent" Background="{StaticResource PlaybackBrush.TimelineResource}" />
+                            <TextBlock Classes="PlaybackTrackName" Text="{markups:Translate Playback_Track_Resource}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="8,0">
+                            <Border Classes="PlaybackTrackAccent" Background="{StaticResource PlaybackBrush.TimelineEntityVital}" />
                             <TextBlock Classes="PlaybackTrackName" Text="{markups:Translate Playback_Track_RemainingHp}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="4" Margin="8,0">

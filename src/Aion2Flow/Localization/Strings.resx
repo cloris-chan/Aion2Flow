@@ -105,7 +105,6 @@
   <data name="Category_Damage" xml:space="preserve"><value>Damage</value></data>
   <data name="Category_Healing" xml:space="preserve"><value>Healing</value></data>
   <data name="Category_Shield" xml:space="preserve"><value>Protective Shield</value></data>
-  <data name="Category_Support" xml:space="preserve"><value>Support</value></data>
 
   <!-- Empty-state placeholders -->
   <data name="Empty_History" xml:space="preserve"><value>No archived battles</value></data>
@@ -221,10 +220,20 @@
   <data name="Playback_Column_Skill" xml:space="preserve"><value>Skill</value></data>
   <data name="Playback_Column_Amount" xml:space="preserve"><value>Amount</value></data>
   <data name="Playback_Track_Combat" xml:space="preserve"><value>Combat</value></data>
+  <data name="Playback_Track_Mechanic" xml:space="preserve"><value>Mechanics</value></data>
+  <data name="Playback_Track_Resource" xml:space="preserve"><value>Resources</value></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>Remaining HP</value></data>
   <data name="Playback_Track_Aura" xml:space="preserve"><value>Effect lifecycle</value></data>
   <data name="Playback_AuraCoverage" xml:space="preserve"><value>Buff / Debuff</value></data>
   <data name="Playback_AuraUnknownFormat" xml:space="preserve"><value>Effect #{0}</value></data>
+  <data name="Playback_AuraDisposition_Label" xml:space="preserve"><value>Disposition</value></data>
+  <data name="Playback_AuraDisposition_Buff" xml:space="preserve"><value>Buff</value></data>
+  <data name="Playback_AuraDisposition_Debuff" xml:space="preserve"><value>Debuff</value></data>
+  <data name="Playback_AuraDisposition_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="Playback_AuraEvidence_ExactNodeFormat" xml:space="preserve"><value>Exact node #{0}</value></data>
+  <data name="Playback_AuraEvidence_UnambiguousSlotFormat" xml:space="preserve"><value>Skill {0}, slot {1}</value></data>
+  <data name="Playback_AuraEvidence_AmbiguousFormat" xml:space="preserve"><value>Ambiguous: {0} candidates</value></data>
+  <data name="Playback_AuraEvidence_None" xml:space="preserve"><value>No semantic match</value></data>
   <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>Apply {0} ms</value></data>
   <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>Apply</value></data>
   <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>Refresh</value></data>
@@ -234,6 +243,7 @@
   <data name="Playback_Track_Action" xml:space="preserve"><value>Action</value></data>
   <data name="Playback_Track_Diagnostic" xml:space="preserve"><value>Diagnostic</value></data>
   <data name="Playback_Track_Other" xml:space="preserve"><value>Other</value></data>
+  <data name="Playback_Mechanic_HitAttemptFormat" xml:space="preserve"><value>Hits {0}/{1}</value></data>
 
   <!-- Battle scene labels (used in archived battle history) -->
   <data name="Scene_Activation" xml:space="preserve"><value>Scene Activation</value></data>
@@ -241,4 +251,11 @@
   <data name="Scene_Teardown" xml:space="preserve"><value>Scene Teardown</value></data>
   <data name="Scene_Archive" xml:space="preserve"><value>Scene Archive</value></data>
   <data name="Scene_Unknown" xml:space="preserve"><value>Unknown Scene</value></data>
+  <data name="Category_Resource" xml:space="preserve"><value>Resources</value></data>
+  <data name="Metric_ManaChange" xml:space="preserve"><value>MP change</value></data>
+  <data name="Metric_DirectEvents" xml:space="preserve"><value>Direct events</value></data>
+  <data name="Metric_PeriodicEvents" xml:space="preserve"><value>Periodic events</value></data>
+  <data name="Metric_ResourceSkills" xml:space="preserve"><value>Resource skills</value></data>
+  <data name="Metric_ResourceEvents" xml:space="preserve"><value>Resource events</value></data>
+  <data name="Empty_ResourceEvents" xml:space="preserve"><value>No resource events</value></data>
 </root>

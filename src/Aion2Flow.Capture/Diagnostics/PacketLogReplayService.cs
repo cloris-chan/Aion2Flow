@@ -198,7 +198,7 @@ public sealed class PacketLogReplayService
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
-        var summaries = owner.ReadLocked((entities, _, metadataRegistry, combat, adapter) => BuildCombatantSummaries(combat, entities, metadataRegistry, adapter, snapshot));
+        var summaries = owner.ReadLocked((entities, _, metadataRegistry, combat, mechanics, resources, adapter) => BuildCombatantSummaries(combat, mechanics, resources, entities, metadataRegistry, adapter, snapshot));
         var summaryCounter = CaptureBaselineCounter(summaryStart);
 
         return new PacketLogReplayResult(
@@ -210,6 +210,7 @@ public sealed class PacketLogReplayService
             journal,
             owner,
             summaries,
+            owner.Resources.Events,
             replayedEventCounts,
             skippedEventCounts)
         {
@@ -246,7 +247,14 @@ public sealed class PacketLogReplayService
         return new PacketLogReplayBaselineCounter(elapsed, Math.Max(0, allocatedBytes));
     }
 
-    private static List<PacketLogCombatantSummary> BuildCombatantSummaries(CombatStore combat, EntityStore entities, RuntimeMetadataRegistry metadataRegistry, SceneCombatSnapshotAdapter adapter, SceneCombatSnapshot snapshot)
+    internal static List<PacketLogCombatantSummary> BuildCombatantSummaries(
+        CombatStore combat,
+        MechanicStore mechanics,
+        ResourceStore resources,
+        EntityStore entities,
+        RuntimeMetadataRegistry metadataRegistry,
+        SceneCombatSnapshotAdapter adapter,
+        SceneCombatSnapshot snapshot)
     {
         var summariesByCombatantId = new Dictionary<int, MutableCombatantSummary>();
 
@@ -265,12 +273,12 @@ public sealed class PacketLogReplayService
                 EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry);
             }
 
-            var observation = e.Observation;
+            var contribution = e.Contribution;
             if (e.ContributesDamage)
             {
                 if (!IsSummonDamageTarget(adapter, in e))
                 {
-                    ApplyDamageSummary(summariesByCombatantId, sourceId, targetId, in observation);
+                    ApplyDamageSummary(summariesByCombatantId, sourceId, targetId, in contribution);
                 }
 
                 continue;
@@ -278,14 +286,50 @@ public sealed class PacketLogReplayService
 
             if (e.ContributesHealing)
             {
-                ApplyHealingSummary(summariesByCombatantId, sourceId, targetId, in observation);
+                ApplyHealingSummary(summariesByCombatantId, sourceId, targetId, in contribution);
                 continue;
             }
 
             if (e.ContributesShieldGrant || e.ContributesShieldAbsorbed)
             {
-                ApplyShieldSummary(summariesByCombatantId, sourceId, targetId, in observation);
+                ApplyShieldSummary(summariesByCombatantId, sourceId, targetId, in contribution);
             }
+        }
+
+        var mechanicEvents = mechanics.Events;
+        for (var i = 0; i < mechanicEvents.Count; i++)
+        {
+            var e = mechanicEvents[i];
+            if (!IsWithinEncounterWindow(e.ObservedAtMilliseconds, snapshot.EncounterStartTime, snapshot.EncounterEndTime) ||
+                adapter.IsSummonDamageTarget(e.SourceId, e.TargetId, 0))
+            {
+                continue;
+            }
+
+            var sourceId = adapter.ResolveDetailCombatantId(e.SourceId);
+            var targetId = e.TargetId;
+            if (sourceId > 0)
+                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry);
+            if (targetId > 0)
+                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry);
+
+            var mechanic = e.Mechanic;
+            ApplyMechanicSummary(summariesByCombatantId, sourceId, targetId, in mechanic);
+        }
+
+        var resourceEvents = resources.Events;
+        for (var i = 0; i < resourceEvents.Count; i++)
+        {
+            var e = resourceEvents[i];
+            if (!IsWithinEncounterWindow(e.ObservedAtMilliseconds, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
+                continue;
+
+            var sourceId = adapter.ResolveDetailCombatantId(e.SourceId);
+            var targetId = e.TargetId;
+            if (sourceId > 0)
+                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry);
+            if (targetId > 0)
+                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry);
         }
 
         return [.. summariesByCombatantId.OrderBy(static pair => pair.Key).Select(static pair => pair.Value.ToSummary())];
@@ -384,32 +428,38 @@ public sealed class PacketLogReplayService
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int sourceId,
         int targetId,
-        in CombatObservation observation)
+        in CombatContribution contribution)
     {
-        var hitContribution = Math.Max(0, observation.HitCount);
-        var attemptContribution = Math.Max(hitContribution, Math.Max(0, observation.AttemptCount));
-        var criticalContribution = (observation.Modifiers & DamageModifiers.Critical) != 0 ? hitContribution : 0;
-        var evadeContribution = (observation.Modifiers & DamageModifiers.Evade) != 0 ? attemptContribution : 0;
-        var invincibleContribution = (observation.Modifiers & DamageModifiers.Invincible) != 0 ? attemptContribution : 0;
+        if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
+            source.OutgoingDamage += contribution.Amount;
 
+        if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
+            target.IncomingDamage += contribution.Amount;
+    }
+
+    private static void ApplyMechanicSummary(
+        Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
+        int sourceId,
+        int targetId,
+        in CombatMechanicOccurrence mechanic)
+    {
+        var criticalContribution = (mechanic.Modifiers & DamageModifiers.Critical) != 0 ? mechanic.HitCount : 0;
         if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
-            source.OutgoingDamage += observation.Damage;
-            source.OutgoingHits += hitContribution;
-            source.OutgoingAttempts += attemptContribution;
+            source.OutgoingHits += mechanic.HitCount;
+            source.OutgoingAttempts += mechanic.AttemptCount;
             source.OutgoingCriticals += criticalContribution;
-            source.OutgoingEvades += evadeContribution;
-            source.OutgoingInvincibles += invincibleContribution;
+            source.OutgoingEvades += mechanic.EvadeCount;
+            source.OutgoingInvincibles += mechanic.InvincibleCount;
         }
 
         if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
-            target.IncomingDamage += observation.Damage;
-            target.IncomingHits += hitContribution;
-            target.IncomingAttempts += attemptContribution;
+            target.IncomingHits += mechanic.HitCount;
+            target.IncomingAttempts += mechanic.AttemptCount;
             target.IncomingCriticals += criticalContribution;
-            target.IncomingEvades += evadeContribution;
-            target.IncomingInvincibles += invincibleContribution;
+            target.IncomingEvades += mechanic.EvadeCount;
+            target.IncomingInvincibles += mechanic.InvincibleCount;
         }
     }
 
@@ -417,19 +467,19 @@ public sealed class PacketLogReplayService
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int sourceId,
         int targetId,
-        in CombatObservation observation)
+        in CombatContribution contribution)
     {
         if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
-            source.OutgoingHealing += observation.Damage;
+            source.OutgoingHealing += contribution.Amount;
         }
 
         if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
-            target.IncomingHealing += observation.Damage;
-            if (observation.EffectTag == PacketEffectTag.RegenerationHealing)
+            target.IncomingHealing += contribution.Amount;
+            if (contribution.Delivery == CombatDeliveryKind.Regeneration)
             {
-                target.RegenerationHealing += observation.Damage;
+                target.RegenerationHealing += contribution.Amount;
             }
         }
     }
@@ -438,56 +488,58 @@ public sealed class PacketLogReplayService
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int sourceId,
         int targetId,
-        in CombatObservation observation)
+        in CombatContribution contribution)
     {
-        if (observation.EffectTag == PacketEffectTag.ShieldAbsorbed)
+        if (contribution.Metric == CombatMetricKind.ShieldAbsorbed)
         {
-            if (observation.Damage <= 0)
+            if (contribution.Amount <= 0)
             {
                 return;
             }
 
             if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var absorbSource))
             {
-                absorbSource.OutgoingShieldAbsorbed += observation.Damage;
+                absorbSource.OutgoingShieldAbsorbed += contribution.Amount;
             }
 
             if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var absorbTarget))
             {
-                absorbTarget.IncomingShieldAbsorbed += observation.Damage;
+                absorbTarget.IncomingShieldAbsorbed += contribution.Amount;
             }
             return;
         }
 
         if (sourceId > 0 && summariesByCombatantId.TryGetValue(sourceId, out var source))
         {
-            source.OutgoingShield += observation.Damage;
+            source.OutgoingShield += contribution.Amount;
         }
 
         if (targetId > 0 && summariesByCombatantId.TryGetValue(targetId, out var target))
         {
-            target.IncomingShield += observation.Damage;
+            target.IncomingShield += contribution.Amount;
         }
     }
 
     private static bool IsWithinEncounterWindow(in CombatEventRecord e, long start, long end) =>
-        e.ObservedAtMilliseconds >= start && e.ObservedAtMilliseconds <= end;
+        IsWithinEncounterWindow(e.ObservedAtMilliseconds, start, end);
+
+    private static bool IsWithinEncounterWindow(long observedAtMilliseconds, long start, long end) =>
+        observedAtMilliseconds >= start && observedAtMilliseconds <= end;
 
     private static bool IsSummonDamageTarget(SceneCombatSnapshotAdapter adapter, in CombatEventRecord e)
     {
         if (e.TargetId <= 0 || !e.ContributesDamage)
             return false;
 
-        return adapter.IsSummonDamageTarget(e.SourceId, e.TargetId, e.Observation.Damage);
+        return adapter.IsSummonDamageTarget(e.SourceId, e.TargetId, e.Contribution.Amount);
     }
 
     private static bool IsRelevantRecoveryEvent(in CombatEventRecord e, int sourceId, int targetId, HashSet<int> relevant)
     {
-        if (e.Observation.Damage <= 0 || (!relevant.Contains(sourceId) && !relevant.Contains(targetId)))
+        if (e.Contribution.Amount <= 0 || (!relevant.Contains(sourceId) && !relevant.Contains(targetId)))
             return false;
 
-        return e.Observation.EventKind is CombatEventKind.Healing or CombatEventKind.Support
-               || e.Observation.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing or CombatValueKind.Shield or CombatValueKind.Support;
+        return e.Contribution.Metric is CombatMetricKind.Healing or CombatMetricKind.ShieldGranted or CombatMetricKind.ShieldAbsorbed;
     }
 
     private static string ResolveDisplayName(EntityStore entities, RuntimeMetadataRegistry metadataRegistry, int entityId)
@@ -808,6 +860,7 @@ public sealed record PacketLogReplayResult(
     ObservedEventJournal SceneJournal,
     SceneReadModelOwner SceneOwner,
     IReadOnlyList<PacketLogCombatantSummary> Combatants,
+    IReadOnlyList<CombatResourceEventRecord> ResourceEvents,
     IReadOnlyDictionary<string, int> ReplayedEventCounts,
     IReadOnlyDictionary<string, int> SkippedEventCounts)
 {

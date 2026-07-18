@@ -2,20 +2,6 @@ using System.Collections.Frozen;
 
 namespace Cloris.Aion2Flow.Resources.Catalog;
 
-[Flags]
-public enum SkillSemanticFacet : ushort
-{
-    None = 0,
-    Damage = 1 << 0,
-    Healing = 1 << 1,
-    DamageOverTime = 1 << 2,
-    HealingOverTime = 1 << 3,
-    Shield = 1 << 4,
-    Buff = 1 << 5,
-    Debuff = 1 << 6,
-    Support = 1 << 7
-}
-
 public enum SkillSemanticOwnerEdgeKind : byte
 {
     SkillEffectFilter = 1,
@@ -47,12 +33,12 @@ public readonly record struct SkillSemanticOwnerEdge(
 
 public readonly record struct SkillSemanticEffectResolution(
     int EffectId,
-    SkillSemanticFacet DirectFacets,
-    SkillSemanticFacet Facets);
+    SkillSemanticValue DirectSemantics,
+    SkillSemanticValue Semantics);
 
 public sealed record SkillSemanticProfile(
     int SkillId,
-    SkillSemanticFacet Facets,
+    SkillSemanticValue Semantics,
     IReadOnlyList<int> EffectGroupIds,
     IReadOnlyList<int> EffectIds,
     IReadOnlyList<int> EffectLevelIds,
@@ -69,19 +55,20 @@ public sealed class SkillSemanticOwnerGraph
     private SkillSemanticOwnerGraph(
         IReadOnlyDictionary<int, SkillSemanticProfile> profiles,
         IReadOnlyList<SkillSemanticOwnerEdge> edges,
-        SkillSemanticFacetIndex facets,
+        SkillSemanticValueIndex semanticValues,
         SkillSemanticEffectSlotIndex slots)
     {
         Profiles = profiles;
         Edges = edges;
         EdgesByOwnerSkillId = BuildEdgeLookup(edges);
-        FacetsBySkillId = facets.SkillFacets;
-        FacetsByEffectGroupId = facets.EffectGroupFacets;
-        DirectFacetsByEffectId = facets.DirectEffectFacets;
-        FacetsByEffectId = facets.EffectFacets;
-        FacetsByProjectileId = facets.ProjectileFacets;
-        FacetsByAbnormalId = facets.AbnormalFacets;
-        FacetsByAbnormalEffectId = facets.AbnormalEffectFacets;
+        SemanticsBySkillId = semanticValues.SkillSemantics;
+        SemanticsByEffectGroupId = semanticValues.EffectGroupSemantics;
+        DirectSemanticsByEffectId = semanticValues.DirectEffectSemantics;
+        SemanticsByEffectId = semanticValues.EffectSemantics;
+        SemanticsByProjectileId = semanticValues.ProjectileSemantics;
+        DirectSemanticsByAbnormalId = semanticValues.DirectAbnormalSemantics;
+        SemanticsByAbnormalId = semanticValues.AbnormalSemantics;
+        SemanticsByAbnormalEffectId = semanticValues.AbnormalEffectSemantics;
         OwnerSkillIdsByEffectGroupId = BuildOwnerLookup(profiles.Values, static profile => profile.EffectGroupIds);
         OwnerSkillIdsByEffectId = BuildOwnerLookup(profiles.Values, static profile => profile.EffectIds);
         OwnerSkillIdsByEffectFilterId = BuildOwnerLookup(profiles.Values, static profile => profile.EffectFilterIds);
@@ -96,20 +83,21 @@ public sealed class SkillSemanticOwnerGraph
         EffectSlotsByProjectileId = slots.SlotsByProjectileId;
         EffectSlotsByAbnormalId = slots.SlotsByAbnormalId;
         EffectSlotsByAbnormalEffectId = slots.SlotsByAbnormalEffectId;
-        DirectFacetsByEffectGroupId = slots.DirectFacetsByEffectGroupId;
-        DirectFacetsByProjectileId = slots.DirectFacetsByProjectileId;
+        DirectSemanticsByEffectGroupId = slots.DirectSemanticsByEffectGroupId;
+        DirectSemanticsByProjectileId = slots.DirectSemanticsByProjectileId;
     }
 
     public IReadOnlyDictionary<int, SkillSemanticProfile> Profiles { get; }
     public IReadOnlyList<SkillSemanticOwnerEdge> Edges { get; }
     public IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticOwnerEdge>> EdgesByOwnerSkillId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> FacetsBySkillId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> FacetsByEffectGroupId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> DirectFacetsByEffectId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> FacetsByEffectId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> FacetsByProjectileId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> FacetsByAbnormalId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> FacetsByAbnormalEffectId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> SemanticsBySkillId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> SemanticsByEffectGroupId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> DirectSemanticsByEffectId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> SemanticsByEffectId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> SemanticsByProjectileId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> DirectSemanticsByAbnormalId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> SemanticsByAbnormalId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> SemanticsByAbnormalEffectId { get; }
     public IReadOnlyDictionary<int, IReadOnlyList<int>> OwnerSkillIdsByEffectGroupId { get; }
     public IReadOnlyDictionary<int, IReadOnlyList<int>> OwnerSkillIdsByEffectId { get; }
     public IReadOnlyDictionary<int, IReadOnlyList<int>> OwnerSkillIdsByEffectFilterId { get; }
@@ -124,16 +112,16 @@ public sealed class SkillSemanticOwnerGraph
     public IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> EffectSlotsByProjectileId { get; }
     public IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> EffectSlotsByAbnormalId { get; }
     public IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> EffectSlotsByAbnormalEffectId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> DirectFacetsByEffectGroupId { get; }
-    public IReadOnlyDictionary<int, SkillSemanticFacet> DirectFacetsByProjectileId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> DirectSemanticsByEffectGroupId { get; }
+    public IReadOnlyDictionary<int, SkillSemanticValue> DirectSemanticsByProjectileId { get; }
 
     public bool TryResolveEffect(int effectId, out SkillSemanticEffectResolution resolution)
     {
         if (effectId > 0 &&
-            DirectFacetsByEffectId.TryGetValue(effectId, out var directFacets) &&
-            FacetsByEffectId.TryGetValue(effectId, out var facets))
+            DirectSemanticsByEffectId.TryGetValue(effectId, out var directSemantics) &&
+            SemanticsByEffectId.TryGetValue(effectId, out var semantics))
         {
-            resolution = new SkillSemanticEffectResolution(effectId, directFacets, facets);
+            resolution = new SkillSemanticEffectResolution(effectId, directSemantics, semantics);
             return true;
         }
 
@@ -189,13 +177,13 @@ public sealed class SkillSemanticOwnerGraph
         var referencesBySkillId = references
             .GroupBy(static reference => reference.SkillId)
             .ToDictionary(static group => group.Key, static group => group.ToArray());
-        var facets = SkillSemanticFacetIndex.Build(semantics, referencesBySkillId);
-        var slots = SkillSemanticEffectSlotIndex.Build(semantics, references, facets);
+        var semanticValues = SkillSemanticValueIndex.Build(semantics, referencesBySkillId);
+        var slots = SkillSemanticEffectSlotIndex.Build(semantics, references, semanticValues);
         var profiles = new Dictionary<int, SkillSemanticProfile>(referencesBySkillId.Count);
         var allEdges = new List<SkillSemanticOwnerEdge>();
         foreach (var skillId in referencesBySkillId.Keys.Order())
         {
-            var builder = new ProfileBuilder(skillId, semantics, referencesBySkillId, facets);
+            var builder = new ProfileBuilder(skillId, semantics, referencesBySkillId, semanticValues);
             builder.TraverseSkill(skillId, triggered: false);
             var profile = builder.Build();
             profiles.Add(skillId, profile);
@@ -209,7 +197,7 @@ public sealed class SkillSemanticOwnerGraph
             .ThenBy(static edge => edge.SourceId)
             .ThenBy(static edge => edge.TargetId)
             .ToArray();
-        return new SkillSemanticOwnerGraph(profiles.ToFrozenDictionary(), orderedEdges, facets, slots);
+        return new SkillSemanticOwnerGraph(profiles.ToFrozenDictionary(), orderedEdges, semanticValues, slots);
     }
 
     private bool TryResolveResourceNode(
@@ -227,21 +215,21 @@ public sealed class SkillSemanticOwnerGraph
             return true;
         }
 
-        if (DirectFacetsByEffectId.TryGetValue(nodeId, out var directEffectFacets) && FacetsByEffectId.TryGetValue(nodeId, out var effectFacets))
+        if (DirectSemanticsByEffectId.TryGetValue(nodeId, out var directEffectSemantics) && SemanticsByEffectId.TryGetValue(nodeId, out var effectSemantics))
         {
-            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillEffect, nodeId, directEffectFacets, effectFacets, EffectSlotsByEffectId, preferredSkillId);
+            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillEffect, nodeId, directEffectSemantics, effectSemantics, EffectSlotsByEffectId, preferredSkillId);
             return true;
         }
 
-        if (FacetsByEffectGroupId.TryGetValue(nodeId, out var groupFacets))
+        if (SemanticsByEffectGroupId.TryGetValue(nodeId, out var groupSemantics))
         {
-            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillEffectGroup, nodeId, DirectFacetsByEffectGroupId.GetValueOrDefault(nodeId), groupFacets, EffectSlotsByEffectGroupId, preferredSkillId);
+            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillEffectGroup, nodeId, DirectSemanticsByEffectGroupId.GetValueOrDefault(nodeId), groupSemantics, EffectSlotsByEffectGroupId, preferredSkillId);
             return true;
         }
 
-        if (FacetsByProjectileId.TryGetValue(nodeId, out var projectileFacets))
+        if (SemanticsByProjectileId.TryGetValue(nodeId, out var projectileSemantics))
         {
-            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillProjectile, nodeId, DirectFacetsByProjectileId.GetValueOrDefault(nodeId), projectileFacets, EffectSlotsByProjectileId, preferredSkillId);
+            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillProjectile, nodeId, DirectSemanticsByProjectileId.GetValueOrDefault(nodeId), projectileSemantics, EffectSlotsByProjectileId, preferredSkillId);
             return true;
         }
 
@@ -254,7 +242,7 @@ public sealed class SkillSemanticOwnerGraph
 
         if (EffectSlotsByEffectFilterId.ContainsKey(nodeId))
         {
-            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillEffectFilter, nodeId, SkillSemanticFacet.None, SkillSemanticFacet.None, EffectSlotsByEffectFilterId, preferredSkillId);
+            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillEffectFilter, nodeId, SkillSemanticValue.Empty, SkillSemanticValue.Empty, EffectSlotsByEffectFilterId, preferredSkillId);
             return true;
         }
 
@@ -264,15 +252,15 @@ public sealed class SkillSemanticOwnerGraph
 
     private bool TryResolveAbnormalResourceNode(uint rawId, int nodeId, int preferredSkillId, out SkillSemanticResourceResolution resolution)
     {
-        if (FacetsByAbnormalEffectId.TryGetValue(nodeId, out var abnormalEffectFacets))
+        if (SemanticsByAbnormalEffectId.TryGetValue(nodeId, out var abnormalEffectSemantics))
         {
-            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillAbnormalEffect, nodeId, SkillSemanticFacet.None, abnormalEffectFacets, EffectSlotsByAbnormalEffectId, preferredSkillId);
+            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillAbnormalEffect, nodeId, abnormalEffectSemantics, abnormalEffectSemantics, EffectSlotsByAbnormalEffectId, preferredSkillId);
             return true;
         }
 
-        if (FacetsByAbnormalId.TryGetValue(nodeId, out var abnormalFacets))
+        if (SemanticsByAbnormalId.TryGetValue(nodeId, out var abnormalSemantics))
         {
-            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillAbnormal, nodeId, SkillSemanticFacet.None, abnormalFacets, EffectSlotsByAbnormalId, preferredSkillId);
+            resolution = CreateResourceResolution(rawId, SkillSemanticResourceNodeKind.SkillAbnormal, nodeId, DirectSemanticsByAbnormalId.GetValueOrDefault(nodeId), abnormalSemantics, EffectSlotsByAbnormalId, preferredSkillId);
             return true;
         }
 
@@ -284,23 +272,23 @@ public sealed class SkillSemanticOwnerGraph
         uint rawId,
         SkillSemanticResourceNodeKind nodeKind,
         int nodeId,
-        SkillSemanticFacet directFacets,
-        SkillSemanticFacet facets,
+        SkillSemanticValue directSemantics,
+        SkillSemanticValue semantics,
         IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> slotsByNodeId,
         int preferredSkillId)
     {
         slotsByNodeId.TryGetValue(nodeId, out var slots);
         var slot = SelectUnambiguousSlot(slots, preferredSkillId, out var candidateSlotCount);
-        if (slot is not null && facets == SkillSemanticFacet.None)
+        if (slot is not null && semantics.IsEmpty)
         {
-            directFacets = slot.DirectFacets;
-            facets = slot.Facets;
+            directSemantics = slot.DirectSemantics;
+            semantics = slot.Semantics;
         }
 
         SkillSemanticRuntimeSlot? runtimeSlot = slot is null
             ? null
-            : new SkillSemanticRuntimeSlot(slot.SkillId, slot.Slot, slot.DirectFacets, slot.Facets);
-        return new SkillSemanticResourceResolution(rawId, nodeKind, nodeId, directFacets, facets, runtimeSlot, candidateSlotCount);
+            : new SkillSemanticRuntimeSlot(slot.SkillId, slot.Slot, slot.DirectSemantics, slot.Semantics);
+        return new SkillSemanticResourceResolution(rawId, nodeKind, nodeId, directSemantics, semantics, runtimeSlot, candidateSlotCount);
     }
 
     private static SkillSemanticEffectSlot? SelectUnambiguousSlot(
@@ -381,7 +369,7 @@ public sealed class SkillSemanticOwnerGraph
         int ownerSkillId,
         SkillSemanticCatalog semantics,
         IReadOnlyDictionary<int, SkillEffectReference[]> referencesBySkillId,
-        SkillSemanticFacetIndex facets)
+        SkillSemanticValueIndex semanticValues)
     {
         private readonly HashSet<int> _visitedSkills = [];
         private readonly HashSet<int> _visitedEffectGroups = [];
@@ -397,7 +385,7 @@ public sealed class SkillSemanticOwnerGraph
         private readonly SortedSet<int> _abnormalEffectLevelIds = [];
         private readonly SortedSet<int> _triggeredSkillIds = [];
         private readonly List<SkillSemanticOwnerEdge> _edges = [];
-        private SkillSemanticFacet _facets = facets.SkillFacets.GetValueOrDefault(ownerSkillId);
+        private SkillSemanticValue _semantics = semanticValues.SkillSemantics.GetValueOrDefault(ownerSkillId);
         private bool _hasUnresolvedReferences;
 
         public IReadOnlyList<SkillSemanticOwnerEdge> Edges => _edges;
@@ -439,15 +427,9 @@ public sealed class SkillSemanticOwnerGraph
 
         public SkillSemanticProfile Build()
         {
-            if (_facets == SkillSemanticFacet.None &&
-                (_effectIds.Count > 0 || _effectFilterIds.Count > 0 || _projectileIds.Count > 0 || _abnormalIds.Count > 0))
-            {
-                _facets = SkillSemanticFacet.Support;
-            }
-
             return new SkillSemanticProfile(
                 ownerSkillId,
-                _facets,
+                _semantics,
                 _effectGroupIds.ToArray(),
                 _effectIds.ToArray(),
                 _effectLevelIds.ToArray(),
@@ -474,12 +456,12 @@ public sealed class SkillSemanticOwnerGraph
             }
 
             _effectGroupIds.Add(groupId);
-            _facets |= facets.EffectGroupFacets.GetValueOrDefault(groupId);
+            _semantics |= semanticValues.EffectGroupSemantics.GetValueOrDefault(groupId);
             foreach (var effect in effects)
             {
                 _effectIds.Add(effect.Id);
                 AddEdge(SkillSemanticOwnerEdgeKind.EffectGroupEffect, groupId, effect.Id, true);
-                _facets |= facets.EffectFacets.GetValueOrDefault(effect.Id);
+                _semantics |= semanticValues.EffectSemantics.GetValueOrDefault(effect.Id);
                 if (!string.Equals(effect.LevelGroupId, "None", StringComparison.Ordinal) && effect.LevelGroupId.Length > 0)
                 {
                     if (semantics.EffectLevelsByGroupId.TryGetValue(effect.LevelGroupId, out var levels))
@@ -526,7 +508,7 @@ public sealed class SkillSemanticOwnerGraph
             }
 
             _projectileIds.Add(projectileId);
-            _facets |= facets.ProjectileFacets.GetValueOrDefault(projectileId);
+            _semantics |= semanticValues.ProjectileSemantics.GetValueOrDefault(projectileId);
             if (projectile.ChainProjectileId > 0)
             {
                 AddEdge(SkillSemanticOwnerEdgeKind.ProjectileChain, projectileId, projectile.ChainProjectileId, semantics.Projectiles.ContainsKey(projectile.ChainProjectileId));
@@ -585,7 +567,7 @@ public sealed class SkillSemanticOwnerGraph
             }
 
             _abnormalIds.Add(abnormalId);
-            _facets |= facets.AbnormalFacets.GetValueOrDefault(abnormalId);
+            _semantics |= semanticValues.AbnormalSemantics.GetValueOrDefault(abnormalId);
             if (!semantics.AbnormalEffectsByAbnormalId.TryGetValue(abnormalId, out var effects))
             {
                 return;
@@ -595,7 +577,7 @@ public sealed class SkillSemanticOwnerGraph
             {
                 _abnormalEffectIds.Add(effect.Id);
                 AddEdge(SkillSemanticOwnerEdgeKind.AbnormalEffect, abnormalId, effect.Id, true);
-                _facets |= facets.AbnormalEffectFacets.GetValueOrDefault(effect.Id);
+                _semantics |= semanticValues.AbnormalEffectSemantics.GetValueOrDefault(effect.Id);
                 if (!string.Equals(effect.LevelGroupId, "None", StringComparison.Ordinal) && effect.LevelGroupId.Length > 0)
                 {
                     if (semantics.AbnormalEffectLevelsByGroupId.TryGetValue(effect.LevelGroupId, out var levels))

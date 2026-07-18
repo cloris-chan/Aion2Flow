@@ -159,6 +159,7 @@ public sealed class DetailCounterpartFilterViewModel : ObservableObject, IDispos
                             option.HealingShare,
                             option.ShieldAmount,
                             option.ShieldShare,
+                            option.ManaChange,
                             isSelected);
                         counterpart.SelectionChanged += HandleCounterpartSelectionChanged;
 

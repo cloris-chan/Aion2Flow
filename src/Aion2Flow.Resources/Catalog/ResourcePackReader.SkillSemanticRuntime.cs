@@ -31,8 +31,8 @@ internal static partial class ResourcePackReader
             result[i] = new SkillSemanticRuntimeSlot(
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor),
-                (SkillSemanticFacet)ReadUInt16(ref cursor),
-                (SkillSemanticFacet)ReadUInt16(ref cursor));
+                ReadSemanticValue(ref cursor),
+                ReadSemanticValue(ref cursor));
         }
 
         RequireFullyRead(cursor);
@@ -48,8 +48,8 @@ internal static partial class ResourcePackReader
             result[i] = new SkillSemanticRuntimeNode(
                 (SkillSemanticResourceNodeKind)ReadByte(ref cursor),
                 ReadInt32(ref cursor),
-                (SkillSemanticFacet)ReadUInt16(ref cursor),
-                (SkillSemanticFacet)ReadUInt16(ref cursor),
+                ReadSemanticValue(ref cursor),
+                ReadSemanticValue(ref cursor),
                 ReadInt32(ref cursor),
                 ReadInt32(ref cursor));
         }
@@ -66,5 +66,14 @@ internal static partial class ResourcePackReader
             result[i] = ReadInt32(ref cursor);
         RequireFullyRead(cursor);
         return result;
+    }
+
+    private static SkillSemanticValue ReadSemanticValue(ref ReadOnlySpan<byte> cursor)
+    {
+        var packed = ReadUInt16(ref cursor);
+        return new SkillSemanticValue(
+            (SkillQuantifiedFacet)(packed & 0x1F),
+            (SkillAuraFacet)((packed >> 5) & 0x03),
+            (SkillSemanticKnowledge)((packed >> 7) & 0x07));
     }
 }

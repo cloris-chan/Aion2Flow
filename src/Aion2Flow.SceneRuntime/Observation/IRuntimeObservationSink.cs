@@ -40,7 +40,7 @@ public interface IRuntimeObservationSink
 
     void MarkSceneTransportBoundary(in PacketObservationSource packet);
 
-    void AppendCombatObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatObservation observation);
+    void AppendCombatWireObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatWireObservation observation);
 
     void CompleteFlush(long flushId);
 

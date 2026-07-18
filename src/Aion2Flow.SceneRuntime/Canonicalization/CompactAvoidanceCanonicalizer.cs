@@ -18,17 +18,21 @@ public sealed class CompactAvoidanceCanonicalizer
     private int _lastCompactAvoidanceLayoutTag;
     private bool _hasLastCompactAvoidanceKey;
 
-    public StampedCombatCanonicalizationBatch NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw)
+    public StampedCombatCanonicalizationBatch NormalizeCombat(int sourceId, int targetId, in TimelineStamp stamp, in CombatWireObservation observation, long observedAtMilliseconds, RawPacketReference raw)
     {
-        var result = new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation);
+        var packetRule = observation.OutcomeKind switch
+        {
+            CombatWireOutcomeKind.ActiveSkillInvincible => CombatPacketRule.ActiveSkillInvincible,
+            CombatWireOutcomeKind.PeriodicLinkInvincible => CombatPacketRule.PeriodicLinkInvincible,
+            _ => CombatPacketRule.None
+        };
+        var result = new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, packetRule);
         return StampedCombatCanonicalizationBatch.One(result);
     }
 
-    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw)
+    public StampedCombatCanonicalizationBatch ObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatWireObservation observation, long observedAtMilliseconds, RawPacketReference raw)
     {
-        var isCompactSignal = IsCompactSignalShape(in observation) &&
-                              observation.EventKind == CombatEventKind.Unknown &&
-                              observation.ValueKind == CombatValueKind.Unknown;
+        var isCompactSignal = IsCompactSignalShape(in observation);
         if (!isCompactSignal)
         {
             ClearCompactAvoidanceRun();
@@ -71,7 +75,7 @@ public sealed class CompactAvoidanceCanonicalizer
         return canonicalizer;
     }
 
-    private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw)
+    private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatWireObservation observation, long observedAtMilliseconds, RawPacketReference raw)
     {
         if (!IsCompactEvadeSignal(sourceId, targetId, in observation) || observation.Marker <= 0)
             return false;
@@ -97,7 +101,14 @@ public sealed class CompactAvoidanceCanonicalizer
     {
         var results = new StampedCombatCanonicalizationBatchBuilder(_pendingCompact.Count);
         foreach (var pending in _pendingCompact)
-            results.Add(new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, pending.ObservedAtMilliseconds, pending.Raw, CreateCompactEvade(in pending), CombatContributionCanonicalization.CompactAvoidance));
+            results.Add(new StampedCombatCanonicalizationResult(
+                pending.SourceId,
+                pending.TargetId,
+                pending.Stamp,
+                pending.ObservedAtMilliseconds,
+                pending.Raw,
+                CreateCompactEvade(in pending),
+                CombatPacketRule.CompactAvoidance));
 
         _pendingCompact.Clear();
         ClearCompactAvoidanceRun();
@@ -132,7 +143,7 @@ public sealed class CompactAvoidanceCanonicalizer
         _hasLastCompactAvoidanceKey = false;
     }
 
-    private static bool IsCompactEvadeSignal(int sourceId, int targetId, in CombatObservation observation) =>
+    private static bool IsCompactEvadeSignal(int sourceId, int targetId, in CombatWireObservation observation) =>
         IsCompactSignalShape(in observation) &&
         targetId > 0 &&
         sourceId > 0 &&
@@ -141,16 +152,16 @@ public sealed class CompactAvoidanceCanonicalizer
         observation.Type == 1 &&
         observation.LayoutTag is 0 or 2;
 
-    private static bool IsCompactSignalShape(in CombatObservation observation) => observation.HitCount == 0 && observation.AttemptCount == 0;
+    private static bool IsCompactSignalShape(in CombatWireObservation observation) => observation.HitCount == 0 && observation.AttemptCount == 0;
 
-    private static bool IsCompactType2Sidecar(in CombatObservation observation) => IsCompactSignalShape(in observation) && observation.Type == 2;
+    private static bool IsCompactType2Sidecar(in CombatWireObservation observation) => IsCompactSignalShape(in observation) && observation.Type == 2;
 
     private static bool IsDuplicateCompactAvoidanceSignal(int previousLayoutTag, int currentLayoutTag) =>
         previousLayoutTag == 2 && currentLayoutTag == 0;
 
-    private static CombatObservation CreateCompactEvade(in PendingCompactAvoidance pending)
+    private static CombatWireObservation CreateCompactEvade(in PendingCompactAvoidance pending)
     {
-        var observation = new CombatObservation
+        var observation = new CombatWireObservation
         {
             SkillCode = pending.BodySkillVariantRaw,
             BodySkillVariantRaw = pending.BodySkillVariantRaw,
@@ -158,26 +169,35 @@ public sealed class CompactAvoidanceCanonicalizer
             HitCount = 0,
             AttemptCount = 1,
             Marker = pending.Marker,
-            Modifiers = DamageModifiers.Evade,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage,
-            EffectTag = PacketEffectTag.CompactEvade
+            Modifiers = DamageModifiers.Evade
         };
-        return CombatResourceRegistry.NormalizeObservationForStorage(pending.SourceId, pending.TargetId, in observation);
+        return observation;
     }
 
 }
 
 internal sealed record CompactAvoidanceCanonicalizerSnapshot(CompactAvoidanceCanonicalizer.PendingCompactAvoidance[] Pending, bool HasLastCompactAvoidanceKey, int LastSourceId, int LastTargetId, int LastBodySkillVariantRaw, int LastMarker, int LastLayoutTag);
 
-public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatObservation Observation, CombatContributionCanonicalization Canonicalization)
+public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatWireObservation Observation, CombatOccurrenceResolution Resolution)
 {
-    public StampedCombatCanonicalizationResult(int sourceId, int targetId, TimelineStamp stamp, long observedAtMilliseconds, RawPacketReference raw, CombatObservation observation)
-        : this(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, CombatContributionCanonicalization.None)
+    public StampedCombatCanonicalizationResult(int sourceId, int targetId, TimelineStamp stamp, long observedAtMilliseconds, RawPacketReference raw, CombatWireObservation observation)
+        : this(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, CombatOccurrenceResolution.Primary)
     {
     }
 
-    public StampedCombatCanonicalizationResult WithCanonicalization(CombatContributionCanonicalization canonicalization) => this with { Canonicalization = Canonicalization | canonicalization };
+    public StampedCombatCanonicalizationResult(
+        int sourceId,
+        int targetId,
+        TimelineStamp stamp,
+        long observedAtMilliseconds,
+        RawPacketReference raw,
+        CombatWireObservation observation,
+        CombatPacketRule packetRule,
+        CombatMaterializationKind materialization = CombatMaterializationKind.Primary,
+        CombatAssociationKind association = CombatAssociationKind.None)
+        : this(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, new CombatOccurrenceResolution(packetRule, materialization, association, CombatSuppressionReason.None))
+    {
+    }
 }
 
 public readonly struct StampedCombatCanonicalizationBatch

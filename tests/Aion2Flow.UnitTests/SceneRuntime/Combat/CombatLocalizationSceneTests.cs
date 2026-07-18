@@ -10,12 +10,9 @@ public sealed class CombatLocalizationSceneTests
     {
         try
         {
-            var observation = new CombatObservation
+            var observation = new CombatWireObservation
             {
-                SkillCode = 2011101,
-                Damage = 100,
-                EventKind = CombatEventKind.Healing,
-                ValueKind = CombatValueKind.PeriodicHealing
+                SkillCode = 2011101
             };
 
             CombatResourceRegistry.LoadSkillMap("zh-TW");
@@ -81,21 +78,23 @@ public sealed class CombatLocalizationSceneTests
             const int skillCode = 11800008;
 
             scene.AppendNickname(sourceId, "Perigee");
-            scene.AppendCombatPacket(new ParsedCombatPacket
+            var firstDamage = new CombatWireObservation
             {
-                SourceId = sourceId,
-                TargetId = targetId,
                 SkillCode = skillCode,
-                Damage = 77669
-            });
+                Damage = 77669,
+                HitCount = 1,
+                AttemptCount = 1
+            };
+            scene.AppendCombatWireObservation(sourceId, targetId, in firstDamage);
             Thread.Sleep(5);
-            scene.AppendCombatPacket(new ParsedCombatPacket
+            var secondDamage = new CombatWireObservation
             {
-                SourceId = sourceId,
-                TargetId = targetId,
                 SkillCode = skillCode,
-                Damage = 77669
-            });
+                Damage = 77669,
+                HitCount = 1,
+                AttemptCount = 1
+            };
+            scene.AppendCombatWireObservation(sourceId, targetId, in secondDamage);
 
             var zhSnapshot = scene.CreateSnapshot();
             Assert.True(zhSnapshot.Combatants.TryGetValue(sourceId, out var zhCombatant));
@@ -115,11 +114,7 @@ public sealed class CombatLocalizationSceneTests
             Assert.Equal(zhCombatant.DrainDamageAmount, enCombatant.DrainDamageAmount);
             Assert.Equal(zhCombatant.DamageContribution, enCombatant.DamageContribution);
 
-            Assert.Equal(zhSkill.DamageAmount, enSkill.DamageAmount);
-            Assert.Equal(zhSkill.Times, enSkill.Times);
-            Assert.Equal(zhSkill.SupportTimes, enSkill.SupportTimes);
-            Assert.Equal(zhSkill.PrimaryValueKind, enSkill.PrimaryValueKind);
-            Assert.Equal(zhSkill.EventKind, enSkill.EventKind);
+            Assert.Equal(zhSkill, enSkill);
 
             Assert.Equal("殺氣破裂", zhSkillName);
             var enSkillName = CombatResourceRegistry.DisplaySkillNameFor(enSkill.SkillCode);

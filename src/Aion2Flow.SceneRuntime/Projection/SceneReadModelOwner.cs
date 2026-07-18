@@ -65,6 +65,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public SceneBoundaryStore Boundary => boundary;
     public RuntimeMetadataRegistry MetadataRegistry => metadataRegistry;
     public CombatStore Combat => combat;
+    public MechanicStore Mechanics => _applier.Mechanics;
+    public ResourceStore Resources => _applier.Resources;
+    public EntityVitalStore EntityVitals => _applier.EntityVitals;
+    public AuraStore Auras => _applier.Auras;
     public DomainEventApplier Applier => _applier;
     public BossFocusStore BossFocus => _applier.BossFocus;
     public Guid EncounterId { get; private set; } = encounterId;
@@ -123,7 +127,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 boundary,
                 metadataRegistry,
                 _applier.BossFocus,
+                _applier.EntityVitals,
                 combat,
+                _applier.Mechanics,
+                _applier.Resources,
                 CreateAdapter(),
                 CreateTimelineSegment(isLiveGrowing: false));
         }
@@ -142,7 +149,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 boundary,
                 metadataRegistry,
                 _applier.BossFocus,
+                _applier.EntityVitals,
                 combat,
+                _applier.Mechanics,
+                _applier.Resources,
                 CreateAdapter(),
                 CreateTimelineSegment(isLiveGrowing: false));
         }
@@ -166,7 +176,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 RefreshCore(endObservationOrdinalExclusive, completeFlushes: true);
             }
             var snapshot = CreateSnapshotCore();
-            var payload = SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, boundary, metadataRegistry, _applier.BossFocus, combat, CreateAdapter(), CreateTimelineSegment(isLiveGrowing: false, endObservationOrdinalExclusive));
+            var payload = SceneArchivePayload.CreateLocked(snapshot, SceneStarted, entities, boundary, metadataRegistry, _applier.BossFocus, _applier.EntityVitals, combat, _applier.Mechanics, _applier.Resources, CreateAdapter(), CreateTimelineSegment(isLiveGrowing: false, endObservationOrdinalExclusive));
             return new SceneArchiveCapture(snapshot, payload);
         }
     }
@@ -180,21 +190,12 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
-    public T ReadLocked<T>(Func<EntityStore, SceneBoundaryStore, RuntimeMetadataRegistry, CombatStore, T> reader)
+    internal T ReadLocked<T>(Func<EntityStore, SceneBoundaryStore, RuntimeMetadataRegistry, CombatStore, MechanicStore, ResourceStore, SceneCombatSnapshotAdapter, T> reader)
     {
         lock (_gate)
         {
             RefreshCore();
-            return reader(entities, boundary, metadataRegistry, combat);
-        }
-    }
-
-    internal T ReadLocked<T>(Func<EntityStore, SceneBoundaryStore, RuntimeMetadataRegistry, CombatStore, SceneCombatSnapshotAdapter, T> reader)
-    {
-        lock (_gate)
-        {
-            RefreshCore();
-            return reader(entities, boundary, metadataRegistry, combat, CreateAdapter());
+            return reader(entities, boundary, metadataRegistry, combat, _applier.Mechanics, _applier.Resources, CreateAdapter());
         }
     }
 
@@ -271,7 +272,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         if (GetSceneNowMilliseconds() > _snapshotCacheValidUntilMilliseconds)
             return true;
 
-        return _snapshotCacheKey != SnapshotCacheKey.From(EncounterId, entities, boundary, combat, _applier.BossFocus);
+        return _snapshotCacheKey != SnapshotCacheKey.From(EncounterId, entities, _applier.EntityVitals, boundary, combat, _applier.Mechanics, _applier.Resources, _applier.BossFocus);
     }
 
     private void RefreshCore(long stopBeforeObservationOrdinal, bool completeFlushes)
@@ -348,7 +349,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private SceneCombatSnapshot CreateSnapshotCore()
     {
         var now = GetSceneNowMilliseconds();
-        var key = SnapshotCacheKey.From(EncounterId, entities, boundary, combat, _applier.BossFocus);
+        var key = SnapshotCacheKey.From(EncounterId, entities, _applier.EntityVitals, boundary, combat, _applier.Mechanics, _applier.Resources, _applier.BossFocus);
         if (_snapshotCache is not null && _snapshotCacheKey == key && now <= _snapshotCacheValidUntilMilliseconds)
         {
             _projectionCacheStats = _projectionCacheStats.WithHit();
@@ -356,19 +357,23 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
 
         var adapter = CreateAdapter();
-        _snapshotBuilder.Reset(EncounterId, Kind, combat.Combatants.Count, 0);
+        _snapshotBuilder.Reset(
+            EncounterId,
+            Kind,
+            combat.Combatants.Count + _applier.Mechanics.Combatants.Count + (_applier.Resources.Pairs.Count * 2),
+            0);
         adapter.BuildSnapshot(_snapshotBuilder);
         ApplyBossFocusSnapshots(_snapshotBuilder, now);
         ApplyBossNpcCodes(_snapshotBuilder);
-        var snapshot = _snapshotBuilder.ToSnapshot(combat.Revision);
-        _snapshotCacheKey = SnapshotCacheKey.From(EncounterId, entities, boundary, combat, _applier.BossFocus);
+        var snapshot = _snapshotBuilder.ToSnapshot(adapter.ReadModelRevision);
+        _snapshotCacheKey = SnapshotCacheKey.From(EncounterId, entities, _applier.EntityVitals, boundary, combat, _applier.Mechanics, _applier.Resources, _applier.BossFocus);
         _snapshotCache = snapshot;
         _snapshotCacheValidUntilMilliseconds = GetSnapshotCacheValidUntilMilliseconds(snapshot);
         _projectionCacheStats = _projectionCacheStats.WithMiss();
         return snapshot;
     }
 
-    private SceneCombatSnapshotAdapter CreateAdapter() => _adapter ??= new(entities, combat, boundary, _applier.BossFocus, EncounterId);
+    private SceneCombatSnapshotAdapter CreateAdapter() => _adapter ??= new(entities, _applier.EntityVitals, combat, _applier.Mechanics, _applier.Resources, boundary, _applier.BossFocus, EncounterId);
 
     private SceneJournalSegment CreateTimelineSegment(bool isLiveGrowing, long? endObservationOrdinalExclusive = null)
     {
@@ -510,7 +515,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     {
         if (!_detailSubscriptions.TryGetValue(combatantId, out var subscription))
         {
-            subscription = new CombatDetailSubscription(combat, combatantId);
+            subscription = new CombatDetailSubscription(combat, _applier.Mechanics, _applier.Resources, combatantId);
             _detailSubscriptions[combatantId] = subscription;
         }
 
@@ -562,10 +567,10 @@ public readonly record struct BossDamageContribution(int BossId, int SourceComba
 
 internal readonly record struct BossDamageContributionKey(int BossId, int SourceCombatantId);
 
-internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long EntityIdentityRevision, long EntityVolatileStateRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision, long SkillMapRevision)
+internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long MechanicRevision, long ResourceRevision, long EntityIdentityRevision, long EntityVolatileStateRevision, long EntityVitalRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision, long SkillMapRevision)
 {
-    public static SnapshotCacheKey From(Guid encounterId, EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, BossFocusStore bossFocus) =>
-        new(encounterId, combat.Revision, entities.IdentityRevision, entities.VolatileStateRevision, boundary.Revision, boundary.SceneTransitionRevision, bossFocus.Revision, CombatResourceRegistry.SkillMapRevision);
+    public static SnapshotCacheKey From(Guid encounterId, EntityStore entities, EntityVitalStore entityVitals, SceneBoundaryStore boundary, CombatStore combat, MechanicStore mechanics, ResourceStore resources, BossFocusStore bossFocus) =>
+        new(encounterId, combat.Revision, mechanics.Revision, resources.Revision, entities.IdentityRevision, entities.VolatileStateRevision, entityVitals.Revision, boundary.Revision, boundary.SceneTransitionRevision, bossFocus.Revision, CombatResourceRegistry.SkillMapRevision);
 }
 
 public readonly record struct ProjectionCacheStats(long SnapshotBuilds, long SnapshotCacheHits)

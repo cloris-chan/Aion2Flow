@@ -3,14 +3,14 @@ namespace Cloris.Aion2Flow.Resources.Catalog;
 public readonly record struct SkillSemanticRuntimeSlot(
     int SkillId,
     int Slot,
-    SkillSemanticFacet DirectFacets,
-    SkillSemanticFacet Facets);
+    SkillSemanticValue DirectSemantics,
+    SkillSemanticValue Semantics);
 
 internal readonly record struct SkillSemanticRuntimeNode(
     SkillSemanticResourceNodeKind Kind,
     int Id,
-    SkillSemanticFacet DirectFacets,
-    SkillSemanticFacet Facets,
+    SkillSemanticValue DirectSemantics,
+    SkillSemanticValue Semantics,
     int CandidateSlotStart,
     int CandidateSlotCount);
 
@@ -26,6 +26,7 @@ public sealed class SkillSemanticRuntimeIndex
     {
         Direct = 1,
         Periodic = 2,
+        Aura = 3,
     }
 
     private readonly int[] _skillIds;
@@ -60,7 +61,7 @@ public sealed class SkillSemanticRuntimeIndex
     {
         if (TryGetNode(SkillSemanticResourceNodeKind.SkillEffect, effectId, out var node))
         {
-            resolution = new SkillSemanticEffectResolution(effectId, node.DirectFacets, node.Facets);
+            resolution = new SkillSemanticEffectResolution(effectId, node.DirectSemantics, node.Semantics);
             return true;
         }
 
@@ -73,6 +74,9 @@ public sealed class SkillSemanticRuntimeIndex
 
     public bool TryResolvePeriodicResourceReference(uint rawId, int preferredSkillId, out SkillSemanticResourceResolution resolution)
         => TryResolveResourceReference(rawId, preferredSkillId, ResourceReferenceDomain.Periodic, out resolution);
+
+    public bool TryResolveAuraResourceReference(uint rawId, out SkillSemanticResourceResolution resolution)
+        => TryResolveResourceReference(rawId, 0, ResourceReferenceDomain.Aura, out resolution);
 
     private bool TryResolveResourceReference(
         uint rawId,
@@ -87,7 +91,7 @@ public sealed class SkillSemanticRuntimeIndex
         }
 
         var candidateId = unchecked((int)rawId);
-        if (TryResolveResourceNode(rawId, candidateId, preferredSkillId, domain, includeAbnormalNodes: domain == ResourceReferenceDomain.Periodic, out resolution))
+        if (TryResolveResourceNode(rawId, candidateId, preferredSkillId, domain, includeAbnormalNodes: domain is ResourceReferenceDomain.Periodic or ResourceReferenceDomain.Aura, out resolution))
             return true;
 
         candidateId = unchecked((int)(rawId / 10));
@@ -119,6 +123,13 @@ public sealed class SkillSemanticRuntimeIndex
         {
             resolution = default;
             return false;
+        }
+
+        if (domain == ResourceReferenceDomain.Aura &&
+            includeAbnormalNodes &&
+            TryResolveAuraResourceNode(rawId, nodeStart, nodeEnd, preferredSkillId, out resolution))
+        {
+            return true;
         }
 
         if (domain == ResourceReferenceDomain.Periodic &&
@@ -154,6 +165,15 @@ public sealed class SkillSemanticRuntimeIndex
         => TryResolveNode(rawId, nodeStart, nodeEnd, SkillSemanticResourceNodeKind.SkillAbnormalEffect, preferredSkillId, out resolution) ||
            TryResolveNode(rawId, nodeStart, nodeEnd, SkillSemanticResourceNodeKind.SkillAbnormal, preferredSkillId, out resolution);
 
+    private bool TryResolveAuraResourceNode(
+        uint rawId,
+        int nodeStart,
+        int nodeEnd,
+        int preferredSkillId,
+        out SkillSemanticResourceResolution resolution)
+        => TryResolveNode(rawId, nodeStart, nodeEnd, SkillSemanticResourceNodeKind.SkillAbnormal, preferredSkillId, out resolution) ||
+           TryResolveNode(rawId, nodeStart, nodeEnd, SkillSemanticResourceNodeKind.SkillAbnormalEffect, preferredSkillId, out resolution);
+
     private bool TryResolveNode(
         uint rawId,
         int nodeStart,
@@ -181,20 +201,20 @@ public sealed class SkillSemanticRuntimeIndex
         }
 
         var slot = SelectUnambiguousSlot(in node, preferredSkillId, out var candidateSlotCount);
-        var directFacets = node.DirectFacets;
-        var facets = node.Facets;
-        if (slot.HasValue && facets == SkillSemanticFacet.None)
+        var directSemantics = node.DirectSemantics;
+        var semantics = node.Semantics;
+        if (slot.HasValue && semantics.IsEmpty)
         {
-            directFacets = slot.Value.DirectFacets;
-            facets = slot.Value.Facets;
+            directSemantics = slot.Value.DirectSemantics;
+            semantics = slot.Value.Semantics;
         }
 
         resolution = new SkillSemanticResourceResolution(
             rawId,
             node.Kind,
             node.Id,
-            directFacets,
-            facets,
+            directSemantics,
+            semantics,
             slot,
             candidateSlotCount);
         return true;
@@ -305,6 +325,9 @@ public sealed class SkillSemanticRuntimeIndex
         {
             var slot = data.Slots[i];
             if (slot.SkillId <= 0 || slot.Slot < -1 ||
+                !IsValidSemanticValue(slot.DirectSemantics) ||
+                !IsValidSemanticValue(slot.Semantics) ||
+                !IsSemanticSubset(slot.DirectSemantics, slot.Semantics) ||
                 i > 0 && CompareSlotKey(previousSlot, slot) >= 0)
             {
                 throw new InvalidDataException("Runtime semantic slots must be valid and strictly ordered by skill and slot.");
@@ -319,6 +342,9 @@ public sealed class SkillSemanticRuntimeIndex
         {
             var node = data.Nodes[i];
             if (!Enum.IsDefined(node.Kind) || node.Id <= 0 || node.CandidateSlotStart != expectedCandidateStart || node.CandidateSlotCount < 0 ||
+                !IsValidSemanticValue(node.DirectSemantics) ||
+                !IsValidSemanticValue(node.Semantics) ||
+                !IsSemanticSubset(node.DirectSemantics, node.Semantics) ||
                 node.CandidateSlotCount > data.NodeSlotIndexes.Length - node.CandidateSlotStart ||
                 i > 0 && CompareNodeKey(previousNode.Kind, previousNode.Id, node.Kind, node.Id) >= 0)
             {
@@ -346,6 +372,37 @@ public sealed class SkillSemanticRuntimeIndex
         if (expectedCandidateStart != data.NodeSlotIndexes.Length)
             throw new InvalidDataException("Runtime semantic node slot references contain trailing values.");
     }
+
+    private static bool IsValidSemanticValue(SkillSemanticValue value)
+    {
+        const SkillQuantifiedFacet quantifiedMask =
+            SkillQuantifiedFacet.DirectDamage |
+            SkillQuantifiedFacet.DirectHealing |
+            SkillQuantifiedFacet.PeriodicDamage |
+            SkillQuantifiedFacet.PeriodicHealing |
+            SkillQuantifiedFacet.Shield;
+        const SkillAuraFacet auraMask = SkillAuraFacet.Buff | SkillAuraFacet.Debuff;
+        const SkillSemanticKnowledge knowledgeMask =
+            SkillSemanticKnowledge.Classified |
+            SkillSemanticKnowledge.KnownNonQuantified |
+            SkillSemanticKnowledge.Unclassified;
+
+        if ((value.QuantifiedFacets & ~quantifiedMask) != 0 ||
+            (value.AuraFacets & ~auraMask) != 0 ||
+            (value.Knowledge & ~knowledgeMask) != 0)
+        {
+            return false;
+        }
+
+        var hasFacets = value.QuantifiedFacets != SkillQuantifiedFacet.None || value.AuraFacets != SkillAuraFacet.None;
+        var isClassified = (value.Knowledge & SkillSemanticKnowledge.Classified) != 0;
+        return hasFacets == isClassified;
+    }
+
+    private static bool IsSemanticSubset(SkillSemanticValue direct, SkillSemanticValue transitive) =>
+        (direct.QuantifiedFacets & ~transitive.QuantifiedFacets) == 0 &&
+        (direct.AuraFacets & ~transitive.AuraFacets) == 0 &&
+        (direct.Knowledge & ~transitive.Knowledge) == 0;
 
     private static int CompareNodeKey(
         SkillSemanticResourceNodeKind leftKind,
@@ -376,30 +433,30 @@ internal static class SkillSemanticRuntimeIndexCompiler
         var referencesBySkillId = references
             .GroupBy(static reference => reference.SkillId)
             .ToDictionary(static group => group.Key, static group => group.ToArray());
-        var facets = SkillSemanticFacetIndex.Build(semantics, referencesBySkillId);
-        var richSlots = SkillSemanticEffectSlotIndex.Build(semantics, references, facets);
+        var semanticValues = SkillSemanticValueIndex.Build(semantics, referencesBySkillId);
+        var richSlots = SkillSemanticEffectSlotIndex.Build(semantics, references, semanticValues);
         var slots = new SkillSemanticRuntimeSlot[richSlots.Slots.Count];
         var slotIndexes = new Dictionary<(int SkillId, int Slot), int>(slots.Length);
         for (var i = 0; i < slots.Length; i++)
         {
             var slot = richSlots.Slots[i];
-            slots[i] = new SkillSemanticRuntimeSlot(slot.SkillId, slot.Slot, slot.DirectFacets, slot.Facets);
+            slots[i] = new SkillSemanticRuntimeSlot(slot.SkillId, slot.Slot, slot.DirectSemantics, slot.Semantics);
             slotIndexes.Add((slot.SkillId, slot.Slot), i);
         }
 
         var sources = new List<NodeSource>(
-            facets.EffectFacets.Count +
-            facets.EffectGroupFacets.Count +
-            facets.ProjectileFacets.Count +
-            facets.AbnormalFacets.Count +
-            facets.AbnormalEffectFacets.Count +
+            semanticValues.EffectSemantics.Count +
+            semanticValues.EffectGroupSemantics.Count +
+            semanticValues.ProjectileSemantics.Count +
+            semanticValues.AbnormalSemantics.Count +
+            semanticValues.AbnormalEffectSemantics.Count +
             richSlots.SlotsByEffectFilterId.Count);
-        AddSources(sources, SkillSemanticResourceNodeKind.SkillEffect, facets.EffectFacets, facets.DirectEffectFacets, richSlots.SlotsByEffectId);
-        AddSources(sources, SkillSemanticResourceNodeKind.SkillEffectGroup, facets.EffectGroupFacets, richSlots.DirectFacetsByEffectGroupId, richSlots.SlotsByEffectGroupId);
+        AddSources(sources, SkillSemanticResourceNodeKind.SkillEffect, semanticValues.EffectSemantics, semanticValues.DirectEffectSemantics, richSlots.SlotsByEffectId);
+        AddSources(sources, SkillSemanticResourceNodeKind.SkillEffectGroup, semanticValues.EffectGroupSemantics, richSlots.DirectSemanticsByEffectGroupId, richSlots.SlotsByEffectGroupId);
         AddSources(sources, SkillSemanticResourceNodeKind.SkillEffectFilter, null, null, richSlots.SlotsByEffectFilterId);
-        AddSources(sources, SkillSemanticResourceNodeKind.SkillProjectile, facets.ProjectileFacets, richSlots.DirectFacetsByProjectileId, richSlots.SlotsByProjectileId);
-        AddSources(sources, SkillSemanticResourceNodeKind.SkillAbnormal, facets.AbnormalFacets, null, richSlots.SlotsByAbnormalId);
-        AddSources(sources, SkillSemanticResourceNodeKind.SkillAbnormalEffect, facets.AbnormalEffectFacets, null, richSlots.SlotsByAbnormalEffectId);
+        AddSources(sources, SkillSemanticResourceNodeKind.SkillProjectile, semanticValues.ProjectileSemantics, richSlots.DirectSemanticsByProjectileId, richSlots.SlotsByProjectileId);
+        AddSources(sources, SkillSemanticResourceNodeKind.SkillAbnormal, semanticValues.AbnormalSemantics, semanticValues.DirectAbnormalSemantics, richSlots.SlotsByAbnormalId);
+        AddSources(sources, SkillSemanticResourceNodeKind.SkillAbnormalEffect, semanticValues.AbnormalEffectSemantics, semanticValues.AbnormalEffectSemantics, richSlots.SlotsByAbnormalEffectId);
         sources.Sort(static (left, right) =>
         {
             var comparison = left.Id.CompareTo(right.Id);
@@ -424,8 +481,8 @@ internal static class SkillSemanticRuntimeIndexCompiler
             nodes[i] = new SkillSemanticRuntimeNode(
                 source.Kind,
                 source.Id,
-                source.DirectFacets,
-                source.Facets,
+                source.DirectSemantics,
+                source.Semantics,
                 candidateStart,
                 nodeSlotIndexes.Count - candidateStart);
         }
@@ -440,29 +497,29 @@ internal static class SkillSemanticRuntimeIndexCompiler
     private static void AddSources(
         List<NodeSource> target,
         SkillSemanticResourceNodeKind kind,
-        IReadOnlyDictionary<int, SkillSemanticFacet>? facets,
-        IReadOnlyDictionary<int, SkillSemanticFacet>? directFacets,
+        IReadOnlyDictionary<int, SkillSemanticValue>? semantics,
+        IReadOnlyDictionary<int, SkillSemanticValue>? directSemantics,
         IReadOnlyDictionary<int, IReadOnlyList<SkillSemanticEffectSlot>> slots)
     {
-        if (facets is not null)
+        if (semantics is not null)
         {
-            foreach (var (id, value) in facets)
+            foreach (var (id, value) in semantics)
             {
                 slots.TryGetValue(id, out var candidates);
-                target.Add(new NodeSource(kind, id, directFacets?.GetValueOrDefault(id) ?? SkillSemanticFacet.None, value, candidates));
+                target.Add(new NodeSource(kind, id, directSemantics?.GetValueOrDefault(id) ?? SkillSemanticValue.Empty, value, candidates));
             }
 
             return;
         }
 
         foreach (var (id, candidates) in slots)
-            target.Add(new NodeSource(kind, id, SkillSemanticFacet.None, SkillSemanticFacet.None, candidates));
+            target.Add(new NodeSource(kind, id, SkillSemanticValue.Empty, SkillSemanticValue.Empty, candidates));
     }
 
     private readonly record struct NodeSource(
         SkillSemanticResourceNodeKind Kind,
         int Id,
-        SkillSemanticFacet DirectFacets,
-        SkillSemanticFacet Facets,
+        SkillSemanticValue DirectSemantics,
+        SkillSemanticValue Semantics,
         IReadOnlyList<SkillSemanticEffectSlot>? Slots);
 }

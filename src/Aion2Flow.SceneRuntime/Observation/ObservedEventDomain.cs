@@ -8,7 +8,7 @@ public enum ObservedEventDomain : byte
 
     State,
 
-    Resource,
+    EntityVital,
 
     Aura,
 

@@ -92,7 +92,11 @@ public struct CombatantClassEvidence
         }
     }
 
-    public static bool TryCreate(in CombatObservation observation, out CharacterClass characterClass, out int score)
+    public static bool TryCreate(
+        in CombatWireObservation observation,
+        in CombatContribution contribution,
+        out CharacterClass characterClass,
+        out int score)
     {
         characterClass = default;
         score = 0;
@@ -101,18 +105,21 @@ public struct CombatantClassEvidence
             return false;
 
         var mappedClass = MapSkillCategoryToClass(skill.Category);
-        if (mappedClass is null || skill.SourceType != SkillSourceType.PcSkill || observation.PeriodicRelation != PeriodicEffectRelation.None || observation.EffectTag == PacketEffectTag.RegenerationHealing)
+        if (mappedClass is null ||
+            skill.SourceType != SkillSourceType.PcSkill ||
+            observation.PeriodicRelation != PeriodicEffectRelation.None ||
+            contribution.Delivery != CombatDeliveryKind.Direct)
+        {
             return false;
+        }
 
-        score = observation.EventKind == CombatEventKind.Damage
-            ? 6
-            : observation.ValueKind == CombatValueKind.Shield
-                ? 4
-                : observation.EventKind == CombatEventKind.Healing
-                    ? 3
-                    : observation.EventKind == CombatEventKind.Support
-                        ? 2
-                        : 0;
+        score = contribution.Metric switch
+        {
+            CombatMetricKind.Damage => 6,
+            CombatMetricKind.ShieldGranted or CombatMetricKind.ShieldAbsorbed => 4,
+            CombatMetricKind.Healing => 3,
+            _ => 0
+        };
 
         if (score <= 0)
             return false;

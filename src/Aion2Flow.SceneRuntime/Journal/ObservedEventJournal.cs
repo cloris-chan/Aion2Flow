@@ -54,7 +54,7 @@ public sealed class ObservedEventJournal(int capacity = 0)
         get { lock (_gate) return _lastCompletedFlushId; }
     }
 
-    public void Append(in ObservedEventHeader header, in CombatObservation observation)
+    public void Append(in ObservedEventHeader header, in CombatWireObservation observation)
     {
         lock (_gate)
         {
@@ -84,13 +84,13 @@ public sealed class ObservedEventJournal(int capacity = 0)
         }
     }
 
-    public void Append(in ObservedEventHeader header, in ResourceObservation observation)
+    public void Append(in ObservedEventHeader header, in EntityVitalObservation observation)
     {
         lock (_gate)
         {
             var segment = PrepareAppend(in header, out var sessionIndex, out var rawIndex);
-            var payloadIndex = segment.AddResource(in observation);
-            CommitAppend(segment, in header, sessionIndex, rawIndex, payloadIndex, ObservedEventDomain.Resource);
+            var payloadIndex = segment.AddEntityVital(in observation);
+            CommitAppend(segment, in header, sessionIndex, rawIndex, payloadIndex, ObservedEventDomain.EntityVital);
         }
     }
 
@@ -308,7 +308,7 @@ public readonly ref struct ObservedEventEntry
     public long ObservedAtMilliseconds => _header.OffsetTicks / TimeSpan.TicksPerMillisecond;
     public ref readonly RawPacketReference Raw => ref _journal.GetRawReference(_header.RawReferenceIndex);
 
-    public ref readonly CombatObservation Combat
+    public ref readonly CombatWireObservation Combat
     {
         get
         {
@@ -335,12 +335,12 @@ public readonly ref struct ObservedEventEntry
         }
     }
 
-    public ref readonly ResourceObservation Resource
+    public ref readonly EntityVitalObservation EntityVital
     {
         get
         {
-            EnsureDomain(ObservedEventDomain.Resource);
-            return ref _segment.GetResource(_header.PayloadIndex);
+            EnsureDomain(ObservedEventDomain.EntityVital);
+            return ref _segment.GetEntityVital(_header.PayloadIndex);
         }
     }
 
@@ -417,26 +417,26 @@ public readonly ref struct JournalEntryBatch
 internal sealed class ObservedEventStorageSegment(long firstObservationOrdinal)
 {
     private readonly StoredObservedEventHeader[] _headers = new StoredObservedEventHeader[ObservedEventJournal.SegmentCapacity];
-    private PayloadBuffer<CombatObservation> _combat;
+    private PayloadBuffer<CombatWireObservation> _combat;
     private PayloadBuffer<ActionObservation> _actions;
     private PayloadBuffer<StateObservation> _states;
-    private PayloadBuffer<ResourceObservation> _resources;
+    private PayloadBuffer<EntityVitalObservation> _entityVitals;
     private PayloadBuffer<AuraObservation> _auras;
     private PayloadBuffer<SceneObservation> _scenes;
 
     public int Count { get; private set; }
 
     public void AddHeader(in StoredObservedEventHeader header) => _headers[Count++] = header;
-    public int AddCombat(in CombatObservation value) => _combat.Add(in value);
+    public int AddCombat(in CombatWireObservation value) => _combat.Add(in value);
     public int AddAction(in ActionObservation value) => _actions.Add(in value);
     public int AddState(in StateObservation value) => _states.Add(in value);
-    public int AddResource(in ResourceObservation value) => _resources.Add(in value);
+    public int AddEntityVital(in EntityVitalObservation value) => _entityVitals.Add(in value);
     public int AddAura(in AuraObservation value) => _auras.Add(in value);
     public int AddScene(in SceneObservation value) => _scenes.Add(in value);
-    public ref readonly CombatObservation GetCombat(int index) => ref _combat[index];
+    public ref readonly CombatWireObservation GetCombat(int index) => ref _combat[index];
     public ref readonly ActionObservation GetAction(int index) => ref _actions[index];
     public ref readonly StateObservation GetState(int index) => ref _states[index];
-    public ref readonly ResourceObservation GetResource(int index) => ref _resources[index];
+    public ref readonly EntityVitalObservation GetEntityVital(int index) => ref _entityVitals[index];
     public ref readonly AuraObservation GetAura(int index) => ref _auras[index];
     public ref readonly SceneObservation GetScene(int index) => ref _scenes[index];
 

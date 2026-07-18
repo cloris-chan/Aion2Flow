@@ -1,6 +1,6 @@
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -11,7 +11,8 @@ public static class ScenePlaybackAuraTimelineReader
         if (segment.IsEmpty || targetEntityId <= 0 || durationMilliseconds <= 0)
             return ScenePlaybackAuraTimeline.Empty;
 
-        var active = new Dictionary<int, ActiveAura>();
+        var lifecycle = new AuraStore();
+        var active = new Dictionary<AuraInstanceKey, TimelineAura>();
         var coverages = new List<ScenePlaybackAuraCoverage>();
         var applications = new List<ScenePlaybackAuraApplication>();
         var cursor = segment.CreateCursor();
@@ -22,26 +23,21 @@ public static class ScenePlaybackAuraTimelineReader
             {
                 for (var i = 0; i < entries.Count; i++)
                 {
-                    var entry = entries[i];
                     cancellationToken.ThrowIfCancellationRequested();
+                    var entry = entries[i];
+                    var transition = lifecycle.Apply(entry);
+                    if (!transition.HasPreviousState && !transition.HasState)
+                        continue;
+
                     var position = Math.Max(0, ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry));
-                    if (entry.Domain == ObservedEventDomain.Aura && entry.Aura.EntityId == targetEntityId)
-                    {
-                        ref readonly var aura = ref entry.Aura;
-                        if (ScenePlaybackAuraProtocol.IsTrackableOpen(in aura))
-                            ApplyOpen(in aura, position, durationMilliseconds, active, coverages, applications);
-                        else if (aura.Kind == AuraObservationKind.Open)
-                            ApplyReplacement(in aura, position, durationMilliseconds, active, coverages);
-                        else if (aura.Kind == AuraObservationKind.Result)
-                            ApplyResult(in aura, position, durationMilliseconds, active, coverages, applications);
-                    }
-                    else if (entry.Domain == ObservedEventDomain.Action &&
-                             entry.Action.SourceEntityId == targetEntityId &&
-                             ScenePlaybackAuraProtocol.IsRenewal(in entry.Action))
-                    {
-                        ref readonly var action = ref entry.Action;
-                        ApplyRenew(in action, position, durationMilliseconds, active, coverages, applications);
-                    }
+                    ApplyTransition(
+                        in transition,
+                        targetEntityId,
+                        position,
+                        durationMilliseconds,
+                        active,
+                        coverages,
+                        applications);
                 }
             });
 
@@ -59,94 +55,169 @@ public static class ScenePlaybackAuraTimelineReader
         return new ScenePlaybackAuraTimeline(coverages.ToArray(), applications.ToArray());
     }
 
-    private static void ApplyOpen(
-        in AuraObservation observation,
+    private static void ApplyTransition(
+        in AuraLifecycleTransition transition,
+        int targetEntityId,
         long positionMilliseconds,
         long durationMilliseconds,
-        Dictionary<int, ActiveAura> active,
+        Dictionary<AuraInstanceKey, TimelineAura> active,
         List<ScenePlaybackAuraCoverage> coverages,
         List<ScenePlaybackAuraApplication> applications)
     {
-        if (active.Remove(observation.InstanceSequenceId, out var previous))
-            AddCoverage(previous, Math.Min(positionMilliseconds, ResolveCoverageEnd(previous, durationMilliseconds)), durationMilliseconds, coverages);
+        if (transition.RemovedByReplacement)
+        {
+            ClosePrevious(
+                transition.PreviousState.Key,
+                positionMilliseconds,
+                durationMilliseconds,
+                active,
+                coverages);
+            return;
+        }
 
-        var aura = new ActiveAura(
-            observation.EntityId,
-            observation.EchoSourceEntityId,
-            observation.InstanceSequenceId,
-            observation.BuffResourceEffectRef,
-            observation.HeadValue,
-            positionMilliseconds,
-            ResolveExpiration(positionMilliseconds, observation.HeadValue));
-        active.Add(observation.InstanceSequenceId, aura);
-        AddApplication(aura, positionMilliseconds, ScenePlaybackLifecycleEventKind.Open, durationMilliseconds, applications);
+        switch (transition.Kind)
+        {
+            case AuraLifecycleEventKind.Open:
+                ApplyOpen(in transition, targetEntityId, positionMilliseconds, durationMilliseconds, active, coverages, applications);
+                break;
+            case AuraLifecycleEventKind.Renew:
+                ApplyRenew(in transition, targetEntityId, positionMilliseconds, durationMilliseconds, active, coverages, applications);
+                break;
+            case AuraLifecycleEventKind.Result:
+                ApplyResult(in transition, targetEntityId, positionMilliseconds, durationMilliseconds, active, coverages, applications);
+                break;
+        }
     }
 
-    private static void ApplyReplacement(
-        in AuraObservation observation,
+    private static void ApplyOpen(
+        in AuraLifecycleTransition transition,
+        int targetEntityId,
         long positionMilliseconds,
         long durationMilliseconds,
-        Dictionary<int, ActiveAura> active,
-        List<ScenePlaybackAuraCoverage> coverages)
+        Dictionary<AuraInstanceKey, TimelineAura> active,
+        List<ScenePlaybackAuraCoverage> coverages,
+        List<ScenePlaybackAuraApplication> applications)
     {
-        if (!active.Remove(observation.InstanceSequenceId, out var aura))
+        if (transition.HasPreviousState)
+        {
+            ClosePrevious(
+                transition.PreviousState.Key,
+                positionMilliseconds,
+                durationMilliseconds,
+                active,
+                coverages);
+        }
+
+        var state = transition.State;
+        if (state.TargetEntityId != targetEntityId)
             return;
 
-        AddCoverage(aura, Math.Min(positionMilliseconds, ResolveCoverageEnd(aura, durationMilliseconds)), durationMilliseconds, coverages);
+        var aura = new TimelineAura(in state, positionMilliseconds);
+        active[state.Key] = aura;
+        AddApplication(aura, positionMilliseconds, AuraLifecycleEventKind.Open, durationMilliseconds, applications);
     }
 
     private static void ApplyRenew(
-        in ActionObservation observation,
+        in AuraLifecycleTransition transition,
+        int targetEntityId,
         long positionMilliseconds,
         long durationMilliseconds,
-        Dictionary<int, ActiveAura> active,
+        Dictionary<AuraInstanceKey, TimelineAura> active,
         List<ScenePlaybackAuraCoverage> coverages,
         List<ScenePlaybackAuraApplication> applications)
     {
-        if (!active.TryGetValue(observation.InstanceSequenceId, out var aura))
+        var state = transition.State;
+        if (state.TargetEntityId != targetEntityId || !active.TryGetValue(state.Key, out var aura))
             return;
 
-        if (aura.DisplayResourceEffectRef.IsEmpty && !observation.ActionResourceEffectRef.IsEmpty)
+        var previousCoverageEnd = ResolveCoverageEnd(aura, durationMilliseconds);
+        if (positionMilliseconds > previousCoverageEnd)
         {
-            aura.DisplayResourceEffectRef = observation.ActionResourceEffectRef;
-            BackfillApplications(aura, applications);
+            AddCoverage(aura, previousCoverageEnd, durationMilliseconds, coverages);
+            aura.CoverageStartMilliseconds = positionMilliseconds;
         }
-        var previousEnd = ResolveCoverageEnd(aura, durationMilliseconds);
-        if (positionMilliseconds > previousEnd)
+        else if (RequiresCoverageBoundary(aura, in state) && positionMilliseconds > aura.CoverageStartMilliseconds)
         {
-            AddCoverage(aura, previousEnd, durationMilliseconds, coverages);
+            AddCoverage(aura, positionMilliseconds, durationMilliseconds, coverages);
             aura.CoverageStartMilliseconds = positionMilliseconds;
         }
 
-        aura.OriginEntityId = observation.SourceEntityIdCopy;
-        aura.ExpirationMilliseconds = ResolveExpiration(positionMilliseconds, aura.DurationMilliseconds);
-        AddApplication(aura, positionMilliseconds, ScenePlaybackLifecycleEventKind.Renew, durationMilliseconds, applications);
+        ApplyResolvedState(aura, in state, coverages, applications);
+        aura.OriginEntityId = state.OriginEntityId;
+        aura.ExpirationMilliseconds = state.ExpiresAtMilliseconds;
+        AddApplication(aura, positionMilliseconds, AuraLifecycleEventKind.Renew, durationMilliseconds, applications);
     }
 
     private static void ApplyResult(
-        in AuraObservation observation,
+        in AuraLifecycleTransition transition,
+        int targetEntityId,
         long positionMilliseconds,
         long durationMilliseconds,
-        Dictionary<int, ActiveAura> active,
+        Dictionary<AuraInstanceKey, TimelineAura> active,
         List<ScenePlaybackAuraCoverage> coverages,
         List<ScenePlaybackAuraApplication> applications)
     {
-        if (!active.Remove(observation.InstanceSequenceId, out var aura))
+        var state = transition.State;
+        if (state.TargetEntityId != targetEntityId || !active.Remove(state.Key, out var aura))
             return;
 
-        if (aura.DisplayResourceEffectRef.IsEmpty && !observation.BuffResourceEffectRef.IsEmpty)
-        {
-            aura.DisplayResourceEffectRef = observation.BuffResourceEffectRef;
-            BackfillApplications(aura, applications);
-        }
+        if (CanApplyResultStateToPriorCoverage(aura, in state))
+            ApplyResolvedState(aura, in state, coverages, applications);
+        AddCoverage(
+            aura,
+            Math.Min(positionMilliseconds, ResolveCoverageEnd(aura, durationMilliseconds)),
+            durationMilliseconds,
+            coverages);
+    }
 
-        AddCoverage(aura, Math.Min(positionMilliseconds, ResolveCoverageEnd(aura, durationMilliseconds)), durationMilliseconds, coverages);
+    private static bool CanApplyResultStateToPriorCoverage(TimelineAura aura, in AuraInstanceState state) =>
+        aura.DisplayResourceEffectRef.IsEmpty ||
+        state.ResourceEffectRef.IsEmpty ||
+        aura.DisplayResourceEffectRef == state.ResourceEffectRef;
+
+    private static void ClosePrevious(
+        AuraInstanceKey key,
+        long positionMilliseconds,
+        long durationMilliseconds,
+        Dictionary<AuraInstanceKey, TimelineAura> active,
+        List<ScenePlaybackAuraCoverage> coverages)
+    {
+        if (!active.Remove(key, out var aura))
+            return;
+
+        AddCoverage(
+            aura,
+            Math.Min(positionMilliseconds, ResolveCoverageEnd(aura, durationMilliseconds)),
+            durationMilliseconds,
+            coverages);
+    }
+
+    private static bool RequiresCoverageBoundary(TimelineAura aura, in AuraInstanceState state) =>
+        aura.OriginEntityId != state.OriginEntityId ||
+        (!aura.DisplayResourceEffectRef.IsEmpty &&
+         !state.ResourceEffectRef.IsEmpty &&
+         aura.DisplayResourceEffectRef != state.ResourceEffectRef);
+
+    private static void ApplyResolvedState(
+        TimelineAura aura,
+        in AuraInstanceState state,
+        List<ScenePlaybackAuraCoverage> coverages,
+        List<ScenePlaybackAuraApplication> applications)
+    {
+        if (state.ResourceEffectRef.IsEmpty)
+            return;
+
+        var backfill = aura.DisplayResourceEffectRef.IsEmpty;
+        aura.DisplayResourceEffectRef = state.ResourceEffectRef;
+        aura.Semantics = state.Semantics;
+        if (backfill)
+            BackfillReferences(aura, coverages, applications);
     }
 
     private static void AddApplication(
-        ActiveAura aura,
+        TimelineAura aura,
         long positionMilliseconds,
-        ScenePlaybackLifecycleEventKind kind,
+        AuraLifecycleEventKind kind,
         long durationMilliseconds,
         List<ScenePlaybackAuraApplication> applications)
     {
@@ -155,79 +226,109 @@ public static class ScenePlaybackAuraTimelineReader
 
         var applicationIndex = applications.Count;
         applications.Add(new ScenePlaybackAuraApplication(
-            aura.EntityId,
+            aura.TargetEntityId,
             aura.OriginEntityId,
             aura.InstanceSequenceId,
             aura.DisplayResourceEffectRef,
+            aura.Semantics,
             Math.Clamp(positionMilliseconds, 0, durationMilliseconds),
             kind));
         if (aura.DisplayResourceEffectRef.IsEmpty)
             aura.AddUnresolvedApplication(applicationIndex);
     }
 
-    private static void BackfillApplications(ActiveAura aura, List<ScenePlaybackAuraApplication> applications)
-    {
-        if (aura.DisplayResourceEffectRef.IsEmpty || aura.UnresolvedApplicationIndexes is not { Count: > 0 } indexes)
-            return;
-
-        for (var i = 0; i < indexes.Count; i++)
-        {
-            var applicationIndex = indexes[i];
-            applications[applicationIndex] = applications[applicationIndex] with
-            {
-                DisplayResourceEffectRef = aura.DisplayResourceEffectRef
-            };
-        }
-
-        aura.ClearUnresolvedApplications();
-    }
-
-    private static void AddCoverage(ActiveAura aura, long endMilliseconds, long durationMilliseconds, List<ScenePlaybackAuraCoverage> coverages)
+    private static void AddCoverage(
+        TimelineAura aura,
+        long endMilliseconds,
+        long durationMilliseconds,
+        List<ScenePlaybackAuraCoverage> coverages)
     {
         var start = Math.Clamp(aura.CoverageStartMilliseconds, 0, durationMilliseconds);
         var end = Math.Clamp(endMilliseconds, 0, durationMilliseconds);
         if (end <= start)
             return;
 
+        var coverageIndex = coverages.Count;
         coverages.Add(new ScenePlaybackAuraCoverage(
-            aura.EntityId,
+            aura.TargetEntityId,
             aura.OriginEntityId,
             aura.InstanceSequenceId,
             aura.DisplayResourceEffectRef,
+            aura.Semantics,
             start,
             end));
+        if (aura.DisplayResourceEffectRef.IsEmpty)
+            aura.AddUnresolvedCoverage(coverageIndex);
     }
 
-    private static long ResolveCoverageEnd(ActiveAura aura, long durationMilliseconds)
-        => aura.ExpirationMilliseconds ?? durationMilliseconds;
-
-    private static long? ResolveExpiration(long positionMilliseconds, ushort durationMilliseconds)
+    private static void BackfillReferences(
+        TimelineAura aura,
+        List<ScenePlaybackAuraCoverage> coverages,
+        List<ScenePlaybackAuraApplication> applications)
     {
-        if (durationMilliseconds == ushort.MaxValue)
-            return null;
+        if (aura.DisplayResourceEffectRef.IsEmpty)
+            return;
 
-        return positionMilliseconds > long.MaxValue - durationMilliseconds
-            ? long.MaxValue
-            : positionMilliseconds + durationMilliseconds;
+        if (aura.UnresolvedCoverageIndexes is { Count: > 0 } coverageIndexes)
+        {
+            for (var i = 0; i < coverageIndexes.Count; i++)
+            {
+                var index = coverageIndexes[i];
+                coverages[index] = coverages[index] with
+                {
+                    DisplayResourceEffectRef = aura.DisplayResourceEffectRef,
+                    Semantics = aura.Semantics
+                };
+            }
+        }
+
+        if (aura.UnresolvedApplicationIndexes is { Count: > 0 } applicationIndexes)
+        {
+            for (var i = 0; i < applicationIndexes.Count; i++)
+            {
+                var index = applicationIndexes[i];
+                applications[index] = applications[index] with
+                {
+                    DisplayResourceEffectRef = aura.DisplayResourceEffectRef,
+                    Semantics = aura.Semantics
+                };
+            }
+        }
+
+        aura.ClearUnresolvedReferences();
     }
 
-    private sealed class ActiveAura(
-        int entityId,
-        int originEntityId,
-        int instanceSequenceId,
-        ResourceEffectRef displayResourceEffectRef,
-        ushort durationMilliseconds,
-        long coverageStartMilliseconds,
-        long? expirationMilliseconds)
+    private static long ResolveCoverageEnd(TimelineAura aura, long durationMilliseconds) =>
+        aura.ExpirationMilliseconds ?? durationMilliseconds;
+
+    private sealed class TimelineAura
     {
-        public int EntityId { get; } = entityId;
-        public int OriginEntityId { get; set; } = originEntityId;
-        public int InstanceSequenceId { get; } = instanceSequenceId;
-        public ResourceEffectRef DisplayResourceEffectRef { get; set; } = displayResourceEffectRef;
-        public ushort DurationMilliseconds { get; } = durationMilliseconds;
-        public long CoverageStartMilliseconds { get; set; } = coverageStartMilliseconds;
-        public long? ExpirationMilliseconds { get; set; } = expirationMilliseconds;
+        public TimelineAura(in AuraInstanceState state, long coverageStartMilliseconds)
+        {
+            TargetEntityId = state.TargetEntityId;
+            OriginEntityId = state.OriginEntityId;
+            InstanceSequenceId = state.InstanceSequenceId;
+            DisplayResourceEffectRef = state.ResourceEffectRef;
+            Semantics = state.Semantics;
+            CoverageStartMilliseconds = coverageStartMilliseconds;
+            ExpirationMilliseconds = state.ExpiresAtMilliseconds;
+        }
+
+        public int TargetEntityId { get; }
+        public int OriginEntityId { get; set; }
+        public int InstanceSequenceId { get; }
+        public ResourceEffectRef DisplayResourceEffectRef { get; set; }
+        public AuraSemanticValue Semantics { get; set; }
+        public long CoverageStartMilliseconds { get; set; }
+        public long? ExpirationMilliseconds { get; set; }
+        public List<int>? UnresolvedCoverageIndexes { get; private set; }
         public List<int>? UnresolvedApplicationIndexes { get; private set; }
+
+        public void AddUnresolvedCoverage(int coverageIndex)
+        {
+            UnresolvedCoverageIndexes ??= [];
+            UnresolvedCoverageIndexes.Add(coverageIndex);
+        }
 
         public void AddUnresolvedApplication(int applicationIndex)
         {
@@ -235,7 +336,11 @@ public static class ScenePlaybackAuraTimelineReader
             UnresolvedApplicationIndexes.Add(applicationIndex);
         }
 
-        public void ClearUnresolvedApplications() => UnresolvedApplicationIndexes = null;
+        public void ClearUnresolvedReferences()
+        {
+            UnresolvedCoverageIndexes = null;
+            UnresolvedApplicationIndexes = null;
+        }
     }
 
     private sealed class ScenePlaybackAuraCoverageComparer : IComparer<ScenePlaybackAuraCoverage>
@@ -283,6 +388,7 @@ public readonly record struct ScenePlaybackAuraCoverage(
     int OriginEntityId,
     int InstanceSequenceId,
     ResourceEffectRef DisplayResourceEffectRef,
+    AuraSemanticValue Semantics,
     long StartMilliseconds,
     long EndMilliseconds);
 
@@ -291,5 +397,6 @@ public readonly record struct ScenePlaybackAuraApplication(
     int OriginEntityId,
     int InstanceSequenceId,
     ResourceEffectRef DisplayResourceEffectRef,
+    AuraSemanticValue Semantics,
     long PositionMilliseconds,
-    ScenePlaybackLifecycleEventKind Kind);
+    AuraLifecycleEventKind Kind);

@@ -12,17 +12,7 @@ public static class CombatResourceRegistry
     private static IReadOnlyDictionary<uint, int> _effectSkillIds = new Dictionary<uint, int>();
     private static SkillSemanticRuntimeIndex _skillSemanticIndex = SkillSemanticRuntimeIndex.Empty;
 
-    public static SkillDisplayCatalog SkillMap
-    {
-        get => _skillMap;
-        set
-        {
-            _skillMap = value;
-            SetSkillResourceData(new Dictionary<int, SkillBaseProjection>(), new Dictionary<uint, int>(), SkillSemanticRuntimeIndex.Empty);
-            SkillDisplayMap = _skillMap;
-            SkillMapRevision++;
-        }
-    }
+    public static SkillDisplayCatalog SkillMap => _skillMap;
 
     public static SkillDisplayCatalog SkillDisplayMap { get; private set; } = [];
     public static IReadOnlyDictionary<int, SkillBaseProjection> SkillBaseProjections => _skillBaseProjections;
@@ -42,42 +32,17 @@ public static class CombatResourceRegistry
         SetGameResources(ResourceCatalog.Load(lang));
     }
 
-    public static void SetGameResources(SkillDisplayCatalog skillMap, IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog)
-    {
-        SkillMap = skillMap;
-        SkillDisplayMap = skillMap;
-        NpcCatalog = npcCatalog;
-    }
-
     public static void SetGameResources(ResourceCatalogSnapshot snapshot)
     {
-        SkillMap = snapshot.Skills;
-        SetSkillResourceData(snapshot.SkillBaseProjections, snapshot.EffectSkillIds, snapshot.SkillSemanticRuntimeIndex);
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        _skillMap = snapshot.Skills;
+        _skillBaseProjections = snapshot.SkillBaseProjections;
+        _effectSkillIds = snapshot.EffectSkillIds;
+        _skillSemanticIndex = snapshot.SkillSemanticRuntimeIndex;
         SkillDisplayMap = snapshot.Skills;
         NpcCatalog = snapshot.NpcCatalog;
-    }
-
-    public static void SetGameResources(
-        SkillDisplayCatalog skillMap,
-        IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog,
-        IReadOnlyDictionary<int, SkillBaseProjection> skillBaseProjections,
-        IReadOnlyDictionary<uint, int> effectSkillIds)
-    {
-        SkillMap = skillMap;
-        SetSkillResourceData(skillBaseProjections, effectSkillIds, SkillSemanticRuntimeIndex.Empty);
-        SkillDisplayMap = skillMap;
-        NpcCatalog = npcCatalog;
-    }
-
-    public static void SetGameResources(
-        SkillDisplayCatalog skillMap,
-        IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog,
-        IReadOnlyDictionary<int, SkillBaseProjection> skillBaseProjections)
-    {
-        SkillMap = skillMap;
-        SetSkillResourceData(skillBaseProjections, new Dictionary<uint, int>(), SkillSemanticRuntimeIndex.Empty);
-        SkillDisplayMap = skillMap;
-        NpcCatalog = npcCatalog;
+        SkillMapRevision++;
     }
 
     public static void UpdateDisplayResources(SkillDisplayCatalog skillMap, IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog)
@@ -107,25 +72,9 @@ public static class CombatResourceRegistry
         return true;
     }
 
-    public static bool TryResolveSkillEffectSemantics(ResourceEffectRef effectRef, out SkillSemanticEffectResolution resolution)
-    {
-        if (!effectRef.IsEmpty &&
-            effectRef.RawId <= int.MaxValue &&
-            _skillSemanticIndex.TryResolveEffect(unchecked((int)effectRef.RawId), out resolution))
-        {
-            return true;
-        }
-
-        resolution = default;
-        return false;
-    }
-
-    public static bool TryResolveDirectCombatEffectSemantics(in CombatObservation observation, out SkillSemanticEffectResolution resolution)
-        => TryResolveSkillEffectSemantics(observation.DetailResourceEffectRef, out resolution);
-
     private static bool TryResolveDirectResourceSemantics(
         ResourceEffectRef effectRef,
-        in CombatObservation observation,
+        in CombatWireObservation observation,
         out SkillSemanticResourceResolution resolution)
     {
         if (effectRef.IsEmpty)
@@ -140,7 +89,7 @@ public static class CombatResourceRegistry
 
     private static bool TryResolvePeriodicResourceSemantics(
         ResourceEffectRef effectRef,
-        in CombatObservation observation,
+        in CombatWireObservation observation,
         out SkillSemanticResourceResolution resolution)
     {
         if (effectRef.IsEmpty)
@@ -153,10 +102,10 @@ public static class CombatResourceRegistry
         return _skillSemanticIndex.TryResolvePeriodicResourceReference(effectRef.RawId, preferredSkillId, out resolution);
     }
 
-    public static bool TryResolveDirectCombatResourceSemantics(in CombatObservation observation, out SkillSemanticResourceResolution resolution)
+    public static bool TryResolveDirectCombatResourceSemantics(in CombatWireObservation observation, out SkillSemanticResourceResolution resolution)
         => TryResolveDirectResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
 
-    public static bool TryResolvePeriodicCombatResourceSemantics(in CombatObservation observation, out SkillSemanticResourceResolution resolution)
+    public static bool TryResolvePeriodicCombatResourceSemantics(in CombatWireObservation observation, out SkillSemanticResourceResolution resolution)
     {
         if (TryResolvePeriodicResourceSemantics(observation.BodyResourceEffectRef, in observation, out resolution))
         {
@@ -164,6 +113,17 @@ public static class CombatResourceRegistry
         }
 
         return TryResolvePeriodicResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
+    }
+
+    public static bool TryResolveAuraResourceSemantics(ResourceEffectRef resourceEffectRef, out SkillSemanticResourceResolution resolution)
+    {
+        if (resourceEffectRef.IsEmpty)
+        {
+            resolution = default;
+            return false;
+        }
+
+        return _skillSemanticIndex.TryResolveAuraResourceReference(resourceEffectRef.RawId, out resolution);
     }
 
     public static int ResolveBaseSkillIdForCode(int skillCode)
@@ -178,7 +138,7 @@ public static class CombatResourceRegistry
             : skillCode;
     }
 
-    private static int ResolveSemanticSkillId(in CombatObservation observation)
+    private static int ResolveSemanticSkillId(in CombatWireObservation observation)
     {
         var skillId = observation.SkillCode > 0
             ? observation.SkillCode
@@ -293,16 +253,6 @@ public static class CombatResourceRegistry
         return false;
     }
 
-    private static void SetSkillResourceData(
-        IReadOnlyDictionary<int, SkillBaseProjection> skillBaseProjections,
-        IReadOnlyDictionary<uint, int> effectSkillIds,
-        SkillSemanticRuntimeIndex skillSemanticIndex)
-    {
-        _skillBaseProjections = skillBaseProjections;
-        _effectSkillIds = effectSkillIds;
-        _skillSemanticIndex = skillSemanticIndex;
-    }
-
     public static NpcKind ResolveNpcKind(NpcCatalogKind kind) =>
         kind switch
         {
@@ -314,69 +264,4 @@ public static class CombatResourceRegistry
             _ => NpcKind.Unknown
         };
 
-    public static void NormalizePacketForStorage(ref ParsedCombatPacket packet)
-    {
-        if (packet.IsNormalized)
-            return;
-
-        var observation = packet.ToObservation();
-        var normalized = NormalizeObservationForStorage(packet.SourceId, packet.TargetId, in observation);
-        packet.SkillCode = normalized.SkillCode;
-        packet.BodySkillVariantRaw = normalized.BodySkillVariantRaw;
-        packet.BodyResourceEffectRef = normalized.BodyResourceEffectRef;
-        packet.Damage = checked((int)normalized.Damage);
-        packet.HitContribution = normalized.HitCount;
-        packet.AttemptContribution = normalized.AttemptCount;
-        packet.DetailRaw = normalized.DetailRaw;
-        packet.DetailResourceEffectRef = normalized.DetailResourceEffectRef;
-        packet.Marker = normalized.Marker;
-        packet.Type = normalized.Type;
-        packet.Flag = normalized.Flag;
-        packet.LayoutTag = normalized.LayoutTag;
-        packet.Loop = normalized.Loop;
-        packet.MultiHitCount = normalized.MultiHitCount;
-        packet.DrainHealAmount = normalized.DrainHealAmount;
-        packet.RegenerationAmount = normalized.RegenerationAmount;
-        packet.Modifiers = normalized.Modifiers;
-        packet.ResourceKind = normalized.ResourceKind;
-        packet.EventKind = normalized.EventKind;
-        packet.ValueKind = normalized.ValueKind;
-        packet.PeriodicTailSkillCodeRaw = normalized.PeriodicTailSkillCodeRaw;
-        packet.PeriodicTailPrefixValue = normalized.PeriodicTailPrefixValue;
-        packet.PeriodicTailLength = normalized.PeriodicTailLength;
-        packet.SetPeriodicEffect(normalized.PeriodicRelation, normalized.PeriodicMode);
-        packet.SetEffectTag(normalized.EffectTag);
-        packet.IsNormalized = true;
-    }
-
-    public static CombatObservation NormalizeObservationForStorage(int sourceId, int targetId, in CombatObservation observation)
-    {
-        var modifiers = observation.Type == 3 ? observation.Modifiers | DamageModifiers.Critical : observation.Modifiers;
-        var normalized = observation with
-        {
-            SkillCode = Math.Max(0, observation.SkillCode),
-            Modifiers = modifiers
-        };
-
-        if (normalized.ValueKind == CombatValueKind.Unknown)
-        {
-            var (EventKind, ValueKind) = CombatEventClassifier.Classify(sourceId, targetId, in normalized);
-            normalized = normalized with
-            {
-                ValueKind = ValueKind,
-                EventKind = EventKind
-            };
-        }
-
-        if (normalized.ValueKind is CombatValueKind.PeriodicDamage or CombatValueKind.PeriodicHealing && (normalized.Modifiers & (DamageModifiers.Evade | DamageModifiers.Invincible)) == 0)
-        {
-            normalized = normalized with
-            {
-                HitCount = 0,
-                AttemptCount = 0
-            };
-        }
-
-        return normalized;
-    }
 }

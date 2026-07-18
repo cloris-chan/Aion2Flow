@@ -14,13 +14,13 @@ public sealed class CompactDirectValueCanonicalizer
     private const int MaxSamePayloadSelfRecoveryGroups = 128;
     private const int MaxSamePayloadSelfPairRecoveryGroups = 128;
 
-    internal readonly record struct PendingCompactOpener(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, int Mode, int Flag, int EchoSourceId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatObservation Observation, int MatchedValueCount);
-    internal readonly record struct PendingCompactValue(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatObservation Observation);
+    internal readonly record struct PendingCompactOpener(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, int Mode, int Flag, int EchoSourceId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatWireObservation Observation, int MatchedValueCount);
+    internal readonly record struct PendingCompactValue(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatWireObservation Observation);
     internal readonly record struct PendingCompactSidecar(int SourceId, int TargetId, uint BodyCodeRaw, int Marker);
     internal readonly record struct PendingCompactInlineRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker);
     internal readonly record struct PendingSamePayloadSelfRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, uint DetailRefBase, PacketStructureKind ParentKind, int ParentScopeId);
     internal readonly record struct PendingSamePayloadSelfPairRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, uint FirstDetailRef, uint SecondDetailRef, PacketStructureKind ParentKind, int ParentScopeId);
-    internal readonly record struct CompactControlHeader(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatObservation Observation)
+    internal readonly record struct CompactControlHeader(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatWireObservation Observation)
     {
         public static CompactControlHeader Empty { get; } = default;
 
@@ -35,7 +35,7 @@ public sealed class CompactDirectValueCanonicalizer
     private readonly List<PendingSamePayloadSelfRecoveryGroup> _samePayloadSelfRecoveryGroups = new(MaxSamePayloadSelfRecoveryGroups);
     private readonly List<PendingSamePayloadSelfPairRecoveryGroup> _samePayloadSelfPairRecoveryGroups = new(MaxSamePayloadSelfPairRecoveryGroups);
 
-    internal bool TryObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw, out StampedCombatCanonicalizationBatch results, out CompactControlHeader header)
+    internal bool TryObserveCompactValue0438(int sourceId, int targetId, in TimelineStamp stamp, in CombatWireObservation observation, long observedAtMilliseconds, RawPacketReference raw, out StampedCombatCanonicalizationBatch results, out CompactControlHeader header)
     {
         header = CompactControlHeader.Empty;
         if (!IsCompactDirectValueShape(in observation))
@@ -51,46 +51,52 @@ public sealed class CompactDirectValueCanonicalizer
             if (!matchesRecovery && targetId == sourceId)
                 return ObservePendingCompactValue(sourceId, targetId, bodyCodeRaw, in stamp, in observation, observedAtMilliseconds, raw, out results);
 
-            var normalized = matchesRecovery ? NormalizeAsHealing(in observation) : observation;
-            var canonicalization = CombatContributionCanonicalization.CompactDirectValue;
-            if (matchesRecovery)
-                canonicalization |= CombatContributionCanonicalization.CompactRecoveryByOpener;
-            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, normalized, canonicalization));
+            var packetRule = matchesRecovery ? CombatPacketRule.CompactRecovery : CombatPacketRule.CompactDirectValue;
+            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(
+                sourceId,
+                targetId,
+                stamp,
+                observedAtMilliseconds,
+                raw,
+                observation,
+                packetRule,
+                CombatMaterializationKind.CompactAssociated,
+                CombatAssociationKind.CompactOpener));
             MarkOpenerMatched(openerIndex, results.Count);
             header = CreateHeader(in opener);
             return true;
         }
 
-        if (IsDirectSupportValue(in observation) &&
+        if (targetId == sourceId &&
             TryConsumeClosedRecoveryOpener(sourceId, bodyCodeRaw, observation.Marker, out var closedOpener))
         {
-            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, NormalizeAsHealing(in observation), CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryByOpener));
+            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, CombatPacketRule.CompactRecovery, CombatMaterializationKind.CompactAssociated, CombatAssociationKind.CompactOpener));
             header = CreateHeader(in closedOpener);
             return true;
         }
 
         if (TryFindInlineRecoveryGroup(sourceId, bodyCodeRaw, observation.Marker, out _))
         {
-            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, NormalizeAsHealing(in observation), CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryByInlineGroup));
+            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, CombatPacketRule.CompactRecovery, CombatMaterializationKind.CompactAssociated, CombatAssociationKind.CompactInlineRecoveryGroup));
             return true;
         }
 
         if (TryFindSamePayloadSelfRecoveryGroup(sourceId, bodyCodeRaw, observation.Marker, in observation, raw, out _))
         {
-            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, NormalizeAsHealing(in observation), CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup));
+            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, CombatPacketRule.CompactRecovery, CombatMaterializationKind.CompactAssociated, CombatAssociationKind.CompactSelfValueGroup));
             return true;
         }
 
         if (TryFindSamePayloadSelfPairRecoveryGroup(sourceId, targetId, bodyCodeRaw, observation.Marker, in observation, raw, out _))
         {
-            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, NormalizeAsHealing(in observation), CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup));
+            results = StampedCombatCanonicalizationBatch.One(new StampedCombatCanonicalizationResult(sourceId, targetId, stamp, observedAtMilliseconds, raw, observation, CombatPacketRule.CompactRecovery, CombatMaterializationKind.CompactAssociated, CombatAssociationKind.CompactSelfValueGroup));
             return true;
         }
 
         return ObservePendingCompactValue(sourceId, targetId, bodyCodeRaw, in stamp, in observation, observedAtMilliseconds, raw, out results);
     }
 
-    private bool ObservePendingCompactValue(int sourceId, int targetId, uint bodyCodeRaw, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw, out StampedCombatCanonicalizationBatch results)
+    private bool ObservePendingCompactValue(int sourceId, int targetId, uint bodyCodeRaw, in TimelineStamp stamp, in CombatWireObservation observation, long observedAtMilliseconds, RawPacketReference raw, out StampedCombatCanonicalizationBatch results)
     {
         var pending = new PendingCompactValue(sourceId, targetId, bodyCodeRaw, observation.Marker, stamp, observedAtMilliseconds, raw, observation);
         _pendingValues.Add(pending);
@@ -105,7 +111,7 @@ public sealed class CompactDirectValueCanonicalizer
         return true;
     }
 
-    internal StampedCombatCanonicalizationBatch ObserveCompactValueSidecar0438(int sourceId, int targetId, in CombatObservation observation)
+    internal StampedCombatCanonicalizationBatch ObserveCompactValueSidecar0438(int sourceId, int targetId, in CombatWireObservation observation)
     {
         if (!IsInlineDirectValueSidecarShape(in observation))
             return StampedCombatCanonicalizationBatch.Empty;
@@ -118,7 +124,7 @@ public sealed class CompactDirectValueCanonicalizer
             : StampedCombatCanonicalizationBatch.Empty;
     }
 
-    internal StampedCombatCanonicalizationBatch ObserveCompactControl0238(int sourceId, int targetId, in TimelineStamp stamp, in CombatObservation observation, long observedAtMilliseconds, RawPacketReference raw)
+    internal StampedCombatCanonicalizationBatch ObserveCompactControl0238(int sourceId, int targetId, in TimelineStamp stamp, in CombatWireObservation observation, long observedAtMilliseconds, RawPacketReference raw)
     {
         if (!IsCompactControlOpener(sourceId, in observation))
             return StampedCombatCanonicalizationBatch.Empty;
@@ -131,7 +137,7 @@ public sealed class CompactDirectValueCanonicalizer
         return results;
     }
 
-    internal StampedCombatCanonicalizationBatch ObserveCompactControl0638(int sourceId, in CombatObservation observation)
+    internal StampedCombatCanonicalizationBatch ObserveCompactControl0638(int sourceId, in CombatWireObservation observation)
     {
         if (IsCompactControlCloser(sourceId, in observation))
             CloseUnmatchedPendingOpener(sourceId, observation.BodyResourceEffectRef.RawId, observation.Marker);
@@ -147,7 +153,7 @@ public sealed class CompactDirectValueCanonicalizer
 
         var results = new StampedCombatCanonicalizationBatchBuilder(_pendingValues.Count);
         foreach (var pending in _pendingValues)
-            results.Add(CreateResult(in pending, asHealing: false, CombatContributionCanonicalization.CompactDirectValue));
+            results.Add(CreateResult(in pending, asHealing: false, CombatAssociationKind.None));
 
         _pendingValues.Clear();
         return results.ToBatch();
@@ -206,10 +212,7 @@ public sealed class CompactDirectValueCanonicalizer
             }
 
             var matchesRecovery = MatchesRecoveryOpener(in opener, pending.SourceId);
-            var canonicalization = CombatContributionCanonicalization.CompactDirectValue;
-            if (matchesRecovery)
-                canonicalization |= CombatContributionCanonicalization.CompactRecoveryByOpener;
-            results.Add(CreateResult(in pending, matchesRecovery, canonicalization));
+            results.Add(CreateResult(in pending, matchesRecovery, CombatAssociationKind.CompactOpener));
             _pendingValues.RemoveAt(i);
         }
 
@@ -231,7 +234,7 @@ public sealed class CompactDirectValueCanonicalizer
                 continue;
             }
 
-            results.Add(CreateResult(in pending, asHealing: true, CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryByInlineGroup));
+            results.Add(CreateResult(in pending, asHealing: true, CombatAssociationKind.CompactInlineRecoveryGroup));
             _pendingValues.RemoveAt(i);
         }
 
@@ -253,7 +256,7 @@ public sealed class CompactDirectValueCanonicalizer
                 continue;
             }
 
-            results.Add(CreateResult(in pending, asHealing: true, CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup));
+            results.Add(CreateResult(in pending, asHealing: true, CombatAssociationKind.CompactSelfValueGroup));
             _pendingValues.RemoveAt(i);
         }
 
@@ -275,7 +278,7 @@ public sealed class CompactDirectValueCanonicalizer
                 continue;
             }
 
-            results.Add(CreateResult(in pending, asHealing: true, CombatContributionCanonicalization.CompactDirectValue | CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup));
+            results.Add(CreateResult(in pending, asHealing: true, CombatAssociationKind.CompactSelfValueGroup));
             _pendingValues.RemoveAt(i);
         }
 
@@ -358,7 +361,7 @@ public sealed class CompactDirectValueCanonicalizer
         return false;
     }
 
-    private bool TryFindSamePayloadSelfRecoveryGroup(int sourceId, uint bodyCodeRaw, int marker, in CombatObservation observation, RawPacketReference raw, out PendingSamePayloadSelfRecoveryGroup group)
+    private bool TryFindSamePayloadSelfRecoveryGroup(int sourceId, uint bodyCodeRaw, int marker, in CombatWireObservation observation, RawPacketReference raw, out PendingSamePayloadSelfRecoveryGroup group)
     {
         if (!TryCreateSamePayloadSelfRecoveryGroup(sourceId, bodyCodeRaw, marker, in observation, raw, out var candidateGroup))
         {
@@ -380,7 +383,7 @@ public sealed class CompactDirectValueCanonicalizer
         return false;
     }
 
-    private bool TryFindSamePayloadSelfPairRecoveryGroup(int sourceId, int targetId, uint bodyCodeRaw, int marker, in CombatObservation observation, RawPacketReference raw, out PendingSamePayloadSelfPairRecoveryGroup group)
+    private bool TryFindSamePayloadSelfPairRecoveryGroup(int sourceId, int targetId, uint bodyCodeRaw, int marker, in CombatWireObservation observation, RawPacketReference raw, out PendingSamePayloadSelfPairRecoveryGroup group)
     {
         if (!IsSelfLoop2Value(sourceId, targetId, in observation))
         {
@@ -581,25 +584,24 @@ public sealed class CompactDirectValueCanonicalizer
         return false;
     }
 
-    private static StampedCombatCanonicalizationResult CreateResult(in PendingCompactValue pending, bool asHealing, CombatContributionCanonicalization canonicalization)
+    private static StampedCombatCanonicalizationResult CreateResult(in PendingCompactValue pending, bool asHealing, CombatAssociationKind association)
     {
-        var original = pending.Observation;
-        var observation = asHealing ? NormalizeAsHealing(in original) : original;
-        return new StampedCombatCanonicalizationResult(pending.SourceId, pending.TargetId, pending.Stamp, pending.ObservedAtMilliseconds, pending.Raw, observation, canonicalization);
+        var observation = pending.Observation;
+        var packetRule = asHealing ? CombatPacketRule.CompactRecovery : CombatPacketRule.CompactDirectValue;
+        return new StampedCombatCanonicalizationResult(
+            pending.SourceId,
+            pending.TargetId,
+            pending.Stamp,
+            pending.ObservedAtMilliseconds,
+            pending.Raw,
+            observation,
+            packetRule,
+            CombatMaterializationKind.CompactAssociated,
+            association);
     }
 
     private static CompactControlHeader CreateHeader(in PendingCompactOpener opener) =>
         new(opener.SourceId, opener.TargetId, opener.Stamp, opener.ObservedAtMilliseconds, opener.Raw, opener.Observation);
-
-    private static CombatObservation NormalizeAsHealing(in CombatObservation observation) => observation with
-    {
-        EventKind = CombatEventKind.Healing,
-        ValueKind = CombatValueKind.Healing
-    };
-
-    private static bool IsDirectSupportValue(in CombatObservation observation) =>
-        observation.EventKind == CombatEventKind.Support ||
-        observation.ValueKind == CombatValueKind.Support;
 
     private static bool MatchesOpener(in PendingCompactOpener pending, int sourceId, uint bodyCodeRaw, int marker) =>
         pending.SourceId == sourceId &&
@@ -620,7 +622,7 @@ public sealed class CompactDirectValueCanonicalizer
         pendingBodyCodeRaw == bodyCodeRaw &&
         pendingMarker == marker;
 
-    private static bool TryCreateSamePayloadSelfRecoveryGroup(int sourceId, uint bodyCodeRaw, int marker, in CombatObservation observation, RawPacketReference raw, out PendingSamePayloadSelfRecoveryGroup group)
+    private static bool TryCreateSamePayloadSelfRecoveryGroup(int sourceId, uint bodyCodeRaw, int marker, in CombatWireObservation observation, RawPacketReference raw, out PendingSamePayloadSelfRecoveryGroup group)
     {
         var parent = raw.StructurePath.Parent;
         var detailRefBase = observation.DetailResourceEffectRef.RawId / 10;
@@ -684,7 +686,7 @@ public sealed class CompactDirectValueCanonicalizer
         return MatchesSamePayloadSelfPairRecoveryGroup(in group, pending.SourceId, pending.TargetId, pending.BodyCodeRaw, pending.Marker, in observation, pending.Raw);
     }
 
-    private static bool MatchesSamePayloadSelfPairRecoveryGroup(in PendingSamePayloadSelfPairRecoveryGroup group, int sourceId, int targetId, uint bodyCodeRaw, int marker, in CombatObservation observation, RawPacketReference raw)
+    private static bool MatchesSamePayloadSelfPairRecoveryGroup(in PendingSamePayloadSelfPairRecoveryGroup group, int sourceId, int targetId, uint bodyCodeRaw, int marker, in CombatWireObservation observation, RawPacketReference raw)
     {
         var parent = raw.StructurePath.Parent;
         var detailRef = observation.DetailResourceEffectRef.RawId;
@@ -703,7 +705,7 @@ public sealed class CompactDirectValueCanonicalizer
         return IsSelfLoop2Value(value.SourceId, value.TargetId, in observation);
     }
 
-    private static bool IsSelfLoop2Value(int sourceId, int targetId, in CombatObservation observation) =>
+    private static bool IsSelfLoop2Value(int sourceId, int targetId, in CombatWireObservation observation) =>
         sourceId > 0 &&
         targetId == sourceId &&
         observation.Loop == 2;
@@ -716,7 +718,7 @@ public sealed class CompactDirectValueCanonicalizer
     private static bool IsPrimaryControlOpener(in PendingCompactOpener pending) =>
         pending.Flag == 2;
 
-    private static bool IsCompactControlOpener(int sourceId, in CombatObservation observation) =>
+    private static bool IsCompactControlOpener(int sourceId, in CombatWireObservation observation) =>
         sourceId > 0 &&
         observation.BodyCodeRaw > 0 &&
         observation.Marker > 0 &&
@@ -725,7 +727,7 @@ public sealed class CompactDirectValueCanonicalizer
         observation.AttemptCount == 0 &&
         observation.LayoutTag == 0;
 
-    private static bool IsCompactControlCloser(int sourceId, in CombatObservation observation) =>
+    private static bool IsCompactControlCloser(int sourceId, in CombatWireObservation observation) =>
         sourceId > 0 &&
         observation.BodyResourceEffectRef.RawId > 0 &&
         observation.Marker > 0 &&
@@ -734,38 +736,35 @@ public sealed class CompactDirectValueCanonicalizer
         observation.AttemptCount == 0 &&
         observation.LayoutTag == 0;
 
-    private static bool IsCompactDirectValueShape(in CombatObservation observation) =>
+    private static bool IsCompactDirectValueShape(in CombatWireObservation observation) =>
         observation.Damage > 0 &&
         observation.HitCount == 1 &&
         observation.AttemptCount == 1 &&
         observation.ResourceKind == CombatResourceKind.Unknown &&
         observation.PeriodicRelation == PeriodicEffectRelation.None &&
-        observation.EffectTag == PacketEffectTag.None &&
+        observation.OutcomeKind == CombatWireOutcomeKind.None &&
         observation.LayoutTag == 4 &&
         observation.Flag == 0 &&
         observation.Type == 2 &&
         observation.Loop is 1 or 2 &&
         observation.ChainId > 0 &&
         observation.BodySkillVariantRaw > 0 &&
-        observation.Marker > 0 &&
-        observation.ValueKind is CombatValueKind.Unknown or CombatValueKind.Damage or CombatValueKind.Support;
+        observation.Marker > 0;
 
-    private static bool IsInlineDirectValueSidecarShape(in CombatObservation observation) =>
+    private static bool IsInlineDirectValueSidecarShape(in CombatWireObservation observation) =>
         observation.Damage == 0 &&
         observation.HitCount == 0 &&
         observation.AttemptCount == 0 &&
         observation.ResourceKind == CombatResourceKind.Unknown &&
         observation.PeriodicRelation == PeriodicEffectRelation.None &&
-        observation.EffectTag == PacketEffectTag.None &&
+        observation.OutcomeKind == CombatWireOutcomeKind.None &&
         observation.LayoutTag == 0 &&
         observation.Flag == 0 &&
         observation.Type is 0 or 2 &&
         observation.Loop == 0 &&
         observation.ChainId == 0 &&
         observation.BodySkillVariantRaw > 0 &&
-        observation.Marker > 0 &&
-        observation.EventKind == CombatEventKind.Unknown &&
-        observation.ValueKind == CombatValueKind.Unknown;
+        observation.Marker > 0;
 
     private void TrimPendingOpeners()
     {
@@ -796,7 +795,7 @@ public sealed class CompactDirectValueCanonicalizer
 
         var oldest = _pendingValues[0];
         _pendingValues.RemoveAt(0);
-        return StampedCombatCanonicalizationBatch.One(CreateResult(in oldest, asHealing: false, CombatContributionCanonicalization.CompactDirectValue));
+        return StampedCombatCanonicalizationBatch.One(CreateResult(in oldest, asHealing: false, CombatAssociationKind.None));
     }
 
     private void TrimPendingSidecars()

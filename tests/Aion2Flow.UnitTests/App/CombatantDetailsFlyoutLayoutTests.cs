@@ -2,7 +2,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.LogicalTree;
 using Cloris.Aion2Flow.Controls;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.ViewModels;
 using Cloris.Aion2Flow.Views;
@@ -19,13 +18,14 @@ public sealed class CombatantDetailsFlyoutLayoutTests
     private static UiFrameBatchService? s_frameBatch;
 
     [Fact]
-    public void DetailsLayout_PreservesScrollingRecoveryColumnsAndSupportBreakdown()
+    public void DetailsLayout_UsesIndependentHealingShieldAndResourceCategories()
     {
         AvaloniaTestHost.Run(() =>
         {
             AssertConstrainedViewportConfiguresVerticalScrollingForShieldSection();
-            AssertRecoverySkillTablesDoNotExposeDamageHitCountColumns();
-            AssertSupportBannerShowsAggregateHealingAndTableShowsBreakdown();
+            AssertHealingAndShieldSkillTablesDoNotExposeDamageHitCountColumns();
+            AssertHealingAndShieldUseIndependentSummaryCards();
+            AssertResourceSectionUsesNeutralManaChangeColumn();
         });
     }
 
@@ -65,7 +65,7 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         Assert.True(detailLayout.RowDefinitions[1].Height.IsStar);
     }
 
-    private static void AssertRecoverySkillTablesDoNotExposeDamageHitCountColumns()
+    private static void AssertHealingAndShieldSkillTablesDoNotExposeDamageHitCountColumns()
     {
         var (localization, frameBatch) = CreateViewServices();
         var view = new CombatDirectionDetailView
@@ -83,7 +83,7 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         Assert.Single(hitCountHeaders);
     }
 
-    private static void AssertSupportBannerShowsAggregateHealingAndTableShowsBreakdown()
+    private static void AssertHealingAndShieldUseIndependentSummaryCards()
     {
         var (localization, frameBatch) = CreateViewServices();
         var view = new CombatDirectionDetailView
@@ -91,10 +91,22 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             DataContext = new CombatDirectionDetailViewModel(localization, frameBatch, "Direction_Targets")
         };
 
-        var supportBannerMetrics = view.FindControl<Grid>("SupportBannerMetrics");
-        var bannerLabels = supportBannerMetrics!.Children
+        var healingCard = view.FindControl<Border>("HealingSummaryCard");
+        var shieldCard = view.FindControl<Border>("ShieldSummaryCard");
+        var healingBannerMetrics = view.FindControl<Grid>("HealingBannerMetrics");
+        var shieldBannerMetrics = view.FindControl<Grid>("ShieldBannerMetrics");
+        var healingBannerLabels = healingBannerMetrics!.Children
             .OfType<MetricTile>()
             .Select(static tile => tile.Label)
+            .ToArray();
+        var shieldBannerLabels = shieldBannerMetrics!.Children
+            .OfType<MetricTile>()
+            .Select(static tile => tile.Label)
+            .ToArray();
+        var bannerTitles = view.GetLogicalDescendants()
+            .OfType<TextBlock>()
+            .Where(static textBlock => textBlock.Classes.Contains("DetailBannerTitle"))
+            .Select(static textBlock => textBlock.Text)
             .ToArray();
         var directHealingHeaders = view.GetLogicalDescendants()
             .OfType<TextBlock>()
@@ -103,11 +115,47 @@ public sealed class CombatantDetailsFlyoutLayoutTests
                 string.Equals(textBlock.Text, localization["Metric_DirectHealing"], StringComparison.Ordinal))
             .ToArray();
 
-        Assert.Equal(4, bannerLabels.Length);
-        Assert.Contains(localization["Metric_TotalHealing"], bannerLabels);
-        Assert.DoesNotContain(localization["Metric_DirectHealing"], bannerLabels);
-        Assert.DoesNotContain(localization["MetricShort_Hot"], bannerLabels);
+        Assert.NotNull(healingCard);
+        Assert.NotNull(shieldCard);
+        Assert.NotSame(healingCard, shieldCard);
+        Assert.Equal(3, healingBannerLabels.Length);
+        Assert.Contains(localization["Metric_TotalHealing"], healingBannerLabels);
+        Assert.DoesNotContain(localization["Category_Shield"], healingBannerLabels);
+        Assert.Equal(2, shieldBannerLabels.Length);
+        Assert.Contains(localization["Metric_Total"], shieldBannerLabels);
+        Assert.Equal(4, bannerTitles.Length);
+        Assert.Contains(localization["Category_Damage"], bannerTitles);
+        Assert.Contains(localization["Category_Healing"], bannerTitles);
+        Assert.Contains(localization["Category_Shield"], bannerTitles);
+        Assert.Contains(localization["Category_Resource"], bannerTitles);
         Assert.Single(directHealingHeaders);
+    }
+
+    private static void AssertResourceSectionUsesNeutralManaChangeColumn()
+    {
+        var (localization, frameBatch) = CreateViewServices();
+        var view = new CombatDirectionDetailView
+        {
+            DataContext = new CombatDirectionDetailViewModel(localization, frameBatch, "Direction_Targets")
+        };
+
+        var resourceCard = view.FindControl<Border>("ResourceSummaryCard")!;
+        var resourceBannerMetrics = view.FindControl<Grid>("ResourceBannerMetrics")!;
+        var tableHeaders = resourceCard.GetLogicalDescendants()
+            .OfType<TextBlock>()
+            .Where(static textBlock => textBlock.Classes.Contains("DetailTableHeader"))
+            .Select(static textBlock => textBlock.Text ?? string.Empty)
+            .ToArray();
+        var bannerMetric = Assert.Single(resourceBannerMetrics.Children.OfType<MetricTile>());
+        Assert.Equal(localization["Metric_ManaChange"], bannerMetric.Label);
+        Assert.Equal(
+            [
+                localization["Metric_ManaChange"],
+                localization["Metric_DirectEvents"],
+                localization["Metric_PeriodicEvents"],
+                localization["Column_Events"]
+            ],
+            tableHeaders);
     }
 
     private static void PopulateRows(SkillDetailSectionViewModel section, int count, int firstSkillCode)

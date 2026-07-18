@@ -174,7 +174,7 @@ internal static class CapturePacketTestData
 internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
 {
     public int CurrentTarget { get; set; }
-    public int CombatObservationCount { get; private set; }
+    public int CombatWireObservationCount { get; private set; }
     public int LastSkillCode { get; private set; }
     public int ConfirmedMapCount { get; private set; }
     public uint LastConfirmedMapId { get; private set; }
@@ -236,7 +236,7 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
     {
     }
 
-    public void AppendCombatObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatObservation observation)
+    public void AppendCombatWireObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatWireObservation observation)
     {
         RecordCombat(observation.SkillCode);
     }
@@ -338,7 +338,7 @@ internal sealed class RecordingRuntimeObservationSink : IRuntimeObservationSink
 
     private void RecordCombat(int skillCode)
     {
-        CombatObservationCount++;
+        CombatWireObservationCount++;
         LastSkillCode = skillCode;
     }
 }

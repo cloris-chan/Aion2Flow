@@ -113,7 +113,7 @@ public sealed class MainViewModelCombatantFilterTests
     public void ShouldDisplayCombatant_Hides_Combatants_Without_Player_Class()
     {
         var fixture = MainViewModelFixture.Create();
-        fixture.AppendSceneDamage(38924, 100, 11000010, 200, 1_000, 1);
+        fixture.AppendSceneDamage(38924, 100, 999_999, 200, 1_000, 1);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         Assert.DoesNotContain(fixture.ViewModel.Combatants, x => x.Id == 38924);
@@ -1085,7 +1085,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         public static MainViewModelFixture Create(SceneKind sceneKind = SceneKind.Standard)
         {
-            CombatResourceRegistry.SetGameResources(BuildSkillMap(), ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
+            CombatResourceTestFixture.SetResources(BuildSkillMap(), ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
             var settingsPath = Path.Combine(Path.GetTempPath(), $"aion2flow-test-{Guid.NewGuid():N}.json");
             var settings = new SettingsService(settingsPath);
             settings.Update(s => s.SceneKind = sceneKind);
@@ -1138,26 +1138,8 @@ public sealed class MainViewModelCombatantFilterTests
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
         var origin = scene.SessionStarted.ToUnixTimeMilliseconds();
         sink.AppendNickname(playerId, name);
-        sink.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = 900_002,
-            SkillCode = 11000010,
-            Damage = damage / 2,
-            Timestamp = origin + start,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        }, flushId: 1);
-        sink.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = 900_002,
-            SkillCode = 11000010,
-            Damage = damage - damage / 2,
-            Timestamp = origin + end,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        }, flushId: 2);
+        AppendDamage(sink, playerId, 900_002, 11000010, damage / 2, origin + start, 1);
+        AppendDamage(sink, playerId, 900_002, 11000010, damage - damage / 2, origin + end, 2);
         sink.CompleteFlush(1);
         sink.CompleteFlush(2);
     }
@@ -1181,30 +1163,8 @@ public sealed class MainViewModelCombatantFilterTests
     private static void AppendLiveBattle(IRuntimeObservationSink sink, long sceneStartedMilliseconds, int playerId, string name, int damage, long start, long end, long firstFlushId)
     {
         sink.AppendNickname(playerId, name);
-        sink.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = 900_002,
-            SkillCode = 11000010,
-            Damage = damage / 2,
-            Timestamp = sceneStartedMilliseconds + start,
-            HitContribution = 1,
-            AttemptContribution = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        }, flushId: firstFlushId);
-        sink.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = 900_002,
-            SkillCode = 11000010,
-            Damage = damage - damage / 2,
-            Timestamp = sceneStartedMilliseconds + end,
-            HitContribution = 1,
-            AttemptContribution = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        }, flushId: firstFlushId + 1);
+        AppendDamage(sink, playerId, 900_002, 11000010, damage / 2, sceneStartedMilliseconds + start, firstFlushId);
+        AppendDamage(sink, playerId, 900_002, 11000010, damage - damage / 2, sceneStartedMilliseconds + end, firstFlushId + 1);
         sink.CompleteFlush(firstFlushId);
         sink.CompleteFlush(firstFlushId + 1);
     }
@@ -1250,17 +1210,28 @@ public sealed class MainViewModelCombatantFilterTests
     private static void AppendSceneDamage(SceneLiveReadModel scene, int sourceId, int targetId, int skillCode, int damage, long timestamp, long flushId)
     {
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
-        sink.AppendCombatPacket(new ParsedCombatPacket
+        AppendDamage(sink, sourceId, targetId, skillCode, damage, scene.SessionStarted.ToUnixTimeMilliseconds() + timestamp, flushId);
+        sink.CompleteFlush(flushId);
+    }
+
+    private static void AppendDamage(
+        IRuntimeObservationSink sink,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int damage,
+        long timestamp,
+        long flushId)
+    {
+        var source = new PacketObservationSource(timestamp, flushId, 0, 0, 0, default);
+        var observation = new CombatWireObservation
         {
-            SourceId = sourceId,
-            TargetId = targetId,
             SkillCode = skillCode,
             Damage = damage,
-            Timestamp = scene.SessionStarted.ToUnixTimeMilliseconds() + timestamp,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        }, flushId: flushId);
-        sink.CompleteFlush(flushId);
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        sink.AppendCombatWireObservation(in source, sourceId, targetId, in observation);
     }
 
     private static void AppendSceneMap(SceneLiveReadModel scene, uint mapId, uint instanceId)

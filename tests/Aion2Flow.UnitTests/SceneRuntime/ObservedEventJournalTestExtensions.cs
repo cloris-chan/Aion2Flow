@@ -9,7 +9,7 @@ internal readonly record struct ObservedEventTestEntry<TObservation>(ObservedEve
 
 internal static class ObservedEventJournalTestExtensions
 {
-    public static void AppendCombat(this ObservedEventJournal journal, Guid sceneSessionId, TimelineStamp stamp, int sourceEntityId, int targetEntityId, in CombatObservation observation, RawPacketReference raw = default)
+    public static void AppendCombat(this ObservedEventJournal journal, Guid sceneSessionId, TimelineStamp stamp, int sourceEntityId, int targetEntityId, in CombatWireObservation observation, RawPacketReference raw = default)
     {
         var header = new ObservedEventHeader(sceneSessionId, stamp, sourceEntityId, targetEntityId, raw);
         journal.Append(in header, in observation);
@@ -27,7 +27,7 @@ internal static class ObservedEventJournalTestExtensions
         journal.Append(in header, in observation);
     }
 
-    public static void AppendResource(this ObservedEventJournal journal, Guid sceneSessionId, TimelineStamp stamp, int sourceEntityId, int targetEntityId, in ResourceObservation observation, RawPacketReference raw = default)
+    public static void AppendEntityVital(this ObservedEventJournal journal, Guid sceneSessionId, TimelineStamp stamp, int sourceEntityId, int targetEntityId, in EntityVitalObservation observation, RawPacketReference raw = default)
     {
         var header = new ObservedEventHeader(sceneSessionId, stamp, sourceEntityId, targetEntityId, raw);
         journal.Append(in header, in observation);
@@ -45,7 +45,7 @@ internal static class ObservedEventJournalTestExtensions
         journal.Append(in header, in observation);
     }
 
-    public static void Append(this ObservedEventJournal journal, in ObservedEventTestEntry<CombatObservation> entry)
+    public static void Append(this ObservedEventJournal journal, in ObservedEventTestEntry<CombatWireObservation> entry)
     {
         var header = entry.Header;
         var observation = entry.Observation;
@@ -66,7 +66,7 @@ internal static class ObservedEventJournalTestExtensions
         journal.Append(in header, in observation);
     }
 
-    public static void Append(this ObservedEventJournal journal, in ObservedEventTestEntry<ResourceObservation> entry)
+    public static void Append(this ObservedEventJournal journal, in ObservedEventTestEntry<EntityVitalObservation> entry)
     {
         var header = entry.Header;
         var observation = entry.Observation;
@@ -102,10 +102,10 @@ internal readonly record struct ObservedEventTestSnapshot(
     int SourceEntityId,
     int TargetEntityId,
     RawPacketReference Raw,
-    CombatObservation? Combat,
+    CombatWireObservation? Combat,
     ActionObservation? Action,
     StateObservation? State,
-    ResourceObservation? Resource,
+    EntityVitalObservation? EntityVital,
     AuraObservation? Aura,
     SceneObservation? Scene)
 {
@@ -120,7 +120,7 @@ internal readonly record struct ObservedEventTestSnapshot(
             entry.Domain == ObservedEventDomain.Combat ? entry.Combat : null,
             entry.Domain == ObservedEventDomain.Action ? entry.Action : null,
             entry.Domain == ObservedEventDomain.State ? entry.State : null,
-            entry.Domain == ObservedEventDomain.Resource ? entry.Resource : null,
+            entry.Domain == ObservedEventDomain.EntityVital ? entry.EntityVital : null,
             entry.Domain == ObservedEventDomain.Aura ? entry.Aura : null,
             entry.Domain == ObservedEventDomain.Scene ? entry.Scene : null);
 }

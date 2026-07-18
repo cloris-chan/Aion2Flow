@@ -102,5 +102,13 @@ public sealed class DetailCounterpartFilterViewModelTests
     }
 
     private static DetailCounterpartOption CreateOption(int combatantId, long damage)
-        => new(combatantId, damage, damage / 1000d, damage / 2, damage / 2000d, damage / 4, damage / 4000d);
+        => new(
+            combatantId,
+            damage,
+            damage / 1000d,
+            damage / 2,
+            damage / 2000d,
+            damage / 4,
+            damage / 4000d,
+            0);
 }

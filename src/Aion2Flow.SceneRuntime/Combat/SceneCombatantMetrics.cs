@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.SceneRuntime.Model;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
@@ -78,12 +77,6 @@ internal struct SceneCombatantMetricsAccumulator
         this = default;
     }
 
-    public void ProcessCombatObservation(in CombatObservation observation)
-    {
-        var contribution = CombatContributionClassifier.Evaluate(in observation);
-        ApplyContribution(contribution, observation.ValueKind, observation.EffectTag);
-    }
-
     public void ApplyCombatTotals(long damageAmount, long healingAmount, long periodicHealingAmount, long drainDamageAmount, long drainHealingAmount, long regenerationHealingAmount, long shieldAmount, int shieldTimes, long shieldAbsorbedAmount, int shieldAbsorbedTimes)
     {
         DamageAmount += damageAmount;
@@ -96,39 +89,6 @@ internal struct SceneCombatantMetricsAccumulator
         ShieldTimes += shieldTimes;
         ShieldAbsorbedAmount += shieldAbsorbedAmount;
         ShieldAbsorbedTimes += shieldAbsorbedTimes;
-    }
-
-    private void ApplyContribution(
-        in CombatContribution contribution,
-        CombatValueKind valueKind,
-        PacketEffectTag effectTag)
-        => ApplyValues(contribution.DamageAmount, contribution.HealingAmount, contribution.ShieldGrantAmount, contribution.ShieldGrantCount, contribution.ShieldAbsorbedAmount, contribution.ShieldAbsorbedCount, valueKind, effectTag);
-
-    private void ApplyValues(long damageAmount, long healingAmount, long shieldGrantAmount, int shieldGrantCount, long shieldAbsorbedAmount, int shieldAbsorbedCount, CombatValueKind valueKind, PacketEffectTag effectTag)
-    {
-        DamageAmount += damageAmount;
-        HealingAmount += healingAmount;
-        ShieldAmount += shieldGrantAmount;
-        ShieldTimes += shieldGrantCount;
-        ShieldAbsorbedAmount += shieldAbsorbedAmount;
-        ShieldAbsorbedTimes += shieldAbsorbedCount;
-
-        if (valueKind == CombatValueKind.PeriodicHealing)
-        {
-            PeriodicHealingAmount += healingAmount;
-        }
-        else if (valueKind == CombatValueKind.DrainHealing)
-        {
-            DrainHealingAmount += healingAmount;
-        }
-        else if (valueKind == CombatValueKind.DrainDamage)
-        {
-            DrainDamageAmount += damageAmount;
-        }
-        else if (effectTag == PacketEffectTag.RegenerationHealing)
-        {
-            RegenerationHealingAmount += healingAmount;
-        }
     }
 
     public readonly SceneCombatantMetrics ToSnapshot()

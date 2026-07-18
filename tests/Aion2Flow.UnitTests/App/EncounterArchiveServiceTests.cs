@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.Resources.Catalog;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
@@ -114,10 +113,10 @@ public sealed class EncounterArchiveServiceTests
         Assert.Equal(8, timelineCount);
         Assert.Equal(8, timelineRead.Cursor.NextObservationOrdinal);
         Assert.Equal(playerId, delta.CombatantId);
-        Assert.Equal(2, delta.Events.Count);
-        Assert.Equal(playerId, delta.Events[0].SourceId);
-        Assert.Equal(bossId, delta.Events[0].TargetId);
-        Assert.Equal(750, delta.Events[0].Amount);
+        Assert.Equal(2, delta.MetricEvents.Count);
+        Assert.Equal(playerId, delta.MetricEvents[0].SourceId);
+        Assert.Equal(bossId, delta.MetricEvents[0].TargetId);
+        Assert.Equal(750, delta.MetricEvents[0].Amount);
         Assert.Equal(751, delta.Combatant!.Value.OutgoingDamage);
         Assert.Single(delta.OutgoingPairs);
     }
@@ -134,8 +133,8 @@ public sealed class EncounterArchiveServiceTests
         var delta = payload.CreateDetailDelta(bossId);
 
         Assert.False(snapshot.Combatants.ContainsKey(bossId));
-        Assert.Equal(2, payload.EventOrdinalsByCombatant[bossId].Length);
-        Assert.Equal(2, delta.Events.Count);
+        Assert.Equal(2, payload.MetricEventOrdinalsByCombatant[bossId].Length);
+        Assert.Equal(2, delta.MetricEvents.Count);
         Assert.Equal(bossId, delta.CombatantId);
         Assert.Equal(751, delta.Combatant!.Value.IncomingDamage);
         Assert.Empty(delta.OutgoingPairs);
@@ -160,11 +159,13 @@ public sealed class EncounterArchiveServiceTests
 
         var delta = payload.CreateDetailDelta(playerId);
 
-        Assert.Equal([1L, 2L], delta.Events.Select(static e => e.Revision));
-        Assert.Equal([0L, 1L], payload.EventOrdinalsByCombatant[playerId]);
+        Assert.Equal([1L, 2L], delta.MetricEvents.Select(static e => e.Revision));
+        Assert.Equal([1L, 2L], delta.MechanicEvents.Select(static e => e.Revision));
+        Assert.Empty(delta.ResourceEvents);
+        Assert.Equal([0L, 1L], payload.MetricEventOrdinalsByCombatant[playerId]);
         Assert.Equal([new DirectedPairKey(playerId, bossId)], delta.OutgoingPairs);
         Assert.Equal([new DirectedPairKey(bossId, playerId)], delta.IncomingPairs);
-        Assert.Equal(2, delta.Revision);
+        Assert.Equal(delta.MetricEvents[^1].Revision + delta.MechanicEvents[^1].Revision, delta.Revision);
         Assert.Equal(100, delta.Combatant!.Value.OutgoingDamage);
         Assert.Equal(75, delta.Combatant.Value.IncomingDamage);
     }
@@ -206,26 +207,26 @@ public sealed class EncounterArchiveServiceTests
         var payload = owner.CreateArchivePayload(snapshot);
 
         owner.Entities.ApplyNickname(playerId, "Changed");
-        owner.Combat.ApplyCombat(playerId, bossId, new CombatObservation
+        var appendedObservation = new CombatWireObservation
         {
             SkillCode = 11000011,
             Damage = 250,
             HitCount = 1,
-            AttemptCount = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        }, 2_000);
+            AttemptCount = 1
+        };
+        var appendedContribution = ResolveContribution(playerId, bossId, in appendedObservation);
+        owner.Combat.ApplyCombat(playerId, bossId, in appendedObservation, in appendedContribution, 2_000);
 
         owner.Combat.Clear();
-        owner.Combat.ApplyCombat(playerId, bossId, new CombatObservation
+        var replacementObservation = new CombatWireObservation
         {
             SkillCode = 11000011,
             Damage = 500,
             HitCount = 1,
-            AttemptCount = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        }, 3_000);
+            AttemptCount = 1
+        };
+        var replacementContribution = ResolveContribution(playerId, bossId, in replacementObservation);
+        owner.Combat.ApplyCombat(playerId, bossId, in replacementObservation, in replacementContribution, 3_000);
 
         var delta = payload.CreateDetailDelta(playerId);
 
@@ -233,8 +234,8 @@ public sealed class EncounterArchiveServiceTests
         Assert.True(payload.IdentityScope.TryGetPcMetadata(playerId, out var archivedPc));
         Assert.Equal("Tester", archivedPc.Nickname);
         Assert.Equal(2, payload.CombatEvents.Count);
-        Assert.Equal(2, delta.Events.Count);
-        Assert.Equal(750, delta.Events[0].Amount);
+        Assert.Equal(2, delta.MetricEvents.Count);
+        Assert.Equal(750, delta.MetricEvents[0].Amount);
         Assert.Single(owner.Combat.Events);
     }
 
@@ -303,7 +304,7 @@ public sealed class EncounterArchiveServiceTests
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId, DateTimeOffset sceneStarted)
     {
         const int bossCode = 2_999_997;
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>
+        CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>
         {
             [bossCode] = new(bossCode, "Archive Boss", NpcCatalogKind.Boss, NpcHpDisplayScale.Normal)
         });
@@ -314,7 +315,7 @@ public sealed class EncounterArchiveServiceTests
         AppendState(journal, sceneId, bossId, 0, bossCode, 0, 0, null, 2, 1_001);
         AppendState(journal, sceneId, bossCode, 0, StateCodes.LocalizedNpcName, 0, 0, "Archive Boss", 3, 1_002);
         AppendState(journal, sceneId, bossId, 0, StateCodes.NpcKind, (int)NpcKind.Boss, 0, null, 4, 1_003);
-        AppendResource(journal, sceneId, bossId, 50_000, 100_000, 5, 1_004);
+        AppendEntityVital(journal, sceneId, bossId, 50_000, 100_000, 5, 1_004);
         AppendState(journal, sceneId, bossId, 0, StateCodes.NpcBattle, 1, 0, null, 6, 1_005);
         AppendCombat(journal, sceneId, playerId, bossId, 750, 7, 1_500);
         AppendCombat(journal, sceneId, playerId, bossId, 1, 8, 1_501);
@@ -332,26 +333,40 @@ public sealed class EncounterArchiveServiceTests
         journal.Append(in header, in observation);
     }
 
-    private static void AppendResource(ObservedEventJournal journal, Guid sceneId, int entityId, long current, long maximum, long ordinal, long observedAt)
+    private static void AppendEntityVital(ObservedEventJournal journal, Guid sceneId, int entityId, long currentHp, long maxHp, long ordinal, long observedAt)
     {
         var header = CreateHeader(sceneId, entityId, 0, ordinal, observedAt, 0);
-        var observation = new ResourceObservation(entityId, current, maximum, null, 0);
+        var observation = new EntityVitalObservation(entityId, currentHp, maxHp);
         journal.Append(in header, in observation);
     }
 
     private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, int sourceId, int targetId, int damage, long ordinal, long observedAt)
     {
         var header = CreateHeader(sceneId, sourceId, targetId, ordinal, observedAt, 0x0438);
-        var observation = new CombatObservation
+        var observation = new CombatWireObservation
         {
             SkillCode = 11000010,
             Damage = damage,
             HitCount = 1,
-            AttemptCount = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
+            AttemptCount = 1
         };
         journal.Append(in header, in observation);
+    }
+
+    private static CombatContribution ResolveContribution(
+        int sourceId,
+        int targetId,
+        in CombatWireObservation observation)
+    {
+        Assert.True(CombatContributionResolver.TryResolve(
+            sourceId,
+            targetId,
+            in observation,
+            CombatPacketRule.None,
+            CombatMaterializationKind.Primary,
+            CombatAssociationKind.None,
+            out var contribution));
+        return contribution;
     }
 
     private static ObservedEventHeader CreateHeader(Guid sceneId, int sourceId, int targetId, long ordinal, long observedAt, ushort opcode)

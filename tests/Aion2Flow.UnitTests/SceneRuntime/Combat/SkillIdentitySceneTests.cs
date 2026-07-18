@@ -8,50 +8,46 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 public sealed class SkillIdentitySceneTests
 {
     [Fact]
-    public void Keeps_Confirmed_Specialization_Variant_Without_Resource_Normalization()
+    public void Journal_Keeps_Confirmed_Specialization_Variant_As_Wire_Identity()
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
             new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        var packet = new ParsedCombatPacket
+        var observation = new CombatWireObservation
         {
-            SourceId = 4342,
-            TargetId = 4342,
             SkillCode = 17750010,
             Damage = 603
         };
 
-        CombatResourceRegistry.NormalizePacketForStorage(ref packet);
+        var journaled = JournalObservation(4342, 4342, in observation);
 
-        Assert.True(packet.IsNormalized);
-        Assert.Equal(17750010, packet.SkillCode);
+        Assert.Equal(observation, journaled);
+        Assert.Equal(17750010, journaled.SkillCode);
     }
 
     [Fact]
     public void Does_Not_Infer_SkillCode_From_ResourceEffectRef()
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
             new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        var packet = new ParsedCombatPacket
+        var observation = new CombatWireObservation
         {
-            SourceId = 4342,
-            TargetId = 4342,
             BodyResourceEffectRef = ResourceEffectRef.FromRaw(1775000011),
             DetailResourceEffectRef = ResourceEffectRef.FromRaw(1775000012),
             Damage = 603
         };
 
-        CombatResourceRegistry.NormalizePacketForStorage(ref packet);
+        var journaled = JournalObservation(4342, 4342, in observation);
 
-        Assert.True(packet.IsNormalized);
-        Assert.Equal(0, packet.SkillCode);
-        Assert.Equal(1775000011u, packet.BodyResourceEffectRef.RawId);
-        Assert.Equal(1775000012u, packet.DetailResourceEffectRef.RawId);
+        Assert.Equal(observation, journaled);
+        Assert.Equal(0, journaled.SkillCode);
+        Assert.Equal(1775000011u, journaled.BodyResourceEffectRef.RawId);
+        Assert.Equal(1775000012u, journaled.DetailResourceEffectRef.RawId);
     }
 
     [Fact]
@@ -63,20 +59,8 @@ public sealed class SkillIdentitySceneTests
         const int targetId = 19621;
 
         scene.AppendNickname(sourceId, "Cleric");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 17040257,
-            Damage = 38641
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 17040257,
-            Damage = 38641
-        });
+        AppendDamage(scene, sourceId, targetId, 17040257, 38641);
+        AppendDamage(scene, sourceId, targetId, 17040257, 38641);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -97,20 +81,8 @@ public sealed class SkillIdentitySceneTests
         const int targetId = 19621;
 
         scene.AppendNickname(sourceId, "Cleric");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 17040250,
-            Damage = 9408
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 17040250,
-            Damage = 9408
-        });
+        AppendDamage(scene, sourceId, targetId, 17040250, 9408);
+        AppendDamage(scene, sourceId, targetId, 17040250, 9408);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -125,10 +97,11 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Keeps_SameName_PcSkill_Variants_As_Distinct_Packet_Identities()
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
             new SkillDisplayEntry(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill),
             new SkillDisplayEntry(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(12240039, "審判", SkillCategory.Templar, SkillSourceType.PcSkill),
             new SkillDisplayEntry(12240350, "審判", SkillCategory.Templar, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>(), new Dictionary<int, SkillBaseProjection>
         {
@@ -140,22 +113,8 @@ public sealed class SkillIdentitySceneTests
         const int targetId = 29219;
 
         scene.AppendNickname(sourceId, "Templar");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 12240350,
-            Damage = 23108,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 12240039,
-            Damage = 15957,
-            Timestamp = 1_100
-        });
+        AppendDamage(scene, sourceId, targetId, 12240350, 23108, 1_000);
+        AppendDamage(scene, sourceId, targetId, 12240039, 15957, 1_100);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -174,7 +133,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Attributes_Drain_Heal_To_Confirmed_Skill_Code()
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
             new SkillDisplayEntry(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
@@ -184,32 +143,16 @@ public sealed class SkillIdentitySceneTests
         const int npcId = 17629;
 
         scene.AppendNickname(playerId, "Perigee");
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var drainDamage = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = npcId,
             SkillCode = 13060250,
             Damage = 1200,
             DrainHealAmount = 240,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 13060250,
-            Damage = 240,
-            DrainHealAmount = 240,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = npcId,
-            SkillCode = 13060250,
-            Damage = 800,
-            Timestamp = 1_040
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(playerId, npcId, in drainDamage, 1_000);
+        AppendDamage(scene, playerId, npcId, 13060250, 800, 1_040);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -229,38 +172,22 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void ResourceKind_Health_Classifies_Confirmed_Skill_As_Healing_Without_Damage_Total()
     {
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>());
+        CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int playerId = 9024;
         const int targetId = 262851;
 
         scene.AppendNickname(playerId, "Perigee");
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        AppendDamage(scene, playerId, targetId, 13360120, 18167, 1_000);
+        AppendDamage(scene, playerId, targetId, 13360120, 32404, 1_050);
+        var healing = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
-            SkillCode = 13360120,
-            Damage = 18167,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = targetId,
-            SkillCode = 13360120,
-            Damage = 32404,
-            Timestamp = 1_050
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
             SkillCode = 1900001,
             Damage = 35373,
-            ResourceKind = CombatResourceKind.Health,
-            Timestamp = 1_100
-        });
+            ResourceKind = CombatResourceKind.Health
+        };
+        scene.AppendCombatWireObservation(playerId, playerId, in healing, 1_100);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -278,7 +205,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void NoSkill_Direct_Events_Group_By_ResourceEffectRefs_With_Fallback_Label()
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
             new SkillDisplayEntry(17000000, "Should not be used", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
@@ -290,24 +217,24 @@ public sealed class SkillIdentitySceneTests
         var detail = ResourceEffectRef.FromRaw(1700000012);
 
         scene.AppendNickname(sourceId, "Cleric");
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var firstEffect = new CombatWireObservation
         {
-            SourceId = sourceId,
-            TargetId = targetId,
             BodyResourceEffectRef = body,
             DetailResourceEffectRef = detail,
             Damage = 1200,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(sourceId, targetId, in firstEffect, 1_000);
+        var secondEffect = new CombatWireObservation
         {
-            SourceId = sourceId,
-            TargetId = targetId,
             BodyResourceEffectRef = body,
             DetailResourceEffectRef = detail,
             Damage = 800,
-            Timestamp = 1_100
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(sourceId, targetId, in secondEffect, 1_100);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -323,7 +250,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Compact0438_Body_Code_Is_Stored_As_Skill_Code()
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
             new SkillDisplayEntry(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ClientSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
@@ -380,5 +307,38 @@ public sealed class SkillIdentitySceneTests
         Assert.Equal(0, combat.SkillCode);
         Assert.Equal(0, combat.BodySkillVariantRaw);
         Assert.Equal(30011101u, combat.BodyResourceEffectRef.RawId);
+    }
+
+    private static CombatWireObservation JournalObservation(
+        int sourceId,
+        int targetId,
+        in CombatWireObservation observation)
+    {
+        var journal = new ObservedEventJournal();
+        var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
+        var source = new PacketObservationSource(1_000, 1, 0x0438, 0, 0, default);
+        sink.AppendCombatWireObservation(in source, sourceId, targetId, in observation);
+
+        var entry = journal.ReadSnapshot(0);
+        Assert.True(entry.Combat.HasValue);
+        return entry.Combat.Value;
+    }
+
+    private static void AppendDamage(
+        SceneTestHarness scene,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int damage,
+        long timestamp = 0)
+    {
+        var observation = new CombatWireObservation
+        {
+            SkillCode = skillCode,
+            Damage = damage,
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(sourceId, targetId, in observation, timestamp);
     }
 }

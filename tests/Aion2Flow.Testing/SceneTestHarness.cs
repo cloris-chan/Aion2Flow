@@ -58,12 +58,16 @@ public sealed class SceneTestHarness : IDisposable
 
     public void AppendSummon(int ownerId, int summonInstanceId) => Sink.AppendSummon(NextSource(), ownerId, summonInstanceId);
 
-    public void AppendCombatPacket(ParsedCombatPacket packet, long flushId = 0)
+    public void AppendCombatWireObservation(
+        int sourceId,
+        int targetId,
+        in CombatWireObservation observation,
+        long timestamp = 0,
+        long flushId = 0)
     {
-        packet = PreparePacket(packet, flushId, out var resolvedFlushId);
-        var observation = packet.ToObservation();
-        var source = new PacketObservationSource(packet.Timestamp, resolvedFlushId, 0, 0, 0, default);
-        _holder.Sink.AppendCombatObservation(in source, packet.SourceId, packet.TargetId, in observation);
+        var source = new PacketObservationSource(timestamp, flushId, 0, 0, 0, default);
+        source = PrepareSource(in source);
+        _holder.Sink.AppendCombatWireObservation(in source, sourceId, targetId, in observation);
     }
 
     public bool TryGetNpcRuntimeState(int instanceId, out RuntimeNpcStateSnapshot state)
@@ -71,7 +75,8 @@ public sealed class SceneTestHarness : IDisposable
         Owner.Refresh();
         if (Owner.Entities.TryGet(instanceId, out var entity))
         {
-            state = new RuntimeNpcStateSnapshot(entity.NpcCode, entity.CurrentHp, entity.MaxHp, null, entity.NpcCombatActive, entity.Kind, entity.Value2136, entity.Sequence2136, entity.Value0140, entity.Value0240, entity.State4636, entity.Latest2C38);
+            Owner.EntityVitals.TryGet(instanceId, out var vital);
+            state = new RuntimeNpcStateSnapshot(entity.NpcCode, vital.EntityId > 0 ? vital.CurrentHp : null, vital.MaxHp, vital.EntityId > 0 ? vital.ObservedAtMilliseconds : null, entity.NpcCombatActive, entity.Kind, entity.Value2136, entity.Sequence2136, entity.Value0140, entity.Value0240, entity.State4636, entity.Latest2C38);
             return true;
         }
 
@@ -81,21 +86,26 @@ public sealed class SceneTestHarness : IDisposable
 
     public void Dispose() => _holder.Dispose();
 
-    private ParsedCombatPacket PreparePacket(ParsedCombatPacket packet, long flushId, out long resolvedFlushId)
+    private PacketObservationSource PrepareSource(in PacketObservationSource source)
     {
-        resolvedFlushId = flushId > 0 ? flushId : ++_flushId;
+        var resolvedFlushId = source.FlushId > 0 ? source.FlushId : ++_flushId;
         _flushId = Math.Max(_flushId, resolvedFlushId);
-        if (packet.Timestamp <= 0 || packet.Timestamp > 10_000_000_000)
+        var timestamp = source.CaptureTimestampMilliseconds;
+        if (timestamp <= 0 || timestamp > 10_000_000_000)
         {
-            packet = WithTimestamp(packet, _timestamp);
+            timestamp = _timestamp;
             _timestamp += 50;
         }
         else
         {
-            _timestamp = Math.Max(_timestamp, packet.Timestamp + 50);
+            _timestamp = Math.Max(_timestamp, timestamp + 50);
         }
 
-        return packet;
+        return source with
+        {
+            CaptureTimestampMilliseconds = timestamp,
+            FlushId = resolvedFlushId
+        };
     }
 
     private void CompleteFlush(long flushId)
@@ -125,51 +135,6 @@ public sealed class SceneTestHarness : IDisposable
         }
     }
 
-    private static ParsedCombatPacket WithTimestamp(ParsedCombatPacket packet, long timestamp)
-    {
-        var clone = new ParsedCombatPacket
-        {
-            SourceId = packet.SourceId,
-            TargetId = packet.TargetId,
-            Flag = packet.Flag,
-            Damage = packet.Damage,
-            SkillCode = packet.SkillCode,
-            BodySkillVariantRaw = packet.BodySkillVariantRaw,
-            BodyCodeRaw = packet.BodyCodeRaw,
-            BodyResourceEffectRef = packet.BodyResourceEffectRef,
-            Marker = packet.Marker,
-            Type = packet.Type,
-            Unknown = packet.Unknown,
-            LayoutTag = packet.LayoutTag,
-            Loop = packet.Loop,
-            HitContribution = packet.HitContribution,
-            AttemptContribution = packet.AttemptContribution,
-            MultiHitCount = packet.MultiHitCount,
-            DrainHealAmount = packet.DrainHealAmount,
-            RegenerationAmount = packet.RegenerationAmount,
-            DetailRaw = packet.DetailRaw,
-            DetailResourceEffectRef = packet.DetailResourceEffectRef,
-            ResourceKind = packet.ResourceKind,
-            Timestamp = timestamp,
-            Id = packet.Id,
-            Modifiers = packet.Modifiers,
-            EventKind = packet.EventKind,
-            ValueKind = packet.ValueKind,
-            PeriodicTailSkillCodeRaw = packet.PeriodicTailSkillCodeRaw,
-            PeriodicTailPrefixValue = packet.PeriodicTailPrefixValue,
-            PeriodicTailLength = packet.PeriodicTailLength,
-            IsNormalized = packet.IsNormalized
-        };
-
-        if (packet.IsPeriodicEffect)
-            clone.SetPeriodicEffect(packet.PeriodicRelation, packet.PeriodicMode);
-
-        if (packet.EffectTag != PacketEffectTag.None)
-            clone.SetEffectTag(packet.EffectTag);
-
-        return clone;
-    }
-
     private sealed class HarnessSink(SceneTestHarness owner, IRuntimeObservationSink inner) : IRuntimeObservationSink
     {
         public int CurrentTarget
@@ -194,17 +159,10 @@ public sealed class SceneTestHarness : IDisposable
         public void StageDestinationMapInstance(in PacketObservationSource packet, uint instanceId) => inner.StageDestinationMapInstance(in packet, instanceId);
         public void ConfirmDestinationMapInstance(in PacketObservationSource packet, uint instanceId) => inner.ConfirmDestinationMapInstance(in packet, instanceId);
         public void MarkSceneTransportBoundary(in PacketObservationSource packet) => inner.MarkSceneTransportBoundary(in packet);
-        public void AppendCombatObservation(in PacketObservationSource source, int sourceId, int targetId, in CombatObservation observation)
+        public void AppendCombatWireObservation(in PacketObservationSource source, int sourceId, int targetId, in CombatWireObservation observation)
         {
-            var packet = ParsedCombatPacket.FromObservation(sourceId, targetId, in observation, source.CaptureTimestampMilliseconds);
-            packet = owner.PreparePacket(packet, source.FlushId, out var resolvedFlushId);
-            var prepared = packet.ToObservation();
-            var preparedSource = source with
-            {
-                CaptureTimestampMilliseconds = packet.Timestamp,
-                FlushId = resolvedFlushId
-            };
-            inner.AppendCombatObservation(in preparedSource, packet.SourceId, packet.TargetId, in prepared);
+            var preparedSource = owner.PrepareSource(in source);
+            inner.AppendCombatWireObservation(in preparedSource, sourceId, targetId, in observation);
         }
         public void CompleteFlush(long flushId) => owner.CompleteFlush(flushId);
         public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type) => inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodySkillVariantRaw, marker, layoutTag, type);

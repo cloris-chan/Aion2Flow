@@ -9,7 +9,7 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
     private readonly record struct State(long Damage);
     private readonly Dictionary<Key, State> _seeds = [];
 
-    public CombatCanonicalizationResult Normalize(int sourceId, int targetId, in CombatObservation observation)
+    public CombatCanonicalizationResult Normalize(int sourceId, int targetId, in CombatWireObservation observation)
     {
         if (!TryGetKey(sourceId, targetId, in observation, out var key, out var isSeed))
             return new CombatCanonicalizationResult(sourceId, targetId, observation);
@@ -17,11 +17,12 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
         if (isSeed)
         {
             _seeds[key] = new State(observation.Damage);
-            return new CombatCanonicalizationResult(sourceId, targetId, observation with
-            {
-                EventKind = CombatEventKind.Support,
-                ValueKind = CombatValueKind.Support
-            }, CombatContributionCanonicalization.SystemPeriodicRecoverySeed);
+            return new CombatCanonicalizationResult(
+                sourceId,
+                targetId,
+                observation,
+                CombatPacketRule.None,
+                suppression: CombatSuppressionReason.SystemPeriodicRecoverySeed);
         }
 
         if (!_seeds.TryGetValue(key, out var state))
@@ -31,11 +32,12 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
         if (observation.Damage != state.Damage)
             return new CombatCanonicalizationResult(sourceId, targetId, observation);
 
-        return new CombatCanonicalizationResult(sourceId, targetId, observation with
-        {
-            EventKind = CombatEventKind.Healing,
-            ValueKind = CombatValueKind.PeriodicHealing
-        }, CombatContributionCanonicalization.SystemPeriodicRecoveryHealing);
+        return new CombatCanonicalizationResult(
+            sourceId,
+            targetId,
+            observation,
+            CombatPacketRule.PeriodicRecovery,
+            CombatMaterializationKind.PeriodicRecovery);
     }
 
     internal SystemPeriodicRecoveryCanonicalizerSnapshot CreateSnapshot()
@@ -62,7 +64,7 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
         return canonicalizer;
     }
 
-    private static bool TryGetKey(int sourceId, int targetId, in CombatObservation observation, out Key key, out bool isSeed)
+    private static bool TryGetKey(int sourceId, int targetId, in CombatWireObservation observation, out Key key, out bool isSeed)
     {
         key = default;
         isSeed = false;

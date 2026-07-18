@@ -3,6 +3,7 @@ using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
@@ -10,26 +11,7 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public class CombatPacketFactTests
 {
     public CombatPacketFactTests()
-        => CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>());
-
-    [Fact]
-    public void CombatContributionCanonicalization_UsesSemanticBitOrder()
-    {
-        Assert.Equal(0, (int)CombatContributionCanonicalization.None);
-        Assert.Equal(1 << 0, (int)CombatContributionCanonicalization.CompactDirectValue);
-        Assert.Equal(1 << 1, (int)CombatContributionCanonicalization.CompactRecoveryByOpener);
-        Assert.Equal(1 << 2, (int)CombatContributionCanonicalization.CompactRecoveryByInlineGroup);
-        Assert.Equal(1 << 3, (int)CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup);
-        Assert.Equal(1 << 4, (int)CombatContributionCanonicalization.CompactAvoidance);
-        Assert.Equal(1 << 5, (int)CombatContributionCanonicalization.OwnerTargetSummonResource);
-        Assert.Equal(1 << 6, (int)CombatContributionCanonicalization.SystemPeriodicRecoverySeed);
-        Assert.Equal(1 << 7, (int)CombatContributionCanonicalization.SystemPeriodicRecoveryHealing);
-        Assert.Equal(1 << 8, (int)CombatContributionCanonicalization.PeriodicStandaloneDamage);
-        Assert.Equal(1 << 9, (int)CombatContributionCanonicalization.PeriodicStandaloneContinuation);
-        Assert.Equal(1 << 10, (int)CombatContributionCanonicalization.PeriodicContinuationHealing);
-        Assert.Equal(1 << 11, (int)CombatContributionCanonicalization.PeriodicShieldGrant);
-        Assert.Equal(1 << 12, (int)CombatContributionCanonicalization.PeriodicShieldAbsorbed);
-    }
+        => CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>());
 
     [Fact]
     public void ScenePath_ClassifiesCompactControlDirectRecoveryAsHealing()
@@ -47,6 +29,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetCombatant(8972, out var source));
         Assert.Equal(0, source!.OutgoingDamage);
         Assert.Equal(2048, source.OutgoingHealing);
+        AssertCompactContribution(combat, 8972, 5578, 2048, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
@@ -65,6 +48,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetCombatant(8972, out var source));
         Assert.Equal(0, source!.OutgoingDamage);
         Assert.Equal(2048, source.OutgoingHealing);
+        AssertCompactContribution(combat, 8972, 5578, 2048, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
@@ -80,6 +64,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 5578, out var pair));
         Assert.Equal(0, pair!.TotalDamage);
         Assert.Equal(2048, pair.TotalHealing);
+        AssertCompactContribution(combat, 8972, 5578, 2048, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
@@ -99,6 +84,7 @@ public class CombatPacketFactTests
         Assert.Equal(0, source!.OutgoingDamage);
         Assert.Equal(2048, source.OutgoingHealing);
         Assert.Equal(2048, source.IncomingHealing);
+        AssertCompactContribution(combat, 8972, 8972, 2048, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
@@ -119,6 +105,8 @@ public class CombatPacketFactTests
         Assert.Equal(0, source!.OutgoingDamage);
         Assert.Equal(15075, source.OutgoingHealing);
         Assert.Equal(15075, source.IncomingHealing);
+        AssertCompactContribution(combat, 3013, 3013, 8627, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
+        AssertCompactContribution(combat, 3013, 3013, 6448, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
@@ -138,6 +126,8 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 5578, out var target));
         Assert.Equal(0, target!.TotalDamage);
         Assert.Equal(4698, target.TotalHealing);
+        AssertCompactContribution(combat, 8972, 8972, 3324, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
+        AssertCompactContribution(combat, 8972, 5578, 4698, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
@@ -157,25 +147,28 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 5578, out var target));
         Assert.Equal(0, target!.TotalDamage);
         Assert.Equal(4698, target.TotalHealing);
+        AssertCompactContribution(combat, 8972, 8972, 3324, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
+        AssertCompactContribution(combat, 8972, 5578, 4698, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
-    public void ScenePath_CompactControlCloseStillMatchesLaterRecoveryValue()
+    public void ScenePath_DoesNotClassifyClosedOpenerTargetValueAsRecoveryWithoutPacketEvidence()
     {
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
         journal.Append(CreateCompactControlCloser(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, flag: 0));
-        journal.Append(CreateDirectValue(sceneId, 2, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048, eventKind: CombatEventKind.Support, valueKind: CombatValueKind.Support));
+        journal.Append(CreateDirectValue(sceneId, 2, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048));
 
         var combat = Apply(journal);
 
         Assert.True(combat.TryGetPair(8972, 5578, out var pair));
-        Assert.Equal(0, pair!.TotalDamage);
-        Assert.Equal(2048, pair.TotalHealing);
+        Assert.Equal(2048, pair!.TotalDamage);
+        Assert.Equal(0, pair.TotalHealing);
         Assert.True(combat.TryGetCombatant(8972, out var source));
-        Assert.Equal(0, source!.OutgoingDamage);
-        Assert.Equal(2048, source.OutgoingHealing);
+        Assert.Equal(2048, source!.OutgoingDamage);
+        Assert.Equal(0, source.OutgoingHealing);
+        AssertCompactContribution(combat, 8972, 5578, 2048, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
     }
 
     [Fact]
@@ -192,6 +185,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 5578, out var pair));
         Assert.Equal(0, pair!.TotalDamage);
         Assert.Equal(2048, pair.TotalHealing);
+        AssertCompactContribution(combat, 8972, 5578, 2048, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
@@ -215,6 +209,9 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 8972, out var self));
         Assert.Equal(0, self!.TotalDamage);
         Assert.Equal(5425, self.TotalHealing);
+        AssertCompactContribution(combat, 8972, 5578, 7761, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactInlineRecoveryGroup);
+        AssertCompactContribution(combat, 8972, 12632, 9003, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactInlineRecoveryGroup);
+        AssertCompactContribution(combat, 8972, 8972, 5425, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactInlineRecoveryGroup);
     }
 
     [Fact]
@@ -231,6 +228,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 5578, out var pair));
         Assert.Equal(0, pair!.TotalDamage);
         Assert.Equal(7761, pair.TotalHealing);
+        AssertCompactContribution(combat, 8972, 5578, 7761, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactInlineRecoveryGroup);
     }
 
     [Fact]
@@ -249,7 +247,9 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(12613, 12613, out var self));
         Assert.Equal(0, self!.TotalDamage);
         Assert.Equal(2305, self.TotalHealing);
-        Assert.Equal(2, combat.Events.Count(static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0));
+        Assert.Equal(2, combat.Events.Count(static e => e.Contribution.Resolution.Association == CombatAssociationKind.CompactSelfValueGroup));
+        AssertCompactContribution(combat, 12613, 8062, 2694, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactSelfValueGroup);
+        AssertCompactContribution(combat, 12613, 12613, 2305, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactSelfValueGroup);
     }
 
     [Fact]
@@ -265,7 +265,9 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(7023, 7023, out var self));
         Assert.Equal(0, self!.TotalDamage);
         Assert.Equal(7519, self.TotalHealing);
-        Assert.Equal(2, combat.Events.Count(static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0));
+        Assert.Equal(2, combat.Events.Count(static e => e.Contribution.Resolution.Association == CombatAssociationKind.CompactSelfValueGroup));
+        AssertCompactContribution(combat, 7023, 7023, 3432, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactSelfValueGroup);
+        AssertCompactContribution(combat, 7023, 7023, 4087, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactSelfValueGroup);
     }
 
     [Fact]
@@ -283,7 +285,9 @@ public class CombatPacketFactTests
         Assert.Equal(0, target.TotalHealing);
         Assert.True(combat.TryGetPair(4587, 4587, out var self));
         Assert.Equal(0, self!.TotalHealing);
-        Assert.DoesNotContain(combat.Events, static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0);
+        Assert.DoesNotContain(combat.Events, static e => e.Contribution.Resolution.Association == CombatAssociationKind.CompactSelfValueGroup);
+        AssertCompactContribution(combat, 4587, 3039, 2586, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
+        AssertCompactContribution(combat, 4587, 4587, 2104, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
     }
 
     [Fact]
@@ -298,7 +302,9 @@ public class CombatPacketFactTests
 
         Assert.True(combat.TryGetPair(4587, 4587, out var self));
         Assert.Equal(0, self!.TotalHealing);
-        Assert.DoesNotContain(combat.Events, static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0);
+        Assert.DoesNotContain(combat.Events, static e => e.Contribution.Resolution.Association == CombatAssociationKind.CompactSelfValueGroup);
+        AssertCompactContribution(combat, 4587, 4587, 2586, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
+        AssertCompactContribution(combat, 4587, 4587, 2104, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
     }
 
     [Fact]
@@ -313,7 +319,9 @@ public class CombatPacketFactTests
 
         Assert.True(combat.TryGetPair(7023, 7023, out var self));
         Assert.Equal(0, self!.TotalHealing);
-        Assert.DoesNotContain(combat.Events, static e => (e.Canonicalization & CombatContributionCanonicalization.CompactRecoveryBySelfValueGroup) != 0);
+        Assert.DoesNotContain(combat.Events, static e => e.Contribution.Resolution.Association == CombatAssociationKind.CompactSelfValueGroup);
+        AssertCompactContribution(combat, 7023, 7023, 3432, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
+        AssertCompactContribution(combat, 7023, 7023, 4087, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
     }
 
     [Fact]
@@ -338,6 +346,18 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetCombatant(2141, out var source));
         Assert.Equal(10_000, source!.OutgoingDamage);
         Assert.Equal(2673, source.OutgoingHealing);
+        AssertCompactContribution(combat, 2141, 2141, 2673, CombatMetricKind.Healing, CombatPacketRule.CompactRecovery, CombatAssociationKind.CompactInlineRecoveryGroup);
+        AssertContribution(
+            combat,
+            2141,
+            30058,
+            10_000,
+            CombatMetricKind.Damage,
+            CombatDeliveryKind.Direct,
+            CombatPacketRule.DirectFallbackDamage,
+            CombatResolutionAuthority.PacketDefault,
+            CombatMaterializationKind.Primary,
+            CombatAssociationKind.None);
     }
 
     [Fact]
@@ -353,6 +373,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 144994, out var pair));
         Assert.Equal(2519, pair!.TotalDamage);
         Assert.Equal(0, pair.TotalHealing);
+        AssertCompactContribution(combat, 8972, 144994, 2519, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
     }
 
     [Fact]
@@ -367,6 +388,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 144994, out var pair));
         Assert.Equal(5629, pair!.TotalDamage);
         Assert.Equal(0, pair.TotalHealing);
+        AssertCompactContribution(combat, 8972, 144994, 5629, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
     }
 
     [Fact]
@@ -381,6 +403,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 5578, out var pair));
         Assert.Equal(2048, pair!.TotalDamage);
         Assert.Equal(0, pair.TotalHealing);
+        AssertCompactContribution(combat, 8972, 5578, 2048, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.None);
     }
 
     [Fact]
@@ -396,6 +419,7 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 144994, out var pair));
         Assert.Equal(2519, pair!.TotalDamage);
         Assert.Equal(0, pair.TotalHealing);
+        AssertCompactContribution(combat, 8972, 144994, 2519, CombatMetricKind.Damage, CombatPacketRule.CompactDirectValue, CombatAssociationKind.CompactOpener);
     }
 
     [Fact]
@@ -411,6 +435,17 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(8972, 144994, out var pair));
         Assert.Equal(2519, pair!.TotalDamage);
         Assert.Equal(0, pair.TotalHealing);
+        AssertContribution(
+            combat,
+            8972,
+            144994,
+            2519,
+            CombatMetricKind.Damage,
+            CombatDeliveryKind.Direct,
+            CombatPacketRule.DirectFallbackDamage,
+            CombatResolutionAuthority.PacketDefault,
+            CombatMaterializationKind.Primary,
+            CombatAssociationKind.None);
     }
 
     [Fact]
@@ -426,20 +461,31 @@ public class CombatPacketFactTests
         Assert.True(combat.TryGetPair(12632, 161904, out var pair));
         Assert.Equal(52763, pair!.TotalDamage);
         Assert.Equal(0, pair.TotalHealing);
+        AssertContribution(
+            combat,
+            12632,
+            161904,
+            52763,
+            CombatMetricKind.Damage,
+            CombatDeliveryKind.Direct,
+            CombatPacketRule.DirectFallbackDamage,
+            CombatResolutionAuthority.PacketDefault,
+            CombatMaterializationKind.Primary,
+            CombatAssociationKind.None);
     }
 
     [Fact]
     public void ScenePath_PreservesParserAuthoritativeMultiHitFact()
     {
         var journal = new ObservedEventJournal();
-        journal.Append(new ObservedEventTestEntry<CombatObservation>(
+        journal.Append(new ObservedEventTestEntry<CombatWireObservation>(
             new ObservedEventHeader(
                 Guid.NewGuid(),
                 new TimelineStamp { ObservationOrdinal = 0, FlushId = 100 },
                 8171,
                 42995,
                 default),
-            new CombatObservation
+            new CombatWireObservation
             {
                 SkillCode = 17010230,
                 Damage = 2400,
@@ -447,17 +493,33 @@ public class CombatPacketFactTests
                 AttemptCount = 1,
                 Marker = 5,
                 MultiHitCount = 2,
-                Modifiers = DamageModifiers.MultiHit,
-                EventKind = CombatEventKind.Damage,
-                ValueKind = CombatValueKind.Damage
+                Modifiers = DamageModifiers.MultiHit
             }));
 
-        var combat = Apply(journal);
+        var combat = Apply(journal, out var mechanics, out var resources);
 
-        Assert.True(combat.TryGetPair(8171, 42995, out var pair));
-        Assert.Equal(1, pair!.MultiHitCount);
-        Assert.True(combat.TryGetCombatant(8171, out var source));
-        Assert.Equal(1, source!.OutgoingMultiHits);
+        var pair = CombatPairProjection.GetPair(combat, mechanics, resources, 8171, 42995);
+        Assert.True(pair.HasValue);
+        Assert.Equal(1, pair.Value.MultiHitCount);
+        var source = CombatPairProjection.GetCombatant(combat, mechanics, resources, 8171);
+        Assert.True(source.HasValue);
+        Assert.Equal(1, source.Value.OutgoingMultiHits);
+        var eventRecord = AssertContribution(
+            combat,
+            8171,
+            42995,
+            2400,
+            CombatMetricKind.Damage,
+            CombatDeliveryKind.Direct,
+            CombatPacketRule.DirectFallbackDamage,
+            CombatResolutionAuthority.PacketDefault,
+            CombatMaterializationKind.Primary,
+            CombatAssociationKind.None);
+        Assert.Equal(2, eventRecord.Observation.MultiHitCount);
+        var mechanicEvent = Assert.Single(mechanics.Events);
+        Assert.Equal(2, mechanicEvent.Observation.MultiHitCount);
+        Assert.Equal(1, mechanicEvent.Mechanic.MultiHitCount);
+        Assert.Equal(2, mechanicEvent.Mechanic.MultiHitSubCount);
     }
 
     [Fact]
@@ -471,12 +533,25 @@ public class CombatPacketFactTests
         journal.Append(CreateCompactAvoidanceSignal(sceneId, 3, sourceId: 31338, targetId: 2141, bodyCodeRaw: 1603150, marker: 23, layoutTag: 0, scopeId: 104, flushId: 103));
         journal.Append(CreateCompactAvoidanceSignal(sceneId, 4, sourceId: 31338, targetId: 2141, bodyCodeRaw: 1603150, marker: 23, layoutTag: 0, scopeId: 105, flushId: 104));
 
-        var combat = Apply(journal);
+        var combat = Apply(journal, out var mechanics);
 
-        Assert.True(combat.TryGetPair(31338, 2141, out var pair));
-        Assert.Equal(0, pair!.TotalDamage);
-        Assert.Equal(3, pair.AttemptCount);
+        Assert.False(combat.TryGetPair(31338, 2141, out _));
+        Assert.True(mechanics.TryGetPair(31338, 2141, out var pair));
+        Assert.Equal(3, pair!.AttemptCount);
         Assert.Equal(3, pair.EvadeCount);
+        var avoidanceEvents = mechanics.Events.Where(static e => e.Mechanic.Resolution.PacketRule == CombatPacketRule.CompactAvoidance).ToArray();
+        Assert.Equal(3, avoidanceEvents.Length);
+        Assert.All(avoidanceEvents, static eventRecord =>
+        {
+            Assert.Equal(0, eventRecord.Observation.Damage);
+            Assert.Equal(0, eventRecord.Mechanic.HitCount);
+            Assert.Equal(1, eventRecord.Mechanic.AttemptCount);
+            Assert.Equal(1, eventRecord.Mechanic.EvadeCount);
+            Assert.Equal(CombatResolutionAuthority.Packet, eventRecord.Mechanic.Resolution.Authority);
+            Assert.Equal(CombatMaterializationKind.Primary, eventRecord.Mechanic.Resolution.Materialization);
+            Assert.Equal(CombatAssociationKind.None, eventRecord.Mechanic.Resolution.Association);
+            Assert.Equal(CombatSemanticMatchKind.None, eventRecord.Mechanic.Resolution.SemanticMatch);
+        });
     }
 
     [Fact]
@@ -484,7 +559,7 @@ public class CombatPacketFactTests
     {
         var canonicalizer = new CompactAvoidanceCanonicalizer();
         var stamp = new TimelineStamp { ObservationOrdinal = 1, FlushId = 1 };
-        var observation = new CombatObservation
+        var observation = new CombatWireObservation
         {
             SkillCode = 40_567_740,
             BodySkillVariantRaw = 40_567_740,
@@ -505,7 +580,7 @@ public class CombatPacketFactTests
     public void PeriodicNormalizer_PreservesParserAuthoritativeMultiHitCount()
     {
         var canonicalizer = new PeriodicPoolCanonicalizer();
-        var observation = new CombatObservation
+        var observation = new CombatWireObservation
         {
             SkillCode = 17010230,
             Damage = 2400,
@@ -513,28 +588,92 @@ public class CombatPacketFactTests
             AttemptCount = 1,
             Marker = 5,
             MultiHitCount = 2,
-            Modifiers = DamageModifiers.MultiHit,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
+            Modifiers = DamageModifiers.MultiHit
         };
 
         var results = canonicalizer.Normalize(8171, 42995, in observation);
         Assert.Equal(1, results.Count);
         var result = results[0];
 
+        Assert.Equal(2400, result.Observation.Damage);
+        Assert.Equal(1, result.Observation.HitCount);
+        Assert.Equal(1, result.Observation.AttemptCount);
         Assert.Equal(2, result.Observation.MultiHitCount);
         Assert.Equal(DamageModifiers.MultiHit, result.Observation.Modifiers & DamageModifiers.MultiHit);
     }
 
+    private static CombatEventRecord AssertCompactContribution(
+        CombatStore combat,
+        int sourceId,
+        int targetId,
+        long packetValue,
+        CombatMetricKind metric,
+        CombatPacketRule packetRule,
+        CombatAssociationKind association) =>
+        AssertContribution(
+            combat,
+            sourceId,
+            targetId,
+            packetValue,
+            metric,
+            CombatDeliveryKind.Direct,
+            packetRule,
+            CombatResolutionAuthority.Packet,
+            CombatMaterializationKind.CompactAssociated,
+            association);
+
+    private static CombatEventRecord AssertContribution(
+        CombatStore combat,
+        int sourceId,
+        int targetId,
+        long packetValue,
+        CombatMetricKind metric,
+        CombatDeliveryKind delivery,
+        CombatPacketRule packetRule,
+        CombatResolutionAuthority authority,
+        CombatMaterializationKind materialization,
+        CombatAssociationKind association)
+    {
+        var eventRecord = Assert.Single(combat.Events, e =>
+            e.SourceId == sourceId &&
+            e.TargetId == targetId &&
+            e.Observation.Damage == packetValue);
+
+        Assert.Equal(packetValue, eventRecord.Observation.Damage);
+        Assert.Equal(CombatResourceKind.Unknown, eventRecord.Observation.ResourceKind);
+        Assert.Equal(PeriodicEffectRelation.None, eventRecord.Observation.PeriodicRelation);
+        Assert.Equal(CombatWireOutcomeKind.None, eventRecord.Observation.OutcomeKind);
+
+        var contribution = eventRecord.Contribution;
+        Assert.Equal(metric, contribution.Metric);
+        Assert.Equal(delivery, contribution.Delivery);
+        Assert.Equal(packetValue, contribution.Amount);
+        Assert.Equal(packetRule, contribution.Resolution.PacketRule);
+        Assert.Equal(authority, contribution.Resolution.Authority);
+        Assert.Equal(materialization, contribution.Resolution.Materialization);
+        Assert.Equal(association, contribution.Resolution.Association);
+        Assert.Equal(CombatSemanticMatchKind.None, contribution.Resolution.SemanticMatch);
+        Assert.False(contribution.Resolution.HasResourceEvidence);
+        return eventRecord;
+    }
+
     private static CombatStore Apply(ObservedEventJournal journal)
+        => Apply(journal, out _);
+
+    private static CombatStore Apply(ObservedEventJournal journal, out MechanicStore mechanics)
+        => Apply(journal, out mechanics, out _);
+
+    private static CombatStore Apply(ObservedEventJournal journal, out MechanicStore mechanics, out ResourceStore resources)
     {
         var combat = new CombatStore();
         var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat);
         applier.ApplyJournal(journal);
+        mechanics = applier.Mechanics;
+        resources = applier.Resources;
         return combat;
     }
 
-    private static ObservedEventTestEntry<CombatObservation> CreateCompactControlOpener(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int mode, int flag, int echoSourceId, int scopeId = 100, long flushId = 100) =>
+    private static ObservedEventTestEntry<CombatWireObservation> CreateCompactControlOpener(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int mode, int flag, int echoSourceId, int scopeId = 100, long flushId = 100) =>
         new(
             new ObservedEventHeader(
                 sceneId,
@@ -542,7 +681,7 @@ public class CombatPacketFactTests
                 sourceId,
                 0,
                 new RawPacketReference(0x0238, 0, 0, CreateStructurePath(scopeId))),
-            new CombatObservation
+            new CombatWireObservation
         {
             BodyCodeRaw = unchecked((uint)bodyCodeRaw),
             Damage = 0,
@@ -556,7 +695,7 @@ public class CombatPacketFactTests
             LayoutTag = 0
         });
 
-    private static ObservedEventTestEntry<CombatObservation> CreateCompactControlCloser(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int flag, int scopeId = 100, long flushId = 100) =>
+    private static ObservedEventTestEntry<CombatWireObservation> CreateCompactControlCloser(Guid sceneId, long ordinal, int sourceId, int bodyCodeRaw, int marker, int flag, int scopeId = 100, long flushId = 100) =>
         new(
             new ObservedEventHeader(
                 sceneId,
@@ -564,7 +703,7 @@ public class CombatPacketFactTests
                 sourceId,
                 0,
                 new RawPacketReference(0x0638, 0, 0, CreateStructurePath(scopeId))),
-            new CombatObservation
+            new CombatWireObservation
         {
             BodyResourceEffectRef = ResourceEffectRef.FromRaw(bodyCodeRaw),
             Damage = 0,
@@ -576,7 +715,7 @@ public class CombatPacketFactTests
             LayoutTag = 0
         });
 
-    private static ObservedEventTestEntry<CombatObservation> CreateCompactAvoidanceSignal(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int scopeId = 100, long flushId = 100) =>
+    private static ObservedEventTestEntry<CombatWireObservation> CreateCompactAvoidanceSignal(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int scopeId = 100, long flushId = 100) =>
         new(
             new ObservedEventHeader(
                 sceneId,
@@ -584,7 +723,7 @@ public class CombatPacketFactTests
                 sourceId,
                 targetId,
                 new RawPacketReference(0x0438, 0, 0, CreateStructurePath(scopeId))),
-            new CombatObservation
+            new CombatWireObservation
         {
             SkillCode = bodyCodeRaw,
             BodySkillVariantRaw = bodyCodeRaw,
@@ -599,7 +738,7 @@ public class CombatPacketFactTests
             ChainId = 0
         });
 
-    private static ObservedEventTestEntry<CombatObservation> CreateDirectValue(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int flag, int type, int chainId, int damage, int scopeId = 100, long flushId = 100, int loop = 1, CombatEventKind eventKind = CombatEventKind.Unknown, CombatValueKind valueKind = CombatValueKind.Unknown, uint detailRef = 0, PacketStructurePath structurePath = default) =>
+    private static ObservedEventTestEntry<CombatWireObservation> CreateDirectValue(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int layoutTag, int flag, int type, int chainId, int damage, int scopeId = 100, long flushId = 100, int loop = 1, uint detailRef = 0, PacketStructurePath structurePath = default) =>
         new(
             new ObservedEventHeader(
                 sceneId,
@@ -607,7 +746,7 @@ public class CombatPacketFactTests
                 sourceId,
                 targetId,
                 new RawPacketReference(0x0438, 0, 0, structurePath.IsEmpty ? CreateStructurePath(scopeId) : structurePath)),
-            new CombatObservation
+            new CombatWireObservation
         {
             SkillCode = bodyCodeRaw,
             BodySkillVariantRaw = bodyCodeRaw,
@@ -620,12 +759,10 @@ public class CombatPacketFactTests
             Flag = flag,
             Type = type,
             Loop = loop,
-            ChainId = chainId,
-            EventKind = eventKind,
-            ValueKind = valueKind
+            ChainId = chainId
         });
 
-    private static ObservedEventTestEntry<CombatObservation> CreateInlineSidecar(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int type, int scopeId = 100, long flushId = 100) =>
+    private static ObservedEventTestEntry<CombatWireObservation> CreateInlineSidecar(Guid sceneId, long ordinal, int sourceId, int targetId, int bodyCodeRaw, int marker, int type, int scopeId = 100, long flushId = 100) =>
         new(
             new ObservedEventHeader(
                 sceneId,
@@ -633,7 +770,7 @@ public class CombatPacketFactTests
                 sourceId,
                 targetId,
                 new RawPacketReference(0x0438, 0, 0, CreateStructurePath(scopeId))),
-            new CombatObservation
+            new CombatWireObservation
         {
             SkillCode = bodyCodeRaw,
             BodySkillVariantRaw = bodyCodeRaw,

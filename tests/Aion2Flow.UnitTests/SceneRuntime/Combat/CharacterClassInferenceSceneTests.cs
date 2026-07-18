@@ -1,12 +1,13 @@
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
 public sealed class CharacterClassInferenceSceneTests
 {
     [Fact]
-    public void Does_Not_Infer_CharacterClass_From_Periodic_Self_Support_Proc()
+    public void Does_Not_Infer_CharacterClass_From_Periodic_Self_Proc()
     {
         CombatResourceRegistry.LoadSkillMap("en-US");
         using var scene = new SceneTestHarness();
@@ -14,30 +15,29 @@ public sealed class CharacterClassInferenceSceneTests
         const int targetId = 9001;
 
         scene.AppendNickname(playerId, "Player");
-        var periodicPacket = new ParsedCombatPacket
+        var periodicObservation = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
             SkillCode = 18160030,
-            Damage = 120
+            Damage = 120,
+            PeriodicRelation = PeriodicEffectRelation.Self
         };
-        periodicPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 0);
-        scene.AppendCombatPacket(periodicPacket);
+        scene.AppendCombatWireObservation(playerId, targetId, in periodicObservation);
 
         Thread.Sleep(5);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var unknownDamage = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
             SkillCode = 99999999,
             Damage = 1350,
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(playerId, targetId, in unknownDamage);
 
-        var snapshot = scene.CreateSnapshot();
+        _ = scene.CreateSnapshot();
 
-        Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
-        Assert.Null(combatant.CharacterClass);
+        Assert.True(scene.Owner.Entities.TryGet(playerId, out var player));
+        Assert.Null(player.CharacterClass);
     }
 
     [Fact]
@@ -49,30 +49,29 @@ public sealed class CharacterClassInferenceSceneTests
         const int targetId = 9002;
 
         scene.AppendNickname(playerId, "Ranger");
-        var periodicPacket = new ParsedCombatPacket
+        var periodicObservation = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
             SkillCode = 18160030,
-            Damage = 90
+            Damage = 90,
+            PeriodicRelation = PeriodicEffectRelation.Self
         };
-        periodicPacket.SetPeriodicEffect(PeriodicEffectRelation.Self, 0);
-        scene.AppendCombatPacket(periodicPacket);
+        scene.AppendCombatWireObservation(playerId, targetId, in periodicObservation);
 
         Thread.Sleep(5);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var rangerDamage = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
             SkillCode = 14342350,
             Damage = 2450,
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(playerId, targetId, in rangerDamage);
 
-        var snapshot = scene.CreateSnapshot();
+        _ = scene.CreateSnapshot();
 
-        Assert.True(snapshot.Combatants.TryGetValue(playerId, out var combatant));
-        Assert.Equal(CharacterClass.Ranger, combatant.CharacterClass);
+        Assert.True(scene.Owner.Entities.TryGet(playerId, out var player));
+        Assert.Equal(CharacterClass.Ranger, player.CharacterClass);
     }
 
     [Fact]
@@ -84,23 +83,25 @@ public sealed class CharacterClassInferenceSceneTests
         const int targetId = 9003;
 
         scene.AppendNickname(playerId, "Late Ranger");
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var unknownDamage = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
             SkillCode = 99999999,
             Damage = 1000,
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(playerId, targetId, in unknownDamage);
 
         Thread.Sleep(5);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var rangerDamage = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
             SkillCode = 14342350,
             Damage = 500,
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(playerId, targetId, in rangerDamage);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -113,40 +114,37 @@ public sealed class CharacterClassInferenceSceneTests
     [Fact]
     public void CharacterClassEvidence_Rebuilds_When_SkillMap_Arrives_After_Combat()
     {
-        CombatResourceRegistry.SkillMap = [];
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
         using var scene = new SceneTestHarness();
         const int playerId = 10408;
         const int targetId = 9004;
+        const int lateSkillCode = 997_060_233;
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var firstDamage = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
-            SkillCode = 17060233,
+            SkillCode = lateSkillCode,
             Damage = 281_041,
-            Timestamp = 1_000,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(playerId, targetId, in firstDamage, 1_000);
+        var secondDamage = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = targetId,
-            SkillCode = 17060233,
+            SkillCode = lateSkillCode,
             Damage = 532_761,
-            Timestamp = 2_000,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(playerId, targetId, in secondDamage, 2_000);
 
         var snapshotBeforeResources = scene.CreateSnapshot();
 
         Assert.True(snapshotBeforeResources.Combatants.TryGetValue(playerId, out var beforeResources));
         Assert.Null(beforeResources.CharacterClass);
 
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
-            new SkillDisplayEntry(17060233, "Thunderbolt MAX", SkillCategory.Cleric, SkillSourceType.PcSkill)
+            new SkillDisplayEntry(lateSkillCode, "Thunderbolt MAX", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
         var snapshotAfterResources = scene.CreateSnapshot();
@@ -157,13 +155,11 @@ public sealed class CharacterClassInferenceSceneTests
     }
 
     [Fact]
-    public void Ignores_Derived_RegenerationHealing_ClassEvidence_And_Uses_SourceSupportEvidence()
+    public void Ignores_Derived_Regeneration_ClassEvidence_And_Uses_Direct_Damage_Evidence()
     {
-        CombatResourceRegistry.SetGameResources(
+        CombatResourceTestFixture.SetResources(
         [
             new SkillDisplayEntry(13352450, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill),
-            new SkillDisplayEntry(16790001, "Revitalization Contract", SkillCategory.Elementalist, SkillSourceType.PcSkill),
-            new SkillDisplayEntry(16200130, "Defiance", SkillCategory.Elementalist, SkillSourceType.PcSkill),
             new SkillDisplayEntry(16190040, "Enhance: Spirit's Benediction", SkillCategory.Elementalist, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
@@ -173,58 +169,24 @@ public sealed class CharacterClassInferenceSceneTests
         const int targetId = 12225;
 
         scene.AppendNickname(playerId, "Elementalist");
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var damageWithRegeneration = new CombatWireObservation
         {
-            SourceId = assassinId,
-            TargetId = playerId,
             SkillCode = 13352450,
             Damage = 12000,
-            Timestamp = 1_000
-        });
-
-        var regeneration = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 13352450,
-            Damage = 781,
-            EventKind = CombatEventKind.Healing,
-            ValueKind = CombatValueKind.Healing,
-            Timestamp = 1_010
+            HitCount = 1,
+            AttemptCount = 1,
+            RegenerationAmount = 781
         };
-        regeneration.SetEffectTag(PacketEffectTag.RegenerationHealing);
-        scene.AppendCombatPacket(regeneration);
+        scene.AppendCombatWireObservation(assassinId, playerId, in damageWithRegeneration, 1_000);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var elementalistDamage = new CombatWireObservation
         {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 16790001,
-            Damage = 1,
-            EventKind = CombatEventKind.Support,
-            ValueKind = CombatValueKind.Support,
-            Timestamp = 1_020
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 16200130,
-            Damage = 1,
-            EventKind = CombatEventKind.Support,
-            ValueKind = CombatValueKind.Support,
-            Timestamp = 1_030
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = targetId,
             SkillCode = 16190040,
             Damage = 1,
-            EventKind = CombatEventKind.Support,
-            ValueKind = CombatValueKind.Support,
-            Timestamp = 1_040
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(playerId, targetId, in elementalistDamage, 1_040);
 
         var snapshot = scene.CreateSnapshot();
 

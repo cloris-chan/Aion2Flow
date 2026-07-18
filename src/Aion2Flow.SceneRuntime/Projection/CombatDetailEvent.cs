@@ -4,47 +4,113 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public readonly record struct CombatDetailEvent
+public readonly record struct CombatDetailFact
 {
-    public CombatDetailEvent(
-        CombatObservation observation,
+    public CombatDetailFact(
+        CombatWireObservation observation,
         int sourceId,
         int targetId,
         long observedAtMilliseconds,
+        long sourceObservationOrdinal,
         long revision,
         CombatEventKey eventKey,
         RawPacketReference raw,
-        CombatContribution contribution,
-        CombatContributionCanonicalization canonicalization)
+        CombatPacketContext packetContext)
     {
         Observation = observation;
         SourceId = sourceId;
         TargetId = targetId;
         ObservedAtMilliseconds = observedAtMilliseconds;
+        SourceObservationOrdinal = sourceObservationOrdinal;
         Revision = revision;
         EventKey = eventKey;
         Raw = raw;
-        PacketContext = CombatPacketContext.FromRaw(in raw);
-        Contribution = contribution;
-        Canonicalization = canonicalization;
+        PacketContext = packetContext;
     }
 
-    public CombatObservation Observation { get; init; }
+    public CombatWireObservation Observation { get; init; }
     public int SourceId { get; init; }
     public int TargetId { get; init; }
     public long ObservedAtMilliseconds { get; init; }
+    public long SourceObservationOrdinal { get; init; }
     public long Revision { get; init; }
     public CombatEventKey EventKey { get; init; }
     public RawPacketReference Raw { get; init; }
     public CombatPacketContext PacketContext { get; init; }
-    public CombatContribution Contribution { get; init; }
-    public CombatContributionCanonicalization Canonicalization { get; init; }
     public int SkillCode => Observation.SkillCode;
-    public long Amount => Observation.Damage;
-    public CombatEventKind EventKind => Observation.EventKind;
-    public CombatValueKind ValueKind => Observation.ValueKind;
-    public PacketEffectTag EffectTag => Observation.EffectTag;
     public long ObservedAt => ObservedAtMilliseconds;
+
+    public static CombatDetailFact Create(
+        CombatWireObservation observation,
+        int sourceId,
+        int targetId,
+        long observedAtMilliseconds,
+        long sourceObservationOrdinal,
+        long revision,
+        CombatEventKey eventKey,
+        RawPacketReference raw)
+        => new(
+            observation,
+            sourceId,
+            targetId,
+            observedAtMilliseconds,
+            sourceObservationOrdinal,
+            revision,
+            eventKey,
+            raw,
+            CombatPacketContext.FromRaw(in raw));
+}
+
+public readonly record struct CombatMetricDetailEvent(CombatDetailFact Fact, CombatContribution Contribution)
+{
+    public CombatWireObservation Observation => Fact.Observation;
+    public int SourceId => Fact.SourceId;
+    public int TargetId => Fact.TargetId;
+    public long ObservedAtMilliseconds => Fact.ObservedAtMilliseconds;
+    public long SourceObservationOrdinal => Fact.SourceObservationOrdinal;
+    public long Revision => Fact.Revision;
+    public CombatEventKey EventKey => Fact.EventKey;
+    public RawPacketReference Raw => Fact.Raw;
+    public CombatPacketContext PacketContext => Fact.PacketContext;
+    public int SkillCode => Fact.SkillCode;
+    public long Amount => Contribution.Amount;
+    public CombatMetricKind Metric => Contribution.Metric;
+    public CombatDeliveryKind Delivery => Contribution.Delivery;
+    public CombatResolutionTrace Resolution => Contribution.Resolution;
+    public long ObservedAt => Fact.ObservedAt;
+}
+
+public readonly record struct CombatMechanicDetailEvent(CombatDetailFact Fact, CombatMechanicOccurrence Mechanic)
+{
+    public CombatWireObservation Observation => Fact.Observation;
+    public int SourceId => Fact.SourceId;
+    public int TargetId => Fact.TargetId;
+    public long ObservedAtMilliseconds => Fact.ObservedAtMilliseconds;
+    public long SourceObservationOrdinal => Fact.SourceObservationOrdinal;
+    public long Revision => Fact.Revision;
+    public CombatEventKey EventKey => Fact.EventKey;
+    public RawPacketReference Raw => Fact.Raw;
+    public CombatPacketContext PacketContext => Fact.PacketContext;
+    public int SkillCode => Fact.SkillCode;
+    public CombatResolutionTrace Resolution => Mechanic.Resolution;
+    public long ObservedAt => Fact.ObservedAt;
+}
+
+public readonly record struct CombatResourceDetailEvent(CombatDetailFact Fact, CombatResourceOccurrence Resource)
+{
+    public CombatWireObservation Observation => Fact.Observation;
+    public int SourceId => Fact.SourceId;
+    public int TargetId => Fact.TargetId;
+    public long ObservedAtMilliseconds => Fact.ObservedAtMilliseconds;
+    public long SourceObservationOrdinal => Fact.SourceObservationOrdinal;
+    public long Revision => Fact.Revision;
+    public CombatEventKey EventKey => Fact.EventKey;
+    public RawPacketReference Raw => Fact.Raw;
+    public CombatPacketContext PacketContext => Fact.PacketContext;
+    public int SkillCode => Fact.SkillCode;
+    public long Amount => Resource.Amount;
+    public CombatResolutionTrace Resolution => Resource.Resolution;
+    public long ObservedAt => Fact.ObservedAt;
 }
 
 public readonly record struct CombatPacketContext(
@@ -88,7 +154,4 @@ public readonly record struct CombatPacketContext(
     }
 }
 
-internal readonly record struct CombatDetailProjectionVersion(
-    long IdentityRevision,
-    long OwnerInferenceVersion,
-    long SkillMapRevision);
+internal readonly record struct CombatDetailProjectionVersion(long IdentityRevision);

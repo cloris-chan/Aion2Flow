@@ -10,12 +10,12 @@ public readonly record struct CombatEventKey(int SkillCode, ResourceEffectRef Bo
 
     public bool HasSkillCode => SkillCode > 0;
 
-    public static CombatEventKey FromObservation(in CombatObservation observation)
+    public static CombatEventKey FromObservation(in CombatWireObservation observation)
     {
-        if (observation.SkillCode > 0)
-            return new CombatEventKey(observation.SkillCode, default, default);
-
-        return new CombatEventKey(0, observation.BodyResourceEffectRef, observation.DetailResourceEffectRef);
+        return new CombatEventKey(
+            Math.Max(0, observation.SkillCode),
+            observation.BodyResourceEffectRef,
+            observation.DetailResourceEffectRef);
     }
 
     public string FormatFallbackLabel(string unknownEffectLabel = DefaultUnknownEffectLabel)

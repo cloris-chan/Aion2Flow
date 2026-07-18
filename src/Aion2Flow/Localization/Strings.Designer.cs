@@ -136,6 +136,17 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Resources.
+        /// </summary>
+        internal static string Category_Resource
+        {
+            get
+            {
+                return ResourceManager.GetString("Category_Resource", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Protective Shield.
         /// </summary>
         internal static string Category_Shield
@@ -143,17 +154,6 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Category_Shield", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Support.
-        /// </summary>
-        internal static string Category_Support
-        {
-            get
-            {
-                return ResourceManager.GetString("Category_Support", resourceCulture);
             }
         }
 
@@ -543,6 +543,17 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to No resource events.
+        /// </summary>
+        internal static string Empty_ResourceEvents
+        {
+            get
+            {
+                return ResourceManager.GetString("Empty_ResourceEvents", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to No skill data.
         /// </summary>
         internal static string Empty_Skills
@@ -561,6 +572,17 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Metric_Attacks", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Direct events.
+        /// </summary>
+        internal static string Metric_DirectEvents
+        {
+            get
+            {
+                return ResourceManager.GetString("Metric_DirectEvents", resourceCulture);
             }
         }
 
@@ -638,6 +660,50 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Metric_Hps", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to MP change.
+        /// </summary>
+        internal static string Metric_ManaChange
+        {
+            get
+            {
+                return ResourceManager.GetString("Metric_ManaChange", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Periodic events.
+        /// </summary>
+        internal static string Metric_PeriodicEvents
+        {
+            get
+            {
+                return ResourceManager.GetString("Metric_PeriodicEvents", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Resource events.
+        /// </summary>
+        internal static string Metric_ResourceEvents
+        {
+            get
+            {
+                return ResourceManager.GetString("Metric_ResourceEvents", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Resource skills.
+        /// </summary>
+        internal static string Metric_ResourceSkills
+        {
+            get
+            {
+                return ResourceManager.GetString("Metric_ResourceSkills", resourceCulture);
             }
         }
 
@@ -1038,6 +1104,17 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Hits {0}/{1}.
+        /// </summary>
+        internal static string Playback_Mechanic_HitAttemptFormat
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_Mechanic_HitAttemptFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Active.
         /// </summary>
         internal static string Playback_Metric_ActiveTime
@@ -1225,6 +1302,17 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Mechanics.
+        /// </summary>
+        internal static string Playback_Track_Mechanic
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_Track_Mechanic", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Other.
         /// </summary>
         internal static string Playback_Track_Other
@@ -1243,6 +1331,17 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Playback_Track_RemainingHp", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Resources.
+        /// </summary>
+        internal static string Playback_Track_Resource
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_Track_Resource", resourceCulture);
             }
         }
 

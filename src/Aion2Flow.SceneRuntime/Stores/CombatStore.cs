@@ -45,12 +45,20 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         }
     }
 
-    public void ApplyCombat(int sourceId, int targetId, in CombatObservation observation, long observedAtMilliseconds, long sourceObservationOrdinal = UnknownSourceObservationOrdinal, RawPacketReference raw = default, CombatContributionCanonicalization canonicalization = CombatContributionCanonicalization.None)
+    public void ApplyCombat(
+        int sourceId,
+        int targetId,
+        in CombatWireObservation observation,
+        in CombatContribution contribution,
+        long observedAtMilliseconds,
+        long sourceObservationOrdinal = UnknownSourceObservationOrdinal,
+        RawPacketReference raw = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(observedAtMilliseconds);
         ValidateSourceObservationOrdinal(sourceObservationOrdinal);
-        var contribution = CombatContributionClassifier.Evaluate(in observation);
-        AppendCombatEvent(sourceId, targetId, observedAtMilliseconds, sourceObservationOrdinal, raw, in observation, in contribution, canonicalization);
+        if (contribution.Amount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(contribution), contribution.Amount, "Combat contribution amount must be positive.");
+        AppendCombatEvent(sourceId, targetId, observedAtMilliseconds, sourceObservationOrdinal, raw, in observation, in contribution);
     }
 
     private static void ValidateSourceObservationOrdinal(long sourceObservationOrdinal)
@@ -59,7 +67,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             throw new ArgumentOutOfRangeException(nameof(sourceObservationOrdinal), sourceObservationOrdinal, "Source observation ordinal must be -1 or greater.");
     }
 
-    private void AppendCombatEvent(int sourceId, int targetId, long observedAtMilliseconds, long sourceObservationOrdinal, RawPacketReference raw, in CombatObservation observation, in CombatContribution contribution, CombatContributionCanonicalization canonicalization)
+    private void AppendCombatEvent(int sourceId, int targetId, long observedAtMilliseconds, long sourceObservationOrdinal, RawPacketReference raw, in CombatWireObservation observation, in CombatContribution contribution)
     {
         _revision++;
         var eventKey = CombatEventKey.FromObservation(in observation);
@@ -73,15 +81,19 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
             SourceObservationOrdinal = sourceObservationOrdinal,
             Revision = _revision,
             EventKey = eventKey,
-            Contribution = contribution,
-            Canonicalization = canonicalization
+            Contribution = contribution
         };
         _events.Append(in eventRecord);
-        var totalHealing = contribution.HealingAmount;
-        var periodicHealing = observation.ValueKind == CombatValueKind.PeriodicHealing ? contribution.HealingAmount : 0;
-        var drainDamage = observation.ValueKind == CombatValueKind.DrainDamage ? contribution.DamageAmount : 0;
-        var drainHealing = observation.ValueKind == CombatValueKind.DrainHealing ? contribution.HealingAmount : 0;
-        var regenerationHealing = observation.EffectTag == PacketEffectTag.RegenerationHealing ? contribution.HealingAmount : 0;
+        var damage = contribution.Metric == CombatMetricKind.Damage ? contribution.Amount : 0;
+        var totalHealing = contribution.Metric == CombatMetricKind.Healing ? contribution.Amount : 0;
+        var shieldGranted = contribution.Metric == CombatMetricKind.ShieldGranted ? contribution.Amount : 0;
+        var shieldAbsorbed = contribution.Metric == CombatMetricKind.ShieldAbsorbed ? contribution.Amount : 0;
+        var shieldGrantCount = contribution.Metric == CombatMetricKind.ShieldGranted ? 1 : 0;
+        var shieldAbsorbedCount = contribution.Metric == CombatMetricKind.ShieldAbsorbed ? 1 : 0;
+        var periodicHealing = contribution.Metric == CombatMetricKind.Healing && contribution.Delivery == CombatDeliveryKind.Periodic ? contribution.Amount : 0;
+        var drainDamage = contribution.Metric == CombatMetricKind.Damage && contribution.Delivery == CombatDeliveryKind.Drain ? contribution.Amount : 0;
+        var drainHealing = contribution.Metric == CombatMetricKind.Healing && contribution.Delivery == CombatDeliveryKind.Drain ? contribution.Amount : 0;
+        var regenerationHealing = contribution.Metric == CombatMetricKind.Healing && contribution.Delivery == CombatDeliveryKind.Regeneration ? contribution.Amount : 0;
 
         var pairKey = (sourceId, targetId);
         ref var pair = ref CollectionsMarshal.GetValueRefOrAddDefault(_pairs, pairKey, out var pairExists);
@@ -106,21 +118,16 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         {
             throw new InvalidOperationException("Combat pair dictionary returned a null record.");
         }
-        pairRecord.TotalDamage += contribution.DamageAmount;
+        pairRecord.TotalDamage += damage;
         pairRecord.TotalHealing += totalHealing;
         pairRecord.TotalPeriodicHealing += periodicHealing;
         pairRecord.TotalDrainDamage += drainDamage;
         pairRecord.TotalDrainHealing += drainHealing;
         pairRecord.TotalRegenerationHealing += regenerationHealing;
-        pairRecord.TotalShield += contribution.ShieldGrantAmount;
-        pairRecord.TotalShieldAbsorbed += contribution.ShieldAbsorbedAmount;
-        pairRecord.ShieldCount += contribution.ShieldGrantCount;
-        pairRecord.ShieldAbsorbedCount += contribution.ShieldAbsorbedCount;
-        pairRecord.HitCount += contribution.HitCount;
-        pairRecord.AttemptCount += contribution.AttemptCount;
-        pairRecord.EvadeCount += contribution.EvadeCount;
-        pairRecord.InvincibleCount += contribution.InvincibleCount;
-        pairRecord.MultiHitCount += contribution.MultiHitCount;
+        pairRecord.TotalShield += shieldGranted;
+        pairRecord.TotalShieldAbsorbed += shieldAbsorbed;
+        pairRecord.ShieldCount += shieldGrantCount;
+        pairRecord.ShieldAbsorbedCount += shieldAbsorbedCount;
         pairRecord.LastSkillCode = observation.SkillCode;
         pairRecord.FirstRevision = pairRecord.FirstRevision > 0 ? Math.Min(pairRecord.FirstRevision, _revision) : _revision;
         pairRecord.Revision = _revision;
@@ -130,17 +137,12 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         MarkDetailRevision(targetId, _revision);
 
         var source = GetOrAddCombatant(sourceId, observedAtMilliseconds);
-        source.OutgoingDamage += contribution.DamageAmount;
+        source.OutgoingDamage += damage;
         source.OutgoingHealing += totalHealing;
-        source.OutgoingShield += contribution.ShieldGrantAmount;
-        source.OutgoingShieldAbsorbed += contribution.ShieldAbsorbedAmount;
-        source.OutgoingShieldCount += contribution.ShieldGrantCount;
-        source.OutgoingShieldAbsorbedCount += contribution.ShieldAbsorbedCount;
-        source.OutgoingHits += contribution.HitCount;
-        source.OutgoingAttempts += contribution.AttemptCount;
-        source.OutgoingEvades += contribution.EvadeCount;
-        source.OutgoingInvincibles += contribution.InvincibleCount;
-        source.OutgoingMultiHits += contribution.MultiHitCount;
+        source.OutgoingShield += shieldGranted;
+        source.OutgoingShieldAbsorbed += shieldAbsorbed;
+        source.OutgoingShieldCount += shieldGrantCount;
+        source.OutgoingShieldAbsorbedCount += shieldAbsorbedCount;
         source.Revision = _revision;
         ApplyObservedAt(source, observedAtMilliseconds);
         _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, sourceId, default, _revision));
@@ -148,17 +150,12 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         if (targetId > 0)
         {
             var target = GetOrAddCombatant(targetId, observedAtMilliseconds);
-            target.IncomingDamage += contribution.DamageAmount;
-            target.IncomingHealing += contribution.HealingAmount;
-            target.IncomingShield += contribution.ShieldGrantAmount;
-            target.IncomingShieldAbsorbed += contribution.ShieldAbsorbedAmount;
-            target.IncomingShieldCount += contribution.ShieldGrantCount;
-            target.IncomingShieldAbsorbedCount += contribution.ShieldAbsorbedCount;
-            target.IncomingHits += contribution.HitCount;
-            target.IncomingAttempts += contribution.AttemptCount;
-            target.IncomingEvades += contribution.EvadeCount;
-            target.IncomingInvincibles += contribution.InvincibleCount;
-            target.IncomingMultiHits += contribution.MultiHitCount;
+            target.IncomingDamage += damage;
+            target.IncomingHealing += totalHealing;
+            target.IncomingShield += shieldGranted;
+            target.IncomingShieldAbsorbed += shieldAbsorbed;
+            target.IncomingShieldCount += shieldGrantCount;
+            target.IncomingShieldAbsorbedCount += shieldAbsorbedCount;
             target.Revision = _revision;
             ApplyObservedAt(target, observedAtMilliseconds);
             _changeLog.Add(new CombatSnapshotChange(CombatSnapshotChangeKind.CombatantUpdated, targetId, default, _revision));
@@ -355,12 +352,7 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         pair.TotalDamage > 0 ||
         pair.TotalHealing > 0 ||
         pair.TotalShield > 0 ||
-        pair.TotalShieldAbsorbed > 0 ||
-        pair.AttemptCount > 0 ||
-        pair.HitCount > 0 ||
-        pair.EvadeCount > 0 ||
-        pair.InvincibleCount > 0 ||
-        pair.MultiHitCount > 0;
+        pair.TotalShieldAbsorbed > 0;
 
     public void Clear()
     {
@@ -464,11 +456,6 @@ internal readonly record struct CombatPairRecordSnapshot(
     long TotalShieldAbsorbed,
     int ShieldCount,
     int ShieldAbsorbedCount,
-    int HitCount,
-    int AttemptCount,
-    int EvadeCount,
-    int InvincibleCount,
-    int MultiHitCount,
     int LastSkillCode,
     long FirstObserved,
     long LastObserved,
@@ -488,11 +475,6 @@ internal readonly record struct CombatPairRecordSnapshot(
         record.TotalShieldAbsorbed,
         record.ShieldCount,
         record.ShieldAbsorbedCount,
-        record.HitCount,
-        record.AttemptCount,
-        record.EvadeCount,
-        record.InvincibleCount,
-        record.MultiHitCount,
         record.LastSkillCode,
         record.FirstObserved,
         record.LastObserved,
@@ -513,11 +495,6 @@ internal readonly record struct CombatPairRecordSnapshot(
         TotalShieldAbsorbed = TotalShieldAbsorbed,
         ShieldCount = ShieldCount,
         ShieldAbsorbedCount = ShieldAbsorbedCount,
-        HitCount = HitCount,
-        AttemptCount = AttemptCount,
-        EvadeCount = EvadeCount,
-        InvincibleCount = InvincibleCount,
-        MultiHitCount = MultiHitCount,
         LastSkillCode = LastSkillCode,
         FirstObserved = FirstObserved,
         LastObserved = LastObserved,
@@ -529,17 +506,7 @@ internal readonly record struct CombatPairRecordSnapshot(
 internal readonly record struct CombatantRecordSnapshot(
     int CombatantId,
     long OutgoingDamage,
-    int OutgoingHits,
-    int OutgoingAttempts,
-    int OutgoingEvades,
-    int OutgoingInvincibles,
-    int OutgoingMultiHits,
     long IncomingDamage,
-    int IncomingHits,
-    int IncomingAttempts,
-    int IncomingEvades,
-    int IncomingInvincibles,
-    int IncomingMultiHits,
     long OutgoingHealing,
     long IncomingHealing,
     long OutgoingShield,
@@ -557,17 +524,7 @@ internal readonly record struct CombatantRecordSnapshot(
     public static CombatantRecordSnapshot From(CombatantRecord record) => new(
         record.CombatantId,
         record.OutgoingDamage,
-        record.OutgoingHits,
-        record.OutgoingAttempts,
-        record.OutgoingEvades,
-        record.OutgoingInvincibles,
-        record.OutgoingMultiHits,
         record.IncomingDamage,
-        record.IncomingHits,
-        record.IncomingAttempts,
-        record.IncomingEvades,
-        record.IncomingInvincibles,
-        record.IncomingMultiHits,
         record.OutgoingHealing,
         record.IncomingHealing,
         record.OutgoingShield,
@@ -586,17 +543,7 @@ internal readonly record struct CombatantRecordSnapshot(
     {
         CombatantId = CombatantId,
         OutgoingDamage = OutgoingDamage,
-        OutgoingHits = OutgoingHits,
-        OutgoingAttempts = OutgoingAttempts,
-        OutgoingEvades = OutgoingEvades,
-        OutgoingInvincibles = OutgoingInvincibles,
-        OutgoingMultiHits = OutgoingMultiHits,
         IncomingDamage = IncomingDamage,
-        IncomingHits = IncomingHits,
-        IncomingAttempts = IncomingAttempts,
-        IncomingEvades = IncomingEvades,
-        IncomingInvincibles = IncomingInvincibles,
-        IncomingMultiHits = IncomingMultiHits,
         OutgoingHealing = OutgoingHealing,
         IncomingHealing = IncomingHealing,
         OutgoingShield = OutgoingShield,
@@ -627,11 +574,6 @@ public sealed class CombatPairRecord
     public long TotalShieldAbsorbed { get; set; }
     public int ShieldCount { get; set; }
     public int ShieldAbsorbedCount { get; set; }
-    public int HitCount { get; set; }
-    public int AttemptCount { get; set; }
-    public int EvadeCount { get; set; }
-    public int InvincibleCount { get; set; }
-    public int MultiHitCount { get; set; }
     public int LastSkillCode { get; set; }
     public long FirstObserved { get; set; }
     public long LastObserved { get; set; }
@@ -644,40 +586,24 @@ public readonly record struct CombatEventRecord
 {
     public int SourceId { get; init; }
     public int TargetId { get; init; }
-    public CombatObservation Observation { get; init; }
+    public CombatWireObservation Observation { get; init; }
     public RawPacketReference Raw { get; init; }
     public long ObservedAtMilliseconds { get; init; }
     public long SourceObservationOrdinal { get; init; }
     public long Revision { get; init; }
     public CombatEventKey EventKey { get; init; }
     public CombatContribution Contribution { get; init; }
-    public CombatContributionCanonicalization Canonicalization { get; init; }
-    public bool ContributesDamage => Contribution.CountsAsDamage;
-    public bool ContributesHealing => Contribution.CountsAsHealing;
-    public bool ContributesShieldGrant => Contribution.CountsAsShieldGrant;
-    public bool ContributesShieldAbsorbed => Contribution.CountsAsShieldAbsorbed;
-    public int HitCount => Contribution.HitCount;
-    public int AttemptCount => Contribution.AttemptCount;
-    public int EvadeCount => Contribution.EvadeCount;
-    public int InvincibleCount => Contribution.InvincibleCount;
-    public int MultiHitCount => Contribution.MultiHitCount;
+    public bool ContributesDamage => Contribution.Metric == CombatMetricKind.Damage;
+    public bool ContributesHealing => Contribution.Metric == CombatMetricKind.Healing;
+    public bool ContributesShieldGrant => Contribution.Metric == CombatMetricKind.ShieldGranted;
+    public bool ContributesShieldAbsorbed => Contribution.Metric == CombatMetricKind.ShieldAbsorbed;
 }
 
 public sealed class CombatantRecord
 {
     public int CombatantId { get; init; }
     public long OutgoingDamage { get; set; }
-    public int OutgoingHits { get; set; }
-    public int OutgoingAttempts { get; set; }
-    public int OutgoingEvades { get; set; }
-    public int OutgoingInvincibles { get; set; }
-    public int OutgoingMultiHits { get; set; }
     public long IncomingDamage { get; set; }
-    public int IncomingHits { get; set; }
-    public int IncomingAttempts { get; set; }
-    public int IncomingEvades { get; set; }
-    public int IncomingInvincibles { get; set; }
-    public int IncomingMultiHits { get; set; }
     public long OutgoingHealing { get; set; }
     public long IncomingHealing { get; set; }
     public long OutgoingShield { get; set; }

@@ -9,28 +9,21 @@ internal static class SyntheticObservationExtensions
 {
     public static void ApplyCombat(this CombatStore store, int sourceId, int targetId, long damage, int hitCount, int attemptCount, int skillCode)
     {
-        var observation = new CombatObservation
+        var observation = new CombatWireObservation
         {
             SkillCode = skillCode,
             Damage = damage,
             HitCount = hitCount,
-            AttemptCount = attemptCount,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
+            AttemptCount = attemptCount
         };
-        store.ApplyCombat(sourceId, targetId, in observation, store.Revision + 1);
+        var contribution = CreateDirectDamageContribution(damage);
+        store.ApplyCombat(sourceId, targetId, in observation, in contribution, store.Revision + 1);
     }
 
-    public static void ApplyCombat(this CombatStore store, int sourceId, int targetId, in CombatObservation observation) => store.ApplyCombat(sourceId, targetId, in observation, store.Revision + 1);
+    public static void ApplyCombat(this CombatStore store, int sourceId, int targetId, in CombatWireObservation observation, in CombatContribution contribution) =>
+        store.ApplyCombat(sourceId, targetId, in observation, in contribution, store.Revision + 1);
 
     public static PacketObservationSource Source(long timestamp = 0, ushort opcode = 0) => new(timestamp, 0, opcode, 0, 0, default);
-
-    public static void AppendCombatPacket(this IRuntimeObservationSink sink, ParsedCombatPacket packet, long flushId = 0)
-    {
-        var observation = packet.ToObservation();
-        var source = new PacketObservationSource(packet.Timestamp, flushId, 0, 0, 0, default);
-        sink.AppendCombatObservation(in source, packet.SourceId, packet.TargetId, in observation);
-    }
 
     public static void StageDestinationMap(this IRuntimeObservationSink sink, uint mapId)
     {
@@ -128,5 +121,27 @@ internal static class SyntheticObservationExtensions
         Span<AuraResultRecord> results = stackalloc AuraResultRecord[1];
         results[0] = new AuraResultRecord(0, instanceSequenceId, resultCode, 0, 0, 0);
         sink.RegisterObservation2C38(in source, entityId, results);
+    }
+
+    private static CombatContribution CreateDirectDamageContribution(long damage)
+    {
+        return new CombatContribution(
+            Metric: CombatMetricKind.Damage,
+            Delivery: CombatDeliveryKind.Direct,
+            Amount: Math.Max(0, damage),
+            Resolution: new CombatResolutionTrace(
+                PacketRule: CombatPacketRule.DirectFallbackDamage,
+                SemanticMatch: CombatSemanticMatchKind.None,
+                Authority: CombatResolutionAuthority.PacketDefault,
+                Materialization: CombatMaterializationKind.Primary,
+                Association: CombatAssociationKind.None,
+                DirectSemantics: default,
+                Semantics: default,
+                ResourceEffectRef: default,
+                ResourceNodeKind: default,
+                ResourceNodeId: 0,
+                ResourceSkillId: 0,
+                EffectSlot: -1,
+                ResourceCandidateSlotCount: 0));
     }
 }

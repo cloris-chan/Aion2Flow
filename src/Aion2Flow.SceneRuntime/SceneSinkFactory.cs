@@ -248,7 +248,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
         if (_bossState == BossSceneState.Frozen)
         {
-            if (Owner.Entities.TryGet(focusTargetId, out var focusTarget) && focusTarget.CurrentHp == 0)
+            if (Owner.EntityVitals.TryGet(focusTargetId, out var focusTargetVital) && focusTargetVital.CurrentHp == 0)
                 return false;
 
             _pendingArchives.Enqueue(GetFrozenArchiveCore());
@@ -281,7 +281,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     bool ILiveSceneCollectionPolicy.ShouldAppendExtendedObservation() =>
         _kind == SceneKind.Standard || _bossState == BossSceneState.Recording;
 
-    bool ILiveSceneCollectionPolicy.ShouldAppendResourceObservation() =>
+    bool ILiveSceneCollectionPolicy.ShouldAppendEntityVitalObservation() =>
         _kind == SceneKind.Standard || _bossState == BossSceneState.Recording;
 
     void ILiveSceneCollectionPolicy.OnBossMetadataChanged()

@@ -227,7 +227,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         }
     }
 
-    public async ValueTask<ScenePlaybackEventReadResult> CopyLatestCombatEventsAsync(
+    public async ValueTask<ScenePlaybackEventReadResult> CopyLatestMaterializedEventsAsync(
         ScenePlaybackEventScope scope,
         long startPositionMilliseconds,
         long endPositionMilliseconds,
@@ -239,7 +239,7 @@ public sealed class ScenePlaybackController : IAsyncDisposable
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Session.CopyLatestCombatEvents(
+            return Session.CopyLatestMaterializedEvents(
                 scope,
                 startPositionMilliseconds,
                 endPositionMilliseconds,

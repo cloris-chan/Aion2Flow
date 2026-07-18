@@ -1,37 +1,17 @@
 using System.Collections;
 using Cloris.Aion2Flow.Protocol.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
-public struct SkillMetrics
+public struct SkillMetrics(CombatEventKey eventKey)
 {
-    private readonly CombatValueKind _primaryValueKind;
-
-    public SkillMetrics(in CombatObservation observation)
-        : this(CombatEventKey.FromObservation(in observation), in observation)
-    {
-    }
-
-    public SkillMetrics(CombatEventKey eventKey, in CombatObservation observation)
-        : this()
-    {
-        _primaryValueKind = observation.ValueKind;
-        EventKey = eventKey;
-        SkillCode = observation.SkillCode;
-        EventKind = observation.EventKind;
-    }
-
-    public CombatEventKey EventKey { get; private set; }
-    public int SkillCode { get; private set; }
-    public CombatEventKind EventKind { get; private set; }
-    public readonly CombatValueKind PrimaryValueKind => ResolvePrimaryValueKind();
+    public CombatEventKey EventKey { get; private set; } = eventKey;
+    public int SkillCode { get; private set; } = eventKey.SkillCode;
     public long DamageAmount { get; set; }
     public long PeriodicDamageAmount { get; set; }
     public int PeriodicDamageTimes { get; set; }
     public long HealingAmount { get; set; }
     public int HealingTimes { get; set; }
-    public int SupportTimes { get; set; }
     public long PeriodicHealingAmount { get; set; }
     public int PeriodicHealingTimes { get; set; }
     public long DrainDamageAmount { get; set; }
@@ -67,14 +47,11 @@ public struct SkillMetrics
         {
             EventKey = EventKey,
             SkillCode = SkillCode,
-            EventKind = EventKind,
-            PrimaryValueKind = PrimaryValueKind,
             DamageAmount = DamageAmount,
             PeriodicDamageAmount = PeriodicDamageAmount,
             PeriodicDamageTimes = PeriodicDamageTimes,
             HealingAmount = HealingAmount,
             HealingTimes = HealingTimes,
-            SupportTimes = SupportTimes,
             PeriodicHealingAmount = PeriodicHealingAmount,
             PeriodicHealingTimes = PeriodicHealingTimes,
             DrainDamageAmount = DrainDamageAmount,
@@ -106,17 +83,17 @@ public struct SkillMetrics
         };
     }
 
-    private void ApplyDamageAttemptMetrics(long damage, DamageModifiers modifiers, in CombatContribution contribution)
+    public void ProcessMechanic(in CombatMechanicOccurrence mechanic)
     {
-        DamageAmount += damage;
-        var hitContribution = contribution.HitCount;
+        var hitContribution = mechanic.HitCount;
 
         Times += hitContribution;
-        AttemptTimes += contribution.AttemptCount;
-        EvadeTimes += contribution.EvadeCount;
-        InvincibleTimes += contribution.InvincibleCount;
-        MultiHitTimes += contribution.MultiHitCount;
+        AttemptTimes += mechanic.AttemptCount;
+        EvadeTimes += mechanic.EvadeCount;
+        InvincibleTimes += mechanic.InvincibleCount;
+        MultiHitTimes += mechanic.MultiHitCount;
 
+        var modifiers = mechanic.Modifiers;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Critical) != 0) CriticalTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Front) != 0) FrontTimes += hitContribution;
         if (hitContribution > 0 && (modifiers & DamageModifiers.Back) != 0) BackTimes += hitContribution;
@@ -130,171 +107,76 @@ public struct SkillMetrics
         if (hitContribution > 0 && (modifiers & DamageModifiers.Regeneration) != 0) RegenerationTimes += hitContribution;
     }
 
-    public void ProcessObservation(in CombatObservation observation)
+    public void ProcessContribution(in CombatContribution contribution)
     {
-        var contribution = CombatContributionClassifier.Evaluate(in observation);
-        ProcessContribution(in observation, in contribution);
+        switch (contribution.Metric)
+        {
+            case CombatMetricKind.Damage:
+                ProcessDamage(in contribution);
+                break;
+            case CombatMetricKind.Healing:
+                ProcessHealing(in contribution);
+                break;
+            case CombatMetricKind.ShieldGranted:
+                ShieldAmount += contribution.Amount;
+                ShieldTimes++;
+                break;
+            case CombatMetricKind.ShieldAbsorbed:
+                ShieldAbsorbedAmount += contribution.Amount;
+                ShieldAbsorbedTimes++;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(contribution), contribution.Metric, "Combat contribution metric is invalid.");
+        }
     }
 
-    public void ProcessContribution(in CombatObservation observation, in CombatContribution contribution) =>
-        ProcessCore(observation.EventKind, observation.ValueKind, observation.EffectTag, observation.Modifiers, observation.Damage, in contribution);
-
-    private void ProcessCore(CombatEventKind eventKind, CombatValueKind valueKind, PacketEffectTag effectTag, DamageModifiers modifiers, long damage, in CombatContribution contribution)
+    private void ProcessDamage(in CombatContribution contribution)
     {
-        if (!contribution.CountsAsDamage &&
-            !contribution.CountsAsHealing &&
-            !contribution.CountsAsShieldGrant &&
-            !contribution.CountsAsShieldAbsorbed &&
-            valueKind is not CombatValueKind.Support &&
-            eventKind != CombatEventKind.Support)
+        if (contribution.Delivery == CombatDeliveryKind.Periodic)
         {
+            PeriodicDamageAmount += contribution.Amount;
+            PeriodicDamageTimes++;
             return;
         }
 
-        if (contribution.CountsAsDamage && damage <= 0)
+        DamageAmount += contribution.Amount;
+        if (contribution.Delivery == CombatDeliveryKind.Drain)
         {
-            ApplyDamageAttemptMetrics(damage, modifiers, in contribution);
-            return;
+            DrainDamageAmount += contribution.Amount;
+            DrainDamageTimes++;
         }
+    }
 
-        switch (valueKind)
+    private void ProcessHealing(in CombatContribution contribution)
+    {
+        HealingAmount += contribution.Amount;
+        HealingTimes++;
+        switch (contribution.Delivery)
         {
-            case CombatValueKind.PeriodicHealing:
-                HealingTimes++;
-                HealingAmount += damage;
+            case CombatDeliveryKind.Periodic:
+                PeriodicHealingAmount += contribution.Amount;
                 PeriodicHealingTimes++;
-                PeriodicHealingAmount += damage;
-                return;
-            case CombatValueKind.DrainHealing:
-                HealingTimes++;
-                HealingAmount += damage;
+                break;
+            case CombatDeliveryKind.Drain:
+                DrainHealingAmount += contribution.Amount;
                 DrainHealingTimes++;
-                DrainHealingAmount += damage;
-                return;
-            case CombatValueKind.Healing:
-                HealingTimes++;
-                HealingAmount += damage;
-                if (effectTag == PacketEffectTag.RegenerationHealing)
-                {
-                    RegenerationHealingTimes++;
-                    RegenerationHealingAmount += damage;
-                }
-                return;
-            case CombatValueKind.Shield:
-            case CombatValueKind.Support:
-                SupportTimes++;
-                if (valueKind == CombatValueKind.Shield)
-                {
-                    if (contribution.CountsAsShieldAbsorbed)
-                    {
-                        ShieldAbsorbedAmount += damage;
-                        ShieldAbsorbedTimes++;
-                    }
-                    else if (contribution.CountsAsShieldGrant)
-                    {
-                        ShieldAmount += damage;
-                        ShieldTimes++;
-                    }
-                }
-
-                return;
-            case CombatValueKind.PeriodicDamage:
-                PeriodicDamageTimes++;
-                PeriodicDamageAmount += damage;
-                return;
-            case CombatValueKind.DrainDamage:
-                DrainDamageTimes++;
-                DrainDamageAmount += damage;
-                goto case CombatValueKind.Damage;
-            case CombatValueKind.Damage:
-            case CombatValueKind.Unknown:
+                break;
+            case CombatDeliveryKind.Regeneration:
+                RegenerationHealingAmount += contribution.Amount;
+                RegenerationHealingTimes++;
                 break;
         }
-
-        if (eventKind == CombatEventKind.Healing)
-        {
-            HealingTimes++;
-            HealingAmount += damage;
-            return;
-        }
-
-        if (eventKind == CombatEventKind.Support)
-        {
-            SupportTimes++;
-            return;
-        }
-
-        ApplyDamageAttemptMetrics(damage, modifiers, in contribution);
-    }
-
-    private readonly CombatValueKind ResolvePrimaryValueKind()
-    {
-        var best = CombatValueKind.Unknown;
-        var bestAmount = -1L;
-        var bestTimes = -1;
-        var bestPriority = int.MinValue;
-
-        Consider(CombatValueKind.DrainHealing, DrainHealingAmount, DrainHealingTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
-        Consider(CombatValueKind.PeriodicHealing, PeriodicHealingAmount, PeriodicHealingTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
-        Consider(CombatValueKind.Healing, HealingAmount, HealingTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
-        Consider(CombatValueKind.PeriodicDamage, PeriodicDamageAmount, PeriodicDamageTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
-        Consider(CombatValueKind.Damage, DamageAmount, Times, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
-        Consider(CombatValueKind.Shield, ShieldAmount, ShieldTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
-        Consider(CombatValueKind.Support, 0, SupportTimes, ref best, ref bestAmount, ref bestTimes, ref bestPriority);
-
-        return best == CombatValueKind.Unknown
-            ? _primaryValueKind
-            : best;
-
-        static void Consider(
-            CombatValueKind kind, long amount, int times,
-            ref CombatValueKind best, ref long bestAmount, ref int bestTimes, ref int bestPriority)
-        {
-            if (amount <= 0 && times <= 0)
-            {
-                return;
-            }
-
-            var priority = GetValueKindPriority(kind);
-            if (amount > bestAmount ||
-                (amount == bestAmount && times > bestTimes) ||
-                (amount == bestAmount && times == bestTimes && priority > bestPriority))
-            {
-                best = kind;
-                bestAmount = amount;
-                bestTimes = times;
-                bestPriority = priority;
-            }
-        }
-    }
-
-    private static int GetValueKindPriority(CombatValueKind kind)
-    {
-        return kind switch
-        {
-            CombatValueKind.DrainHealing => 75,
-            CombatValueKind.PeriodicHealing => 70,
-            CombatValueKind.Healing => 60,
-            CombatValueKind.PeriodicDamage => 50,
-            CombatValueKind.Damage => 40,
-            CombatValueKind.Shield => 30,
-            CombatValueKind.Support => 20,
-            _ => 0
-        };
     }
 }
 
 public readonly record struct SkillMetricsSnapshot(
     CombatEventKey EventKey,
     int SkillCode,
-    CombatEventKind EventKind,
-    CombatValueKind PrimaryValueKind,
     long DamageAmount,
     long PeriodicDamageAmount,
     int PeriodicDamageTimes,
     long HealingAmount,
     int HealingTimes,
-    int SupportTimes,
     long PeriodicHealingAmount,
     int PeriodicHealingTimes,
     long DrainDamageAmount,
@@ -430,7 +312,20 @@ public readonly struct SkillMetricsSnapshotMap : IReadOnlyDictionary<CombatEvent
     public bool TryGetBySkillCode(int skillCode, out SkillMetricsSnapshot value)
     {
         if (skillCode > 0)
-            return TryGetValue(new CombatEventKey(skillCode, default, default), out value);
+        {
+            var entries = Entries;
+            for (var i = 0; i < entries.Length; i++)
+            {
+                if (entries[i].SkillCode == skillCode)
+                {
+                    value = entries[i].Metrics;
+                    return true;
+                }
+
+                if (entries[i].SkillCode > skillCode)
+                    break;
+            }
+        }
 
         value = default;
         return false;

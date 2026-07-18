@@ -153,13 +153,12 @@ public sealed class ResourcePackTests
         Assert.True(runtime.NodeCount > 50_000);
         Assert.True(runtime.NodeSlotReferenceCount > runtime.SlotCount);
         Assert.True(runtime.TryResolveEffect(101000011, out var directHeal));
-        Assert.Equal(SkillSemanticFacet.Healing, directHeal.DirectFacets);
-        Assert.Equal(SkillSemanticFacet.Healing, directHeal.Facets);
+        Assert.Equal(SkillQuantifiedFacet.DirectHealing, directHeal.DirectSemantics.QuantifiedFacets);
+        Assert.Equal(SkillQuantifiedFacet.DirectHealing, directHeal.Semantics.QuantifiedFacets);
         Assert.True(runtime.TryResolveEffect(1406004012, out var dotApplication));
-        Assert.Equal(SkillSemanticFacet.None, dotApplication.DirectFacets);
-        Assert.Equal(
-            SkillSemanticFacet.DamageOverTime | SkillSemanticFacet.Debuff,
-            dotApplication.Facets & (SkillSemanticFacet.DamageOverTime | SkillSemanticFacet.Debuff));
+        Assert.Equal(SkillQuantifiedFacet.None, dotApplication.DirectSemantics.QuantifiedFacets);
+        Assert.Equal(SkillQuantifiedFacet.PeriodicDamage, dotApplication.Semantics.QuantifiedFacets & SkillQuantifiedFacet.PeriodicDamage);
+        Assert.Equal(SkillAuraFacet.Debuff, dotApplication.Semantics.AuraFacets & SkillAuraFacet.Debuff);
     }
 
     [Fact]
@@ -174,10 +173,10 @@ public sealed class ResourcePackTests
         Assert.Equal(4008, slotResolution.Slot!.Value.SkillId);
         Assert.True(runtime.TryResolveDirectResourceReference(1742001011, 17420010, out var directCollision));
         Assert.Equal(SkillSemanticResourceNodeKind.SkillEffect, directCollision.NodeKind);
-        Assert.Equal(SkillSemanticFacet.Buff, directCollision.Facets & SkillSemanticFacet.Buff);
+        Assert.Equal(SkillAuraFacet.Buff, directCollision.Semantics.AuraFacets & SkillAuraFacet.Buff);
         Assert.True(runtime.TryResolvePeriodicResourceReference(1742001011, 17420010, out var periodicCollision));
         Assert.Equal(SkillSemanticResourceNodeKind.SkillAbnormalEffect, periodicCollision.NodeKind);
-        Assert.Equal(SkillSemanticFacet.Shield, periodicCollision.Facets & SkillSemanticFacet.Shield);
+        Assert.Equal(SkillQuantifiedFacet.Shield, periodicCollision.Semantics.QuantifiedFacets & SkillQuantifiedFacet.Shield);
     }
 
     [Theory]

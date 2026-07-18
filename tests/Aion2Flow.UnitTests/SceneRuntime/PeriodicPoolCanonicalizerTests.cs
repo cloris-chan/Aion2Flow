@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -18,36 +19,17 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var seed = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 17091250,
-            Damage = 4676,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        seed.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
-        sink.AppendCombatPacket(seed);
+        var seed = CreatePeriodicObservation(17091250, 4676, chainId, PeriodicEffectRelation.Self, 9);
+        AppendCombatWireObservation(sink, playerId, playerId, in seed, 1_000);
 
         var remainingTotals = new[] { 4209, 3742, 3275 };
         for (var i = 0; i < remainingTotals.Length; i++)
         {
-            var tick = new ParsedCombatPacket
-            {
-                SourceId = playerId,
-                TargetId = playerId,
-                SkillCode = 17091250,
-                Damage = remainingTotals[i],
-                Unknown = chainId,
-                Timestamp = 3_000 + (i * 2_000L),
-                PeriodicTailPrefixValue = 467
-            };
-            tick.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);
-            sink.AppendCombatPacket(tick);
+            var tick = CreatePeriodicObservation(17091250, remainingTotals[i], chainId, PeriodicEffectRelation.Self, 11, tailPrefixValue: 467);
+            AppendCombatWireObservation(sink, playerId, playerId, in tick, 3_000 + (i * 2_000L));
         }
 
-        var combat = Apply(journal);
+        var combat = Apply(journal, out var mechanics);
 
         Assert.True(combat.TryGetCombatant(playerId, out var combatant));
         Assert.Equal(1401, combatant!.OutgoingHealing);
@@ -65,37 +47,20 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var seed = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 17091250,
-            Damage = 4676,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        seed.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
-        sink.AppendCombatPacket(seed);
+        var seed = CreatePeriodicObservation(17091250, 4676, chainId, PeriodicEffectRelation.Self, 9);
+        AppendCombatWireObservation(sink, playerId, playerId, in seed, 1_000);
 
-        var terminal = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 17091250,
-            Damage = 0,
-            Unknown = chainId,
-            Timestamp = 3_000,
-            PeriodicTailPrefixValue = 4676
-        };
-        terminal.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);
-        sink.AppendCombatPacket(terminal);
+        var terminal = CreatePeriodicObservation(17091250, 0, chainId, PeriodicEffectRelation.Self, 11, tailPrefixValue: 4676);
+        AppendCombatWireObservation(sink, playerId, playerId, in terminal, 3_000);
 
-        var combat = Apply(journal);
+        var combat = Apply(journal, out var mechanics, out var resources);
 
         Assert.True(combat.TryGetCombatant(playerId, out var combatant));
         Assert.Equal(4676, combatant!.OutgoingHealing);
-        Assert.Equal(0, combatant.OutgoingHits);
-        Assert.Equal(0, combatant.OutgoingAttempts);
+        var summary = CombatPairProjection.GetCombatant(combat, mechanics, resources, playerId);
+        Assert.True(summary.HasValue);
+        Assert.Equal(0, summary.Value.OutgoingHits);
+        Assert.Equal(0, summary.Value.OutgoingAttempts);
     }
 
     [Fact]
@@ -108,32 +73,13 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var grant = new ParsedCombatPacket
-        {
-            SourceId = casterId,
-            TargetId = targetId,
-            SkillCode = 18730000,
-            Damage = 1000,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        grant.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
-        sink.AppendCombatPacket(grant);
+        var grant = CreatePeriodicObservation(18730000, 1000, chainId, PeriodicEffectRelation.Target, 9);
+        AppendCombatWireObservation(sink, casterId, targetId, in grant, 1_000);
 
-        var continuation = new ParsedCombatPacket
-        {
-            SourceId = 300,
-            TargetId = targetId,
-            SkillCode = 18730000,
-            Damage = 700,
-            Unknown = chainId,
-            Timestamp = 2_000,
-            PeriodicTailPrefixValue = 300
-        };
-        continuation.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
-        sink.AppendCombatPacket(continuation);
+        var continuation = CreatePeriodicObservation(18730000, 700, chainId, PeriodicEffectRelation.Target, 11, tailPrefixValue: 300);
+        AppendCombatWireObservation(sink, 300, targetId, in continuation, 2_000);
 
-        var combat = Apply(journal);
+        var combat = Apply(journal, out var mechanics, out var resources);
 
         Assert.True(combat.TryGetCombatant(casterId, out var caster));
         Assert.True(combat.TryGetCombatant(targetId, out var target));
@@ -144,12 +90,14 @@ public class PeriodicPoolCanonicalizerTests
         Assert.Equal(1000, target!.IncomingShield);
         Assert.Equal(300, target.IncomingShieldAbsorbed);
         Assert.Equal(0, target.IncomingDamage);
-        Assert.Equal(0, target.IncomingHits);
-        Assert.Equal(0, target.IncomingAttempts);
+        var targetSummary = CombatPairProjection.GetCombatant(combat, mechanics, resources, targetId);
+        Assert.True(targetSummary.HasValue);
+        Assert.Equal(0, targetSummary.Value.IncomingHits);
+        Assert.Equal(0, targetSummary.Value.IncomingAttempts);
         Assert.Equal(1000, grantPair!.TotalShield);
         Assert.Equal(300, grantPair.TotalShieldAbsorbed);
-        var grantEvent = Assert.Single(combat.Events, static e => e.Canonicalization == CombatContributionCanonicalization.PeriodicShieldGrant);
-        var absorbedEvent = Assert.Single(combat.Events, static e => e.Canonicalization == CombatContributionCanonicalization.PeriodicShieldAbsorbed);
+        var grantEvent = Assert.Single(combat.Events, static e => e.Contribution.Resolution.Materialization == CombatMaterializationKind.PeriodicPoolGrant);
+        var absorbedEvent = Assert.Single(combat.Events, static e => e.Contribution.Resolution.Materialization == CombatMaterializationKind.PeriodicPoolAbsorb);
         Assert.Equal(casterId, grantEvent.SourceId);
         Assert.Equal(targetId, grantEvent.TargetId);
         Assert.Equal(casterId, absorbedEvent.SourceId);
@@ -166,32 +114,13 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var seed = new ParsedCombatPacket
-        {
-            SourceId = casterId,
-            TargetId = targetId,
-            SkillCode = 18120010,
-            Damage = 3000,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        seed.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
-        sink.AppendCombatPacket(seed);
+        var seed = CreatePeriodicObservation(18120010, 3000, chainId, PeriodicEffectRelation.Target, 9);
+        AppendCombatWireObservation(sink, casterId, targetId, in seed, 1_000);
 
-        var tick = new ParsedCombatPacket
-        {
-            SourceId = casterId,
-            TargetId = targetId,
-            SkillCode = 18120010,
-            Damage = 2400,
-            Unknown = chainId,
-            Timestamp = 2_000,
-            PeriodicTailPrefixValue = 600
-        };
-        tick.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
-        sink.AppendCombatPacket(tick);
+        var tick = CreatePeriodicObservation(18120010, 2400, chainId, PeriodicEffectRelation.Target, 11, tailPrefixValue: 600);
+        AppendCombatWireObservation(sink, casterId, targetId, in tick, 2_000);
 
-        var combat = Apply(journal);
+        var combat = Apply(journal, out var mechanics);
 
         Assert.True(combat.TryGetCombatant(casterId, out var caster));
         Assert.True(combat.TryGetCombatant(targetId, out var target));
@@ -200,7 +129,10 @@ public class PeriodicPoolCanonicalizerTests
         Assert.Equal(600, target!.IncomingHealing);
         Assert.Equal(0, caster.OutgoingShield);
         Assert.Equal(0, target.IncomingShield);
-        var contributionEvent = Assert.Single(combat.Events, static e => e.Canonicalization == CombatContributionCanonicalization.PeriodicContinuationHealing);
+        var contributionEvent = Assert.Single(combat.Events, static e =>
+            e.Contribution.Metric == CombatMetricKind.Healing &&
+            e.Contribution.Delivery == CombatDeliveryKind.Periodic &&
+            e.Contribution.Resolution.PacketRule == CombatPacketRule.PeriodicRecovery);
         Assert.Equal(casterId, contributionEvent.SourceId);
         Assert.Equal(targetId, contributionEvent.TargetId);
     }
@@ -216,43 +148,14 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var seed = new ParsedCombatPacket
-        {
-            SourceId = casterId,
-            TargetId = targetId,
-            SkillCode = 16190000,
-            Damage = 3000,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        seed.SetPeriodicEffect(PeriodicEffectRelation.Target, 9);
-        sink.AppendCombatPacket(seed);
+        var seed = CreatePeriodicObservation(16190000, 3000, chainId, PeriodicEffectRelation.Target, 9);
+        AppendCombatWireObservation(sink, casterId, targetId, in seed, 1_000);
 
-        var healTick = new ParsedCombatPacket
-        {
-            SourceId = casterId,
-            TargetId = targetId,
-            SkillCode = 16190000,
-            Damage = 2800,
-            Unknown = chainId,
-            Timestamp = 2_000,
-            PeriodicTailPrefixValue = 200
-        };
-        healTick.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
-        sink.AppendCombatPacket(healTick);
+        var healTick = CreatePeriodicObservation(16190000, 2800, chainId, PeriodicEffectRelation.Target, 11, tailPrefixValue: 200);
+        AppendCombatWireObservation(sink, casterId, targetId, in healTick, 2_000);
 
-        var shieldTick = new ParsedCombatPacket
-        {
-            SourceId = attackerId,
-            TargetId = targetId,
-            SkillCode = 16190000,
-            Damage = 2500,
-            Unknown = chainId,
-            Timestamp = 3_000,
-            PeriodicTailPrefixValue = 300
-        };
-        shieldTick.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
-        sink.AppendCombatPacket(shieldTick);
+        var shieldTick = CreatePeriodicObservation(16190000, 2500, chainId, PeriodicEffectRelation.Target, 11, tailPrefixValue: 300);
+        AppendCombatWireObservation(sink, attackerId, targetId, in shieldTick, 3_000);
 
         var combat = Apply(journal);
 
@@ -279,30 +182,11 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var seed = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 2011101,
-            Damage = 2117,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        seed.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
-        sink.AppendCombatPacket(seed);
+        var seed = CreatePeriodicObservation(2011101, 2117, chainId, PeriodicEffectRelation.Self, 9);
+        AppendCombatWireObservation(sink, playerId, playerId, in seed, 1_000);
 
-        var tick = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 2011101,
-            Damage = 2258,
-            Unknown = chainId,
-            Timestamp = 2_000,
-            PeriodicTailPrefixValue = 423
-        };
-        tick.SetPeriodicEffect(PeriodicEffectRelation.Self, 11);
-        sink.AppendCombatPacket(tick);
+        var tick = CreatePeriodicObservation(2011101, 2258, chainId, PeriodicEffectRelation.Self, 11, tailPrefixValue: 423);
+        AppendCombatWireObservation(sink, playerId, playerId, in tick, 2_000);
 
         var combat = Apply(journal);
 
@@ -315,7 +199,7 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void ScenePath_PeriodicPoolKeyUsesTailEffectToAvoidSameChainCollision()
     {
-        CombatResourceRegistry.SetGameResources([], new Dictionary<int, NpcDisplayEntry>());
+        CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>());
 
         const int casterA = 100;
         const int casterB = 101;
@@ -349,17 +233,8 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var grant = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 12070000,
-            Damage = 2975,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        grant.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
-        sink.AppendCombatPacket(grant);
+        var grant = CreatePeriodicObservation(12070000, 2975, chainId, PeriodicEffectRelation.Self, 9);
+        AppendCombatWireObservation(sink, playerId, playerId, in grant, 1_000);
 
         var combat = Apply(journal);
 
@@ -376,20 +251,16 @@ public class PeriodicPoolCanonicalizerTests
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var grant = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 17420010,
-            Damage = 3119,
-            Unknown = 79,
-            Timestamp = 1_000,
-            BodyResourceEffectRef = ResourceEffectRef.FromRaw(1742001011),
-            PeriodicTailSkillCodeRaw = 17420010,
-            PeriodicTailLength = 4
-        };
-        grant.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
-        sink.AppendCombatPacket(grant);
+        var grant = CreatePeriodicObservation(
+            17420010,
+            3119,
+            79,
+            PeriodicEffectRelation.Self,
+            9,
+            bodyResourceEffectRef: ResourceEffectRef.FromRaw(1742001011),
+            tailSkillCode: 17420010,
+            tailLength: 4);
+        AppendCombatWireObservation(sink, playerId, playerId, in grant, 1_000);
 
         var combat = Apply(journal);
 
@@ -397,9 +268,59 @@ public class PeriodicPoolCanonicalizerTests
         Assert.Equal(3119, player!.OutgoingShield);
         Assert.Equal(3119, player.IncomingShield);
         var shieldEvent = Assert.Single(combat.Events);
-        Assert.Equal(CombatContributionCanonicalization.PeriodicShieldGrant, shieldEvent.Canonicalization);
-        Assert.Equal(CombatValueKind.Shield, shieldEvent.Observation.ValueKind);
-        Assert.Equal(PacketEffectTag.ShieldGrant, shieldEvent.Observation.EffectTag);
+        Assert.Equal(CombatMetricKind.ShieldGranted, shieldEvent.Contribution.Metric);
+        Assert.Equal(CombatDeliveryKind.Pool, shieldEvent.Contribution.Delivery);
+        Assert.Equal(CombatPacketRule.PeriodicSemantic, shieldEvent.Contribution.Resolution.PacketRule);
+        Assert.Equal(CombatResolutionAuthority.SkillSemantic, shieldEvent.Contribution.Resolution.Authority);
+        Assert.Equal(CombatSemanticMatchKind.UnambiguousSlot, shieldEvent.Contribution.Resolution.SemanticMatch);
+        Assert.Equal(CombatMaterializationKind.PeriodicPoolGrant, shieldEvent.Contribution.Resolution.Materialization);
+        Assert.Equal(PeriodicEffectRelation.Self, shieldEvent.Observation.PeriodicRelation);
+        Assert.Equal(9, shieldEvent.Observation.PeriodicMode);
+        Assert.Equal(ResourceEffectRef.FromRaw(1742001011), shieldEvent.Observation.BodyResourceEffectRef);
+    }
+
+    [Fact]
+    public void ScenePath_SemanticMode9ShieldGrantIsNotDuplicatedByLaterAbsorb()
+    {
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        const int playerId = 15104;
+        const int attackerId = 136787;
+        const int chainId = 79;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+        var grant = CreatePeriodicObservation(
+            17420010,
+            3119,
+            chainId,
+            PeriodicEffectRelation.Self,
+            9,
+            bodyResourceEffectRef: ResourceEffectRef.FromRaw(1742001011),
+            tailSkillCode: 17420010,
+            tailLength: 4);
+        AppendCombatWireObservation(sink, playerId, playerId, in grant, 1_000);
+
+        var continuation = CreatePeriodicObservation(
+            17420010,
+            2719,
+            chainId,
+            PeriodicEffectRelation.Target,
+            11,
+            bodyResourceEffectRef: ResourceEffectRef.FromRaw(1742001011),
+            tailSkillCode: 17420010,
+            tailPrefixValue: 400,
+            tailLength: 5);
+        AppendCombatWireObservation(sink, attackerId, playerId, in continuation, 2_000);
+
+        var combat = Apply(journal);
+
+        Assert.Equal(2, combat.Events.Count);
+        var grantEvent = Assert.Single(combat.Events, static e => e.Contribution.Metric == CombatMetricKind.ShieldGranted);
+        var absorbEvent = Assert.Single(combat.Events, static e => e.Contribution.Metric == CombatMetricKind.ShieldAbsorbed);
+        Assert.Equal(3119, grantEvent.Contribution.Amount);
+        Assert.Equal(CombatResolutionAuthority.SkillSemantic, grantEvent.Contribution.Resolution.Authority);
+        Assert.Equal(400, absorbEvent.Contribution.Amount);
+        Assert.Equal(CombatResolutionAuthority.Packet, absorbEvent.Contribution.Resolution.Authority);
     }
 
     [Fact]
@@ -412,30 +333,11 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var grant = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 12070000,
-            Damage = 2975,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        grant.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
-        sink.AppendCombatPacket(grant);
+        var grant = CreatePeriodicObservation(12070000, 2975, chainId, PeriodicEffectRelation.Self, 9);
+        AppendCombatWireObservation(sink, playerId, playerId, in grant, 1_000);
 
-        var continuation = new ParsedCombatPacket
-        {
-            SourceId = attackerId,
-            TargetId = playerId,
-            SkillCode = 12070000,
-            Damage = 2575,
-            Unknown = chainId,
-            Timestamp = 2_000,
-            PeriodicTailPrefixValue = 400
-        };
-        continuation.SetPeriodicEffect(PeriodicEffectRelation.Target, 11);
-        sink.AppendCombatPacket(continuation);
+        var continuation = CreatePeriodicObservation(12070000, 2575, chainId, PeriodicEffectRelation.Target, 11, tailPrefixValue: 400);
+        AppendCombatWireObservation(sink, attackerId, playerId, in continuation, 2_000);
 
         var combat = Apply(journal);
 
@@ -446,6 +348,13 @@ public class PeriodicPoolCanonicalizerTests
         Assert.Equal(400, player.IncomingShieldAbsorbed);
         Assert.Equal(0, player.OutgoingHealing);
         Assert.Equal(0, player.OutgoingDamage);
+        Assert.Equal(2, combat.Events.Count);
+        var grantEvent = Assert.Single(combat.Events, static e => e.Contribution.Metric == CombatMetricKind.ShieldGranted);
+        var absorbEvent = Assert.Single(combat.Events, static e => e.Contribution.Metric == CombatMetricKind.ShieldAbsorbed);
+        Assert.Equal(CombatPacketRule.PeriodicShieldGrant, grantEvent.Contribution.Resolution.PacketRule);
+        Assert.Equal(CombatResolutionAuthority.Packet, grantEvent.Contribution.Resolution.Authority);
+        Assert.Equal(CombatPacketRule.PeriodicShieldAbsorbed, absorbEvent.Contribution.Resolution.PacketRule);
+        Assert.Equal(CombatResolutionAuthority.Packet, absorbEvent.Contribution.Resolution.Authority);
     }
 
     [Fact]
@@ -458,29 +367,11 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var grant = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 12130040,
-            Damage = 3539,
-            Unknown = chainId,
-            Timestamp = 1_000
-        };
-        grant.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
-        sink.AppendCombatPacket(grant);
+        var grant = CreatePeriodicObservation(12130040, 3539, chainId, PeriodicEffectRelation.Self, 9);
+        AppendCombatWireObservation(sink, playerId, playerId, in grant, 1_000);
 
-        var terminal = new ParsedCombatPacket
-        {
-            SourceId = attackerId,
-            TargetId = playerId,
-            SkillCode = 12130040,
-            Damage = 3539,
-            Unknown = chainId,
-            Timestamp = 2_000
-        };
-        terminal.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
-        sink.AppendCombatPacket(terminal);
+        var terminal = CreatePeriodicObservation(12130040, 3539, chainId, PeriodicEffectRelation.Target, 10);
+        AppendCombatWireObservation(sink, attackerId, playerId, in terminal, 2_000);
 
         var combat = Apply(journal);
 
@@ -499,32 +390,28 @@ public class PeriodicPoolCanonicalizerTests
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 16140000,
-            Damage = 1395,
-            Unknown = 6,
-            Timestamp = 1_000,
-            BodyResourceEffectRef = ResourceEffectRef.FromRaw(16140000),
-            PeriodicTailSkillCodeRaw = 16140030,
-            PeriodicTailLength = 4
-        };
-        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
-        sink.AppendCombatPacket(packet, flushId: 1);
+        var packet = CreatePeriodicObservation(
+            16140000,
+            1395,
+            6,
+            PeriodicEffectRelation.Target,
+            10,
+            bodyResourceEffectRef: ResourceEffectRef.FromRaw(16140000),
+            tailSkillCode: 16140030,
+            tailLength: 4);
+        AppendCombatWireObservation(sink, sourceId, targetId, in packet, 1_000, flushId: 1);
 
-        var combat = Apply(journal);
+        var combat = Apply(journal, out var mechanics);
 
         var combatEvent = Assert.Single(combat.Events);
         Assert.Equal(sourceId, combatEvent.SourceId);
         Assert.Equal(targetId, combatEvent.TargetId);
         Assert.Equal(16140030, combatEvent.Observation.SkillCode);
         Assert.Equal(1395, combatEvent.Observation.Damage);
-        Assert.Equal(CombatEventKind.Damage, combatEvent.Observation.EventKind);
-        Assert.Equal(CombatValueKind.PeriodicDamage, combatEvent.Observation.ValueKind);
-        Assert.Equal(0, combatEvent.HitCount);
-        Assert.Equal(0, combatEvent.AttemptCount);
+        Assert.Equal(CombatMetricKind.Damage, combatEvent.Contribution.Metric);
+        Assert.Equal(CombatDeliveryKind.Periodic, combatEvent.Contribution.Delivery);
+        Assert.Equal(CombatPacketRule.PeriodicFallbackDamage, combatEvent.Contribution.Resolution.PacketRule);
+        Assert.Empty(mechanics.Events);
         Assert.True(combat.TryGetCombatant(sourceId, out var source));
         Assert.Equal(1395, source!.OutgoingDamage);
         Assert.True(combat.TryGetPair(sourceId, targetId, out var pair));
@@ -538,20 +425,16 @@ public class PeriodicPoolCanonicalizerTests
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = sourceId,
-            SkillCode = 17091250,
-            Damage = 4676,
-            Unknown = 4242,
-            Timestamp = 1_000,
-            BodyResourceEffectRef = ResourceEffectRef.FromRaw(17091250),
-            PeriodicTailSkillCodeRaw = 17091250,
-            PeriodicTailLength = 4
-        };
-        packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 10);
-        sink.AppendCombatPacket(packet, flushId: 1);
+        var packet = CreatePeriodicObservation(
+            17091250,
+            4676,
+            4242,
+            PeriodicEffectRelation.Self,
+            10,
+            bodyResourceEffectRef: ResourceEffectRef.FromRaw(17091250),
+            tailSkillCode: 17091250,
+            tailLength: 4);
+        AppendCombatWireObservation(sink, sourceId, sourceId, in packet, 1_000, flushId: 1);
 
         var combat = Apply(journal);
 
@@ -567,19 +450,14 @@ public class PeriodicPoolCanonicalizerTests
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = 16140000,
-            Damage = 1395,
-            Unknown = 6,
-            Timestamp = 1_000,
-            BodyResourceEffectRef = ResourceEffectRef.FromRaw(16140000),
-            PeriodicTailLength = 0
-        };
-        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, 10);
-        sink.AppendCombatPacket(packet, flushId: 1);
+        var packet = CreatePeriodicObservation(
+            16140000,
+            1395,
+            6,
+            PeriodicEffectRelation.Target,
+            10,
+            bodyResourceEffectRef: ResourceEffectRef.FromRaw(16140000));
+        AppendCombatWireObservation(sink, sourceId, targetId, in packet, 1_000, flushId: 1);
 
         var combat = Apply(journal);
 
@@ -617,44 +495,63 @@ public class PeriodicPoolCanonicalizerTests
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = playerId,
-            TargetId = playerId,
-            SkillCode = 17091250,
-            Damage = 4676,
-            Unknown = 4242,
-            Timestamp = 1_000
-        };
-        packet.SetPeriodicEffect(PeriodicEffectRelation.Self, 9);
+        var packet = CreatePeriodicObservation(17091250, 4676, 4242, PeriodicEffectRelation.Self, 9);
+        AppendCombatWireObservation(sink, playerId, playerId, in packet, 1_000);
 
-        sink.AppendCombatPacket(packet);
-
-        Assert.Equal(4676, journal.ReadSnapshot(0).Combat!.Value.Damage);
-        Assert.Equal(4676, packet.Damage);
+        Assert.Equal(packet, journal.ReadSnapshot(0).Combat!.Value);
     }
 
     private static CombatStore Apply(ObservedEventJournal journal)
+        => Apply(journal, out _);
+
+    private static CombatStore Apply(ObservedEventJournal journal, out MechanicStore mechanics)
+        => Apply(journal, out mechanics, out _);
+
+    private static CombatStore Apply(ObservedEventJournal journal, out MechanicStore mechanics, out ResourceStore resources)
     {
         var combat = new CombatStore();
         var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat);
         applier.ApplyJournal(journal);
+        mechanics = applier.Mechanics;
+        resources = applier.Resources;
         return combat;
     }
 
-    private static CombatObservation CreatePeriodicPoolObservation(int skillCode, int damage, int chainId, int mode, int tailSkillCode = 0, int tailPrefixValue = 0)
+    private static CombatWireObservation CreatePeriodicObservation(
+        int skillCode,
+        long damage,
+        int chainId,
+        PeriodicEffectRelation relation,
+        int mode,
+        ResourceEffectRef bodyResourceEffectRef = default,
+        int tailSkillCode = 0,
+        int tailPrefixValue = 0,
+        int tailLength = 0)
     {
-        return new CombatObservation
+        return new CombatWireObservation
         {
             SkillCode = skillCode,
             Damage = damage,
             ChainId = chainId,
-            PeriodicRelation = PeriodicEffectRelation.Target,
+            BodyResourceEffectRef = bodyResourceEffectRef,
+            PeriodicRelation = relation,
             PeriodicMode = mode,
             PeriodicTailSkillCodeRaw = tailSkillCode,
             PeriodicTailPrefixValue = tailPrefixValue,
-            PeriodicTailLength = tailPrefixValue > 0 ? 5 : tailSkillCode > 0 ? 4 : 0
+            PeriodicTailLength = tailLength
         };
+    }
+
+    private static void AppendCombatWireObservation(
+        IRuntimeObservationSink sink,
+        int sourceId,
+        int targetId,
+        in CombatWireObservation observation,
+        long timestamp,
+        long flushId = 0)
+    {
+        var source = new PacketObservationSource(timestamp, flushId, 0, 0, 0, default);
+        sink.AppendCombatWireObservation(in source, sourceId, targetId, in observation);
     }
 
     private static void AppendPeriodicPoolPacket(
@@ -670,21 +567,17 @@ public class PeriodicPoolCanonicalizerTests
         long flushId,
         int tailPrefixValue = 0)
     {
-        var packet = new ParsedCombatPacket
-        {
-            SourceId = sourceId,
-            TargetId = targetId,
-            SkillCode = skillCode,
-            Damage = damage,
-            Unknown = chainId,
-            Timestamp = timestamp,
-            BodyResourceEffectRef = ResourceEffectRef.FromRaw(skillCode),
-            PeriodicTailSkillCodeRaw = tailSkillCode,
-            PeriodicTailPrefixValue = tailPrefixValue,
-            PeriodicTailLength = tailPrefixValue > 0 ? 5 : 4
-        };
-        packet.SetPeriodicEffect(PeriodicEffectRelation.Target, mode);
-        sink.AppendCombatPacket(packet, flushId);
+        var observation = CreatePeriodicObservation(
+            skillCode,
+            damage,
+            chainId,
+            PeriodicEffectRelation.Target,
+            mode,
+            ResourceEffectRef.FromRaw(skillCode),
+            tailSkillCode,
+            tailPrefixValue,
+            tailPrefixValue > 0 ? 5 : 4);
+        AppendCombatWireObservation(sink, sourceId, targetId, in observation, timestamp, flushId);
     }
 
 }

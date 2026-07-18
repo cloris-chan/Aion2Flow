@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -10,7 +9,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Attributes_Summon_Damage_To_Owner_In_Snapshot()
     {
-        CombatResourceRegistry.SkillMap = [];
+        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
         using var scene = new SceneTestHarness();
         const int ownerId = 12115;
         const int summonId = 18345;
@@ -19,25 +18,11 @@ public sealed class SummonAttributionSceneTests
         scene.AppendSummon(ownerId, summonId);
         scene.AppendNickname(ownerId, "Owner");
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = targetId,
-            SkillCode = 17150342,
-            Damage = 4609,
-            Type = 3
-        });
+        AppendDamage(scene, summonId, targetId, 17150342, 4609, type: 3);
 
         Thread.Sleep(5);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = targetId,
-            SkillCode = 17150342,
-            Damage = 4384,
-            Type = 2
-        });
+        AppendDamage(scene, summonId, targetId, 17150342, 4384, type: 2);
 
         var snapshot = scene.CreateSnapshot();
 
@@ -58,273 +43,35 @@ public sealed class SummonAttributionSceneTests
     }
 
     [Fact]
-    public void Infers_Preexisting_Elementalist_Summon_From_Signature_Skills()
+    public void SummonLike_Source_Remains_Independent_Without_Packet_Ownership()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
-
-        using var scene = new SceneTestHarness();
-        const int ownerId = 1734;
-        const int summonId = 123483;
-        const int targetId = 110150;
-
-        scene.AppendNickname(ownerId, "Owner");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 405,
-            Timestamp = 1_000
-        });
-
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = targetId,
-            SkillCode = 16100003,
-            Damage = 1205,
-            Timestamp = 1_010
-        });
-
-        var snapshot = scene.CreateSnapshot();
-
-        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        Assert.False(snapshot.Combatants.ContainsKey(summonId));
-        Assert.Equal(1610, owner.DamageAmount);
-    }
-
-    [Fact]
-    public void Infers_Preexisting_Elementalist_Summon_From_OwnerSupport_When_Class_Candidates_Are_Ambiguous()
-    {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        CombatResourceTestFixture.SetResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 10389;
-        const int otherElementalistId = 9915;
         const int summonId = 26765;
         const int targetId = 163760;
 
         scene.AppendNickname(ownerId, "Owner");
-        scene.AppendNickname(otherElementalistId, "Other");
-        scene.AppendNpcHp(summonId, 19_649, 19_649, 1_005);
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 405,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = otherElementalistId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 777,
-            Timestamp = 1_010
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = summonId,
-            SkillCode = 16770001,
-            Damage = 587,
-            EventKind = CombatEventKind.Healing,
-            ValueKind = CombatValueKind.Healing,
-            Timestamp = 1_020
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = targetId,
-            SkillCode = 16100004,
-            Damage = 1205,
-            Timestamp = 1_030
-        });
-
-        var snapshot = scene.CreateSnapshot();
-
-        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        Assert.True(snapshot.Combatants.TryGetValue(otherElementalistId, out var other));
-        Assert.False(snapshot.Combatants.ContainsKey(summonId));
-        Assert.Equal(1610, owner.DamageAmount);
-        Assert.Equal(777, other.DamageAmount);
-        Assert.Equal(587, owner.HealingAmount);
-    }
-
-    [Fact]
-    public void Infers_Preexisting_Elementalist_Catalog_Summon_From_OwnerSupport_When_Class_Candidates_Are_Ambiguous()
-    {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>
-        {
-            [2920115] = new(2920115, "火之精靈", NpcCatalogKind.Summon, NpcHpDisplayScale.Normal)
-        });
-
-        using var scene = new SceneTestHarness();
-        const int ownerId = 10389;
-        const int otherElementalistId = 9915;
-        const int summonId = 26765;
-        const int targetId = 163760;
-
-        scene.AppendNickname(ownerId, "Owner");
-        scene.AppendNickname(otherElementalistId, "Other");
-        scene.AppendNpcCode(summonId, 2920115);
         scene.AppendNpcKind(summonId, NpcKind.Summon);
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 405,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = otherElementalistId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 777,
-            Timestamp = 1_010
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = summonId,
-            SkillCode = 16770001,
-            Damage = 587,
-            EventKind = CombatEventKind.Healing,
-            ValueKind = CombatValueKind.Healing,
-            Timestamp = 1_020
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = targetId,
-            SkillCode = 16100004,
-            Damage = 1205,
-            Timestamp = 1_030
-        });
+        AppendDamage(scene, ownerId, targetId, 16010000, 405, 1_000);
+        AppendHealing(scene, ownerId, summonId, 16770001, 587, 1_020);
+        AppendDamage(scene, summonId, targetId, 16100004, 1_205, 1_030);
 
         var snapshot = scene.CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        Assert.True(snapshot.Combatants.TryGetValue(otherElementalistId, out var other));
-        Assert.False(snapshot.Combatants.ContainsKey(summonId));
-        Assert.Equal(1610, owner.DamageAmount);
-        Assert.Equal(777, other.DamageAmount);
-        Assert.Equal(587, owner.HealingAmount);
-    }
-
-    [Fact]
-    public void Infers_Preexisting_Elementalist_Catalog_Summon_With_NpcCode()
-    {
-        const int ownerId = 10389;
-        const int summonId = 153484;
-        const int targetId = 163760;
-        const int summonNpcCode = 2920115;
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>
-        {
-            [summonNpcCode] = new(summonNpcCode, "火之精靈", NpcCatalogKind.Summon, NpcHpDisplayScale.Normal)
-        });
-        using var scene = new SceneTestHarness();
-        var writer = new SceneObservationWriter(scene.Sink);
-
-        scene.AppendNickname(ownerId, "Owner");
-        writer.ApplyNpcCatalog(Source(1_005), summonId, summonNpcCode, requireCatalogEntry: true);
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 405,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = targetId,
-            SkillCode = 16100004,
-            Damage = 1_205,
-            Timestamp = 1_030
-        });
-
-        var snapshot = scene.CreateSnapshot();
-
-        Assert.True(scene.Owner.Entities.TryGet(summonId, out var summon));
-        Assert.Equal(summonNpcCode, summon.NpcCode);
-        Assert.Equal(NpcKind.Summon, summon.Kind);
-        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        Assert.False(snapshot.Combatants.ContainsKey(summonId));
-        Assert.Equal(1_610, owner.DamageAmount);
-    }
-
-    [Fact]
-    public void Does_Not_Infer_Preexisting_Summon_Owner_When_DirectSupport_Has_Multiple_SameClass_Candidates()
-    {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
-
-        using var scene = new SceneTestHarness();
-        const int firstElementalistId = 10389;
-        const int secondElementalistId = 9915;
-        const int summonId = 26765;
-        const int targetId = 163760;
-
-        scene.AppendNickname(firstElementalistId, "First");
-        scene.AppendNickname(secondElementalistId, "Second");
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = firstElementalistId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 405,
-            Timestamp = 1_000
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = secondElementalistId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 777,
-            Timestamp = 1_010
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = firstElementalistId,
-            TargetId = summonId,
-            SkillCode = 16770001,
-            Damage = 587,
-            EventKind = CombatEventKind.Healing,
-            ValueKind = CombatValueKind.Healing,
-            Timestamp = 1_020
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = secondElementalistId,
-            TargetId = summonId,
-            SkillCode = 16770001,
-            Damage = 586,
-            EventKind = CombatEventKind.Healing,
-            ValueKind = CombatValueKind.Healing,
-            Timestamp = 1_025
-        });
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = targetId,
-            SkillCode = 16100004,
-            Damage = 1205,
-            Timestamp = 1_030
-        });
-
-        var snapshot = scene.CreateSnapshot();
-
         Assert.True(snapshot.Combatants.ContainsKey(summonId));
+        Assert.Equal(405, owner.DamageAmount);
+        Assert.Equal(1_205, snapshot.Combatants[summonId].DamageAmount);
+        Assert.True(scene.Owner.Entities.TryGet(summonId, out var summon));
+        Assert.Null(summon.OwnerEntityId);
     }
 
     [Fact]
-    public void Treats_Spirit_Descent_Summon_Restore_As_Support()
+    public void Spirit_Descent_Summon_Restore_Does_Not_Create_Combat_Contribution()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        CombatResourceTestFixture.SetResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 1734;
@@ -333,46 +80,18 @@ public sealed class SummonAttributionSceneTests
 
         scene.AppendNickname(ownerId, "Owner");
         scene.AppendSummon(ownerId, summonId);
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 405,
-            Timestamp = 1_000
-        });
+        AppendDamage(scene, ownerId, targetId, 16010000, 405, 1_000);
+        AppendSpiritDescentRestore(scene, summonId, 0, 1_050, 10_921);
+        AppendSpiritDescentRestore(scene, summonId, 0, 1_051, 110_000);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = summonId,
-            SkillCode = 16990004,
-            Damage = 10_921,
-            Timestamp = 1_050
-        });
+        _ = scene.CreateSnapshot();
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = summonId,
-            SkillCode = 16990004,
-            Damage = 110_000,
-            Timestamp = 1_051
-        });
-
-        var snapshot = scene.CreateSnapshot();
-
-        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
-        Assert.Equal(0, owner.HealingAmount);
-        Assert.True(skills.TryGetBySkillCode(16990004, out var restore));
-        Assert.Equal(0, restore.HealingAmount);
-        Assert.Equal(0, restore.HealingTimes);
-        Assert.Equal(2, restore.SupportTimes);
+        Assert.DoesNotContain(scene.Owner.Combat.Events, static combatEvent =>
+            combatEvent.Observation.SkillCode == 16990004);
     }
 
     [Fact]
-    public void Treats_Owner_To_Known_Summon_Direct_Resource_Value_As_Support()
+    public void Owner_To_Known_Summon_Resource_Value_Is_Suppressed_From_Combat()
     {
         using var scene = new SceneTestHarness();
         const int ownerId = 1734;
@@ -380,31 +99,25 @@ public sealed class SummonAttributionSceneTests
 
         scene.AppendNickname(ownerId, "Owner");
         scene.AppendSummon(ownerId, summonId);
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var resourceValue = new CombatWireObservation
         {
-            SourceId = ownerId,
-            TargetId = summonId,
             SkillCode = 16770001,
             Damage = 587,
             LayoutTag = 4,
             Flag = 0,
             Type = 2,
             Loop = 1,
-            HitContribution = 1,
-            AttemptContribution = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage,
-            Timestamp = 1_000
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(ownerId, summonId, in resourceValue, 1_000);
 
         _ = scene.CreateSnapshot();
-        var combatEvent = Assert.Single(scene.Owner.Combat.Events);
-        Assert.Equal(CombatEventKind.Support, combatEvent.Observation.EventKind);
-        Assert.Equal(CombatValueKind.Support, combatEvent.Observation.ValueKind);
+        Assert.Empty(scene.Owner.Combat.Events);
     }
 
     [Fact]
-    public void Treats_Known_Summon_To_Owner_Direct_Resource_Value_As_Support()
+    public void Known_Summon_To_Owner_Resource_Value_Is_Suppressed_From_Combat()
     {
         using var scene = new SceneTestHarness();
         const int ownerId = 1734;
@@ -412,33 +125,27 @@ public sealed class SummonAttributionSceneTests
 
         scene.AppendNickname(ownerId, "Owner");
         scene.AppendSummon(ownerId, summonId);
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var resourceValue = new CombatWireObservation
         {
-            SourceId = summonId,
-            TargetId = ownerId,
             SkillCode = 16990004,
             Damage = 10_921,
             LayoutTag = 4,
             Flag = 0,
             Type = 2,
             Loop = 1,
-            HitContribution = 1,
-            AttemptContribution = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage,
-            Timestamp = 1_000
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(summonId, ownerId, in resourceValue, 1_000);
 
         _ = scene.CreateSnapshot();
-        var combatEvent = Assert.Single(scene.Owner.Combat.Events);
-        Assert.Equal(CombatEventKind.Support, combatEvent.Observation.EventKind);
-        Assert.Equal(CombatValueKind.Support, combatEvent.Observation.ValueKind);
+        Assert.Empty(scene.Owner.Combat.Events);
     }
 
     [Fact]
-    public void Treats_Repeated_Spirit_Descent_Summon_Restore_As_Support()
+    public void Repeated_Spirit_Descent_Summon_Restore_Does_Not_Create_Combat_Contribution()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        CombatResourceTestFixture.SetResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 314;
@@ -447,70 +154,22 @@ public sealed class SummonAttributionSceneTests
 
         scene.AppendNickname(ownerId, "Owner");
         scene.AppendSummon(ownerId, summonId);
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 405,
-            Timestamp = 1_000
-        });
+        AppendDamage(scene, ownerId, targetId, 16010000, 405, 1_000);
+        AppendSpiritDescentRestore(scene, summonId, 1, 1_050, 9_410);
+        AppendSpiritDescentRestore(scene, summonId, 1, 1_051, 100_000);
+        AppendSpiritDescentRestore(scene, summonId, 6, 2_050, 9_410);
+        AppendSpiritDescentRestore(scene, summonId, 6, 2_051, 100_000);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = summonId,
-            SkillCode = 16990004,
-            Damage = 9_410,
-            Marker = 1,
-            Timestamp = 1_050
-        });
+        _ = scene.CreateSnapshot();
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = summonId,
-            SkillCode = 16990004,
-            Damage = 100_000,
-            Marker = 1,
-            Timestamp = 1_051
-        });
-
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = summonId,
-            SkillCode = 16990004,
-            Damage = 9_410,
-            Marker = 6,
-            Timestamp = 2_050
-        });
-
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = summonId,
-            TargetId = summonId,
-            SkillCode = 16990004,
-            Damage = 100_000,
-            Marker = 6,
-            Timestamp = 2_051
-        });
-
-        var snapshot = scene.CreateSnapshot();
-
-        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
-        Assert.Equal(0, owner.HealingAmount);
-        Assert.True(skills.TryGetBySkillCode(16990004, out var restore));
-        Assert.Equal(0, restore.HealingAmount);
-        Assert.Equal(0, restore.HealingTimes);
-        Assert.Equal(4, restore.SupportTimes);
+        Assert.DoesNotContain(scene.Owner.Combat.Events, static combatEvent =>
+            combatEvent.Observation.SkillCode == 16990004);
     }
 
     [Fact]
-    public void Treats_Wind_Spirit_Descent_Restore_As_Support()
+    public void Wind_Spirit_Descent_Restore_Does_Not_Create_Combat_Contribution()
     {
-        CombatResourceRegistry.SetGameResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        CombatResourceTestFixture.SetResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         using var scene = new SceneTestHarness();
         const int ownerId = 314;
@@ -520,29 +179,17 @@ public sealed class SummonAttributionSceneTests
         scene.AppendNickname(ownerId, "Owner");
         scene.AppendSummon(ownerId, summonId);
         scene.AppendNpcCode(summonId, 2920148);
-        scene.AppendCombatPacket(new ParsedCombatPacket
-        {
-            SourceId = ownerId,
-            TargetId = targetId,
-            SkillCode = 16010000,
-            Damage = 405,
-            Timestamp = 1_000
-        });
+        AppendDamage(scene, ownerId, targetId, 16010000, 405, 1_000);
 
         AppendSpiritDescentRestore(scene, summonId, 1, 1_050, 8_588);
         AppendSpiritDescentRestore(scene, summonId, 1, 1_051, 100_000);
         AppendSpiritDescentRestore(scene, summonId, 5, 2_050, 8_588);
         AppendSpiritDescentRestore(scene, summonId, 5, 2_051, 100_000);
 
-        var snapshot = scene.CreateSnapshot();
+        _ = scene.CreateSnapshot();
 
-        Assert.True(snapshot.Combatants.TryGetValue(ownerId, out var owner));
-        var skills = scene.CreateSkillBreakdown(snapshot, ownerId).Skills;
-        Assert.Equal(0, owner.HealingAmount);
-        Assert.True(skills.TryGetBySkillCode(16990004, out var restore));
-        Assert.Equal(0, restore.HealingAmount);
-        Assert.Equal(0, restore.HealingTimes);
-        Assert.Equal(4, restore.SupportTimes);
+        Assert.DoesNotContain(scene.Owner.Combat.Events, static combatEvent =>
+            combatEvent.Observation.SkillCode == 16990004);
     }
 
     private static void AppendSpiritDescentRestore(
@@ -552,15 +199,50 @@ public sealed class SummonAttributionSceneTests
         long timestamp,
         int amount)
     {
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var observation = new CombatWireObservation
         {
-            SourceId = summonId,
-            TargetId = summonId,
             SkillCode = 16990004,
             Damage = amount,
-            Marker = marker,
-            Timestamp = timestamp
-        });
+            Marker = marker
+        };
+        scene.AppendCombatWireObservation(summonId, summonId, in observation, timestamp);
+    }
+
+    private static void AppendDamage(
+        SceneTestHarness scene,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int amount,
+        long timestamp = 0,
+        int type = 0)
+    {
+        var observation = new CombatWireObservation
+        {
+            SkillCode = skillCode,
+            Damage = amount,
+            HitCount = 1,
+            AttemptCount = 1,
+            Type = type
+        };
+        scene.AppendCombatWireObservation(sourceId, targetId, in observation, timestamp);
+    }
+
+    private static void AppendHealing(
+        SceneTestHarness scene,
+        int sourceId,
+        int targetId,
+        int skillCode,
+        int amount,
+        long timestamp)
+    {
+        var observation = new CombatWireObservation
+        {
+            SkillCode = skillCode,
+            Damage = amount,
+            ResourceKind = CombatResourceKind.Health
+        };
+        scene.AppendCombatWireObservation(sourceId, targetId, in observation, timestamp);
     }
 
     private static SkillDisplayCatalog BuildElementalistSummonSkillMap()
@@ -575,6 +257,4 @@ public sealed class SummonAttributionSceneTests
         ];
     }
 
-    private static PacketObservationSource Source(long timestamp) =>
-        new(timestamp, 1, 0, 0, 0, default);
 }

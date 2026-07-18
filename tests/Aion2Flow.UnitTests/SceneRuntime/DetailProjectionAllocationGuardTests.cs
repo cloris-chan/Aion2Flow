@@ -3,7 +3,7 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public sealed class DetailProjectionAllocationGuardTests
 {
     [Fact]
-    public void DetailProjectionArchiveAndViewModel_DoNotMaterializeParsedCombatPacket()
+    public void DetailProjectionArchiveAndViewModel_Reuse_Stored_WireFacts_And_Contributions()
     {
         var root = FindRepositoryRoot();
         var files = new[]
@@ -18,10 +18,13 @@ public sealed class DetailProjectionAllocationGuardTests
         foreach (var file in files)
         {
             var text = File.ReadAllText(file);
-            Assert.DoesNotContain("new ParsedCombatPacket", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("ParsedCombatPacket", text, StringComparison.Ordinal);
             Assert.DoesNotContain(".Packet.", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("CombatContributionResolver.TryResolve", text, StringComparison.Ordinal);
         }
+
+        var detailEvent = File.ReadAllText(files[0]);
+        Assert.Contains("CombatWireObservation Observation", detailEvent, StringComparison.Ordinal);
+        Assert.Contains("CombatContribution Contribution", detailEvent, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -39,7 +42,7 @@ public sealed class DetailProjectionAllocationGuardTests
         {
             var text = File.ReadAllText(file);
             Assert.DoesNotContain("CombatEventKey.FromObservation", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("CombatContributionClassifier.Evaluate", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("CombatContributionResolver.TryResolve", text, StringComparison.Ordinal);
         }
     }
 
@@ -57,31 +60,45 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
-    public void ArchivePayload_UsesSharedCombatSegmentsAndOrdinalIndexes()
+    public void ArchivePayload_UsesTypedEventSegmentsAndIndexes()
     {
         var root = FindRepositoryRoot();
         var archive = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Archive", "SceneArchivePayload.cs"));
 
         Assert.Contains("CombatEventSegment CombatEvents", archive, StringComparison.Ordinal);
+        Assert.Contains("SnapshotList<CombatMechanicEventRecord> MechanicEvents", archive, StringComparison.Ordinal);
+        Assert.Contains("SnapshotList<CombatResourceEventRecord> ResourceEvents", archive, StringComparison.Ordinal);
         Assert.Contains("Dictionary<int, long[]>", archive, StringComparison.Ordinal);
-        Assert.Contains("TryResolveDetailEventSource", archive, StringComparison.Ordinal);
-        Assert.DoesNotContain("SceneArchiveCombatEvent", archive, StringComparison.Ordinal);
-        Assert.DoesNotContain("CreateDetailEvents(", archive, StringComparison.Ordinal);
-        Assert.DoesNotContain("DeepClone()", archive, StringComparison.Ordinal);
+        Assert.Contains("Dictionary<int, int[]>", archive, StringComparison.Ordinal);
+        Assert.Contains("ResolveMetricSourceId", archive, StringComparison.Ordinal);
+        Assert.Contains("ResolveMechanicSourceId", archive, StringComparison.Ordinal);
+        Assert.Contains("ResolveResourceSourceId", archive, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void DetailSkillTables_ExposeEventCountsOnly()
+    public void PlaybackMaterializedEventIndex_AppendsPostingsBeforeBatchSort()
+    {
+        var root = FindRepositoryRoot();
+        var index = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Playback", "ScenePlaybackMaterializedEventIndex.cs"));
+
+        Assert.Contains("posting.Add(markerIndex)", index, StringComparison.Ordinal);
+        Assert.Contains("posting.Sort(CompareMarkerIndexes)", index, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Insert(", index, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DetailMetricAndResourceTables_ExposeEventCountsOnly()
     {
         var root = FindRepositoryRoot();
         var xaml = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "Views", "CombatDirectionDetailView.axaml"));
         var sectionViewModel = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "ViewModels", "SkillDetailSectionViewModel.cs"));
         var flyoutViewModel = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow", "ViewModels", "CombatantDetailsFlyoutViewModel.cs"));
 
-        Assert.Equal(3, CountOccurrences(xaml, "{markups:Translate Column_Events}"));
-        Assert.Equal(3, CountOccurrences(xaml, "Value=\"{Binding EventCount}\""));
+        Assert.Equal(4, CountOccurrences(xaml, "{markups:Translate Column_Events}"));
+        Assert.Equal(4, CountOccurrences(xaml, "Value=\"{Binding EventCount}\""));
         Assert.Equal(3, CountOccurrences(xaml, "Tapped=\"SkillDetailRowTapped\""));
         Assert.Equal(3, CountOccurrences(xaml, "Classes.selected=\"{Binding IsSelected}\""));
+        Assert.Contains("ItemsSource=\"{Binding ResourceSection.Rows}\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Column_" + "Actions", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Grouped" + "Action" + "Count", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Action" + "Count", xaml, StringComparison.Ordinal);
@@ -119,7 +136,9 @@ public sealed class DetailProjectionAllocationGuardTests
             "    public IReadOnlyCollection<DetailCounterpartOption> BuildOutgoingDamageOptions(");
 
         Assert.Contains("_counterpartOptionBuilder.Accumulate(", rebuildBlock, StringComparison.Ordinal);
-        Assert.Equal(1, CountOccurrences(accumulateBlock, "foreach (ref readonly var detailEvent in detailEvents)"));
+        Assert.Equal(1, CountOccurrences(accumulateBlock, "foreach (ref readonly var detailEvent in metricEvents)"));
+        Assert.Equal(1, CountOccurrences(accumulateBlock, "foreach (ref readonly var detailEvent in mechanicEvents)"));
+        Assert.Equal(1, CountOccurrences(accumulateBlock, "foreach (ref readonly var detailEvent in resourceEvents)"));
         Assert.DoesNotContain("BuildCounterpartOptions(DetailSectionKind", flyoutText, StringComparison.Ordinal);
     }
 
@@ -131,9 +150,11 @@ public sealed class DetailProjectionAllocationGuardTests
         var refreshDirectionBlock = ExtractSourceBlock(
             text,
             "    private void RefreshDirection(",
-            "    private static void AccumulateSection(");
+            "    private static void CopyDirectionSelections(");
 
-        Assert.Equal(1, CountOccurrences(refreshDirectionBlock, "foreach (ref readonly var detailPacket in packetsSpan)"));
+        Assert.Equal(1, CountOccurrences(refreshDirectionBlock, "foreach (ref readonly var detailEvent in metricEvents)"));
+        Assert.Equal(1, CountOccurrences(refreshDirectionBlock, "foreach (ref readonly var detailEvent in mechanicEvents)"));
+        Assert.Equal(1, CountOccurrences(refreshDirectionBlock, "foreach (ref readonly var detailEvent in resourceEvents)"));
         Assert.DoesNotContain("private void RefreshSection(", text, StringComparison.Ordinal);
     }
 
@@ -147,12 +168,14 @@ public sealed class DetailProjectionAllocationGuardTests
             "    private void RefreshAllSections()",
             "    private void RefreshDirection(");
 
-        Assert.Equal(1, CountOccurrences(refreshAllBlock, "foreach (ref readonly var detailPacket in packetsSpan)"));
+        Assert.Equal(1, CountOccurrences(refreshAllBlock, "foreach (ref readonly var detailEvent in metricEvents)"));
+        Assert.Equal(1, CountOccurrences(refreshAllBlock, "foreach (ref readonly var detailEvent in mechanicEvents)"));
+        Assert.Equal(1, CountOccurrences(refreshAllBlock, "foreach (ref readonly var detailEvent in resourceEvents)"));
         Assert.DoesNotContain("RefreshDirection(", refreshAllBlock, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void RuntimeObservationCanonicalizationAndCapture_DoNotMaterializeParsedCombatPacket()
+    public void RuntimeObservationCanonicalizationAndCapture_Use_Immutable_WireFacts()
     {
         var root = FindRepositoryRoot();
         var files = EnumerateCanonicalizationFiles(root).Concat([
@@ -161,12 +184,10 @@ public sealed class DetailProjectionAllocationGuardTests
             Path.Combine(root, "src", "Aion2Flow.Capture", "Diagnostics", "PacketLogReplayService.cs")
         ]).ToArray();
 
-        foreach (var file in files)
-        {
-            var text = File.ReadAllText(file);
-            Assert.DoesNotContain("new ParsedCombatPacket", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("NormalizePacketForStorage", text, StringComparison.Ordinal);
-        }
+        var combinedText = string.Join(Environment.NewLine, files.Select(File.ReadAllText));
+        Assert.Contains("CombatWireObservation", combinedText, StringComparison.Ordinal);
+        Assert.Contains("AppendCombatWireObservation", combinedText, StringComparison.Ordinal);
+        Assert.DoesNotContain("NormalizeObservationForStorage", combinedText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -182,10 +203,10 @@ public sealed class DetailProjectionAllocationGuardTests
     }
 
     [Fact]
-    public void CombatEventClassifier_UsesPacketFactsAndStructuredSemanticsWithoutDisplayHeuristics()
+    public void CombatContributionResolver_UsesPacketFactsAndStructuredSemanticsWithoutDisplayHeuristics()
     {
         var root = FindRepositoryRoot();
-        var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Combat", "CombatEventClassifier.cs"));
+        var text = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Combat", "CombatContributionResolver.cs"));
         var forbiddenTerms = new[]
         {
             "SkillMap",
@@ -207,7 +228,9 @@ public sealed class DetailProjectionAllocationGuardTests
         foreach (var term in forbiddenTerms)
             Assert.DoesNotContain(term, text, StringComparison.Ordinal);
 
-        Assert.Contains("CombatSemanticResolution", text, StringComparison.Ordinal);
+        Assert.Contains("CombatResolutionTrace", text, StringComparison.Ordinal);
+        Assert.Contains("CombatSemanticMatchKind.ExactNode", text, StringComparison.Ordinal);
+        Assert.Contains("CombatSemanticMatchKind.UnambiguousSlot", text, StringComparison.Ordinal);
         Assert.Contains("TryResolveDirectCombatResourceSemantics", text, StringComparison.Ordinal);
     }
 
@@ -227,6 +250,29 @@ public sealed class DetailProjectionAllocationGuardTests
         Assert.DoesNotContain("CurrentValue", text, StringComparison.Ordinal);
         Assert.DoesNotContain("MaximumValue", text, StringComparison.Ordinal);
         Assert.DoesNotContain("HpCorrelation", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Canonicalizers_DoNotAccessClientResourceSemantics()
+    {
+        var root = FindRepositoryRoot();
+        var forbiddenTerms = new[]
+        {
+            "Resources.Catalog",
+            "CombatResourceRegistry",
+            "ResourceCatalog",
+            "SkillSemantic",
+            "TryResolveDirectCombatEffectSemantics",
+            "TryResolveDirectCombatResourceSemantics",
+            "TryResolvePeriodicCombatResourceSemantics"
+        };
+
+        foreach (var file in EnumerateCanonicalizationFiles(root))
+        {
+            var text = File.ReadAllText(file);
+            foreach (var term in forbiddenTerms)
+                Assert.DoesNotContain(term, text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -311,7 +357,7 @@ public sealed class DetailProjectionAllocationGuardTests
             "SourceObservationOrdinal",
             "sourceObservationOrdinal",
             "SkillCode",
-            "CombatObservation",
+            "CombatWireObservation",
             "ObservedAtMilliseconds",
             "sourceId",
             "targetId",
@@ -337,6 +383,22 @@ public sealed class DetailProjectionAllocationGuardTests
 
         foreach (var term in forbiddenTerms)
             Assert.DoesNotContain(term, classifier, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CombatantOwnerAttribution_UsesOnlyPacketBackedSummonRelations()
+    {
+        var root = FindRepositoryRoot();
+        var entityStore = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Stores", "EntityStore.cs"));
+        var snapshotAdapter = File.ReadAllText(Path.Combine(root, "src", "Aion2Flow.SceneRuntime", "Projection", "SceneCombatSnapshotAdapter.cs"));
+
+        Assert.Contains("ApplySummon", entityStore, StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(entityStore, "entity.OwnerEntityId = ownerId;"));
+        Assert.Equal(1, CountOccurrences(entityStore, "entity.OwnerKind = EntityOwnerKind.Summon;"));
+        Assert.Contains("entity.OwnerEntityId is int ownerId", snapshotAdapter, StringComparison.Ordinal);
+        Assert.DoesNotContain("SkillDisplayEntry", snapshotAdapter, StringComparison.Ordinal);
+        Assert.DoesNotContain("SkillCategory", snapshotAdapter, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Name.Contains", snapshotAdapter, StringComparison.Ordinal);
     }
 
     [Fact]

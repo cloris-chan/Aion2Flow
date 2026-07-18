@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -48,7 +49,7 @@ public readonly record struct ScenePlaybackEventScope
 
     public bool HasSkill => SkillBaseKey.HasValue || !AuraIdentity.IsEmpty;
 
-    public bool IncludesCombatEvents => Relation != ScenePlaybackEventRelation.Aura;
+    public bool IncludesMaterializedEvents => Relation != ScenePlaybackEventRelation.Aura;
 
     public static ScenePlaybackEventScope ForCombatant(int combatantId)
     {
@@ -99,7 +100,9 @@ public readonly record struct ScenePlaybackEventScope
 
 public enum ScenePlaybackEventFactKind : byte
 {
-    Combat,
+    Metric,
+    Mechanic,
+    Resource,
     Observation
 }
 
@@ -115,7 +118,10 @@ public readonly record struct ScenePlaybackEventId(ScenePlaybackEventFactKind Ki
 public readonly record struct ScenePlaybackEventMarker(
     ScenePlaybackEventId Id,
     ScenePlaybackTrackMarker Marker,
-    SkillBaseKey SkillBaseKey)
+    SkillBaseKey SkillBaseKey,
+    CombatContribution? Contribution,
+    CombatMechanicOccurrence? Mechanic,
+    CombatResourceOccurrence? Resource)
 {
     public ScenePlaybackTrack Track => Marker.Track;
     public long PositionMilliseconds => Marker.PositionMilliseconds;
@@ -125,12 +131,15 @@ public readonly record struct ScenePlaybackEventMarker(
     public CombatEventKey EventKey => Marker.EventKey;
     public ScenePlaybackCombatEventFlags CombatEventFlags => Marker.CombatEventFlags;
     public long Amount => Marker.Amount;
-    public long? CurrentValue => Marker.CurrentValue;
-    public long? MaximumValue => Marker.MaximumValue;
-    public ScenePlaybackLifecycleEventKind LifecycleEventKind => Marker.LifecycleEventKind;
+    public long? CurrentHp => Marker.CurrentHp;
+    public long? MaxHp => Marker.MaxHp;
+    public AuraLifecycleEventKind LifecycleEventKind => Marker.LifecycleEventKind;
     public int ResultCode => Marker.ResultCode;
     public int DurationMilliseconds => Marker.DurationMilliseconds;
     public ResourceEffectRef DisplayResourceEffectRef => Marker.DisplayResourceEffectRef;
+    public AuraSemanticValue AuraSemantics => Marker.AuraSemantics;
+    public AuraDisposition AuraDisposition => Marker.AuraDisposition;
+    public AuraSemanticTrace AuraSemanticTrace => Marker.AuraSemanticTrace;
     public ScenePlaybackAuraIdentity AuraIdentity => Marker.AuraIdentity;
 }
 

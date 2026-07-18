@@ -5,7 +5,9 @@ internal enum DetailSectionKind
     OutgoingDamage,
     OutgoingHealing,
     OutgoingShield,
+    OutgoingResource,
     IncomingDamage,
     IncomingHealing,
-    IncomingShield
+    IncomingShield,
+    IncomingResource
 }

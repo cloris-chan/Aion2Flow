@@ -3,10 +3,12 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.Presentation;
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.DependencyInjection;
@@ -29,10 +31,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private readonly IScenePlaybackSource _source;
     private readonly ArchivedEncounterRecord _record;
     private readonly UiFrameBatchService _frameBatchService;
-    private readonly Dictionary<int, ScenePlaybackResourceState> _resourceScratch = [];
+    private readonly Dictionary<int, EntityVitalState> _vitalScratch = [];
     private readonly HashSet<int> _seenCombatantIds = [];
     private readonly HashSet<ScenePlaybackEventId> _eventWindowIds = [];
-    private readonly ScenePlaybackEventMarker[] _combatEventBuffer = new ScenePlaybackEventMarker[MaxEventWindowMarkers];
+    private readonly ScenePlaybackEventMarker[] _materializedEventBuffer = new ScenePlaybackEventMarker[MaxEventWindowMarkers];
     private readonly ScenePlaybackEventMarker[] _nonCombatEventBuffer = new ScenePlaybackEventMarker[MaxEventWindowMarkers];
     private readonly ScenePlaybackEventMarker[] _eventMarkerBuffer = new ScenePlaybackEventMarker[MaxEventWindowMarkers];
     private string _eventScopeSkillText = string.Empty;
@@ -730,7 +732,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private void RefreshCombatants(ScenePlaybackFrame frame)
     {
         var combatants = frame.Snapshot.Combatants.AsSpan();
-        if (combatants.Length == 0 && frame.Resources.Count == 0)
+        if (combatants.Length == 0 && frame.EntityVitals.Count == 0)
         {
             if (Combatants.Count > 0)
                 Combatants.Clear();
@@ -739,9 +741,9 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             return;
         }
 
-        _resourceScratch.Clear();
-        for (var i = 0; i < frame.Resources.Count; i++)
-            _resourceScratch[frame.Resources[i].EntityId] = frame.Resources[i];
+        _vitalScratch.Clear();
+        for (var i = 0; i < frame.EntityVitals.Count; i++)
+            _vitalScratch[frame.EntityVitals[i].EntityId] = frame.EntityVitals[i];
 
         var timelines = _combatantTimelines;
         _seenCombatantIds.Clear();
@@ -751,14 +753,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             {
                 var id = row.EntityId;
                 var hasMetrics = frame.Snapshot.Combatants.TryGetValue(id, out var metrics);
-                var hasResource = _resourceScratch.TryGetValue(id, out var resource);
-                if (!hasMetrics && !hasResource)
+                var hasVital = _vitalScratch.TryGetValue(id, out var vital);
+                if (!hasMetrics && !hasVital)
                 {
                     Combatants.Remove(id);
                     continue;
                 }
 
-                ApplyCombatantRow(row, id, in metrics, hasMetrics, in resource, ResolveCombatantTimeline(timelines, id));
+                ApplyCombatantRow(row, id, in metrics, hasMetrics, in vital, ResolveCombatantTimeline(timelines, id));
                 _seenCombatantIds.Add(id);
             }
 
@@ -769,21 +771,21 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                     continue;
 
                 var metrics = entry.Metrics;
-                _resourceScratch.TryGetValue(entry.Id, out var resource);
+                _vitalScratch.TryGetValue(entry.Id, out var vital);
                 var row = new PlaybackCombatantRowViewModel(_frameBatchService, entry.Id);
-                ApplyCombatantRow(row, entry.Id, in metrics, hasMetrics: true, in resource, ResolveCombatantTimeline(timelines, entry.Id));
+                ApplyCombatantRow(row, entry.Id, in metrics, hasMetrics: true, in vital, ResolveCombatantTimeline(timelines, entry.Id));
                 Combatants.Add(row);
             }
 
-            for (var i = 0; i < frame.Resources.Count; i++)
+            for (var i = 0; i < frame.EntityVitals.Count; i++)
             {
-                var resource = frame.Resources[i];
-                if (!_seenCombatantIds.Add(resource.EntityId))
+                var vital = frame.EntityVitals[i];
+                if (!_seenCombatantIds.Add(vital.EntityId))
                     continue;
 
                 var metrics = default(SceneCombatantMetrics);
-                var row = new PlaybackCombatantRowViewModel(_frameBatchService, resource.EntityId);
-                ApplyCombatantRow(row, resource.EntityId, in metrics, hasMetrics: false, in resource, ResolveCombatantTimeline(timelines, resource.EntityId));
+                var row = new PlaybackCombatantRowViewModel(_frameBatchService, vital.EntityId);
+                ApplyCombatantRow(row, vital.EntityId, in metrics, hasMetrics: false, in vital, ResolveCombatantTimeline(timelines, vital.EntityId));
                 Combatants.Add(row);
             }
 
@@ -806,7 +808,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
     }
 
-    private void ApplyCombatantRow(PlaybackCombatantRowViewModel row, int entityId, in SceneCombatantMetrics metrics, bool hasMetrics, in ScenePlaybackResourceState resource, PlaybackTimelineStrip timeline)
+    private void ApplyCombatantRow(PlaybackCombatantRowViewModel row, int entityId, in SceneCombatantMetrics metrics, bool hasMetrics, in EntityVitalState vital, PlaybackTimelineStrip timeline)
     {
         var damage = hasMetrics ? metrics.DamageAmount : 0;
         var damagePerSecond = hasMetrics ? metrics.DamagePerSecond : 0;
@@ -818,8 +820,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         row.DamagePerSecondText = FormatNumber(damagePerSecond);
         row.HealingText = FormatNumber(healing);
         row.HealingPerSecondText = FormatNumber(healingPerSecond);
-        row.HpText = CreateHpText(in resource);
-        row.UpdateHpSegments(CreateHpRatio(in resource), ScenePlaybackTimelineBuilder.ResourceBrush);
+        row.HpText = CreateHpText(in vital);
+        row.UpdateHpSegments(CreateHpRatio(in vital), ScenePlaybackTimelineBuilder.EntityVitalBrush);
         row.Timeline = timeline;
     }
 
@@ -973,23 +975,23 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
     }
 
-    private static string CreateHpText(in ScenePlaybackResourceState resource)
+    private static string CreateHpText(in EntityVitalState vital)
     {
-        if (resource.EntityId == 0)
+        if (vital.EntityId == 0)
             return string.Empty;
 
-        var current = Math.Max(0, resource.CurrentValue ?? 0);
-        var maximum = Math.Max(current, resource.MaximumValue ?? 0);
+        var current = Math.Max(0, vital.CurrentHp);
+        var maximum = Math.Max(current, vital.MaxHp ?? 0);
         return maximum > 0 ? $"{FormatNumber(current)} / {FormatNumber(maximum)}" : FormatNumber(current);
     }
 
-    private static double CreateHpRatio(in ScenePlaybackResourceState resource)
+    private static double CreateHpRatio(in EntityVitalState vital)
     {
-        if (resource.EntityId == 0)
+        if (vital.EntityId == 0)
             return 0d;
 
-        var current = Math.Max(0, resource.CurrentValue ?? 0);
-        var maximum = Math.Max(current, resource.MaximumValue ?? 0);
+        var current = Math.Max(0, vital.CurrentHp);
+        var maximum = Math.Max(current, vital.MaxHp ?? 0);
         return maximum > 0 ? Math.Clamp(current / (double)maximum, 0d, 1d) : 0d;
     }
 
@@ -1224,11 +1226,11 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     {
         try
         {
-            var combatRead = await _controller.CopyLatestCombatEventsAsync(
+            var materializedRead = await _controller.CopyLatestMaterializedEventsAsync(
                 scope,
                 startPositionMilliseconds,
                 endPositionMilliseconds,
-                _combatEventBuffer,
+                _materializedEventBuffer,
                 cancellation.Token).ConfigureAwait(false);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -1236,7 +1238,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                     return;
 
                 var frame = _currentFrame;
-                if (combatRead.EndObservationOrdinalExclusive != expectedEndObservationOrdinalExclusive ||
+                if (materializedRead.EndObservationOrdinalExclusive != expectedEndObservationOrdinalExclusive ||
                     frame.AppliedSegment.EndObservationOrdinalExclusive != expectedEndObservationOrdinalExclusive ||
                     frame.PositionMilliseconds != positionMilliseconds ||
                     EventSelection != scope)
@@ -1252,7 +1254,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                     expectedEndObservationOrdinalExclusive,
                     _nonCombatEventBuffer);
                 var markerCount = MergeLatestEventMarkers(
-                    _combatEventBuffer.AsSpan(0, combatRead.Count),
+                    _materializedEventBuffer.AsSpan(0, materializedRead.Count),
                     _nonCombatEventBuffer.AsSpan(0, nonCombatRead.Count),
                     _eventMarkerBuffer);
                 ApplyEventWindowMarkers(_eventMarkerBuffer.AsSpan(0, markerCount));
@@ -1325,16 +1327,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     }
 
     private static int MergeLatestEventMarkers(
-        ReadOnlySpan<ScenePlaybackEventMarker> combat,
+        ReadOnlySpan<ScenePlaybackEventMarker> materialized,
         ReadOnlySpan<ScenePlaybackEventMarker> nonCombat,
         Span<ScenePlaybackEventMarker> destination)
     {
-        var count = Math.Min(destination.Length, combat.Length + nonCombat.Length);
-        var combatIndex = combat.Length - 1;
+        var count = Math.Min(destination.Length, materialized.Length + nonCombat.Length);
+        var materializedIndex = materialized.Length - 1;
         var nonCombatIndex = nonCombat.Length - 1;
         for (var destinationIndex = count - 1; destinationIndex >= 0; destinationIndex--)
         {
-            if (combatIndex < 0)
+            if (materializedIndex < 0)
             {
                 destination[destinationIndex] = nonCombat[nonCombatIndex--];
                 continue;
@@ -1342,12 +1344,12 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
             if (nonCombatIndex < 0)
             {
-                destination[destinationIndex] = combat[combatIndex--];
+                destination[destinationIndex] = materialized[materializedIndex--];
                 continue;
             }
 
-            if (CompareEventMarkers(combat[combatIndex], nonCombat[nonCombatIndex]) > 0)
-                destination[destinationIndex] = combat[combatIndex--];
+            if (CompareEventMarkers(materialized[materializedIndex], nonCombat[nonCombatIndex]) > 0)
+                destination[destinationIndex] = materialized[materializedIndex--];
             else
                 destination[destinationIndex] = nonCombat[nonCombatIndex--];
         }
@@ -1376,7 +1378,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         row.SourceText = DisplayContext.ResolveEntityName(marker.SourceEntityId);
         row.TargetText = DisplayContext.ResolveEntityName(marker.TargetEntityId);
         row.SkillText = ResolveEventMarkerDisplayName(in trackMarker);
-        row.AmountText = CreateAmountText(trackMarker);
+        row.AmountText = CreateEventValueText(in marker);
         row.DisplayTextRevision = _displayTextRevision;
     }
 
@@ -1407,7 +1409,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     private string ResolveEventMarkerDisplayName(in ScenePlaybackTrackMarker marker)
     {
-        if (marker.Track == ScenePlaybackTrack.Combat)
+        if (marker.Track is ScenePlaybackTrack.Combat or ScenePlaybackTrack.Mechanic or ScenePlaybackTrack.Resource)
             return ResolveCombatEventDisplayName(marker.EventKey);
 
         return marker.DisplayResourceEffectRef.IsEmpty
@@ -1431,15 +1433,59 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         return eventKey.FormatFallbackLabel(Localization["Skill_UnknownEffect"]);
     }
 
+    private string CreateEventValueText(in ScenePlaybackEventMarker marker)
+    {
+        return marker.Id.Kind switch
+        {
+            ScenePlaybackEventFactKind.Metric when marker.Contribution is { } contribution => FormatSigned(contribution.Amount),
+            ScenePlaybackEventFactKind.Mechanic when marker.Mechanic is { } mechanic => CreateMechanicValueText(in mechanic),
+            ScenePlaybackEventFactKind.Resource when marker.Resource is { } resource => CreateResourceValueText(in resource),
+            _ => CreateAmountText(marker.Marker)
+        };
+    }
+
+    private string CreateMechanicValueText(in CombatMechanicOccurrence mechanic)
+    {
+        var parts = new List<string>(4);
+        if (mechanic.HitCount > 0 || mechanic.AttemptCount > 0)
+        {
+            parts.Add(string.Format(
+                CultureInfo.CurrentCulture,
+                Localization["Playback_Mechanic_HitAttemptFormat"],
+                mechanic.HitCount,
+                mechanic.AttemptCount));
+        }
+        if (mechanic.EvadeCount > 0)
+            parts.Add($"{Localization["Stat_Evade"]} {mechanic.EvadeCount:N0}");
+        if (mechanic.InvincibleCount > 0)
+            parts.Add($"{Localization["Stat_Invincible"]} {mechanic.InvincibleCount:N0}");
+        if (mechanic.MultiHitCount > 0)
+            parts.Add($"{Localization["Stat_MultiHit"]} {mechanic.MultiHitCount:N0}");
+        return string.Join(" | ", parts);
+    }
+
+    private static string CreateResourceValueText(in CombatResourceOccurrence resource)
+    {
+        var name = resource.Resource switch
+        {
+            CombatResourceKind.Health => "HP",
+            CombatResourceKind.Mana => "MP",
+            _ => string.Empty
+        };
+        var amount = resource.Flow == CombatResourceFlowKind.Spend ? -resource.Amount : resource.Amount;
+        var amountText = FormatSigned(amount);
+        return name.Length == 0 ? amountText : $"{name} {amountText}";
+    }
+
     private string CreateAmountText(ScenePlaybackTrackMarker marker)
     {
         if (marker.Track == ScenePlaybackTrack.Combat && marker.Amount != 0)
             return FormatSigned(marker.Amount);
 
-        if (marker.Track == ScenePlaybackTrack.Resource)
+        if (marker.Track == ScenePlaybackTrack.EntityVital)
         {
-            var current = marker.CurrentValue.HasValue ? FormatNumber(marker.CurrentValue.Value) : "?";
-            var maximum = marker.MaximumValue.HasValue ? FormatNumber(marker.MaximumValue.Value) : "?";
+            var current = marker.CurrentHp.HasValue ? FormatNumber(marker.CurrentHp.Value) : "?";
+            var maximum = marker.MaxHp.HasValue ? FormatNumber(marker.MaxHp.Value) : "?";
             return $"{current}/{maximum}";
         }
 
@@ -1447,10 +1493,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         {
             return marker.LifecycleEventKind switch
             {
-                ScenePlaybackLifecycleEventKind.Open when marker.DurationMilliseconds == ushort.MaxValue => Localization["Playback_Lifecycle_OpenIndefinite"],
-                ScenePlaybackLifecycleEventKind.Open => string.Format(CultureInfo.CurrentCulture, Localization["Playback_Lifecycle_OpenFormat"], marker.DurationMilliseconds),
-                ScenePlaybackLifecycleEventKind.Renew => Localization["Playback_Lifecycle_Renew"],
-                ScenePlaybackLifecycleEventKind.Result => string.Format(CultureInfo.CurrentCulture, Localization["Playback_Lifecycle_ResultFormat"], marker.ResultCode),
+                AuraLifecycleEventKind.Open when marker.DurationMilliseconds == ushort.MaxValue => Localization["Playback_Lifecycle_OpenIndefinite"],
+                AuraLifecycleEventKind.Open => string.Format(CultureInfo.CurrentCulture, Localization["Playback_Lifecycle_OpenFormat"], marker.DurationMilliseconds),
+                AuraLifecycleEventKind.Renew => Localization["Playback_Lifecycle_Renew"],
+                AuraLifecycleEventKind.Result => string.Format(CultureInfo.CurrentCulture, Localization["Playback_Lifecycle_ResultFormat"], marker.ResultCode),
                 _ => string.Empty
             };
         }
@@ -1461,7 +1507,9 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private string ResolveTrackName(ScenePlaybackTrack track) => track switch
     {
         ScenePlaybackTrack.Combat => Localization["Playback_Track_Combat"],
-        ScenePlaybackTrack.Resource => Localization["Playback_Track_RemainingHp"],
+        ScenePlaybackTrack.Mechanic => Localization["Playback_Track_Mechanic"],
+        ScenePlaybackTrack.Resource => Localization["Playback_Track_Resource"],
+        ScenePlaybackTrack.EntityVital => Localization["Playback_Track_RemainingHp"],
         ScenePlaybackTrack.Aura => Localization["Playback_Track_Aura"],
         ScenePlaybackTrack.State => Localization["Playback_Track_State"],
         ScenePlaybackTrack.Scene => Localization["Playback_Track_Scene"],

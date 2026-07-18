@@ -105,9 +105,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.MarkSceneTransportBoundary(in packet);
     }
 
-    public void AppendCombatObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatObservation observation)
+    public void AppendCombatWireObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatWireObservation observation)
     {
-        lock (gate) inner.AppendCombatObservation(in packet, sourceId, targetId, in observation);
+        lock (gate) inner.AppendCombatWireObservation(in packet, sourceId, targetId, in observation);
     }
 
     public void CompleteFlush(long flushId)

@@ -1,50 +1,34 @@
-using System.Numerics;
 using System.Runtime.InteropServices;
-using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary, BossFocusStore? bossFocus = null, Guid encounterId = default)
+public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVitalStore entityVitals, CombatStore combat, MechanicStore mechanics, ResourceStore resources, SceneBoundaryStore boundary, BossFocusStore? bossFocus = null, Guid encounterId = default)
 {
     private const int SmallSetStackCapacity = 64;
 
     private readonly Dictionary<int, CombatantClassEvidence> _classEvidence = [];
-    private readonly Dictionary<int, int> _inferredOwnerBySummon = [];
-    private readonly Dictionary<int, int> _nextInferredOwnerBySummon = [];
-    private readonly Dictionary<int, SummonOwnerInferenceAccumulator> _ownerInferenceBySource = [];
-    private readonly Dictionary<SkillCategory, OwnerCandidateAccumulator> _ownerCandidatesByCategory = [];
-    private readonly Dictionary<SummonOwnerInferenceKey, OwnerCandidateAccumulator> _directOwnerCandidatesBySummonCategory = [];
-    private readonly Dictionary<int, OwnerInferenceSkillClassification> _ownerInferenceSkillClassifications = [];
     private readonly Dictionary<int, int> _resolvedCombatantIds = [];
     private readonly Dictionary<int, bool> _knownSummons = [];
     private readonly Dictionary<int, TargetInfo> _targetInfos = [];
-    private long _ownerInferenceCombatRevision = -1;
-    private long _ownerInferenceIdentityRevision = -1;
-    private long _ownerInferenceSkillMapRevision = -1;
-    private long _ownerInferenceSkillClassificationRevision = -1;
-    private long _ownerInferenceVersion;
-    private int _ownerInferenceScannedEventCount;
     private long _classEvidenceCombatRevision = -1;
     private long _classEvidenceIdentityRevision = -1;
-    private long _classEvidenceOwnerVersion = -1;
     private long _classEvidenceSkillMapRevision = -1;
     private int _classEvidenceScannedEventCount;
     private long _resolveCacheIdentityRevision = -1;
-    private long _resolveCacheOwnerVersion = -1;
-    private bool _ownerInferenceReady;
     private bool _hasProjectionBaseline;
 
-    public SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary)
-        : this(entities, combat, boundary, null, default)
+    public long ReadModelRevision => SaturatingAdd(combat.Revision, mechanics.Revision, resources.Revision);
+
+    public SceneCombatSnapshotAdapter(EntityStore entities, EntityVitalStore entityVitals, CombatStore combat, MechanicStore mechanics, ResourceStore resources, SceneBoundaryStore boundary)
+        : this(entities, entityVitals, combat, mechanics, resources, boundary, null, default)
     {
     }
 
-    internal SceneCombatSnapshotAdapter(EntityStore entities, CombatStore combat, SceneBoundaryStore boundary, BossFocusStore? bossFocus, Guid encounterId, SceneCombatSnapshotAdapterSnapshot snapshot)
-        : this(entities, combat, boundary, bossFocus, encounterId)
+    internal SceneCombatSnapshotAdapter(EntityStore entities, EntityVitalStore entityVitals, CombatStore combat, MechanicStore mechanics, ResourceStore resources, SceneBoundaryStore boundary, BossFocusStore? bossFocus, Guid encounterId, SceneCombatSnapshotAdapterSnapshot snapshot)
+        : this(entities, entityVitals, combat, mechanics, resources, boundary, bossFocus, encounterId)
     {
         RestoreSnapshot(snapshot);
     }
@@ -55,27 +39,17 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         EnsureClassEvidence();
         return new SceneCombatSnapshotAdapterSnapshot(
             CreateClassEvidenceSnapshot(),
-            CreateInferredOwnerSnapshot(),
-            CreateOwnerInferenceSourceSnapshot(),
-            CreateOwnerCandidateSnapshot(),
-            CreateDirectOwnerCandidateSnapshot(),
-            _ownerInferenceCombatRevision,
-            _ownerInferenceIdentityRevision,
-            _ownerInferenceSkillMapRevision,
-            _ownerInferenceVersion,
-            _ownerInferenceReady,
             _classEvidenceCombatRevision,
             _classEvidenceIdentityRevision,
-            _classEvidenceOwnerVersion,
             _classEvidenceSkillMapRevision);
     }
 
     public SceneCombatSnapshot CreateSnapshot(SceneKind kind = SceneKind.Standard)
     {
         var builder = new SceneCombatSnapshotBuilder();
-        builder.Reset(encounterId, kind, combat.Combatants.Count, 0);
+        builder.Reset(encounterId, kind, combat.Combatants.Count + mechanics.Combatants.Count + (resources.Pairs.Count * 2), 0);
         BuildSnapshot(builder);
-        return builder.ToSnapshot(combat.Revision);
+        return builder.ToSnapshot(ReadModelRevision);
     }
 
     internal void BuildSnapshot(SceneCombatSnapshotBuilder builder)
@@ -95,9 +69,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (start == end && start >= 0 && combat.EventSpan.Length > 0)
             ExpandSinglePointEncounterWindowFromRelevantRecovery(ref start, ref end);
         var encounterTime = end > start ? end - start : 0;
+        var hasMaterializedActivity = combat.EventSpan.Length > 0 || mechanics.Events.Count > 0 || resources.Events.Count > 0;
         builder.SetEncounterWindow(start, end, encounterTime);
 
-        if (encounterTime > 0)
+        if (hasMaterializedActivity)
             ApplyCombatState(builder);
         var totalDamage = 0L;
         foreach (var id in builder.CombatantIds)
@@ -117,17 +92,17 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             metrics.DamageContribution = totalDamage > 0 ? (double)metrics.DamageAmount / totalDamage : 0;
         }
 
-        builder.SetEncounter(EvaluateEncounter(trackingTargetId, encounterTime, targetObservation, now));
+        builder.SetEncounter(EvaluateEncounter(trackingTargetId, hasMaterializedActivity, targetObservation, now));
     }
 
-    public IReadOnlyList<CombatDetailEvent> CreateDetailEvents(SceneCombatSnapshot snapshot, int combatantId)
+    public CombatDetailEventSet CreateDetailEvents(SceneCombatSnapshot snapshot, int combatantId)
     {
         if (!CanProjectDetailCombatant(snapshot, combatantId))
-            return [];
+            return CombatDetailEventSet.Empty;
 
-        var events = new List<CombatDetailEvent>();
-        WriteDetailEvents(snapshot, combatantId, new ListDetailEventWriter(events));
-        return events;
+        var writer = new ListDetailEventWriter();
+        WriteDetailEvents(snapshot, combatantId, writer);
+        return writer.ToEventSet();
     }
 
     internal CombatDetailWriteResult WriteDetailEvents(SceneCombatSnapshot snapshot, int combatantId, ICombatDetailEventWriter writer)
@@ -140,35 +115,61 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         PrepareProjectionCaches();
 
-        var count = 0;
+        var metricEventCount = 0;
+        var mechanicEventCount = 0;
+        var resourceEventCount = 0;
         var revision = 0L;
         var records = combat.EventSpan;
         foreach (ref readonly var record in records)
         {
-            if (!TryCreateDetailEventCached(snapshot, combatantId, in record, scope, out var detailEvent))
+            if (!TryCreateMetricDetailEventCached(snapshot, combatantId, in record, scope, out var detailEvent))
                 continue;
 
-            writer.Add(in detailEvent);
-            count++;
+            writer.AddMetric(in detailEvent);
+            metricEventCount++;
             revision = Math.Max(revision, detailEvent.Revision);
         }
 
-        return new CombatDetailWriteResult(count, revision);
+        var mechanicEvents = mechanics.Events;
+        for (var i = 0; i < mechanicEvents.Count; i++)
+        {
+            var record = mechanicEvents[i];
+            if (!TryCreateMechanicDetailEventCached(snapshot, combatantId, in record, scope, out var detailEvent))
+                continue;
+
+            writer.AddMechanic(in detailEvent);
+            mechanicEventCount++;
+            revision = Math.Max(revision, detailEvent.Revision);
+        }
+
+        var resourceEvents = resources.Events;
+        for (var i = 0; i < resourceEvents.Count; i++)
+        {
+            var record = resourceEvents[i];
+            if (!TryCreateResourceDetailEventCached(snapshot, combatantId, in record, scope, out var detailEvent))
+                continue;
+
+            writer.AddResource(in detailEvent);
+            resourceEventCount++;
+            revision = Math.Max(revision, detailEvent.Revision);
+        }
+
+        return new CombatDetailWriteResult(metricEventCount, mechanicEventCount, resourceEventCount, revision);
     }
 
-    internal bool TryCreateDetailEvent(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, out CombatDetailEvent detailEvent)
+    internal bool TryCreateMetricDetailEvent(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, out CombatMetricDetailEvent detailEvent)
     {
         PrepareProjectionCaches();
-        return TryCreateDetailEventCached(snapshot, combatantId, in record, CombatDetailProjectionScope.EncounterWindow, out detailEvent);
+        return TryCreateMetricDetailEventCached(snapshot, combatantId, in record, CombatDetailProjectionScope.EncounterWindow, out detailEvent);
     }
 
-    internal bool TryResolveDetailEventSource(SceneCombatSnapshot snapshot, in CombatEventRecord record, out int sourceId)
+    internal bool TryResolveMetricDetailEventSource(SceneCombatSnapshot snapshot, in CombatEventRecord record, out int sourceId)
     {
         PrepareProjectionCaches();
-        return TryResolveDetailEventSourceCached(snapshot, in record, CombatDetailProjectionScope.EncounterWindow, out sourceId);
+        return TryResolveMetricDetailEventSourceCached(snapshot, in record, CombatDetailProjectionScope.EncounterWindow, out sourceId);
     }
 
-    private bool TryCreateDetailEventCached(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, CombatDetailProjectionScope scope, out CombatDetailEvent detailEvent)
+    private bool TryCreateMetricDetailEventCached(SceneCombatSnapshot snapshot, int combatantId, in CombatEventRecord record, CombatDetailProjectionScope scope, out CombatMetricDetailEvent detailEvent)
     {
         var eventSourceId = ResolveCombatantIdCached(record.SourceId);
         if (eventSourceId != combatantId && record.TargetId != combatantId)
@@ -177,10 +178,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return false;
         }
 
-        return TryCreateDetailEventCached(snapshot, in record, eventSourceId, scope, out detailEvent);
+        return TryCreateMetricDetailEventCached(snapshot, in record, eventSourceId, scope, out detailEvent);
     }
 
-    private bool TryCreateDetailEventCached(SceneCombatSnapshot snapshot, in CombatEventRecord record, int eventSourceId, CombatDetailProjectionScope scope, out CombatDetailEvent detailEvent)
+    private bool TryCreateMetricDetailEventCached(SceneCombatSnapshot snapshot, in CombatEventRecord record, int eventSourceId, CombatDetailProjectionScope scope, out CombatMetricDetailEvent detailEvent)
     {
         if (!ShouldIncludeDetailEvent(in record, eventSourceId, record.TargetId, snapshot, scope))
         {
@@ -188,11 +189,11 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             return false;
         }
 
-        detailEvent = CreateDetailEvent(in record, eventSourceId);
+        detailEvent = CreateMetricDetailEvent(in record, eventSourceId);
         return true;
     }
 
-    private bool TryResolveDetailEventSourceCached(SceneCombatSnapshot snapshot, in CombatEventRecord record, CombatDetailProjectionScope scope, out int sourceId)
+    private bool TryResolveMetricDetailEventSourceCached(SceneCombatSnapshot snapshot, in CombatEventRecord record, CombatDetailProjectionScope scope, out int sourceId)
     {
         sourceId = ResolveCombatantIdCached(record.SourceId);
         if (ShouldIncludeDetailEvent(in record, sourceId, record.TargetId, snapshot, scope))
@@ -202,12 +203,83 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return false;
     }
 
-    private static CombatDetailEvent CreateDetailEvent(in CombatEventRecord record, int sourceId)
-        => new(record.Observation, sourceId, record.TargetId, ObservedAt(record), record.Revision, record.EventKey, record.Raw, record.Contribution, record.Canonicalization);
+    private static CombatMetricDetailEvent CreateMetricDetailEvent(in CombatEventRecord record, int sourceId)
+        => new(
+            CombatDetailFact.Create(
+                record.Observation,
+                sourceId,
+                record.TargetId,
+                ObservedAt(record),
+                record.SourceObservationOrdinal,
+                record.Revision,
+                record.EventKey,
+                record.Raw),
+            record.Contribution);
+
+    private bool TryCreateMechanicDetailEventCached(
+        SceneCombatSnapshot snapshot,
+        int combatantId,
+        in CombatMechanicEventRecord record,
+        CombatDetailProjectionScope scope,
+        out CombatMechanicDetailEvent detailEvent)
+    {
+        var sourceId = ResolveCombatantIdCached(record.SourceId);
+        if (sourceId != combatantId && record.TargetId != combatantId ||
+            scope == CombatDetailProjectionScope.EncounterWindow &&
+            !IsWithinEncounterWindow(record.ObservedAtMilliseconds, snapshot.EncounterStartTime, snapshot.EncounterEndTime) ||
+            IsSummonMechanicTargetCached(record.SourceId, record.TargetId, record.Mechanic))
+        {
+            detailEvent = default;
+            return false;
+        }
+
+        detailEvent = new CombatMechanicDetailEvent(
+            CombatDetailFact.Create(
+                record.Observation,
+                sourceId,
+                record.TargetId,
+                record.ObservedAtMilliseconds,
+                record.SourceObservationOrdinal,
+                record.Revision,
+                record.EventKey,
+                record.Raw),
+            record.Mechanic);
+        return true;
+    }
+
+    private bool TryCreateResourceDetailEventCached(
+        SceneCombatSnapshot snapshot,
+        int combatantId,
+        in CombatResourceEventRecord record,
+        CombatDetailProjectionScope scope,
+        out CombatResourceDetailEvent detailEvent)
+    {
+        var sourceId = ResolveCombatantIdCached(record.SourceId);
+        if (sourceId != combatantId && record.TargetId != combatantId ||
+            scope == CombatDetailProjectionScope.EncounterWindow &&
+            !IsWithinEncounterWindow(record.ObservedAtMilliseconds, snapshot.EncounterStartTime, snapshot.EncounterEndTime))
+        {
+            detailEvent = default;
+            return false;
+        }
+
+        detailEvent = new CombatResourceDetailEvent(
+            CombatDetailFact.Create(
+                record.Observation,
+                sourceId,
+                record.TargetId,
+                record.ObservedAtMilliseconds,
+                record.SourceObservationOrdinal,
+                record.Revision,
+                record.EventKey,
+                record.Raw),
+            record.Resource);
+        return true;
+    }
 
     public CombatSkillBreakdownSnapshot CreateSkillBreakdown(SceneCombatSnapshot snapshot, int combatantId)
     {
-        if (combatantId <= 0 || snapshot.EncounterTime <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime)
+        if (combatantId <= 0 || snapshot.EncounterEndTime < snapshot.EncounterStartTime)
             return CombatSkillBreakdownSnapshot.Empty;
 
         PrepareProjectionCaches();
@@ -220,13 +292,18 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private static bool IsSnapshotTarget(SceneCombatSnapshot snapshot, int entityId) =>
         snapshot.TargetObservation?.InstanceId == entityId || snapshot.Encounter.TrackingTargetId == entityId;
 
+    private static long SaturatingAdd(long first, long second, long third)
+    {
+        var sum = first > long.MaxValue - second ? long.MaxValue : first + second;
+        return sum > long.MaxValue - third ? long.MaxValue : sum + third;
+    }
+
     private bool CanProjectDetailCombatant(SceneCombatSnapshot snapshot, int combatantId) =>
         combatantId > 0 &&
-        snapshot.EncounterTime > 0 &&
         snapshot.EncounterEndTime >= snapshot.EncounterStartTime &&
         (snapshot.Combatants.ContainsKey(combatantId) ||
          IsSnapshotTarget(snapshot, combatantId) ||
-         CombatPairProjection.GetCombatant(combat, combatantId) is not null);
+         CombatPairProjection.GetCombatant(combat, mechanics, resources, combatantId) is not null);
 
     public int ResolveDetailCombatantId(int entityId)
     {
@@ -238,9 +315,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     {
         PrepareProjectionCaches();
         return new CombatDetailProjectionVersion(
-            entities.IdentityRevision,
-            _ownerInferenceVersion,
-            CombatResourceRegistry.SkillMapRevision);
+            entities.IdentityRevision);
     }
 
     internal bool TryResolveCurrentFrameEventSourcePrepared(in CombatEventRecord record, out int sourceId)
@@ -253,10 +328,29 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return false;
     }
 
+    internal bool TryResolveCurrentFrameEventSourcePrepared(in CombatMechanicEventRecord record, out int sourceId)
+    {
+        sourceId = ResolveCombatantIdCached(record.SourceId);
+        if (!IsSummonMechanicTargetCached(record.SourceId, record.TargetId, record.Mechanic))
+            return true;
+
+        sourceId = 0;
+        return false;
+    }
+
+    internal int ResolveCurrentFrameEventSourcePrepared(in CombatResourceEventRecord record) =>
+        ResolveCombatantIdCached(record.SourceId);
+
     internal bool IsSummonDamageTarget(int sourceId, int targetId, long damage)
     {
         PrepareProjectionCaches();
         return IsSummonDamageTargetCached(sourceId, targetId, damage);
+    }
+
+    internal bool IsSummonMechanicTarget(int sourceId, int targetId, CombatMechanicOccurrence mechanic)
+    {
+        PrepareProjectionCaches();
+        return IsSummonMechanicTargetCached(sourceId, targetId, mechanic);
     }
 
     private bool ShouldIncludeDetailEvent(in CombatEventRecord e, int sourceId, int targetId, SceneCombatSnapshot snapshot, CombatDetailProjectionScope scope)
@@ -278,24 +372,28 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         {
             var lastObserved = ObservedAt(pair);
             latestObservedAt = Math.Max(latestObservedAt, lastObserved);
-            if (!HasDamageActivity(pair) || IsSummonDamageTargetCached(pair.SourceId, pair.TargetId, pair.TotalDamage))
+            mechanics.TryGetPair(pair.SourceId, pair.TargetId, out var mechanicPair);
+            if (!HasDamageActivity(pair.TotalDamage, mechanicPair))
                 continue;
 
-            var targetId = pair.TargetId;
-            if (targetId <= 0 || IsKnownSummonCached(targetId))
-                continue;
-
-            var firstObserved = FirstObservedAt(pair);
-            ref var info = ref CollectionsMarshal.GetValueRefOrAddDefault(_targetInfos, targetId, out var exists);
-            if (!exists)
-                info = new TargetInfo(firstObserved, lastObserved);
-
-            info.Add(firstObserved);
-            info.Add(lastObserved);
+            var firstObserved = mechanicPair is null ? pair.FirstObserved : Math.Min(pair.FirstObserved, mechanicPair.FirstObserved);
+            AddTargetInfo(pair.SourceId, pair.TargetId, pair.TotalDamage, firstObserved, Math.Max(lastObserved, mechanicPair?.LastObserved ?? 0));
         }
 
+        foreach (var mechanicPair in mechanics.Pairs.Values)
+        {
+            latestObservedAt = Math.Max(latestObservedAt, mechanicPair.LastObserved);
+            if (combat.Pairs.ContainsKey((mechanicPair.SourceId, mechanicPair.TargetId)) || !HasDamageActivity(0, mechanicPair))
+                continue;
+
+            AddTargetInfo(mechanicPair.SourceId, mechanicPair.TargetId, 0, mechanicPair.FirstObserved, mechanicPair.LastObserved);
+        }
+
+        foreach (var resourcePair in resources.Pairs.Values)
+            latestObservedAt = Math.Max(latestObservedAt, resourcePair.LastObserved);
+
         if (_targetInfos.Count == 0)
-            return new TargetDecision(0, 0, 0, latestObservedAt);
+            return BuildResourceOnlyTargetDecision(latestObservedAt);
 
         var start = long.MaxValue;
         var end = long.MinValue;
@@ -313,6 +411,41 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
 
         return new TargetDecision(start, end, trackingTargetId, latestObservedAt);
+    }
+
+    private TargetDecision BuildResourceOnlyTargetDecision(long latestObservedAt)
+    {
+        var start = long.MaxValue;
+        var end = long.MinValue;
+        var trackingTargetId = 0;
+        var lastTargetObserved = long.MinValue;
+        foreach (var pair in resources.Pairs.Values)
+        {
+            start = Math.Min(start, pair.FirstObserved);
+            end = Math.Max(end, pair.LastObserved);
+            var targetId = pair.TargetId > 0 ? pair.TargetId : ResolveCombatantIdCached(pair.SourceId);
+            if (targetId > 0 && pair.LastObserved > lastTargetObserved)
+            {
+                trackingTargetId = targetId;
+                lastTargetObserved = pair.LastObserved;
+            }
+        }
+
+        return start == long.MaxValue
+            ? new TargetDecision(0, 0, 0, latestObservedAt)
+            : new TargetDecision(start, end, trackingTargetId, latestObservedAt);
+    }
+
+    private void AddTargetInfo(int sourceId, int targetId, long damage, long firstObserved, long lastObserved)
+    {
+        if (targetId <= 0 || IsKnownSummonCached(targetId) || IsSummonDamageTargetCached(sourceId, targetId, damage))
+            return;
+
+        ref var info = ref CollectionsMarshal.GetValueRefOrAddDefault(_targetInfos, targetId, out var exists);
+        if (!exists)
+            info = new TargetInfo(firstObserved, lastObserved);
+        info.Add(firstObserved);
+        info.Add(lastObserved);
     }
 
     private void ApplyCombatState(SceneCombatSnapshotBuilder builder)
@@ -336,6 +469,22 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
                 pair.TotalShieldAbsorbed,
                 pair.ShieldAbsorbedCount);
         }
+
+        foreach (var pair in mechanics.Pairs.Values)
+        {
+            var sourceId = ResolveCombatantIdCached(pair.SourceId);
+            if (sourceId > 0)
+                _ = builder.GetOrAddCombatant(sourceId);
+        }
+
+        foreach (var pair in resources.Pairs.Values)
+        {
+            var sourceId = ResolveCombatantIdCached(pair.SourceId);
+            if (sourceId > 0)
+                _ = builder.GetOrAddCombatant(sourceId);
+            if (pair.TargetId > 0 && pair.TargetId != sourceId)
+                _ = builder.GetOrAddCombatant(pair.TargetId);
+        }
     }
 
     private void ProcessClassEvidenceEvents(CombatEventRange events)
@@ -347,7 +496,8 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
                 continue;
 
             var observation = record.Observation;
-            if (!CombatantClassEvidence.TryCreate(in observation, out var characterClass, out var score))
+            var contribution = record.Contribution;
+            if (!CombatantClassEvidence.TryCreate(in observation, in contribution, out var characterClass, out var score))
                 continue;
 
             ref var evidence = ref CollectionsMarshal.GetValueRefOrAddDefault(_classEvidence, sourceId, out _);
@@ -409,36 +559,60 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
                 AddSkillEvent(skills, in e);
         }
 
-        if (relevant.Count == 0)
-            return;
-
-        var events2 = combat.EventSpan;
-        foreach (ref readonly var e in events2)
+        if (relevant.Count > 0)
         {
-            var observedAt = ObservedAt(in e);
-            if (IsWithinEncounterWindow(observedAt, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTargetCached(in e))
-                continue;
+            var events2 = combat.EventSpan;
+            foreach (ref readonly var e in events2)
+            {
+                var observedAt = ObservedAt(in e);
+                if (IsWithinEncounterWindow(observedAt, snapshot.EncounterStartTime, snapshot.EncounterEndTime) || IsSummonDamageTargetCached(in e))
+                    continue;
 
-            var sourceId = ResolveCombatantIdCached(e.SourceId);
-            if (sourceId != combatantId || !IsRelevantRecoveryEvent(in e, sourceId, e.TargetId, ref relevant))
-                continue;
+                var sourceId = ResolveCombatantIdCached(e.SourceId);
+                if (sourceId != combatantId || !IsRelevantRecoveryEvent(in e, sourceId, e.TargetId, ref relevant))
+                    continue;
 
-            AddSkillEvent(skills, in e);
+                AddSkillEvent(skills, in e);
+            }
+        }
+
+        var mechanicEvents = mechanics.Events;
+        for (var i = 0; i < mechanicEvents.Count; i++)
+        {
+            var mechanicEvent = mechanicEvents[i];
+            if (!IsWithinEncounterWindow(mechanicEvent.ObservedAtMilliseconds, snapshot.EncounterStartTime, snapshot.EncounterEndTime) ||
+                IsSummonMechanicTargetCached(mechanicEvent.SourceId, mechanicEvent.TargetId, mechanicEvent.Mechanic) ||
+                ResolveCombatantIdCached(mechanicEvent.SourceId) != combatantId)
+            {
+                continue;
+            }
+
+            AddSkillMechanicEvent(skills, in mechanicEvent);
         }
     }
 
     private static void AddSkillEvent(Dictionary<CombatEventKey, SkillMetrics> skills, in CombatEventRecord e)
     {
-        var observation = e.Observation;
         var eventKey = e.EventKey;
         ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(skills, eventKey, out var exists);
         if (!exists)
         {
-            metrics = new SkillMetrics(eventKey, in observation);
+            metrics = new SkillMetrics(eventKey);
         }
 
         var contribution = e.Contribution;
-        metrics.ProcessContribution(in observation, in contribution);
+        metrics.ProcessContribution(in contribution);
+    }
+
+    private static void AddSkillMechanicEvent(Dictionary<CombatEventKey, SkillMetrics> skills, in CombatMechanicEventRecord e)
+    {
+        var eventKey = e.EventKey;
+        ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(skills, eventKey, out var exists);
+        if (!exists)
+            metrics = new SkillMetrics(eventKey);
+
+        var mechanic = e.Mechanic;
+        metrics.ProcessMechanic(in mechanic);
     }
 
     private int ResolveCombatantIdCached(int combatantId)
@@ -465,13 +639,13 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             }
         }
 
-        resolved = _inferredOwnerBySummon.TryGetValue(combatantId, out var inferredOwnerId) ? inferredOwnerId : combatantId;
+        resolved = combatantId;
         return resolved;
     }
 
     private bool IsSummonDamageTargetCached(in CombatEventRecord e)
     {
-        return IsSummonDamageTargetCached(e.SourceId, e.TargetId, e.ContributesDamage ? e.Observation.Damage : 0);
+        return IsSummonDamageTargetCached(e.SourceId, e.TargetId, e.ContributesDamage ? e.Contribution.Amount : 0);
     }
 
     private bool IsSummonDamageTargetCached(int sourceId, int targetId, long damage)
@@ -479,6 +653,22 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         if (targetId <= 0 || damage <= 0)
             return false;
 
+        return IsSummonCombatTargetCached(sourceId, targetId);
+    }
+
+    private bool IsSummonMechanicTargetCached(
+        int sourceId,
+        int targetId,
+        CombatMechanicOccurrence mechanic)
+    {
+        if (targetId <= 0 || !mechanic.HasFacts)
+            return false;
+
+        return IsSummonCombatTargetCached(sourceId, targetId);
+    }
+
+    private bool IsSummonCombatTargetCached(int sourceId, int targetId)
+    {
         var sourceIsSummon = IsKnownSummonCached(sourceId);
         var targetIsSummon = IsKnownSummonCached(targetId);
         if (targetIsSummon)
@@ -502,20 +692,9 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private bool IsKnownSummonCore(int entityId)
     {
-        if (entities.TryGet(entityId, out var entity))
-        {
-            if (entity.OwnerKind == EntityOwnerKind.Summon || entity.Kind == NpcKind.Summon)
-                return true;
-
-            if (entity.Kind != NpcKind.Summon && IsExplicitNonSummon(entity))
-                return false;
-        }
-
-        return _inferredOwnerBySummon.ContainsKey(entityId);
+        return entities.TryGet(entityId, out var entity) &&
+               (entity.OwnerKind == EntityOwnerKind.Summon || entity.Kind == NpcKind.Summon);
     }
-
-    private bool IsExplicitKnownSummonCore(int entityId) =>
-        entities.TryGet(entityId, out var entity) && entity.OwnerKind == EntityOwnerKind.Summon;
 
     private static bool IsExplicitNonSummon(EntityRecord entity) =>
         entity.IsPlayer ||
@@ -551,12 +730,18 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     private static long ObservedAt(CombatPairRecord pair) =>
         pair.LastObserved;
 
-    private static bool HasDamageActivity(CombatPairRecord pair) =>
-        pair.TotalDamage > 0 || pair.AttemptCount > 0 || pair.EvadeCount > 0 || pair.InvincibleCount > 0 || pair.MultiHitCount > 0;
+    private static bool HasDamageActivity(long damage, CombatMechanicPairRecord? mechanic) =>
+        damage > 0 ||
+        mechanic is not null &&
+        (mechanic.HitCount > 0 ||
+         mechanic.AttemptCount > 0 ||
+         mechanic.EvadeCount > 0 ||
+         mechanic.InvincibleCount > 0 ||
+         mechanic.MultiHitCount > 0);
 
     private static bool IsRelevantRecoveryEvent(in CombatEventRecord e, int sourceId, int targetId, ref SmallIntSet relevant)
     {
-        if (e.Observation.Damage <= 0 || (!relevant.Contains(sourceId) && !relevant.Contains(targetId)))
+        if (e.Contribution.Amount <= 0 || (!relevant.Contains(sourceId) && !relevant.Contains(targetId)))
             return false;
 
         return IsRecoveryEvent(in e);
@@ -564,7 +749,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private static bool IsRelevantRecoveryEvent(in CombatEventRecord e, int sourceId, int targetId, SceneCombatSnapshot snapshot)
     {
-        if (e.Observation.Damage <= 0)
+        if (e.Contribution.Amount <= 0)
             return false;
 
         var targetObservationId = snapshot.TargetObservation?.InstanceId;
@@ -581,8 +766,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
     private static bool IsRecoveryEvent(in CombatEventRecord e)
     {
-        return e.Observation.EventKind is CombatEventKind.Healing or CombatEventKind.Support
-               || e.Observation.ValueKind is CombatValueKind.Healing or CombatValueKind.PeriodicHealing or CombatValueKind.DrainHealing or CombatValueKind.Shield or CombatValueKind.Support;
+        return e.Contribution.Metric is CombatMetricKind.Healing or CombatMetricKind.ShieldGranted or CombatMetricKind.ShieldAbsorbed;
     }
 
     private int ResolveTrackingTargetId(int trackingTargetId, long nowMilliseconds)
@@ -604,102 +788,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return _classEvidence.TryGetValue(entityId, out var evidence) ? evidence.Resolve() : null;
     }
 
-    private void ProcessOwnerInferenceEvents(CombatEventRange events)
-    {
-        if (CombatResourceRegistry.SkillMap.Count == 0)
-            return;
-
-        foreach (ref readonly var e in events)
-        {
-            var sourceId = e.SourceId;
-            if (sourceId <= 0 || IsExplicitKnownSummonCore(sourceId))
-                continue;
-
-            if (entities.TryGet(sourceId, out var entity) && entity.Kind is not NpcKind.Unknown and not NpcKind.Summon)
-                continue;
-
-            var skill = ClassifyOwnerInferenceSkill(e.Observation.SkillCode);
-            if (skill.Flags == OwnerInferenceSkillFlags.None)
-                continue;
-
-            if (skill.IsOwnerCandidate && IsDirectSummonOwnerSupportEvidence(in e) && IsPotentialImplicitSummonTarget(sourceId, e.TargetId))
-            {
-                var key = new SummonOwnerInferenceKey(e.TargetId, skill.Category);
-                ref var directOwners = ref CollectionsMarshal.GetValueRefOrAddDefault(_directOwnerCandidatesBySummonCategory, key, out var directOwnersExist);
-                if (!directOwnersExist)
-                    directOwners = default;
-                directOwners.Add(sourceId);
-            }
-
-            ref var source = ref CollectionsMarshal.GetValueRefOrAddDefault(_ownerInferenceBySource, sourceId, out var sourceExists);
-            if (!sourceExists)
-                source = new SummonOwnerInferenceAccumulator(sourceId);
-
-            if (skill.IsPreexistingSummonSignature)
-            {
-                source.AddSummonSkillCategory(skill.Category);
-                continue;
-            }
-
-            if (!skill.IsOwnerCandidate)
-                continue;
-
-            source.HasOwnerSkillEvidence = true;
-            ref var owners = ref CollectionsMarshal.GetValueRefOrAddDefault(_ownerCandidatesByCategory, skill.Category, out var ownersExist);
-            if (!ownersExist)
-                owners = default;
-            owners.Add(sourceId);
-        }
-    }
-
-    private bool RebuildInferredSummonOwners()
-    {
-        _nextInferredOwnerBySummon.Clear();
-        if (CombatResourceRegistry.SkillMap.Count != 0)
-        {
-            foreach (var (_, source) in _ownerInferenceBySource)
-            {
-                if (source.HasOwnerSkillEvidence || !source.TryGetSingleSummonSkillCategory(out var category))
-                    continue;
-
-                if (category == SkillCategory.Unknown)
-                    continue;
-
-                var ownerId = _directOwnerCandidatesBySummonCategory.TryGetValue(new SummonOwnerInferenceKey(source.SourceId, category), out var directOwners)
-                    ? directOwners.ResolveUniqueOwner(source.SourceId)
-                    : 0;
-                if (ownerId <= 0 && _ownerCandidatesByCategory.TryGetValue(category, out var owners))
-                    ownerId = owners.ResolveUniqueOwner(source.SourceId);
-                if (ownerId > 0)
-                    _nextInferredOwnerBySummon[source.SourceId] = ownerId;
-            }
-        }
-
-        if (DictionaryEquals(_inferredOwnerBySummon, _nextInferredOwnerBySummon))
-            return false;
-
-        _inferredOwnerBySummon.Clear();
-        foreach (var (summonId, ownerId) in _nextInferredOwnerBySummon)
-            _inferredOwnerBySummon[summonId] = ownerId;
-
-        _ownerInferenceVersion++;
-        return true;
-    }
-
-    private static bool DictionaryEquals(Dictionary<int, int> left, Dictionary<int, int> right)
-    {
-        if (left.Count != right.Count)
-            return false;
-
-        foreach (var (key, value) in left)
-        {
-            if (!right.TryGetValue(key, out var other) || other != value)
-                return false;
-        }
-
-        return true;
-    }
-
     private SceneCombatSnapshotClassEvidenceEntry[] CreateClassEvidenceSnapshot()
     {
         if (_classEvidence.Count == 0)
@@ -712,54 +800,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return result;
     }
 
-    private SceneCombatSnapshotOwnerEntry[] CreateInferredOwnerSnapshot()
-    {
-        if (_inferredOwnerBySummon.Count == 0)
-            return [];
-
-        var result = new SceneCombatSnapshotOwnerEntry[_inferredOwnerBySummon.Count];
-        var index = 0;
-        foreach (var (summonId, ownerId) in _inferredOwnerBySummon)
-            result[index++] = new SceneCombatSnapshotOwnerEntry(summonId, ownerId);
-        return result;
-    }
-
-    private SceneCombatSnapshotOwnerInferenceSourceEntry[] CreateOwnerInferenceSourceSnapshot()
-    {
-        if (_ownerInferenceBySource.Count == 0)
-            return [];
-
-        var result = new SceneCombatSnapshotOwnerInferenceSourceEntry[_ownerInferenceBySource.Count];
-        var index = 0;
-        foreach (var (sourceId, source) in _ownerInferenceBySource)
-            result[index++] = new SceneCombatSnapshotOwnerInferenceSourceEntry(sourceId, source.HasOwnerSkillEvidence, source.SummonSkillCategoryMask);
-        return result;
-    }
-
-    private SceneCombatSnapshotOwnerCandidateEntry[] CreateOwnerCandidateSnapshot()
-    {
-        if (_ownerCandidatesByCategory.Count == 0)
-            return [];
-
-        var result = new SceneCombatSnapshotOwnerCandidateEntry[_ownerCandidatesByCategory.Count];
-        var index = 0;
-        foreach (var (category, owners) in _ownerCandidatesByCategory)
-            result[index++] = new SceneCombatSnapshotOwnerCandidateEntry(category, owners.ToArray());
-        return result;
-    }
-
-    private SceneCombatSnapshotDirectOwnerCandidateEntry[] CreateDirectOwnerCandidateSnapshot()
-    {
-        if (_directOwnerCandidatesBySummonCategory.Count == 0)
-            return [];
-
-        var result = new SceneCombatSnapshotDirectOwnerCandidateEntry[_directOwnerCandidatesBySummonCategory.Count];
-        var index = 0;
-        foreach (var (key, owners) in _directOwnerCandidatesBySummonCategory)
-            result[index++] = new SceneCombatSnapshotDirectOwnerCandidateEntry(key.SummonId, key.Category, owners.ToArray());
-        return result;
-    }
-
     private void RestoreSnapshot(SceneCombatSnapshotAdapterSnapshot snapshot)
     {
         for (var i = 0; i < snapshot.ClassEvidence.Length; i++)
@@ -768,55 +808,15 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             _classEvidence[entry.EntityId] = entry.Evidence;
         }
 
-        for (var i = 0; i < snapshot.InferredOwners.Length; i++)
-        {
-            var entry = snapshot.InferredOwners[i];
-            _inferredOwnerBySummon[entry.SummonId] = entry.OwnerId;
-        }
-
-        for (var i = 0; i < snapshot.OwnerInferenceSources.Length; i++)
-        {
-            var entry = snapshot.OwnerInferenceSources[i];
-            _ownerInferenceBySource[entry.SourceId] = SummonOwnerInferenceAccumulator.FromSnapshot(entry.SourceId, entry.HasOwnerSkillEvidence, entry.SummonSkillCategoryMask);
-        }
-
-        for (var i = 0; i < snapshot.OwnerCandidates.Length; i++)
-        {
-            var entry = snapshot.OwnerCandidates[i];
-            _ownerCandidatesByCategory[entry.Category] = OwnerCandidateAccumulator.FromSnapshot(entry.OwnerIds);
-        }
-
-        for (var i = 0; i < snapshot.DirectOwnerCandidates.Length; i++)
-        {
-            var entry = snapshot.DirectOwnerCandidates[i];
-            _directOwnerCandidatesBySummonCategory[new SummonOwnerInferenceKey(entry.SummonId, entry.Category)] = OwnerCandidateAccumulator.FromSnapshot(entry.OwnerIds);
-        }
-
-        _ownerInferenceCombatRevision = snapshot.OwnerInferenceCombatRevision;
-        _ownerInferenceIdentityRevision = snapshot.OwnerInferenceIdentityRevision;
-        _ownerInferenceSkillMapRevision = snapshot.OwnerInferenceSkillMapRevision;
-        _ownerInferenceVersion = snapshot.OwnerInferenceVersion;
-        _ownerInferenceReady = snapshot.OwnerInferenceReady;
-        _ownerInferenceScannedEventCount = 0;
         _classEvidenceCombatRevision = snapshot.ClassEvidenceCombatRevision;
         _classEvidenceIdentityRevision = snapshot.ClassEvidenceIdentityRevision;
-        _classEvidenceOwnerVersion = snapshot.ClassEvidenceOwnerVersion;
         _classEvidenceSkillMapRevision = snapshot.ClassEvidenceSkillMapRevision;
         _classEvidenceScannedEventCount = 0;
         _hasProjectionBaseline = true;
     }
 
-    private void ResetOwnerInferenceScan()
-    {
-        _ownerInferenceBySource.Clear();
-        _ownerCandidatesByCategory.Clear();
-        _directOwnerCandidatesBySummonCategory.Clear();
-        _ownerInferenceScannedEventCount = 0;
-    }
-
     private void PrepareProjectionCaches()
     {
-        EnsureOwnerInference();
         EnsureResolveCaches();
     }
 
@@ -824,14 +824,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
     {
         var combatRevision = combat.Revision;
         var identityRevision = entities.IdentityRevision;
-        var ownerVersion = _ownerInferenceVersion;
         var skillMapRevision = CombatResourceRegistry.SkillMapRevision;
         var events = combat.EventSpan;
         var rebuildFromStart = combatRevision < _classEvidenceCombatRevision ||
                                (!_hasProjectionBaseline &&
                                 (_classEvidenceIdentityRevision != identityRevision ||
-                                 _classEvidenceOwnerVersion != ownerVersion ||
-                                 _classEvidenceSkillMapRevision != skillMapRevision ||
+                                  _classEvidenceSkillMapRevision != skillMapRevision ||
                                  _classEvidenceScannedEventCount > events.Length));
 
         if (rebuildFromStart)
@@ -848,298 +846,18 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
 
         _classEvidenceCombatRevision = combatRevision;
         _classEvidenceIdentityRevision = identityRevision;
-        _classEvidenceOwnerVersion = ownerVersion;
         _classEvidenceSkillMapRevision = skillMapRevision;
-    }
-
-    private void EnsureOwnerInference()
-    {
-        var combatRevision = combat.Revision;
-        var identityRevision = entities.IdentityRevision;
-        var skillMapRevision = CombatResourceRegistry.SkillMapRevision;
-        if (_ownerInferenceSkillClassificationRevision != skillMapRevision)
-        {
-            _ownerInferenceSkillClassifications.Clear();
-            _ownerInferenceSkillClassificationRevision = skillMapRevision;
-        }
-
-        if (_ownerInferenceReady &&
-            _ownerInferenceCombatRevision == combatRevision &&
-            (_hasProjectionBaseline || _ownerInferenceIdentityRevision == identityRevision) &&
-            (_hasProjectionBaseline || _ownerInferenceSkillMapRevision == skillMapRevision))
-        {
-            return;
-        }
-
-        var events = combat.EventSpan;
-        var rebuildFromStart = combatRevision < _ownerInferenceCombatRevision ||
-                               (!_hasProjectionBaseline &&
-                                (!_ownerInferenceReady ||
-                                 _ownerInferenceIdentityRevision != identityRevision ||
-                                 _ownerInferenceSkillMapRevision != skillMapRevision ||
-                                 _ownerInferenceScannedEventCount > events.Length));
-
-        if (rebuildFromStart)
-            ResetOwnerInferenceScan();
-
-        if (_ownerInferenceScannedEventCount < events.Length)
-        {
-            ProcessOwnerInferenceEvents(events[_ownerInferenceScannedEventCount..]);
-            _ownerInferenceScannedEventCount = events.Length;
-        }
-
-        if (rebuildFromStart || _ownerInferenceCombatRevision != combatRevision)
-            RebuildInferredSummonOwners();
-
-        _ownerInferenceCombatRevision = combatRevision;
-        _ownerInferenceIdentityRevision = identityRevision;
-        _ownerInferenceSkillMapRevision = skillMapRevision;
-        _ownerInferenceReady = true;
     }
 
     private void EnsureResolveCaches()
     {
-        if (_resolveCacheIdentityRevision == entities.IdentityRevision &&
-            _resolveCacheOwnerVersion == _ownerInferenceVersion)
-        {
+        if (_resolveCacheIdentityRevision == entities.IdentityRevision)
             return;
-        }
 
         _resolvedCombatantIds.Clear();
         _knownSummons.Clear();
         _resolveCacheIdentityRevision = entities.IdentityRevision;
-        _resolveCacheOwnerVersion = _ownerInferenceVersion;
     }
-
-    [Flags]
-    private enum OwnerInferenceSkillFlags : byte
-    {
-        None = 0,
-        OwnerCandidate = 1,
-        PreexistingSummonSignature = 2
-    }
-
-    private readonly record struct OwnerInferenceSkillClassification(SkillCategory Category, OwnerInferenceSkillFlags Flags)
-    {
-        public bool IsOwnerCandidate => (Flags & OwnerInferenceSkillFlags.OwnerCandidate) != 0;
-        public bool IsPreexistingSummonSignature => (Flags & OwnerInferenceSkillFlags.PreexistingSummonSignature) != 0;
-    }
-
-    private struct SummonOwnerInferenceAccumulator(int sourceId)
-    {
-        private uint _summonSkillCategoryMask;
-
-        public int SourceId { get; } = sourceId;
-        public bool HasOwnerSkillEvidence { get; set; }
-        public readonly uint SummonSkillCategoryMask => _summonSkillCategoryMask;
-
-        public static SummonOwnerInferenceAccumulator FromSnapshot(int sourceId, bool hasOwnerSkillEvidence, uint summonSkillCategoryMask)
-        {
-            return new SummonOwnerInferenceAccumulator(sourceId)
-            {
-                HasOwnerSkillEvidence = hasOwnerSkillEvidence,
-                _summonSkillCategoryMask = summonSkillCategoryMask
-            };
-        }
-
-        public void AddSummonSkillCategory(SkillCategory category)
-        {
-            if ((uint)category < 32)
-                _summonSkillCategoryMask |= 1u << (int)category;
-        }
-
-        public readonly bool TryGetSingleSummonSkillCategory(out SkillCategory category)
-        {
-            if (_summonSkillCategoryMask == 0 || (_summonSkillCategoryMask & (_summonSkillCategoryMask - 1)) != 0)
-            {
-                category = SkillCategory.Unknown;
-                return false;
-            }
-
-            category = (SkillCategory)BitOperations.TrailingZeroCount(_summonSkillCategoryMask);
-            return true;
-        }
-    }
-
-    private struct OwnerCandidateAccumulator
-    {
-        private const int InlineCapacity = 4;
-        private int _count;
-        private int _id0;
-        private int _id1;
-        private int _id2;
-        private int _id3;
-        private HashSet<int>? _overflow;
-
-        public void Add(int ownerId)
-        {
-            if (ownerId <= 0 || ContainsInline(ownerId))
-                return;
-
-            if (_overflow is { } overflow)
-            {
-                overflow.Add(ownerId);
-                return;
-            }
-
-            if (_count < InlineCapacity)
-            {
-                SetInline(_count++, ownerId);
-                return;
-            }
-
-            _overflow = [_id0, _id1, _id2, _id3, ownerId];
-        }
-
-        public readonly int ResolveUniqueOwner(int excludedId)
-        {
-            var ownerId = 0;
-            if (_overflow is not null)
-            {
-                foreach (var candidate in _overflow)
-                {
-                    if (!TrySelect(candidate, excludedId, ref ownerId))
-                        return 0;
-                }
-
-                return ownerId;
-            }
-
-            for (var i = 0; i < _count; i++)
-            {
-                var candidate = GetInline(i);
-                if (!TrySelect(candidate, excludedId, ref ownerId))
-                    return 0;
-            }
-
-            return ownerId;
-        }
-
-        public readonly int[] ToArray()
-        {
-            if (_overflow is { } overflow)
-            {
-                var result = overflow.ToArray();
-                Array.Sort(result);
-                return result;
-            }
-
-            if (_count == 0)
-                return [];
-
-            var inline = new int[_count];
-            for (var i = 0; i < _count; i++)
-                inline[i] = GetInline(i);
-            Array.Sort(inline);
-            return inline;
-        }
-
-        public static OwnerCandidateAccumulator FromSnapshot(int[] ownerIds)
-        {
-            var accumulator = new OwnerCandidateAccumulator();
-            for (var i = 0; i < ownerIds.Length; i++)
-                accumulator.Add(ownerIds[i]);
-            return accumulator;
-        }
-
-        private readonly bool ContainsInline(int ownerId)
-        {
-            for (var i = 0; i < _count; i++)
-            {
-                if (GetInline(i) == ownerId)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private readonly int GetInline(int index)
-        {
-            return index switch
-            {
-                0 => _id0,
-                1 => _id1,
-                2 => _id2,
-                _ => _id3
-            };
-        }
-
-        private void SetInline(int index, int ownerId)
-        {
-            switch (index)
-            {
-                case 0:
-                    _id0 = ownerId;
-                    break;
-                case 1:
-                    _id1 = ownerId;
-                    break;
-                case 2:
-                    _id2 = ownerId;
-                    break;
-                default:
-                    _id3 = ownerId;
-                    break;
-            }
-        }
-
-        private static bool TrySelect(int candidate, int excludedId, ref int ownerId)
-        {
-            if (candidate == excludedId)
-                return true;
-
-            if (ownerId != 0)
-                return false;
-
-            ownerId = candidate;
-            return true;
-        }
-    }
-
-    private OwnerInferenceSkillClassification ClassifyOwnerInferenceSkill(int skillCode)
-    {
-        if (skillCode <= 0)
-            return default;
-
-        ref var classification = ref CollectionsMarshal.GetValueRefOrAddDefault(_ownerInferenceSkillClassifications, skillCode, out var exists);
-        if (exists)
-            return classification;
-
-        if (!CombatResourceRegistry.SkillMap.TryGetValue(skillCode, out var skill))
-            return default;
-
-        var flags = OwnerInferenceSkillFlags.None;
-        if (IsSummonOwnerCandidateSkill(skill))
-            flags |= OwnerInferenceSkillFlags.OwnerCandidate;
-        if (IsPreexistingSummonSignatureSkill(skill))
-            flags |= OwnerInferenceSkillFlags.PreexistingSummonSignature;
-
-        classification = new OwnerInferenceSkillClassification(skill.Category, flags);
-        return classification;
-    }
-
-    private static bool IsSummonOwnerCandidateSkill(SkillDisplayEntry skill) =>
-        skill.SourceType == SkillSourceType.PcSkill && CombatantClassEvidence.MapSkillCategoryToClass(skill.Category) is not null;
-
-    private static bool IsPreexistingSummonSignatureSkill(SkillDisplayEntry skill) =>
-        skill.Category == SkillCategory.Elementalist && skill.Name.Contains("Spirit:", StringComparison.OrdinalIgnoreCase);
-
-    private bool IsPotentialImplicitSummonTarget(int sourceId, int targetId)
-    {
-        if (targetId <= 0 || targetId == sourceId)
-            return false;
-
-        if (!entities.TryGet(targetId, out var target))
-            return true;
-
-        if (target.IsPlayer || !string.IsNullOrWhiteSpace(target.Nickname))
-            return false;
-
-        return target.Kind == NpcKind.Summon || (target.Kind == NpcKind.Unknown && !target.NpcCode.HasValue);
-    }
-
-    private static bool IsDirectSummonOwnerSupportEvidence(in CombatEventRecord e) =>
-        e.TargetId > 0 && e.Observation.Damage > 0 && IsRecoveryEvent(in e);
 
     private NpcRuntimeObservationSnapshot? BuildTargetObservation(int targetId)
     {
@@ -1167,9 +885,11 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
             state4636Value1 = entity.State4636?.State1;
             sequence2C38 = entity.Latest2C38?.SequenceId;
             result2C38 = entity.Latest2C38?.ResultCode;
-            hp = entity.CurrentHp;
             battleToggledOn = entity.NpcCombatActive;
         }
+
+        if (entityVitals.TryGet(targetId, out var vital))
+            hp = vital.CurrentHp;
 
         var mutableObservation = new NpcRuntimeObservation
         {
@@ -1216,7 +936,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return now;
     }
 
-    private EncounterSummarySnapshot EvaluateEncounter(int targetId, long encounterTime, NpcRuntimeObservationSnapshot? observation, long nowMilliseconds)
+    private EncounterSummarySnapshot EvaluateEncounter(int targetId, bool hasMaterializedActivity, NpcRuntimeObservationSnapshot? observation, long nowMilliseconds)
     {
         if (targetId <= 0 && bossFocus is not null && bossFocus.TryGetObservedBoss(nowMilliseconds, 10_000, out var boss))
         {
@@ -1237,14 +957,12 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         return new EncounterSummarySnapshot(
             TrackingTargetId: targetId,
             PhaseHint: observation?.PhaseHint ?? NpcRuntimePhaseHint.Unknown,
-            IsActive: encounterTime > 0 || observation?.BattleToggledOn == true || observation?.Hp.HasValue == true,
+            IsActive: hasMaterializedActivity || observation?.BattleToggledOn == true || observation?.Hp.HasValue == true,
             ShouldArchive: false,
-            Reason: encounterTime > 0 ? "scene-combat" : observation?.BattleToggledOn == true ? "battle-toggle" : observation?.Hp.HasValue == true ? "hp-observed" : "insufficient-signal");
+            Reason: hasMaterializedActivity ? "scene-combat" : observation?.BattleToggledOn == true ? "battle-toggle" : observation?.Hp.HasValue == true ? "hp-observed" : "insufficient-signal");
     }
 
     private readonly record struct TargetDecision(long EncounterStartTime, long EncounterEndTime, int TrackingTargetId, long LatestObservedAt);
-
-    private readonly record struct SummonOwnerInferenceKey(int SummonId, SkillCategory Category);
 
     private struct TargetInfo(long firstDamageAt, long lastDamageAt)
     {
@@ -1320,36 +1038,33 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, CombatStore
         }
     }
 
-    private sealed class ListDetailEventWriter(List<CombatDetailEvent> events) : ICombatDetailEventWriter
+    private sealed class ListDetailEventWriter : ICombatDetailEventWriter
     {
-        public void Clear() => events.Clear();
+        private readonly List<CombatMetricDetailEvent> _metricEvents = [];
+        private readonly List<CombatMechanicDetailEvent> _mechanicEvents = [];
+        private readonly List<CombatResourceDetailEvent> _resourceEvents = [];
 
-        public void Add(in CombatDetailEvent detailEvent) => events.Add(detailEvent);
+        public void Clear()
+        {
+            _metricEvents.Clear();
+            _mechanicEvents.Clear();
+            _resourceEvents.Clear();
+        }
+
+        public void AddMetric(in CombatMetricDetailEvent detailEvent) => _metricEvents.Add(detailEvent);
+
+        public void AddMechanic(in CombatMechanicDetailEvent detailEvent) => _mechanicEvents.Add(detailEvent);
+
+        public void AddResource(in CombatResourceDetailEvent detailEvent) => _resourceEvents.Add(detailEvent);
+
+        public CombatDetailEventSet ToEventSet() => new(_metricEvents, _mechanicEvents, _resourceEvents);
     }
 }
 
 internal sealed record SceneCombatSnapshotAdapterSnapshot(
     SceneCombatSnapshotClassEvidenceEntry[] ClassEvidence,
-    SceneCombatSnapshotOwnerEntry[] InferredOwners,
-    SceneCombatSnapshotOwnerInferenceSourceEntry[] OwnerInferenceSources,
-    SceneCombatSnapshotOwnerCandidateEntry[] OwnerCandidates,
-    SceneCombatSnapshotDirectOwnerCandidateEntry[] DirectOwnerCandidates,
-    long OwnerInferenceCombatRevision,
-    long OwnerInferenceIdentityRevision,
-    long OwnerInferenceSkillMapRevision,
-    long OwnerInferenceVersion,
-    bool OwnerInferenceReady,
     long ClassEvidenceCombatRevision,
     long ClassEvidenceIdentityRevision,
-    long ClassEvidenceOwnerVersion,
     long ClassEvidenceSkillMapRevision);
 
 internal readonly record struct SceneCombatSnapshotClassEvidenceEntry(int EntityId, CombatantClassEvidence Evidence);
-
-internal readonly record struct SceneCombatSnapshotOwnerEntry(int SummonId, int OwnerId);
-
-internal readonly record struct SceneCombatSnapshotOwnerInferenceSourceEntry(int SourceId, bool HasOwnerSkillEvidence, uint SummonSkillCategoryMask);
-
-internal readonly record struct SceneCombatSnapshotOwnerCandidateEntry(SkillCategory Category, int[] OwnerIds);
-
-internal readonly record struct SceneCombatSnapshotDirectOwnerCandidateEntry(int SummonId, SkillCategory Category, int[] OwnerIds);

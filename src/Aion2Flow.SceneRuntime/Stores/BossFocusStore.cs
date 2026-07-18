@@ -3,7 +3,7 @@ using Cloris.Aion2Flow.SceneRuntime.Model;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
-public sealed class BossFocusStore(EntityStore entities)
+public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entityVitals)
 {
     private readonly Dictionary<int, Snapshot> _observed = [];
     private readonly Dictionary<int, Snapshot> _encounterBosses = [];
@@ -144,27 +144,30 @@ public sealed class BossFocusStore(EntityStore entities)
         return new BossFocusStoreSnapshot(observed, cleared, encounterBosses, _revision);
     }
 
-    internal static BossFocusStore FromSnapshot(EntityStore entities, BossFocusStoreSnapshot snapshot)
+    internal void RestoreSnapshot(BossFocusStoreSnapshot snapshot)
     {
-        var store = new BossFocusStore(entities) { _revision = snapshot.Revision };
+        _observed.Clear();
+        _encounterBosses.Clear();
+        _encounterBossOrder.Clear();
+        _lastClearedAtMilliseconds.Clear();
         for (var i = 0; i < snapshot.Observed.Length; i++)
         {
             var observed = snapshot.Observed[i];
-            store._observed[observed.InstanceId] = observed.Snapshot;
+            _observed[observed.InstanceId] = observed.Snapshot;
         }
 
         for (var i = 0; i < snapshot.Cleared.Length; i++)
         {
             var cleared = snapshot.Cleared[i];
-            store._lastClearedAtMilliseconds[cleared.InstanceId] = cleared.ObservedAtMilliseconds;
+            _lastClearedAtMilliseconds[cleared.InstanceId] = cleared.ObservedAtMilliseconds;
         }
         for (var i = 0; i < snapshot.EncounterBosses.Length; i++)
         {
             var encounterBoss = snapshot.EncounterBosses[i];
-            store._encounterBossOrder.Add(encounterBoss.InstanceId);
-            store._encounterBosses[encounterBoss.InstanceId] = encounterBoss.Snapshot;
+            _encounterBossOrder.Add(encounterBoss.InstanceId);
+            _encounterBosses[encounterBoss.InstanceId] = encounterBoss.Snapshot;
         }
-        return store;
+        _revision = snapshot.Revision;
     }
 
     private void Clear(int instanceId, long observedAtMilliseconds)
@@ -202,9 +205,9 @@ public sealed class BossFocusStore(EntityStore entities)
     private void RememberActivity(int instanceId, long observedAtMilliseconds)
     {
         var observedAt = Math.Max(0, observedAtMilliseconds);
-        if (entities.TryGet(instanceId, out var entity) && entity.CurrentHp is long hp)
+        if (entityVitals.TryGet(instanceId, out var vital))
         {
-            Remember(instanceId, hp, entity.MaxHp ?? 0, entity.MaxHp.HasValue, observedAt);
+            Remember(instanceId, vital.CurrentHp, vital.MaxHp ?? 0, vital.MaxHp.HasValue, observedAt);
             return;
         }
 
@@ -277,8 +280,8 @@ public sealed class BossFocusStore(EntityStore entities)
     private long ResolveMaxHp(int instanceId, long maxHp)
     {
         var resolved = maxHp;
-        if (entities.TryGet(instanceId, out var entity) && entity.MaxHp is long entityMaxHp)
-            resolved = Math.Max(resolved, entityMaxHp);
+        if (entityVitals.TryGet(instanceId, out var vital) && vital.MaxHp is long observedMaxHp)
+            resolved = Math.Max(resolved, observedMaxHp);
         return resolved;
     }
 
@@ -290,7 +293,7 @@ public sealed class BossFocusStore(EntityStore entities)
 
     private bool IsNpcCombatActive(int instanceId) => entities.TryGet(instanceId, out var entity) && entity.NpcCombatActive && !IsObservedDead(instanceId);
 
-    private bool IsObservedDead(int instanceId) => entities.TryGet(instanceId, out var entity) && entity.CurrentHp == 0;
+    private bool IsObservedDead(int instanceId) => entityVitals.TryGet(instanceId, out var vital) && vital.CurrentHp == 0;
 
     private bool IsAfterLastClear(int instanceId, long activityObservedAtMilliseconds) =>
         !_lastClearedAtMilliseconds.TryGetValue(instanceId, out var clearedAt) ||

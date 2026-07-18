@@ -105,7 +105,6 @@
   <data name="Category_Damage" xml:space="preserve"><value>피해</value></data>
   <data name="Category_Healing" xml:space="preserve"><value>치유</value></data>
   <data name="Category_Shield" xml:space="preserve"><value>보호막</value></data>
-  <data name="Category_Support" xml:space="preserve"><value>지원</value></data>
 
   <!-- Empty-state placeholders -->
   <data name="Empty_History" xml:space="preserve"><value>보관된 전투 없음</value></data>
@@ -221,10 +220,20 @@
   <data name="Playback_Column_Skill" xml:space="preserve"><value>스킬</value></data>
   <data name="Playback_Column_Amount" xml:space="preserve"><value>값</value></data>
   <data name="Playback_Track_Combat" xml:space="preserve"><value>전투</value></data>
+  <data name="Playback_Track_Mechanic" xml:space="preserve"><value>전투 판정</value></data>
+  <data name="Playback_Track_Resource" xml:space="preserve"><value>자원</value></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>남은 HP</value></data>
   <data name="Playback_Track_Aura" xml:space="preserve"><value>효과 수명 주기</value></data>
   <data name="Playback_AuraCoverage" xml:space="preserve"><value>버프 / 디버프</value></data>
   <data name="Playback_AuraUnknownFormat" xml:space="preserve"><value>효과 #{0}</value></data>
+  <data name="Playback_AuraDisposition_Label" xml:space="preserve"><value>효과 분류</value></data>
+  <data name="Playback_AuraDisposition_Buff" xml:space="preserve"><value>버프</value></data>
+  <data name="Playback_AuraDisposition_Debuff" xml:space="preserve"><value>디버프</value></data>
+  <data name="Playback_AuraDisposition_Unknown" xml:space="preserve"><value>미확인</value></data>
+  <data name="Playback_AuraEvidence_ExactNodeFormat" xml:space="preserve"><value>정확한 노드 #{0}</value></data>
+  <data name="Playback_AuraEvidence_UnambiguousSlotFormat" xml:space="preserve"><value>스킬 {0}, 슬롯 {1}</value></data>
+  <data name="Playback_AuraEvidence_AmbiguousFormat" xml:space="preserve"><value>모호함: 후보 {0}개</value></data>
+  <data name="Playback_AuraEvidence_None" xml:space="preserve"><value>명확한 의미 일치 없음</value></data>
   <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>적용 {0} ms</value></data>
   <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>적용</value></data>
   <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>갱신</value></data>
@@ -234,10 +243,18 @@
   <data name="Playback_Track_Action" xml:space="preserve"><value>행동</value></data>
   <data name="Playback_Track_Diagnostic" xml:space="preserve"><value>진단</value></data>
   <data name="Playback_Track_Other" xml:space="preserve"><value>기타</value></data>
+  <data name="Playback_Mechanic_HitAttemptFormat" xml:space="preserve"><value>적중 {0}/{1}</value></data>
 
   <data name="Scene_Activation" xml:space="preserve"><value>장면 활성화</value></data>
   <data name="Scene_Combat" xml:space="preserve"><value>전투 장면</value></data>
   <data name="Scene_Teardown" xml:space="preserve"><value>장면 종료</value></data>
   <data name="Scene_Archive" xml:space="preserve"><value>장면 보관</value></data>
   <data name="Scene_Unknown" xml:space="preserve"><value>알 수 없는 장면</value></data>
+  <data name="Category_Resource" xml:space="preserve"><value>자원</value></data>
+  <data name="Metric_ManaChange" xml:space="preserve"><value>MP 변동</value></data>
+  <data name="Metric_DirectEvents" xml:space="preserve"><value>직접 이벤트</value></data>
+  <data name="Metric_PeriodicEvents" xml:space="preserve"><value>지속 이벤트</value></data>
+  <data name="Metric_ResourceSkills" xml:space="preserve"><value>자원 스킬</value></data>
+  <data name="Metric_ResourceEvents" xml:space="preserve"><value>자원 이벤트</value></data>
+  <data name="Empty_ResourceEvents" xml:space="preserve"><value>자원 이벤트 없음</value></data>
 </root>

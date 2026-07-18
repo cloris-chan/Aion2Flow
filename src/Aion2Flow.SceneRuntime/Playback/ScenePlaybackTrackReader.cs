@@ -1,7 +1,6 @@
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Journal;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -9,59 +8,6 @@ public static class ScenePlaybackTrackReader
 {
     private static readonly ScenePlaybackTrack[] Tracks = Enum.GetValues<ScenePlaybackTrack>();
     private static readonly int TrackBucketCount = ResolveTrackBucketCount();
-
-    public static ScenePlaybackTrackReadResult Read(SceneJournalSegment segment, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkers)
-        => Read(segment, startPositionMilliseconds, endPositionMilliseconds, maxMarkers, segment.CreateCursor());
-
-    public static ScenePlaybackTrackReadResult Read(SceneJournalSegment segment, long startPositionMilliseconds, long endPositionMilliseconds, int maxMarkers, JournalCursor cursor)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(maxMarkers);
-        var markers = new List<ScenePlaybackTrackMarker>(Math.Min(maxMarkers, 256));
-        var current = cursor;
-        var lifecycle = CreateLifecycleState(segment, cursor);
-        var hasMore = false;
-        var stopWindow = false;
-        while (markers.Count < maxMarkers)
-        {
-            JournalCursor? nextCursor = null;
-            var result = segment.ReadEntries(current, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
-            {
-                for (var i = 0; i < entries.Count; i++)
-                {
-                    var entry = entries[i];
-                    var offset = ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry);
-                    var position = Math.Max(0, offset);
-                    if (position > endPositionMilliseconds)
-                    {
-                        stopWindow = true;
-                        nextCursor = new JournalCursor(entry.Stamp.ObservationOrdinal);
-                        return;
-                    }
-
-                    var lifecycleProjection = lifecycle.Apply(entry);
-                    if (position < startPositionMilliseconds)
-                        continue;
-
-                    markers.Add(ScenePlaybackTrackProjection.CreateMarker(entry, offset, position, lifecycleProjection));
-                    if (markers.Count >= maxMarkers)
-                    {
-                        hasMore = true;
-                        nextCursor = new JournalCursor(entry.Stamp.ObservationOrdinal + 1);
-                        return;
-                    }
-                }
-            });
-
-            if (result.Count == 0)
-                break;
-
-            current = nextCursor ?? result.Cursor;
-            if (hasMore || stopWindow)
-                break;
-        }
-
-        return new ScenePlaybackTrackReadResult(markers.ToArray(), hasMore, current);
-    }
 
     public static ScenePlaybackTimelineSampledReadResult SampleTimeline(
         ReadOnlySpan<ScenePlaybackTrackMarker> markers,
@@ -154,31 +100,6 @@ public static class ScenePlaybackTrackReader
         return new ScenePlaybackCombatantTrackSampledReadResult(results.ToArray());
     }
 
-    private static ScenePlaybackLifecycleTrackState CreateLifecycleState(SceneJournalSegment segment, JournalCursor cursor)
-    {
-        var result = new ScenePlaybackLifecycleTrackState();
-        var current = segment.CreateCursor();
-        var end = Math.Clamp(cursor.NextObservationOrdinal, segment.StartObservationOrdinal, segment.CurrentEndObservationOrdinalExclusive);
-        while (current.NextObservationOrdinal < end)
-        {
-            var read = segment.ReadEntries(current, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
-            {
-                for (var i = 0; i < entries.Count; i++)
-                {
-                    var entry = entries[i];
-                    if (entry.Stamp.ObservationOrdinal >= end)
-                        return;
-                    result.Apply(entry);
-                }
-            });
-            if (read.Count == 0)
-                break;
-            current = read.Cursor;
-        }
-
-        return result;
-    }
-
     private struct SampleBucket
     {
         private ScenePlaybackTrackMarker _marker;
@@ -266,14 +187,6 @@ public static class ScenePlaybackTrackReader
 
 }
 
-public enum ScenePlaybackLifecycleEventKind : byte
-{
-    None,
-    Open,
-    Renew,
-    Result
-}
-
 [Flags]
 public enum ScenePlaybackCombatEventFlags : byte
 {
@@ -315,21 +228,21 @@ public readonly record struct ScenePlaybackTrackMarker(
     CombatEventKey EventKey,
     ScenePlaybackCombatEventFlags CombatEventFlags,
     long Amount,
-    long? CurrentValue,
-    long? MaximumValue,
-    int ResourceKind,
+    long? CurrentHp,
+    long? MaxHp,
     int ResultCode,
-    ScenePlaybackLifecycleEventKind LifecycleEventKind,
+    AuraLifecycleEventKind LifecycleEventKind,
     int InstanceSequenceId,
     int DurationMilliseconds,
-    ResourceEffectRef DisplayResourceEffectRef)
+    ResourceEffectRef DisplayResourceEffectRef,
+    AuraSemanticValue AuraSemantics)
 {
     public int SkillCode => EventKey.SkillCode;
     public uint DisplayResourceEffectRefRaw => DisplayResourceEffectRef.RawId;
+    public AuraDisposition AuraDisposition => AuraSemantics.Disposition;
+    public AuraSemanticTrace AuraSemanticTrace => AuraSemantics.Trace;
     public ScenePlaybackAuraIdentity AuraIdentity => ScenePlaybackAuraIdentity.Create(DisplayResourceEffectRef, InstanceSequenceId);
 }
-
-public readonly record struct ScenePlaybackTrackReadResult(IReadOnlyList<ScenePlaybackTrackMarker> Markers, bool HasMore, JournalCursor NextCursor);
 
 public readonly record struct ScenePlaybackTrackSample(ScenePlaybackTrackMarker Marker, int EventCount);
 

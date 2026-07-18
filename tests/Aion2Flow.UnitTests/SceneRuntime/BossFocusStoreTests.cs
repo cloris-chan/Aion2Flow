@@ -199,8 +199,9 @@ public sealed class BossFocusStoreTests
         Assert.Equal(0, boss.Hp);
         Assert.Equal(1_260, boss.LastObservedAtMilliseconds);
         Assert.False(h.Focus.TryGetObservedBoss(3_261, 2_000, out _));
+        Assert.True(h.Vitals.TryGet(3518, out var vital));
+        Assert.Equal(0, vital.CurrentHp);
         Assert.True(h.Entities.TryGet(3518, out var entity));
-        Assert.Equal(0, entity!.CurrentHp);
         Assert.False(entity.NpcCombatActive);
     }
 
@@ -265,17 +266,13 @@ public sealed class BossFocusStoreTests
         var spawnOnly = scene.CreateSnapshot();
         Assert.Empty(spawnOnly.BossFocuses);
 
-        scene.AppendCombatPacket(new ParsedCombatPacket
+        var combat = new CombatWireObservation
         {
-            SourceId = 100,
-            TargetId = 3518,
             Damage = 500,
-            HitContribution = 1,
-            AttemptContribution = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage,
-            Timestamp = 1_100
-        });
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.AppendCombatWireObservation(100, 3518, in combat, timestamp: 1_100);
 
         var snapshot = scene.CreateSnapshot();
         var boss = Assert.Single(snapshot.BossFocuses);
@@ -299,18 +296,16 @@ public sealed class BossFocusStoreTests
         var combatSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 300, 1, 0, 0, 0, default);
         var deathSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 1_200, 2, 0, 0, 0, default);
         var restoredHpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 12_500, 3, 0, 0, 0, default);
-        var combat = new CombatObservation
+        var combat = new CombatWireObservation
         {
             Damage = 500,
             HitCount = 1,
-            AttemptCount = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
+            AttemptCount = 1
         };
 
         sink.AppendNpcKind(in kindSource, 3518, NpcKind.Boss);
         sink.AppendNpcHp(in hpSource, 3518, 156_500, 167_000);
-        sink.AppendCombatObservation(in combatSource, 100, 3518, in combat);
+        sink.AppendCombatWireObservation(in combatSource, 100, 3518, in combat);
         sink.CompleteFlush(1);
         timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(300));
         Assert.Single(owner.CreateSnapshot().BossFocuses);
@@ -341,18 +336,16 @@ public sealed class BossFocusStoreTests
         var kindSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 100, 0, 0, 0, 0, default);
         var hpSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 200, 0, 0, 0, 0, default);
         var combatSource = new PacketObservationSource(sceneStarted.ToUnixTimeMilliseconds() + 300, 0, 0, 0, 0, default);
-        var combat = new CombatObservation
+        var combat = new CombatWireObservation
         {
             Damage = 500,
             HitCount = 1,
-            AttemptCount = 1,
-            EventKind = CombatEventKind.Damage,
-            ValueKind = CombatValueKind.Damage
+            AttemptCount = 1
         };
 
         sink.AppendNpcKind(in kindSource, 3518, NpcKind.Boss);
         sink.AppendNpcHp(in hpSource, 3518, 157_000, 167_000);
-        sink.AppendCombatObservation(in combatSource, 100, 3518, in combat);
+        sink.AppendCombatWireObservation(in combatSource, 100, 3518, in combat);
         timeProvider.SetUtcNow(sceneStarted.AddMilliseconds(300));
 
         Assert.Single(owner.CreateSnapshot().BossFocuses);
@@ -368,12 +361,13 @@ public sealed class BossFocusStoreTests
     public void ScenePath_RestoresActiveBossFromEntityStateAfterFocusStoreReset()
     {
         var entities = new EntityStore();
+        var vitals = new EntityVitalStore();
         entities.ApplyNpcKind(3518, NpcKind.Boss);
-        entities.ApplyNpcHp(3518, 157_000, 167_000);
+        ApplyVital(vitals, 3518, 157_000, 167_000, 0);
         entities.ApplyBattleToggle(3518, true);
-        var focus = new BossFocusStore(entities);
+        var focus = new BossFocusStore(entities, vitals);
 
-        entities.ApplyNpcHp(3518, 152_000, 167_000);
+        ApplyVital(vitals, 3518, 152_000, 167_000, 100);
         focus.ApplyNpcHp(3518, 152_000, 167_000, 100);
 
         Assert.True(focus.TryGetObservedBoss(200, 2_000, out var boss));
@@ -386,12 +380,13 @@ public sealed class BossFocusStoreTests
     public void ScenePath_DoesNotRestoreActiveMonsterFromEntityStateAfterFocusStoreReset()
     {
         var entities = new EntityStore();
+        var vitals = new EntityVitalStore();
         entities.ApplyNpcKind(3518, NpcKind.Monster);
-        entities.ApplyNpcHp(3518, 157_000, 167_000);
+        ApplyVital(vitals, 3518, 157_000, 167_000, 0);
         entities.ApplyBattleToggle(3518, true);
-        var focus = new BossFocusStore(entities);
+        var focus = new BossFocusStore(entities, vitals);
 
-        entities.ApplyNpcHp(3518, 152_000, 167_000);
+        ApplyVital(vitals, 3518, 152_000, 167_000, 100);
         focus.ApplyNpcHp(3518, 152_000, 167_000, 100);
 
         Assert.False(focus.TryGetObservedBoss(200, 2_000, out _));
@@ -424,17 +419,24 @@ public sealed class BossFocusStoreTests
         Assert.Equal(StateCodes.NpcBattleToggle, toggle.State!.Value.StateCode);
 
         var hp = journal.ReadSnapshot(3);
-        Assert.Equal(ObservedEventDomain.Resource, hp.Domain);
-        Assert.Equal(22_847, hp.Resource!.Value.CurrentValue);
+        Assert.Equal(ObservedEventDomain.EntityVital, hp.Domain);
+        Assert.Equal(22_847, hp.EntityVital!.Value.CurrentHp);
         Assert.Equal(1_100, hp.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+    }
+
+    private static void ApplyVital(EntityVitalStore store, int entityId, long currentHp, long? maxHp, long observedAtMilliseconds)
+    {
+        var observation = new EntityVitalObservation(entityId, currentHp, maxHp);
+        store.Apply(in observation, observedAtMilliseconds, observationOrdinal: observedAtMilliseconds);
     }
 
     private sealed class Harness
     {
         public EntityStore Entities { get; } = new();
+        public EntityVitalStore Vitals { get; } = new();
         public BossFocusStore Focus { get; }
 
-        public Harness() => Focus = new BossFocusStore(Entities);
+        public Harness() => Focus = new BossFocusStore(Entities, Vitals);
 
         public void Kind(int instanceId, NpcKind kind, long observedAtMilliseconds = 0)
         {
@@ -444,7 +446,7 @@ public sealed class BossFocusStoreTests
 
         public void Hp(int instanceId, int hp, long observedAtMilliseconds, int maxHp = 0)
         {
-            Entities.ApplyNpcHp(instanceId, hp, maxHp);
+            ApplyVital(Vitals, instanceId, hp, maxHp > 0 ? maxHp : null, observedAtMilliseconds);
             Focus.ApplyNpcHp(instanceId, hp, maxHp, observedAtMilliseconds);
         }
 
@@ -463,7 +465,7 @@ public sealed class BossFocusStoreTests
         }
 
         private bool CanActivate(int instanceId) =>
-            !Entities.TryGet(instanceId, out var entity) || entity.CurrentHp != 0;
+            !Vitals.TryGet(instanceId, out var vital) || vital.CurrentHp != 0;
     }
 
     private sealed class MutableTimeProvider(DateTimeOffset utcNow) : TimeProvider

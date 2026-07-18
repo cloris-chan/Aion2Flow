@@ -237,7 +237,10 @@ public sealed class SceneIdentityTests
         var journal = new ObservedEventJournal();
         var header = new ObservedEventHeader(Guid.Empty, default, sourceEntityId, 0, default);
         journal.Append(in header, in observation);
-        journal.ReadEntry(0, applier.ApplyEntry);
+        journal.ReadEntry(0, entry =>
+        {
+            _ = applier.ApplyEntry(entry);
+        });
     }
 
     private static void ApplyScene(DomainEventApplier applier, in SceneObservation observation)
@@ -245,6 +248,9 @@ public sealed class SceneIdentityTests
         var journal = new ObservedEventJournal();
         var header = new ObservedEventHeader(Guid.Empty, default, 0, 0, default);
         journal.Append(in header, in observation);
-        journal.ReadEntry(0, applier.ApplyEntry);
+        journal.ReadEntry(0, entry =>
+        {
+            _ = applier.ApplyEntry(entry);
+        });
     }
 }

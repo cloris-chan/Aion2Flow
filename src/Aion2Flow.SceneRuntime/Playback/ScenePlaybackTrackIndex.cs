@@ -1,5 +1,8 @@
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Projection;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
@@ -11,11 +14,13 @@ public sealed class ScenePlaybackTrackIndex
 
     private ScenePlaybackTrackIndex(
         long startObservationOrdinal,
+        long endObservationOrdinalExclusive,
         ScenePlaybackTrackMarker[] markers,
         int[] nonCombatEventIndexes,
         Dictionary<ScenePlaybackEventScope, int[]> eventPostings)
     {
         StartObservationOrdinal = startObservationOrdinal;
+        EndObservationOrdinalExclusive = endObservationOrdinalExclusive;
         _markers = markers;
         _nonCombatEventIndexes = nonCombatEventIndexes;
         _eventPostings = eventPostings;
@@ -25,27 +30,30 @@ public sealed class ScenePlaybackTrackIndex
 
     public int Count => _markers.Length;
 
-    public long EndObservationOrdinalExclusive => checked(StartObservationOrdinal + _markers.Length);
+    public long EndObservationOrdinalExclusive { get; }
 
     public static ScenePlaybackTrackIndex Build(SceneJournalSegment segment, CancellationToken cancellationToken = default)
     {
-        if (segment.IsEmpty)
-            return new ScenePlaybackTrackIndex(segment.StartObservationOrdinal, [], [], []);
-
         var startObservationOrdinal = segment.StartObservationOrdinal;
         var endObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
-        var markerCount = checked((int)(endObservationOrdinalExclusive - startObservationOrdinal));
-        if (markerCount == 0)
-            return new ScenePlaybackTrackIndex(startObservationOrdinal, [], [], []);
+        var observationCount = checked((int)(endObservationOrdinalExclusive - startObservationOrdinal));
+        if (observationCount == 0)
+            return new ScenePlaybackTrackIndex(startObservationOrdinal, endObservationOrdinalExclusive, [], [], []);
 
         var fixedSegment = new SceneJournalSegment(segment.Journal, startObservationOrdinal, endObservationOrdinalExclusive, IsLiveGrowing: false);
-        var markers = new ScenePlaybackTrackMarker[markerCount];
-        var lifecycle = new ScenePlaybackLifecycleTrackState();
-        Dictionary<int, long>? resourceMaximums = null;
+        var entities = new EntityStore();
+        var boundary = new SceneBoundaryStore();
+        var metadata = new RuntimeMetadataRegistry();
+        var combat = new CombatStore(observationCount);
+        var applier = new DomainEventApplier(entities, boundary, metadata, combat);
+        var indexedMarkers = new List<IndexedTrackMarker>(observationCount);
         var cursor = fixedSegment.CreateCursor();
-        var markerIndex = 0;
+        var observationIndex = 0;
+        var sequence = 0;
         var previousPosition = 0L;
-        while (markerIndex < markers.Length)
+        var currentFlushId = -1L;
+        var completedFlushId = -1L;
+        while (observationIndex < observationCount)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var result = fixedSegment.ReadEntries(cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
@@ -55,30 +63,36 @@ public sealed class ScenePlaybackTrackIndex
                     var entry = entries[i];
                     cancellationToken.ThrowIfCancellationRequested();
                     var position = Math.Max(0, ScenePlaybackTimeline.ResolveOffsetMilliseconds(entry));
-                    if (markerIndex > 0 && position < previousPosition)
+                    if (observationIndex > 0 && position < previousPosition)
                         throw new InvalidDataException($"Playback timeline position moved backwards at observation {entry.Stamp.ObservationOrdinal}.");
 
-                    var lifecycleProjection = lifecycle.Apply(entry);
-                    var marker = ScenePlaybackTrackProjection.CreateMarker(entry, position, position, lifecycleProjection);
-                    if (entry.Domain == ObservedEventDomain.Resource)
+                    var flushId = entry.Stamp.FlushId;
+                    if (currentFlushId > 0 && flushId != currentFlushId && currentFlushId > completedFlushId)
                     {
-                        ref readonly var resource = ref entry.Resource;
-                        resourceMaximums ??= [];
-                        if (resource.MaximumValue is > 0)
-                            resourceMaximums[resource.EntityId] = resource.MaximumValue.Value;
-
-                        if (resourceMaximums.TryGetValue(resource.EntityId, out var knownMaximum))
-                        {
-                            marker = marker with
-                            {
-                                MaximumValue = resource.MaximumValue.HasValue
-                                    ? Math.Max(resource.MaximumValue.Value, knownMaximum)
-                                    : knownMaximum,
-                            };
-                        }
+                        applier.CompleteFlush();
+                        completedFlushId = currentFlushId;
                     }
 
-                    markers[markerIndex++] = marker;
+                    currentFlushId = flushId;
+                    var materialization = applier.ApplyEntry(entry);
+                    if (entry.Domain == ObservedEventDomain.Combat)
+                    {
+                        observationIndex++;
+                        previousPosition = position;
+                        continue;
+                    }
+
+                    var auraLifecycle = materialization.AuraLifecycle;
+                    var marker = ScenePlaybackTrackProjection.CreateObservationMarker(entry, position, position, in auraLifecycle);
+                    if (entry.Domain == ObservedEventDomain.EntityVital)
+                    {
+                        ref readonly var vital = ref entry.EntityVital;
+                        if (applier.EntityVitals.TryGet(vital.EntityId, out var state))
+                            marker = marker with { MaxHp = state.MaxHp };
+                    }
+
+                    indexedMarkers.Add(new IndexedTrackMarker(marker, IsObservation: true, sequence++));
+                    observationIndex++;
                     previousPosition = position;
                 }
             });
@@ -89,12 +103,46 @@ public sealed class ScenePlaybackTrackIndex
             cursor = result.Cursor;
         }
 
-        if (markerIndex != markers.Length)
-            throw new InvalidDataException($"Playback marker index expected {markers.Length} observations but read {markerIndex}.");
+        if (observationIndex != observationCount)
+            throw new InvalidDataException($"Playback marker index expected {observationCount} observations but read {observationIndex}.");
+
+        var canCompleteFinalFlush = !segment.IsLiveGrowing ||
+            (fixedSegment.Journal?.LastCompletedFlushId ?? -1) >= currentFlushId;
+        if (currentFlushId > 0 && currentFlushId > completedFlushId && canCompleteFinalFlush)
+            applier.CompleteFlush();
+
+        var adapter = new SceneCombatSnapshotAdapter(
+            entities,
+            applier.EntityVitals,
+            combat,
+            applier.Mechanics,
+            applier.Resources,
+            boundary,
+            applier.BossFocus);
+        _ = adapter.PrepareCurrentFrameEventProjection();
+        AppendMaterializedMarkers(indexedMarkers, combat, applier.Mechanics, applier.Resources, adapter, ref sequence, cancellationToken);
+        indexedMarkers.Sort(static (left, right) => CompareIndexedMarkers(in left, in right));
+
+        var markers = new ScenePlaybackTrackMarker[indexedMarkers.Count];
+        var observationMarkers = new bool[indexedMarkers.Count];
+        previousPosition = 0;
+        for (var markerIndex = 0; markerIndex < indexedMarkers.Count; markerIndex++)
+        {
+            var indexedMarker = indexedMarkers[markerIndex];
+            var marker = indexedMarker.Marker;
+            if (marker.ObservationOrdinal < startObservationOrdinal || marker.ObservationOrdinal >= endObservationOrdinalExclusive)
+                throw new InvalidDataException($"Playback materialized marker has invalid source observation {marker.ObservationOrdinal}.");
+            if (markerIndex > 0 && marker.PositionMilliseconds < previousPosition)
+                throw new InvalidDataException($"Playback materialized timeline position moved backwards at observation {marker.ObservationOrdinal}.");
+
+            markers[markerIndex] = marker;
+            observationMarkers[markerIndex] = indexedMarker.IsObservation;
+            previousPosition = marker.PositionMilliseconds;
+        }
 
         BackfillAuraIdentities(markers);
-        var nonCombatEventIndexes = BuildEventPostings(markers, out var eventPostings);
-        return new ScenePlaybackTrackIndex(startObservationOrdinal, markers, nonCombatEventIndexes, eventPostings);
+        var nonCombatEventIndexes = BuildEventPostings(markers, observationMarkers, out var eventPostings);
+        return new ScenePlaybackTrackIndex(startObservationOrdinal, endObservationOrdinalExclusive, markers, nonCombatEventIndexes, eventPostings);
     }
 
     public ScenePlaybackTrackMarkerWindow ReadWindow(
@@ -109,7 +157,7 @@ public sealed class ScenePlaybackTrackIndex
         if (maxMarkers == 0 || _markers.Length == 0 || endObservationOrdinalExclusive <= StartObservationOrdinal)
             return default;
 
-        var appliedCount = checked((int)Math.Min(_markers.Length, endObservationOrdinalExclusive - StartObservationOrdinal));
+        var appliedCount = LowerBoundObservationOrdinal(Math.Min(endObservationOrdinalExclusive, EndObservationOrdinalExclusive));
         var first = LowerBound(startPositionMilliseconds, appliedCount);
         var end = UpperBound(endPositionMilliseconds, first, appliedCount);
         first = Math.Max(first, end - maxMarkers);
@@ -134,7 +182,7 @@ public sealed class ScenePlaybackTrackIndex
         if (posting is null || posting.Length == 0)
             return new ScenePlaybackEventReadResult(0, endObservationOrdinalExclusive);
 
-        var appliedMarkerCount = checked((int)Math.Min(_markers.Length, endObservationOrdinalExclusive - StartObservationOrdinal));
+        var appliedMarkerCount = LowerBoundObservationOrdinal(Math.Min(endObservationOrdinalExclusive, EndObservationOrdinalExclusive));
         var appliedPostingCount = LowerBoundMarkerIndex(posting, appliedMarkerCount);
         var first = LowerBoundPosition(posting, startPositionMilliseconds, appliedPostingCount);
         var end = UpperBoundPosition(posting, endPositionMilliseconds, first, appliedPostingCount);
@@ -146,7 +194,10 @@ public sealed class ScenePlaybackTrackIndex
             destination[i] = new ScenePlaybackEventMarker(
                 new ScenePlaybackEventId(ScenePlaybackEventFactKind.Observation, marker.ObservationOrdinal),
                 marker,
-                default);
+                default,
+                null,
+                null,
+                null);
         }
 
         return new ScenePlaybackEventReadResult(count, endObservationOrdinalExclusive);
@@ -154,20 +205,20 @@ public sealed class ScenePlaybackTrackIndex
 
     private static void BackfillAuraIdentities(ScenePlaybackTrackMarker[] markers)
     {
-        Dictionary<ScenePlaybackAuraInstanceKey, List<int>>? unresolved = null;
+        Dictionary<AuraInstanceKey, List<int>>? unresolved = null;
         for (var markerIndex = 0; markerIndex < markers.Length; markerIndex++)
         {
             ref readonly var marker = ref markers[markerIndex];
             if (marker.Track != ScenePlaybackTrack.Aura || marker.TargetEntityId <= 0 || marker.InstanceSequenceId <= 0)
                 continue;
 
-            var key = new ScenePlaybackAuraInstanceKey(marker.TargetEntityId, marker.InstanceSequenceId);
-            if (marker.LifecycleEventKind == ScenePlaybackLifecycleEventKind.Open)
+            var key = new AuraInstanceKey(marker.TargetEntityId, marker.InstanceSequenceId);
+            if (marker.LifecycleEventKind == AuraLifecycleEventKind.Open)
                 unresolved?.Remove(key);
 
             if (marker.DisplayResourceEffectRef.IsEmpty)
             {
-                if (marker.LifecycleEventKind != ScenePlaybackLifecycleEventKind.Result)
+                if (marker.LifecycleEventKind != AuraLifecycleEventKind.Result)
                 {
                     unresolved ??= [];
                     if (!unresolved.TryGetValue(key, out var markerIndexes))
@@ -186,28 +237,91 @@ public sealed class ScenePlaybackTrackIndex
                     var index = markerIndexes[unresolvedIndex];
                     markers[index] = markers[index] with
                     {
-                        DisplayResourceEffectRef = marker.DisplayResourceEffectRef
+                        DisplayResourceEffectRef = marker.DisplayResourceEffectRef,
+                        AuraSemantics = marker.AuraSemantics
                     };
                 }
             }
 
-            if (marker.LifecycleEventKind == ScenePlaybackLifecycleEventKind.Result)
+            if (marker.LifecycleEventKind == AuraLifecycleEventKind.Result)
                 unresolved?.Remove(key);
         }
     }
 
+    private static void AppendMaterializedMarkers(
+        List<IndexedTrackMarker> markers,
+        CombatStore combat,
+        MechanicStore mechanics,
+        ResourceStore resources,
+        SceneCombatSnapshotAdapter adapter,
+        ref int sequence,
+        CancellationToken cancellationToken)
+    {
+        var metricEvents = combat.EventSpan;
+        for (var eventIndex = 0; eventIndex < metricEvents.Length; eventIndex++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ref readonly var record = ref metricEvents[eventIndex];
+            if (!adapter.TryResolveCurrentFrameEventSourcePrepared(in record, out var sourceEntityId))
+                continue;
+
+            markers.Add(new IndexedTrackMarker(
+                ScenePlaybackTrackProjection.CreateMetricMarker(in record, sourceEntityId),
+                IsObservation: false,
+                sequence++));
+        }
+
+        var mechanicEvents = mechanics.Events;
+        for (var eventIndex = 0; eventIndex < mechanicEvents.Count; eventIndex++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var record = mechanicEvents[eventIndex];
+            if (!adapter.TryResolveCurrentFrameEventSourcePrepared(in record, out var sourceEntityId))
+                continue;
+
+            markers.Add(new IndexedTrackMarker(
+                ScenePlaybackTrackProjection.CreateMechanicMarker(in record, sourceEntityId),
+                IsObservation: false,
+                sequence++));
+        }
+
+        var resourceEvents = resources.Events;
+        for (var eventIndex = 0; eventIndex < resourceEvents.Count; eventIndex++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var record = resourceEvents[eventIndex];
+            markers.Add(new IndexedTrackMarker(
+                ScenePlaybackTrackProjection.CreateResourceMarker(
+                    in record,
+                    adapter.ResolveCurrentFrameEventSourcePrepared(in record)),
+                IsObservation: false,
+                sequence++));
+        }
+    }
+
+    private static int CompareIndexedMarkers(in IndexedTrackMarker left, in IndexedTrackMarker right)
+    {
+        var comparison = left.Marker.ObservationOrdinal.CompareTo(right.Marker.ObservationOrdinal);
+        if (comparison != 0)
+            return comparison;
+
+        comparison = left.Marker.Track.CompareTo(right.Marker.Track);
+        return comparison != 0 ? comparison : left.Sequence.CompareTo(right.Sequence);
+    }
+
     private static int[] BuildEventPostings(
         ScenePlaybackTrackMarker[] markers,
+        bool[] observationMarkers,
         out Dictionary<ScenePlaybackEventScope, int[]> postings)
     {
         var all = new List<int>(markers.Length);
         var builders = new Dictionary<ScenePlaybackEventScope, List<int>>();
         for (var markerIndex = 0; markerIndex < markers.Length; markerIndex++)
         {
-            ref readonly var marker = ref markers[markerIndex];
-            if (marker.Track == ScenePlaybackTrack.Combat)
+            if (!observationMarkers[markerIndex])
                 continue;
 
+            ref readonly var marker = ref markers[markerIndex];
             all.Add(markerIndex);
             if (marker.SourceEntityId > 0)
                 AddPosting(builders, ScenePlaybackEventScope.ForCombatant(marker.SourceEntityId), markerIndex);
@@ -309,6 +423,22 @@ public sealed class ScenePlaybackTrackIndex
         return low;
     }
 
+    private int LowerBoundObservationOrdinal(long endObservationOrdinalExclusive)
+    {
+        var low = 0;
+        var high = _markers.Length;
+        while (low < high)
+        {
+            var middle = low + ((high - low) >> 1);
+            if (_markers[middle].ObservationOrdinal < endObservationOrdinalExclusive)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
+
     private int UpperBound(long positionMilliseconds, int start, int count)
     {
         var low = start;
@@ -324,6 +454,11 @@ public sealed class ScenePlaybackTrackIndex
 
         return low;
     }
+
+    private readonly record struct IndexedTrackMarker(
+        ScenePlaybackTrackMarker Marker,
+        bool IsObservation,
+        int Sequence);
 }
 
 public readonly struct ScenePlaybackTrackMarkerWindow

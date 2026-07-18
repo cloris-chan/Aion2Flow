@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
@@ -8,20 +9,30 @@ namespace Cloris.Aion2Flow.ViewModels;
 
 public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, ICombatDetailEventWriter, IDisposable
 {
-    private readonly List<CombatDetailEvent> _detailEvents = [];
+    private readonly List<CombatMetricDetailEvent> _metricDetailEvents = [];
+    private readonly List<CombatMechanicDetailEvent> _mechanicDetailEvents = [];
+    private readonly List<CombatResourceDetailEvent> _resourceDetailEvents = [];
     private readonly DetailCounterpartOptionBuilder _counterpartOptionBuilder = new();
     private readonly HashSet<int> _outgoingDamageSelectionIds = [];
-    private readonly HashSet<int> _outgoingSupportSelectionIds = [];
+    private readonly HashSet<int> _outgoingHealingSelectionIds = [];
+    private readonly HashSet<int> _outgoingShieldSelectionIds = [];
+    private readonly HashSet<int> _outgoingResourceSelectionIds = [];
     private readonly HashSet<int> _incomingDamageSelectionIds = [];
-    private readonly HashSet<int> _incomingSupportSelectionIds = [];
+    private readonly HashSet<int> _incomingHealingSelectionIds = [];
+    private readonly HashSet<int> _incomingShieldSelectionIds = [];
+    private readonly HashSet<int> _incomingResourceSelectionIds = [];
     private readonly SkillDetailSectionAggregation _outgoingDamageSectionAggregation = new();
     private readonly SkillDetailSectionAggregation _outgoingHealingSectionAggregation = new();
     private readonly SkillDetailSectionAggregation _outgoingShieldSectionAggregation = new();
+    private readonly ResourceDetailSectionAggregation _outgoingResourceSectionAggregation = new();
     private readonly SkillDetailSectionAggregation _incomingDamageSectionAggregation = new();
     private readonly SkillDetailSectionAggregation _incomingHealingSectionAggregation = new();
     private readonly SkillDetailSectionAggregation _incomingShieldSectionAggregation = new();
+    private readonly ResourceDetailSectionAggregation _incomingResourceSectionAggregation = new();
     private readonly List<SkillDetailRowData> _sectionRows = [];
     private readonly Dictionary<SkillBaseKey, int> _sectionRowIndexes = [];
+    private readonly List<ResourceDetailRowData> _resourceSectionRows = [];
+    private readonly Dictionary<SkillBaseKey, int> _resourceSectionRowIndexes = [];
     private readonly LocalizationService _localization;
     private SceneCombatSnapshot _currentSnapshot = new();
     private Guid _encounterContextId;
@@ -35,9 +46,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         OutgoingDetail = new CombatDirectionDetailViewModel(localization, frameBatchService, "Direction_Targets");
         IncomingDetail = new CombatDirectionDetailViewModel(localization, frameBatchService, "Direction_Sources");
         OutgoingDetail.DamageCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
-        OutgoingDetail.SupportCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        OutgoingDetail.HealingCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        OutgoingDetail.ShieldCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        OutgoingDetail.ResourceCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
         IncomingDetail.DamageCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
-        IncomingDetail.SupportCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        IncomingDetail.HealingCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        IncomingDetail.ShieldCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
+        IncomingDetail.ResourceCounterpartFilter.SelectionChanged += HandleCounterpartSelectionChanged;
     }
 
     public CombatDirectionDetailViewModel OutgoingDetail { get; }
@@ -55,6 +70,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     public SkillDetailSectionViewModel IncomingHealing => IncomingDetail.HealingSection;
 
     public SkillDetailSectionViewModel IncomingShield => IncomingDetail.ShieldSection;
+
+    public ResourceDetailSectionViewModel OutgoingResource => OutgoingDetail.ResourceSection;
+
+    public ResourceDetailSectionViewModel IncomingResource => IncomingDetail.ResourceSection;
 
     public void SynchronizeSkillSelection(bool isOutgoing, CombatContributionCategory category, SkillBaseKey baseKey)
     {
@@ -83,9 +102,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
         _disposed = true;
         DisposeCounterpartFilter(OutgoingDetail.DamageCounterpartFilter);
-        DisposeCounterpartFilter(OutgoingDetail.SupportCounterpartFilter);
+        DisposeCounterpartFilter(OutgoingDetail.HealingCounterpartFilter);
+        DisposeCounterpartFilter(OutgoingDetail.ShieldCounterpartFilter);
+        DisposeCounterpartFilter(OutgoingDetail.ResourceCounterpartFilter);
         DisposeCounterpartFilter(IncomingDetail.DamageCounterpartFilter);
-        DisposeCounterpartFilter(IncomingDetail.SupportCounterpartFilter);
+        DisposeCounterpartFilter(IncomingDetail.HealingCounterpartFilter);
+        DisposeCounterpartFilter(IncomingDetail.ShieldCounterpartFilter);
+        DisposeCounterpartFilter(IncomingDetail.ResourceCounterpartFilter);
     }
 
     [ObservableProperty]
@@ -137,13 +160,14 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         RefreshLiveSceneContext(encounterContextId, combatantId, snapshot, update, forceRefresh);
     }
 
-    public void SelectPlaybackSceneEncounterCombatant(Guid encounterContextId, int combatantId, SceneCombatSnapshot snapshot, CombatDetailUpdateResult update, IReadOnlyList<CombatDetailEvent> events)
+    public void SelectPlaybackSceneEncounterCombatant(Guid encounterContextId, int combatantId, SceneCombatSnapshot snapshot, CombatDetailUpdateResult update, in CombatDetailEventSet events)
     {
         if (update.IsFullSnapshot)
-            _detailEvents.Clear();
+            ClearDetailEvents();
 
-        for (var i = 0; i < events.Count; i++)
-            _detailEvents.Add(events[i]);
+        _metricDetailEvents.AddRange(events.MetricEvents);
+        _mechanicDetailEvents.AddRange(events.MechanicEvents);
+        _resourceDetailEvents.AddRange(events.ResourceEvents);
 
         RefreshLiveSceneContext(encounterContextId, combatantId, snapshot, update, forceRefresh: false);
     }
@@ -158,7 +182,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         _encounterContextId = Guid.Empty;
         _combatantId = null;
         _currentSnapshot = new SceneCombatSnapshot();
-        _detailEvents.Clear();
+        ClearDetailEvents();
         _detailRevision = -1;
         SelectedCombatantId = 0;
         SelectedDirectionIndex = 0;
@@ -166,9 +190,25 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         IncomingDetail.Clear();
     }
 
-    void ICombatDetailEventWriter.Clear() => _detailEvents.Clear();
+    void ICombatDetailEventWriter.Clear() => ClearDetailEvents();
 
-    void ICombatDetailEventWriter.Add(in CombatDetailEvent detailEvent) => _detailEvents.Add(detailEvent);
+    void ICombatDetailEventWriter.AddMetric(in CombatMetricDetailEvent detailEvent) => _metricDetailEvents.Add(detailEvent);
+
+    void ICombatDetailEventWriter.AddMechanic(in CombatMechanicDetailEvent detailEvent) => _mechanicDetailEvents.Add(detailEvent);
+
+    void ICombatDetailEventWriter.AddResource(in CombatResourceDetailEvent detailEvent) => _resourceDetailEvents.Add(detailEvent);
+
+    private bool HasDetailEvents =>
+        _metricDetailEvents.Count > 0 ||
+        _mechanicDetailEvents.Count > 0 ||
+        _resourceDetailEvents.Count > 0;
+
+    private void ClearDetailEvents()
+    {
+        _metricDetailEvents.Clear();
+        _mechanicDetailEvents.Clear();
+        _resourceDetailEvents.Clear();
+    }
 
     private void DisposeCounterpartFilter(DetailCounterpartFilterViewModel filter)
     {
@@ -184,22 +224,28 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         }
 
         if (ReferenceEquals(sender, OutgoingDetail.DamageCounterpartFilter) ||
-            ReferenceEquals(sender, OutgoingDetail.SupportCounterpartFilter))
+            ReferenceEquals(sender, OutgoingDetail.HealingCounterpartFilter) ||
+            ReferenceEquals(sender, OutgoingDetail.ShieldCounterpartFilter) ||
+            ReferenceEquals(sender, OutgoingDetail.ResourceCounterpartFilter))
         {
             RefreshDirection(
                 OutgoingDetail,
                 DetailSectionKind.OutgoingDamage,
                 DetailSectionKind.OutgoingHealing,
-                DetailSectionKind.OutgoingShield);
+                DetailSectionKind.OutgoingShield,
+                DetailSectionKind.OutgoingResource);
         }
         else if (ReferenceEquals(sender, IncomingDetail.DamageCounterpartFilter) ||
-                 ReferenceEquals(sender, IncomingDetail.SupportCounterpartFilter))
+                 ReferenceEquals(sender, IncomingDetail.HealingCounterpartFilter) ||
+                 ReferenceEquals(sender, IncomingDetail.ShieldCounterpartFilter) ||
+                 ReferenceEquals(sender, IncomingDetail.ResourceCounterpartFilter))
         {
             RefreshDirection(
                 IncomingDetail,
                 DetailSectionKind.IncomingDamage,
                 DetailSectionKind.IncomingHealing,
-                DetailSectionKind.IncomingShield);
+                DetailSectionKind.IncomingShield,
+                DetailSectionKind.IncomingResource);
         }
     }
 
@@ -207,12 +253,13 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     {
         if (combatantId is null ||
             encounterContextId == Guid.Empty ||
-            !snapshot.Combatants.ContainsKey(combatantId.Value) && detail.Combatant is null && detail.Events.Count == 0)
+            !snapshot.Combatants.ContainsKey(combatantId.Value) && detail.Combatant is null &&
+            detail.MetricEvents.Count == 0 && detail.MechanicEvents.Count == 0 && detail.ResourceEvents.Count == 0)
         {
             _encounterContextId = encounterContextId;
             _combatantId = combatantId;
             _currentSnapshot = new SceneCombatSnapshot();
-            _detailEvents.Clear();
+            ClearDetailEvents();
             _detailRevision = -1;
             SelectedCombatantId = 0;
             ClearSectionsOnly();
@@ -237,8 +284,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         }
 
         _detailRevision = nextDetailRevision;
-        _detailEvents.Clear();
-        _detailEvents.AddRange(detail.Events);
+        ClearDetailEvents();
+        _metricDetailEvents.AddRange(detail.MetricEvents);
+        _mechanicDetailEvents.AddRange(detail.MechanicEvents);
+        _resourceDetailEvents.AddRange(detail.ResourceEvents);
 
         RebuildCounterpartSelections();
         RefreshAllSections();
@@ -248,12 +297,12 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     {
         if (combatantId is null ||
             encounterContextId == Guid.Empty ||
-            !snapshot.Combatants.ContainsKey(combatantId.Value) && update.Combatant is null && _detailEvents.Count == 0)
+            !snapshot.Combatants.ContainsKey(combatantId.Value) && update.Combatant is null && !HasDetailEvents)
         {
             _encounterContextId = encounterContextId;
             _combatantId = combatantId;
             _currentSnapshot = new SceneCombatSnapshot();
-            _detailEvents.Clear();
+            ClearDetailEvents();
             _detailRevision = -1;
             SelectedCombatantId = 0;
             ClearSectionsOnly();
@@ -279,7 +328,11 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         }
 
         _detailRevision = update.Revision;
-        if (update.IsFullSnapshot || update.AddedEventCount > 0 || forceRefresh)
+        if (update.IsFullSnapshot ||
+            update.AddedMetricEventCount > 0 ||
+            update.AddedMechanicEventCount > 0 ||
+            update.AddedResourceEventCount > 0 ||
+            forceRefresh)
         {
             RebuildCounterpartSelections();
             RefreshAllSections();
@@ -296,11 +349,19 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             return;
         }
 
-        _counterpartOptionBuilder.Accumulate(CollectionsMarshal.AsSpan(_detailEvents), _combatantId.Value);
+        _counterpartOptionBuilder.Accumulate(
+            CollectionsMarshal.AsSpan(_metricDetailEvents),
+            CollectionsMarshal.AsSpan(_mechanicDetailEvents),
+            CollectionsMarshal.AsSpan(_resourceDetailEvents),
+            _combatantId.Value);
         OutgoingDetail.DamageCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildOutgoingDamageOptions(DisplayContext));
-        OutgoingDetail.SupportCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildOutgoingSupportOptions(DisplayContext));
+        OutgoingDetail.HealingCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildOutgoingHealingOptions(DisplayContext));
+        OutgoingDetail.ShieldCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildOutgoingShieldOptions(DisplayContext));
+        OutgoingDetail.ResourceCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildOutgoingResourceOptions(DisplayContext));
         IncomingDetail.DamageCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildIncomingDamageOptions(DisplayContext));
-        IncomingDetail.SupportCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildIncomingSupportOptions(DisplayContext));
+        IncomingDetail.HealingCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildIncomingHealingOptions(DisplayContext));
+        IncomingDetail.ShieldCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildIncomingShieldOptions(DisplayContext));
+        IncomingDetail.ResourceCounterpartFilter.ReplaceCounterparts(_counterpartOptionBuilder.BuildIncomingResourceOptions(DisplayContext));
     }
 
     private void RefreshAllSections()
@@ -311,36 +372,78 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             return;
         }
 
-        CopyDirectionSelections(OutgoingDetail, _outgoingDamageSelectionIds, _outgoingSupportSelectionIds, out var outgoingDamageCounterpartCount, out var outgoingSupportCounterpartCount);
-        CopyDirectionSelections(IncomingDetail, _incomingDamageSelectionIds, _incomingSupportSelectionIds, out var incomingDamageCounterpartCount, out var incomingSupportCounterpartCount);
+        CopyDirectionSelections(
+            OutgoingDetail,
+            _outgoingDamageSelectionIds,
+            _outgoingHealingSelectionIds,
+            _outgoingShieldSelectionIds,
+            _outgoingResourceSelectionIds,
+            out var outgoingDamageCounterpartCount,
+            out var outgoingHealingCounterpartCount,
+            out var outgoingShieldCounterpartCount,
+            out var outgoingResourceCounterpartCount);
+        CopyDirectionSelections(
+            IncomingDetail,
+            _incomingDamageSelectionIds,
+            _incomingHealingSelectionIds,
+            _incomingShieldSelectionIds,
+            _incomingResourceSelectionIds,
+            out var incomingDamageCounterpartCount,
+            out var incomingHealingCounterpartCount,
+            out var incomingShieldCounterpartCount,
+            out var incomingResourceCounterpartCount);
 
         ResetDirectionAggregations(
             _outgoingDamageSectionAggregation,
             _outgoingHealingSectionAggregation,
             _outgoingShieldSectionAggregation,
+            _outgoingResourceSectionAggregation,
             _outgoingDamageSelectionIds,
-            _outgoingSupportSelectionIds,
+            _outgoingHealingSelectionIds,
+            _outgoingShieldSelectionIds,
+            _outgoingResourceSelectionIds,
             outgoingDamageCounterpartCount,
-            outgoingSupportCounterpartCount);
+            outgoingHealingCounterpartCount,
+            outgoingShieldCounterpartCount,
+            outgoingResourceCounterpartCount);
         ResetDirectionAggregations(
             _incomingDamageSectionAggregation,
             _incomingHealingSectionAggregation,
             _incomingShieldSectionAggregation,
+            _incomingResourceSectionAggregation,
             _incomingDamageSelectionIds,
-            _incomingSupportSelectionIds,
+            _incomingHealingSelectionIds,
+            _incomingShieldSelectionIds,
+            _incomingResourceSelectionIds,
             incomingDamageCounterpartCount,
-            incomingSupportCounterpartCount);
+            incomingHealingCounterpartCount,
+            incomingShieldCounterpartCount,
+            incomingResourceCounterpartCount);
 
-        var packetsSpan = CollectionsMarshal.AsSpan(_detailEvents);
+        var metricEvents = CollectionsMarshal.AsSpan(_metricDetailEvents);
         var combatantId = _combatantId.Value;
-        foreach (ref readonly var detailPacket in packetsSpan)
+        foreach (ref readonly var detailEvent in metricEvents)
         {
-            AccumulateSection(_outgoingDamageSectionAggregation, in detailPacket, DetailSectionKind.OutgoingDamage, combatantId, _outgoingDamageSelectionIds);
-            AccumulateSection(_outgoingHealingSectionAggregation, in detailPacket, DetailSectionKind.OutgoingHealing, combatantId, _outgoingSupportSelectionIds);
-            AccumulateSection(_outgoingShieldSectionAggregation, in detailPacket, DetailSectionKind.OutgoingShield, combatantId, _outgoingSupportSelectionIds);
-            AccumulateSection(_incomingDamageSectionAggregation, in detailPacket, DetailSectionKind.IncomingDamage, combatantId, _incomingDamageSelectionIds);
-            AccumulateSection(_incomingHealingSectionAggregation, in detailPacket, DetailSectionKind.IncomingHealing, combatantId, _incomingSupportSelectionIds);
-            AccumulateSection(_incomingShieldSectionAggregation, in detailPacket, DetailSectionKind.IncomingShield, combatantId, _incomingSupportSelectionIds);
+            AccumulateMetricSection(_outgoingDamageSectionAggregation, in detailEvent, DetailSectionKind.OutgoingDamage, combatantId, _outgoingDamageSelectionIds);
+            AccumulateMetricSection(_outgoingHealingSectionAggregation, in detailEvent, DetailSectionKind.OutgoingHealing, combatantId, _outgoingHealingSelectionIds);
+            AccumulateMetricSection(_outgoingShieldSectionAggregation, in detailEvent, DetailSectionKind.OutgoingShield, combatantId, _outgoingShieldSelectionIds);
+            AccumulateMetricSection(_incomingDamageSectionAggregation, in detailEvent, DetailSectionKind.IncomingDamage, combatantId, _incomingDamageSelectionIds);
+            AccumulateMetricSection(_incomingHealingSectionAggregation, in detailEvent, DetailSectionKind.IncomingHealing, combatantId, _incomingHealingSelectionIds);
+            AccumulateMetricSection(_incomingShieldSectionAggregation, in detailEvent, DetailSectionKind.IncomingShield, combatantId, _incomingShieldSelectionIds);
+        }
+
+        var mechanicEvents = CollectionsMarshal.AsSpan(_mechanicDetailEvents);
+        foreach (ref readonly var detailEvent in mechanicEvents)
+        {
+            AccumulateMechanicSection(_outgoingDamageSectionAggregation, in detailEvent, DetailSectionKind.OutgoingDamage, combatantId, _outgoingDamageSelectionIds);
+            AccumulateMechanicSection(_incomingDamageSectionAggregation, in detailEvent, DetailSectionKind.IncomingDamage, combatantId, _incomingDamageSelectionIds);
+        }
+
+        var resourceEvents = CollectionsMarshal.AsSpan(_resourceDetailEvents);
+        foreach (ref readonly var detailEvent in resourceEvents)
+        {
+            AccumulateResourceSection(_outgoingResourceSectionAggregation, in detailEvent, DetailSectionKind.OutgoingResource, combatantId, _outgoingResourceSelectionIds);
+            AccumulateResourceSection(_incomingResourceSectionAggregation, in detailEvent, DetailSectionKind.IncomingResource, combatantId, _incomingResourceSelectionIds);
         }
 
         ApplyAggregatedSection(OutgoingDetail.DamageSection, DetailSectionKind.OutgoingDamage, _outgoingDamageSectionAggregation);
@@ -349,27 +452,43 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         ApplyAggregatedSection(IncomingDetail.DamageSection, DetailSectionKind.IncomingDamage, _incomingDamageSectionAggregation);
         ApplyAggregatedSection(IncomingDetail.HealingSection, DetailSectionKind.IncomingHealing, _incomingHealingSectionAggregation);
         ApplyAggregatedSection(IncomingDetail.ShieldSection, DetailSectionKind.IncomingShield, _incomingShieldSectionAggregation);
+        ApplyResourceSection(OutgoingDetail.ResourceSection, _outgoingResourceSectionAggregation);
+        ApplyResourceSection(IncomingDetail.ResourceSection, _incomingResourceSectionAggregation);
     }
 
     private void RefreshDirection(
         CombatDirectionDetailViewModel directionDetail,
         DetailSectionKind damageSectionKind,
         DetailSectionKind healingSectionKind,
-        DetailSectionKind shieldSectionKind)
+        DetailSectionKind shieldSectionKind,
+        DetailSectionKind resourceSectionKind)
     {
         var isOutgoing = ReferenceEquals(directionDetail, OutgoingDetail);
         var damageAggregation = isOutgoing ? _outgoingDamageSectionAggregation : _incomingDamageSectionAggregation;
         var healingAggregation = isOutgoing ? _outgoingHealingSectionAggregation : _incomingHealingSectionAggregation;
         var shieldAggregation = isOutgoing ? _outgoingShieldSectionAggregation : _incomingShieldSectionAggregation;
+        var resourceAggregation = isOutgoing ? _outgoingResourceSectionAggregation : _incomingResourceSectionAggregation;
         var selectedDamageCounterpartIds = isOutgoing ? _outgoingDamageSelectionIds : _incomingDamageSelectionIds;
-        var selectedSupportCounterpartIds = isOutgoing ? _outgoingSupportSelectionIds : _incomingSupportSelectionIds;
-        CopyDirectionSelections(directionDetail, selectedDamageCounterpartIds, selectedSupportCounterpartIds, out var selectableDamageCounterpartCount, out var selectableSupportCounterpartCount);
+        var selectedHealingCounterpartIds = isOutgoing ? _outgoingHealingSelectionIds : _incomingHealingSelectionIds;
+        var selectedShieldCounterpartIds = isOutgoing ? _outgoingShieldSelectionIds : _incomingShieldSelectionIds;
+        var selectedResourceCounterpartIds = isOutgoing ? _outgoingResourceSelectionIds : _incomingResourceSelectionIds;
+        CopyDirectionSelections(
+            directionDetail,
+            selectedDamageCounterpartIds,
+            selectedHealingCounterpartIds,
+            selectedShieldCounterpartIds,
+            selectedResourceCounterpartIds,
+            out var selectableDamageCounterpartCount,
+            out var selectableHealingCounterpartCount,
+            out var selectableShieldCounterpartCount,
+            out var selectableResourceCounterpartCount);
 
         if (_combatantId is null)
         {
             directionDetail.DamageSection.Clear();
             directionDetail.HealingSection.Clear();
             directionDetail.ShieldSection.Clear();
+            directionDetail.ResourceSection.Clear();
             return;
         }
 
@@ -377,63 +496,93 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             damageAggregation,
             healingAggregation,
             shieldAggregation,
+            resourceAggregation,
             selectedDamageCounterpartIds,
-            selectedSupportCounterpartIds,
+            selectedHealingCounterpartIds,
+            selectedShieldCounterpartIds,
+            selectedResourceCounterpartIds,
             selectableDamageCounterpartCount,
-            selectableSupportCounterpartCount);
+            selectableHealingCounterpartCount,
+            selectableShieldCounterpartCount,
+            selectableResourceCounterpartCount);
 
-        var packetsSpan = CollectionsMarshal.AsSpan(_detailEvents);
+        var metricEvents = CollectionsMarshal.AsSpan(_metricDetailEvents);
         var combatantId = _combatantId.Value;
-        foreach (ref readonly var detailPacket in packetsSpan)
+        foreach (ref readonly var detailEvent in metricEvents)
         {
-            AccumulateSection(damageAggregation, in detailPacket, damageSectionKind, combatantId, selectedDamageCounterpartIds);
-            AccumulateSection(healingAggregation, in detailPacket, healingSectionKind, combatantId, selectedSupportCounterpartIds);
-            AccumulateSection(shieldAggregation, in detailPacket, shieldSectionKind, combatantId, selectedSupportCounterpartIds);
+            AccumulateMetricSection(damageAggregation, in detailEvent, damageSectionKind, combatantId, selectedDamageCounterpartIds);
+            AccumulateMetricSection(healingAggregation, in detailEvent, healingSectionKind, combatantId, selectedHealingCounterpartIds);
+            AccumulateMetricSection(shieldAggregation, in detailEvent, shieldSectionKind, combatantId, selectedShieldCounterpartIds);
         }
+
+        var mechanicEvents = CollectionsMarshal.AsSpan(_mechanicDetailEvents);
+        foreach (ref readonly var detailEvent in mechanicEvents)
+        {
+            AccumulateMechanicSection(damageAggregation, in detailEvent, damageSectionKind, combatantId, selectedDamageCounterpartIds);
+        }
+
+        var resourceEvents = CollectionsMarshal.AsSpan(_resourceDetailEvents);
+        foreach (ref readonly var detailEvent in resourceEvents)
+            AccumulateResourceSection(resourceAggregation, in detailEvent, resourceSectionKind, combatantId, selectedResourceCounterpartIds);
 
         ApplyAggregatedSection(directionDetail.DamageSection, damageSectionKind, damageAggregation);
         ApplyAggregatedSection(directionDetail.HealingSection, healingSectionKind, healingAggregation);
         ApplyAggregatedSection(directionDetail.ShieldSection, shieldSectionKind, shieldAggregation);
+        ApplyResourceSection(directionDetail.ResourceSection, resourceAggregation);
     }
 
     private static void CopyDirectionSelections(
         CombatDirectionDetailViewModel directionDetail,
         HashSet<int> selectedDamageCounterpartIds,
-        HashSet<int> selectedSupportCounterpartIds,
+        HashSet<int> selectedHealingCounterpartIds,
+        HashSet<int> selectedShieldCounterpartIds,
+        HashSet<int> selectedResourceCounterpartIds,
         out int selectableDamageCounterpartCount,
-        out int selectableSupportCounterpartCount)
+        out int selectableHealingCounterpartCount,
+        out int selectableShieldCounterpartCount,
+        out int selectableResourceCounterpartCount)
     {
         directionDetail.DamageCounterpartFilter.CopySelectedCounterpartIds(selectedDamageCounterpartIds);
         selectableDamageCounterpartCount = directionDetail.DamageCounterpartFilter.Counterparts.Count;
-        directionDetail.SupportCounterpartFilter.CopySelectedCounterpartIds(selectedSupportCounterpartIds);
-        selectableSupportCounterpartCount = directionDetail.SupportCounterpartFilter.Counterparts.Count;
+        directionDetail.HealingCounterpartFilter.CopySelectedCounterpartIds(selectedHealingCounterpartIds);
+        selectableHealingCounterpartCount = directionDetail.HealingCounterpartFilter.Counterparts.Count;
+        directionDetail.ShieldCounterpartFilter.CopySelectedCounterpartIds(selectedShieldCounterpartIds);
+        selectableShieldCounterpartCount = directionDetail.ShieldCounterpartFilter.Counterparts.Count;
+        directionDetail.ResourceCounterpartFilter.CopySelectedCounterpartIds(selectedResourceCounterpartIds);
+        selectableResourceCounterpartCount = directionDetail.ResourceCounterpartFilter.Counterparts.Count;
     }
 
     private static void ResetDirectionAggregations(
         SkillDetailSectionAggregation damageAggregation,
         SkillDetailSectionAggregation healingAggregation,
         SkillDetailSectionAggregation shieldAggregation,
+        ResourceDetailSectionAggregation resourceAggregation,
         HashSet<int> selectedDamageCounterpartIds,
-        HashSet<int> selectedSupportCounterpartIds,
+        HashSet<int> selectedHealingCounterpartIds,
+        HashSet<int> selectedShieldCounterpartIds,
+        HashSet<int> selectedResourceCounterpartIds,
         int selectableDamageCounterpartCount,
-        int selectableSupportCounterpartCount)
+        int selectableHealingCounterpartCount,
+        int selectableShieldCounterpartCount,
+        int selectableResourceCounterpartCount)
     {
         damageAggregation.Reset(selectableDamageCounterpartCount > 0 && selectedDamageCounterpartIds.Count != selectableDamageCounterpartCount);
-        healingAggregation.Reset(selectableSupportCounterpartCount > 0 && selectedSupportCounterpartIds.Count != selectableSupportCounterpartCount);
-        shieldAggregation.Reset(healingAggregation.HasSubsetFilter);
+        healingAggregation.Reset(selectableHealingCounterpartCount > 0 && selectedHealingCounterpartIds.Count != selectableHealingCounterpartCount);
+        shieldAggregation.Reset(selectableShieldCounterpartCount > 0 && selectedShieldCounterpartIds.Count != selectableShieldCounterpartCount);
+        resourceAggregation.Reset(selectableResourceCounterpartCount > 0 && selectedResourceCounterpartIds.Count != selectableResourceCounterpartCount);
     }
 
-    private static void AccumulateSection(
+    private static void AccumulateMetricSection(
         SkillDetailSectionAggregation aggregation,
-        in CombatDetailEvent detailPacket,
+        in CombatMetricDetailEvent detailEvent,
         DetailSectionKind sectionKind,
         int combatantId,
         HashSet<int> selectedCounterpartIds)
     {
-        if (!SkillDetailSectionRules.Matches(in detailPacket, sectionKind, combatantId))
+        if (!SkillDetailSectionRules.Matches(in detailEvent, sectionKind, combatantId))
             return;
 
-        var counterpartCombatantId = SkillDetailSectionRules.GetCounterpartCombatantId(in detailPacket, sectionKind);
+        var counterpartCombatantId = SkillDetailSectionRules.GetCounterpartCombatantId(in detailEvent, sectionKind);
         if (counterpartCombatantId > 0)
         {
             if (!selectedCounterpartIds.Contains(counterpartCombatantId))
@@ -444,29 +593,95 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             return;
         }
 
-        if (!SkillDetailSectionRules.Contributes(in detailPacket, sectionKind))
+        if (!SkillDetailSectionRules.Contributes(in detailEvent, sectionKind))
             return;
 
-        var observedAt = detailPacket.ObservedAt;
+        var observedAt = detailEvent.ObservedAt;
         if (observedAt > 0)
         {
             aggregation.FirstObserved = Math.Min(aggregation.FirstObserved, observedAt);
             aggregation.LastObserved = Math.Max(aggregation.LastObserved, observedAt);
         }
 
-        var eventKey = detailPacket.EventKey;
+        var eventKey = detailEvent.EventKey;
         ref var skillMetrics = ref CollectionsMarshal.GetValueRefOrAddDefault(aggregation.SkillMetrics, eventKey, out var exists);
         if (!exists)
         {
-            var observation = detailPacket.Observation;
-            skillMetrics = new SkillMetrics(eventKey, in observation);
+            skillMetrics = new SkillMetrics(eventKey);
         }
 
-        var skillObservation = detailPacket.Observation;
-        var contribution = detailPacket.Contribution;
-        skillMetrics.ProcessContribution(in skillObservation, in contribution);
-        ref var eventCount = ref CollectionsMarshal.GetValueRefOrAddDefault(aggregation.EventCounts, eventKey, out _);
-        eventCount++;
+        var contribution = detailEvent.Contribution;
+        skillMetrics.ProcessContribution(in contribution);
+        aggregation.CountOccurrence(detailEvent.Fact);
+    }
+
+    private static void AccumulateMechanicSection(
+        SkillDetailSectionAggregation aggregation,
+        in CombatMechanicDetailEvent detailEvent,
+        DetailSectionKind sectionKind,
+        int combatantId,
+        HashSet<int> selectedCounterpartIds)
+    {
+        if (!SkillDetailSectionRules.Matches(in detailEvent, sectionKind, combatantId))
+            return;
+
+        var counterpartCombatantId = SkillDetailSectionRules.GetCounterpartCombatantId(in detailEvent, sectionKind);
+        if (counterpartCombatantId > 0)
+        {
+            if (!selectedCounterpartIds.Contains(counterpartCombatantId))
+                return;
+        }
+        else if (aggregation.HasSubsetFilter)
+        {
+            return;
+        }
+
+        var observedAt = detailEvent.ObservedAt;
+        if (observedAt > 0)
+        {
+            aggregation.FirstObserved = Math.Min(aggregation.FirstObserved, observedAt);
+            aggregation.LastObserved = Math.Max(aggregation.LastObserved, observedAt);
+        }
+
+        var eventKey = detailEvent.EventKey;
+        ref var skillMetrics = ref CollectionsMarshal.GetValueRefOrAddDefault(aggregation.SkillMetrics, eventKey, out var exists);
+        if (!exists)
+            skillMetrics = new SkillMetrics(eventKey);
+
+        var mechanic = detailEvent.Mechanic;
+        skillMetrics.ProcessMechanic(in mechanic);
+        aggregation.CountOccurrence(detailEvent.Fact);
+    }
+
+    private static void AccumulateResourceSection(
+        ResourceDetailSectionAggregation aggregation,
+        in CombatResourceDetailEvent detailEvent,
+        DetailSectionKind sectionKind,
+        int combatantId,
+        HashSet<int> selectedCounterpartIds)
+    {
+        if (!SkillDetailSectionRules.Matches(in detailEvent, sectionKind, combatantId))
+            return;
+
+        if (detailEvent.Resource.Resource != CombatResourceKind.Mana)
+            return;
+
+        var counterpartCombatantId = SkillDetailSectionRules.GetCounterpartCombatantId(in detailEvent, sectionKind);
+        if (counterpartCombatantId > 0)
+        {
+            if (!selectedCounterpartIds.Contains(counterpartCombatantId))
+                return;
+        }
+        else if (aggregation.HasSubsetFilter)
+        {
+            return;
+        }
+
+        var eventKey = detailEvent.EventKey;
+        ref var metrics = ref CollectionsMarshal.GetValueRefOrAddDefault(aggregation.Skills, eventKey, out _);
+
+        var resource = detailEvent.Resource;
+        metrics.Process(in resource);
     }
 
     private void ApplyAggregatedSection(SkillDetailSectionViewModel section, DetailSectionKind sectionKind, SkillDetailSectionAggregation aggregation)
@@ -486,6 +701,17 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             ? ResolveObservedDurationSeconds(aggregation.FirstObserved, aggregation.LastObserved)
             : ResolveSceneDurationSeconds();
         SkillDetailSectionSummaryApplier.Apply(section, metrics, _sectionRows, sectionKind, durationSeconds, !aggregation.HasSubsetFilter);
+    }
+
+    private void ApplyResourceSection(ResourceDetailSectionViewModel section, ResourceDetailSectionAggregation aggregation)
+    {
+        ResourceDetailRowBuilder.Build(
+            aggregation.Skills,
+            DisplayContext,
+            _localization,
+            _resourceSectionRows,
+            _resourceSectionRowIndexes);
+        ResourceDetailRowBuilder.ApplySummary(section, _resourceSectionRows);
     }
 
     private double ResolveSceneDurationSeconds()
@@ -522,5 +748,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         IncomingDamage.Clear();
         IncomingHealing.Clear();
         IncomingShield.Clear();
+        OutgoingResource.Clear();
+        IncomingResource.Clear();
     }
 }

@@ -6,7 +6,9 @@
     <Styles.Resources>
         <SolidColorBrush x:Key="PlaybackBrush.TimelineTrack">#060B0F</SolidColorBrush>
         <SolidColorBrush x:Key="PlaybackBrush.TimelineCombat">#18D7F4</SolidColorBrush>
-        <SolidColorBrush x:Key="PlaybackBrush.TimelineResource">#8CE271</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.TimelineMechanic">#FFD166</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.TimelineResource">#55D6BE</SolidColorBrush>
+        <SolidColorBrush x:Key="PlaybackBrush.TimelineEntityVital">#8CE271</SolidColorBrush>
         <SolidColorBrush x:Key="PlaybackBrush.TimelineAura">#C98EFF</SolidColorBrush>
         <SolidColorBrush x:Key="PlaybackBrush.TimelineState">#FFD166</SolidColorBrush>
         <SolidColorBrush x:Key="PlaybackBrush.TimelineScene">#FF8A65</SolidColorBrush>

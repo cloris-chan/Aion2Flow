@@ -5,7 +5,9 @@ namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 public interface ICombatDetailEventWriter
 {
     void Clear();
-    void Add(in CombatDetailEvent detailEvent);
+    void AddMetric(in CombatMetricDetailEvent detailEvent);
+    void AddMechanic(in CombatMechanicDetailEvent detailEvent);
+    void AddResource(in CombatResourceDetailEvent detailEvent);
 }
 
 public readonly record struct CombatDetailUpdateResult
@@ -14,7 +16,9 @@ public readonly record struct CombatDetailUpdateResult
     public long Revision { get; init; }
     public bool IsFullSnapshot { get; init; }
     public bool HasChanges { get; init; }
-    public int AddedEventCount { get; init; }
+    public int AddedMetricEventCount { get; init; }
+    public int AddedMechanicEventCount { get; init; }
+    public int AddedResourceEventCount { get; init; }
     public CombatantSummary? Combatant { get; init; }
 
     public static CombatDetailUpdateResult None(int combatantId, long revision, CombatantSummary? combatant) => new()
@@ -43,4 +47,19 @@ internal enum CombatDetailProjectionScope
     CurrentFrame
 }
 
-internal readonly record struct CombatDetailWriteResult(int Count, long Revision);
+internal readonly record struct CombatDetailWriteResult(
+    int MetricEventCount,
+    int MechanicEventCount,
+    int ResourceEventCount,
+    long Revision)
+{
+    public int TotalEventCount => MetricEventCount + MechanicEventCount + ResourceEventCount;
+}
+
+public readonly record struct CombatDetailEventSet(
+    IReadOnlyList<CombatMetricDetailEvent> MetricEvents,
+    IReadOnlyList<CombatMechanicDetailEvent> MechanicEvents,
+    IReadOnlyList<CombatResourceDetailEvent> ResourceEvents)
+{
+    public static CombatDetailEventSet Empty { get; } = new([], [], []);
+}
