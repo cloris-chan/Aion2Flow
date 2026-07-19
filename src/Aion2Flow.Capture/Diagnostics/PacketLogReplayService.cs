@@ -15,17 +15,29 @@ namespace Cloris.Aion2Flow.Capture.Diagnostics;
 public sealed class PacketLogReplayService
 {
     public static PacketLogReplayResult Replay(string path)
-        => ReplayFile(path, CancellationToken.None);
+        => ReplayFile(path, CancellationToken.None, null, null);
+
+    public static PacketLogReplayResult Replay(string path, ICombatOccurrenceObserver combatOccurrenceObserver)
+    {
+        ArgumentNullException.ThrowIfNull(combatOccurrenceObserver);
+        return ReplayFile(path, CancellationToken.None, combatOccurrenceObserver, null);
+    }
+
+    public static PacketLogReplayResult Replay(string path, ISceneEventObserver sceneEventObserver)
+    {
+        ArgumentNullException.ThrowIfNull(sceneEventObserver);
+        return ReplayFile(path, CancellationToken.None, sceneEventObserver, sceneEventObserver);
+    }
 
     public static PacketLogReplayResult ReplayCancellable(string path, CancellationToken cancellationToken)
-        => ReplayFile(path, cancellationToken);
+        => ReplayFile(path, cancellationToken, null, null);
 
-    private static PacketLogReplayResult ReplayFile(string path, CancellationToken cancellationToken)
+    private static PacketLogReplayResult ReplayFile(string path, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         using var reader = File.OpenText(path);
-        return ReplayCore(reader, path, cancellationToken);
+        return ReplayCore(reader, path, cancellationToken, combatOccurrenceObserver, auraLifecycleObserver);
     }
 
     public static IReadOnlyList<PacketLogReplayResult> ReplayMany(IEnumerable<string> paths)
@@ -40,9 +52,9 @@ public sealed class PacketLogReplayService
     }
 
     public static PacketLogReplayResult Replay(TextReader reader, string sourceName)
-        => ReplayCore(reader, sourceName, CancellationToken.None);
+        => ReplayCore(reader, sourceName, CancellationToken.None, null, null);
 
-    private static PacketLogReplayResult ReplayCore(TextReader reader, string sourceName, CancellationToken cancellationToken)
+    private static PacketLogReplayResult ReplayCore(TextReader reader, string sourceName, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
@@ -51,7 +63,7 @@ public sealed class PacketLogReplayService
         {
             return sourceLogKind switch
             {
-                ReplayLogKind.Stream => ReplayStreamLines(ReadLines(reader), sourceName, cancellationToken),
+                ReplayLogKind.Stream => ReplayStreamLines(ReadLines(reader), sourceName, cancellationToken, combatOccurrenceObserver, auraLifecycleObserver),
                 ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
                 _ => throw new InvalidOperationException($"Unsupported replay log kind: {sourceLogKind}.")
             };
@@ -67,7 +79,7 @@ public sealed class PacketLogReplayService
         var logKind = DetectLogKind(lines, sourceName);
         return logKind switch
         {
-            ReplayLogKind.Stream => ReplayStreamLines(lines, sourceName, cancellationToken),
+            ReplayLogKind.Stream => ReplayStreamLines(lines, sourceName, cancellationToken, combatOccurrenceObserver, auraLifecycleObserver),
             ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
             _ => throw new NotSupportedException("Only stream log replay is supported. Raw logs are not supported yet.")
         };
@@ -81,7 +93,7 @@ public sealed class PacketLogReplayService
         }
     }
 
-    private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName, CancellationToken cancellationToken)
+    private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver)
     {
         var journal = new ObservedEventJournal(lines is ICollection<string> collection ? ResolveJournalCapacity(collection.Count) : 16_384);
         var sceneId = Guid.NewGuid();
@@ -89,7 +101,14 @@ public sealed class PacketLogReplayService
         var clock = new SceneRuntimeClock(sceneStarted.ToUnixTimeMilliseconds());
         var metadataRegistry = new RuntimeMetadataRegistry();
         var replayTimeProvider = new ReplayTimeProvider(sceneStarted);
-        var owner = new SceneReadModelOwner(journal, sceneId, sceneStarted, metadataRegistry, replayTimeProvider);
+        var owner = new SceneReadModelOwner(
+            journal,
+            sceneId,
+            sceneStarted,
+            metadataRegistry,
+            replayTimeProvider,
+            combatOccurrenceObserver,
+            auraLifecycleObserver);
         long nextFlushId = 0;
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);

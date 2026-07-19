@@ -27,23 +27,20 @@ public enum CombatPacketRule : byte
     DirectValue = 1,
     DirectHealthResource = 2,
     DirectManaResource = 3,
-    DirectSemantic = 4,
-    DirectFallbackDamage = 5,
     CompactDirectValue = 6,
     CompactRecovery = 7,
     CompactAvoidance = 8,
     PeriodicValue = 9,
     PeriodicHealthResource = 10,
     PeriodicManaResource = 11,
-    PeriodicSemantic = 12,
-    PeriodicFallbackDamage = 13,
     PeriodicRecovery = 14,
     PeriodicShieldGrant = 15,
     PeriodicShieldAbsorbed = 16,
     ActiveSkillInvincible = 17,
     PeriodicLinkInvincible = 18,
     DrainSecondary = 19,
-    RegenerationSecondary = 20
+    RegenerationSecondary = 20,
+    PeriodicPoolClosed = 21
 }
 
 public enum CombatSemanticMatchKind : byte
@@ -68,7 +65,8 @@ public enum CombatMaterializationKind : byte
     RegenerationSecondary = 3,
     PeriodicRecovery = 4,
     PeriodicPoolGrant = 5,
-    PeriodicPoolAbsorb = 6
+    PeriodicPoolAbsorb = 6,
+    PeriodicPoolClose = 7
 }
 
 public enum CombatAssociationKind : byte
@@ -84,7 +82,8 @@ public enum CombatSuppressionReason : byte
     None = 0,
     OwnerTargetSummonResource = 1,
     SystemPeriodicRecoverySeed = 2,
-    PeriodicPoolSemanticCandidate = 3
+    PeriodicPoolSemanticCandidate = 3,
+    PeriodicPoolClosed = 4
 }
 
 public readonly record struct CombatResolutionTrace(

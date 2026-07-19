@@ -8,12 +8,14 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, TimeProvider? timeProvider = null)
+public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, TimeProvider? timeProvider = null, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null)
 {
     public const long BossFocusVisibilityTimeoutMilliseconds = 10_000;
     private readonly Lock _gate = new();
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
-    private DomainEventApplier _applier = new(entities, boundary, metadataRegistry, combat);
+    private readonly ICombatOccurrenceObserver? _combatOccurrenceObserver = combatOccurrenceObserver;
+    private readonly IAuraLifecycleObserver? _auraLifecycleObserver = auraLifecycleObserver;
+    private DomainEventApplier _applier = new(entities, boundary, metadataRegistry, combat, combatOccurrenceObserver, auraLifecycleObserver);
     private readonly SceneCombatSnapshotBuilder _snapshotBuilder = new();
     private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
     private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
@@ -46,6 +48,18 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     }
 
     public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, RuntimeMetadataRegistry metadataRegistry, TimeProvider timeProvider) : this(journal, encounterId, sceneStarted, new EntityStore(), new SceneBoundaryStore(), metadataRegistry, new CombatStore(), timeProvider)
+    {
+    }
+
+    public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, RuntimeMetadataRegistry metadataRegistry, TimeProvider timeProvider, ICombatOccurrenceObserver combatOccurrenceObserver) : this(journal, encounterId, sceneStarted, new EntityStore(), new SceneBoundaryStore(), metadataRegistry, new CombatStore(), timeProvider, combatOccurrenceObserver)
+    {
+    }
+
+    public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, RuntimeMetadataRegistry metadataRegistry, TimeProvider timeProvider, ISceneEventObserver sceneEventObserver) : this(journal, encounterId, sceneStarted, new EntityStore(), new SceneBoundaryStore(), metadataRegistry, new CombatStore(), timeProvider, sceneEventObserver, sceneEventObserver)
+    {
+    }
+
+    public SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, RuntimeMetadataRegistry metadataRegistry, TimeProvider timeProvider, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver) : this(journal, encounterId, sceneStarted, new EntityStore(), new SceneBoundaryStore(), metadataRegistry, new CombatStore(), timeProvider, combatOccurrenceObserver, auraLifecycleObserver)
     {
     }
 
@@ -537,7 +551,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             SceneStarted = sceneStarted;
             SceneStartObservationOrdinal = startOrdinal;
             combat.Clear();
-            _applier = new DomainEventApplier(entities, boundary, metadataRegistry, combat)
+            _applier = new DomainEventApplier(entities, boundary, metadataRegistry, combat, _combatOccurrenceObserver, _auraLifecycleObserver)
             {
                 TrackBossFocus = trackBossFocus
             };

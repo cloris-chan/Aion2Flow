@@ -340,13 +340,12 @@ public sealed class EncounterArchiveServiceTests
         int targetId,
         in CombatWireObservation observation)
     {
+        var occurrence = CombatOccurrenceResolution.Primary;
         Assert.True(CombatContributionResolver.TryResolve(
             sourceId,
             targetId,
             in observation,
-            CombatPacketRule.None,
-            CombatMaterializationKind.Primary,
-            CombatAssociationKind.None,
+            in occurrence,
             out var contribution));
         return contribution;
     }

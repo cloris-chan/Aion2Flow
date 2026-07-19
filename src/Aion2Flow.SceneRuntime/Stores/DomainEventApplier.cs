@@ -16,6 +16,9 @@ public sealed class DomainEventApplier
     private readonly CombatStore _combat;
     private readonly MechanicStore _mechanics;
     private readonly ResourceStore _resources;
+    private readonly ICombatOccurrenceObserver? _combatOccurrenceObserver;
+    private readonly IAuraLifecycleObserver? _auraLifecycleObserver;
+    private readonly CombatContributionPathResolver _contributionPathResolver;
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery;
     private readonly PeriodicPoolCanonicalizer _periodicPool;
     private readonly CompactDirectValueCanonicalizer _compactDirectValue;
@@ -24,8 +27,8 @@ public sealed class DomainEventApplier
     private readonly EntityVitalStore _entityVitals;
     private readonly AuraStore _auras;
     private readonly BossFocusStore _bossFocus;
-    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat)
-        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactDirectValueCanonicalizer(), new CompactAvoidanceCanonicalizer(), new EntityVitalStore(), new AuraStore(), new MechanicStore(), new ResourceStore())
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null)
+        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactDirectValueCanonicalizer(), new CompactAvoidanceCanonicalizer(), new EntityVitalStore(), new AuraStore(), new MechanicStore(), new ResourceStore(), combatOccurrenceObserver, auraLifecycleObserver)
     {
     }
 
@@ -34,7 +37,17 @@ public sealed class DomainEventApplier
     {
     }
 
-    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactDirectValueCanonicalizer compactDirectValue, CompactAvoidanceCanonicalizer compactAvoidance, EntityVitalStore entityVitals, AuraStore auras, MechanicStore mechanics, ResourceStore resources)
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, ICombatOccurrenceObserver combatOccurrenceObserver)
+        : this(entities, boundary, new RuntimeMetadataRegistry(), combat, combatOccurrenceObserver)
+    {
+    }
+
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, ISceneEventObserver sceneEventObserver)
+        : this(entities, boundary, new RuntimeMetadataRegistry(), combat, sceneEventObserver, sceneEventObserver)
+    {
+    }
+
+    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactDirectValueCanonicalizer compactDirectValue, CompactAvoidanceCanonicalizer compactAvoidance, EntityVitalStore entityVitals, AuraStore auras, MechanicStore mechanics, ResourceStore resources, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null, CombatContributionPathResolver? contributionPathResolver = null)
     {
         _entities = entities;
         _boundary = boundary;
@@ -42,6 +55,9 @@ public sealed class DomainEventApplier
         _combat = combat;
         _mechanics = mechanics;
         _resources = resources;
+        _combatOccurrenceObserver = combatOccurrenceObserver;
+        _auraLifecycleObserver = auraLifecycleObserver;
+        _contributionPathResolver = contributionPathResolver ?? new CombatContributionPathResolver(CombatContributionPath.ProductionFallback);
         _systemPeriodicRecovery = systemPeriodicRecovery;
         _periodicPool = periodicPool;
         _compactDirectValue = compactDirectValue;
@@ -72,6 +88,7 @@ public sealed class DomainEventApplier
         _auras.CreateSnapshot(),
         _mechanics.CreateSnapshot(),
         _resources.CreateSnapshot(),
+        _contributionPathResolver.CreateSnapshot(),
         _bossFocus.CreateSnapshot());
 
     internal static DomainEventApplier FromSnapshot(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, DomainEventApplierSnapshot snapshot)
@@ -89,7 +106,8 @@ public sealed class DomainEventApplier
             entityVitals,
             AuraStore.FromSnapshot(snapshot.Auras),
             MechanicStore.FromSnapshot(snapshot.Mechanics),
-            ResourceStore.FromSnapshot(snapshot.Resources));
+            ResourceStore.FromSnapshot(snapshot.Resources),
+            contributionPathResolver: CombatContributionPathResolver.FromSnapshot(snapshot.ContributionPath));
         applier._bossFocus.RestoreSnapshot(snapshot.BossFocus);
         return applier;
     }
@@ -145,10 +163,12 @@ public sealed class DomainEventApplier
                 break;
             case ObservedEventDomain.Aura:
                 auraLifecycle = _auras.Apply(entry);
+                ObserveAuraLifecycle(entry, in auraLifecycle);
                 ApplyAura(in entry.Aura);
                 break;
             case ObservedEventDomain.Action:
                 auraLifecycle = _auras.Apply(entry);
+                ObserveAuraLifecycle(entry, in auraLifecycle);
                 break;
         }
 
@@ -175,7 +195,7 @@ public sealed class DomainEventApplier
         var observedAtMilliseconds = stamp.OffsetTicks / TimeSpan.TicksPerMillisecond;
         if (entry.Raw.Opcode == 0x0238)
         {
-            var controlResults = _compactDirectValue.ObserveCompactControl0238(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw);
+            var controlResults = _compactDirectValue.ObserveCompactControl0238(entry.SourceEntityId, in combatObservation);
             if (controlResults.Count > 0)
             {
                 ApplyStampedCombatResults(controlResults);
@@ -200,20 +220,12 @@ public sealed class DomainEventApplier
         }
 
         if (entry.Raw.Opcode == 0x0438 &&
-            _compactDirectValue.TryObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw, out var compactResults, out var compactHeader))
+            _compactDirectValue.TryObserveCompactValue0438(entry.SourceEntityId, entry.TargetEntityId, in stamp, in combatObservation, observedAtMilliseconds, entry.Raw, out var compactResults))
         {
             if (compactResults.Count == 0)
                 return;
 
-            if (compactHeader.HasHeader)
-            {
-                ApplyStampedCombatResults(compactResults);
-            }
-            else
-            {
-                ApplyStampedCombatResults(compactResults);
-            }
-
+            ApplyStampedCombatResults(compactResults);
             return;
         }
 
@@ -262,15 +274,15 @@ public sealed class DomainEventApplier
         foreach (var normalized in _periodicPool.Normalize(systemRecoveryResult.SourceId, systemRecoveryResult.TargetId, in systemRecoveryObservation))
         {
             var final = normalized.Inherit(in systemRecoveryResolution);
-            ApplyCombatResult(in final, observedAtMilliseconds, stamp.ObservationOrdinal, raw);
+            ApplyCombatResult(in final, observedAtMilliseconds, in stamp, raw);
         }
     }
 
-    private void ApplyCombatResult(in CombatCanonicalizationResult result, long observedAtMilliseconds, long sourceObservationOrdinal, RawPacketReference raw)
+    private void ApplyCombatResult(in CombatCanonicalizationResult result, long observedAtMilliseconds, in TimelineStamp stamp, RawPacketReference raw)
     {
         var occurrence = result.Resolution;
         var observation = result.Observation;
-        var materialization = CombatOccurrenceMaterializer.Resolve(result.SourceId, result.TargetId, in observation, in occurrence);
+        var materialization = ResolveCombatOccurrence(result.SourceId, result.TargetId, in observation, in occurrence, observedAtMilliseconds, in stamp, raw);
         if (!materialization.IsAdmitted)
             return;
 
@@ -280,14 +292,11 @@ public sealed class DomainEventApplier
             in observation,
             in materialization,
             observedAtMilliseconds,
-            sourceObservationOrdinal,
+            stamp.ObservationOrdinal,
             raw,
             applyClassEvidence: true);
 
-        if (occurrence.Suppression == CombatSuppressionReason.PeriodicPoolSemanticCandidate)
-            _periodicPool.AcknowledgeEmittedGrant(result.SourceId, result.TargetId, in observation);
-
-        MaterializeSecondaryContributions(in result, observedAtMilliseconds, sourceObservationOrdinal, raw);
+        MaterializeSecondaryContributions(in result, observedAtMilliseconds, in stamp, raw);
     }
 
     private void ApplyMaterialization(
@@ -320,7 +329,7 @@ public sealed class DomainEventApplier
         TryApplyBossCombatActivity(targetId, observedAtMilliseconds);
     }
 
-    private void MaterializeSecondaryContributions(in CombatCanonicalizationResult result, long observedAtMilliseconds, long sourceObservationOrdinal, RawPacketReference raw)
+    private void MaterializeSecondaryContributions(in CombatCanonicalizationResult result, long observedAtMilliseconds, in TimelineStamp stamp, RawPacketReference raw)
     {
         var observation = result.Observation;
         if (observation.DrainHealAmount > 0 && result.SourceId > 0 && result.SourceId != result.TargetId)
@@ -342,8 +351,8 @@ public sealed class DomainEventApplier
                 CombatMaterializationKind.DrainSecondary,
                 CombatAssociationKind.None,
                 CombatSuppressionReason.None);
-            var drainMaterialization = CombatOccurrenceMaterializer.Resolve(result.SourceId, result.SourceId, in drain, in drainOccurrence);
-            ApplyMaterialization(result.SourceId, result.SourceId, in drain, in drainMaterialization, observedAtMilliseconds, sourceObservationOrdinal, raw, applyClassEvidence: false);
+            var drainMaterialization = ResolveCombatOccurrence(result.SourceId, result.SourceId, in drain, in drainOccurrence, observedAtMilliseconds, in stamp, raw);
+            ApplyMaterialization(result.SourceId, result.SourceId, in drain, in drainMaterialization, observedAtMilliseconds, stamp.ObservationOrdinal, raw, applyClassEvidence: false);
         }
 
         if (observation.RegenerationAmount <= 0 || result.TargetId <= 0 || IsSummon(result.TargetId))
@@ -366,13 +375,73 @@ public sealed class DomainEventApplier
             CombatMaterializationKind.RegenerationSecondary,
             CombatAssociationKind.None,
             CombatSuppressionReason.None);
-        var regenerationMaterialization = CombatOccurrenceMaterializer.Resolve(result.TargetId, result.TargetId, in regeneration, in regenerationOccurrence);
-        ApplyMaterialization(result.TargetId, result.TargetId, in regeneration, in regenerationMaterialization, observedAtMilliseconds, sourceObservationOrdinal, raw, applyClassEvidence: false);
+        var regenerationMaterialization = ResolveCombatOccurrence(result.TargetId, result.TargetId, in regeneration, in regenerationOccurrence, observedAtMilliseconds, in stamp, raw);
+        ApplyMaterialization(result.TargetId, result.TargetId, in regeneration, in regenerationMaterialization, observedAtMilliseconds, stamp.ObservationOrdinal, raw, applyClassEvidence: false);
+    }
+
+    private CombatOccurrenceMaterialization ResolveCombatOccurrence(
+        int sourceId,
+        int targetId,
+        in CombatWireObservation observation,
+        in CombatOccurrenceResolution occurrence,
+        long observedAtMilliseconds,
+        in TimelineStamp stamp,
+        RawPacketReference raw)
+    {
+        var materialization = CombatOccurrenceMaterializer.Resolve(sourceId, targetId, in observation, in occurrence, _contributionPathResolver);
+        if (_combatOccurrenceObserver is { } observer)
+        {
+            var context = new CombatOccurrenceContext(
+                sourceId,
+                targetId,
+                observation,
+                occurrence,
+                observedAtMilliseconds,
+                stamp.ObservationOrdinal,
+                stamp.FlushId,
+                raw,
+                materialization);
+            observer.Observe(in context);
+        }
+
+        return materialization;
     }
 
     private bool IsSummon(int entityId) =>
         _entities.TryGet(entityId, out var entity) &&
         (entity.OwnerKind == EntityOwnerKind.Summon || entity.Kind == NpcKind.Summon);
+
+    private void ObserveAuraLifecycle(ObservedEventEntry entry, in AuraLifecycleTransition transition)
+    {
+        if (_auraLifecycleObserver is not { } observer)
+            return;
+
+        var stamp = entry.Stamp;
+        var context = entry.Domain == ObservedEventDomain.Aura
+            ? new AuraLifecycleObservationContext(
+                AuraLifecycleSourceKind.Aura,
+                entry.SourceEntityId,
+                entry.TargetEntityId,
+                entry.Aura,
+                default,
+                transition,
+                entry.ObservedAtMilliseconds,
+                stamp.ObservationOrdinal,
+                stamp.FlushId,
+                entry.Raw)
+            : new AuraLifecycleObservationContext(
+                AuraLifecycleSourceKind.Action,
+                entry.SourceEntityId,
+                entry.TargetEntityId,
+                default,
+                entry.Action,
+                transition,
+                entry.ObservedAtMilliseconds,
+                stamp.ObservationOrdinal,
+                stamp.FlushId,
+                entry.Raw);
+        observer.Observe(in context);
+    }
 
     private void ApplyAura(in AuraObservation aura)
     {
@@ -424,6 +493,7 @@ public sealed class DomainEventApplier
 
         if (scene.DiagnosticKey == "scene-transport-boundary")
         {
+            _compactDirectValue.ResetPendingAssociations();
             _boundary.MarkSceneTransportBoundary();
             _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
         }
@@ -573,6 +643,7 @@ internal sealed record DomainEventApplierSnapshot(
     AuraStoreSnapshot Auras,
     MechanicStoreSnapshot Mechanics,
     ResourceStoreSnapshot Resources,
+    CombatContributionPathResolverSnapshot ContributionPath,
     BossFocusStoreSnapshot BossFocus);
 
 public readonly record struct DomainEventMaterialization(AuraLifecycleTransition AuraLifecycle);

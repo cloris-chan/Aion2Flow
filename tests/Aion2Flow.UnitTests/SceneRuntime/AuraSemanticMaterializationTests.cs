@@ -1,6 +1,7 @@
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -88,7 +89,7 @@ public sealed class AuraSemanticMaterializationTests
             Slot: null,
             CandidateSlotCount: 2);
 
-        var value = AuraSemanticResolver.Resolve(in resolution);
+        var value = AuraSemanticEvidenceResolver.Evaluate(in resolution);
 
         Assert.Equal(AuraDisposition.Unknown, value.Disposition);
         Assert.Equal(AuraSemanticMatchKind.ExactNode, value.Trace.Match);
@@ -202,6 +203,52 @@ public sealed class AuraSemanticMaterializationTests
         Assert.Equal(AuraDisposition.Buff, application.Semantics.Disposition);
     }
 
+    [Fact]
+    public void SceneObserver_Reports_Packet_Lifecycle_And_Semantic_Disposition_Independently()
+    {
+        const uint buffRef = 174_200_101u;
+        const uint debuffRef = 140_600_401u;
+        var journal = new ObservedEventJournal();
+        var sceneSessionId = Guid.NewGuid();
+        AppendOpen(journal, sceneSessionId, 0, 200, 300, 7, buffRef);
+        AppendRenew(journal, sceneSessionId, 1, 200, 300, 7, buffRef);
+        AppendResult(journal, sceneSessionId, 2, 200, 7, debuffRef);
+        AppendResult(journal, sceneSessionId, 3, 200, 99, buffRef);
+        var observer = new RecordingAuraLifecycleObserver();
+        var applier = new DomainEventApplier(
+            new EntityStore(),
+            new SceneBoundaryStore(),
+            new RuntimeMetadataRegistry(),
+            new CombatStore(),
+            combatOccurrenceObserver: null,
+            auraLifecycleObserver: observer);
+
+        applier.ApplyJournal(journal);
+
+        Assert.Equal(4, observer.Contexts.Count);
+        Assert.Equal(
+            [AuraPacketRule.TrackableOpen, AuraPacketRule.Renewal, AuraPacketRule.Result, AuraPacketRule.None],
+            observer.Contexts.Select(static context => AuraPacketEvidenceResolver.Evaluate(in context).Rule));
+        Assert.All(observer.Contexts, static context =>
+        {
+            var packet = AuraPacketEvidenceResolver.Evaluate(in context);
+            Assert.Equal(AuraDisposition.Unknown, packet.Disposition);
+            Assert.Equal(1, context.FlushId);
+        });
+
+        Assert.Equal(AuraDisposition.Buff, ResolveIndependentSemantics(observer.Contexts[0]).Disposition);
+        Assert.Equal(AuraDisposition.Buff, ResolveIndependentSemantics(observer.Contexts[1]).Disposition);
+        Assert.Equal(AuraDisposition.Debuff, ResolveIndependentSemantics(observer.Contexts[2]).Disposition);
+        Assert.Equal(AuraDisposition.Buff, ResolveIndependentSemantics(observer.Contexts[3]).Disposition);
+        Assert.Equal(AuraLifecycleEventKind.Open, observer.Contexts[0].ProductionTransition.Kind);
+        Assert.Equal(AuraLifecycleEventKind.Renew, observer.Contexts[1].ProductionTransition.Kind);
+        Assert.Equal(AuraLifecycleEventKind.Result, observer.Contexts[2].ProductionTransition.Kind);
+        Assert.Equal(default, observer.Contexts[3].ProductionTransition);
+    }
+
+    private static AuraSemanticValue ResolveIndependentSemantics(in AuraLifecycleObservationContext context) =>
+        AuraSemanticEvidenceResolver.Evaluate(context.EffectiveResourceEffectRef);
+
     private static (AuraStore Store, AuraLifecycleTransition Transition) ApplyOpen(uint resourceEffectRefRaw, int originEntityId)
     {
         var journal = new ObservedEventJournal();
@@ -294,5 +341,12 @@ public sealed class AuraSemanticMaterializationTests
         public ScenePlaybackSourceKind SourceKind => ScenePlaybackSourceKind.Archived;
         public SceneJournalSegment CreateTimelineSegment() => segment;
         public SceneCombatSnapshot CreateSnapshot() => SceneCombatSnapshot.Empty;
+    }
+
+    private sealed class RecordingAuraLifecycleObserver : IAuraLifecycleObserver
+    {
+        public List<AuraLifecycleObservationContext> Contexts { get; } = [];
+
+        public void Observe(in AuraLifecycleObservationContext context) => Contexts.Add(context);
     }
 }

@@ -10,24 +10,19 @@ public sealed class CombatContributionResolverTests
         CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
     }
 
-    [Theory]
-    [InlineData(CombatPacketRule.CompactDirectValue, CombatMetricKind.Damage, CombatDeliveryKind.Direct)]
-    [InlineData(CombatPacketRule.CompactRecovery, CombatMetricKind.Healing, CombatDeliveryKind.Direct)]
-    public void PacketRule_Is_Authoritative_Over_Exact_Resource_Semantics(
-        CombatPacketRule packetRule,
-        CombatMetricKind expectedMetric,
-        CombatDeliveryKind expectedDelivery)
+    [Fact]
+    public void Proven_CompactRecovery_Is_Authoritative_Over_Resource_Semantics()
     {
         var observation = DirectValue(1_010_000, 1_064) with
         {
             DetailResourceEffectRef = ResourceEffectRef.FromRaw(101_000_011)
         };
 
-        var contribution = Resolve(18_846, 18_846, in observation, packetRule);
+        var contribution = Resolve(18_846, 18_846, in observation, CombatPacketRule.CompactRecovery);
 
-        Assert.Equal(expectedMetric, contribution.Metric);
-        Assert.Equal(expectedDelivery, contribution.Delivery);
-        Assert.Equal(packetRule, contribution.Resolution.PacketRule);
+        Assert.Equal(CombatMetricKind.Healing, contribution.Metric);
+        Assert.Equal(CombatDeliveryKind.Direct, contribution.Delivery);
+        Assert.Equal(CombatPacketRule.CompactRecovery, contribution.Resolution.PacketRule);
         Assert.Equal(CombatResolutionAuthority.Packet, contribution.Resolution.Authority);
         Assert.Equal(CombatSemanticMatchKind.None, contribution.Resolution.SemanticMatch);
     }
@@ -38,6 +33,51 @@ public sealed class CombatContributionResolverTests
         var observation = DirectValue(2_010_302, 400_000);
 
         Assert.False(TryResolve(9_024, 9_024, in observation, out _));
+    }
+
+    [Fact]
+    public void Packet_And_Semantic_Evidence_Are_Independently_Evaluable()
+    {
+        var observation = DirectValue(18_720_001, 566) with
+        {
+            BodySkillVariantRaw = 18_720_001,
+            DetailResourceEffectRef = ResourceEffectRef.FromRaw(1_872_000_111)
+        };
+        var occurrence = new CombatOccurrenceResolution(
+            CombatPacketRule.CompactDirectValue,
+            CombatMaterializationKind.CompactAssociated,
+            CombatAssociationKind.None,
+            CombatSuppressionReason.None);
+
+        var packet = CombatPacketEvidenceResolver.Evaluate(15_931, 15_931, in observation, in occurrence);
+        var semantic = CombatSemanticEvidenceResolver.Evaluate(in observation);
+
+        Assert.Equal(CombatPacketEvidenceStrength.Default, packet.Strength);
+        Assert.Equal(CombatMetricKind.Damage, packet.Candidate!.Value.Metric);
+        Assert.Equal(CombatSemanticMatchKind.ExactNode, semantic.Match);
+        Assert.Equal(CombatMetricKind.Healing, semantic.Candidate!.Value.Metric);
+
+        Assert.False(CombatContributionResolver.TryResolvePacketOnly(
+            15_931,
+            15_931,
+            in observation,
+            in occurrence,
+            in packet,
+            out _));
+        Assert.True(CombatContributionResolver.TryResolveSemanticOnly(
+            15_931,
+            15_931,
+            in observation,
+            in occurrence,
+            in semantic,
+            out var semanticOnly));
+        Assert.Equal(CombatMetricKind.Healing, semanticOnly.Metric);
+        Assert.Equal(CombatResolutionAuthority.SkillSemantic, semanticOnly.Resolution.Authority);
+
+        Assert.True(CombatContributionResolver.TryResolve(15_931, 15_931, in observation, in occurrence, out var contribution));
+        Assert.Equal(CombatMetricKind.Healing, contribution.Metric);
+        Assert.Equal(CombatResolutionAuthority.SkillSemantic, contribution.Resolution.Authority);
+        Assert.Equal(CombatPacketRule.CompactDirectValue, contribution.Resolution.PacketRule);
     }
 
     [Fact]
@@ -76,7 +116,7 @@ public sealed class CombatContributionResolverTests
 
         Assert.Equal(CombatMetricKind.Damage, contribution.Metric);
         Assert.Equal(CombatDeliveryKind.Direct, contribution.Delivery);
-        Assert.Equal(CombatPacketRule.DirectFallbackDamage, contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.DirectValue, contribution.Resolution.PacketRule);
         Assert.Equal(CombatResolutionAuthority.PacketDefault, contribution.Resolution.Authority);
     }
 
@@ -92,7 +132,7 @@ public sealed class CombatContributionResolverTests
 
         Assert.Equal(CombatMetricKind.Healing, contribution.Metric);
         Assert.Equal(CombatDeliveryKind.Direct, contribution.Delivery);
-        Assert.Equal(CombatPacketRule.DirectSemantic, contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.DirectValue, contribution.Resolution.PacketRule);
         Assert.Equal(CombatResolutionAuthority.SkillSemantic, contribution.Resolution.Authority);
         Assert.Equal(CombatSemanticMatchKind.ExactNode, contribution.Resolution.SemanticMatch);
         Assert.Equal(SkillSemanticResourceNodeKind.SkillEffect, contribution.Resolution.ResourceNodeKind);
@@ -118,38 +158,6 @@ public sealed class CombatContributionResolverTests
     }
 
     [Fact]
-    public void Semantic_Match_Gate_Rejects_Ambiguous_NonEffect_Node()
-    {
-        var semantics = SkillSemanticValue.Classified(SkillQuantifiedFacet.DirectDamage);
-        var resolution = new SkillSemanticResourceResolution(
-            RawId: 123_450,
-            NodeKind: SkillSemanticResourceNodeKind.SkillEffectGroup,
-            NodeId: 12_345,
-            DirectSemantics: semantics,
-            Semantics: semantics,
-            Slot: null,
-            CandidateSlotCount: 2);
-
-        Assert.Equal(CombatSemanticMatchKind.None, CombatContributionResolver.GetSemanticMatch(in resolution));
-    }
-
-    [Fact]
-    public void Semantic_Match_Gate_Accepts_Exact_Effect_Even_With_Multiple_Owners()
-    {
-        var semantics = SkillSemanticValue.Classified(SkillQuantifiedFacet.DirectDamage);
-        var resolution = new SkillSemanticResourceResolution(
-            RawId: 123_456,
-            NodeKind: SkillSemanticResourceNodeKind.SkillEffect,
-            NodeId: 123_456,
-            DirectSemantics: semantics,
-            Semantics: semantics,
-            Slot: null,
-            CandidateSlotCount: 4);
-
-        Assert.Equal(CombatSemanticMatchKind.ExactNode, CombatContributionResolver.GetSemanticMatch(in resolution));
-    }
-
-    [Fact]
     public void Periodic_Initial_Target_Value_Uses_Direct_Damage_Default()
     {
         var observation = PeriodicValue(17_070_240, 15_392, PeriodicEffectRelation.Target, mode: 1);
@@ -158,7 +166,7 @@ public sealed class CombatContributionResolverTests
 
         Assert.Equal(CombatMetricKind.Damage, contribution.Metric);
         Assert.Equal(CombatDeliveryKind.Direct, contribution.Delivery);
-        Assert.Equal(CombatPacketRule.PeriodicFallbackDamage, contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.PeriodicValue, contribution.Resolution.PacketRule);
     }
 
     [Fact]
@@ -170,7 +178,7 @@ public sealed class CombatContributionResolverTests
 
         Assert.Equal(CombatMetricKind.Damage, contribution.Metric);
         Assert.Equal(CombatDeliveryKind.Periodic, contribution.Delivery);
-        Assert.Equal(CombatPacketRule.PeriodicFallbackDamage, contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.PeriodicValue, contribution.Resolution.PacketRule);
     }
 
     [Theory]
@@ -215,14 +223,52 @@ public sealed class CombatContributionResolverTests
             PeriodicTailSkillCodeRaw = 17_420_010
         };
 
+        var semantic = CombatSemanticEvidenceResolver.Evaluate(in observation);
         var contribution = Resolve(15_104, 15_104, in observation);
 
+        Assert.Equal(CombatSemanticMatchKind.UnambiguousSlot, semantic.Match);
+        Assert.Equal(CombatMetricKind.ShieldGranted, semantic.Candidate!.Value.Metric);
+        Assert.Equal(CombatDeliveryKind.Pool, semantic.Candidate.Value.Delivery);
         Assert.Equal(CombatMetricKind.ShieldGranted, contribution.Metric);
         Assert.Equal(CombatDeliveryKind.Pool, contribution.Delivery);
-        Assert.Equal(CombatPacketRule.PeriodicSemantic, contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.PeriodicValue, contribution.Resolution.PacketRule);
         Assert.Equal(CombatSemanticMatchKind.UnambiguousSlot, contribution.Resolution.SemanticMatch);
         Assert.Equal(SkillSemanticResourceNodeKind.SkillAbnormalEffect, contribution.Resolution.ResourceNodeKind);
         Assert.Equal(1_742_001_011, contribution.Resolution.ResourceNodeId);
+    }
+
+    [Fact]
+    public void Periodic_Pool_Modes_Apply_The_Production_Suppression_Contract()
+    {
+        var observation = PeriodicValue(17_420_010, 3_119, PeriodicEffectRelation.Self, mode: 9) with
+        {
+            BodyResourceEffectRef = ResourceEffectRef.FromRaw(1_742_001_011),
+            PeriodicTailSkillCodeRaw = 17_420_010
+        };
+        var occurrence = new CombatOccurrenceResolution(
+            CombatPacketRule.PeriodicValue,
+            CombatMaterializationKind.PeriodicPoolGrant,
+            CombatAssociationKind.None,
+            CombatSuppressionReason.PeriodicPoolSemanticCandidate);
+        var packet = CombatPacketEvidenceResolver.Evaluate(15_104, 15_104, in observation, in occurrence);
+        var semantic = CombatSemanticEvidenceResolver.Evaluate(in observation);
+
+        Assert.False(CombatContributionResolver.TryResolvePacketOnly(
+            15_104,
+            15_104,
+            in observation,
+            in occurrence,
+            in packet,
+            out _));
+        Assert.True(CombatContributionResolver.TryResolveSemanticOnly(
+            15_104,
+            15_104,
+            in observation,
+            in occurrence,
+            in semantic,
+            out var semanticOnly));
+        Assert.Equal(CombatMetricKind.ShieldGranted, semanticOnly.Metric);
+        Assert.Equal(CombatDeliveryKind.Pool, semanticOnly.Delivery);
     }
 
     [Fact]
@@ -291,15 +337,20 @@ public sealed class CombatContributionResolverTests
     public void Resolver_Does_Not_Allocate_Per_Event()
     {
         var observation = DirectValue(1_100_020, 100);
+        var occurrence = new CombatOccurrenceResolution(
+            CombatPacketRule.CompactDirectValue,
+            CombatMaterializationKind.Primary,
+            CombatAssociationKind.None,
+            CombatSuppressionReason.None);
 
         for (var i = 0; i < 10_000; i++)
-            _ = CombatContributionResolver.TryResolve(100, 200, in observation, CombatPacketRule.CompactDirectValue, default, default, out _);
+            _ = CombatContributionResolver.TryResolve(100, 200, in observation, in occurrence, out _);
 
         var checksum = 0L;
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < 10_000; i++)
         {
-            CombatContributionResolver.TryResolve(100, 200, in observation, CombatPacketRule.CompactDirectValue, default, default, out var contribution);
+            CombatContributionResolver.TryResolve(100, 200, in observation, in occurrence, out var contribution);
             checksum += contribution.Amount;
         }
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
@@ -330,15 +381,11 @@ public sealed class CombatContributionResolverTests
         int sourceId,
         int targetId,
         in CombatWireObservation observation,
-        out CombatContribution contribution) =>
-        CombatContributionResolver.TryResolve(
-            sourceId,
-            targetId,
-            in observation,
-            CombatPacketRule.None,
-            CombatMaterializationKind.Primary,
-            CombatAssociationKind.None,
-            out contribution);
+        out CombatContribution contribution)
+    {
+        var occurrence = CombatOccurrenceResolution.Primary;
+        return CombatContributionResolver.TryResolve(sourceId, targetId, in observation, in occurrence, out contribution);
+    }
 
     private static CombatContribution Resolve(
         int sourceId,
@@ -347,13 +394,16 @@ public sealed class CombatContributionResolverTests
         CombatPacketRule packetRule = CombatPacketRule.None,
         CombatMaterializationKind materialization = CombatMaterializationKind.Primary)
     {
+        var occurrence = new CombatOccurrenceResolution(
+            packetRule,
+            materialization,
+            CombatAssociationKind.None,
+            CombatSuppressionReason.None);
         Assert.True(CombatContributionResolver.TryResolve(
             sourceId,
             targetId,
             in observation,
-            packetRule,
-            materialization,
-            CombatAssociationKind.None,
+            in occurrence,
             out var contribution));
         return contribution;
     }

@@ -270,7 +270,7 @@ public class PeriodicPoolCanonicalizerTests
         var shieldEvent = Assert.Single(combat.Events);
         Assert.Equal(CombatMetricKind.ShieldGranted, shieldEvent.Contribution.Metric);
         Assert.Equal(CombatDeliveryKind.Pool, shieldEvent.Contribution.Delivery);
-        Assert.Equal(CombatPacketRule.PeriodicSemantic, shieldEvent.Contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.PeriodicValue, shieldEvent.Contribution.Resolution.PacketRule);
         Assert.Equal(CombatResolutionAuthority.SkillSemantic, shieldEvent.Contribution.Resolution.Authority);
         Assert.Equal(CombatSemanticMatchKind.UnambiguousSlot, shieldEvent.Contribution.Resolution.SemanticMatch);
         Assert.Equal(CombatMaterializationKind.PeriodicPoolGrant, shieldEvent.Contribution.Resolution.Materialization);
@@ -324,6 +324,68 @@ public class PeriodicPoolCanonicalizerTests
     }
 
     [Fact]
+    public void ScenePath_PacketAndSemanticPathsRemainIndependentAcrossSemanticGrantAndAbsorb()
+    {
+        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        const int playerId = 15104;
+        const int attackerId = 136787;
+        const int chainId = 79;
+        var journal = new ObservedEventJournal();
+        var clock = new SceneRuntimeClock(0);
+        var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
+        var observer = new RecordingCombatOccurrenceObserver();
+        var grant = CreatePeriodicObservation(
+            17420010,
+            3119,
+            chainId,
+            PeriodicEffectRelation.Self,
+            9,
+            bodyResourceEffectRef: ResourceEffectRef.FromRaw(1742001011),
+            tailSkillCode: 17420010,
+            tailLength: 4);
+        AppendCombatWireObservation(sink, playerId, playerId, in grant, 1_000);
+        var continuation = CreatePeriodicObservation(
+            17420010,
+            2719,
+            chainId,
+            PeriodicEffectRelation.Target,
+            11,
+            bodyResourceEffectRef: ResourceEffectRef.FromRaw(1742001011),
+            tailSkillCode: 17420010,
+            tailPrefixValue: 400,
+            tailLength: 5);
+        AppendCombatWireObservation(sink, attackerId, playerId, in continuation, 2_000);
+        var combat = new CombatStore();
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, observer);
+
+        applier.ApplyJournal(journal);
+
+        Assert.Equal(3, observer.Contexts.Count);
+        var semanticOpen = observer.Contexts[0];
+        var packetGrant = observer.Contexts[1];
+        var packetAbsorb = observer.Contexts[2];
+        Assert.Equal(CombatSuppressionReason.PeriodicPoolSemanticCandidate, semanticOpen.Resolution.Suppression);
+        Assert.Equal(CombatPacketRule.PeriodicShieldGrant, packetGrant.Resolution.PacketRule);
+        Assert.False(packetGrant.ProductionMaterialization.IsAdmitted);
+        Assert.Equal(CombatPacketRule.PeriodicShieldAbsorbed, packetAbsorb.Resolution.PacketRule);
+
+        var packetPath = new CombatContributionPathResolver(CombatContributionPath.PacketOnly);
+        var semanticPath = new CombatContributionPathResolver(CombatContributionPath.SemanticOnly);
+        Assert.False(TryResolve(packetPath, in semanticOpen, out _));
+        Assert.True(TryResolve(semanticPath, in semanticOpen, out var semanticGrant));
+        Assert.Equal(CombatResolutionAuthority.SkillSemantic, semanticGrant.Resolution.Authority);
+        Assert.True(TryResolve(packetPath, in packetGrant, out var provenGrant));
+        Assert.Equal(CombatResolutionAuthority.Packet, provenGrant.Resolution.Authority);
+        Assert.False(TryResolve(semanticPath, in packetGrant, out _));
+        Assert.True(TryResolve(packetPath, in packetAbsorb, out var absorbed));
+        Assert.Equal(CombatMetricKind.ShieldAbsorbed, absorbed.Metric);
+
+        Assert.Equal(2, combat.Events.Count);
+        Assert.Single(combat.Events, static e => e.Contribution.Metric == CombatMetricKind.ShieldGranted);
+        Assert.Single(combat.Events, static e => e.Contribution.Metric == CombatMetricKind.ShieldAbsorbed);
+    }
+
+    [Fact]
     public void ScenePath_ShieldContinuationEmitsGrantBeforeAbsorb()
     {
         const int playerId = 8470;
@@ -373,13 +435,70 @@ public class PeriodicPoolCanonicalizerTests
         var terminal = CreatePeriodicObservation(12130040, 3539, chainId, PeriodicEffectRelation.Target, 10);
         AppendCombatWireObservation(sink, attackerId, playerId, in terminal, 2_000);
 
-        var combat = Apply(journal);
+        var combat = new CombatStore();
+        var observer = new RecordingCombatOccurrenceObserver();
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, observer);
+        applier.ApplyJournal(journal);
 
         Assert.False(combat.TryGetCombatant(playerId, out var player));
         Assert.Null(player);
         Assert.False(combat.TryGetPair(playerId, playerId, out var grantPair));
         Assert.Null(grantPair);
         Assert.False(combat.TryGetPair(attackerId, playerId, out _));
+        var closed = Assert.Single(observer.Contexts, static context =>
+            context.Resolution.PacketRule == CombatPacketRule.PeriodicPoolClosed);
+        Assert.Equal(CombatMaterializationKind.PeriodicPoolClose, closed.Resolution.Materialization);
+        Assert.Equal(CombatSuppressionReason.PeriodicPoolClosed, closed.Resolution.Suppression);
+        Assert.False(closed.ProductionMaterialization.IsAdmitted);
+        Assert.False(closed.ProductionMaterialization.HasAny);
+    }
+
+    [Fact]
+    public void PathResolver_Mode10TerminalReleasesSemanticPoolGrantState()
+    {
+        const int targetId = 8470;
+        const int chainId = 59;
+        const int tailSkillCode = 12130040;
+        var resolver = new CombatContributionPathResolver(CombatContributionPath.SemanticOnly);
+        var grant = CreatePeriodicObservation(
+            tailSkillCode,
+            3539,
+            chainId,
+            PeriodicEffectRelation.Self,
+            9,
+            tailSkillCode: tailSkillCode);
+        var grantOccurrence = new CombatOccurrenceResolution(
+            CombatPacketRule.PeriodicValue,
+            CombatMaterializationKind.PeriodicPoolGrant,
+            CombatAssociationKind.None,
+            CombatSuppressionReason.PeriodicPoolSemanticCandidate);
+        var semantic = new CombatSemanticEvidence(
+            CombatSemanticMatchKind.ExactNode,
+            default,
+            new CombatContributionCandidate(CombatMetricKind.ShieldGranted, CombatDeliveryKind.Pool, grant.Damage));
+
+        Assert.True(resolver.TryResolve(targetId, targetId, in grant, in grantOccurrence, default, in semantic, out _));
+        Assert.Single(resolver.CreateSnapshot().MaterializedSemanticPoolGrants);
+
+        var terminal = CreatePeriodicObservation(
+            tailSkillCode,
+            3539,
+            chainId,
+            PeriodicEffectRelation.Target,
+            10,
+            tailSkillCode: tailSkillCode);
+        var terminalOccurrence = new CombatOccurrenceResolution(
+            CombatPacketRule.PeriodicPoolClosed,
+            CombatMaterializationKind.PeriodicPoolClose,
+            CombatAssociationKind.None,
+            CombatSuppressionReason.PeriodicPoolClosed);
+        var terminalPacket = new CombatPacketEvidence(
+            CombatPacketEvidenceStrength.Proven,
+            CombatPacketRule.PeriodicPoolClosed,
+            null);
+
+        Assert.False(resolver.TryResolve(136787, targetId, in terminal, in terminalOccurrence, in terminalPacket, default, out _));
+        Assert.Empty(resolver.CreateSnapshot().MaterializedSemanticPoolGrants);
     }
 
     [Fact]
@@ -410,7 +529,7 @@ public class PeriodicPoolCanonicalizerTests
         Assert.Equal(1395, combatEvent.Observation.Damage);
         Assert.Equal(CombatMetricKind.Damage, combatEvent.Contribution.Metric);
         Assert.Equal(CombatDeliveryKind.Periodic, combatEvent.Contribution.Delivery);
-        Assert.Equal(CombatPacketRule.PeriodicFallbackDamage, combatEvent.Contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.PeriodicValue, combatEvent.Contribution.Resolution.PacketRule);
         Assert.Empty(mechanics.Events);
         Assert.True(combat.TryGetCombatant(sourceId, out var source));
         Assert.Equal(1395, source!.OutgoingDamage);
@@ -578,6 +697,23 @@ public class PeriodicPoolCanonicalizerTests
             tailPrefixValue,
             tailPrefixValue > 0 ? 5 : 4);
         AppendCombatWireObservation(sink, sourceId, targetId, in observation, timestamp, flushId);
+    }
+
+    private static bool TryResolve(
+        CombatContributionPathResolver resolver,
+        in CombatOccurrenceContext context,
+        out CombatContribution contribution)
+    {
+        var observation = context.Wire;
+        var occurrence = context.Resolution;
+        return resolver.TryResolve(context.SourceId, context.TargetId, in observation, in occurrence, out contribution);
+    }
+
+    private sealed class RecordingCombatOccurrenceObserver : ICombatOccurrenceObserver
+    {
+        public List<CombatOccurrenceContext> Contexts { get; } = [];
+
+        public void Observe(in CombatOccurrenceContext context) => Contexts.Add(context);
     }
 
 }

@@ -367,7 +367,7 @@ public class SceneTimelineContractTests
             AttemptCount = 1
         };
         var resolution = new CombatResolutionTrace(
-            PacketRule: CombatPacketRule.DirectFallbackDamage,
+            PacketRule: CombatPacketRule.DirectValue,
             SemanticMatch: CombatSemanticMatchKind.None,
             Authority: CombatResolutionAuthority.PacketDefault,
             Materialization: CombatMaterializationKind.Primary,

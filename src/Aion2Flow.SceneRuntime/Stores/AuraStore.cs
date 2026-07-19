@@ -207,7 +207,7 @@ public sealed class AuraStore
             observation.GroupCode,
             observation.HeadValue,
             observation.BuffResourceEffectRef,
-            AuraSemanticResolver.Resolve(observation.BuffResourceEffectRef),
+            AuraSemanticEvidenceResolver.Evaluate(observation.BuffResourceEffectRef),
             observedAtMilliseconds,
             observedAtMilliseconds,
             ResolveExpiration(observedAtMilliseconds, observation.HeadValue),
@@ -221,7 +221,7 @@ public sealed class AuraStore
     private static AuraSemanticValue ResolveSemantics(ResourceEffectRef resourceEffectRef, in AuraInstanceState previous) =>
         resourceEffectRef == previous.ResourceEffectRef
             ? previous.Semantics
-            : AuraSemanticResolver.Resolve(resourceEffectRef);
+            : AuraSemanticEvidenceResolver.Evaluate(resourceEffectRef);
 
     private static long? ResolveExpiration(long observedAtMilliseconds, ushort durationMilliseconds)
     {

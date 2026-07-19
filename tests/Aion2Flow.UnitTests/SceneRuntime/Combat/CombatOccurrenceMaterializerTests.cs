@@ -152,7 +152,7 @@ public sealed class CombatOccurrenceMaterializerTests
         Assert.True(result.IsAdmitted);
         var contribution = Assert.IsType<CombatContribution>(result.Contribution);
         Assert.Equal(expectedMetric, contribution.Metric);
-        Assert.Equal(CombatPacketRule.DirectSemantic, contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.DirectValue, contribution.Resolution.PacketRule);
         Assert.Equal(CombatResolutionAuthority.SkillSemantic, contribution.Resolution.Authority);
         Assert.Equal(expectedMatch, contribution.Resolution.SemanticMatch);
     }
@@ -224,7 +224,7 @@ public sealed class CombatOccurrenceMaterializerTests
         var contribution = Assert.IsType<CombatContribution>(result.Contribution);
         Assert.Equal(CombatMetricKind.ShieldGranted, contribution.Metric);
         Assert.Equal(CombatDeliveryKind.Pool, contribution.Delivery);
-        Assert.Equal(CombatPacketRule.PeriodicSemantic, contribution.Resolution.PacketRule);
+        Assert.Equal(CombatPacketRule.PeriodicValue, contribution.Resolution.PacketRule);
         Assert.Equal(CombatResolutionAuthority.SkillSemantic, contribution.Resolution.Authority);
         Assert.Equal(CombatSemanticMatchKind.UnambiguousSlot, contribution.Resolution.SemanticMatch);
     }

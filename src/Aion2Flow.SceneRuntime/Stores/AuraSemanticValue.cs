@@ -39,9 +39,9 @@ public readonly record struct AuraSemanticValue(
     public bool IsAnnotated => Disposition != AuraDisposition.Unknown;
 }
 
-internal static class AuraSemanticResolver
+public static class AuraSemanticEvidenceResolver
 {
-    public static AuraSemanticValue Resolve(ResourceEffectRef resourceEffectRef)
+    public static AuraSemanticValue Evaluate(ResourceEffectRef resourceEffectRef)
     {
         if (!CombatResourceRegistry.TryResolveAuraResourceSemantics(resourceEffectRef, out var resolution))
         {
@@ -59,10 +59,10 @@ internal static class AuraSemanticResolver
                     0));
         }
 
-        return Resolve(in resolution);
+        return Evaluate(in resolution);
     }
 
-    internal static AuraSemanticValue Resolve(in SkillSemanticResourceResolution resolution)
+    internal static AuraSemanticValue Evaluate(in SkillSemanticResourceResolution resolution)
     {
         var match = GetMatch(in resolution);
         var trace = new AuraSemanticTrace(

@@ -11,41 +11,52 @@ public static class CombatOccurrenceMaterializer
         in CombatWireObservation observation,
         in CombatOccurrenceResolution occurrence)
     {
-        if (occurrence.Suppression == CombatSuppressionReason.SystemPeriodicRecoverySeed)
+        if (CombatContributionAdmission.IsSuppressedBeforeResolution(in occurrence))
             return default;
 
-        bool hasContribution;
-        CombatContribution contribution;
-        if (occurrence.Suppression == CombatSuppressionReason.PeriodicPoolSemanticCandidate)
-        {
-            hasContribution = CombatContributionResolver.TryResolvePeriodicPoolSemanticGrant(
-                in observation,
-                occurrence.Association,
-                out contribution);
-        }
-        else
-        {
-            hasContribution = CombatContributionResolver.TryResolve(
-                sourceId,
-                targetId,
-                in observation,
-                occurrence.PacketRule,
-                occurrence.Materialization,
-                occurrence.Association,
-                out contribution);
-        }
+        var hasContribution = CombatContributionResolver.TryResolve(
+            sourceId,
+            targetId,
+            in observation,
+            in occurrence,
+            out var contribution);
 
-        if (occurrence.Suppression == CombatSuppressionReason.OwnerTargetSummonResource &&
-            !IsAdmittedOwnerTargetSemanticContribution(hasContribution, in contribution))
-        {
-            return default;
-        }
+        return Resolve(sourceId, targetId, in observation, in occurrence, hasContribution, in contribution);
+    }
 
-        if (occurrence.Suppression == CombatSuppressionReason.PeriodicPoolSemanticCandidate &&
-            !IsAdmittedPeriodicPoolSemanticGrant(hasContribution, in contribution))
-        {
+    internal static CombatOccurrenceMaterialization Resolve(
+        int sourceId,
+        int targetId,
+        in CombatWireObservation observation,
+        in CombatOccurrenceResolution occurrence,
+        CombatContributionPathResolver pathResolver)
+    {
+        if (CombatContributionAdmission.IsSuppressedBeforeResolution(in occurrence))
             return default;
-        }
+
+        var hasContribution = pathResolver.TryResolve(
+            sourceId,
+            targetId,
+            in observation,
+            in occurrence,
+            out var contribution,
+            out var suppressedOccurrence);
+        if (suppressedOccurrence)
+            return default;
+
+        return Resolve(sourceId, targetId, in observation, in occurrence, hasContribution, in contribution);
+    }
+
+    private static CombatOccurrenceMaterialization Resolve(
+        int sourceId,
+        int targetId,
+        in CombatWireObservation observation,
+        in CombatOccurrenceResolution occurrence,
+        bool hasContribution,
+        in CombatContribution contribution)
+    {
+        if (!CombatContributionAdmission.IsOccurrenceAdmissible(in occurrence, hasContribution, in contribution))
+            return default;
 
         var hasMechanic = TryResolveMechanic(
             in observation,
@@ -66,24 +77,6 @@ public static class CombatOccurrenceMaterializer
             hasMechanic ? mechanic : null,
             hasResource ? resource : null);
     }
-
-    private static bool IsAdmittedOwnerTargetSemanticContribution(
-        bool hasContribution,
-        in CombatContribution contribution) =>
-        hasContribution &&
-        contribution.Resolution.PacketRule == CombatPacketRule.DirectSemantic &&
-        contribution.Resolution.Authority == CombatResolutionAuthority.SkillSemantic &&
-        contribution.Resolution.SemanticMatch is CombatSemanticMatchKind.ExactNode or CombatSemanticMatchKind.UnambiguousSlot;
-
-    private static bool IsAdmittedPeriodicPoolSemanticGrant(
-        bool hasContribution,
-        in CombatContribution contribution) =>
-        hasContribution &&
-        contribution.Metric == CombatMetricKind.ShieldGranted &&
-        contribution.Delivery == CombatDeliveryKind.Pool &&
-        contribution.Resolution.PacketRule == CombatPacketRule.PeriodicSemantic &&
-        contribution.Resolution.Authority == CombatResolutionAuthority.SkillSemantic &&
-        contribution.Resolution.SemanticMatch is CombatSemanticMatchKind.ExactNode or CombatSemanticMatchKind.UnambiguousSlot;
 
     private static bool TryResolveMechanic(
         in CombatWireObservation observation,

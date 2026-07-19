@@ -130,7 +130,7 @@ internal static class SyntheticObservationExtensions
             Delivery: CombatDeliveryKind.Direct,
             Amount: Math.Max(0, damage),
             Resolution: new CombatResolutionTrace(
-                PacketRule: CombatPacketRule.DirectFallbackDamage,
+                PacketRule: CombatPacketRule.DirectValue,
                 SemanticMatch: CombatSemanticMatchKind.None,
                 Authority: CombatResolutionAuthority.PacketDefault,
                 Materialization: CombatMaterializationKind.Primary,

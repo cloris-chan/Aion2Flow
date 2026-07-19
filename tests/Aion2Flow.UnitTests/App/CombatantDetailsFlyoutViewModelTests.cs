@@ -1284,8 +1284,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         {
             (CombatMetricKind.Damage, _, DamageModifiers.Invincible) => CombatPacketRule.ActiveSkillInvincible,
             (CombatMetricKind.Damage, _, DamageModifiers.Evade) => CombatPacketRule.CompactAvoidance,
-            (CombatMetricKind.Damage, CombatDeliveryKind.Periodic, _) => CombatPacketRule.PeriodicFallbackDamage,
-            (CombatMetricKind.Damage, _, _) => CombatPacketRule.DirectFallbackDamage,
+            (CombatMetricKind.Damage, CombatDeliveryKind.Periodic, _) => CombatPacketRule.PeriodicValue,
+            (CombatMetricKind.Damage, _, _) => CombatPacketRule.DirectValue,
             (CombatMetricKind.Healing, CombatDeliveryKind.Periodic, _) => CombatPacketRule.PeriodicHealthResource,
             (CombatMetricKind.Healing, _, _) => CombatPacketRule.DirectHealthResource,
             (CombatMetricKind.ShieldGranted, _, _) => CombatPacketRule.PeriodicShieldGrant,
@@ -1298,7 +1298,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
             CombatMetricKind.ShieldAbsorbed => CombatMaterializationKind.PeriodicPoolAbsorb,
             _ => CombatMaterializationKind.Primary
         };
-        var authority = packetRule is CombatPacketRule.DirectFallbackDamage or CombatPacketRule.PeriodicFallbackDamage
+        var authority = packetRule is CombatPacketRule.DirectValue or CombatPacketRule.PeriodicValue
             ? CombatResolutionAuthority.PacketDefault
             : CombatResolutionAuthority.Packet;
 

@@ -4,12 +4,45 @@ using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
 
 public sealed class PacketLogReplayServiceTests
 {
+    [Fact]
+    public void Replay_Observer_Receives_Production_Occurrences_After_Initial_Reset()
+    {
+        SetResources();
+        var observer = new RecordingSceneEventObserver();
+
+        var replay = PacketLogReplayService.Replay(
+            FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentBrawlerRegenerationRecovery}"),
+            observer);
+
+        Assert.True(replay.ReplayedLines > 0);
+        Assert.NotEmpty(observer.Contexts);
+        Assert.NotEmpty(observer.AuraContexts);
+        Assert.Contains(
+            observer.AuraContexts,
+            static context => AuraPacketEvidenceResolver.Evaluate(in context).HasLifecycleEvidence);
+        Assert.Contains(
+            observer.Contexts,
+            static context =>
+                context.Resolution.PacketRule == CombatPacketRule.RegenerationSecondary &&
+                context.ProductionMaterialization.Contribution is
+                {
+                    Metric: CombatMetricKind.Healing,
+                    Delivery: CombatDeliveryKind.Regeneration
+                });
+        Assert.All(observer.Contexts, static context =>
+        {
+            Assert.True(context.SourceObservationOrdinal >= 0);
+            Assert.True(context.FlushId >= 0);
+        });
+    }
+
     [Fact]
     public void Replay_20260702031011_Parses_Current0438_Damage_And_Modifier_Layout()
     {
@@ -607,7 +640,7 @@ public sealed class PacketLogReplayServiceTests
                 continue;
 
             Assert.True(materialization.IsAdmitted);
-            Assert.Equal(CombatPacketRule.DirectSemantic, contribution.Resolution.PacketRule);
+            Assert.Equal(CombatPacketRule.DirectValue, contribution.Resolution.PacketRule);
             Assert.True(contribution.Resolution.SemanticMatch is CombatSemanticMatchKind.ExactNode or CombatSemanticMatchKind.UnambiguousSlot);
             admitted.Add(contribution);
         }
@@ -796,6 +829,16 @@ public sealed class PacketLogReplayServiceTests
         CombatWireObservation Observation,
         RawPacketReference Raw,
         CombatOccurrenceResolution Resolution);
+
+    private sealed class RecordingSceneEventObserver : ISceneEventObserver
+    {
+        public List<CombatOccurrenceContext> Contexts { get; } = [];
+        public List<AuraLifecycleObservationContext> AuraContexts { get; } = [];
+
+        public void Observe(in CombatOccurrenceContext context) => Contexts.Add(context);
+
+        public void Observe(in AuraLifecycleObservationContext context) => AuraContexts.Add(context);
+    }
 
     private static int CountHitsWithAny(SceneReplayPacket packet, DamageModifiers modifiers)
         => (packet.Modifiers & modifiers) != 0 ? packet.HitCount : 0;
