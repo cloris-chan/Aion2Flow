@@ -6,51 +6,24 @@ namespace Cloris.Aion2Flow.Controls;
 
 public sealed class AnimatedItemsViewItem : ContentControl
 {
-    public static readonly DirectProperty<AnimatedItemsViewItem, bool> IsSelectedProperty =
-        AvaloniaProperty.RegisterDirect<AnimatedItemsViewItem, bool>(
-            nameof(IsSelected),
-            item => item.IsSelected);
+    public static readonly DirectProperty<AnimatedItemsViewItem, bool> IsSelectedProperty = AvaloniaProperty.RegisterDirect<AnimatedItemsViewItem, bool>(nameof(IsSelected), static item => item.IsSelected);
 
-    public static readonly DirectProperty<AnimatedItemsViewItem, bool> IsAddingProperty =
-        AvaloniaProperty.RegisterDirect<AnimatedItemsViewItem, bool>(
-            nameof(IsAdding),
-            item => item.IsAdding);
-
-    public static readonly DirectProperty<AnimatedItemsViewItem, bool> IsRemovingProperty =
-        AvaloniaProperty.RegisterDirect<AnimatedItemsViewItem, bool>(
-            nameof(IsRemoving),
-            item => item.IsRemoving);
-
+    private bool _isSelected;
 
     internal AnimatedItemsView? Owner { get; set; }
+    internal int Generation { get; set; }
+    internal double VirtualTop { get; set; }
+    internal bool IsViewportVisible { get; set; }
+    internal TimeSpan ConfiguredAddRemoveDuration { get; set; } = TimeSpan.MinValue;
+    internal TimeSpan ConfiguredMoveDuration { get; set; } = TimeSpan.MinValue;
 
     public bool IsSelected
     {
-        get;
+        get => _isSelected;
         internal set
         {
-            SetAndRaise(IsSelectedProperty, ref field, value);
-            PseudoClasses.Set(":selected", value);
-        }
-    }
-
-    public bool IsAdding
-    {
-        get;
-        internal set
-        {
-            SetAndRaise(IsAddingProperty, ref field, value);
-            PseudoClasses.Set(":adding", value);
-        }
-    }
-
-    public bool IsRemoving
-    {
-        get;
-        internal set
-        {
-            SetAndRaise(IsRemovingProperty, ref field, value);
-            PseudoClasses.Set(":removing", value);
+            if (SetAndRaise(IsSelectedProperty, ref _isSelected, value))
+                PseudoClasses.Set(":selected", value);
         }
     }
 
@@ -58,9 +31,7 @@ public sealed class AnimatedItemsViewItem : ContentControl
     {
         base.OnPointerPressed(e);
 
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && !IsRemoving)
-        {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             Owner?.SelectedItem = Content;
-        }
     }
 }

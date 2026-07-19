@@ -202,6 +202,7 @@
                                      ItemsSource="{Binding Combatants}"
                                      SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}"
                                      MaxVisibleItems="{Binding SettingsFlyout.MaxVisibleCombatantRows}"
+                                     ItemHeight="36"
                                      MoveDuration="0:0:0.16"
                                      AddRemoveDuration="0:0:0.14"
                                      AddRemoveOffset="16">
