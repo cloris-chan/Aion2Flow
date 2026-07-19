@@ -110,7 +110,7 @@ public readonly record struct ScenePlaybackEventId(ScenePlaybackEventFactKind Ki
 {
     public int CompareTo(ScenePlaybackEventId other)
     {
-        var comparison = Kind.CompareTo(other.Kind);
+        var comparison = ((byte)Kind).CompareTo((byte)other.Kind);
         return comparison != 0 ? comparison : Ordinal.CompareTo(other.Ordinal);
     }
 }

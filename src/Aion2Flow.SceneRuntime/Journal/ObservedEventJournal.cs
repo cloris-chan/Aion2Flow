@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -10,8 +9,6 @@ public sealed class ObservedEventJournal(int capacity = 0)
 
     private readonly Lock _gate = new();
     private readonly List<ObservedEventStorageSegment> _segments = capacity > 0 ? new(ResolveSegmentCapacity(capacity)) : [];
-    private readonly List<RawPacketReference> _rawReferences = [];
-    private readonly Dictionary<RawPacketReference, int> _rawReferenceIndices = [];
     private readonly List<Guid> _sceneSessionIds = [];
     private readonly Dictionary<Guid, int> _sceneSessionIndices = [];
     private int _count;
@@ -27,11 +24,6 @@ public sealed class ObservedEventJournal(int capacity = 0)
     public int SegmentCount
     {
         get { lock (_gate) return _segments.Count; }
-    }
-
-    public int RawReferenceCount
-    {
-        get { lock (_gate) return _rawReferences.Count; }
     }
 
     public int SceneSessionCount
@@ -58,9 +50,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
     {
         lock (_gate)
         {
-            var segment = PrepareAppend(in header, out var sessionIndex, out var rawIndex);
+            var segment = PrepareAppend(in header, out var sessionIndex);
             var payloadIndex = segment.AddCombat(in observation);
-            CommitAppend(segment, in header, sessionIndex, rawIndex, payloadIndex, ObservedEventDomain.Combat);
+            CommitAppend(segment, in header, sessionIndex, payloadIndex, ObservedEventDomain.Combat);
         }
     }
 
@@ -68,9 +60,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
     {
         lock (_gate)
         {
-            var segment = PrepareAppend(in header, out var sessionIndex, out var rawIndex);
+            var segment = PrepareAppend(in header, out var sessionIndex);
             var payloadIndex = segment.AddAction(in observation);
-            CommitAppend(segment, in header, sessionIndex, rawIndex, payloadIndex, ObservedEventDomain.Action);
+            CommitAppend(segment, in header, sessionIndex, payloadIndex, ObservedEventDomain.Action);
         }
     }
 
@@ -78,9 +70,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
     {
         lock (_gate)
         {
-            var segment = PrepareAppend(in header, out var sessionIndex, out var rawIndex);
+            var segment = PrepareAppend(in header, out var sessionIndex);
             var payloadIndex = segment.AddState(in observation);
-            CommitAppend(segment, in header, sessionIndex, rawIndex, payloadIndex, ObservedEventDomain.State);
+            CommitAppend(segment, in header, sessionIndex, payloadIndex, ObservedEventDomain.State);
         }
     }
 
@@ -88,9 +80,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
     {
         lock (_gate)
         {
-            var segment = PrepareAppend(in header, out var sessionIndex, out var rawIndex);
+            var segment = PrepareAppend(in header, out var sessionIndex);
             var payloadIndex = segment.AddEntityVital(in observation);
-            CommitAppend(segment, in header, sessionIndex, rawIndex, payloadIndex, ObservedEventDomain.EntityVital);
+            CommitAppend(segment, in header, sessionIndex, payloadIndex, ObservedEventDomain.EntityVital);
         }
     }
 
@@ -98,9 +90,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
     {
         lock (_gate)
         {
-            var segment = PrepareAppend(in header, out var sessionIndex, out var rawIndex);
+            var segment = PrepareAppend(in header, out var sessionIndex);
             var payloadIndex = segment.AddAura(in observation);
-            CommitAppend(segment, in header, sessionIndex, rawIndex, payloadIndex, ObservedEventDomain.Aura);
+            CommitAppend(segment, in header, sessionIndex, payloadIndex, ObservedEventDomain.Aura);
         }
     }
 
@@ -108,9 +100,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
     {
         lock (_gate)
         {
-            var segment = PrepareAppend(in header, out var sessionIndex, out var rawIndex);
+            var segment = PrepareAppend(in header, out var sessionIndex);
             var payloadIndex = segment.AddScene(in observation);
-            CommitAppend(segment, in header, sessionIndex, rawIndex, payloadIndex, ObservedEventDomain.Scene);
+            CommitAppend(segment, in header, sessionIndex, payloadIndex, ObservedEventDomain.Scene);
         }
     }
 
@@ -118,8 +110,8 @@ public sealed class ObservedEventJournal(int capacity = 0)
     {
         lock (_gate)
         {
-            var segment = PrepareAppend(in header, out var sessionIndex, out var rawIndex);
-            CommitAppend(segment, in header, sessionIndex, rawIndex, -1, ObservedEventDomain.Diagnostic);
+            var segment = PrepareAppend(in header, out var sessionIndex);
+            CommitAppend(segment, in header, sessionIndex, -1, ObservedEventDomain.Diagnostic);
         }
     }
 
@@ -200,11 +192,9 @@ public sealed class ObservedEventJournal(int capacity = 0)
         }
     }
 
-    internal ref readonly RawPacketReference GetRawReference(int index) => ref CollectionsMarshal.AsSpan(_rawReferences)[index];
-
     internal Guid GetSceneSessionId(int index) => _sceneSessionIds[index];
 
-    private ObservedEventStorageSegment PrepareAppend(in ObservedEventHeader header, out int sessionIndex, out int rawIndex)
+    private ObservedEventStorageSegment PrepareAppend(in ObservedEventHeader header, out int sessionIndex)
     {
         if (header.Stamp.ObservationOrdinal != _nextObservationOrdinal)
             throw new ArgumentException($"ObservationOrdinal must be {_nextObservationOrdinal}, got {header.Stamp.ObservationOrdinal}.", nameof(header));
@@ -213,7 +203,6 @@ public sealed class ObservedEventJournal(int capacity = 0)
             _segments.Add(new ObservedEventStorageSegment(_nextObservationOrdinal));
 
         sessionIndex = InternSceneSession(header.SceneSessionId);
-        rawIndex = InternRawReference(header.Raw);
         return _segments[^1];
     }
 
@@ -221,11 +210,11 @@ public sealed class ObservedEventJournal(int capacity = 0)
         ObservedEventStorageSegment segment,
         in ObservedEventHeader header,
         int sessionIndex,
-        int rawIndex,
         int payloadIndex,
         ObservedEventDomain domain)
     {
-        segment.AddHeader(new StoredObservedEventHeader(
+        var rawIndex = segment.Count;
+        var storedHeader = new StoredObservedEventHeader(
             header.Stamp.OffsetTicks,
             header.Stamp.FlushId,
             sessionIndex,
@@ -233,22 +222,13 @@ public sealed class ObservedEventJournal(int capacity = 0)
             header.TargetEntityId,
             rawIndex,
             payloadIndex,
-            domain));
+            domain);
+        var raw = header.Raw;
+        segment.AddHeader(in storedHeader, in raw);
         if (_count == 0)
             _firstObservationOrdinal = header.Stamp.ObservationOrdinal;
         _count++;
         _nextObservationOrdinal++;
-    }
-
-    private int InternRawReference(RawPacketReference raw)
-    {
-        if (_rawReferenceIndices.TryGetValue(raw, out var index))
-            return index;
-
-        index = _rawReferences.Count;
-        _rawReferences.Add(raw);
-        _rawReferenceIndices.Add(raw, index);
-        return index;
     }
 
     private int InternSceneSession(Guid sceneSessionId)
@@ -306,7 +286,7 @@ public readonly ref struct ObservedEventEntry
     public int SourceEntityId => _header.SourceEntityId;
     public int TargetEntityId => _header.TargetEntityId;
     public long ObservedAtMilliseconds => _header.OffsetTicks / TimeSpan.TicksPerMillisecond;
-    public ref readonly RawPacketReference Raw => ref _journal.GetRawReference(_header.RawReferenceIndex);
+    public ref readonly RawPacketReference Raw => ref _segment.GetRaw(_header.RawIndex);
 
     public ref readonly CombatWireObservation Combat
     {
@@ -417,6 +397,7 @@ public readonly ref struct JournalEntryBatch
 internal sealed class ObservedEventStorageSegment(long firstObservationOrdinal)
 {
     private readonly StoredObservedEventHeader[] _headers = new StoredObservedEventHeader[ObservedEventJournal.SegmentCapacity];
+    private readonly RawPacketReference[] _rawReferences = new RawPacketReference[ObservedEventJournal.SegmentCapacity];
     private PayloadBuffer<CombatWireObservation> _combat;
     private PayloadBuffer<ActionObservation> _actions;
     private PayloadBuffer<StateObservation> _states;
@@ -426,7 +407,11 @@ internal sealed class ObservedEventStorageSegment(long firstObservationOrdinal)
 
     public int Count { get; private set; }
 
-    public void AddHeader(in StoredObservedEventHeader header) => _headers[Count++] = header;
+    public void AddHeader(in StoredObservedEventHeader header, in RawPacketReference raw)
+    {
+        _rawReferences[Count] = raw;
+        _headers[Count++] = header;
+    }
     public int AddCombat(in CombatWireObservation value) => _combat.Add(in value);
     public int AddAction(in ActionObservation value) => _actions.Add(in value);
     public int AddState(in StateObservation value) => _states.Add(in value);
@@ -439,6 +424,7 @@ internal sealed class ObservedEventStorageSegment(long firstObservationOrdinal)
     public ref readonly EntityVitalObservation GetEntityVital(int index) => ref _entityVitals[index];
     public ref readonly AuraObservation GetAura(int index) => ref _auras[index];
     public ref readonly SceneObservation GetScene(int index) => ref _scenes[index];
+    public ref readonly RawPacketReference GetRaw(int index) => ref _rawReferences[index];
 
     public ObservedEventEntry GetEntry(ObservedEventJournal journal, int index)
         => new(journal, this, in _headers[index], firstObservationOrdinal + index);
@@ -450,7 +436,7 @@ internal readonly record struct StoredObservedEventHeader(
     int SceneSessionIndex,
     int SourceEntityId,
     int TargetEntityId,
-    int RawReferenceIndex,
+    int RawIndex,
     int PayloadIndex,
     ObservedEventDomain Domain);
 

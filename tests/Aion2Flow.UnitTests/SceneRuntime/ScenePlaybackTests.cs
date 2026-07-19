@@ -14,6 +14,28 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public sealed class ScenePlaybackTests
 {
     [Fact]
+    public void EventId_CompareTo_DoesNotAllocate()
+    {
+        ScenePlaybackEventId[] eventIds =
+        [
+            new(ScenePlaybackEventFactKind.Metric, 1),
+            new(ScenePlaybackEventFactKind.Mechanic, 2),
+            new(ScenePlaybackEventFactKind.Resource, 3),
+            new(ScenePlaybackEventFactKind.Observation, 4)
+        ];
+        _ = eventIds[0].CompareTo(eventIds[1]);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var checksum = 0;
+        for (var i = 0; i < 100_000; i++)
+            checksum += eventIds[i & 3].CompareTo(eventIds[(i + 1) & 3]) * ((i & 1) + 1);
+        var allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
+
+        Assert.NotEqual(0, checksum);
+        Assert.Equal(allocatedBefore, allocatedAfter);
+    }
+
+    [Fact]
     public void ArchivedSource_UsesFixedTimelineSegment()
     {
         var record = CreateArchiveRecord();

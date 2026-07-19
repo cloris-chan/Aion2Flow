@@ -282,8 +282,56 @@ public class SceneTimelineContractTests
         Assert.Equal(3, second.Count);
         Assert.Equal([512L, 513L, 514L], secondOrdinals);
         Assert.Equal(2, journal.SegmentCount);
-        Assert.Equal(1, journal.RawReferenceCount);
         Assert.Equal(1, journal.SceneSessionCount);
+    }
+
+    [Fact]
+    public void Journal_RawPacketReferencesRemainExactAcrossStorageSegments()
+    {
+        var entryCount = ObservedEventJournal.SegmentCapacity + 1;
+        var journal = new ObservedEventJournal(entryCount);
+        var sceneId = Guid.NewGuid();
+
+        for (var i = 0; i < entryCount; i++)
+        {
+            var raw = CreateStructuredRawReference(i);
+            var header = CreateHeader(sceneId, i, raw);
+            journal.AppendDiagnostic(in header);
+        }
+
+        Assert.Equal(CreateStructuredRawReference(0), ReadRaw(journal, 0));
+        Assert.Equal(
+            CreateStructuredRawReference(ObservedEventJournal.SegmentCapacity - 1),
+            ReadRaw(journal, ObservedEventJournal.SegmentCapacity - 1));
+        Assert.Equal(
+            CreateStructuredRawReference(ObservedEventJournal.SegmentCapacity),
+            ReadRaw(journal, ObservedEventJournal.SegmentCapacity));
+    }
+
+    [Fact]
+    public void Journal_AppendingUniqueRawPacketReferences_UsesBoundedStorageAllocation()
+    {
+        const int entryCount = 16_384;
+        const long maxAllocatedBytesPerEntry = 275;
+        var warmup = new ObservedEventJournal(1);
+        var warmupHeader = CreateHeader(Guid.Empty, 0, new RawPacketReference(0x0438, 64, 0));
+        warmup.AppendDiagnostic(in warmupHeader);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var journal = new ObservedEventJournal(entryCount);
+        for (var i = 0; i < entryCount; i++)
+        {
+            var raw = new RawPacketReference(0x0438, 64, i);
+            var header = CreateHeader(Guid.Empty, i, raw);
+            journal.AppendDiagnostic(in header);
+        }
+        var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Equal(entryCount, journal.Count);
+        Assert.True(
+            allocatedBytes <= entryCount * maxAllocatedBytesPerEntry,
+            $"Journal allocated {allocatedBytes} bytes for {entryCount} unique raw packet references.");
+        GC.KeepAlive(journal);
     }
 
     [Fact]
@@ -802,6 +850,13 @@ public class SceneTimelineContractTests
     private static ObservedEventHeader CreateHeader(Guid sceneId, long ordinal, RawPacketReference raw = default)
         => new(sceneId, new TimelineStamp(ordinal * 100, ordinal, 0), (int)ordinal, 0, raw);
 
+    private static RawPacketReference CreateStructuredRawReference(long captureSequence)
+    {
+        var root = new PacketStructureReference(PacketStructureKind.TransportPacket, 1, 0, 1, 0, 0, 100, 0, 100);
+        var frame = new PacketStructureReference(PacketStructureKind.FrameBatchEntry, 2, 1, 2, 3, 16, 64, 4, 60);
+        return new RawPacketReference(0x0438, 64, captureSequence, default(PacketStructurePath).Push(root).Push(frame));
+    }
+
     private static void AppendCombat(ObservedEventJournal journal, Guid sceneId, long ordinal, RawPacketReference raw = default)
     {
         var header = CreateHeader(sceneId, ordinal, raw);
@@ -821,6 +876,13 @@ public class SceneTimelineContractTests
     {
         var result = default(TimelineStamp);
         journal.ReadEntry(ordinal, entry => result = entry.Stamp);
+        return result;
+    }
+
+    private static RawPacketReference ReadRaw(ObservedEventJournal journal, long ordinal)
+    {
+        var result = default(RawPacketReference);
+        journal.ReadEntry(ordinal, entry => result = entry.Raw);
         return result;
     }
 
