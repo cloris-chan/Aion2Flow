@@ -1,22 +1,19 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.LogicalTree;
+using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Threading;
 using Cloris.Aion2Flow.Controls;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.ViewModels;
 using Cloris.Aion2Flow.Views;
-using CommunityToolkit.Mvvm.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
 [Collection(AvaloniaTestCollection.Name)]
 public sealed class CombatantDetailsFlyoutLayoutTests
 {
-    private static readonly Lock AvaloniaGate = new();
-    private static LocalizationService? s_localization;
-    private static UiFrameBatchService? s_frameBatch;
-
     [Fact]
     public void DetailsLayout_UsesIndependentHealingShieldAndResourceCategories()
     {
@@ -26,6 +23,7 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             AssertHealingAndShieldSkillTablesDoNotExposeDamageHitCountColumns();
             AssertHealingAndShieldUseIndependentSummaryCards();
             AssertResourceSectionUsesNeutralManaChangeColumn();
+            AssertSkillListsUseAnimatedVirtualizationAndContextualSelection();
         });
     }
 
@@ -63,6 +61,8 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         Assert.Equal(0d, contentScroller.MinHeight);
         Assert.Equal(ScrollBarVisibility.Auto, contentScroller.VerticalScrollBarVisibility);
         Assert.True(detailLayout.RowDefinitions[1].Height.IsStar);
+        Assert.False(outgoingDetail.EnableSkillSelection);
+        Assert.All(outgoingDetail.GetLogicalDescendants().OfType<AnimatedItemsView>(), static list => Assert.False(list.IsSelectionEnabled));
     }
 
     private static void AssertHealingAndShieldSkillTablesDoNotExposeDamageHitCountColumns()
@@ -158,6 +158,72 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             tableHeaders);
     }
 
+    [Fact]
+    public void DetailRowSelectionStyle_PreservesMeasuredHeight()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var style = new StyleInclude(new Uri("avares://Aion2Flow/"))
+            {
+                Source = new Uri("avares://Aion2Flow/Styles/OverlayTheme.axaml")
+            };
+            Application.Current!.Styles.Add(style);
+            var row = new Border { Child = new Border { Height = 22 } };
+            row.Classes.Add("DetailTableRow");
+            row.Classes.Add("SelectableDetailTableRow");
+            var window = new Window
+            {
+                Width = 400,
+                SizeToContent = SizeToContent.Height,
+                Content = new StackPanel { Children = { row } }
+            };
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                var initialHeight = row.Bounds.Height;
+
+                row.Classes.Add("selected");
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Equal(initialHeight, row.Bounds.Height);
+            }
+            finally
+            {
+                window.Close();
+                Dispatcher.UIThread.RunJobs();
+                Application.Current.Styles.Remove(style);
+            }
+        });
+    }
+
+    private static void AssertSkillListsUseAnimatedVirtualizationAndContextualSelection()
+    {
+        var (localization, frameBatch) = CreateViewServices();
+        var view = new CombatDirectionDetailView
+        {
+            DataContext = new CombatDirectionDetailViewModel(localization, frameBatch, "Direction_Targets")
+        };
+
+        var skillLists = new[]
+        {
+            view.FindControl<AnimatedItemsView>("DamageRows"),
+            view.FindControl<AnimatedItemsView>("HealingRows"),
+            view.FindControl<AnimatedItemsView>("ShieldRows")
+        };
+
+        Assert.All(skillLists, static list =>
+        {
+            Assert.NotNull(list);
+            Assert.True(list.IsSelectionEnabled);
+            Assert.Equal(ScrollBarVisibility.Hidden, list.VerticalScrollBarVisibility);
+        });
+        var allLists = view.GetLogicalDescendants().OfType<AnimatedItemsView>().ToArray();
+        Assert.Equal(4, allLists.Length);
+        Assert.All(allLists, static list => Assert.Equal(ScrollBarVisibility.Hidden, list.VerticalScrollBarVisibility));
+    }
+
     private static void PopulateRows(SkillDetailSectionViewModel section, int count, int firstSkillCode)
     {
         var rows = new List<SkillDetailRowData>(count);
@@ -184,22 +250,6 @@ public sealed class CombatantDetailsFlyoutLayoutTests
     }
 
     private static (LocalizationService Localization, UiFrameBatchService FrameBatch) CreateViewServices()
-    {
-        lock (AvaloniaGate)
-        {
-            if (s_localization is null)
-            {
-                var language = new LanguageService();
-                language.SetLanguage(LanguageService.TraditionalChinese);
-                s_frameBatch = new UiFrameBatchService();
-                s_localization = new LocalizationService(language);
-                Ioc.Default.ConfigureServices(new ServiceCollection()
-                    .AddSingleton(s_localization)
-                    .BuildServiceProvider());
-            }
-
-            return (s_localization, s_frameBatch!);
-        }
-    }
+        => ViewTestServices.Get();
 
 }

@@ -222,38 +222,6 @@
         <Setter Property="Foreground" Value="{StaticResource AppBrush.AccentStrong}" />
     </Style>
 
-    <Style Selector="ListBox.PlaybackCombatantList">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="0" />
-    </Style>
-
-    <Style Selector="ListBox.PlaybackCombatantList ListBoxItem">
-        <Setter Property="MinHeight" Value="40" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
-        <Setter Property="BorderThickness" Value="0,0,0,1" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-    </Style>
-
-    <Style Selector="ListBox.PlaybackCombatantList ListBoxItem:pointerover">
-        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
-    </Style>
-
-    <Style Selector="ListBox.PlaybackCombatantList ListBoxItem:selected">
-        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceSelected}" />
-    </Style>
-
-    <Style Selector="ListBox.PlaybackCombatantList ListBoxItem:selected /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceSelected}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Accent}" />
-        <Setter Property="BorderThickness" Value="3,0,0,0" />
-        <Setter Property="CornerRadius" Value="0" />
-    </Style>
-
     <Style Selector="TextBlock.PlaybackMetricLabel">
         <Setter Property="Foreground" Value="{StaticResource AppBrush.TextSubtle}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
@@ -343,31 +311,6 @@
         <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
 
-    <Style Selector="ListBox.PlaybackEventList">
-        <Setter Property="Background" Value="{StaticResource AppBrush.Canvas}" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="0" />
-    </Style>
-
-    <Style Selector="ListBox.PlaybackEventList ListBoxItem">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
-        <Setter Property="BorderThickness" Value="0,0,0,1" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="Focusable" Value="False" />
-        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-    </Style>
-
-    <Style Selector="ListBox.PlaybackEventList ListBoxItem:pointerover">
-        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
-    </Style>
-
-    <Style Selector="ListBox.PlaybackEventList ListBoxItem:selected">
-        <Setter Property="Background" Value="Transparent" />
-    </Style>
-
     <Style Selector="ListBox.PlaybackWorkspaceList">
         <Setter Property="Background" Value="{StaticResource AppBrush.Canvas}" />
         <Setter Property="BorderThickness" Value="0" />
@@ -417,22 +360,38 @@
         <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
-    <Style Selector="Grid.PlaybackEventRow">
+    <Style Selector="Border.PlaybackEventRow">
         <Setter Property="Background" Value="{StaticResource AppBrush.Surface}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
         <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="CornerRadius" Value="0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinHeight" Value="28" />
     </Style>
 
-    <Style Selector="Grid.PlaybackEventRow:pointerover">
+    <Style Selector="Border.PlaybackEventRow:pointerover">
         <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
     </Style>
 
-    <Style Selector="Grid.PlaybackCombatantRow">
+    <Style Selector="Border.PlaybackCombatantRow">
         <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="3,0,0,0" />
         <Setter Property="ClipToBounds" Value="True" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="MinHeight" Value="42" />
         <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="Border.PlaybackCombatantRow:pointerover">
+        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
+    </Style>
+
+    <Style Selector="Border.PlaybackCombatantRow.selected">
+        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceSelected}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Accent}" />
     </Style>
 
     <Style Selector="Border.PlaybackDetailTimelineRow">
@@ -476,17 +435,6 @@
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="Grid.PlaybackEventRow, Border.PlaybackEventRow">
-        <Setter Property="MinHeight" Value="28" />
-        <Setter Property="Margin" Value="0" />
-    </Style>
-
-    <Style Selector="Border.PlaybackEventRow">
-        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
-        <Setter Property="BorderThickness" Value="0,0,0,1" />
-        <Setter Property="CornerRadius" Value="0" />
     </Style>
 
     <Style Selector="controls|CombatantDisplay.PlaybackCombatantName">

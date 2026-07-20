@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
              xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.PlaybackEventWindowView"
@@ -77,33 +78,33 @@
                        Text="{markups:Translate Playback_Column_Amount}" />
         </Grid>
 
-        <ListBox Grid.Row="2"
-                 Classes="PlaybackEventList AppScrollViewer"
-                 ItemsSource="{Binding EventWindow}"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 ScrollViewer.VerticalScrollBarVisibility="Visible">
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <VirtualizingStackPanel CacheLength="0.5" />
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-            <ListBox.ItemTemplate>
+        <controls:AnimatedItemsView x:Name="EventRows"
+                                    Grid.Row="2"
+                                    Classes="AppScrollViewer"
+                                    FollowTail="True"
+                                    IsSelectionEnabled="False"
+                                    ItemHeight="28"
+                                    ItemsSource="{Binding EventWindow}"
+                                    MaxVisibleItems="32"
+                                    VerticalScrollBarVisibility="Visible">
+            <controls:AnimatedItemsView.ItemTemplate>
                 <DataTemplate x:DataType="vm:PlaybackEventRowViewModel">
-                    <Grid Classes="PlaybackEventRow"
-                          ColumnDefinitions="80,86,*,*,*,90"
-                          ColumnSpacing="10"
-                          Margin="10,0"
-                          Tapped="EventRowTapped">
-                        <TextBlock Classes="PlaybackEventTime" Text="{Binding TimeText}" />
-                        <TextBlock Grid.Column="1" Classes="PlaybackEventTrack" Text="{Binding TrackText}" />
-                        <TextBlock Grid.Column="2" Classes="PlaybackEventText" Text="{Binding SourceText}" />
-                        <TextBlock Grid.Column="3" Classes="PlaybackEventText" Text="{Binding TargetText}" />
-                        <TextBlock Grid.Column="4" Classes="PlaybackEventText" Text="{Binding SkillText}" />
-                        <TextBlock Grid.Column="5" Classes="PlaybackEventAmount" Text="{Binding AmountText}" />
-                    </Grid>
+                    <Border Classes="PlaybackEventRow"
+                            Tapped="EventRowTapped">
+                        <Grid ColumnDefinitions="80,86,*,*,*,90"
+                              ColumnSpacing="10"
+                              Margin="10,0">
+                            <TextBlock Classes="PlaybackEventTime" Text="{Binding TimeText}" />
+                            <TextBlock Grid.Column="1" Classes="PlaybackEventTrack" Text="{Binding TrackText}" />
+                            <TextBlock Grid.Column="2" Classes="PlaybackEventText" Text="{Binding SourceText}" />
+                            <TextBlock Grid.Column="3" Classes="PlaybackEventText" Text="{Binding TargetText}" />
+                            <TextBlock Grid.Column="4" Classes="PlaybackEventText" Text="{Binding SkillText}" />
+                            <TextBlock Grid.Column="5" Classes="PlaybackEventAmount" Text="{Binding AmountText}" />
+                        </Grid>
+                    </Border>
                 </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+            </controls:AnimatedItemsView.ItemTemplate>
+        </controls:AnimatedItemsView>
 
         <TextBlock Grid.Row="2"
                    Classes="PlaybackEmptyState"

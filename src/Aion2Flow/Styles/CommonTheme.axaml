@@ -159,6 +159,10 @@
         <Setter Property="Theme" Value="{StaticResource CommonScrollbarTheme}" />
     </Style>
 
+    <Style Selector="controls|AnimatedItemsView.AppScrollViewer > ScrollBar">
+        <Setter Property="Theme" Value="{StaticResource CommonScrollbarTheme}" />
+    </Style>
+
     <Style Selector="Popup">
         <Setter Property="InheritsTransform" Value="True" />
     </Style>

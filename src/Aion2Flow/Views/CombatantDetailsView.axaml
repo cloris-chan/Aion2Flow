@@ -42,10 +42,10 @@
                       VerticalScrollBarVisibility="Auto">
             <Grid>
                 <Border IsVisible="{Binding IsOutgoingSelected}">
-                    <views:CombatDirectionDetailView DataContext="{Binding OutgoingDetail}" />
+                    <views:CombatDirectionDetailView DataContext="{Binding OutgoingDetail}" EnableSkillSelection="False" />
                 </Border>
                 <Border IsVisible="{Binding IsIncomingSelected}">
-                    <views:CombatDirectionDetailView DataContext="{Binding IncomingDetail}" />
+                    <views:CombatDirectionDetailView DataContext="{Binding IncomingDetail}" EnableSkillSelection="False" />
                 </Border>
             </Grid>
         </ScrollViewer>

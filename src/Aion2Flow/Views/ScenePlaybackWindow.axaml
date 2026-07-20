@@ -264,25 +264,25 @@
                                    Classes="PlaybackHeaderCellRight"
                                    Text="{markups:Translate Playback_Column_Damage}" />
                     </Grid>
-                    <ListBox Grid.Row="2"
-                             Classes="PlaybackCombatantList AppScrollViewer"
-                             ItemsSource="{Binding Combatants}"
-                             SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}"
-                             SelectionMode="Single"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             ScrollViewer.VerticalScrollBarVisibility="Visible">
-                        <ListBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel CacheLength="1" />
-                            </ItemsPanelTemplate>
-                        </ListBox.ItemsPanel>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PlaybackCombatantRowViewModel">
-                                <Grid Classes="PlaybackCombatantRow"
-                                      RowDefinitions="Auto,8"
-                                      ColumnDefinitions="*,68,88"
-                                      ColumnSpacing="8"
-                                      Margin="12,6">
+                    <ScrollViewer Grid.Row="2"
+                                  Classes="AppScrollViewer"
+                                  HorizontalContentAlignment="Stretch"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <controls:AnimatedItemsView Classes="PlaybackCombatantList AppScrollViewer"
+                                                    ItemsSource="{Binding Combatants}"
+                                                    SelectedItem="{Binding SelectedCombatant, Mode=TwoWay}"
+                                                    ItemHeight="54"
+                                                    MaxVisibleItems="64"
+                                                    VerticalScrollBarVisibility="Visible">
+                            <controls:AnimatedItemsView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PlaybackCombatantRowViewModel">
+                                    <Border Classes="PlaybackCombatantRow"
+                                            Classes.selected="{Binding $parent[controls:AnimatedItemsViewItem].IsSelected}">
+                                        <Grid RowDefinitions="Auto,8"
+                                              ColumnDefinitions="*,68,88"
+                                              ColumnSpacing="8"
+                                              Margin="12,6">
                                     <controls:CombatantDisplay Classes="PlaybackCombatantName"
                                                                EntityId="{Binding EntityId}"
                                                                IconSize="22" />
@@ -298,10 +298,12 @@
                                                                         Bands="{Binding Timeline.Bands}"
                                                                         Viewport="{Binding $parent[Window].DataContext.TimelineViewport}"
                                                                         PositionMilliseconds="{Binding $parent[Window].DataContext.PositionMilliseconds}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </controls:AnimatedItemsView.ItemTemplate>
+                        </controls:AnimatedItemsView>
+                    </ScrollViewer>
                 </Grid>
             </Border>
 

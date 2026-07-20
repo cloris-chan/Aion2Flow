@@ -277,12 +277,11 @@
                 <Border Classes="DetailTableCard">
                     <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                         <StackPanel Orientation="Vertical"
-                                    Spacing="6"
-                                    Grid.IsSharedSizeScope="True">
+                                    Spacing="6">
                             <Border Classes="DetailTableHeaderBand">
                                 <Grid ColumnSpacing="4">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" SharedSizeGroup="DamageSkillName" />
+                                        <ColumnDefinition Width="220" />
                                         <ColumnDefinition Width="82" />
                                         <ColumnDefinition Width="82" />
                                         <ColumnDefinition Width="90" />
@@ -378,16 +377,20 @@
                                 </Grid>
                             </Border>
 
-                            <ItemsControl x:Name="DamageRows"
-                                          ItemsSource="{Binding DamageSection.Rows}">
-                                <ItemsControl.ItemTemplate>
+                            <controls:AnimatedItemsView x:Name="DamageRows"
+                                                        Classes="AppScrollViewer"
+                                                        ItemsSource="{Binding DamageSection.Rows}"
+                                                        SelectedItem="{Binding DamageSection.SelectedRow, Mode=OneWay}"
+                                                        ItemHeight="36"
+                                                        MaxVisibleItems="10">
+                                <controls:AnimatedItemsView.ItemTemplate>
                                     <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
                                         <Border Classes="DetailTableRow SelectableDetailTableRow"
-                                                Classes.selected="{Binding IsSelected}"
+                                                Classes.selected="{Binding $parent[controls:AnimatedItemsViewItem].IsSelected}"
                                                 Tapped="SkillDetailRowTapped">
                                             <Grid ColumnSpacing="4">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="DamageSkillName" />
+                                                    <ColumnDefinition Width="220" />
                                                     <ColumnDefinition Width="82" />
                                                     <ColumnDefinition Width="82" />
                                                     <ColumnDefinition Width="90" />
@@ -591,8 +594,8 @@
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                </controls:AnimatedItemsView.ItemTemplate>
+                            </controls:AnimatedItemsView>
                             <TextBlock Classes="OverlayMutedText"
                                        Text="{markups:Translate Empty_Skills}"
                                        IsVisible="{Binding DamageSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
@@ -771,12 +774,11 @@
                 <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                             <StackPanel Orientation="Vertical"
-                                        Spacing="6"
-                                        Grid.IsSharedSizeScope="True">
+                                        Spacing="6">
                                 <Border Classes="DetailTableHeaderBand">
                                     <Grid ColumnSpacing="4">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="HealingSkillName" />
+                                            <ColumnDefinition Width="220" />
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="96" />
@@ -816,16 +818,20 @@
                                     </Grid>
                                 </Border>
 
-                                <ItemsControl x:Name="HealingRows"
-                                              ItemsSource="{Binding HealingSection.Rows}">
-                                    <ItemsControl.ItemTemplate>
+                                <controls:AnimatedItemsView x:Name="HealingRows"
+                                                            Classes="AppScrollViewer"
+                                                            ItemsSource="{Binding HealingSection.Rows}"
+                                                            SelectedItem="{Binding HealingSection.SelectedRow, Mode=OneWay}"
+                                                            ItemHeight="36"
+                                                            MaxVisibleItems="10">
+                                    <controls:AnimatedItemsView.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
                                             <Border Classes="DetailTableRow SelectableDetailTableRow"
-                                                    Classes.selected="{Binding IsSelected}"
+                                                    Classes.selected="{Binding $parent[controls:AnimatedItemsViewItem].IsSelected}"
                                                     Tapped="SkillDetailRowTapped">
                                                 <Grid ColumnSpacing="4">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="HealingSkillName" />
+                                                        <ColumnDefinition Width="220" />
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="96" />
@@ -871,8 +877,8 @@
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                    </controls:AnimatedItemsView.ItemTemplate>
+                                </controls:AnimatedItemsView>
                                 <TextBlock Classes="OverlayMutedText"
                                            Text="{markups:Translate Empty_Skills}"
                                            IsVisible="{Binding HealingSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
@@ -1021,12 +1027,11 @@
                 <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                             <StackPanel Orientation="Vertical"
-                                        Spacing="6"
-                                        Grid.IsSharedSizeScope="True">
+                                        Spacing="6">
                                 <Border Classes="DetailTableHeaderBand">
                                     <Grid ColumnSpacing="4">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="ShieldSkillName" />
+                                            <ColumnDefinition Width="220" />
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="96" />
                                             <ColumnDefinition Width="56" />
@@ -1054,16 +1059,20 @@
                                     </Grid>
                                 </Border>
 
-                                <ItemsControl x:Name="ShieldRows"
-                                              ItemsSource="{Binding ShieldSection.Rows}">
-                                    <ItemsControl.ItemTemplate>
+                                <controls:AnimatedItemsView x:Name="ShieldRows"
+                                                            Classes="AppScrollViewer"
+                                                            ItemsSource="{Binding ShieldSection.Rows}"
+                                                            SelectedItem="{Binding ShieldSection.SelectedRow, Mode=OneWay}"
+                                                            ItemHeight="36"
+                                                            MaxVisibleItems="10">
+                                    <controls:AnimatedItemsView.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
                                             <Border Classes="DetailTableRow SelectableDetailTableRow"
-                                                    Classes.selected="{Binding IsSelected}"
+                                                    Classes.selected="{Binding $parent[controls:AnimatedItemsViewItem].IsSelected}"
                                                     Tapped="SkillDetailRowTapped">
                                                 <Grid ColumnSpacing="4">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="ShieldSkillName" />
+                                                        <ColumnDefinition Width="220" />
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="96" />
                                                         <ColumnDefinition Width="56" />
@@ -1097,8 +1106,8 @@
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                    </controls:AnimatedItemsView.ItemTemplate>
+                                </controls:AnimatedItemsView>
                                 <TextBlock x:Name="ShieldEmptyState"
                                            Classes="OverlayMutedText"
                                            Text="{markups:Translate Empty_Skills}"
@@ -1237,12 +1246,11 @@
                 <Border Classes="DetailTableCard">
                         <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
                             <StackPanel Orientation="Vertical"
-                                        Spacing="6"
-                                        Grid.IsSharedSizeScope="True">
+                                        Spacing="6">
                                 <Border Classes="DetailTableHeaderBand">
                                     <Grid ColumnSpacing="4">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="ResourceSkillName" />
+                                            <ColumnDefinition Width="220" />
                                             <ColumnDefinition Width="92" />
                                             <ColumnDefinition Width="72" />
                                             <ColumnDefinition Width="72" />
@@ -1260,13 +1268,17 @@
                                     </Grid>
                                 </Border>
 
-                                <ItemsControl ItemsSource="{Binding ResourceSection.Rows}">
-                                    <ItemsControl.ItemTemplate>
+                                <controls:AnimatedItemsView ItemsSource="{Binding ResourceSection.Rows}"
+                                                             Classes="AppScrollViewer"
+                                                             ItemHeight="36"
+                                                             MaxVisibleItems="10"
+                                                             IsSelectionEnabled="False">
+                                    <controls:AnimatedItemsView.ItemTemplate>
                                         <DataTemplate x:DataType="vm:ResourceDetailRowViewModel">
                                             <Border Classes="DetailTableRow">
                                                 <Grid ColumnSpacing="4">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="ResourceSkillName" />
+                                                        <ColumnDefinition Width="220" />
                                                         <ColumnDefinition Width="92" />
                                                         <ColumnDefinition Width="72" />
                                                         <ColumnDefinition Width="72" />
@@ -1289,8 +1301,8 @@
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                    </controls:AnimatedItemsView.ItemTemplate>
+                                </controls:AnimatedItemsView>
                                 <TextBlock Classes="OverlayMutedText"
                                            Text="{markups:Translate Empty_ResourceEvents}"
                                            IsVisible="{Binding ResourceSection.HasResources, Converter={StaticResource InverseBooleanConverter}}" />

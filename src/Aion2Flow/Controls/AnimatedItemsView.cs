@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
@@ -16,6 +17,7 @@ public sealed class AnimatedItemsView : Panel
 {
     private const int OverscanRows = 1;
     private const int FractionalViewportExtraRows = 1;
+    private const double ScrollBarThickness = 20;
 
     public static readonly StyledProperty<IDataTemplate?> ItemTemplateProperty = AvaloniaProperty.Register<AnimatedItemsView, IDataTemplate?>(nameof(ItemTemplate));
     public static readonly StyledProperty<IDataTemplate?> EmptyTemplateProperty = AvaloniaProperty.Register<AnimatedItemsView, IDataTemplate?>(nameof(EmptyTemplate));
@@ -25,6 +27,9 @@ public sealed class AnimatedItemsView : Panel
     public static readonly StyledProperty<TimeSpan> MoveDurationProperty = AvaloniaProperty.Register<AnimatedItemsView, TimeSpan>(nameof(MoveDuration), TimeSpan.FromMilliseconds(220), validate: static value => value >= TimeSpan.Zero);
     public static readonly StyledProperty<TimeSpan> AddRemoveDurationProperty = AvaloniaProperty.Register<AnimatedItemsView, TimeSpan>(nameof(AddRemoveDuration), TimeSpan.FromMilliseconds(180), validate: static value => value >= TimeSpan.Zero);
     public static readonly StyledProperty<double> AddRemoveOffsetProperty = AvaloniaProperty.Register<AnimatedItemsView, double>(nameof(AddRemoveOffset), 28, validate: double.IsFinite);
+    public static readonly StyledProperty<ScrollBarVisibility> VerticalScrollBarVisibilityProperty = AvaloniaProperty.Register<AnimatedItemsView, ScrollBarVisibility>(nameof(VerticalScrollBarVisibility), ScrollBarVisibility.Hidden);
+    public static readonly StyledProperty<bool> IsSelectionEnabledProperty = AvaloniaProperty.Register<AnimatedItemsView, bool>(nameof(IsSelectionEnabled), true);
+    public static readonly StyledProperty<bool> FollowTailProperty = AvaloniaProperty.Register<AnimatedItemsView, bool>(nameof(FollowTail));
     public static readonly DirectProperty<AnimatedItemsView, IEnumerable?> ItemsSourceProperty = AvaloniaProperty.RegisterDirect<AnimatedItemsView, IEnumerable?>(nameof(ItemsSource), static view => view.ItemsSource, static (view, value) => view.ItemsSource = value);
     public static readonly DirectProperty<AnimatedItemsView, object?> SelectedItemProperty = AvaloniaProperty.RegisterDirect<AnimatedItemsView, object?>(nameof(SelectedItem), static view => view.SelectedItem, static (view, value) => view.SelectedItem = value, defaultBindingMode: BindingMode.TwoWay);
 
@@ -39,6 +44,7 @@ public sealed class AnimatedItemsView : Panel
     private readonly Dictionary<AnimatedItemsViewItem, DepartureAnimationState> _departingContainers = [];
     private readonly List<AnimatedItemsViewItem> _departuresToRecycle = [];
     private readonly Action _completeAnimations;
+    private ScrollBar? _verticalScrollBar;
 
     private INotifyCollectionChanged? _trackedCollection;
     private IEnumerable? _itemsSource;
@@ -48,15 +54,26 @@ public sealed class AnimatedItemsView : Panel
     private bool _animationCompletionScheduled;
     private bool _departureFrameScheduled;
     private bool _hasArrangedOnce;
+    private bool _isTailPinned;
+    private bool _scrollAnimationActive;
+    private bool _scrollAnimationFrameScheduled;
+    private bool _scrollAnimationTargetsTail;
     private long _departureFrameGeneration;
+    private long _scrollAnimationGeneration;
     private int _realizedStart;
     private int _realizedEndExclusive;
     private double _verticalOffset;
     private double _viewportHeight;
+    private double _scrollAnimationStartOffset;
+    private double _scrollAnimationTargetOffset;
+    private double _scrollAnimationViewportHeight;
+    private TimeSpan? _scrollAnimationStartTimestamp;
+    private TimeSpan? _scrollAnimationLastTimestamp;
+    private bool _updatingScrollBars;
 
     static AnimatedItemsView()
     {
-        AffectsMeasure<AnimatedItemsView>(ItemHeightProperty, ItemSpacingProperty, MaxVisibleItemsProperty);
+        AffectsMeasure<AnimatedItemsView>(ItemHeightProperty, ItemSpacingProperty, MaxVisibleItemsProperty, VerticalScrollBarVisibilityProperty);
     }
 
     public AnimatedItemsView()
@@ -73,6 +90,9 @@ public sealed class AnimatedItemsView : Panel
     public TimeSpan MoveDuration { get => GetValue(MoveDurationProperty); set => SetValue(MoveDurationProperty, value); }
     public TimeSpan AddRemoveDuration { get => GetValue(AddRemoveDurationProperty); set => SetValue(AddRemoveDurationProperty, value); }
     public double AddRemoveOffset { get => GetValue(AddRemoveOffsetProperty); set => SetValue(AddRemoveOffsetProperty, value); }
+    public ScrollBarVisibility VerticalScrollBarVisibility { get => GetValue(VerticalScrollBarVisibilityProperty); set => SetValue(VerticalScrollBarVisibilityProperty, value); }
+    public bool IsSelectionEnabled { get => GetValue(IsSelectionEnabledProperty); set => SetValue(IsSelectionEnabledProperty, value); }
+    public bool FollowTail { get => GetValue(FollowTailProperty); set => SetValue(FollowTailProperty, value); }
 
     public IEnumerable? ItemsSource
     {
@@ -126,11 +146,33 @@ public sealed class AnimatedItemsView : Panel
 
     internal bool ScrollByRows(double rowDelta)
     {
-        if (!double.IsFinite(rowDelta))
+        if (VerticalScrollBarVisibility == ScrollBarVisibility.Disabled || !double.IsFinite(rowDelta))
             return false;
 
         var viewportHeight = GetEffectiveViewportHeight();
         return SetVerticalOffset(_verticalOffset + (rowDelta * RowExtent), viewportHeight);
+    }
+
+    internal bool ScrollByRowsAnimated(double rowDelta)
+    {
+        if (VerticalScrollBarVisibility == ScrollBarVisibility.Disabled || !double.IsFinite(rowDelta))
+            return false;
+
+        var viewportHeight = GetEffectiveViewportHeight();
+        var origin = _scrollAnimationActive ? _scrollAnimationTargetOffset : _verticalOffset;
+        var target = CoerceVerticalOffset(origin + (rowDelta * RowExtent), viewportHeight);
+        var targetsTail = FollowTail && IsEndOffset(target, viewportHeight);
+        if (!targetsTail)
+            _isTailPinned = false;
+        if (Math.Abs(target - origin) <= 0.1)
+        {
+            if (targetsTail)
+                _isTailPinned = true;
+            return false;
+        }
+
+        StartScrollAnimation(target, viewportHeight, targetsTail);
+        return true;
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -139,6 +181,7 @@ public sealed class AnimatedItemsView : Panel
 
         if (change.Property == ItemTemplateProperty)
         {
+            CancelScrollAnimation();
             CompleteDepartures();
             RecycleAllRealized(keepForReuse: false);
             _recyclePool.Clear();
@@ -155,8 +198,9 @@ public sealed class AnimatedItemsView : Panel
         }
         else if (change.Property == ItemHeightProperty || change.Property == ItemSpacingProperty || change.Property == MaxVisibleItemsProperty)
         {
+            CancelScrollAnimation();
             CompleteDepartures();
-            _verticalOffset = CoerceVerticalOffset(_verticalOffset, CalculateDesiredViewportHeight());
+            _verticalOffset = ResolveVerticalOffset(_verticalOffset, CalculateDesiredViewportHeight());
             UpdateRealizedContainerMetrics();
             TrimRecyclePool();
             EnsureRealizedRange(GetEffectiveViewportHeight());
@@ -167,16 +211,32 @@ public sealed class AnimatedItemsView : Panel
         {
             RefreshRealizedTransitions();
         }
+        else if (change.Property == IsSelectionEnabledProperty)
+        {
+            ApplySelection();
+        }
+        else if (change.Property == FollowTailProperty)
+        {
+            ApplyFollowTailMode();
+        }
+        else if (change.Property == VerticalScrollBarVisibilityProperty)
+        {
+            EnsureScrollBars();
+            InvalidateMeasure();
+            InvalidateArrange();
+        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        CancelScrollAnimation();
         CompleteDepartures(updateLayout: false);
         base.OnDetachedFromVisualTree(e);
     }
 
     protected override Size MeasureOverride(Size availableSize)
     {
+        EnsureScrollBars();
         if (_items.Count == 0)
             return MeasureEmptyState(availableSize);
 
@@ -185,12 +245,14 @@ public sealed class AnimatedItemsView : Panel
         var viewportHeight = double.IsInfinity(availableSize.Height)
             ? desiredViewportHeight
             : Math.Min(desiredViewportHeight, availableSize.Height);
+        var verticalBarVisible = IsScrollBarVisible(VerticalScrollBarVisibility, CalculateContentHeight(), viewportHeight);
+        var contentAvailableWidth = Math.Max(0, availableSize.Width - (verticalBarVisible ? ScrollBarThickness : 0));
         _viewportHeight = viewportHeight;
-        _verticalOffset = CoerceVerticalOffset(_verticalOffset, viewportHeight);
+        _verticalOffset = ResolveVerticalOffset(_verticalOffset, viewportHeight);
         EnsureRealizedRange(viewportHeight);
 
         var maxWidth = 0d;
-        var measureSize = new Size(availableSize.Width, ItemHeight);
+        var measureSize = new Size(contentAvailableWidth, ItemHeight);
         foreach (var container in _realizedContainers.Values)
         {
             container.Measure(measureSize);
@@ -202,23 +264,30 @@ public sealed class AnimatedItemsView : Panel
             maxWidth = Math.Max(maxWidth, container.DesiredSize.Width);
         }
 
-        return new Size(maxWidth, viewportHeight);
+        _verticalScrollBar?.Measure(new Size(ScrollBarThickness, viewportHeight));
+        var desiredWidth = maxWidth + (verticalBarVisible ? ScrollBarThickness : 0);
+        return new Size(desiredWidth, viewportHeight);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
+        var verticalBarVisible = IsScrollBarVisible(VerticalScrollBarVisibility, CalculateContentHeight(), finalSize.Height);
+        var viewportWidth = Math.Max(0, finalSize.Width - (verticalBarVisible ? ScrollBarThickness : 0));
+        var viewportHeight = finalSize.Height;
+        _viewportHeight = viewportHeight;
+
         if (_items.Count == 0)
         {
-            ArrangeDepartures(finalSize);
+            ArrangeDepartures(new Size(viewportWidth, viewportHeight));
             if (_departingContainers.Count == 0)
-                _emptyStateControl?.Arrange(new Rect(0, 0, finalSize.Width, finalSize.Height));
+                _emptyStateControl?.Arrange(new Rect(0, 0, viewportWidth, viewportHeight));
+            ArrangeScrollBar(viewportWidth, viewportHeight, verticalBarVisible);
             _hasArrangedOnce = true;
             return finalSize;
         }
 
-        _viewportHeight = finalSize.Height;
-        _verticalOffset = CoerceVerticalOffset(_verticalOffset, finalSize.Height);
-        EnsureRealizedRange(finalSize.Height);
+        _verticalOffset = ResolveVerticalOffset(_verticalOffset, viewportHeight);
+        EnsureRealizedRange(viewportHeight);
 
         var animateMoves = _hasArrangedOnce && _animateMovesOnNextArrange;
         for (var index = _realizedStart; index < _realizedEndExclusive; index++)
@@ -228,9 +297,9 @@ public sealed class AnimatedItemsView : Panel
                 continue;
 
             var top = (index * RowExtent) - _verticalOffset;
-            container.Arrange(new Rect(0, top, finalSize.Width, ItemHeight));
+            container.Arrange(new Rect(0, top, viewportWidth, ItemHeight));
             container.VirtualTop = top;
-            container.IsViewportVisible = top + ItemHeight > 0 && top < finalSize.Height;
+            container.IsViewportVisible = top + ItemHeight > 0 && top < viewportHeight;
 
             if (animateMoves && _previousPositions.TryGetValue(item, out var previousTop))
                 BeginMoveAnimation(container, previousTop - top);
@@ -239,7 +308,8 @@ public sealed class AnimatedItemsView : Panel
                 BeginEntranceAnimation(container);
         }
 
-        ArrangeDepartures(finalSize);
+        ArrangeDepartures(new Size(viewportWidth, viewportHeight));
+        ArrangeScrollBar(viewportWidth, viewportHeight, verticalBarVisible);
 
         _animateMovesOnNextArrange = false;
         _previousPositions.Clear();
@@ -250,7 +320,7 @@ public sealed class AnimatedItemsView : Panel
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
-        if (ScrollByRows(-e.Delta.Y))
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) && Math.Abs(e.Delta.X) <= 0.01 && ScrollByRowsAnimated(-e.Delta.Y))
             e.Handled = true;
 
         base.OnPointerWheelChanged(e);
@@ -258,6 +328,7 @@ public sealed class AnimatedItemsView : Panel
 
     private Size MeasureEmptyState(Size availableSize)
     {
+        CancelScrollAnimation();
         _verticalOffset = 0;
         _viewportHeight = 0;
         RecycleAllRealized();
@@ -265,30 +336,36 @@ public sealed class AnimatedItemsView : Panel
 
         if (_departingContainers.Count != 0)
         {
+            var desiredHeight = CalculateDepartureViewportHeight();
+            _viewportHeight = double.IsInfinity(availableSize.Height)
+                ? desiredHeight
+                : Math.Min(desiredHeight, availableSize.Height);
+            var verticalBarVisible = IsScrollBarVisible(VerticalScrollBarVisibility, desiredHeight, _viewportHeight);
+            var contentAvailableWidth = Math.Max(0, availableSize.Width - (verticalBarVisible ? ScrollBarThickness : 0));
             var maxWidth = 0d;
-            var measureSize = new Size(availableSize.Width, ItemHeight);
+            var measureSize = new Size(contentAvailableWidth, ItemHeight);
             foreach (var container in _departingContainers.Keys)
             {
                 container.Measure(measureSize);
                 maxWidth = Math.Max(maxWidth, container.DesiredSize.Width);
             }
 
-            var desiredHeight = CalculateDepartureViewportHeight();
-            _viewportHeight = double.IsInfinity(availableSize.Height)
-                ? desiredHeight
-                : Math.Min(desiredHeight, availableSize.Height);
-            return new Size(maxWidth, _viewportHeight);
+            _verticalScrollBar?.Measure(new Size(ScrollBarThickness, _viewportHeight));
+            return new Size(maxWidth + (verticalBarVisible ? ScrollBarThickness : 0), _viewportHeight);
         }
 
+        var showVerticalBar = VerticalScrollBarVisibility == ScrollBarVisibility.Visible;
+        var emptyAvailableWidth = Math.Max(0, availableSize.Width - (showVerticalBar ? ScrollBarThickness : 0));
         if (_emptyStateControl is null)
-            return default;
+            return new Size(showVerticalBar ? ScrollBarThickness : 0, 0);
 
-        _emptyStateControl.Measure(availableSize);
+        _emptyStateControl.Measure(new Size(emptyAvailableWidth, availableSize.Height));
         var desired = _emptyStateControl.DesiredSize;
         _viewportHeight = double.IsInfinity(availableSize.Height)
             ? desired.Height
             : Math.Min(desired.Height, availableSize.Height);
-        return new Size(desired.Width, _viewportHeight);
+        _verticalScrollBar?.Measure(new Size(ScrollBarThickness, _viewportHeight));
+        return new Size(desired.Width + (showVerticalBar ? ScrollBarThickness : 0), _viewportHeight);
     }
 
     private void AttachCollectionChanged(IEnumerable? source)
@@ -309,8 +386,12 @@ public sealed class AnimatedItemsView : Panel
 
     private void OnItemsSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        var scrollAnchor = CaptureScrollAnchor();
-        CaptureMovePositions();
+        var followTail = FollowTail && _isTailPinned;
+        var preserveScrollAnimation = _scrollAnimationActive;
+        var previousOffset = _verticalOffset;
+        var scrollAnchor = followTail ? default : CaptureScrollAnchor();
+        if (!preserveScrollAnimation)
+            CaptureMovePositions();
 
         var handled = e.Action switch
         {
@@ -328,8 +409,11 @@ public sealed class AnimatedItemsView : Panel
             BeginDeparturesMissingFromItems();
         }
 
-        RestoreScrollAnchor(scrollAnchor);
+        if (!followTail)
+            RestoreScrollAnchor(scrollAnchor);
         CompleteCollectionMutation();
+        if (preserveScrollAnimation)
+            RebaseScrollAnimation(_verticalOffset - previousOffset);
     }
 
     private bool ApplyAdd(NotifyCollectionChangedEventArgs e)
@@ -419,7 +503,7 @@ public sealed class AnimatedItemsView : Panel
             _animateMovesOnNextArrange = false;
         }
 
-        _verticalOffset = CoerceVerticalOffset(_verticalOffset, GetEffectiveViewportHeight());
+        _verticalOffset = ResolveVerticalOffset(_verticalOffset, GetEffectiveViewportHeight());
         UpdateEmptyStateControl();
         EnsureRealizedRange(GetEffectiveViewportHeight());
         TrimPendingEntranceItems();
@@ -430,11 +514,15 @@ public sealed class AnimatedItemsView : Panel
 
     private void ReloadItems(bool resetOffset)
     {
+        CancelScrollAnimation();
         CompleteDepartures(updateLayout: false);
         CaptureMovePositions();
         ReloadItemSnapshot();
         if (resetOffset)
-            _verticalOffset = 0;
+        {
+            _isTailPinned = FollowTail;
+            _verticalOffset = FollowTail ? CalculateMaxVerticalOffset(GetEffectiveViewportHeight()) : 0;
+        }
         CompleteCollectionMutation();
     }
 
@@ -615,7 +703,7 @@ public sealed class AnimatedItemsView : Panel
         container.IsHitTestVisible = true;
         container.VirtualTop = 0;
         container.IsViewportVisible = false;
-        container.IsSelected = ReferenceEquals(item, _selectedItem);
+        container.IsSelected = IsSelectionEnabled && ReferenceEquals(item, _selectedItem);
         ResetAnimationState(container);
         EnsureTransitions(container);
         Children.Add(container);
@@ -689,18 +777,45 @@ public sealed class AnimatedItemsView : Panel
     private void ApplySelection()
     {
         foreach (var (item, container) in _realizedContainers)
-            container.IsSelected = ReferenceEquals(item, _selectedItem);
+            container.IsSelected = IsSelectionEnabled && ReferenceEquals(item, _selectedItem);
+    }
+
+    private void ApplyFollowTailMode()
+    {
+        CancelScrollAnimation();
+        _isTailPinned = FollowTail;
+        if (!FollowTail)
+            return;
+
+        CompleteVerticalMoveAnimations();
+        var viewportHeight = GetEffectiveViewportHeight();
+        var endOffset = CalculateMaxVerticalOffset(viewportHeight);
+        if (Math.Abs(endOffset - _verticalOffset) <= 0.1)
+        {
+            UpdateScrollBarValues();
+            return;
+        }
+
+        ApplyVerticalOffset(endOffset, viewportHeight);
     }
 
     private bool SetVerticalOffset(double value, double viewportHeight)
     {
+        CancelScrollAnimation();
         var nextOffset = CoerceVerticalOffset(value, viewportHeight);
+        _isTailPinned = FollowTail && IsEndOffset(nextOffset, viewportHeight);
         if (Math.Abs(nextOffset - _verticalOffset) <= 0.1)
             return false;
 
         CaptureMovePositions();
         _pendingAnimations.Clear();
         _pendingEntranceItems.Clear();
+        ApplyVerticalOffset(nextOffset, viewportHeight);
+        return true;
+    }
+
+    private void ApplyVerticalOffset(double nextOffset, double viewportHeight)
+    {
         var scrollDelta = nextOffset - _verticalOffset;
         foreach (var departure in _departingContainers.Values)
             departure.Top -= scrollDelta;
@@ -711,7 +826,242 @@ public sealed class AnimatedItemsView : Panel
         if (_realizedStart != previousStart || _realizedEndExclusive != previousEndExclusive)
             InvalidateMeasure();
         InvalidateArrange();
-        return true;
+        UpdateScrollBarValues();
+    }
+
+    private void StartScrollAnimation(double targetOffset, double viewportHeight, bool targetsTail)
+    {
+        if (Math.Abs(targetOffset - _verticalOffset) <= 0.1)
+        {
+            CancelScrollAnimation();
+            _isTailPinned = FollowTail && targetsTail;
+            return;
+        }
+
+        if (MoveDuration <= TimeSpan.Zero)
+        {
+            CancelScrollAnimation();
+            _isTailPinned = FollowTail && targetsTail;
+            ApplyVerticalOffset(targetOffset, viewportHeight);
+            return;
+        }
+
+        var wasActive = _scrollAnimationActive;
+        if (!wasActive)
+        {
+            _scrollAnimationGeneration++;
+            CompleteVerticalMoveAnimations();
+        }
+
+        _scrollAnimationStartOffset = _verticalOffset;
+        _scrollAnimationTargetOffset = targetOffset;
+        _scrollAnimationViewportHeight = viewportHeight;
+        _scrollAnimationStartTimestamp = wasActive ? _scrollAnimationLastTimestamp : null;
+        _scrollAnimationTargetsTail = targetsTail;
+        _scrollAnimationActive = true;
+        ScheduleScrollAnimationFrame();
+    }
+
+    private void ScheduleScrollAnimationFrame()
+    {
+        if (!_scrollAnimationActive || _scrollAnimationFrameScheduled)
+            return;
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is null)
+        {
+            var targetOffset = _scrollAnimationTargetOffset;
+            var targetsTail = _scrollAnimationTargetsTail;
+            CancelScrollAnimation();
+            _isTailPinned = FollowTail && targetsTail;
+            ApplyVerticalOffset(targetOffset, GetEffectiveViewportHeight());
+            return;
+        }
+
+        _scrollAnimationFrameScheduled = true;
+        var generation = _scrollAnimationGeneration;
+        topLevel.RequestAnimationFrame(timestamp => OnScrollAnimationFrame(timestamp, generation));
+    }
+
+    private void OnScrollAnimationFrame(TimeSpan timestamp, long generation)
+    {
+        if (generation != _scrollAnimationGeneration)
+            return;
+
+        AdvanceScrollAnimation(timestamp);
+    }
+
+    internal void AdvanceScrollAnimation(TimeSpan timestamp)
+    {
+        _scrollAnimationFrameScheduled = false;
+        if (!_scrollAnimationActive)
+            return;
+
+        _scrollAnimationStartTimestamp ??= timestamp;
+        _scrollAnimationLastTimestamp = timestamp;
+        var viewportHeight = GetEffectiveViewportHeight();
+        if (Math.Abs(viewportHeight - _scrollAnimationViewportHeight) > 0.1)
+        {
+            _verticalOffset = CoerceVerticalOffset(_verticalOffset, viewportHeight);
+            RebaseScrollAnimationAfterViewportChange(_verticalOffset, viewportHeight);
+            _scrollAnimationViewportHeight = viewportHeight;
+        }
+        _scrollAnimationTargetOffset = _scrollAnimationTargetsTail
+            ? CalculateMaxVerticalOffset(viewportHeight)
+            : CoerceVerticalOffset(_scrollAnimationTargetOffset, viewportHeight);
+        var progress = MoveDuration <= TimeSpan.Zero
+            ? 1
+            : Math.Clamp(
+                (timestamp - _scrollAnimationStartTimestamp.Value).TotalMilliseconds / MoveDuration.TotalMilliseconds,
+                0,
+                1);
+        var nextOffset = InterpolateScrollOffset(_scrollAnimationStartOffset, _scrollAnimationTargetOffset, progress);
+        ApplyVerticalOffset(nextOffset, viewportHeight);
+
+        if (progress >= 1)
+        {
+            _scrollAnimationActive = false;
+            _scrollAnimationStartTimestamp = null;
+            _scrollAnimationLastTimestamp = null;
+            _isTailPinned = FollowTail && _scrollAnimationTargetsTail && IsEndOffset(_verticalOffset, viewportHeight);
+            _scrollAnimationTargetsTail = false;
+            return;
+        }
+
+        ScheduleScrollAnimationFrame();
+    }
+
+    private void CancelScrollAnimation()
+    {
+        if (!_scrollAnimationActive && !_scrollAnimationFrameScheduled)
+            return;
+
+        _scrollAnimationGeneration++;
+        _scrollAnimationActive = false;
+        _scrollAnimationFrameScheduled = false;
+        _scrollAnimationTargetsTail = false;
+        _scrollAnimationStartTimestamp = null;
+        _scrollAnimationLastTimestamp = null;
+        _scrollAnimationStartOffset = _verticalOffset;
+        _scrollAnimationTargetOffset = _verticalOffset;
+        _scrollAnimationViewportHeight = 0;
+    }
+
+    private void RebaseScrollAnimation(double offsetDelta)
+    {
+        if (!_scrollAnimationActive)
+            return;
+
+        var viewportHeight = GetEffectiveViewportHeight();
+        _scrollAnimationViewportHeight = viewportHeight;
+        _scrollAnimationStartOffset += offsetDelta;
+        _scrollAnimationTargetOffset = _scrollAnimationTargetsTail
+            ? CalculateMaxVerticalOffset(viewportHeight)
+            : CoerceVerticalOffset(_scrollAnimationTargetOffset + offsetDelta, viewportHeight);
+        if (Math.Abs(_scrollAnimationTargetOffset - _verticalOffset) <= 0.1)
+        {
+            var reachedTail = FollowTail && (_scrollAnimationTargetsTail || IsEndOffset(_verticalOffset, viewportHeight));
+            CancelScrollAnimation();
+            _isTailPinned = reachedTail;
+        }
+    }
+
+    private void CompleteVerticalMoveAnimations()
+    {
+        _animateMovesOnNextArrange = false;
+        _previousPositions.Clear();
+        foreach (var container in _realizedContainers.Values)
+        {
+            var transform = EnsureTranslateTransform(container);
+            var transitions = transform.Transitions;
+            transform.Transitions = null;
+            transform.Y = 0;
+            transform.Transitions = transitions;
+        }
+    }
+
+    private static double InterpolateScrollOffset(double start, double target, double progress)
+    {
+        var eased = 1 - Math.Pow(1 - Math.Clamp(progress, 0, 1), 3);
+        return start + ((target - start) * eased);
+    }
+
+    internal void SelectItem(object? item)
+    {
+        if (IsSelectionEnabled)
+            SelectedItem = item;
+    }
+
+    private void EnsureScrollBars()
+    {
+        var needsScrollBar = VerticalScrollBarVisibility is ScrollBarVisibility.Auto or ScrollBarVisibility.Visible;
+        if (needsScrollBar && _verticalScrollBar is null)
+        {
+            _verticalScrollBar = CreateVerticalScrollBar();
+            _verticalScrollBar.ValueChanged += OnVerticalScrollBarValueChanged;
+            Children.Add(_verticalScrollBar);
+        }
+        else if (!needsScrollBar && _verticalScrollBar is not null)
+        {
+            _verticalScrollBar.ValueChanged -= OnVerticalScrollBarValueChanged;
+            Children.Remove(_verticalScrollBar);
+            _verticalScrollBar = null;
+        }
+
+        if (VerticalScrollBarVisibility == ScrollBarVisibility.Disabled)
+        {
+            CancelScrollAnimation();
+            _verticalOffset = 0;
+        }
+    }
+
+    private static ScrollBar CreateVerticalScrollBar()
+        => new()
+        {
+            Orientation = Orientation.Vertical,
+            Focusable = false,
+            IsTabStop = false,
+            ZIndex = 100
+        };
+
+    private static bool IsScrollBarVisible(ScrollBarVisibility visibility, double extent, double viewport)
+        => visibility == ScrollBarVisibility.Visible || (visibility == ScrollBarVisibility.Auto && extent > viewport + 0.1);
+
+    private void ArrangeScrollBar(double viewportWidth, double viewportHeight, bool verticalVisible)
+    {
+        if (_verticalScrollBar is not null)
+        {
+            _verticalScrollBar.IsVisible = verticalVisible;
+            _verticalScrollBar.Arrange(new Rect(viewportWidth, 0, ScrollBarThickness, viewportHeight));
+        }
+
+        UpdateScrollBarValues();
+    }
+
+    private void UpdateScrollBarValues()
+    {
+        _updatingScrollBars = true;
+        try
+        {
+            if (_verticalScrollBar is not null)
+            {
+                _verticalScrollBar.Maximum = Math.Max(0, CalculateContentHeight() - _viewportHeight);
+                _verticalScrollBar.ViewportSize = _viewportHeight;
+                _verticalScrollBar.SmallChange = RowExtent;
+                _verticalScrollBar.LargeChange = _viewportHeight;
+                _verticalScrollBar.Value = _verticalOffset;
+            }
+        }
+        finally
+        {
+            _updatingScrollBars = false;
+        }
+    }
+
+    private void OnVerticalScrollBarValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (!_updatingScrollBars)
+            SetVerticalOffset(e.NewValue, _viewportHeight);
     }
 
     private void ArrangeDepartures(Size finalSize)
@@ -934,9 +1284,34 @@ public sealed class AnimatedItemsView : Panel
 
     private double CoerceVerticalOffset(double offset, double viewportHeight)
     {
-        var maxOffset = Math.Max(0, CalculateContentHeight() - Math.Max(0, viewportHeight));
+        var maxOffset = CalculateMaxVerticalOffset(viewportHeight);
         return maxOffset <= 0 ? 0 : Math.Clamp(offset, 0, maxOffset);
     }
+
+    private double ResolveVerticalOffset(double offset, double viewportHeight)
+    {
+        var resolvedOffset = FollowTail && _isTailPinned
+            ? CalculateMaxVerticalOffset(viewportHeight)
+            : CoerceVerticalOffset(offset, viewportHeight);
+        if (FollowTail && !_scrollAnimationActive && IsEndOffset(resolvedOffset, viewportHeight))
+            _isTailPinned = true;
+        return resolvedOffset;
+    }
+
+    private void RebaseScrollAnimationAfterViewportChange(double resolvedOffset, double viewportHeight)
+    {
+        _scrollAnimationStartOffset = resolvedOffset;
+        _scrollAnimationStartTimestamp = _scrollAnimationLastTimestamp;
+        _scrollAnimationTargetOffset = _scrollAnimationTargetsTail
+            ? CalculateMaxVerticalOffset(viewportHeight)
+            : CoerceVerticalOffset(_scrollAnimationTargetOffset, viewportHeight);
+    }
+
+    private bool IsEndOffset(double offset, double viewportHeight)
+        => Math.Abs(offset - CalculateMaxVerticalOffset(viewportHeight)) <= 0.1;
+
+    private double CalculateMaxVerticalOffset(double viewportHeight)
+        => Math.Max(0, CalculateContentHeight() - Math.Max(0, viewportHeight));
 
     private double GetEffectiveViewportHeight()
     {

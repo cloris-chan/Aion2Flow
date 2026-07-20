@@ -32,6 +32,6 @@ public sealed class AnimatedItemsViewItem : ContentControl
         base.OnPointerPressed(e);
 
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-            Owner?.SelectedItem = Content;
+            Owner?.SelectItem(Content);
     }
 }

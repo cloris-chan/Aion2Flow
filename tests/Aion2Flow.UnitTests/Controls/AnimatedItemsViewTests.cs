@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.Styling;
@@ -150,6 +151,154 @@ public sealed class AnimatedItemsViewTests
                 Thread.Sleep(60);
                 Dispatcher.UIThread.RunJobs();
                 Assert.InRange(transform.Y, 0.1, ItemHeight + ItemSpacing - 0.1);
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
+    public void RapidAnimatedScroll_RecyclesAnOutgoingRowOnlyAfterItLeavesTheViewport()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var rows = CreateCollection(128);
+            var view = CreateView(rows, maxVisibleItems: 5);
+            view.MoveDuration = TimeSpan.FromMilliseconds(200);
+            view.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                var outgoingContainer = Assert.Single(
+                    GetRealizedContainers(view),
+                    container => ReferenceEquals(container.Content, rows[0]));
+                var scrollBar = Assert.Single(view.Children.OfType<ScrollBar>());
+
+                Assert.True(view.ScrollByRowsAnimated(1));
+                Assert.True(view.ScrollByRowsAnimated(1));
+                view.AdvanceScrollAnimation(TimeSpan.Zero);
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(20));
+
+                Assert.Contains(outgoingContainer, view.Children);
+                Assert.True(ItemHeight - scrollBar.Value > 0);
+                Assert.True(GetRealizedContainers(view).Length <= 8);
+
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(200));
+
+                Assert.DoesNotContain(
+                    view.Children.OfType<AnimatedItemsViewItem>(),
+                    container => ReferenceEquals(container.Content, rows[0]));
+                Assert.True(ItemHeight - scrollBar.Value <= 0);
+                Assert.True(GetRealizedContainers(view).Length <= 8);
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
+    public void RepeatedAnimatedScrollInputContinuesFromThePreviousFrame()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var view = CreateView(CreateCollection(128), maxVisibleItems: 5);
+            view.MoveDuration = TimeSpan.FromMilliseconds(200);
+            view.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                var scrollBar = Assert.Single(view.Children.OfType<ScrollBar>());
+
+                Assert.True(view.ScrollByRowsAnimated(1));
+                view.AdvanceScrollAnimation(TimeSpan.Zero);
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(20));
+                var offsetBeforeRepeatedInput = scrollBar.Value;
+
+                Assert.True(view.ScrollByRowsAnimated(1));
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(36));
+
+                Assert.True(
+                    scrollBar.Value > offsetBeforeRepeatedInput,
+                    "Repeated wheel input reset animation progress instead of continuing from the previous frame.");
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
+    public void CollectionMoveDuringAnimatedScrollRebasesThePendingTarget()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var rows = CreateCollection(128);
+            var movedRow = rows[4];
+            var view = CreateView(rows, maxVisibleItems: 5);
+            view.MoveDuration = TimeSpan.FromMilliseconds(200);
+            view.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                var scrollBar = Assert.Single(view.Children.OfType<ScrollBar>());
+
+                Assert.True(view.ScrollByRowsAnimated(2));
+                view.AdvanceScrollAnimation(TimeSpan.Zero);
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(20));
+
+                using (rows.SuspendNotifications())
+                {
+                    rows.Remove(movedRow.Id);
+                    rows.Insert(0, movedRow);
+                }
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(200));
+
+                Assert.Equal(3 * (ItemHeight + ItemSpacing), scrollBar.Value, precision: 6);
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
+    public void ZeroMoveDurationCompletesAnActiveScrollWithAFiniteOffset()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var view = CreateView(CreateCollection(128), maxVisibleItems: 5);
+            view.MoveDuration = TimeSpan.FromMilliseconds(200);
+            view.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                var scrollBar = Assert.Single(view.Children.OfType<ScrollBar>());
+
+                Assert.True(view.ScrollByRowsAnimated(2));
+                view.AdvanceScrollAnimation(TimeSpan.Zero);
+                view.MoveDuration = TimeSpan.Zero;
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(1));
+
+                Assert.True(double.IsFinite(scrollBar.Value));
+                Assert.Equal(2 * (ItemHeight + ItemSpacing), scrollBar.Value, precision: 6);
             }
             finally
             {
@@ -529,6 +678,200 @@ public sealed class AnimatedItemsViewTests
             {
                 Close(window);
             }
+        });
+    }
+
+    [Fact]
+    public void VerticalScrollBar_AutoReflectsViewportAndOffset()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var rows = CreateCollection(32);
+            var view = CreateView(rows, maxVisibleItems: 5);
+            view.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+
+                var scrollBar = Assert.Single(view.Children.OfType<ScrollBar>());
+                Assert.True(scrollBar.IsVisible);
+                Assert.Equal(GetViewportHeight(5), scrollBar.ViewportSize);
+                Assert.Equal((32 * (ItemHeight + ItemSpacing)) - ItemSpacing - GetViewportHeight(5), scrollBar.Maximum);
+
+                Assert.True(view.ScrollByRows(2.5));
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Equal(2.5 * (ItemHeight + ItemSpacing), scrollBar.Value);
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
+    public void VerticalScrollBar_VisibleWithoutOverflowAndDisabledPreventsScrolling()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var view = CreateView(CreateCollection(1), maxVisibleItems: 5);
+            view.VerticalScrollBarVisibility = ScrollBarVisibility.Visible;
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+
+                var scrollBar = Assert.Single(view.Children.OfType<ScrollBar>());
+                Assert.True(scrollBar.IsVisible);
+                Assert.Equal(0, scrollBar.Maximum);
+
+                view.ItemsSource = CreateCollection(32);
+                view.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(view.ScrollByRows(2));
+                Dispatcher.UIThread.RunJobs();
+
+                view.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Empty(view.Children.OfType<ScrollBar>());
+                Assert.False(view.ScrollByRows(1));
+                Assert.Equal(0, GetRealizedContainers(view)[0].Bounds.Y);
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
+    public void FollowTailTracksAppendsUntilTheUserScrollsAwayAndResumesAtTheEnd()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var rows = CreateCollection(32);
+            var view = CreateView(rows, maxVisibleItems: 5);
+            view.FollowTail = true;
+            view.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                var scrollBar = Assert.Single(view.Children.OfType<ScrollBar>());
+                Assert.Equal(scrollBar.Maximum, scrollBar.Value, precision: 6);
+
+                rows.Add(new ReferenceRow(rows.Count));
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(scrollBar.Maximum, scrollBar.Value, precision: 6);
+
+                Assert.True(view.ScrollByRows(-2));
+                Dispatcher.UIThread.RunJobs();
+                var detachedOffset = scrollBar.Value;
+                Assert.True(detachedOffset < scrollBar.Maximum);
+
+                rows.Add(new ReferenceRow(rows.Count));
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(detachedOffset, scrollBar.Value, precision: 6);
+
+                Assert.True(view.ScrollByRowsAnimated(10_000));
+                view.AdvanceScrollAnimation(TimeSpan.Zero);
+                rows.Add(new ReferenceRow(rows.Count));
+                view.AdvanceScrollAnimation(view.MoveDuration);
+                Assert.Equal(scrollBar.Maximum, scrollBar.Value, precision: 6);
+
+                rows.Add(new ReferenceRow(rows.Count));
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(scrollBar.Maximum, scrollBar.Value, precision: 6);
+
+                Assert.True(view.ScrollByRows(-2));
+                rows.Clear();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(0, scrollBar.Value);
+                Assert.Equal(0, scrollBar.Maximum);
+
+                using (rows.SuspendNotifications())
+                {
+                    for (var index = 0; index < 32; index++)
+                        rows.Add(new ReferenceRow(1_000 + index));
+                }
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(scrollBar.Maximum, scrollBar.Value, precision: 6);
+
+                view.ItemsSource = CreateCollection(48);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(scrollBar.Maximum, scrollBar.Value, precision: 6);
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
+    public void FollowTailAnimationRebasesWhenTheViewportExpands()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var view = CreateView(CreateCollection(128), maxVisibleItems: 10);
+            view.FollowTail = true;
+            view.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                view.InvalidateMeasure();
+                view.Measure(new Size(640, 80));
+                view.Arrange(new Rect(0, 0, 640, 80));
+                var scrollBar = Assert.Single(view.Children.OfType<ScrollBar>());
+
+                Assert.True(view.ScrollByRows(-5));
+                Assert.True(view.ScrollByRowsAnimated(10_000));
+                view.AdvanceScrollAnimation(TimeSpan.Zero);
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(50));
+
+                view.InvalidateMeasure();
+                view.Measure(new Size(640, 200));
+                view.Arrange(new Rect(0, 0, 640, 200));
+                var expandedViewportMaximum = scrollBar.Maximum;
+                Assert.Equal(expandedViewportMaximum, scrollBar.Value, precision: 6);
+
+                view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(66));
+
+                Assert.Equal(expandedViewportMaximum, scrollBar.Value, precision: 6);
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
+    public void SelectionDisabled_IgnoresContainerSelectionRequests()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var rows = CreateCollection(2);
+            var view = CreateView(rows, maxVisibleItems: 5);
+            view.SelectedItem = rows[0];
+            view.IsSelectionEnabled = false;
+
+            view.SelectItem(rows[1]);
+
+            Assert.Same(rows[0], view.SelectedItem);
+            Assert.DoesNotContain(GetRealizedContainers(view), static container => container.IsSelected);
         });
     }
 
