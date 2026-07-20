@@ -5,6 +5,7 @@ using Avalonia.Themes.Simple;
 using Cloris.Aion2Flow.Assets.Icons;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
+using Cloris.Aion2Flow.Controls;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
@@ -139,6 +140,7 @@ file sealed class App(IServiceProvider serviceProvider) : Application
 {
     public override void Initialize()
     {
+        SmoothScrollBehavior.Initialize();
         RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Styles.Add(new SimpleTheme());
         Styles.Add(AppTextRenderingPolicy.CreateTopLevelStyle());
