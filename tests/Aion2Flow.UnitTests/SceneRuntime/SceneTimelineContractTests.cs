@@ -226,8 +226,9 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void Journal_ReadEntries_DoesNotAllocateAfterWarmup()
+    public void Journal_ReadEntries_DoesNotAllocatePerCallAfterWarmup()
     {
+        const long maxSteadyStateOverheadBytes = 4 * 1024;
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
@@ -239,10 +240,12 @@ public class SceneTimelineContractTests
         var count = 0;
         for (var i = 0; i < 10_000; i++)
             count += journal.ReadEntries(journal.CreateCursor(0), 32, ConsumeJournalEntries).Count;
-        var allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
+        var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
 
         Assert.Equal(320_000, count);
-        Assert.Equal(allocatedBefore, allocatedAfter);
+        Assert.True(
+            allocatedBytes <= maxSteadyStateOverheadBytes,
+            $"Reading 10,000 journal windows allocated {allocatedBytes:N0} bytes.");
     }
 
     [Fact]

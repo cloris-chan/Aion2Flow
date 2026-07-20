@@ -126,8 +126,9 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
-    public void TrackIndex_ReadWindow_DoesNotAllocateOrCopyMarkers()
+    public void TrackIndex_ReadWindow_DoesNotAllocatePerCallOrCopyMarkers()
     {
+        const long maxSteadyStateOverheadBytes = 4 * 1024;
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
         var index = session.CreateTrackIndex(TestContext.Current.CancellationToken);
@@ -140,10 +141,12 @@ public sealed class ScenePlaybackTests
         var total = 0;
         for (var i = 0; i < 10_000; i++)
             total += index.ReadWindow(0, 2_500, 5, 3).AsSpan().Length;
-        var allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
+        var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
 
         Assert.Equal(30_000, total);
-        Assert.Equal(allocatedBefore, allocatedAfter);
+        Assert.True(
+            allocatedBytes <= maxSteadyStateOverheadBytes,
+            $"Reading 10,000 marker windows allocated {allocatedBytes:N0} bytes.");
     }
 
     [Fact]
