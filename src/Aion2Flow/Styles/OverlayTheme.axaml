@@ -534,7 +534,6 @@
 
     <Style Selector="MenuItem.SettingsRowItem /template/ Popup#PART_Popup">
         <Setter Property="Placement" Value="RightEdgeAlignedTop" />
-        <Setter Property="HorizontalOffset" Value="4" />
     </Style>
 
     <Style Selector="MenuItem.SettingsRowItem /template/ Popup#PART_Popup > Border">
