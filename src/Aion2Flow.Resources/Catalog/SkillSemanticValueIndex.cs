@@ -23,7 +23,7 @@ internal sealed class SkillSemanticValueIndex
     {
         "AbnormalClear", "ActivateSkill", "AddAbnormalByCondition", "AdjustMaxAddDamage", "AdjustMaxSkillRate", "AdjustMinAddDamage",
         "AdjustMinSkillRate", "AdjustSecondaryStatMaxValue", "AdjustSecondaryStatMinValue", "Aerial", "BattlePass", "BeamPierce", "Bind",
-        "Bleed", "Blind", "BlockActive", "Blockade", "BlockAniHit", "BlockComposite", "BlockFlight", "BlockGlide", "BlockInteract",
+        "Bleed", "Blind", "BlockActive", "Blockade", "BlockAniHit", "BlockComposite", "BlockFlight", "BlockGlide", "BlockInteract", "BlockInteractGather",
         "BlockItemCasting", "BlockItemEquipItem", "BlockJump", "BlockLooting", "BlockMoveControl", "BlockMovePosition", "BlockRaidEnter",
         "BlockRotate", "BlockSelfRebirth", "BlockSkill", "BlockSpringboard", "BlockSprint", "BlockTargeting", "BlockTargetSkill",
         "CastingCancel", "CastSkill", "CastSkillByCaster", "CastSkillToCaster", "ChangeJumpZvelocity", "ChangeRelationshipEntity",
@@ -44,7 +44,7 @@ internal sealed class SkillSemanticValueIndex
         "SotRatio_Item", "StanceCriticalDamage", "StanceMissDamage", "StanceShieldBlock", "StanceWeaponBlock", "StatChange", "StatConvert",
         "Stealth", "StealthSeek", "Stiffen", "Stone", "Stun", "Taunt", "TeleportCasterTarget", "ToggleAbnormal",
         "TriggerSkillByAddAbnormal", "TriggerSkillByAttackAll", "TriggerSkillByGetAbnormal", "TriggerSkillByGetDamage", "TriggerSkillByKill",
-        "TriggerSkillBySelfEvade", "TriggerSkillBySelfShieldBlock", "TriggerSkillBySelfWeaponBlock", "TriggerSkillCheck_BossMonster",
+        "TriggerSkillBySelfBlock", "TriggerSkillBySelfEvade", "TriggerSkillBySelfShieldBlock", "TriggerSkillBySelfWeaponBlock", "TriggerSkillCheck_BossMonster",
         "UndeletableFear", "UnLockNpcLanguageType", "UseRebirth", "WeaponEquipable"
     }.ToFrozenSet(StringComparer.Ordinal);
 

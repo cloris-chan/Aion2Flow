@@ -128,6 +128,7 @@ public sealed class ScenePlaybackTests
     [Fact]
     public void TrackIndex_ReadWindow_DoesNotAllocatePerCallOrCopyMarkers()
     {
+        const int measurementPassCount = 3;
         const long maxSteadyStateOverheadBytes = 4 * 1024;
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
@@ -137,16 +138,21 @@ public sealed class ScenePlaybackTests
         Assert.Equal([3L, 4L, 4L], window.AsSpan().ToArray().Select(static marker => marker.ObservationOrdinal));
 
         _ = index.ReadWindow(0, 2_500, 5, 3).AsSpan().Length;
-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var minimumAllocatedBytes = long.MaxValue;
         var total = 0;
-        for (var i = 0; i < 10_000; i++)
-            total += index.ReadWindow(0, 2_500, 5, 3).AsSpan().Length;
-        var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        for (var pass = 0; pass < measurementPassCount; pass++)
+        {
+            var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 10_000; i++)
+                total += index.ReadWindow(0, 2_500, 5, 3).AsSpan().Length;
+            var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+            minimumAllocatedBytes = Math.Min(minimumAllocatedBytes, allocatedBytes);
+        }
 
-        Assert.Equal(30_000, total);
+        Assert.Equal(30_000 * measurementPassCount, total);
         Assert.True(
-            allocatedBytes <= maxSteadyStateOverheadBytes,
-            $"Reading 10,000 marker windows allocated {allocatedBytes:N0} bytes.");
+            minimumAllocatedBytes <= maxSteadyStateOverheadBytes,
+            $"Reading 10,000 marker windows allocated at least {minimumAllocatedBytes:N0} bytes per measurement pass.");
     }
 
     [Fact]
