@@ -46,8 +46,9 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             .Single(static scroller => scroller.Classes.Contains("DetailContentScroller"));
         var detailLayout = contentScroller.Parent as Grid;
         var outgoingDetail = view.GetLogicalDescendants().OfType<CombatDirectionDetailView>().First();
-        var shieldSection = outgoingDetail.FindControl<StackPanel>("ShieldSectionPanel");
-        var shieldEmptyState = outgoingDetail.FindControl<TextBlock>("ShieldEmptyState");
+        var shieldDetail = outgoingDetail.GetLogicalDescendants().OfType<ShieldDetailView>().Single();
+        var shieldSection = shieldDetail.FindControl<StackPanel>("ShieldSectionPanel");
+        var shieldEmptyState = shieldDetail.FindControl<TextBlock>("ShieldEmptyState");
 
         Assert.NotNull(rootCard);
         Assert.NotNull(detailLayout);
@@ -86,15 +87,15 @@ public sealed class CombatantDetailsFlyoutLayoutTests
     private static void AssertHealingAndShieldUseIndependentSummaryCards()
     {
         var (localization, frameBatch) = CreateViewServices();
-        var view = new CombatDirectionDetailView
-        {
-            DataContext = new CombatDirectionDetailViewModel(localization, frameBatch, "Direction_Targets")
-        };
+        var detail = new CombatDirectionDetailViewModel(localization, frameBatch, "Direction_Targets");
+        var healingView = new HealingDetailView { DataContext = detail };
+        var shieldView = new ShieldDetailView { DataContext = detail };
+        var compositeView = new CombatDirectionDetailView { DataContext = detail };
 
-        var healingCard = view.FindControl<Border>("HealingSummaryCard");
-        var shieldCard = view.FindControl<Border>("ShieldSummaryCard");
-        var healingBannerMetrics = view.FindControl<Grid>("HealingBannerMetrics");
-        var shieldBannerMetrics = view.FindControl<Grid>("ShieldBannerMetrics");
+        var healingCard = healingView.FindControl<Border>("HealingSummaryCard");
+        var shieldCard = shieldView.FindControl<Border>("ShieldSummaryCard");
+        var healingBannerMetrics = healingView.FindControl<Grid>("HealingBannerMetrics");
+        var shieldBannerMetrics = shieldView.FindControl<Grid>("ShieldBannerMetrics");
         var healingBannerLabels = healingBannerMetrics!.Children
             .OfType<MetricTile>()
             .Select(static tile => tile.Label)
@@ -103,12 +104,12 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             .OfType<MetricTile>()
             .Select(static tile => tile.Label)
             .ToArray();
-        var bannerTitles = view.GetLogicalDescendants()
+        var bannerTitles = compositeView.GetLogicalDescendants()
             .OfType<TextBlock>()
             .Where(static textBlock => textBlock.Classes.Contains("DetailBannerTitle"))
             .Select(static textBlock => textBlock.Text)
             .ToArray();
-        var directHealingHeaders = view.GetLogicalDescendants()
+        var directHealingHeaders = healingView.GetLogicalDescendants()
             .OfType<TextBlock>()
             .Where(textBlock =>
                 textBlock.Classes.Contains("DetailTableHeader") &&
@@ -134,7 +135,7 @@ public sealed class CombatantDetailsFlyoutLayoutTests
     private static void AssertResourceSectionUsesNeutralManaChangeColumn()
     {
         var (localization, frameBatch) = CreateViewServices();
-        var view = new CombatDirectionDetailView
+        var view = new ResourceDetailView
         {
             DataContext = new CombatDirectionDetailViewModel(localization, frameBatch, "Direction_Targets")
         };
@@ -206,11 +207,14 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             DataContext = new CombatDirectionDetailViewModel(localization, frameBatch, "Direction_Targets")
         };
 
+        var damageView = view.GetLogicalDescendants().OfType<DamageDetailView>().Single();
+        var healingView = view.GetLogicalDescendants().OfType<HealingDetailView>().Single();
+        var shieldView = view.GetLogicalDescendants().OfType<ShieldDetailView>().Single();
         var skillLists = new[]
         {
-            view.FindControl<AnimatedItemsView>("DamageRows"),
-            view.FindControl<AnimatedItemsView>("HealingRows"),
-            view.FindControl<AnimatedItemsView>("ShieldRows")
+            damageView.FindControl<AnimatedItemsView>("DamageRows"),
+            healingView.FindControl<AnimatedItemsView>("HealingRows"),
+            shieldView.FindControl<AnimatedItemsView>("ShieldRows")
         };
 
         Assert.All(skillLists, static list =>

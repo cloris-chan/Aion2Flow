@@ -1,10 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Markup.Xaml;
-using Avalonia.VisualTree;
-using Cloris.Aion2Flow.Controls;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Views;
@@ -31,81 +27,16 @@ public partial class CombatDirectionDetailView : UserControl
             ApplySkillSelectionMode();
     }
 
-    private void DamageSectionTapped(object? sender, TappedEventArgs e)
-        => RequestSectionSelection(CombatContributionCategory.Damage, e);
-
-    private void HealingSectionTapped(object? sender, TappedEventArgs e)
-        => RequestSectionSelection(CombatContributionCategory.Healing, e);
-
-    private void ShieldSectionTapped(object? sender, TappedEventArgs e)
-        => RequestSectionSelection(CombatContributionCategory.Shield, e);
-
-    private void SkillDetailRowTapped(object? sender, TappedEventArgs e)
-    {
-        if (!EnableSkillSelection)
-            return;
-
-        if (sender is not Control { DataContext: SkillDetailRowViewModel row } control ||
-            DataContext is not CombatDirectionDetailViewModel detail)
-        {
-            return;
-        }
-
-        var host = control.FindAncestorOfType<AnimatedItemsView>();
-        var selection = host?.Name switch
-        {
-            "DamageRows" => (detail.DamageSection, CombatContributionCategory.Damage),
-            "HealingRows" => (detail.HealingSection, CombatContributionCategory.Healing),
-            "ShieldRows" => (detail.ShieldSection, CombatContributionCategory.Shield),
-            _ => ((SkillDetailSectionViewModel Section, CombatContributionCategory Category)?)null
-        };
-
-        if (selection is null)
-            return;
-
-        selection.Value.Section.SelectRow(row);
-        SelectionRequested?.Invoke(this, new CombatDetailSelectionRequestedEventArgs(selection.Value.Category, row.BaseKey, row.DisplayName));
-        e.Handled = true;
-    }
-
-    private void RequestSectionSelection(CombatContributionCategory category, TappedEventArgs e)
-    {
-        if (!EnableSkillSelection)
-            return;
-
-        if (e.Source is Visual source &&
-            (source is Button || source.FindAncestorOfType<Button>() is not null))
-        {
-            return;
-        }
-
-        if (DataContext is not CombatDirectionDetailViewModel detail)
-            return;
-
-        var section = category switch
-        {
-            CombatContributionCategory.Damage => detail.DamageSection,
-            CombatContributionCategory.Healing => detail.HealingSection,
-            CombatContributionCategory.Shield => detail.ShieldSection,
-            _ => throw new ArgumentOutOfRangeException(nameof(category), category, null)
-        };
-
-        section.SelectRow(null);
-        SelectionRequested?.Invoke(this, new CombatDetailSelectionRequestedEventArgs(category, null, null));
-        e.Handled = true;
-    }
+    private void ChildSelectionRequested(object? sender, CombatDetailSelectionRequestedEventArgs e)
+        => SelectionRequested?.Invoke(this, e);
 
     private void ApplySkillSelectionMode()
     {
-        PseudoClasses.Set(":skill-selection-enabled", EnableSkillSelection);
-        SetSelectionEnabled("DamageRows");
-        SetSelectionEnabled("HealingRows");
-        SetSelectionEnabled("ShieldRows");
-    }
-
-    private void SetSelectionEnabled(string name)
-    {
-        if (this.FindControl<AnimatedItemsView>(name) is { } list)
-            list.IsSelectionEnabled = EnableSkillSelection;
+        if (this.FindControl<DamageDetailView>("DamageDetail") is { } damage)
+            damage.EnableSkillSelection = EnableSkillSelection;
+        if (this.FindControl<HealingDetailView>("HealingDetail") is { } healing)
+            healing.EnableSkillSelection = EnableSkillSelection;
+        if (this.FindControl<ShieldDetailView>("ShieldDetail") is { } shield)
+            shield.EnableSkillSelection = EnableSkillSelection;
     }
 }

@@ -1,0 +1,247 @@
+<views:CombatSkillDetailView xmlns="https://github.com/avaloniaui"
+                             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                             xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
+                             xmlns:conv="clr-namespace:Cloris.Aion2Flow.Converters"
+                             xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
+                             xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
+                             xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
+                             x:Class="Cloris.Aion2Flow.Views.ShieldDetailView"
+                             x:DataType="vm:CombatDirectionDetailViewModel">
+    <views:CombatSkillDetailView.Resources>
+        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+    </views:CombatSkillDetailView.Resources>
+
+    <views:CombatSkillDetailView.Styles>
+        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
+    </views:CombatSkillDetailView.Styles>
+
+        <Border x:Name="ShieldSummaryCard"
+                Classes="DetailSummaryCard">
+            <StackPanel x:Name="ShieldSectionPanel"
+                        Orientation="Vertical"
+                        Spacing="12">
+                <Border Classes="DetailSummaryPanel">
+                    <StackPanel Orientation="Vertical"
+                                Spacing="0">
+                        <Border Classes="DetailSummaryBanner"
+                                Tapped="SectionTapped">
+                            <Grid ColumnDefinitions="Auto,*,Auto"
+                                  ColumnSpacing="12">
+                                <TextBlock Grid.Column="0"
+                                           Classes="DetailBannerTitle"
+                                           Text="{markups:Translate Category_Shield}" />
+
+                                <Grid x:Name="ShieldBannerMetrics"
+                                      Grid.Column="1"
+                                      Classes="DetailBannerMetrics"
+                                      ColumnDefinitions="*,*">
+                                    <controls:MetricTile Grid.Column="0"
+                                                         Classes="DetailBannerMetric"
+                                                         Label="{markups:Translate Metric_Duration}"
+                                                         Value="{Binding ShieldSection.DurationSeconds}"
+                                                         FractionDigits="1"
+                                                         TrimTrailingZeros="False"
+                                                         Suffix="s" />
+                                    <controls:MetricTile Grid.Column="1"
+                                                         Classes="DetailBannerMetric"
+                                                         Label="{markups:Translate Metric_Total}"
+                                                         Value="{Binding ShieldSection.Total}" />
+                                </Grid>
+
+                                <Button Grid.Column="2"
+                                        Classes="CounterpartSelectorButton"
+                                        IsVisible="{Binding ShieldCounterpartFilter.HasCounterparts}"
+                                        ToolTip.Tip="{Binding ShieldCounterpartFilter.CounterpartTitle}">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="8"
+                                          DataContext="{Binding ShieldCounterpartFilter}"
+                                          x:DataType="vm:DetailCounterpartFilterViewModel">
+                                        <TextBlock Classes="CounterpartSelectorText"
+                                                   Text="{Binding CounterpartSummary}" />
+                                        <Path Grid.Column="1"
+                                              Classes="CounterpartSelectorGlyph"
+                                              Data="M 2 4 L 6 8 L 10 4" />
+                                    </Grid>
+                                    <Button.Flyout>
+                                        <Flyout Placement="BottomEdgeAlignedRight"
+                                                ShowMode="Transient">
+                                            <Border Classes="CounterpartSelectorFlyout"
+                                                    DataContext="{Binding ShieldCounterpartFilter}"
+                                                    x:DataType="vm:DetailCounterpartFilterViewModel">
+                                                <Grid RowDefinitions="Auto,*"
+                                                      RowSpacing="8">
+                                                    <Grid ColumnDefinitions="Auto,Auto,84,48"
+                                                          ColumnSpacing="8">
+                                                        <CheckBox Grid.Column="0"
+                                                                  Grid.ColumnSpan="2"
+                                                                  Classes="CounterpartSelectAll"
+                                                                  Content="{Binding CounterpartTitle}"
+                                                                  ToolTip.Tip="{markups:Translate Action_SelectAll}"
+                                                                  IsChecked="{Binding AreAllCounterpartsSelected, Mode=TwoWay}"
+                                                                  IsThreeState="True"
+                                                                  VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2"
+                                                                   Classes="CounterpartHeaderText"
+                                                                   Text="{markups:Translate Category_Shield}" />
+                                                        <TextBlock Grid.Column="3"
+                                                                   Classes="CounterpartHeaderText"
+                                                                   Text="{markups:Translate Column_Share}" />
+                                                    </Grid>
+
+                                                    <ScrollViewer Grid.Row="1"
+                                                                  Classes="CounterpartItemsScroller"
+                                                                  MaxHeight="260">
+                                                        <ItemsControl ItemsSource="{Binding Counterparts}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="vm:DetailCounterpartSelectionViewModel">
+                                                                    <Border Classes="CounterpartRow">
+                                                                        <Grid ColumnDefinitions="Auto,Auto,84,48"
+                                                                              ColumnSpacing="4">
+                                                                            <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                                                              Grid.ColumnSpan="4"
+                                                                                                              LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
+                                                                                                              Classes="DetailTableRowSeparator" />
+                                                                            <CheckBox Grid.Column="0"
+                                                                                      Classes="CounterpartRowCheckBox"
+                                                                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                                                      VerticalAlignment="Center" />
+                                                                            <controls:CombatantDisplay Grid.Column="1"
+                                                                                                        Classes="CounterpartName"
+                                                                                                        EntityId="{Binding CombatantId}"
+                                                                                                        VerticalAlignment="Center" />
+                                                                            <controls:NumericBlock Grid.Column="2"
+                                                                                                   Classes="CounterpartMetricValue"
+                                                                                                   Value="{Binding ShieldAmount}" />
+                                                                            <controls:NumericBlock Grid.Column="3"
+                                                                                                   Classes="CounterpartMetricValue CounterpartMetricRate"
+                                                                                                   Value="{Binding ShieldShare}" />
+                                                                        </Grid>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </ScrollViewer>
+                                                </Grid>
+                                            </Border>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="DetailMetricRowsPanel">
+                            <Border Classes="DetailMetricRowBand DetailMetricRowBandLast">
+                                <Grid Classes="DetailMetricRow"
+                                      ColumnDefinitions="*,*,*">
+                                    <controls:MetricTile Grid.Column="0"
+                                                         Classes="DetailLineMetric"
+                                                         Label="{markups:Translate Metric_ShieldSkills}"
+                                                         Value="{Binding ShieldSection.SkillCount}" />
+                                    <controls:MetricTile Grid.Column="1"
+                                                         Classes="DetailLineMetric"
+                                                         Label="{markups:Translate Metric_ShieldHits}"
+                                                         Value="{Binding ShieldSection.Hits}" />
+                                    <controls:MetricTile Grid.Column="2"
+                                                         Classes="DetailLineMetric"
+                                                         Label="{markups:Translate MetricShort_ShieldAbsorbed}"
+                                                         Value="{Binding ShieldSection.ShieldAbsorbed}" />
+                                </Grid>
+                            </Border>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="DetailTableCard">
+                        <ScrollViewer Classes="DetailTableScroller AppScrollViewer">
+                            <StackPanel Orientation="Vertical"
+                                        Spacing="6">
+                                <Border Classes="DetailTableHeaderBand">
+                                    <Grid ColumnSpacing="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="220" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="72" />
+                                        </Grid.ColumnDefinitions>
+                                        <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                          Grid.ColumnSpan="5"
+                                                                          LineBrush="{StaticResource OverlayBrush.DetailHudLineSoft}"
+                                                                          Classes="DetailTableHeaderSeparator" />
+                                        <TextBlock Grid.Column="0"
+                                                   Classes="DetailTableHeaderLeft"
+                                                   Text="{markups:Translate Column_Skill}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="DetailTableHeader"
+                                                   Text="{markups:Translate Metric_Total}" />
+                                        <TextBlock Grid.Column="2"
+                                                   Classes="DetailTableHeader"
+                                                   Text="{markups:Translate MetricShort_ShieldAbsorbed}" />
+                                        <TextBlock Grid.Column="3"
+                                                   Classes="DetailTableHeader"
+                                                   Text="{markups:Translate Column_Share}" />
+                                        <TextBlock Grid.Column="4"
+                                                   Classes="DetailTableHeader"
+                                                   Text="{markups:Translate Column_Events}" />
+                                    </Grid>
+                                </Border>
+
+                                <controls:AnimatedItemsView x:Name="ShieldRows"
+                                                            Classes="AppScrollViewer"
+                                                            ItemsSource="{Binding ShieldSection.Rows}"
+                                                            SelectedItem="{Binding ShieldSection.SelectedRow, Mode=OneWay}"
+                                                            ItemHeight="36"
+                                                            MaxVisibleItems="10">
+                                    <controls:AnimatedItemsView.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SkillDetailRowViewModel">
+                                            <Border Classes="DetailTableRow SelectableDetailTableRow"
+                                                    Classes.selected="{Binding $parent[controls:AnimatedItemsViewItem].IsSelected}"
+                                                    Tapped="SkillDetailRowTapped">
+                                                <Grid ColumnSpacing="4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="220" />
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="56" />
+                                                        <ColumnDefinition Width="72" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <controls:SegmentedTableSeparator Grid.Column="0"
+                                                                                      Grid.ColumnSpan="5"
+                                                                                      LineBrush="{StaticResource OverlayBrush.DetailSeparator}"
+                                                                                      Classes="DetailTableRowSeparator" />
+                                                    <controls:SkillDisplay Grid.Column="0"
+                                                                           Classes="DetailRowText"
+                                                                           SkillCode="{Binding SkillCode}"
+                                                                           FallbackText="{Binding DisplayName}"
+                                                                           IconSize="22"
+                                                                           VerticalAlignment="Center" />
+                                                    <controls:NumericBlock Grid.Column="1"
+                                                                           Classes="DetailRowValue"
+                                                                           Value="{Binding TotalAmount}" />
+                                            <controls:NumericBlock Grid.Column="2"
+                                                                   Classes="DetailRowValue"
+                                                                   Value="{Binding ShieldAbsorbedAmount}" />
+                                            <controls:NumericBlock Grid.Column="3"
+                                                                   Classes="DetailRowValue"
+                                                                   Value="{Binding SharePercent}"
+                                                                   FractionDigits="1"
+                                                                   TrimTrailingZeros="False"
+                                                                   UsePercentageNotation="True" />
+                                            <controls:NumericBlock Grid.Column="4"
+                                                                   Classes="DetailRowValue"
+                                                                   Value="{Binding EventCount}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </controls:AnimatedItemsView.ItemTemplate>
+                                </controls:AnimatedItemsView>
+                                <TextBlock x:Name="ShieldEmptyState"
+                                           Classes="OverlayMutedText"
+                                           Text="{markups:Translate Empty_Skills}"
+                                           IsVisible="{Binding ShieldSection.HasSkills, Converter={StaticResource InverseBooleanConverter}}" />
+                            </StackPanel>
+                        </ScrollViewer>
+                </Border>
+            </StackPanel>
+        </Border>
+</views:CombatSkillDetailView>

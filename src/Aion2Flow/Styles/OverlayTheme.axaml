@@ -1392,11 +1392,11 @@
         <Setter Property="Margin" Value="0" />
     </Style>
 
-    <Style Selector="views|CombatDirectionDetailView:skill-selection-enabled Border.SelectableDetailTableRow">
+    <Style Selector="views|CombatSkillDetailView:skill-selection-enabled Border.SelectableDetailTableRow">
         <Setter Property="Cursor" Value="Hand" />
     </Style>
 
-    <Style Selector="views|CombatDirectionDetailView:skill-selection-enabled Border.SelectableDetailTableRow:pointerover">
+    <Style Selector="views|CombatSkillDetailView:skill-selection-enabled Border.SelectableDetailTableRow:pointerover">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
     </Style>
 
