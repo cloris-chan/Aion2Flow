@@ -52,7 +52,7 @@ public sealed class ScenePlaybackTests
     public void LiveSource_TimelineSegmentGrowsWithJournalAppend()
     {
         var scene = new SceneLiveReadModel();
-        var source = new LiveScenePlaybackSource(scene);
+        var source = scene.CreatePlaybackSource();
         var sceneId = scene.SessionId;
         AppendCombat(scene.Journal, sceneId, 100, 200, 100, 1, 1_000);
         var first = source.CreateTimelineSegment();
@@ -65,6 +65,120 @@ public sealed class ScenePlaybackTests
         Assert.Equal(1, firstEndBeforeAppend);
         Assert.Equal(2, first.CurrentEndObservationOrdinalExclusive);
         Assert.Equal(2, second.CurrentEndObservationOrdinalExclusive);
+    }
+
+    [Fact]
+    public void LiveSource_ResetFreezesOpeningSceneAndExcludesNextSession()
+    {
+        var started = DateTimeOffset.UtcNow;
+        var scene = new SceneLiveReadModel(started);
+        var openingSceneId = scene.SessionId;
+        AppendLiveCombat(scene, 100, 200, 100, 1_000);
+        var source = scene.CreatePlaybackSource();
+        var heldSegment = source.CreateTimelineSegment();
+
+        scene.Reset(started.AddSeconds(10));
+        var nextSceneId = scene.SessionId;
+        AppendLiveCombat(scene, 300, 400, 900, 1_000);
+
+        var frozenSegment = source.CreateTimelineSegment();
+        var sceneIds = new List<Guid>();
+        frozenSegment.ReadEntries(frozenSegment.CreateCursor(), 16, entries =>
+        {
+            for (var i = 0; i < entries.Count; i++)
+                sceneIds.Add(entries[i].SceneSessionId);
+        });
+
+        Assert.NotEqual(openingSceneId, nextSceneId);
+        Assert.Equal(openingSceneId, source.EncounterId);
+        Assert.Equal(started, source.SceneStarted);
+        Assert.False(heldSegment.IsLiveGrowing);
+        Assert.False(frozenSegment.IsLiveGrowing);
+        Assert.Equal(1, heldSegment.CurrentEndObservationOrdinalExclusive);
+        Assert.Equal(1, frozenSegment.CurrentEndObservationOrdinalExclusive);
+        Assert.Equal([openingSceneId], sceneIds);
+        Assert.Equal(openingSceneId, source.CreateSnapshot().EncounterId);
+        Assert.Equal(100, Assert.Single(source.CreateSnapshot().Combatants).Value.DamageAmount);
+    }
+
+    [Fact]
+    public void LiveSource_MultipleResetsBeforeNextReadStillStopsAtOpeningBoundary()
+    {
+        var started = DateTimeOffset.UtcNow;
+        var scene = new SceneLiveReadModel(started);
+        var openingSceneId = scene.SessionId;
+        AppendLiveCombat(scene, 100, 200, 100, 1_000);
+        var source = scene.CreatePlaybackSource();
+
+        scene.Reset(started.AddSeconds(10));
+        AppendLiveCombat(scene, 300, 400, 200, 1_000);
+        scene.Reset(started.AddSeconds(20));
+        AppendLiveCombat(scene, 500, 600, 300, 1_000);
+
+        var segment = source.CreateTimelineSegment();
+        var sceneIds = new List<Guid>();
+        var cursor = segment.CreateCursor();
+        while (true)
+        {
+            var result = segment.ReadEntries(cursor, 16, entries =>
+            {
+                for (var i = 0; i < entries.Count; i++)
+                    sceneIds.Add(entries[i].SceneSessionId);
+            });
+            if (result.Count == 0)
+                break;
+            cursor = result.Cursor;
+        }
+
+        Assert.False(segment.IsLiveGrowing);
+        Assert.Equal(1, segment.CurrentEndObservationOrdinalExclusive);
+        Assert.Equal([openingSceneId], sceneIds);
+    }
+
+    [Fact]
+    public void LiveSource_DisposingOneLeaseDoesNotFreezeAnotherLease()
+    {
+        var scene = new SceneLiveReadModel();
+        var first = scene.CreatePlaybackSource();
+        using var second = scene.CreatePlaybackSource();
+
+        first.Dispose();
+        AppendLiveCombat(scene, 100, 200, 100, 1_000);
+
+        var segment = second.CreateTimelineSegment();
+        Assert.True(segment.IsLiveGrowing);
+        Assert.Equal(1, segment.CurrentEndObservationOrdinalExclusive);
+    }
+
+    [Fact]
+    public void LiveSource_ResetPublishesFrozenArchiveBeforeBoundaryStopsGrowing()
+    {
+        var started = DateTimeOffset.UtcNow;
+        var scene = new SceneLiveReadModel(started);
+        AppendLiveCombat(scene, 100, 200, 100, 1_000);
+        using var source = scene.CreatePlaybackSource();
+
+        scene.Reset(started.AddSeconds(10));
+
+        Assert.True(source.TryGetFrozenArchive(out var archive));
+        Assert.False(source.CreateTimelineSegment().IsLiveGrowing);
+        Assert.Equal(source.EncounterId, archive.Snapshot.EncounterId);
+        Assert.Equal(source.CreateTimelineSegment().EndObservationOrdinalExclusive, archive.Payload.TimelineSegment.EndObservationOrdinalExclusive);
+    }
+
+    [Fact]
+    public void LiveSegment_BoundedSnapshotKeepsCapturedEndAndLifecycle()
+    {
+        var scene = new SceneLiveReadModel();
+        using var source = scene.CreatePlaybackSource();
+        AppendLiveCombat(scene, 100, 200, 100, 1_000);
+        var bounded = source.CreateTimelineSegment().CreateBoundedSnapshot();
+
+        AppendLiveCombat(scene, 100, 200, 200, 2_000);
+
+        Assert.True(bounded.IsLiveGrowing);
+        Assert.Equal(1, bounded.CurrentEndObservationOrdinalExclusive);
+        Assert.Equal(2, source.CreateTimelineSegment().CurrentEndObservationOrdinalExclusive);
     }
 
     [Fact]
@@ -981,7 +1095,7 @@ public sealed class ScenePlaybackTests
         var scene = new SceneLiveReadModel();
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 100, 1, 1_000);
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 200, 2, 2_000);
-        await using var controller = new ScenePlaybackController(new LiveScenePlaybackSource(scene), new ManualTickSourceFactory(), TimeSpan.FromMilliseconds(33));
+        await using var controller = new ScenePlaybackController(scene.CreatePlaybackSource(), new ManualTickSourceFactory(), TimeSpan.FromMilliseconds(33));
 
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 300, 3, 4_000);
         var frame = await controller.RefreshAsync(TestContext.Current.CancellationToken);
@@ -989,6 +1103,47 @@ public sealed class ScenePlaybackTests
         Assert.Equal(ScenePlaybackSourceKind.Live, controller.State.SourceKind);
         Assert.Equal(4_000, controller.DurationMilliseconds);
         Assert.Equal(4_000, frame.TimeRange.DurationMilliseconds);
+    }
+
+    [Fact]
+    public async Task Controller_RefreshExtendsLiveDurationAcrossSuccessiveAppends()
+    {
+        var scene = new SceneLiveReadModel();
+        AppendLiveCombat(scene, 100, 200, 100, 1_000);
+        await using var controller = new ScenePlaybackController(scene.CreatePlaybackSource(), new ManualTickSourceFactory(), TimeSpan.FromMilliseconds(33));
+
+        AppendLiveCombat(scene, 100, 200, 200, 2_000);
+        var second = await controller.RefreshAsync(TestContext.Current.CancellationToken);
+        AppendLiveCombat(scene, 100, 200, 300, 3_000);
+        var third = await controller.RefreshAsync(TestContext.Current.CancellationToken);
+        var completed = await controller.SeekAsync(3_000, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2_000, second.TimeRange.DurationMilliseconds);
+        Assert.Equal(3_000, third.TimeRange.DurationMilliseconds);
+        Assert.Equal(600, completed.CombatTotals.TotalDamage);
+    }
+
+    [Fact]
+    public async Task Controller_FinalizedLiveSourceUsesFinalDurationAndStopsAtEnd()
+    {
+        var started = DateTimeOffset.UtcNow;
+        var scene = new SceneLiveReadModel(started);
+        AppendLiveCombat(scene, 100, 200, 100, 1_000);
+        var source = scene.CreatePlaybackSource();
+        var tickFactory = new ManualTickSourceFactory();
+        await using var controller = new ScenePlaybackController(source, tickFactory, TimeSpan.FromMilliseconds(33));
+        AppendLiveCombat(scene, 100, 200, 200, 2_000);
+
+        scene.Reset(started.AddSeconds(10));
+        await controller.RefreshAsync(TestContext.Current.CancellationToken);
+        controller.Play();
+        tickFactory.Source.Tick(TimeSpan.FromSeconds(5));
+        await WaitUntil(() => !controller.IsPlaying && controller.PositionMilliseconds == 2_000);
+
+        Assert.Equal(ScenePlaybackSourceKind.Live, controller.State.SourceKind);
+        Assert.Equal(2_000, controller.DurationMilliseconds);
+        Assert.Equal(2_000, controller.CurrentFrame.TimeRange.DurationMilliseconds);
+        Assert.Equal(300, controller.CurrentFrame.CombatTotals.TotalDamage);
     }
 
     [Fact]
@@ -1009,7 +1164,7 @@ public sealed class ScenePlaybackTests
         var scene = new SceneLiveReadModel();
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 100, 1, 1_000);
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 200, 2, 2_000);
-        await using var controller = new ScenePlaybackController(new LiveScenePlaybackSource(scene));
+        await using var controller = new ScenePlaybackController(scene.CreatePlaybackSource());
 
         await Task.Delay(50, TestContext.Current.CancellationToken);
 
@@ -1042,7 +1197,7 @@ public sealed class ScenePlaybackTests
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 100, 1, 1_000);
         AppendCombat(scene.Journal, scene.SessionId, 100, 200, 200, 2, 2_000);
         await using var controller = new ScenePlaybackController(
-            new LiveScenePlaybackSource(scene),
+            scene.CreatePlaybackSource(),
             new ManualTickSourceFactory(),
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
 
@@ -1220,6 +1375,27 @@ public sealed class ScenePlaybackTests
             AttemptCount = 1
         };
         AppendCombatObservation(journal, sceneId, sourceId, targetId, in observation, ordinal, observedAt);
+    }
+
+    private static void AppendLiveCombat(SceneLiveReadModel scene, int sourceId, int targetId, int damage, long observedAt, int skillCode = 11000010)
+    {
+        var flushId = scene.NextFlushId();
+        var stamp = scene.Clock.CreateStamp(scene.SessionStarted.ToUnixTimeMilliseconds() + observedAt, flushId);
+        var header = new ObservedEventHeader(
+            scene.SessionId,
+            stamp,
+            sourceId,
+            targetId,
+            new RawPacketReference(0x0438, 0, stamp.ObservationOrdinal));
+        var observation = new CombatWireObservation
+        {
+            SkillCode = skillCode,
+            Damage = damage,
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        scene.Journal.Append(in header, in observation);
+        scene.Journal.CompleteFlush(flushId);
     }
 
     private static void AppendCombatObservation(

@@ -195,7 +195,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         }
     }
 
-    public SceneJournalSegment CreateLiveTimelineSegment()
+    internal SceneJournalSegment CreateLiveTimelineSegment()
     {
         lock (_gate)
         {

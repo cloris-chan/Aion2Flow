@@ -15,12 +15,14 @@ public sealed class ScenePlaybackTrackIndex
     private ScenePlaybackTrackIndex(
         long startObservationOrdinal,
         long endObservationOrdinalExclusive,
+        bool isSourceGrowing,
         ScenePlaybackTrackMarker[] markers,
         int[] nonCombatEventIndexes,
         Dictionary<ScenePlaybackEventScope, int[]> eventPostings)
     {
         StartObservationOrdinal = startObservationOrdinal;
         EndObservationOrdinalExclusive = endObservationOrdinalExclusive;
+        IsSourceGrowing = isSourceGrowing;
         _markers = markers;
         _nonCombatEventIndexes = nonCombatEventIndexes;
         _eventPostings = eventPostings;
@@ -32,13 +34,15 @@ public sealed class ScenePlaybackTrackIndex
 
     public long EndObservationOrdinalExclusive { get; }
 
+    public bool IsSourceGrowing { get; }
+
     public static ScenePlaybackTrackIndex Build(SceneJournalSegment segment, CancellationToken cancellationToken = default)
     {
         var startObservationOrdinal = segment.StartObservationOrdinal;
         var endObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
         var observationCount = checked((int)(endObservationOrdinalExclusive - startObservationOrdinal));
         if (observationCount == 0)
-            return new ScenePlaybackTrackIndex(startObservationOrdinal, endObservationOrdinalExclusive, [], [], []);
+            return new ScenePlaybackTrackIndex(startObservationOrdinal, endObservationOrdinalExclusive, segment.IsLiveGrowing, [], [], []);
 
         var fixedSegment = new SceneJournalSegment(segment.Journal, startObservationOrdinal, endObservationOrdinalExclusive, IsLiveGrowing: false);
         var entities = new EntityStore();
@@ -142,7 +146,7 @@ public sealed class ScenePlaybackTrackIndex
 
         BackfillAuraIdentities(markers);
         var nonCombatEventIndexes = BuildEventPostings(markers, observationMarkers, out var eventPostings);
-        return new ScenePlaybackTrackIndex(startObservationOrdinal, endObservationOrdinalExclusive, markers, nonCombatEventIndexes, eventPostings);
+        return new ScenePlaybackTrackIndex(startObservationOrdinal, endObservationOrdinalExclusive, segment.IsLiveGrowing, markers, nonCombatEventIndexes, eventPostings);
     }
 
     public ScenePlaybackTrackMarkerWindow ReadWindow(

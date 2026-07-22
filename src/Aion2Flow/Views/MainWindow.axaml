@@ -361,22 +361,6 @@
                             Spacing="3"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Right">
-                    <Button Classes="BottomBarButton"
-                            IsVisible="{Binding IsViewingArchivedEncounter}"
-                            IsEnabled="{Binding IsViewingArchivedEncounter}"
-                            Command="{Binding ReturnToLiveCommand}"
-                            ToolTip.Tip="{markups:Translate Action_Live}">
-                        <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
-                    </Button>
-
-                    <Button Classes="BottomBarButton"
-                            IsVisible="{Binding IsViewingArchivedEncounter}"
-                            IsEnabled="{Binding IsViewingArchivedEncounter}"
-                            Click="OpenSelectedPlayback"
-                            ToolTip.Tip="{markups:Translate Playback_Open}">
-                        <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
-                    </Button>
-
                     <controls:NumericBlock Classes="BottomBarMetric BottomBarTotalDps"
                                            IsVisible="{Binding CombatantColumns.ShowTotalDamagePerSecond}"
                                            Value="{Binding TotalFilteredDamagePerSecond}"
@@ -389,6 +373,20 @@
                                            HorizontalAlignment="Right"
                                            TextAlignment="Right"
                                            VerticalAlignment="Center" />
+
+                    <Button Classes="BottomBarButton"
+                            IsVisible="{Binding IsViewingArchivedEncounter}"
+                            IsEnabled="{Binding IsViewingArchivedEncounter}"
+                            Command="{Binding ReturnToLiveCommand}"
+                            ToolTip.Tip="{markups:Translate Action_Live}">
+                        <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
+                    </Button>
+
+                    <Button Classes="BottomBarButton"
+                            Click="OpenCurrentPlayback"
+                            ToolTip.Tip="{markups:Translate Playback_Open}">
+                        <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
+                    </Button>
 
                     <Button x:Name="EncounterHistoryButton"
                             Classes="BottomBarButton"

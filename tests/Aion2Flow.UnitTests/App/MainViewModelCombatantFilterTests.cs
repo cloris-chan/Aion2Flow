@@ -7,6 +7,7 @@ using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
@@ -18,6 +19,20 @@ namespace Cloris.Aion2Flow.Tests.App;
 
 public sealed class MainViewModelCombatantFilterTests
 {
+    [Fact]
+    public void CurrentPlaybackContextUsesSessionBoundLiveSource()
+    {
+        var fixture = MainViewModelFixture.Create();
+
+        var context = fixture.ViewModel.CreateCurrentPlaybackContext();
+
+        Assert.Equal(ScenePlaybackSourceKind.Live, context.Source.SourceKind);
+        Assert.Equal(fixture.SceneId, context.Source.EncounterId);
+        Assert.Same(fixture.MetadataRegistry, context.DisplayContext.MetadataRegistry);
+        Assert.True(context.Source.CreateTimelineSegment().IsLiveGrowing);
+        context.Source.Dispose();
+    }
+
     [Theory]
     [InlineData(1010u, 0u, 200003u, 113515u, true, "map-transition")]
     [InlineData(1010u, 0u, 1010u, 0u, false, "")]
@@ -1081,6 +1096,7 @@ public sealed class MainViewModelCombatantFilterTests
         public EncounterArchiveService Archive { get; }
         public RuntimeMetadataRegistry MetadataRegistry => _captureService.Scene.Owner.MetadataRegistry;
         public ProjectionCacheStats ProjectionCacheStats => _captureService.Scene.Owner.ProjectionCacheStats;
+        public Guid SceneId => _captureService.Scene.SessionId;
         public long SceneStartedMilliseconds => _captureService.Scene.SessionStarted.ToUnixTimeMilliseconds();
 
         public static MainViewModelFixture Create(SceneKind sceneKind = SceneKind.Standard)

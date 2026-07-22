@@ -56,7 +56,26 @@ internal static class ScenePlaybackTimelineBuilder
         Brush.Parse("#4065A7FF")
     ];
 
-    public static PlaybackTimelineBuildResult BuildTimelineStrips(
+    public static PlaybackTimelineBuildResult? TryBuildTimelineStrips(
+        ScenePlaybackTrackMarkerWindow window,
+        PlaybackTimelineViewport viewport,
+        Func<ScenePlaybackTrackMarker, string> createMarkerText,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+            return null;
+
+        try
+        {
+            return BuildTimelineStripsCore(window, viewport, createMarkerText, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    private static PlaybackTimelineBuildResult BuildTimelineStripsCore(
         ScenePlaybackTrackMarkerWindow window,
         PlaybackTimelineViewport viewport,
         Func<ScenePlaybackTrackMarker, string> createMarkerText,

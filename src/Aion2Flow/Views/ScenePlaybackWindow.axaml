@@ -79,7 +79,7 @@
                 <Grid RowDefinitions="Auto,Auto" RowSpacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="PlaybackSceneTitle" Text="{Binding SceneName}" />
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
-                        <TextBlock Classes="PlaybackHeaderSubtle" Text="{Binding ArchivedAtText}" />
+                        <TextBlock Classes="PlaybackHeaderSubtle" Text="{Binding SceneStartedText}" />
                         <TextBlock Classes="PlaybackHeaderStatus" Text="{Binding StatusText}" />
                     </StackPanel>
                 </Grid>

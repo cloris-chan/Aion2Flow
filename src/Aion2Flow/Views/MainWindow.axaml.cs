@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private readonly AvaloniaFrameClockService _frameClock;
     private readonly UiScaleService _uiScale;
     private readonly LocalizationService _localization;
+    private readonly PlaybackWindowController _playbackWindowController = new();
     private readonly Control? _overlayRoot;
     private OverlayPinWindow? _pinWindow;
     private bool _hotkeyAttached;
@@ -178,6 +179,7 @@ public partial class MainWindow : Window
         ScalingChanged -= OnWindowScalingChanged;
         _globalHotkeyService.DetachWindow();
         _settingsService.Update(settings => settings.MainWindowPosition = new(Position.X, Position.Y));
+        _playbackWindowController.Close();
         ClosePinWindow();
         base.OnClosing(e);
     }
@@ -769,23 +771,36 @@ public partial class MainWindow : Window
         e.Handled = true;
         if (sender is Button { Tag: EncounterHistoryItemViewModel item })
         {
-            OpenPlayback(item);
+            OpenPlayback(MainViewModel.CreatePlaybackContext(item));
         }
     }
 
-    private void OpenSelectedPlayback(object? sender, RoutedEventArgs e)
+    private void OpenCurrentPlayback(object? sender, RoutedEventArgs e)
     {
-        if (DataContext.SelectedEncounterHistory is { } item)
+        OpenPlayback(DataContext.CreateCurrentPlaybackContext());
+    }
+
+    private void OpenPlayback(ScenePlaybackOpenContext context)
+    {
+        if (_playbackWindowController.TryActivate())
         {
-            OpenPlayback(item);
+            context.Source.Dispose();
+            return;
         }
-    }
 
-    private void OpenPlayback(EncounterHistoryItemViewModel item)
-    {
-        var viewModel = new ScenePlaybackViewModel(item.Record, item.DisplayContext, DataContext.Localization);
+        ScenePlaybackViewModel viewModel;
+        try
+        {
+            viewModel = new ScenePlaybackViewModel(context.Source, context.DisplayContext, DataContext.Localization);
+        }
+        catch
+        {
+            context.Source.Dispose();
+            throw;
+        }
+
         var window = new ScenePlaybackWindow(viewModel);
-        window.Show(this);
+        _playbackWindowController.Show(window, this);
     }
 
     private void ConfigureCombatantDetailsFlyout(Flyout flyout, CombatantDetailsFlyoutView flyoutView)

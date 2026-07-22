@@ -191,5 +191,9 @@ public sealed class ScenePlaybackTypedTrackProjectionTests
         public ScenePlaybackSourceKind SourceKind => ScenePlaybackSourceKind.Archived;
         public SceneJournalSegment CreateTimelineSegment() => segment;
         public SceneCombatSnapshot CreateSnapshot() => snapshot;
+
+        public void Dispose()
+        {
+        }
     }
 }

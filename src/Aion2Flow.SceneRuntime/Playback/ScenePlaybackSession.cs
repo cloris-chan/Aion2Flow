@@ -19,7 +19,7 @@ public sealed class ScenePlaybackSession
     public ScenePlaybackSession(IScenePlaybackSource source)
     {
         _source = source;
-        var segment = _source.CreateTimelineSegment();
+        var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
         _nextLoadedObservationOrdinal = segment.StartObservationOrdinal;
     }
 
@@ -30,11 +30,11 @@ public sealed class ScenePlaybackSession
     public long PositionMilliseconds => _positionMilliseconds;
 
     public ScenePlaybackTrackIndex CreateTrackIndex(CancellationToken cancellationToken = default)
-        => ScenePlaybackTrackIndex.Build(_source.CreateTimelineSegment(), cancellationToken);
+        => ScenePlaybackTrackIndex.Build(_source.CreateTimelineSegment().CreateBoundedSnapshot(), cancellationToken);
 
     public void ResetLoadedCursor()
     {
-        var segment = _source.CreateTimelineSegment();
+        var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
         _nextLoadedObservationOrdinal = segment.StartObservationOrdinal;
         _projector = null;
         _positionMilliseconds = 0;
@@ -42,7 +42,7 @@ public sealed class ScenePlaybackSession
 
     public JournalReadResult ReadNextTimelineBatch(int maxCount, JournalEntriesReader reader)
     {
-        var segment = _source.CreateTimelineSegment();
+        var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
         var cursor = new JournalCursor(Math.Max(segment.StartObservationOrdinal, _nextLoadedObservationOrdinal));
         var result = segment.ReadEntries(cursor, maxCount, reader);
         _nextLoadedObservationOrdinal = result.Cursor.NextObservationOrdinal;
@@ -62,14 +62,14 @@ public sealed class ScenePlaybackSession
         if (positionMilliseconds < _positionMilliseconds)
             return Seek(positionMilliseconds);
 
-        var segment = _source.CreateTimelineSegment();
-        var timeRange = segment.IsLiveGrowing ? ScenePlaybackTimeline.ResolveTimeRange(segment, _source.CreateSnapshot()) : projector.TimeRange;
+        var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
+        var timeRange = ResolveTimeRange(segment, projector);
         return ApplyFrame(projector.AdvanceTo(positionMilliseconds, segment, timeRange));
     }
 
     internal ScenePlaybackFrame SeekObservationOrdinal(long endObservationOrdinalExclusive)
     {
-        var segment = _source.CreateTimelineSegment();
+        var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
         var target = Math.Clamp(endObservationOrdinalExclusive, segment.StartObservationOrdinal, segment.CurrentEndObservationOrdinalExclusive);
         var projector = _projector;
         if (projector is null || target < _nextLoadedObservationOrdinal)
@@ -78,7 +78,7 @@ public sealed class ScenePlaybackSession
             _projector = projector;
         }
 
-        var timeRange = segment.IsLiveGrowing ? ScenePlaybackTimeline.ResolveTimeRange(segment, _source.CreateSnapshot()) : projector.TimeRange;
+        var timeRange = ResolveTimeRange(segment, projector);
         return ApplyFrame(projector.AdvanceToObservationOrdinal(target, segment, timeRange));
     }
 
@@ -119,10 +119,25 @@ public sealed class ScenePlaybackSession
 
     private FrameProjector CreateProjector()
     {
-        var segment = _source.CreateTimelineSegment();
+        var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
         var baseSnapshot = _source.CreateSnapshot();
         var timeRange = ScenePlaybackTimeline.ResolveTimeRange(segment, baseSnapshot);
         return new FrameProjector(_source.EncounterId, baseSnapshot.Kind, segment, timeRange);
+    }
+
+    private ScenePlaybackTimeRange ResolveTimeRange(SceneJournalSegment segment, FrameProjector projector)
+    {
+        if (_source.SourceKind != ScenePlaybackSourceKind.Live ||
+            segment.CurrentEndObservationOrdinalExclusive == projector.TimeRangeEndObservationOrdinalExclusive)
+        {
+            return projector.TimeRange;
+        }
+
+        return ScenePlaybackTimeline.ExtendTimeRange(
+            segment,
+            projector.TimeRangeEndObservationOrdinalExclusive,
+            projector.TimeRange,
+            _source.CreateSnapshot());
     }
 
     private sealed class FrameProjector
@@ -170,6 +185,7 @@ public sealed class ScenePlaybackSession
             _targetOffsetMilliseconds = timeRange.HasTiming ? timeRange.StartOffsetMilliseconds : 0;
             _positionMilliseconds = 0;
             _appliedEndOrdinal = segment.StartObservationOrdinal;
+            TimeRangeEndObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
             _currentFlushId = -1;
             _completedFlushId = -1;
             _trackedMetricEventCount = 0;
@@ -184,6 +200,8 @@ public sealed class ScenePlaybackSession
         public SceneJournalSegment Segment => _segment;
 
         public ScenePlaybackTimeRange TimeRange => _timeRange;
+
+        public long TimeRangeEndObservationOrdinalExclusive { get; private set; }
 
         public ScenePlaybackCombatantDetail CreateCombatantDetail(int combatantId)
         {
@@ -219,6 +237,7 @@ public sealed class ScenePlaybackSession
         {
             _segment = segment;
             _timeRange = timeRange;
+            TimeRangeEndObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
             _positionMilliseconds = ScenePlaybackTimeline.ClampPosition(positionMilliseconds, _timeRange.DurationMilliseconds);
             _targetOffsetMilliseconds = _timeRange.HasTiming
                 ? _timeRange.StartOffsetMilliseconds + _positionMilliseconds
@@ -233,6 +252,7 @@ public sealed class ScenePlaybackSession
         {
             _segment = segment;
             _timeRange = timeRange;
+            TimeRangeEndObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
             var target = Math.Clamp(endObservationOrdinalExclusive, _segment.StartObservationOrdinal, _segment.CurrentEndObservationOrdinalExclusive);
             if (_cursor.NextObservationOrdinal < _segment.StartObservationOrdinal)
                 _cursor = _segment.CreateCursor();

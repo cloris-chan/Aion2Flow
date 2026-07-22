@@ -231,6 +231,31 @@ public sealed class BossSceneCollectionTests
     }
 
     [Fact]
+    public void LivePlaybackSourceFreezesWhenBossSceneFreezes()
+    {
+        var scene = CreateBossScene();
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteFlush(1);
+        _ = scene.CreateFrame();
+        var source = scene.CreatePlaybackSource();
+        var heldSegment = source.CreateTimelineSegment();
+
+        sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
+        _ = scene.CreateFrame();
+        var frozenSegment = source.CreateTimelineSegment();
+
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
+        Assert.False(heldSegment.IsLiveGrowing);
+        Assert.False(frozenSegment.IsLiveGrowing);
+        Assert.Equal(frozenSegment.EndObservationOrdinalExclusive, heldSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(scene.SessionId, source.EncounterId);
+        Assert.Equal(500, source.CreateSnapshot().Combatants[100].DamageAmount);
+    }
+
+    [Fact]
     public void DeadBossSceneFreezesImmediatelyButKeepsFocusUntilTimeout()
     {
         var scene = CreateBossScene(out var timeProvider);

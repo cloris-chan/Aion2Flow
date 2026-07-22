@@ -341,6 +341,10 @@ public sealed class AuraSemanticMaterializationTests
         public ScenePlaybackSourceKind SourceKind => ScenePlaybackSourceKind.Archived;
         public SceneJournalSegment CreateTimelineSegment() => segment;
         public SceneCombatSnapshot CreateSnapshot() => SceneCombatSnapshot.Empty;
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class RecordingAuraLifecycleObserver : IAuraLifecycleObserver

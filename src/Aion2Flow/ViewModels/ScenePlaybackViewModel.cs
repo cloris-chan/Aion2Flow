@@ -4,8 +4,8 @@ using Avalonia.Threading;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.Protocol.Combat;
-using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -23,13 +23,15 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private const long EventWindowRefreshIntervalMilliseconds = 100;
     private const long StepMilliseconds = 1_000;
     private const long CombatantRefreshIntervalMilliseconds = 250;
+    private const long LiveRefreshIntervalMilliseconds = 250;
+    private const long MinimumLiveIndexGrowth = 1;
     private const double MinimumTimelineViewportMilliseconds = 1_000d;
     private const double TimelineZoomStep = 2d;
 
     private readonly Lock _frameGate = new();
     private readonly ScenePlaybackController _controller;
     private readonly IScenePlaybackSource _source;
-    private readonly ArchivedEncounterRecord _record;
+    private SceneCombatSnapshot _sceneDescriptorSnapshot;
     private readonly UiFrameBatchService _frameBatchService;
     private readonly Dictionary<int, EntityVitalState> _vitalScratch = [];
     private readonly HashSet<int> _seenCombatantIds = [];
@@ -43,11 +45,13 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private CancellationTokenSource? _eventWindowCancellation;
     private CancellationTokenSource? _timelineProjectionCancellation;
     private CancellationTokenSource? _auraTimelineCancellation;
+    private CancellationTokenSource? _liveRefreshCancellation;
     private Task? _detailTask;
     private Task? _eventIndexTask;
     private Task? _eventWindowTask;
     private Task? _timelineProjectionTask;
     private Task? _auraTimelineTask;
+    private Task? _liveRefreshTask;
     private ScenePlaybackFrame _currentFrame;
     private ScenePlaybackTrackIndex? _eventIndex;
     private ScenePlaybackFrameChangedEventArgs? _pendingFrameChanged;
@@ -57,6 +61,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private double _timelineMarkerDuration = -1;
     private long _lastCombatantRefreshTick;
     private long _lastEventWindowRefreshTick;
+    private long _lastLiveRefreshTimestampTicks = long.MinValue;
+    private long _lastLivePresentationRefreshTick;
     private long _displayTextRevision;
     private bool _isApplyingFrame;
     private bool _isDisposed;
@@ -68,27 +74,33 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private bool _eventWindowRefreshQueued;
     private bool _hasEventWindowRows;
     private bool _timelineMarkersInitialized;
+    private bool _eventIndexRefreshQueued;
+    private bool _liveSourceFinalized;
+    private bool _liveFinalizationApplied;
+    private bool _lastAuraTimelineWasGrowing;
     private long _detailRequestGeneration;
     private long _timelineProjectionGeneration;
+    private long _lastAuraTimelineEndObservationOrdinalExclusive;
 
-    public ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext)
-        : this(record, displayContext, Ioc.Default.GetRequiredService<LocalizationService>())
+    public ScenePlaybackViewModel(IScenePlaybackSource source, SceneDisplayContext displayContext, LocalizationService localization)
+        : this(source, displayContext, localization, Ioc.Default.GetRequiredService<IScenePlaybackTickSourceFactory>())
     {
     }
 
-    public ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext, LocalizationService localization)
-        : this(record, displayContext, localization, Ioc.Default.GetRequiredService<IScenePlaybackTickSourceFactory>())
+    internal ScenePlaybackViewModel(IScenePlaybackSource source, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory)
+        : this(source, displayContext, localization, tickSourceFactory, Ioc.Default.GetRequiredService<UiFrameBatchService>())
     {
     }
 
-    internal ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory)
-        : this(record, displayContext, localization, tickSourceFactory, Ioc.Default.GetRequiredService<UiFrameBatchService>())
+    internal ScenePlaybackViewModel(IScenePlaybackSource source, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory, UiFrameBatchService frameBatchService)
     {
-    }
-
-    internal ScenePlaybackViewModel(ArchivedEncounterRecord record, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory, UiFrameBatchService frameBatchService)
-    {
-        _record = record;
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(displayContext);
+        ArgumentNullException.ThrowIfNull(localization);
+        ArgumentNullException.ThrowIfNull(tickSourceFactory);
+        ArgumentNullException.ThrowIfNull(frameBatchService);
+        _source = source;
+        _sceneDescriptorSnapshot = source.CreateSnapshot();
         _frameBatchService = frameBatchService;
         DisplayContext = displayContext;
         Localization = localization;
@@ -96,19 +108,18 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         {
             DisplayContext = displayContext
         };
-        _source = new ArchivedScenePlaybackSource(record);
         _controller = new ScenePlaybackController(_source, tickSourceFactory, ScenePlaybackControllerOptions.Default);
         _controller.FrameChanged += OnFrameChanged;
         Localization.LanguageChanged += OnLanguageChanged;
-        SceneName = displayContext.ResolveSceneName(record.ScenePayload.Kind, record.Snapshot.MapId, record.ScenePayload.BossNpcCodes);
+        SceneName = displayContext.ResolveSceneName(_sceneDescriptorSnapshot.Kind, _sceneDescriptorSnapshot.MapId, _sceneDescriptorSnapshot.BossNpcCodes);
         WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], SceneName);
-        ArchivedAtText = record.ArchivedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
+        SceneStartedText = source.SceneStarted.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
         _currentFrame = _controller.CurrentFrame;
         RequestEventIndex();
         ApplyFrame(_currentFrame, _controller.State);
     }
 
-    public SceneDisplayContext DisplayContext { get; }
+    public SceneDisplayContext DisplayContext { get; private set; }
 
     public LocalizationService Localization { get; }
 
@@ -190,7 +201,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     public partial string WindowTitle { get; set; } = "Playback";
 
     [ObservableProperty]
-    public partial string ArchivedAtText { get; set; } = string.Empty;
+    public partial string SceneStartedText { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial string SceneName { get; set; } = string.Empty;
@@ -306,6 +317,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _auraTimelineCancellation?.Cancel();
         _detailRequestGeneration++;
         _auraTimelineTracks = [];
+        _lastAuraTimelineEndObservationOrdinalExclusive = 0;
+        _lastAuraTimelineWasGrowing = false;
         AuraTimelineTracks = [];
         SelectedAura = null;
         if (combatantId <= 0)
@@ -456,6 +469,62 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         EventSelection = selection;
     }
 
+    public void ProcessUiFrame(TimeSpan timestamp)
+    {
+        if (_isDisposed ||
+            _source.SourceKind != ScenePlaybackSourceKind.Live ||
+            _liveSourceFinalized ||
+            IsPlaying ||
+            IsLoading)
+        {
+            return;
+        }
+
+        var timestampTicks = timestamp.Ticks;
+        if (_lastLiveRefreshTimestampTicks != long.MinValue &&
+            timestampTicks >= _lastLiveRefreshTimestampTicks &&
+            timestampTicks - _lastLiveRefreshTimestampTicks < LiveRefreshIntervalMilliseconds * TimeSpan.TicksPerMillisecond)
+        {
+            return;
+        }
+
+        _lastLiveRefreshTimestampTicks = timestampTicks;
+        if (_liveRefreshTask is null)
+        {
+            var cancellation = new CancellationTokenSource();
+            _liveRefreshCancellation = cancellation;
+            _liveRefreshTask = RefreshLiveSourceAsync(cancellation);
+        }
+    }
+
+    private async Task RefreshLiveSourceAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await _controller.RefreshAsync(cancellation.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException) when (_isDisposed)
+        {
+        }
+        catch (Exception ex)
+        {
+            StatusText = ex.Message;
+        }
+        finally
+        {
+            if (ReferenceEquals(_liveRefreshCancellation, cancellation))
+            {
+                _liveRefreshCancellation = null;
+                _liveRefreshTask = null;
+            }
+
+            cancellation.Dispose();
+        }
+    }
+
     public void RequestSeek(double positionMilliseconds)
     {
         if (_isDisposed)
@@ -504,19 +573,19 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         SetTimelineViewport(new PlaybackTimelineViewport(start, start + targetDuration));
     }
 
-    private void EnsureTimelinePositionVisible(double positionMilliseconds)
+    private bool EnsureTimelinePositionVisible(double positionMilliseconds, bool requestProjection = true)
     {
         var viewport = TimelineViewport;
         var totalDuration = DurationMilliseconds;
         if (viewport.IsEmpty || totalDuration <= 0d || viewport.Contains(positionMilliseconds))
-            return;
+            return false;
 
         var viewportDuration = Math.Min(viewport.DurationMilliseconds, totalDuration);
         var start = Math.Clamp(positionMilliseconds - viewportDuration * 0.5d, 0d, totalDuration - viewportDuration);
-        SetTimelineViewport(new PlaybackTimelineViewport(start, start + viewportDuration));
+        return SetTimelineViewport(new PlaybackTimelineViewport(start, start + viewportDuration), requestProjection);
     }
 
-    private void SetTimelineViewport(PlaybackTimelineViewport viewport)
+    private bool SetTimelineViewport(PlaybackTimelineViewport viewport, bool requestProjection = true)
     {
         var changed = TimelineViewport != viewport;
         TimelineViewport = viewport;
@@ -526,9 +595,11 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             : 1d;
         TimelineZoomText = $"{zoom:0.#}x";
         if (!changed)
-            return;
+            return false;
 
-        RequestTimelineProjection();
+        if (requestProjection)
+            RequestTimelineProjection();
+        return true;
     }
 
     [RelayCommand]
@@ -656,17 +727,20 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
         _currentFrame = frame;
         var duration = frame.TimeRange.DurationMilliseconds;
+        var previousDuration = DurationMilliseconds;
+        var previousViewport = TimelineViewport;
+        var timelineViewportChanged = false;
         _isApplyingFrame = true;
         PositionMilliseconds = frame.PositionMilliseconds;
-        if (Math.Abs(DurationMilliseconds - duration) > double.Epsilon)
+        if (Math.Abs(previousDuration - duration) > double.Epsilon)
         {
             DurationMilliseconds = duration;
             DurationText = FormatTime(duration);
-            SetTimelineViewport(duration > 0d
-                ? new PlaybackTimelineViewport(0d, duration)
-                : PlaybackTimelineViewport.Empty);
+            timelineViewportChanged = SetTimelineViewport(
+                ResolveViewportAfterDurationChange(previousViewport, previousDuration, duration),
+                requestProjection: false);
         }
-        EnsureTimelinePositionVisible(frame.PositionMilliseconds);
+        timelineViewportChanged |= EnsureTimelinePositionVisible(frame.PositionMilliseconds, requestProjection: false);
         _isApplyingFrame = false;
 
         if (Math.Abs(Speed - state.Speed) > double.Epsilon)
@@ -682,7 +756,10 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (!string.Equals(StatusText, statusText, StringComparison.Ordinal))
             StatusText = statusText;
 
-        RefreshTimelineTracks(frame);
+        var liveSegment = RefreshLivePresentationState();
+        RefreshLiveTimelineData(liveSegment);
+        RefreshTimelineTracks(frame, timelineViewportChanged);
+        ApplyLiveFinalization(liveSegment);
         if (ShouldRefreshEventWindow(frame, state))
         {
             RequestEventWindowRefresh();
@@ -699,6 +776,168 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             RequestCombatantDetail(frame);
         _lastCombatantRefreshTick = Environment.TickCount64;
         _forceNextCombatantRefresh = false;
+    }
+
+    internal static PlaybackTimelineViewport ResolveViewportAfterDurationChange(
+        PlaybackTimelineViewport viewport,
+        double previousDurationMilliseconds,
+        double durationMilliseconds)
+    {
+        if (durationMilliseconds <= 0d)
+            return PlaybackTimelineViewport.Empty;
+
+        if (viewport.IsEmpty ||
+            previousDurationMilliseconds <= 0d ||
+            viewport.StartMilliseconds <= 0d && viewport.EndMilliseconds >= previousDurationMilliseconds)
+        {
+            return new PlaybackTimelineViewport(0d, durationMilliseconds);
+        }
+
+        var viewportDuration = Math.Min(viewport.DurationMilliseconds, durationMilliseconds);
+        var start = Math.Clamp(viewport.StartMilliseconds, 0d, durationMilliseconds - viewportDuration);
+        return new PlaybackTimelineViewport(start, start + viewportDuration);
+    }
+
+    private SceneJournalSegment RefreshLivePresentationState()
+    {
+        if (_source.SourceKind != ScenePlaybackSourceKind.Live)
+            return default;
+
+        var segment = _controller.CreateTimelineSegment().CreateBoundedSnapshot();
+        var now = Environment.TickCount64;
+        if (segment.IsLiveGrowing &&
+            _lastLivePresentationRefreshTick != 0 &&
+            now - _lastLivePresentationRefreshTick < LiveRefreshIntervalMilliseconds)
+        {
+            return segment;
+        }
+
+        _lastLivePresentationRefreshTick = now;
+        var snapshot = _source.CreateSnapshot();
+        var frozenIdentityScope = SceneIdentityScope.Empty;
+        var isFrozen = false;
+        if (_source is LiveScenePlaybackSource liveSource && liveSource.TryGetFrozenArchive(out var frozenArchive))
+        {
+            isFrozen = true;
+            snapshot = frozenArchive.Snapshot;
+            frozenIdentityScope = frozenArchive.Payload.IdentityScope;
+        }
+
+        if (!ReferenceEquals(_sceneDescriptorSnapshot, snapshot) || isFrozen && DisplayContext.MetadataRegistry is not null)
+        {
+            _sceneDescriptorSnapshot = snapshot;
+            var context = isFrozen
+                ? new SceneDisplayContext(
+                    frozenIdentityScope,
+                    null,
+                    snapshot,
+                    DisplayContext.Resources,
+                    DisplayContext.UnknownSceneName)
+                : new SceneDisplayContext(
+                    SceneIdentityScope.Empty,
+                    DisplayContext.MetadataRegistry,
+                    snapshot,
+                    DisplayContext.Resources,
+                    DisplayContext.UnknownSceneName);
+            ReplaceDisplayContext(context);
+        }
+
+        var sceneName = DisplayContext.ResolveSceneName(snapshot.Kind, snapshot.MapId, snapshot.BossNpcCodes);
+        if (!string.Equals(SceneName, sceneName, StringComparison.Ordinal))
+        {
+            SceneName = sceneName;
+            WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], sceneName);
+        }
+
+        return segment;
+    }
+
+    private void ReplaceDisplayContext(SceneDisplayContext displayContext)
+    {
+        DisplayContext = displayContext;
+        CombatantDetails.DisplayContext = displayContext;
+        _displayTextRevision++;
+        _forceNextCombatantRefresh = true;
+        _forceNextEventWindowRefresh = true;
+        OnPropertyChanged(nameof(DisplayContext));
+        OnPropertyChanged(nameof(EventScopeCombatantText));
+    }
+
+    private void RefreshLiveTimelineData(SceneJournalSegment segment)
+    {
+        if (_source.SourceKind != ScenePlaybackSourceKind.Live)
+            return;
+
+        var endObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
+        if (ShouldRefreshLiveIndex(_eventIndex, segment))
+            RequestEventIndex(segment);
+
+        if (SelectedDetailMode == PlaybackDetailMode.Auras &&
+            SelectedCombatantId > 0 &&
+            _auraTimelineTask is null &&
+            (HasReachedLiveGrowthThreshold(
+                 segment.StartObservationOrdinal,
+                 _lastAuraTimelineEndObservationOrdinalExclusive,
+                 endObservationOrdinalExclusive) ||
+             !segment.IsLiveGrowing &&
+             (_lastAuraTimelineWasGrowing || _lastAuraTimelineEndObservationOrdinalExclusive < endObservationOrdinalExclusive)))
+        {
+            RequestAuraTimeline(SelectedCombatantId, segment);
+        }
+    }
+
+    internal static bool ShouldRefreshLiveIndex(ScenePlaybackTrackIndex? index, SceneJournalSegment segment)
+    {
+        if (index is null)
+            return true;
+
+        var endObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
+        if (!segment.IsLiveGrowing &&
+            (index.IsSourceGrowing || index.EndObservationOrdinalExclusive < endObservationOrdinalExclusive))
+        {
+            return true;
+        }
+
+        return segment.IsLiveGrowing && HasReachedLiveGrowthThreshold(
+            segment.StartObservationOrdinal,
+            index.EndObservationOrdinalExclusive,
+            endObservationOrdinalExclusive);
+    }
+
+    private static bool HasReachedLiveGrowthThreshold(
+        long startObservationOrdinal,
+        long indexedEndObservationOrdinalExclusive,
+        long currentEndObservationOrdinalExclusive)
+    {
+        if (currentEndObservationOrdinalExclusive <= indexedEndObservationOrdinalExclusive)
+            return false;
+
+        var indexedCount = Math.Max(0, indexedEndObservationOrdinalExclusive - startObservationOrdinal);
+        var growthThreshold = Math.Max(MinimumLiveIndexGrowth, indexedCount / 4);
+        return currentEndObservationOrdinalExclusive - indexedEndObservationOrdinalExclusive >= growthThreshold;
+    }
+
+    private void ApplyLiveFinalization(SceneJournalSegment segment)
+    {
+        if (_source.SourceKind != ScenePlaybackSourceKind.Live || segment.IsEmpty || segment.IsLiveGrowing)
+            return;
+
+        if (!_liveFinalizationApplied)
+        {
+            _liveFinalizationApplied = true;
+            _controller.StartCheckpointRebuild();
+        }
+
+        var endObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
+        var eventIndexFinalized = _eventIndex is
+        {
+            IsSourceGrowing: false
+        } && _eventIndex.EndObservationOrdinalExclusive >= endObservationOrdinalExclusive;
+        var auraTimelineFinalized = SelectedDetailMode != PlaybackDetailMode.Auras ||
+            SelectedCombatantId <= 0 ||
+            !_lastAuraTimelineWasGrowing &&
+            _lastAuraTimelineEndObservationOrdinalExclusive >= endObservationOrdinalExclusive;
+        _liveSourceFinalized = eventIndexFinalized && auraTimelineFinalized;
     }
 
     private bool ShouldRefreshCombatants(ScenePlaybackFrame frame, ScenePlaybackControllerState state)
@@ -949,15 +1188,19 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         }
     }
 
-    private void RefreshTimelineTracks(ScenePlaybackFrame frame)
+    private void RefreshTimelineTracks(ScenePlaybackFrame frame, bool viewportChanged = false)
     {
         var duration = frame.TimeRange.DurationMilliseconds;
+        var requiresProjection = viewportChanged;
         if (!_timelineMarkersInitialized || Math.Abs(_timelineMarkerDuration - duration) > double.Epsilon)
         {
             _timelineMarkerDuration = duration;
             _timelineMarkersInitialized = true;
-            RequestTimelineProjection();
+            requiresProjection = true;
         }
+
+        if (requiresProjection)
+            RequestTimelineProjection();
 
         GlobalTimeline = _globalTimeline;
     }
@@ -1025,8 +1268,11 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         try
         {
             var timelines = await Task.Run(
-                () => ScenePlaybackTimelineBuilder.BuildTimelineStrips(window, viewport, CreateMarkerText, cancellation.Token),
-                cancellation.Token).ConfigureAwait(false);
+                () => ScenePlaybackTimelineBuilder.TryBuildTimelineStrips(window, viewport, CreateMarkerText, cancellation.Token),
+                CancellationToken.None).ConfigureAwait(false);
+            if (timelines is not { } completedTimelines)
+                return;
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (_isDisposed ||
@@ -1037,13 +1283,13 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                     return;
                 }
 
-                _globalTimeline = timelines.Global;
-                _combatantTimelines = timelines.Combatants;
+                _globalTimeline = completedTimelines.Global;
+                _combatantTimelines = completedTimelines.Combatants;
                 GlobalTimeline = _globalTimeline;
                 ApplyCombatantTimelines(_combatantTimelines);
             });
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
         }
         catch (Exception ex)
@@ -1066,16 +1312,31 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     }
 
     private void RequestAuraTimeline(int targetEntityId)
+        => RequestAuraTimeline(targetEntityId, _controller.CreateTimelineSegment().CreateBoundedSnapshot());
+
+    private void RequestAuraTimeline(int targetEntityId, SceneJournalSegment segment)
     {
         _auraTimelineCancellation?.Cancel();
         var cancellation = new CancellationTokenSource();
         _auraTimelineCancellation = cancellation;
-        var segment = _controller.CreateTimelineSegment();
+        var endObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
         var duration = (long)Math.Round(DurationMilliseconds, MidpointRounding.AwayFromZero);
-        _auraTimelineTask = ProjectAuraTimelineAsync(targetEntityId, segment, duration, cancellation);
+        _auraTimelineTask = ProjectAuraTimelineAsync(
+            targetEntityId,
+            segment,
+            endObservationOrdinalExclusive,
+            segment.IsLiveGrowing,
+            duration,
+            cancellation);
     }
 
-    private async Task ProjectAuraTimelineAsync(int targetEntityId, SceneJournalSegment segment, long durationMilliseconds, CancellationTokenSource cancellation)
+    private async Task ProjectAuraTimelineAsync(
+        int targetEntityId,
+        SceneJournalSegment segment,
+        long endObservationOrdinalExclusive,
+        bool isSourceGrowing,
+        long durationMilliseconds,
+        CancellationTokenSource cancellation)
     {
         try
         {
@@ -1090,9 +1351,12 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                 var selectedIdentity = SelectedAura?.AuraIdentity ?? default;
                 _auraTimelineTracks = ScenePlaybackTimelineBuilder.BuildAuraTimelineTracks(timeline, durationMilliseconds, Localization, DisplayContext);
                 AuraTimelineTracks = _auraTimelineTracks;
+                _lastAuraTimelineEndObservationOrdinalExclusive = endObservationOrdinalExclusive;
+                _lastAuraTimelineWasGrowing = isSourceGrowing;
                 SelectedAura = selectedIdentity.IsEmpty
                     ? null
                     : FindAuraTimelineLane(_auraTimelineTracks, selectedIdentity);
+                ApplyLiveFinalization(_controller.CreateTimelineSegment().CreateBoundedSnapshot());
             });
         }
         catch (OperationCanceledException)
@@ -1134,18 +1398,40 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         => lane.SkillCode > 0 ? DisplayContext.ResolveSkillName(lane.SkillCode) : lane.FallbackText;
 
     private void RequestEventIndex()
+        => RequestEventIndex(_controller.CreateTimelineSegment().CreateBoundedSnapshot());
+
+    private void RequestEventIndex(SceneJournalSegment segment)
     {
+        if (_isDisposed)
+            return;
+
+        var requestedEnd = segment.CurrentEndObservationOrdinalExclusive;
+        if (_eventIndex is not null &&
+            _eventIndex.EndObservationOrdinalExclusive >= requestedEnd &&
+            _eventIndex.IsSourceGrowing == segment.IsLiveGrowing &&
+            _eventIndexTask is null)
+        {
+            return;
+        }
+
+        if (_eventIndexTask is not null)
+        {
+            _eventIndexRefreshQueued = true;
+            return;
+        }
+
         var cancellation = new CancellationTokenSource();
         _eventIndexCancellation = cancellation;
-        _eventIndexTask = BuildEventIndexAsync(cancellation);
+        _eventIndexTask = BuildEventIndexAsync(segment, cancellation);
     }
 
-    private async Task BuildEventIndexAsync(CancellationTokenSource cancellation)
+    private async Task BuildEventIndexAsync(SceneJournalSegment segment, CancellationTokenSource cancellation)
     {
+        var succeeded = false;
         try
         {
             var index = await Task.Run(
-                () => _controller.Session.CreateTrackIndex(cancellation.Token),
+                () => ScenePlaybackTrackIndex.Build(segment, cancellation.Token),
                 cancellation.Token).ConfigureAwait(false);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -1153,7 +1439,9 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                     return;
 
                 _eventIndex = index;
+                succeeded = true;
                 RequestTimelineProjection();
+                ApplyLiveFinalization(_controller.CreateTimelineSegment().CreateBoundedSnapshot());
                 _forceNextEventWindowRefresh = true;
                 if (ShouldRefreshEventWindow(_currentFrame, _controller.State))
                 {
@@ -1180,6 +1468,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
                 cancellation.Dispose();
                 _eventIndexCancellation = null;
                 _eventIndexTask = null;
+                var shouldRefresh = succeeded && _eventIndexRefreshQueued;
+                _eventIndexRefreshQueued = false;
+                if (shouldRefresh && !_isDisposed)
+                {
+                    var currentSegment = _controller.CreateTimelineSegment().CreateBoundedSnapshot();
+                    if (ShouldRefreshLiveIndex(_eventIndex, currentSegment))
+                        RequestEventIndex(currentSegment);
+                }
             });
         }
     }
@@ -1541,6 +1837,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _eventWindowCancellation?.Cancel();
         _timelineProjectionCancellation?.Cancel();
         _auraTimelineCancellation?.Cancel();
+        _liveRefreshCancellation?.Cancel();
         Localization.LanguageChanged -= OnLanguageChanged;
         _controller.FrameChanged -= OnFrameChanged;
         if (_detailTask is not null)
@@ -1598,11 +1895,23 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             }
         }
 
+        if (_liveRefreshTask is not null)
+        {
+            try
+            {
+                await _liveRefreshTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
         _detailCancellation?.Dispose();
         _eventIndexCancellation?.Dispose();
         _eventWindowCancellation?.Dispose();
         _timelineProjectionCancellation?.Dispose();
         _auraTimelineCancellation?.Dispose();
+        _liveRefreshCancellation?.Dispose();
         CombatantDetails.Dispose();
         await _controller.DisposeAsync().ConfigureAwait(false);
     }
@@ -1610,7 +1919,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
         _displayTextRevision++;
-        SceneName = DisplayContext.ResolveSceneName(_record.ScenePayload.Kind, _record.Snapshot.MapId, _record.ScenePayload.BossNpcCodes);
+        SceneName = DisplayContext.ResolveSceneName(_sceneDescriptorSnapshot.Kind, _sceneDescriptorSnapshot.MapId, _sceneDescriptorSnapshot.BossNpcCodes);
         WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], SceneName);
         _timelineMarkersInitialized = false;
         _forceNextCombatantRefresh = true;

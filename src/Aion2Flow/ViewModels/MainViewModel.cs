@@ -11,6 +11,7 @@ using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Settings;
@@ -997,6 +998,19 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private SceneDisplayContext CreateArchivedDisplayContext(ArchivedEncounterRecord record)
         => CreateDisplayContext(record.Snapshot, record.ScenePayload.IdentityScope, null);
+
+    internal ScenePlaybackOpenContext CreateCurrentPlaybackContext()
+    {
+        if (IsViewingArchivedEncounter && SelectedEncounterHistory is { } archived)
+            return CreatePlaybackContext(archived);
+
+        var source = _captureService.Scene.CreatePlaybackSource();
+        var displayContext = CreateDisplayContext(source.CreateSnapshot(), SceneIdentityScope.Empty, _captureService.Scene.Owner.MetadataRegistry);
+        return new ScenePlaybackOpenContext(source, displayContext);
+    }
+
+    internal static ScenePlaybackOpenContext CreatePlaybackContext(EncounterHistoryItemViewModel item)
+        => new(new ArchivedScenePlaybackSource(item.Record), item.DisplayContext);
 
     private SceneDisplayContext CreateDisplayContext(SceneCombatSnapshot snapshot, SceneIdentityScope scope, RuntimeMetadataRegistry? metadataRegistry)
         => new(scope, metadataRegistry, snapshot, _gameResourceService, Localization["Scene_Unknown"]);

@@ -3,6 +3,7 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
@@ -40,6 +41,8 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private BossSceneState _bossState;
     private long _frozenEndObservationOrdinalExclusive = -1;
     private SceneArchiveCapture? _frozenArchive;
+    private LiveScenePlaybackState? _playbackState;
+    private int _playbackSourceCount;
 
     public Guid SessionId { get; private set; }
     public DateTimeOffset SessionStarted { get; private set; }
@@ -159,6 +162,8 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         lock (_gate)
         {
             SceneArchiveCapture? archive = archiveCurrent ? CreateArchiveCaptureCore() : null;
+            if (archive is { } capture)
+                FinalizePlaybackStateCore(capture);
             ResetCore(sessionStarted, kind);
             return archive;
         }
@@ -169,6 +174,8 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         lock (_gate)
         {
             SceneArchiveCapture? archive = archiveCurrent ? CreateArchiveCaptureCore() : null;
+            if (archive is { } capture)
+                FinalizePlaybackStateCore(capture);
             ResetCore(resolveSessionStarted(), kind);
             return archive;
         }
@@ -195,6 +202,60 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             return CreateArchiveCaptureCore();
     }
 
+    public LiveScenePlaybackSource CreatePlaybackSource()
+    {
+        lock (_gate)
+        {
+            if (_kind == SceneKind.Boss && _bossState == BossSceneState.Frozen)
+                return new LiveScenePlaybackSource(LiveScenePlaybackState.CreateFrozen(this, GetFrozenArchiveCore()));
+
+            var state = _playbackState;
+            if (state is null)
+            {
+                var snapshot = Owner.CreateSnapshot();
+                state = new LiveScenePlaybackState(
+                    this,
+                    SessionId,
+                    SessionStarted,
+                    snapshot,
+                    Journal,
+                    Owner.SceneStartObservationOrdinal,
+                    Owner.AppliedNextObservationOrdinal);
+                _playbackState = state;
+            }
+
+            _playbackSourceCount++;
+            return new LiveScenePlaybackSource(state);
+        }
+    }
+
+    internal SceneCombatSnapshot CreatePlaybackSnapshot(LiveScenePlaybackState state)
+    {
+        lock (_gate)
+        {
+            return ReferenceEquals(_playbackState, state) && state.EncounterId == SessionId
+                ? Owner.CreateSnapshot()
+                : state.GetFrozenSnapshot();
+        }
+    }
+
+    internal void ReleasePlaybackSource(LiveScenePlaybackState state)
+    {
+        lock (_gate)
+        {
+            if (!ReferenceEquals(_playbackState, state))
+                return;
+
+            _playbackSourceCount--;
+            if (_playbackSourceCount > 0)
+                return;
+
+            state.StopGrowing(Journal.NextObservationOrdinal);
+            _playbackState = null;
+            _playbackSourceCount = 0;
+        }
+    }
+
     private void ResetCore() => ResetCore(DateTimeOffset.Now);
 
     public void Reset(DateTimeOffset sessionStarted)
@@ -210,6 +271,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
     private void ResetCore(DateTimeOffset sessionStarted, SceneKind kind)
     {
+        FinalizePlaybackStateCore();
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
         Clock.Reset(sessionStarted);
@@ -308,8 +370,20 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
         _frozenEndObservationOrdinalExclusive = Owner.AppliedNextObservationOrdinal;
         _frozenArchive = Owner.CreateArchiveCapture(_frozenEndObservationOrdinalExclusive);
+        FinalizePlaybackStateCore(_frozenArchive.Value);
         _bossState = BossSceneState.Frozen;
         Owner.SetBossFocusTracking(false);
+    }
+
+    private void FinalizePlaybackStateCore(SceneArchiveCapture? capture = null)
+    {
+        var state = _playbackState;
+        if (state is null)
+            return;
+
+        state.Freeze(capture ?? CreateArchiveCaptureCore());
+        _playbackState = null;
+        _playbackSourceCount = 0;
     }
 
     private SceneArchiveCapture CreateArchiveCaptureCore()

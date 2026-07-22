@@ -36,13 +36,20 @@ public partial class ScenePlaybackWindow : Window
             return;
 
         _frameClockAttached = true;
+        _frameClock.Frame += OnAnimationFrame;
         _frameClock.Attach(this);
+    }
+
+    private void OnAnimationFrame(object? sender, AvaloniaFrameEventArgs e)
+    {
+        DataContext?.ProcessUiFrame(e.Timestamp);
     }
 
     protected override async void OnClosed(EventArgs e)
     {
         if (_frameClockAttached)
         {
+            _frameClock.Frame -= OnAnimationFrame;
             _frameClock.Detach(this);
             _frameClockAttached = false;
         }
