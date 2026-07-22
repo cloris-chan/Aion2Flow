@@ -375,16 +375,32 @@
                                       IsVisible="{Binding IsOutgoingDetailVisible}"
                                       HorizontalScrollBarVisibility="Auto"
                                       VerticalScrollBarVisibility="Auto">
-                            <views:CombatDirectionDetailView DataContext="{Binding CombatantDetails.OutgoingDetail}"
-                                                             SelectionRequested="CombatDetailSelectionRequested" />
+                            <StackPanel Orientation="Vertical"
+                                        Spacing="14">
+                                <views:DamageDetailView DataContext="{Binding CombatantDetails.OutgoingDetail}"
+                                                        SelectionRequested="CombatDetailSelectionRequested" />
+                                <views:HealingDetailView DataContext="{Binding CombatantDetails.OutgoingDetail}"
+                                                         SelectionRequested="CombatDetailSelectionRequested" />
+                                <views:ShieldDetailView DataContext="{Binding CombatantDetails.OutgoingDetail}"
+                                                        SelectionRequested="CombatDetailSelectionRequested" />
+                                <views:ResourceDetailView DataContext="{Binding CombatantDetails.OutgoingDetail}" />
+                            </StackPanel>
                         </ScrollViewer>
 
                         <ScrollViewer Classes="PlaybackDetailScroller AppScrollViewer"
                                       IsVisible="{Binding IsIncomingDetailVisible}"
                                       HorizontalScrollBarVisibility="Auto"
                                       VerticalScrollBarVisibility="Auto">
-                            <views:CombatDirectionDetailView DataContext="{Binding CombatantDetails.IncomingDetail}"
-                                                             SelectionRequested="CombatDetailSelectionRequested" />
+                            <StackPanel Orientation="Vertical"
+                                        Spacing="14">
+                                <views:DamageDetailView DataContext="{Binding CombatantDetails.IncomingDetail}"
+                                                        SelectionRequested="CombatDetailSelectionRequested" />
+                                <views:HealingDetailView DataContext="{Binding CombatantDetails.IncomingDetail}"
+                                                         SelectionRequested="CombatDetailSelectionRequested" />
+                                <views:ShieldDetailView DataContext="{Binding CombatantDetails.IncomingDetail}"
+                                                        SelectionRequested="CombatDetailSelectionRequested" />
+                                <views:ResourceDetailView DataContext="{Binding CombatantDetails.IncomingDetail}" />
+                            </StackPanel>
                         </ScrollViewer>
 
                         <ListBox Classes="PlaybackWorkspaceList PlaybackAuraList AppScrollViewer"

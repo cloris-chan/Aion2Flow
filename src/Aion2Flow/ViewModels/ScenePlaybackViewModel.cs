@@ -369,7 +369,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private void ShowOutgoingDetail()
     {
         SelectedDetailMode = PlaybackDetailMode.Outgoing;
-        CombatantDetails.SelectedDirectionIndex = 0;
         SelectEventRelation(ScenePlaybackEventRelation.Outgoing);
     }
 
@@ -377,7 +376,6 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private void ShowIncomingDetail()
     {
         SelectedDetailMode = PlaybackDetailMode.Incoming;
-        CombatantDetails.SelectedDirectionIndex = 1;
         SelectEventRelation(ScenePlaybackEventRelation.Incoming);
     }
 
