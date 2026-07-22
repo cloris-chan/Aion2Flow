@@ -30,6 +30,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     private readonly Lock _frameGate = new();
     private readonly ScenePlaybackController _controller;
+    private readonly PlaybackSeekCoordinator _seekCoordinator;
     private readonly IScenePlaybackSource _source;
     private SceneCombatSnapshot _sceneDescriptorSnapshot;
     private readonly UiFrameBatchService _frameBatchService;
@@ -74,6 +75,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private bool _eventWindowRefreshQueued;
     private bool _hasEventWindowRows;
     private bool _timelineMarkersInitialized;
+    private bool _timelineProjectionPending;
+    private bool _scrubRefreshPending;
     private bool _eventIndexRefreshQueued;
     private bool _liveSourceFinalized;
     private bool _liveFinalizationApplied;
@@ -109,6 +112,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             DisplayContext = displayContext
         };
         _controller = new ScenePlaybackController(_source, tickSourceFactory, ScenePlaybackControllerOptions.Default);
+        _seekCoordinator = new PlaybackSeekCoordinator(SeekCoreAsync, ReportSeekError, ReportSeekIdle);
         _controller.FrameChanged += OnFrameChanged;
         Localization.LanguageChanged += OnLanguageChanged;
         SceneName = displayContext.ResolveSceneName(_sceneDescriptorSnapshot.Kind, _sceneDescriptorSnapshot.MapId, _sceneDescriptorSnapshot.BossNpcCodes);
@@ -530,10 +534,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
         var duration = DurationMilliseconds;
         var target = duration > 0 ? Math.Clamp(positionMilliseconds, 0d, duration) : Math.Max(0d, positionMilliseconds);
-        EnsureTimelinePositionVisible(target);
+        _scrubRefreshPending = true;
+        CancelScrubCompetingWork();
+        if (EnsureTimelinePositionVisible(target, requestProjection: false))
+            _timelineProjectionPending = true;
         _forceNextCombatantRefresh = true;
         _forceNextEventWindowRefresh = true;
-        _ = SeekCoreAsync((long)Math.Round(target, MidpointRounding.AwayFromZero));
+        IsLoading = true;
+        _seekCoordinator.Request((long)Math.Round(target, MidpointRounding.AwayFromZero));
     }
 
     public void ZoomTimelineAt(double factor, double anchorMilliseconds)
@@ -614,6 +622,9 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     [RelayCommand]
     private async Task StopAsync()
     {
+        _scrubRefreshPending = false;
+        CancelScrubCompetingWork();
+        _seekCoordinator.CancelPending();
         _forceNextCombatantRefresh = true;
         _forceNextEventWindowRefresh = true;
         var frame = await _controller.StopAsync().ConfigureAwait(true);
@@ -646,23 +657,46 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         ApplyFrame(_controller.CurrentFrame, _controller.State);
     }
 
-    private async Task SeekCoreAsync(long positionMilliseconds)
-    {
-        try
+    private async ValueTask SeekCoreAsync(long positionMilliseconds, CancellationToken cancellationToken)
+        => await _controller.SeekCoalescedAsync(positionMilliseconds, cancellationToken).ConfigureAwait(false);
+
+    private void ReportSeekError(Exception exception)
+        => Dispatcher.UIThread.Post(() =>
         {
-            IsLoading = true;
-            await _controller.SeekAsync(positionMilliseconds).ConfigureAwait(false);
-        }
-        catch (Exception ex)
+            if (!_isDisposed)
+                StatusText = exception.Message;
+        });
+
+    private void ReportSeekIdle()
+        => Dispatcher.UIThread.Post(() =>
         {
-            await Dispatcher.UIThread.InvokeAsync(() => StatusText = ex.Message);
-        }
-    }
+            if (_isDisposed)
+                return;
+
+            if (_seekCoordinator.IsBusy || _controller.IsLoading)
+            {
+                IsLoading = true;
+                return;
+            }
+
+            var refreshAfterScrub = _scrubRefreshPending;
+            _scrubRefreshPending = false;
+            IsLoading = false;
+            if (!refreshAfterScrub)
+                return;
+
+            _forceNextCombatantRefresh = true;
+            _forceNextEventWindowRefresh = true;
+            ApplyFrame(_controller.CurrentFrame, _controller.State);
+        });
 
     private async Task StepEventAsync(int direction)
     {
         try
         {
+            _scrubRefreshPending = false;
+            CancelScrubCompetingWork();
+            _seekCoordinator.CancelPending();
             _forceNextCombatantRefresh = true;
             _forceNextEventWindowRefresh = true;
             IsLoading = true;
@@ -723,11 +757,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (_isDisposed)
             return;
 
+        var scrubActive = _scrubRefreshPending || _seekCoordinator.IsBusy || _controller.IsLoading || state.IsLoading;
         _currentFrame = frame;
         var duration = frame.TimeRange.DurationMilliseconds;
         var previousDuration = DurationMilliseconds;
         var previousViewport = TimelineViewport;
-        var timelineViewportChanged = false;
+        var timelineViewportChanged = scrubActive ? false : _timelineProjectionPending;
+        if (!scrubActive)
+            _timelineProjectionPending = false;
         _isApplyingFrame = true;
         PositionMilliseconds = frame.PositionMilliseconds;
         if (Math.Abs(previousDuration - duration) > double.Epsilon)
@@ -744,15 +781,21 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (Math.Abs(Speed - state.Speed) > double.Epsilon)
             Speed = state.Speed;
         IsPlaying = state.IsPlaying;
-        IsLoading = state.IsLoading;
+        IsLoading = state.IsLoading || scrubActive;
 
-        var statusText = state.IsLoading
+        var statusText = scrubActive || state.IsLoading
             ? Localization["Playback_Status_Loading"]
             : state.IsPlaying
                 ? Localization["Playback_Status_Playing"]
                 : Localization["Playback_Status_Paused"];
         if (!string.Equals(StatusText, statusText, StringComparison.Ordinal))
             StatusText = statusText;
+
+        if (scrubActive)
+        {
+            GlobalTimeline = _globalTimeline;
+            return;
+        }
 
         var liveSegment = RefreshLivePresentationState();
         RefreshLiveTimelineData(liveSegment);
@@ -774,6 +817,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
             RequestCombatantDetail(frame);
         _lastCombatantRefreshTick = Environment.TickCount64;
         _forceNextCombatantRefresh = false;
+    }
+
+    private void CancelScrubCompetingWork()
+    {
+        _eventWindowRefreshQueued = false;
+        _eventWindowCancellation?.Cancel();
+        _detailRefreshQueued = false;
+        _detailCancellation?.Cancel();
     }
 
     internal static PlaybackTimelineViewport ResolveViewportAfterDurationChange(
@@ -1122,6 +1173,12 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (_isDisposed || combatantId <= 0)
             return;
 
+        if (_scrubRefreshPending || _seekCoordinator.IsBusy || _controller.IsLoading)
+        {
+            _detailRefreshQueued = true;
+            return;
+        }
+
         if (_detailRequestPending)
         {
             _detailRefreshQueued = true;
@@ -1135,7 +1192,14 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _detailRequestPending = true;
         _detailRefreshQueued = false;
         var generation = ++_detailRequestGeneration;
-        _detailTask = ProjectCombatantDetailAsync(frame.EncounterId, combatantId, frame.AppliedSegment.EndObservationOrdinalExclusive, generation, cancellation);
+        _detailTask = Task.Run(
+            () => ProjectCombatantDetailAsync(
+                frame.EncounterId,
+                combatantId,
+                frame.AppliedSegment.EndObservationOrdinalExclusive,
+                generation,
+                cancellation),
+            CancellationToken.None);
     }
 
     private async Task ProjectCombatantDetailAsync(Guid encounterId, int combatantId, long expectedEndObservationOrdinalExclusive, long generation, CancellationTokenSource cancellation)
@@ -1484,6 +1548,12 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         if (_isDisposed || index is null)
             return;
 
+        if (_scrubRefreshPending || _seekCoordinator.IsBusy || _controller.IsLoading)
+        {
+            _eventWindowRefreshQueued = true;
+            return;
+        }
+
         if (_eventWindowTask is not null)
         {
             _eventWindowRefreshQueued = true;
@@ -1499,14 +1569,16 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         var cancellation = new CancellationTokenSource();
         _eventWindowRefreshQueued = false;
         _eventWindowCancellation = cancellation;
-        _eventWindowTask = RefreshEventWindowAsync(
-            frame.PositionMilliseconds,
-            frame.AppliedSegment.EndObservationOrdinalExclusive,
-            EventSelection,
-            (long)start,
-            (long)end,
-            index,
-            cancellation);
+        _eventWindowTask = Task.Run(
+            () => RefreshEventWindowAsync(
+                frame.PositionMilliseconds,
+                frame.AppliedSegment.EndObservationOrdinalExclusive,
+                EventSelection,
+                (long)start,
+                (long)end,
+                index,
+                cancellation),
+            CancellationToken.None);
     }
 
     private async Task RefreshEventWindowAsync(
@@ -1838,6 +1910,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _liveRefreshCancellation?.Cancel();
         Localization.LanguageChanged -= OnLanguageChanged;
         _controller.FrameChanged -= OnFrameChanged;
+        await _seekCoordinator.DisposeAsync().ConfigureAwait(false);
         if (_detailTask is not null)
         {
             try

@@ -15,13 +15,34 @@ internal static class ScenePlaybackTimeline
         return durationMilliseconds > 0 ? Math.Min(positionMilliseconds, durationMilliseconds) : positionMilliseconds;
     }
 
-    public static ScenePlaybackTimeRange ResolveTimeRange(SceneJournalSegment segment, SceneCombatSnapshot snapshot)
+    public static ScenePlaybackTimeRange ResolveTimeRange(
+        SceneJournalSegment segment,
+        SceneCombatSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryResolveTimeRange(segment, snapshot, cancellationToken, out var timeRange))
+            cancellationToken.ThrowIfCancellationRequested();
+
+        return timeRange;
+    }
+
+    public static bool TryResolveTimeRange(
+        SceneJournalSegment segment,
+        SceneCombatSnapshot snapshot,
+        CancellationToken cancellationToken,
+        out ScenePlaybackTimeRange timeRange)
     {
         var end = 0L;
         var hasEntries = false;
         var cursor = segment.CreateCursor();
         while (true)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                timeRange = default;
+                return false;
+            }
+
             var result = segment.ReadEntries(cursor, DefaultReadBatchSize, entries =>
             {
                 for (var i = 0; i < entries.Count; i++)
@@ -38,22 +59,48 @@ internal static class ScenePlaybackTimeline
             cursor = result.Cursor;
         }
 
+        if (cancellationToken.IsCancellationRequested)
+        {
+            timeRange = default;
+            return false;
+        }
+
         if (hasEntries)
-            return new ScenePlaybackTimeRange(0, end, end, true);
+        {
+            timeRange = new ScenePlaybackTimeRange(0, end, end, true);
+            return true;
+        }
 
         if (snapshot.EncounterEndTime > 0)
         {
-            return new ScenePlaybackTimeRange(0, snapshot.EncounterEndTime, snapshot.EncounterEndTime, true);
+            timeRange = new ScenePlaybackTimeRange(0, snapshot.EncounterEndTime, snapshot.EncounterEndTime, true);
+            return true;
         }
 
-        return default;
+        timeRange = default;
+        return true;
     }
 
     public static ScenePlaybackTimeRange ExtendTimeRange(
         SceneJournalSegment segment,
         long startObservationOrdinal,
         ScenePlaybackTimeRange current,
-        SceneCombatSnapshot snapshot)
+        SceneCombatSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryExtendTimeRange(segment, startObservationOrdinal, current, snapshot, cancellationToken, out var timeRange))
+            cancellationToken.ThrowIfCancellationRequested();
+
+        return timeRange;
+    }
+
+    public static bool TryExtendTimeRange(
+        SceneJournalSegment segment,
+        long startObservationOrdinal,
+        ScenePlaybackTimeRange current,
+        SceneCombatSnapshot snapshot,
+        CancellationToken cancellationToken,
+        out ScenePlaybackTimeRange timeRange)
     {
         var endObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
         var scanStart = Math.Clamp(
@@ -61,7 +108,10 @@ internal static class ScenePlaybackTimeline
             segment.StartObservationOrdinal,
             endObservationOrdinalExclusive);
         if (scanStart >= endObservationOrdinalExclusive)
-            return current;
+        {
+            timeRange = current;
+            return true;
+        }
 
         var end = current.HasTiming ? current.EndOffsetMilliseconds : 0L;
         var hasEntries = false;
@@ -73,6 +123,12 @@ internal static class ScenePlaybackTimeline
         var cursor = scanSegment.CreateCursor();
         while (true)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                timeRange = default;
+                return false;
+            }
+
             var result = scanSegment.ReadEntries(cursor, DefaultReadBatchSize, entries =>
             {
                 for (var i = 0; i < entries.Count; i++)
@@ -88,13 +144,26 @@ internal static class ScenePlaybackTimeline
             cursor = result.Cursor;
         }
 
+        if (cancellationToken.IsCancellationRequested)
+        {
+            timeRange = default;
+            return false;
+        }
+
         if (hasEntries || current.HasTiming)
-            return new ScenePlaybackTimeRange(0, end, end, true);
+        {
+            timeRange = new ScenePlaybackTimeRange(0, end, end, true);
+            return true;
+        }
 
         if (snapshot.EncounterEndTime > 0)
-            return new ScenePlaybackTimeRange(0, snapshot.EncounterEndTime, snapshot.EncounterEndTime, true);
+        {
+            timeRange = new ScenePlaybackTimeRange(0, snapshot.EncounterEndTime, snapshot.EncounterEndTime, true);
+            return true;
+        }
 
-        return default;
+        timeRange = default;
+        return true;
     }
 
     public static long ResolveOffsetMilliseconds(ObservedEventEntry entry) => Math.Max(0, entry.ObservedAtMilliseconds);

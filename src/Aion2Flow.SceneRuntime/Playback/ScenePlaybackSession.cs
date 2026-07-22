@@ -49,37 +49,98 @@ public sealed class ScenePlaybackSession
         return result;
     }
 
-    public ScenePlaybackFrame Seek(long positionMilliseconds)
+    public ScenePlaybackFrame Seek(long positionMilliseconds) => Seek(positionMilliseconds, CancellationToken.None);
+
+    public ScenePlaybackFrame Seek(long positionMilliseconds, CancellationToken cancellationToken)
     {
-        var projector = CreateProjector();
-        _projector = projector;
-        return ApplyFrame(projector.AdvanceTo(positionMilliseconds, projector.Segment, projector.TimeRange));
+        if (TrySeek(positionMilliseconds, cancellationToken, out var frame))
+            return frame;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new InvalidOperationException("Playback seek did not produce a frame.");
     }
 
-    public ScenePlaybackFrame AdvanceTo(long positionMilliseconds)
+    internal bool TrySeek(long positionMilliseconds, CancellationToken cancellationToken, out ScenePlaybackFrame frame)
     {
-        var projector = _projector ??= CreateProjector();
-        if (positionMilliseconds < _positionMilliseconds)
-            return Seek(positionMilliseconds);
+        frame = null!;
+        if (!TryCreateProjector(cancellationToken, out var projector) ||
+            !projector.TryAdvanceTo(positionMilliseconds, projector.Segment, projector.TimeRange, cancellationToken, out frame) ||
+            cancellationToken.IsCancellationRequested)
+        {
+            frame = null!;
+            return false;
+        }
+
+        _projector = projector;
+        frame = ApplyFrame(frame);
+        return true;
+    }
+
+    public ScenePlaybackFrame AdvanceTo(long positionMilliseconds) => AdvanceTo(positionMilliseconds, CancellationToken.None);
+
+    public ScenePlaybackFrame AdvanceTo(long positionMilliseconds, CancellationToken cancellationToken)
+    {
+        if (TryAdvanceTo(positionMilliseconds, cancellationToken, out var frame))
+            return frame;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new InvalidOperationException("Playback advance did not produce a frame.");
+    }
+
+    internal bool TryAdvanceTo(long positionMilliseconds, CancellationToken cancellationToken, out ScenePlaybackFrame frame)
+    {
+        frame = null!;
+        var projector = _projector;
+        if (projector is null || positionMilliseconds < _positionMilliseconds)
+            return TrySeek(positionMilliseconds, cancellationToken, out frame);
 
         var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
-        var timeRange = ResolveTimeRange(segment, projector);
-        return ApplyFrame(projector.AdvanceTo(positionMilliseconds, segment, timeRange));
+        if (!TryResolveTimeRange(segment, projector, cancellationToken, out var timeRange) ||
+            !projector.TryAdvanceTo(positionMilliseconds, segment, timeRange, cancellationToken, out frame) ||
+            cancellationToken.IsCancellationRequested)
+        {
+            _projector = null;
+            frame = null!;
+            return false;
+        }
+
+        frame = ApplyFrame(frame);
+        return true;
     }
 
-    internal ScenePlaybackFrame SeekObservationOrdinal(long endObservationOrdinalExclusive)
+    internal bool TrySeekObservationOrdinal(long endObservationOrdinalExclusive, CancellationToken cancellationToken, out ScenePlaybackFrame frame)
     {
+        frame = null!;
         var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
         var target = Math.Clamp(endObservationOrdinalExclusive, segment.StartObservationOrdinal, segment.CurrentEndObservationOrdinalExclusive);
         var projector = _projector;
         if (projector is null || target < _nextLoadedObservationOrdinal)
         {
-            projector = CreateProjector();
-            _projector = projector;
+            if (!TryCreateProjector(cancellationToken, out var replacement) ||
+                !TryResolveTimeRange(segment, replacement, cancellationToken, out var replacementTimeRange) ||
+                !replacement.TryAdvanceToObservationOrdinal(target, segment, replacementTimeRange, cancellationToken, out frame) ||
+                cancellationToken.IsCancellationRequested)
+            {
+                frame = null!;
+                return false;
+            }
+
+            _projector = replacement;
+            frame = ApplyFrame(frame);
+            return true;
         }
 
-        var timeRange = ResolveTimeRange(segment, projector);
-        return ApplyFrame(projector.AdvanceToObservationOrdinal(target, segment, timeRange));
+        if (!TryResolveTimeRange(segment, projector, cancellationToken, out var timeRange) ||
+            !projector.TryAdvanceToObservationOrdinal(target, segment, timeRange, cancellationToken, out frame) ||
+            cancellationToken.IsCancellationRequested)
+        {
+            _projector = null;
+            frame = null!;
+            return false;
+        }
+
+        frame = ApplyFrame(frame);
+        return true;
     }
 
     private ScenePlaybackFrame ApplyFrame(ScenePlaybackFrame frame)
@@ -103,7 +164,7 @@ public sealed class ScenePlaybackSession
     internal ScenePlaybackCombatantDetail CreateCombatantDetail(int combatantId)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(combatantId);
-        var projector = _projector ??= CreateProjector();
+        var projector = GetOrRestoreProjector();
         return projector.CreateCombatantDetail(combatantId);
     }
 
@@ -113,31 +174,53 @@ public sealed class ScenePlaybackSession
         long endPositionMilliseconds,
         Span<ScenePlaybackEventMarker> destination)
     {
-        var projector = _projector ??= CreateProjector();
+        var projector = GetOrRestoreProjector();
         return projector.CopyLatestMaterializedEvents(scope, startPositionMilliseconds, endPositionMilliseconds, destination);
     }
 
-    private FrameProjector CreateProjector()
+    private FrameProjector GetOrRestoreProjector()
+    {
+        if (_projector is { } projector)
+            return projector;
+
+        _ = Seek(_positionMilliseconds);
+        return _projector!;
+    }
+
+    private bool TryCreateProjector(CancellationToken cancellationToken, out FrameProjector projector)
     {
         var segment = _source.CreateTimelineSegment().CreateBoundedSnapshot();
         var baseSnapshot = _source.CreateSnapshot();
-        var timeRange = ScenePlaybackTimeline.ResolveTimeRange(segment, baseSnapshot);
-        return new FrameProjector(_source.EncounterId, baseSnapshot.Kind, segment, timeRange);
+        if (!ScenePlaybackTimeline.TryResolveTimeRange(segment, baseSnapshot, cancellationToken, out var timeRange))
+        {
+            projector = null!;
+            return false;
+        }
+
+        projector = new FrameProjector(_source.EncounterId, baseSnapshot.Kind, segment, timeRange);
+        return true;
     }
 
-    private ScenePlaybackTimeRange ResolveTimeRange(SceneJournalSegment segment, FrameProjector projector)
+    private bool TryResolveTimeRange(
+        SceneJournalSegment segment,
+        FrameProjector projector,
+        CancellationToken cancellationToken,
+        out ScenePlaybackTimeRange timeRange)
     {
         if (_source.SourceKind != ScenePlaybackSourceKind.Live ||
             segment.CurrentEndObservationOrdinalExclusive == projector.TimeRangeEndObservationOrdinalExclusive)
         {
-            return projector.TimeRange;
+            timeRange = projector.TimeRange;
+            return !cancellationToken.IsCancellationRequested;
         }
 
-        return ScenePlaybackTimeline.ExtendTimeRange(
+        return ScenePlaybackTimeline.TryExtendTimeRange(
             segment,
             projector.TimeRangeEndObservationOrdinalExclusive,
             projector.TimeRange,
-            _source.CreateSnapshot());
+            _source.CreateSnapshot(),
+            cancellationToken,
+            out timeRange);
     }
 
     private sealed class FrameProjector
@@ -233,8 +316,14 @@ public sealed class ScenePlaybackSession
                 _appliedEndOrdinal,
                 destination);
 
-        public ScenePlaybackFrame AdvanceTo(long positionMilliseconds, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
+        public bool TryAdvanceTo(
+            long positionMilliseconds,
+            SceneJournalSegment segment,
+            ScenePlaybackTimeRange timeRange,
+            CancellationToken cancellationToken,
+            out ScenePlaybackFrame frame)
         {
+            frame = null!;
             _segment = segment;
             _timeRange = timeRange;
             TimeRangeEndObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
@@ -244,21 +333,36 @@ public sealed class ScenePlaybackSession
                 : _positionMilliseconds;
             if (_cursor.NextObservationOrdinal < _segment.StartObservationOrdinal)
                 _cursor = _segment.CreateCursor();
-            ApplyEntries();
-            return BuildFrame();
+            if (!ApplyEntries(cancellationToken) || cancellationToken.IsCancellationRequested)
+                return false;
+
+            frame = BuildFrame();
+            return true;
         }
 
-        public ScenePlaybackFrame AdvanceToObservationOrdinal(long endObservationOrdinalExclusive, SceneJournalSegment segment, ScenePlaybackTimeRange timeRange)
+        public bool TryAdvanceToObservationOrdinal(
+            long endObservationOrdinalExclusive,
+            SceneJournalSegment segment,
+            ScenePlaybackTimeRange timeRange,
+            CancellationToken cancellationToken,
+            out ScenePlaybackFrame frame)
         {
+            frame = null!;
             _segment = segment;
             _timeRange = timeRange;
             TimeRangeEndObservationOrdinalExclusive = segment.CurrentEndObservationOrdinalExclusive;
             var target = Math.Clamp(endObservationOrdinalExclusive, _segment.StartObservationOrdinal, _segment.CurrentEndObservationOrdinalExclusive);
             if (_cursor.NextObservationOrdinal < _segment.StartObservationOrdinal)
                 _cursor = _segment.CreateCursor();
-            ApplyEntriesToObservationOrdinal(target);
+            if (!ApplyEntriesToObservationOrdinal(target, cancellationToken) || cancellationToken.IsCancellationRequested)
+                return false;
+
             ResolvePositionAtObservationBoundary(target);
-            return BuildFrame();
+            if (cancellationToken.IsCancellationRequested)
+                return false;
+
+            frame = BuildFrame();
+            return true;
         }
 
         private ScenePlaybackFrame BuildFrame()
@@ -279,10 +383,12 @@ public sealed class ScenePlaybackSession
             };
         }
 
-        private void ApplyEntries()
+        private bool ApplyEntries(CancellationToken cancellationToken)
         {
             while (true)
             {
+                if (cancellationToken.IsCancellationRequested)
+                    return false;
                 if (_cursor.NextObservationOrdinal >= _segment.CurrentEndObservationOrdinalExclusive)
                     break;
 
@@ -309,13 +415,19 @@ public sealed class ScenePlaybackSession
                     break;
             }
 
+            if (cancellationToken.IsCancellationRequested)
+                return false;
+
             TryCompleteCurrentFlushAtSegmentEnd();
+            return !cancellationToken.IsCancellationRequested;
         }
 
-        private void ApplyEntriesToObservationOrdinal(long endObservationOrdinalExclusive)
+        private bool ApplyEntriesToObservationOrdinal(long endObservationOrdinalExclusive, CancellationToken cancellationToken)
         {
             while (_cursor.NextObservationOrdinal < endObservationOrdinalExclusive)
             {
+                if (cancellationToken.IsCancellationRequested)
+                    return false;
                 var stoppedAtTarget = false;
                 var appliedAny = false;
                 var result = _segment.ReadEntries(_cursor, ScenePlaybackTimeline.DefaultReadBatchSize, entries =>
@@ -339,7 +451,11 @@ public sealed class ScenePlaybackSession
                     break;
             }
 
+            if (cancellationToken.IsCancellationRequested)
+                return false;
+
             TryCompleteCurrentFlushAtSegmentEnd();
+            return !cancellationToken.IsCancellationRequested;
         }
 
         private void ResolvePositionAtObservationBoundary(long endObservationOrdinalExclusive)

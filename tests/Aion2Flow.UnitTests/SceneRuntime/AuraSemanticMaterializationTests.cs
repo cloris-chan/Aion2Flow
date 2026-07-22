@@ -114,7 +114,7 @@ public sealed class AuraSemanticMaterializationTests
         Assert.Equal(liveState.Semantics, restoredState.Semantics);
 
         var segment = owner.CreateLiveTimelineSegment();
-        var frame = new ScenePlaybackSession(new TestPlaybackSource(sceneSessionId, segment)).Seek(500);
+        var frame = new ScenePlaybackSession(new TestPlaybackSource(sceneSessionId, segment)).Seek(500, TestContext.Current.CancellationToken);
         var playbackState = Assert.Single(frame.ActiveAuras);
         Assert.Equal(liveState.Semantics, playbackState.Semantics);
 
@@ -175,10 +175,10 @@ public sealed class AuraSemanticMaterializationTests
 
         var segment = owner.CreateLiveTimelineSegment();
         var playback = new ScenePlaybackSession(new TestPlaybackSource(sceneSessionId, segment));
-        var beforeResult = Assert.Single(playback.Seek(499).ActiveAuras);
+        var beforeResult = Assert.Single(playback.Seek(499, TestContext.Current.CancellationToken).ActiveAuras);
         Assert.Equal(openResourceEffectRefRaw, beforeResult.ResourceEffectRef.RawId);
         Assert.Equal(AuraDisposition.Buff, beforeResult.Semantics.Disposition);
-        Assert.Empty(playback.Seek(500).ActiveAuras);
+        Assert.Empty(playback.Seek(500, TestContext.Current.CancellationToken).ActiveAuras);
 
         var markers = ScenePlaybackTrackIndex.Build(segment, TestContext.Current.CancellationToken)
             .ReadWindow(0, 500, segment.CurrentEndObservationOrdinalExclusive, 10)

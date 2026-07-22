@@ -119,7 +119,7 @@ public sealed class ResourceOnlyProjectionTests
 
         var payload = owner.CreateArchivePayload(snapshot);
         var playback = new ScenePlaybackSession(new TestPlaybackSource(owner.EncounterId, payload.TimelineSegment, snapshot));
-        var frame = playback.Seek(100);
+        var frame = playback.Seek(100, TestContext.Current.CancellationToken);
         var playbackDetail = playback.CreateCombatantDetail(targetId);
 
         Assert.True(frame.Snapshot.Combatants.ContainsKey(sourceId));

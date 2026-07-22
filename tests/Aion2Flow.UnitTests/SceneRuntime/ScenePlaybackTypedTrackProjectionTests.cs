@@ -38,7 +38,7 @@ public sealed class ScenePlaybackTypedTrackProjectionTests
             .Where(static marker => marker.ObservationOrdinal == 0)
             .Select(static marker => marker.Track)
             .ToArray();
-        var frame = new ScenePlaybackSession(new TestPlaybackSource(sceneId, segment, snapshot)).Seek(100);
+        var frame = new ScenePlaybackSession(new TestPlaybackSource(sceneId, segment, snapshot)).Seek(100, TestContext.Current.CancellationToken);
 
         Assert.Equal([ScenePlaybackTrack.Resource], observationTracks);
         Assert.DoesNotContain(
@@ -76,7 +76,7 @@ public sealed class ScenePlaybackTypedTrackProjectionTests
             .Where(static marker => marker.ObservationOrdinal == 0)
             .Select(static marker => marker.Track)
             .ToArray();
-        var frame = new ScenePlaybackSession(new TestPlaybackSource(sceneId, segment, snapshot)).Seek(100);
+        var frame = new ScenePlaybackSession(new TestPlaybackSource(sceneId, segment, snapshot)).Seek(100, TestContext.Current.CancellationToken);
 
         Assert.Equal([ScenePlaybackTrack.Mechanic], observationTracks);
         Assert.Contains(frame.Tracks, static track => track.Track == ScenePlaybackTrack.Mechanic && track.Count == 1);

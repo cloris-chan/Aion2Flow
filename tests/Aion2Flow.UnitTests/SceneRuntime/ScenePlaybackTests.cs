@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
@@ -8,6 +9,7 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
+using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
@@ -213,7 +215,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_500);
+        var frame = session.Seek(1_500, TestContext.Current.CancellationToken);
 
         Assert.Equal(1_500, frame.PositionMilliseconds);
         Assert.Equal(300, frame.CombatTotals.TotalDamage);
@@ -230,8 +232,8 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var first = session.Seek(1_500);
-        var second = session.AdvanceTo(2_500);
+        var first = session.Seek(1_500, TestContext.Current.CancellationToken);
+        var second = session.AdvanceTo(2_500, TestContext.Current.CancellationToken);
 
         Assert.Equal(300, first.CombatTotals.TotalDamage);
         Assert.Equal(600, second.CombatTotals.TotalDamage);
@@ -276,11 +278,11 @@ public sealed class ScenePlaybackTests
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
         var targetSession = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        session.Seek(1_500);
+        session.Seek(1_500, TestContext.Current.CancellationToken);
         var midpoint = session.CreateCombatantDetail(100);
-        session.AdvanceTo(2_500);
+        session.AdvanceTo(2_500, TestContext.Current.CancellationToken);
         var completed = session.CreateCombatantDetail(100);
-        targetSession.Seek(1_500);
+        targetSession.Seek(1_500, TestContext.Current.CancellationToken);
         var target = targetSession.CreateCombatantDetail(200);
 
         Assert.Equal(1_500, midpoint.PositionMilliseconds);
@@ -309,7 +311,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_500);
+        var frame = session.Seek(1_500, TestContext.Current.CancellationToken);
         var projection = session.CreateCombatantDetail(combatantId);
 
         Assert.True(frame.Snapshot.Combatants.TryGetValue(combatantId, out var metrics));
@@ -336,7 +338,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        session.Seek(1_200);
+        session.Seek(1_200, TestContext.Current.CancellationToken);
         var projection = session.CreateCombatantDetail(sourceId);
 
         Assert.True(projection.Update.IsFullSnapshot);
@@ -380,7 +382,7 @@ public sealed class ScenePlaybackTests
         }, 3, 1_400, opcode: 0x0538);
         journal.CompleteFlush(1);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
-        session.Seek(1_500);
+        session.Seek(1_500, TestContext.Current.CancellationToken);
 
         var all = ReadMaterializedEvents(session, ScenePlaybackEventScope.All, 0, 1_500);
         var outgoing = ReadMaterializedEvents(session, ScenePlaybackEventScope.ForRelation(sourceId, ScenePlaybackEventRelation.Outgoing), 0, 1_500);
@@ -432,7 +434,7 @@ public sealed class ScenePlaybackTests
         journal.CompleteFlush(1);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
 
-        session.Seek(1_000);
+        session.Seek(1_000, TestContext.Current.CancellationToken);
         var rebuilt = ReadMaterializedEvents(session, ScenePlaybackEventScope.All, 0, 1_300);
 
         Assert.Equal(
@@ -443,7 +445,7 @@ public sealed class ScenePlaybackTests
             ],
             rebuilt.Select(static marker => (marker.Id.Kind, marker.PositionMilliseconds)).ToArray());
 
-        session.AdvanceTo(1_300);
+        session.AdvanceTo(1_300, TestContext.Current.CancellationToken);
         var refreshed = ReadMaterializedEvents(session, ScenePlaybackEventScope.All, 0, 1_300);
 
         Assert.Equal(
@@ -477,7 +479,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_200);
+        var frame = session.Seek(1_200, TestContext.Current.CancellationToken);
         var appliedMarkers = ReadAppliedMarkers(record, frame);
         var combatMarkers = appliedMarkers.Where(static marker => marker.Track == ScenePlaybackTrack.Combat).ToArray();
         var mechanicMarkers = appliedMarkers.Where(static marker => marker.Track == ScenePlaybackTrack.Mechanic).ToArray();
@@ -514,7 +516,7 @@ public sealed class ScenePlaybackTests
         };
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_500);
+        var frame = session.Seek(1_500, TestContext.Current.CancellationToken);
 
         var vital = Assert.Single(frame.EntityVitals);
         Assert.Equal(30_000, vital.CurrentHp);
@@ -542,7 +544,7 @@ public sealed class ScenePlaybackTests
         };
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_000);
+        var frame = session.Seek(1_000, TestContext.Current.CancellationToken);
 
         var vital = Assert.Single(frame.EntityVitals);
         Assert.Equal(50_000, vital.CurrentHp);
@@ -558,7 +560,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord();
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_500);
+        var frame = session.Seek(1_500, TestContext.Current.CancellationToken);
 
         var combat = Assert.Single(frame.Tracks, static track => track.Track == ScenePlaybackTrack.Combat);
         var entityVital = Assert.Single(frame.Tracks, static track => track.Track == ScenePlaybackTrack.EntityVital);
@@ -581,8 +583,8 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var afterRemove = session.Seek(1_800);
-        var beforeRemove = session.Seek(1_799);
+        var afterRemove = session.Seek(1_800, TestContext.Current.CancellationToken);
+        var beforeRemove = session.Seek(1_799, TestContext.Current.CancellationToken);
 
         Assert.Empty(afterRemove.ActiveAuras);
         Assert.Single(beforeRemove.ActiveAuras);
@@ -602,9 +604,9 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var beforeOriginalExpiry = session.Seek(999);
-        var afterOriginalExpiry = session.Seek(1_799);
-        var afterRenewedExpiry = session.Seek(1_800);
+        var beforeOriginalExpiry = session.Seek(999, TestContext.Current.CancellationToken);
+        var afterOriginalExpiry = session.Seek(1_799, TestContext.Current.CancellationToken);
+        var afterRenewedExpiry = session.Seek(1_800, TestContext.Current.CancellationToken);
 
         Assert.Single(beforeOriginalExpiry.ActiveAuras);
         Assert.Single(afterOriginalExpiry.ActiveAuras);
@@ -622,8 +624,8 @@ public sealed class ScenePlaybackTests
         AppendCombat(journal, sceneId, 100, 200, 1, 4, 2_500);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
 
-        var expired = session.Seek(1_000);
-        var renewed = session.AdvanceTo(1_200);
+        var expired = session.Seek(1_000, TestContext.Current.CancellationToken);
+        var renewed = session.AdvanceTo(1_200, TestContext.Current.CancellationToken);
 
         Assert.Empty(expired.ActiveAuras);
         Assert.Single(renewed.ActiveAuras);
@@ -741,7 +743,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(250);
+        var frame = session.Seek(250, TestContext.Current.CancellationToken);
         var timeline = ScenePlaybackAuraTimelineReader.Read(record.ScenePayload.TimelineSegment, 200, 1_000, TestContext.Current.CancellationToken);
         var segment = record.ScenePayload.TimelineSegment;
         var markers = ScenePlaybackTrackIndex.Build(segment, TestContext.Current.CancellationToken)
@@ -773,7 +775,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(200);
+        var frame = session.Seek(200, TestContext.Current.CancellationToken);
         var timeline = ScenePlaybackAuraTimelineReader.Read(record.ScenePayload.TimelineSegment, 200, 1_000, TestContext.Current.CancellationToken);
 
         Assert.Empty(frame.ActiveAuras);
@@ -794,7 +796,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(1_000);
+        var frame = session.Seek(1_000, TestContext.Current.CancellationToken);
 
         Assert.Empty(frame.ActiveAuras);
         var results = ReadAppliedMarkers(record, frame).Where(static marker => marker.LifecycleEventKind == AuraLifecycleEventKind.Result).ToArray();
@@ -837,7 +839,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(500);
+        var frame = session.Seek(500, TestContext.Current.CancellationToken);
 
         var aura = Assert.Single(frame.ActiveAuras);
         Assert.Equal(1_500, aura.ExpiresAtMilliseconds);
@@ -854,7 +856,7 @@ public sealed class ScenePlaybackTests
         var record = CreateArchiveRecord(journal, sceneId);
         var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
 
-        var frame = session.Seek(500);
+        var frame = session.Seek(500, TestContext.Current.CancellationToken);
 
         var aura = Assert.Single(frame.ActiveAuras);
         Assert.Equal(1_000, aura.ExpiresAtMilliseconds);
@@ -1270,6 +1272,136 @@ public sealed class ScenePlaybackTests
     }
 
     [Fact]
+    public async Task Controller_SeekAsync_SupersededGateWaitersCompleteBeforeActiveSeek()
+    {
+        using var source = new BlockingPlaybackSource(CreateArchiveRecordWithLongCombatTimeline());
+        await using var controller = new ScenePlaybackController(source, new ManualTickSourceFactory(), TimeSpan.FromMilliseconds(33));
+        var cancellationToken = TestContext.Current.CancellationToken;
+        source.BlockNextTimelineRead();
+
+        var active = controller.SeekAsync(500, cancellationToken).AsTask();
+        try
+        {
+            Assert.True(source.WaitUntilBlocked(TimeSpan.FromSeconds(2)));
+
+            var supersededWaiters = new Task<ScenePlaybackFrame>[64];
+            for (var i = 0; i < supersededWaiters.Length; i++)
+                supersededWaiters[i] = controller.SeekAsync(1_000 + i % 3 * 500, cancellationToken).AsTask();
+            var final = controller.SeekAsync(2_500, cancellationToken).AsTask();
+
+            await Task.WhenAll(supersededWaiters).WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+            Assert.False(active.IsCompleted);
+            Assert.False(final.IsCompleted);
+
+            source.ReleaseBlockedRead();
+            _ = await active;
+            var frame = await final;
+
+            Assert.Equal(2_500, frame.PositionMilliseconds);
+            Assert.Equal(2_500, controller.PositionMilliseconds);
+        }
+        finally
+        {
+            source.ReleaseBlockedRead();
+        }
+    }
+
+    [Fact]
+    public async Task Controller_CoalescedSeek_RapidReplacementDoesNotThrowCancellationAndLatestWins()
+    {
+        using var source = new BlockingPlaybackSource(CreateArchiveRecordWithLongCombatTimeline());
+        await using var controller = new ScenePlaybackController(source, new ManualTickSourceFactory(), TimeSpan.FromMilliseconds(33));
+        var errors = new ConcurrentQueue<Exception>();
+        var becameIdle = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var coordinator = new PlaybackSeekCoordinator(async (positionMilliseconds, supersessionToken) =>
+        {
+            await controller.SeekCoalescedAsync(positionMilliseconds, supersessionToken);
+        }, errors.Enqueue, () => becameIdle.TrySetResult(true));
+        source.BlockNextTimelineRead();
+        coordinator.Request(500);
+
+        try
+        {
+            Assert.True(source.WaitUntilBlocked(TimeSpan.FromSeconds(2)));
+            var firstChanceCancellationCount = 0;
+            EventHandler<FirstChanceExceptionEventArgs> firstChanceHandler = (_, args) =>
+            {
+                if (args.Exception is OperationCanceledException)
+                    Interlocked.Increment(ref firstChanceCancellationCount);
+            };
+            AppDomain.CurrentDomain.FirstChanceException += firstChanceHandler;
+            try
+            {
+                coordinator.Request(1_000);
+                coordinator.Request(1_500);
+                coordinator.Request(2_000);
+                coordinator.Request(2_500);
+                source.ReleaseBlockedRead();
+
+                await becameIdle.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+            }
+            finally
+            {
+                AppDomain.CurrentDomain.FirstChanceException -= firstChanceHandler;
+            }
+
+            Assert.Equal(0, Volatile.Read(ref firstChanceCancellationCount));
+            Assert.Empty(errors);
+            Assert.False(coordinator.IsBusy);
+            Assert.False(controller.IsLoading);
+            Assert.Equal(2_500, controller.PositionMilliseconds);
+        }
+        finally
+        {
+            source.ReleaseBlockedRead();
+        }
+    }
+
+    [Fact]
+    public async Task Controller_SeekAsync_CallerCancellationPropagatesAndControllerRemainsReusable()
+    {
+        using var source = new BlockingPlaybackSource(CreateArchiveRecordWithLongCombatTimeline());
+        await using var controller = new ScenePlaybackController(source, new ManualTickSourceFactory(), TimeSpan.FromMilliseconds(33));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        source.BlockNextTimelineRead();
+
+        var canceledSeek = controller.SeekAsync(2_500, cancellation.Token).AsTask();
+        try
+        {
+            Assert.True(source.WaitUntilBlocked(TimeSpan.FromSeconds(2)));
+            cancellation.Cancel();
+            source.ReleaseBlockedRead();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await canceledSeek);
+
+            var frame = await controller.SeekAsync(1_500, TestContext.Current.CancellationToken);
+            Assert.Equal(1_500, frame.PositionMilliseconds);
+            Assert.Equal(1_500, controller.PositionMilliseconds);
+        }
+        finally
+        {
+            source.ReleaseBlockedRead();
+        }
+    }
+
+    [Fact]
+    public void Session_CanceledForwardAdvance_DiscardsPartialProjectionAndRemainsReusable()
+    {
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord()));
+        var initial = session.Seek(500, TestContext.Current.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.ThrowsAny<OperationCanceledException>(() => session.AdvanceTo(2_000, cancellation.Token));
+        Assert.Equal(initial.PositionMilliseconds, session.PositionMilliseconds);
+
+        var recovered = session.AdvanceTo(1_000, TestContext.Current.CancellationToken);
+        Assert.Equal(1_000, recovered.PositionMilliseconds);
+        Assert.Equal(100, recovered.CombatTotals.TotalDamage);
+        Assert.Equal(1_000, session.PositionMilliseconds);
+    }
+
+    [Fact]
     public async Task Controller_ManualSeekWinsOverPlaybackTick()
     {
         var tickFactory = new ManualTickSourceFactory();
@@ -1600,6 +1732,62 @@ public sealed class ScenePlaybackTests
         {
             _channel.Writer.TryComplete();
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class BlockingPlaybackSource(ArchivedEncounterRecord record) : IScenePlaybackSource
+    {
+        private readonly ArchivedScenePlaybackSource _inner = new(record);
+        private readonly ManualResetEventSlim _blocked = new();
+        private readonly ManualResetEventSlim _release = new();
+        private int _blockNextTimelineRead;
+        private int _isDisposed;
+
+        public Guid EncounterId => _inner.EncounterId;
+
+        public DateTimeOffset SceneStarted => _inner.SceneStarted;
+
+        public ScenePlaybackSourceKind SourceKind => _inner.SourceKind;
+
+        public void BlockNextTimelineRead()
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _isDisposed) != 0, this);
+            _blocked.Reset();
+            _release.Reset();
+            Volatile.Write(ref _blockNextTimelineRead, 1);
+        }
+
+        public bool WaitUntilBlocked(TimeSpan timeout) => _blocked.Wait(timeout);
+
+        public void ReleaseBlockedRead() => _release.Set();
+
+        public SceneJournalSegment CreateTimelineSegment()
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _isDisposed) != 0, this);
+            if (Interlocked.Exchange(ref _blockNextTimelineRead, 0) != 0)
+            {
+                _blocked.Set();
+                _release.Wait();
+            }
+
+            return _inner.CreateTimelineSegment();
+        }
+
+        public SceneCombatSnapshot CreateSnapshot()
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _isDisposed) != 0, this);
+            return _inner.CreateSnapshot();
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _isDisposed, 1) != 0)
+                return;
+
+            _release.Set();
+            _inner.Dispose();
+            _blocked.Dispose();
+            _release.Dispose();
         }
     }
 }
