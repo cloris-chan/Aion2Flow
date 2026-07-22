@@ -21,4 +21,6 @@ public static class ReplayScenarioCatalog
     public const string CurrentPartyStatusRelation = "aion2flow.stream.20260712211428.log";
     public const string CurrentTenPlayerForceRoster = "aion2flow.stream.20260715000443.log";
     public const string CurrentTenPlayerForceStatus = "aion2flow.stream.20260715002239.log";
+    public const string CurrentOwnedEntityHeaderLayout = "aion2flow.stream.20260722171214.log";
+    public const string CurrentOwnedEntityLayouts = "aion2flow.stream.20260722171240.log";
 }

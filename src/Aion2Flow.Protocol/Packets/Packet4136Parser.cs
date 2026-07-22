@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
@@ -39,8 +40,8 @@ internal static class Packet4136Parser
         int? currentHp = null;
         int? maxHp = null;
         int? ownerId = null;
-        if (TryReadSummonCreateNpcCode(packet, tailStart, mode0, mode1, mode2, out var summonNpcCode) &&
-            TryExtractSummonOwnerId(packet, entityId, out var parsedOwnerId))
+        if (TryReadSummonCreateNpcCode(packet, tailStart, mode0, mode1, mode2, out var summonNpcCode, out var ownerSearchOffset) &&
+            TryExtractSummonOwnerId(packet, entityId, ownerSearchOffset, out var parsedOwnerId))
         {
             npcCode = summonNpcCode;
             ownerId = parsedOwnerId;
@@ -76,45 +77,83 @@ internal static class Packet4136Parser
         return PacketNpcStateFields.StateHpPairOffsetFromNpcCodeStart;
     }
 
-    private static bool TryReadSummonCreateNpcCode(ReadOnlySpan<byte> packet, int tailStart, byte mode0, byte mode1, byte mode2, out int npcCode)
+    private static bool TryReadSummonCreateNpcCode(
+        ReadOnlySpan<byte> packet,
+        int tailStart,
+        byte mode0,
+        byte mode1,
+        byte mode2,
+        out int npcCode,
+        out int ownerSearchOffset)
     {
         npcCode = 0;
+        ownerSearchOffset = 0;
 
-        if (mode0 != 0x5f)
+        if (mode2 == 0x00 &&
+            ((mode0 == 0x5f && mode1 == 0x10) ||
+             (mode0 == 0x1d && mode1 == 0x10) ||
+             (mode0 == 0x1f && mode1 is 0x00 or 0x10)))
+        {
+            return TryReadSummonNpcCodeAt(packet, tailStart + NpcCodeOffsetFromModes, out npcCode, out ownerSearchOffset);
+        }
+
+        if (mode0 == 0x5f && mode1 == 0x00 && mode2 == 0x01)
+        {
+            return TryReadSummonNpcCodeAt(packet, tailStart + SummonCreateNpcCodeOffsetFromModes, out npcCode, out ownerSearchOffset);
+        }
+
+        if (mode0 != 0x1f || mode1 != 0x00 || mode2 != 0x01)
         {
             return false;
         }
 
-        if (mode1 == 0x00 && mode2 == 0x01)
+        var nameReader = new PacketSpanReader(packet[(tailStart + NpcCodeOffsetFromModes)..]);
+        if (!nameReader.TryReadVarInt(out var nameByteLength) || !nameReader.TryAdvance(nameByteLength))
         {
-            return PacketNpcStateFields.TryReadNpcCatalogCode(packet, tailStart + SummonCreateNpcCodeOffsetFromModes, out npcCode);
+            return false;
         }
 
-        return mode1 == 0x10 &&
-               mode2 == 0x00 &&
-               PacketNpcStateFields.TryReadNpcCatalogCode(packet, tailStart + NpcCodeOffsetFromModes, out npcCode);
+        return TryReadSummonNpcCodeAt(
+            packet,
+            tailStart + NpcCodeOffsetFromModes + nameReader.Offset,
+            out npcCode,
+            out ownerSearchOffset);
     }
 
-    private static bool TryExtractSummonOwnerId(ReadOnlySpan<byte> packet, int entityId, out int ownerId)
+    private static bool TryReadSummonNpcCodeAt(ReadOnlySpan<byte> packet, int npcCodeOffset, out int npcCode, out int ownerSearchOffset)
+    {
+        ownerSearchOffset = npcCodeOffset + sizeof(int);
+        return PacketNpcStateFields.TryReadNpcCatalogCode(packet, npcCodeOffset, out npcCode);
+    }
+
+    private static bool TryExtractSummonOwnerId(ReadOnlySpan<byte> packet, int entityId, int ownerSearchOffset, out int ownerId)
     {
         ownerId = 0;
-
-        var sentinelOffset = packet.IndexOf(OwnerSectionSentinel);
-        if (sentinelOffset < 0)
+        if ((uint)ownerSearchOffset > (uint)packet.Length)
         {
             return false;
         }
 
-        var afterSentinel = packet[(sentinelOffset + OwnerSectionSentinel.Length)..];
-        if (TryExtractOwnerIdFromHeader(afterSentinel, entityId, out ownerId))
+        var ownerTail = packet[ownerSearchOffset..];
+        var sentinelOffset = ownerTail.IndexOf(OwnerSectionSentinel);
+        ReadOnlySpan<byte> ownerSection;
+        if (sentinelOffset >= 0)
         {
-            return true;
+            ownerSection = ownerTail[(sentinelOffset + OwnerSectionSentinel.Length)..];
+            if (TryExtractOwnerIdFromHeader(ownerSection, entityId, out ownerId))
+            {
+                return true;
+            }
+        }
+        else
+        {
+            ownerSection = ownerTail;
         }
 
-        var ownerMarkerOffset = afterSentinel.LastIndexOf(OwnerOpcodeMarker);
+        var ownerMarkerOffset = ownerSection.LastIndexOf(OwnerOpcodeMarker);
         if (ownerMarkerOffset < 0)
         {
-            ownerMarkerOffset = afterSentinel.LastIndexOf(OwnerOpcodeMarkerAlt);
+            ownerMarkerOffset = ownerSection.LastIndexOf(OwnerOpcodeMarkerAlt);
         }
 
         if (ownerMarkerOffset < 0)
@@ -122,16 +161,12 @@ internal static class Packet4136Parser
             return false;
         }
 
-        var ownerOffset = sentinelOffset + OwnerSectionSentinel.Length + ownerMarkerOffset + OwnerOpcodeMarker.Length;
-        if (ownerOffset < 0 || ownerOffset + sizeof(int) > packet.Length)
+        var ownerOffset = ownerMarkerOffset + OwnerOpcodeMarker.Length;
+        if (!BinaryPrimitives.TryReadInt32LittleEndian(ownerSection[ownerOffset..], out ownerId))
         {
             return false;
         }
 
-        ownerId = packet[ownerOffset]
-            | (packet[ownerOffset + 1] << 8)
-            | (packet[ownerOffset + 2] << 16)
-            | (packet[ownerOffset + 3] << 24);
         return ownerId > 0 && ownerId != entityId;
     }
 

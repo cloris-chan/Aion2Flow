@@ -132,9 +132,81 @@ public sealed class PacketLogReplayServiceTests
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerTargetCanonicalizationEdge}"));
 
-        var ownerRows = AssertOwnerTargetCandidateRows(replay, expectedCount: 127);
+        var ownerRows = AssertOwnerTargetCandidateRows(replay, expectedCount: 236);
         AssertDirectSemanticHealsPassOwnerPostParseGate(replay);
         Assert.All(ownerRows, static row => Assert.Equal((ushort)0x0438, row.Raw.Opcode));
+    }
+
+    [Fact]
+    public void Replay_20260722171214_And_171240_Attributes_Current4136_OwnedEntityLayouts()
+    {
+        SetResources();
+
+        var headerReplay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnedEntityHeaderLayout}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnedEntityLayouts}"));
+
+        AssertOwnedEntity(headerReplay, entityId: 30_471, ownerId: 15_233);
+
+        var ownedEntities = replay.SceneOwner.Entities.Entities.Values
+            .Where(static entity => entity.OwnerKind == EntityOwnerKind.Summon && entity.OwnerEntityId is > 0)
+            .ToArray();
+        Assert.Equal(51, ownedEntities.Length);
+
+        AssertOwnedEntities(
+            replay,
+            ownerId: 1_073,
+            17_712,
+            20_681,
+            21_430,
+            22_310,
+            22_547,
+            23_096,
+            23_394,
+            25_157,
+            26_638,
+            27_643,
+            28_960,
+            30_181,
+            30_805,
+            31_000,
+            31_139,
+            32_835,
+            33_493);
+        AssertOwnedEntities(
+            replay,
+            ownerId: 15_233,
+            18_424,
+            24_860,
+            25_106,
+            26_354,
+            26_991,
+            27_511,
+            28_300,
+            28_800,
+            29_414,
+            29_941,
+            30_249,
+            30_269,
+            32_331,
+            35_882,
+            36_258,
+            40_094,
+            40_099,
+            41_142,
+            41_882,
+            41_990,
+            42_395);
+        AssertOwnedEntities(replay, ownerId: 10_060, 22_542, 26_695, 30_009, 33_064, 37_896);
+        AssertOwnedEntities(replay, ownerId: 14_604, 32_155, 32_846);
+        AssertOwnedEntities(replay, ownerId: 16_199, 17_437, 26_156);
+        AssertOwnedEntities(replay, ownerId: 3_386, 22_438, 24_700, 29_142, 32_146);
+
+        AssertUnownedPlayer(replay, entityId: 1_073);
+        AssertUnownedPlayer(replay, entityId: 3_386);
+        AssertUnownedPlayer(replay, entityId: 10_060);
+        AssertUnownedPlayer(replay, entityId: 14_604);
+        AssertUnownedPlayer(replay, entityId: 16_199);
+        AssertUnownedPlayer(replay, entityId: 15_233);
     }
 
     [Fact]
@@ -784,6 +856,29 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(nickname, metadata.Nickname);
         Assert.Equal(characterClass, metadata.CharacterClass);
         Assert.Equal(faction, metadata.Faction);
+    }
+
+    private static void AssertOwnedEntity(PacketLogReplayResult replay, int entityId, int ownerId)
+    {
+        Assert.True(replay.SceneOwner.Entities.TryGet(entityId, out var entity), $"missing owned entity {entityId}");
+        Assert.Equal(EntityOwnerKind.Summon, entity.OwnerKind);
+        Assert.Equal(ownerId, entity.OwnerEntityId);
+        Assert.Equal(NpcKind.Summon, entity.Kind);
+        Assert.DoesNotContain(entityId, replay.Snapshot.Combatants.Keys);
+    }
+
+    private static void AssertOwnedEntities(PacketLogReplayResult replay, int ownerId, params int[] entityIds)
+    {
+        foreach (var entityId in entityIds)
+            AssertOwnedEntity(replay, entityId, ownerId);
+    }
+
+    private static void AssertUnownedPlayer(PacketLogReplayResult replay, int entityId)
+    {
+        Assert.True(replay.SceneOwner.Entities.TryGet(entityId, out var entity), $"missing player entity {entityId}");
+        Assert.Equal(EntityOwnerKind.None, entity.OwnerKind);
+        Assert.Null(entity.OwnerEntityId);
+        Assert.Contains(entityId, replay.Snapshot.Combatants.Keys);
     }
 
     private static void AssertForceRosterProfile(IReadOnlyList<ReplayJournalEntrySnapshot> entries, string nickname, int originServerId, byte memberSlotIndex)
