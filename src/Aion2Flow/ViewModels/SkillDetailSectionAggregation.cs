@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 
@@ -7,6 +8,7 @@ internal sealed class SkillDetailSectionAggregation
 {
     public readonly Dictionary<CombatEventKey, SkillMetrics> SkillMetrics = [];
     public readonly Dictionary<CombatEventKey, int> EventCounts = [];
+    public readonly Dictionary<CombatEventKey, DamageSampleStatistics> DamageSamples = [];
     private readonly HashSet<CombatDetailOccurrenceKey> _occurrences = [];
 
     public bool HasSubsetFilter;
@@ -17,6 +19,7 @@ internal sealed class SkillDetailSectionAggregation
     {
         SkillMetrics.Clear();
         EventCounts.Clear();
+        DamageSamples.Clear();
         _occurrences.Clear();
         HasSubsetFilter = hasSubsetFilter;
         FirstObserved = long.MaxValue;
@@ -43,6 +46,40 @@ internal sealed class SkillDetailSectionAggregation
             fact.EventKey,
             out _);
         eventCount++;
+    }
+
+    public void AddDamageSample(CombatEventKey eventKey, long amount)
+    {
+        if (amount <= 0)
+            return;
+
+        ref var samples = ref CollectionsMarshal.GetValueRefOrAddDefault(DamageSamples, eventKey, out _);
+        samples.Add(amount);
+    }
+}
+
+internal struct DamageSampleStatistics
+{
+    public long Total { get; private set; }
+    public long Minimum { get; private set; }
+    public long Maximum { get; private set; }
+    public int Count { get; private set; }
+
+    public void Add(long amount)
+    {
+        if (Count == 0)
+        {
+            Minimum = amount;
+            Maximum = amount;
+        }
+        else
+        {
+            Minimum = Math.Min(Minimum, amount);
+            Maximum = Math.Max(Maximum, amount);
+        }
+
+        Total += amount;
+        Count++;
     }
 }
 

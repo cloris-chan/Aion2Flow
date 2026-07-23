@@ -94,6 +94,36 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SelectBattleCombatant_Computes_PerDamage_Statistics_From_Filtered_Contributions()
+    {
+        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+
+        using var scene = new SceneTestHarness();
+        var language = new LanguageService();
+        using var localization = new LocalizationService(language);
+        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+
+        const int playerId = 1001;
+        const int bossId = 9001;
+        const int addId = 9002;
+
+        scene.AppendNickname(playerId, "Perigee");
+        ApplyContribution(scene.Owner, playerId, bossId, 11000010, 100, 1_000, CombatMetricKind.Damage, CombatDeliveryKind.Direct);
+        ApplyContribution(scene.Owner, playerId, bossId, 11000010, 250, 2_000, CombatMetricKind.Damage, CombatDeliveryKind.Periodic);
+        ApplyContribution(scene.Owner, playerId, bossId, 11000010, 401, 3_000, CombatMetricKind.Damage, CombatDeliveryKind.Direct);
+        ApplyContribution(scene.Owner, playerId, addId, 11000010, 900, 4_000, CombatMetricKind.Damage, CombatDeliveryKind.Direct);
+
+        SelectSceneCombatant(viewModel, scene, playerId);
+        SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
+
+        var row = Assert.Single(viewModel.OutgoingDamage.Rows);
+        Assert.Equal(751, row.TotalAmount);
+        Assert.Equal(100, row.MinimumDamage);
+        Assert.Equal(401, row.MaximumDamage);
+        Assert.Equal(751d / 3d, row.AverageDamage, 10);
+    }
+
+    [Fact]
     public void SelectBattleCombatant_Uses_Filtered_Damage_Duration_For_Subset_Counterparts()
     {
         CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());

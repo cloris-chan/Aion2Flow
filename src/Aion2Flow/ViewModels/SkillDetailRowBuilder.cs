@@ -10,6 +10,7 @@ internal static class SkillDetailRowBuilder
     public static void BuildDamageRows(
         Dictionary<CombatEventKey, SkillMetrics> skills,
         Dictionary<CombatEventKey, int> eventCounts,
+        Dictionary<CombatEventKey, DamageSampleStatistics> damageSamples,
         SceneDisplayContext? displayContext,
         LocalizationService localization,
         List<SkillDetailRowData> rows,
@@ -30,6 +31,7 @@ internal static class SkillDetailRowBuilder
                 continue;
 
             var baseProjection = ResolveSkillBaseProjection(skill.EventKey, displayContext, localization);
+            damageSamples.TryGetValue(skill.EventKey, out var samples);
             var row = new SkillDetailRowData
             {
                 BaseKey = baseProjection.Key,
@@ -37,6 +39,10 @@ internal static class SkillDetailRowBuilder
                 DisplayName = baseProjection.DisplayName,
                 EventCount = ResolveEventCount(eventCounts, skill.EventKey),
                 TotalAmount = totalAmount,
+                DamageSampleTotal = samples.Total,
+                DamageSampleCount = samples.Count,
+                MinimumDamage = samples.Minimum,
+                MaximumDamage = samples.Maximum,
                 DirectAmount = skill.DamageAmount,
                 PeriodicAmount = skill.PeriodicDamageAmount,
                 Hits = directHits,

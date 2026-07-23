@@ -21,6 +21,7 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         {
             AssertConstrainedViewportConfiguresVerticalScrollingForShieldSection();
             AssertHealingAndShieldSkillTablesDoNotExposeDamageHitCountColumns();
+            AssertDamageSkillTableIncludesPerDamageColumns();
             AssertHealingAndShieldUseIndependentSummaryCards();
             AssertResourceSectionUsesNeutralManaChangeColumn();
             AssertSkillListsUseAnimatedVirtualizationAndContextualSelection();
@@ -82,6 +83,24 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             .ToArray();
 
         Assert.Single(hitCountHeaders);
+    }
+
+    private static void AssertDamageSkillTableIncludesPerDamageColumns()
+    {
+        var (localization, frameBatch) = CreateViewServices();
+        var view = new DamageDetailView
+        {
+            DataContext = new CombatDirectionDetailViewModel(localization, frameBatch, "Direction_Targets")
+        };
+        var headers = view.GetLogicalDescendants()
+            .OfType<TextBlock>()
+            .Where(static textBlock => textBlock.Classes.Contains("DetailTableHeader"))
+            .Select(static textBlock => textBlock.Text)
+            .ToArray();
+
+        Assert.Contains(localization["Column_Max"], headers);
+        Assert.Contains(localization["Column_Min"], headers);
+        Assert.Contains(localization["Column_Average"], headers);
     }
 
     private static void AssertHealingAndShieldUseIndependentSummaryCards()

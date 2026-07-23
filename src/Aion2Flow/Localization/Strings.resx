@@ -166,6 +166,9 @@
   <data name="Column_History" xml:space="preserve"><value>History</value></data>
   <data name="Column_Skill" xml:space="preserve"><value>Skill</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>Direct</value></data>
+  <data name="Column_Max" xml:space="preserve"><value>Max</value></data>
+  <data name="Column_Min" xml:space="preserve"><value>Min</value></data>
+  <data name="Column_Average" xml:space="preserve"><value>Avg</value></data>
   <data name="Column_Share" xml:space="preserve"><value>Share</value></data>
   <data name="Column_Events" xml:space="preserve"><value>Events</value></data>
   <data name="Column_Action" xml:space="preserve"><value>Action</value></data>

@@ -268,6 +268,17 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Avg.
+        /// </summary>
+        internal static string Column_Average
+        {
+            get
+            {
+                return ResourceManager.GetString("Column_Average", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Canonicalization.
         /// </summary>
         internal static string Column_Canonicalization
@@ -363,6 +374,28 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Column_Index", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Max.
+        /// </summary>
+        internal static string Column_Max
+        {
+            get
+            {
+                return ResourceManager.GetString("Column_Max", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Min.
+        /// </summary>
+        internal static string Column_Min
+        {
+            get
+            {
+                return ResourceManager.GetString("Column_Min", resourceCulture);
             }
         }
 
@@ -880,6 +913,94 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Playback_AuraCoverage", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Buff.
+        /// </summary>
+        internal static string Playback_AuraDisposition_Buff
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_AuraDisposition_Buff", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Debuff.
+        /// </summary>
+        internal static string Playback_AuraDisposition_Debuff
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_AuraDisposition_Debuff", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Disposition.
+        /// </summary>
+        internal static string Playback_AuraDisposition_Label
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_AuraDisposition_Label", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Unknown.
+        /// </summary>
+        internal static string Playback_AuraDisposition_Unknown
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_AuraDisposition_Unknown", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Ambiguous: {0} candidates.
+        /// </summary>
+        internal static string Playback_AuraEvidence_AmbiguousFormat
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_AuraEvidence_AmbiguousFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Exact node #{0}.
+        /// </summary>
+        internal static string Playback_AuraEvidence_ExactNodeFormat
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_AuraEvidence_ExactNodeFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to No semantic match.
+        /// </summary>
+        internal static string Playback_AuraEvidence_None
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_AuraEvidence_None", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Skill {0}, slot {1}.
+        /// </summary>
+        internal static string Playback_AuraEvidence_UnambiguousSlotFormat
+        {
+            get
+            {
+                return ResourceManager.GetString("Playback_AuraEvidence_UnambiguousSlotFormat", resourceCulture);
             }
         }
 

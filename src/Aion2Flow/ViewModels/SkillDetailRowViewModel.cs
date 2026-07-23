@@ -11,6 +11,9 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
     public int EventCount { get; set => SetFrameProperty(ref field, value); }
     public bool IsSelected { get; set => SetFrameProperty(ref field, value); }
     public long TotalAmount { get; set => SetFrameProperty(ref field, value); }
+    public long MinimumDamage { get; set => SetFrameProperty(ref field, value); }
+    public long MaximumDamage { get; set => SetFrameProperty(ref field, value); }
+    public double AverageDamage { get; set => SetFrameProperty(ref field, value); }
     public long DirectAmount { get; set => SetFrameProperty(ref field, value); }
     public long PeriodicAmount { get; set => SetFrameProperty(ref field, value); }
     public long DrainAmount { get; set => SetFrameProperty(ref field, value); }
@@ -57,6 +60,9 @@ public sealed class SkillDetailRowViewModel(UiFrameBatchService frameBatchServic
         DisplayName = data.DisplayName;
         EventCount = data.EventCount;
         TotalAmount = data.TotalAmount;
+        MinimumDamage = data.MinimumDamage;
+        MaximumDamage = data.MaximumDamage;
+        AverageDamage = data.AverageDamage;
         DirectAmount = data.DirectAmount;
         PeriodicAmount = data.PeriodicAmount;
         DrainAmount = data.DrainAmount;
@@ -120,6 +126,10 @@ public struct SkillDetailRowData
     public string DisplayName;
     public int EventCount;
     public long TotalAmount;
+    public long MinimumDamage;
+    public long MaximumDamage;
+    public long DamageSampleTotal;
+    public int DamageSampleCount;
     public long DirectAmount;
     public long PeriodicAmount;
     public long DrainAmount;
@@ -145,6 +155,8 @@ public struct SkillDetailRowData
     public int PerfectBlock;
     public double SharePercent;
 
+    public readonly double AverageDamage => DamageSampleCount > 0 ? DamageSampleTotal / (double)DamageSampleCount : 0d;
+
     public void Merge(in SkillDetailRowData other)
     {
         if (other.SkillCode == BaseKey.SkillCode ||
@@ -156,6 +168,22 @@ public struct SkillDetailRowData
 
         EventCount += other.EventCount;
         TotalAmount += other.TotalAmount;
+        if (other.DamageSampleCount > 0)
+        {
+            if (DamageSampleCount == 0)
+            {
+                MinimumDamage = other.MinimumDamage;
+                MaximumDamage = other.MaximumDamage;
+            }
+            else
+            {
+                MinimumDamage = Math.Min(MinimumDamage, other.MinimumDamage);
+                MaximumDamage = Math.Max(MaximumDamage, other.MaximumDamage);
+            }
+
+            DamageSampleTotal += other.DamageSampleTotal;
+            DamageSampleCount += other.DamageSampleCount;
+        }
         DirectAmount += other.DirectAmount;
         PeriodicAmount += other.PeriodicAmount;
         DrainAmount += other.DrainAmount;

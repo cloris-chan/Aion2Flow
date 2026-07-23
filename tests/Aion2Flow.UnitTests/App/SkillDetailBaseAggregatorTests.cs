@@ -1,5 +1,4 @@
 using Cloris.Aion2Flow.Resources.Catalog;
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
@@ -48,6 +47,37 @@ public sealed class SkillDetailBaseAggregatorTests
         Assert.Equal(84152, row.TotalAmount);
         Assert.Equal(13, row.Hits);
         Assert.Equal(16330000, row.SkillCode);
+    }
+
+    [Fact]
+    public void AddOrMerge_Merges_DamageSamples_Using_Their_Combined_Weight()
+    {
+        SetSkillBaseProjections(
+            new SkillBaseProjection(16330020, 16330000),
+            new SkillBaseProjection(16330027, 16330000));
+
+        var rows = new List<SkillDetailRowData>();
+        var indexes = new Dictionary<SkillBaseKey, int>();
+        var main = CreateRow(16330020, 600, 2);
+        main.DamageSampleTotal = 600;
+        main.DamageSampleCount = 2;
+        main.MinimumDamage = 100;
+        main.MaximumDamage = 500;
+        var derived = CreateRow(16330027, 600, 3);
+        derived.DamageSampleTotal = 600;
+        derived.DamageSampleCount = 3;
+        derived.MinimumDamage = 100;
+        derived.MaximumDamage = 300;
+
+        SkillDetailBaseAggregator.AddOrMerge(rows, indexes, in main);
+        SkillDetailBaseAggregator.AddOrMerge(rows, indexes, in derived);
+
+        var row = Assert.Single(rows);
+        Assert.Equal(5, row.DamageSampleCount);
+        Assert.Equal(1_200, row.DamageSampleTotal);
+        Assert.Equal(100, row.MinimumDamage);
+        Assert.Equal(500, row.MaximumDamage);
+        Assert.Equal(240d, row.AverageDamage);
     }
 
     [Theory]

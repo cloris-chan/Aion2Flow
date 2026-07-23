@@ -612,6 +612,8 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
         var contribution = detailEvent.Contribution;
         skillMetrics.ProcessContribution(in contribution);
+        if (contribution.Metric == CombatMetricKind.Damage)
+            aggregation.AddDamageSample(eventKey, contribution.Amount);
         aggregation.CountOccurrence(detailEvent.Fact);
     }
 
@@ -691,7 +693,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         _sectionRows.Clear();
         _sectionRowIndexes.Clear();
         if (sectionKind is DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage)
-            SkillDetailRowBuilder.BuildDamageRows(metrics, aggregation.EventCounts, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
+            SkillDetailRowBuilder.BuildDamageRows(metrics, aggregation.EventCounts, aggregation.DamageSamples, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
         else if (sectionKind is DetailSectionKind.OutgoingShield or DetailSectionKind.IncomingShield)
             SkillDetailRowBuilder.BuildShieldRows(metrics, aggregation.EventCounts, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
         else

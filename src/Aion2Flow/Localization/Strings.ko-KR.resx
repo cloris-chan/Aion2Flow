@@ -166,6 +166,9 @@
   <data name="Column_History" xml:space="preserve"><value>기록</value></data>
   <data name="Column_Skill" xml:space="preserve"><value>스킬</value></data>
   <data name="Column_Direct" xml:space="preserve"><value>직격</value></data>
+  <data name="Column_Max" xml:space="preserve"><value>최대</value></data>
+  <data name="Column_Min" xml:space="preserve"><value>최소</value></data>
+  <data name="Column_Average" xml:space="preserve"><value>평균</value></data>
   <data name="Column_Share" xml:space="preserve"><value>비율</value></data>
   <data name="Column_Events" xml:space="preserve"><value>이벤트</value></data>
   <data name="Column_Action" xml:space="preserve"><value>행동</value></data>
