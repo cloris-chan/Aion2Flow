@@ -28,16 +28,22 @@ public sealed class PacketStreamProcessor : IDisposable
 
     public bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection, long captureTimestampMilliseconds)
     {
+        var timestamp = new PacketProcessingTimestamp(captureTimestampMilliseconds, 0);
+        return AppendAndProcess(payload, in connection, in timestamp);
+    }
+
+    internal bool AppendAndProcess(ReadOnlySpan<byte> payload, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
+    {
         if (_sink is IRuntimeObservationSynchronization synchronization)
         {
             lock (synchronization.Gate)
-                return AppendAndProcessCore(payload, in connection, captureTimestampMilliseconds);
+                return AppendAndProcessCore(payload, in connection, in timestamp);
         }
 
-        return AppendAndProcessCore(payload, in connection, captureTimestampMilliseconds);
+        return AppendAndProcessCore(payload, in connection, in timestamp);
     }
 
-    private bool AppendAndProcessCore(ReadOnlySpan<byte> payload, in TcpConnection connection, long captureTimestampMilliseconds)
+    private bool AppendAndProcessCore(ReadOnlySpan<byte> payload, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
     {
         var previousAppendFlushId = _parser.BeginAppendFlush();
 
@@ -52,7 +58,7 @@ public sealed class PacketStreamProcessor : IDisposable
                     AppendToTail(payload);
                 }
 
-                ProcessBufferedPackets(ref hasParsed, in connection, captureTimestampMilliseconds);
+                ProcessBufferedPackets(ref hasParsed, in connection, in timestamp);
                 return hasParsed;
             }
 
@@ -64,7 +70,7 @@ public sealed class PacketStreamProcessor : IDisposable
             var remaining = payload;
             while (TryTakePacket(ref remaining, out var packet))
             {
-                if (EmitPacket(packet, in connection, captureTimestampMilliseconds))
+                if (EmitPacket(packet, in connection, in timestamp))
                 {
                     hasParsed = true;
                 }
@@ -87,7 +93,7 @@ public sealed class PacketStreamProcessor : IDisposable
         }
     }
 
-    private void ProcessBufferedPackets(ref bool hasParsed, in TcpConnection connection, long captureTimestampMilliseconds)
+    private void ProcessBufferedPackets(ref bool hasParsed, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
     {
         while (true)
         {
@@ -99,7 +105,7 @@ public sealed class PacketStreamProcessor : IDisposable
             var packet = _tail.Data[..packetLength];
             try
             {
-                if (EmitPacket(packet, in connection, captureTimestampMilliseconds))
+                if (EmitPacket(packet, in connection, in timestamp))
                 {
                     hasParsed = true;
                 }
@@ -111,8 +117,8 @@ public sealed class PacketStreamProcessor : IDisposable
         }
     }
 
-    private bool EmitPacket(ReadOnlySpan<byte> data, in TcpConnection connection, long captureTimestampMilliseconds)
-        => _parser.ParsePacketEntry(data, in connection, captureTimestampMilliseconds);
+    private bool EmitPacket(ReadOnlySpan<byte> data, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
+        => _parser.ParsePacketEntry(data, in connection, in timestamp);
 
     private void AppendToTail(ReadOnlySpan<byte> data)
     {

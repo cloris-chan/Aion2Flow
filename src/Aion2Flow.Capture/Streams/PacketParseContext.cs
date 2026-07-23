@@ -2,12 +2,20 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObservationWriter writer, PacketFlushState flushState, PacketPlayerGroupState playerGroupState, Action<ProtocolRoundTripObservation>? protocolRoundTripObserver, in TcpConnection connection, long timestampMilliseconds)
+internal ref struct PacketParseContext(
+    IRuntimeObservationSink sink,
+    SceneObservationWriter writer,
+    PacketFlushState flushState,
+    PacketPlayerGroupState playerGroupState,
+    Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
+    in TcpConnection connection,
+    in PacketProcessingTimestamp timestamp)
 {
     public readonly IRuntimeObservationSink Sink = sink;
     public readonly SceneObservationWriter Writer = writer;
     public readonly TcpConnection Connection = connection;
-    public readonly long TimestampMilliseconds = timestampMilliseconds;
+    public readonly long TimestampMilliseconds = timestamp.TimelineUnixMilliseconds;
+    public readonly long ArrivalTimestamp = timestamp.ArrivalTimestamp;
     public bool Parsed;
     public PacketStructurePath CurrentStructurePath { get; private set; }
     public readonly PacketStructureReference CurrentStructure => CurrentStructurePath.Leaf;
@@ -26,7 +34,7 @@ internal ref struct PacketParseContext(IRuntimeObservationSink sink, SceneObserv
             Connection,
             clientSentUnixMilliseconds,
             serverUnixMilliseconds,
-            TimestampMilliseconds));
+            ArrivalTimestamp));
 
     public PacketStructurePath EnterStructure(PacketStructureKind kind, int offset, int length, int bodyOffset, int bodyLength, int siblingIndex)
     {

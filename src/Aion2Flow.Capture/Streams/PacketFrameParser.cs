@@ -30,9 +30,16 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink, Action<Pro
         }
     }
 
-    public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, long timestampMilliseconds)
+    public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
     {
-        var context = new PacketParseContext(sink, _writer, _flushState, _playerGroupState, protocolRoundTripObserver, connection, timestampMilliseconds);
+        var context = new PacketParseContext(
+            sink,
+            _writer,
+            _flushState,
+            _playerGroupState,
+            protocolRoundTripObserver,
+            connection,
+            in timestamp);
         var previous = context.EnterStructure(PacketStructureKind.TransportPacket, 0, packet.Length, 0, packet.Length, 0);
         try
         {

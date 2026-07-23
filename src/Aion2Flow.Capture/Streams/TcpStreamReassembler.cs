@@ -2,7 +2,7 @@ using System.Buffers;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal delegate void TcpReassembledChunkHandler<TState>(uint sequenceNumber, ReadOnlySpan<byte> chunk, long captureTimestampMilliseconds, ref TState state);
+internal delegate void TcpReassembledChunkHandler<TState>(uint sequenceNumber, ReadOnlySpan<byte> chunk, CapturedPacketTimestamp timestamp, ref TState state);
 
 internal sealed class TcpStreamReassembler : IDisposable
 {
@@ -11,6 +11,8 @@ internal sealed class TcpStreamReassembler : IDisposable
     private bool _hasExpectedSequence;
     private uint _nextExpectedSequence;
     private int _pendingBytes;
+    private CapturedPacketTimestamp _lastEmittedTimestamp;
+    private bool _hasEmittedTimestamp;
 
     public void StartAt(uint nextExpectedSequence)
     {
@@ -19,7 +21,7 @@ internal sealed class TcpStreamReassembler : IDisposable
         _nextExpectedSequence = nextExpectedSequence;
     }
 
-    public void Feed<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, long captureTimestampMilliseconds, ref TState state, TcpReassembledChunkHandler<TState> handler)
+    public void Feed<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, CapturedPacketTimestamp timestamp, ref TState state, TcpReassembledChunkHandler<TState> handler)
     {
         if (payload.IsEmpty)
         {
@@ -34,7 +36,7 @@ internal sealed class TcpStreamReassembler : IDisposable
 
         if (sequenceNumber == _nextExpectedSequence)
         {
-            Emit(sequenceNumber, payload, captureTimestampMilliseconds, ref state, handler);
+            Emit(sequenceNumber, payload, timestamp, ref state, handler);
             DrainPending(ref state, handler);
             return;
         }
@@ -47,12 +49,12 @@ internal sealed class TcpStreamReassembler : IDisposable
                 return;
             }
 
-            Emit(_nextExpectedSequence, payload[overlap..], captureTimestampMilliseconds, ref state, handler);
+            Emit(_nextExpectedSequence, payload[overlap..], timestamp, ref state, handler);
             DrainPending(ref state, handler);
             return;
         }
 
-        BufferPending(sequenceNumber, payload, captureTimestampMilliseconds);
+        BufferPending(sequenceNumber, payload, timestamp);
     }
 
     public void Reset()
@@ -66,6 +68,8 @@ internal sealed class TcpStreamReassembler : IDisposable
         _hasExpectedSequence = false;
         _nextExpectedSequence = 0;
         _pendingBytes = 0;
+        _lastEmittedTimestamp = default;
+        _hasEmittedTimestamp = false;
     }
 
     public void Dispose()
@@ -73,10 +77,11 @@ internal sealed class TcpStreamReassembler : IDisposable
         Reset();
     }
 
-    private void Emit<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, long captureTimestampMilliseconds, ref TState state, TcpReassembledChunkHandler<TState> handler)
+    private void Emit<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, CapturedPacketTimestamp timestamp, ref TState state, TcpReassembledChunkHandler<TState> handler)
     {
         _nextExpectedSequence = sequenceNumber + (uint)payload.Length;
-        handler(sequenceNumber, payload, captureTimestampMilliseconds, ref state);
+        timestamp = ResolveDeliveryTimestamp(timestamp);
+        handler(sequenceNumber, payload, timestamp, ref state);
     }
 
     private void DrainPending<TState>(ref TState state, TcpReassembledChunkHandler<TState> handler)
@@ -85,7 +90,7 @@ internal sealed class TcpStreamReassembler : IDisposable
         {
             try
             {
-                Emit(sequenceNumber, nextChunk.AsSpan()[offset..], nextChunk.CaptureTimestampMilliseconds, ref state, handler);
+                Emit(sequenceNumber, nextChunk.AsSpan()[offset..], nextChunk.Timestamp, ref state, handler);
             }
             finally
             {
@@ -176,7 +181,7 @@ internal sealed class TcpStreamReassembler : IDisposable
         return false;
     }
 
-    private void BufferPending(uint sequenceNumber, ReadOnlySpan<byte> payload, long captureTimestampMilliseconds)
+    private void BufferPending(uint sequenceNumber, ReadOnlySpan<byte> payload, CapturedPacketTimestamp timestamp)
     {
         if (_pending.TryGetValue(sequenceNumber, out var existing))
         {
@@ -191,7 +196,7 @@ internal sealed class TcpStreamReassembler : IDisposable
 
         var owner = MemoryPool<byte>.Shared.Rent(payload.Length);
         payload.CopyTo(owner.Memory.Span);
-        _pending[sequenceNumber] = new PendingSegment(owner, payload.Length, captureTimestampMilliseconds);
+        _pending[sequenceNumber] = new PendingSegment(owner, payload.Length, timestamp);
         _pendingBytes += payload.Length;
 
         while (_pending.Count > CaptureBufferLimits.ReassemblyPendingSegmentLimit || _pendingBytes > CaptureBufferLimits.ReassemblyPendingByteLimit)
@@ -232,12 +237,29 @@ internal sealed class TcpStreamReassembler : IDisposable
         return unchecked((int)(left - right)) < 0;
     }
 
-    private readonly struct PendingSegment(IMemoryOwner<byte>? owner, int length, long captureTimestampMilliseconds)
+    private CapturedPacketTimestamp ResolveDeliveryTimestamp(CapturedPacketTimestamp timestamp)
+    {
+        if (!_hasEmittedTimestamp)
+        {
+            _hasEmittedTimestamp = true;
+            _lastEmittedTimestamp = timestamp;
+            return timestamp;
+        }
+
+        var unixMilliseconds = Math.Max(timestamp.UnixMilliseconds, _lastEmittedTimestamp.UnixMilliseconds);
+        var monotonicTimestamp = timestamp.MonotonicTimestamp == 0
+            ? 0
+            : Math.Max(timestamp.MonotonicTimestamp, _lastEmittedTimestamp.MonotonicTimestamp);
+        _lastEmittedTimestamp = new CapturedPacketTimestamp(unixMilliseconds, monotonicTimestamp);
+        return _lastEmittedTimestamp;
+    }
+
+    private readonly struct PendingSegment(IMemoryOwner<byte>? owner, int length, CapturedPacketTimestamp timestamp)
     {
         private readonly IMemoryOwner<byte>? _owner = owner;
 
         public int Length { get; } = length;
-        public long CaptureTimestampMilliseconds { get; } = captureTimestampMilliseconds;
+        public CapturedPacketTimestamp Timestamp { get; } = timestamp;
 
         public ReadOnlySpan<byte> AsSpan() =>
             _owner is null || Length == 0

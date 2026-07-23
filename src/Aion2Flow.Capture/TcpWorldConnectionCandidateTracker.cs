@@ -432,7 +432,7 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
             _reassembler.Feed(
                 packet.SequenceNumber,
                 packet.Payload,
-                packet.CaptureTimestampMilliseconds,
+                new CapturedPacketTimestamp(packet.CaptureTimestampMilliseconds, packet.CaptureTimestamp),
                 ref context,
                 ClassifyReassembledChunk);
             return context.Classification;
@@ -480,7 +480,9 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
                 _reassembler.Feed(
                     bufferedPacket.SequenceNumber,
                     bufferedPacket.Payload,
-                    bufferedPacket.CaptureTimestampMilliseconds,
+                    new CapturedPacketTimestamp(
+                        bufferedPacket.CaptureTimestampMilliseconds,
+                        bufferedPacket.CaptureTimestamp),
                     ref context,
                     ClassifyReassembledChunk);
             }
@@ -517,14 +519,14 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
         private static void ClassifyReassembledChunk(
             uint sequenceNumber,
             ReadOnlySpan<byte> chunk,
-            long captureTimestampMilliseconds,
+            CapturedPacketTimestamp timestamp,
             ref ClassifierContext context)
         {
             _ = sequenceNumber;
             context.Classification = context.Candidate.ClassifyChunk(
                 sequenceNumber,
                 chunk,
-                captureTimestampMilliseconds);
+                timestamp.UnixMilliseconds);
         }
 
         private TcpWorldStreamClassification ClassifyChunk(

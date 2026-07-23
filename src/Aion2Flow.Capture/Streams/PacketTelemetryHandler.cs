@@ -6,8 +6,7 @@ internal static class PacketTelemetryHandler
 {
     public static bool ParseRoundTripEcho0336Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (!Packet0336RoundTripParser.TryParse(packet, out var parsed) ||
-            !Packet0336RoundTripParser.IsPlausibleClientEcho(parsed.ClientSentUnixMilliseconds, context.TimestampMilliseconds))
+        if (!Packet0336RoundTripParser.TryParse(packet, out var parsed))
         {
             return false;
         }

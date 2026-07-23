@@ -296,7 +296,12 @@ public sealed class PacketCaptureDispatcher
         }
 
         var context = new DispatchContext(this, tcpStream, connection);
-        tcpStream.Reassembler.Feed(packet.SequenceNumber, packet.Payload, packet.CaptureTimestampMilliseconds, ref context, HandleReassembledChunk);
+        tcpStream.Reassembler.Feed(
+            packet.SequenceNumber,
+            packet.Payload,
+            new CapturedPacketTimestamp(packet.CaptureTimestampMilliseconds, packet.CaptureTimestamp),
+            ref context,
+            HandleReassembledChunk);
 
         if (createdStream)
         {
@@ -306,9 +311,9 @@ public sealed class PacketCaptureDispatcher
         return context.HasParsed;
     }
 
-    private static void HandleReassembledChunk(uint sequenceNumber, ReadOnlySpan<byte> chunk, long captureTimestampMilliseconds, ref DispatchContext context)
+    private static void HandleReassembledChunk(uint sequenceNumber, ReadOnlySpan<byte> chunk, CapturedPacketTimestamp timestamp, ref DispatchContext context)
     {
-        var timelineTimestampMilliseconds = context.Dispatcher.NormalizeTimelineTimestamp(captureTimestampMilliseconds);
+        var timelineTimestampMilliseconds = context.Dispatcher.NormalizeTimelineTimestamp(timestamp.UnixMilliseconds);
         RawPacketDump.AppendReassembled(
             "inbound",
             context.Connection,
@@ -316,7 +321,10 @@ public sealed class PacketCaptureDispatcher
             timelineTimestampMilliseconds,
             context.Stream.ConnectionOrdinal,
             chunk);
-        if (context.Stream.Processor.AppendAndProcess(chunk, context.Connection, timelineTimestampMilliseconds))
+        var processingTimestamp = new PacketProcessingTimestamp(
+            timelineTimestampMilliseconds,
+            timestamp.MonotonicTimestamp);
+        if (context.Stream.Processor.AppendAndProcess(chunk, context.Connection, in processingTimestamp))
         {
             context.HasParsed = true;
         }

@@ -14,7 +14,13 @@ public sealed class ProtocolRoundTripEstimatorTests
         var estimator = new ProtocolRoundTripEstimator();
         var observedTimestamp = Stopwatch.GetTimestamp();
 
-        var resolved = estimator.TryObserveEcho(in Connection, 1_000, 1_078, observedTimestamp, out var roundTripMilliseconds);
+        var resolved = estimator.TryObserveEcho(
+            in Connection,
+            1_000,
+            1_078,
+            observedTimestamp,
+            observedTimestamp,
+            out var roundTripMilliseconds);
 
         Assert.True(resolved);
         Assert.Equal(78, roundTripMilliseconds);
@@ -26,9 +32,15 @@ public sealed class ProtocolRoundTripEstimatorTests
     {
         var estimator = new ProtocolRoundTripEstimator();
         var observedTimestamp = Stopwatch.GetTimestamp();
-        estimator.TryObserveEcho(in Connection, 1_000, 1_120, observedTimestamp, out _);
+        estimator.TryObserveEcho(in Connection, 1_000, 1_120, observedTimestamp, observedTimestamp, out _);
 
-        estimator.TryObserveEcho(in Connection, 11_000, 11_055, observedTimestamp + 1, out var roundTripMilliseconds);
+        estimator.TryObserveEcho(
+            in Connection,
+            11_000,
+            11_055,
+            observedTimestamp + 1,
+            observedTimestamp + 1,
+            out var roundTripMilliseconds);
 
         Assert.Equal(55, roundTripMilliseconds);
         Assert.Equal(55, estimator.GetCurrentMilliseconds(in Connection, observedTimestamp + 1));
@@ -43,7 +55,13 @@ public sealed class ProtocolRoundTripEstimatorTests
         var estimator = new ProtocolRoundTripEstimator();
         var observedTimestamp = Stopwatch.GetTimestamp();
 
-        var resolved = estimator.TryObserveEcho(in Connection, clientSentUnixMilliseconds, arrivalUnixMilliseconds, observedTimestamp, out _);
+        var resolved = estimator.TryObserveEcho(
+            in Connection,
+            clientSentUnixMilliseconds,
+            arrivalUnixMilliseconds,
+            observedTimestamp,
+            observedTimestamp,
+            out _);
 
         Assert.False(resolved);
         Assert.Null(estimator.GetCurrentMilliseconds(in Connection, observedTimestamp));
@@ -54,7 +72,7 @@ public sealed class ProtocolRoundTripEstimatorTests
     {
         var estimator = new ProtocolRoundTripEstimator();
         var observedTimestamp = Stopwatch.GetTimestamp();
-        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, out _);
+        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, observedTimestamp, out _);
 
         Assert.Equal(80, estimator.GetCurrentMilliseconds(in Connection, observedTimestamp + 30 * Stopwatch.Frequency));
         Assert.Null(estimator.GetCurrentMilliseconds(in Connection, observedTimestamp + 30 * Stopwatch.Frequency + 1));
@@ -65,7 +83,7 @@ public sealed class ProtocolRoundTripEstimatorTests
     {
         var estimator = new ProtocolRoundTripEstimator();
         var observedTimestamp = Stopwatch.GetTimestamp();
-        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, out _);
+        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, observedTimestamp, out _);
 
         estimator.Clear();
 
@@ -78,8 +96,127 @@ public sealed class ProtocolRoundTripEstimatorTests
         var estimator = new ProtocolRoundTripEstimator();
         var observedTimestamp = Stopwatch.GetTimestamp();
         var otherConnection = new TcpConnection(5, 6, 7, 8);
-        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, out _);
+        estimator.TryObserveEcho(in Connection, 1_000, 1_080, observedTimestamp, observedTimestamp, out _);
 
         Assert.Null(estimator.GetCurrentMilliseconds(in otherConnection, observedTimestamp));
+    }
+
+    [Fact]
+    public void DelayedSampleOlderThanThirtySecondsDoesNotReplaceCurrent()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var nowTimestamp = 100 * Stopwatch.Frequency;
+        Assert.True(estimator.TryObserveEcho(
+            in Connection,
+            1_000,
+            1_080,
+            nowTimestamp,
+            nowTimestamp,
+            out _));
+
+        var delayedArrivalTimestamp = nowTimestamp - 31 * Stopwatch.Frequency;
+        Assert.False(estimator.TryObserveEcho(
+            in Connection,
+            2_000,
+            2_120,
+            delayedArrivalTimestamp,
+            nowTimestamp,
+            out _));
+        Assert.Equal(80, estimator.GetCurrentMilliseconds(in Connection, nowTimestamp));
+    }
+
+    [Fact]
+    public void OlderArrivalDoesNotReplaceNewerSample()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var nowTimestamp = 100 * Stopwatch.Frequency;
+        Assert.True(estimator.TryObserveEcho(
+            in Connection,
+            1_000,
+            1_080,
+            nowTimestamp,
+            nowTimestamp,
+            out _));
+
+        var olderArrivalTimestamp = nowTimestamp - Stopwatch.Frequency;
+        Assert.False(estimator.TryObserveEcho(
+            in Connection,
+            2_000,
+            2_120,
+            olderArrivalTimestamp,
+            nowTimestamp,
+            out _));
+        Assert.Equal(80, estimator.GetCurrentMilliseconds(in Connection, nowTimestamp));
+    }
+
+    [Fact]
+    public void EchoesFromSameCapturedChunkUseParseOrder()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var arrivalTimestamp = 100 * Stopwatch.Frequency;
+        Assert.True(estimator.TryObserveEcho(
+            in Connection,
+            1_000,
+            1_080,
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out _));
+
+        Assert.True(estimator.TryObserveEcho(
+            in Connection,
+            2_000,
+            2_055,
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out var roundTripMilliseconds));
+        Assert.Equal(55, roundTripMilliseconds);
+        Assert.Equal(55, estimator.GetCurrentMilliseconds(in Connection, arrivalTimestamp));
+    }
+
+    [Fact]
+    public void SampleAtStaleBoundaryIsAccepted()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var arrivalTimestamp = 100 * Stopwatch.Frequency;
+        var nowTimestamp = arrivalTimestamp + 30 * Stopwatch.Frequency;
+
+        Assert.True(estimator.TryObserveEcho(
+            in Connection,
+            1_000,
+            1_080,
+            arrivalTimestamp,
+            nowTimestamp,
+            out _));
+    }
+
+    [Fact]
+    public void SampleBeyondStaleBoundaryIsRejected()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var arrivalTimestamp = 100 * Stopwatch.Frequency;
+        var nowTimestamp = arrivalTimestamp + 30 * Stopwatch.Frequency + 1;
+
+        Assert.False(estimator.TryObserveEcho(
+            in Connection,
+            1_000,
+            1_080,
+            arrivalTimestamp,
+            nowTimestamp,
+            out _));
+    }
+
+    [Fact]
+    public void FutureArrivalTimestampIsRejected()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var nowTimestamp = 100 * Stopwatch.Frequency;
+
+        Assert.False(estimator.TryObserveEcho(
+            in Connection,
+            1_000,
+            1_080,
+            nowTimestamp + 1,
+            nowTimestamp,
+            out _));
     }
 }

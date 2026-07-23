@@ -10,7 +10,7 @@ public sealed class TcpStreamReassemblerTests
         using var reassembler = new TcpStreamReassembler();
         var collector = new ChunkCollector();
 
-        reassembler.Feed(100, [1, 2, 3], 1_000, ref collector, Capture);
+        reassembler.Feed(100, [1, 2, 3], At(1_000), ref collector, Capture);
 
         Assert.Equal([100u], collector.SequenceNumbers);
         Assert.Equal([1, 2, 3], collector.Payloads.Single());
@@ -22,9 +22,9 @@ public sealed class TcpStreamReassemblerTests
         using var reassembler = new TcpStreamReassembler();
         var collector = new ChunkCollector();
 
-        reassembler.Feed(100, [1, 2], 1_000, ref collector, Capture);
-        reassembler.Feed(104, [5, 6], 3_000, ref collector, Capture);
-        reassembler.Feed(102, [3, 4], 2_000, ref collector, Capture);
+        reassembler.Feed(100, [1, 2], At(1_000), ref collector, Capture);
+        reassembler.Feed(104, [5, 6], At(3_000), ref collector, Capture);
+        reassembler.Feed(102, [3, 4], At(2_000), ref collector, Capture);
 
         Assert.Equal([100u, 102u, 104u], collector.SequenceNumbers);
         Assert.Equal([1, 2], collector.Payloads[0]);
@@ -39,8 +39,8 @@ public sealed class TcpStreamReassemblerTests
         using var reassembler = new TcpStreamReassembler();
         var collector = new ChunkCollector();
 
-        reassembler.Feed(100, [1, 2, 3, 4], 1_000, ref collector, Capture);
-        reassembler.Feed(102, [3, 4, 5, 6], 2_000, ref collector, Capture);
+        reassembler.Feed(100, [1, 2, 3, 4], At(1_000), ref collector, Capture);
+        reassembler.Feed(102, [3, 4, 5, 6], At(2_000), ref collector, Capture);
 
         Assert.Equal([100u, 104u], collector.SequenceNumbers);
         Assert.Equal([1, 2, 3, 4], collector.Payloads[0]);
@@ -53,13 +53,13 @@ public sealed class TcpStreamReassemblerTests
         using var reassembler = new TcpStreamReassembler();
         var collector = new ChunkCollector();
 
-        reassembler.Feed(100, [0], 1_000, ref collector, Capture);
+        reassembler.Feed(100, [0], At(1_000), ref collector, Capture);
         for (var i = 1; i <= 503; i++)
         {
-            reassembler.Feed((uint)(101 + i), [(byte)i], 1_000 + i, ref collector, Capture);
+            reassembler.Feed((uint)(101 + i), [(byte)i], At(1_000 + i), ref collector, Capture);
         }
 
-        reassembler.Feed(101, [1], 1_001, ref collector, Capture);
+        reassembler.Feed(101, [1], At(1_001), ref collector, Capture);
 
         Assert.Equal(505, collector.SequenceNumbers.Count);
         Assert.Equal(604u, collector.SequenceNumbers[^1]);
@@ -74,9 +74,9 @@ public sealed class TcpStreamReassemblerTests
         const uint start = uint.MaxValue - 3;
 
         reassembler.StartAt(start);
-        reassembler.Feed(0, [5, 6, 7], 3_000, ref collector, Capture);
-        reassembler.Feed(uint.MaxValue - 1, [3, 4], 2_000, ref collector, Capture);
-        reassembler.Feed(start, [1, 2], 1_000, ref collector, Capture);
+        reassembler.Feed(0, [5, 6, 7], At(3_000), ref collector, Capture);
+        reassembler.Feed(uint.MaxValue - 1, [3, 4], At(2_000), ref collector, Capture);
+        reassembler.Feed(start, [1, 2], At(1_000), ref collector, Capture);
 
         Assert.Equal([start, uint.MaxValue - 1, 0u], collector.SequenceNumbers);
         Assert.Equal([1, 2], collector.Payloads[0]);
@@ -84,11 +84,29 @@ public sealed class TcpStreamReassemblerTests
         Assert.Equal([5, 6, 7], collector.Payloads[2]);
     }
 
-    private static void Capture(uint sequenceNumber, ReadOnlySpan<byte> chunk, long captureTimestampMilliseconds, ref ChunkCollector collector)
+    [Fact]
+    public void BufferedSegmentUsesTimeWhenItBecomesDeliverable()
+    {
+        using var reassembler = new TcpStreamReassembler();
+        var collector = new ChunkCollector();
+
+        reassembler.StartAt(100);
+        reassembler.Feed(102, [3, 4], At(1_000), ref collector, Capture);
+        reassembler.Feed(100, [1, 2], At(3_000), ref collector, Capture);
+
+        Assert.Equal([3_000L, 3_000L], collector.Timestamps);
+        Assert.Equal([30_000L, 30_000L], collector.MonotonicTimestamps);
+    }
+
+    private static CapturedPacketTimestamp At(long unixMilliseconds)
+        => new(unixMilliseconds, unixMilliseconds * 10);
+
+    private static void Capture(uint sequenceNumber, ReadOnlySpan<byte> chunk, CapturedPacketTimestamp timestamp, ref ChunkCollector collector)
     {
         collector.SequenceNumbers.Add(sequenceNumber);
         collector.Payloads.Add(chunk.ToArray());
-        collector.Timestamps.Add(captureTimestampMilliseconds);
+        collector.Timestamps.Add(timestamp.UnixMilliseconds);
+        collector.MonotonicTimestamps.Add(timestamp.MonotonicTimestamp);
     }
 
     private sealed class ChunkCollector
@@ -96,5 +114,6 @@ public sealed class TcpStreamReassemblerTests
         public List<uint> SequenceNumbers { get; } = [];
         public List<byte[]> Payloads { get; } = [];
         public List<long> Timestamps { get; } = [];
+        public List<long> MonotonicTimestamps { get; } = [];
     }
 }

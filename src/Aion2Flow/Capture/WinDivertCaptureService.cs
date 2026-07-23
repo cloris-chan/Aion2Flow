@@ -25,9 +25,8 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
     private readonly TcpDownstreamConnectionTracker _downstreamConnections = new();
     private readonly Lock _pendingPromotionGate = new();
     private readonly Dictionary<TcpConnection, CaptureConnectionPromotion> _pendingPromotions = [];
+    private readonly CaptureTimestampMapper _captureTimestampMapper = new();
     private long _nextConnectionOrdinal;
-    private readonly long _captureClockOriginTicks = Stopwatch.GetTimestamp();
-    private readonly long _captureClockOriginUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService = processPortDiscoveryService;
     private readonly SceneLiveReadModel _scene = new(RawPacketDump.CurrentSessionStarted);
@@ -211,8 +210,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         if (payloadLength != 0 && admission.IsAccepted)
                         {
                             var closePayload = packetSpan.Slice(payloadOffset, payloadLength);
-                            var closeCaptureMilliseconds = _captureClockOriginUnixMilliseconds +
-                                (long)((captureTicks - _captureClockOriginTicks) * 1000d / Stopwatch.Frequency);
+                            var closeCaptureMilliseconds = _captureTimestampMapper.ToTimelineUnixMilliseconds(captureTicks);
                             RoutePayload(
                                 in connection,
                                 admission,
@@ -284,8 +282,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         continue;
                     }
 
-                    var captureTimestampMilliseconds = _captureClockOriginUnixMilliseconds +
-                        (long)((captureTicks - _captureClockOriginTicks) * 1000d / Stopwatch.Frequency);
+                    var captureTimestampMilliseconds = _captureTimestampMapper.ToTimelineUnixMilliseconds(captureTicks);
                     RoutePayload(
                         in connection,
                         admission,
@@ -730,6 +727,11 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
 
     private void OnProtocolRoundTripObserved(ProtocolRoundTripObservation observation)
     {
+        if (observation.ArrivalTimestamp <= 0)
+        {
+            return;
+        }
+
         var observedConnection = observation.Connection;
         var hasLockedConnection = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection);
         if (hasLockedConnection && lockedConnection != observedConnection)
@@ -740,7 +742,8 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         if (_protocolRttEstimator.TryObserveEcho(
             in observedConnection,
             observation.ClientSentUnixMilliseconds,
-            observation.ArrivalUnixMilliseconds,
+            _captureTimestampMapper.ToCurrentUtcUnixMilliseconds(observation.ArrivalTimestamp),
+            observation.ArrivalTimestamp,
             out var roundTripMilliseconds))
         {
             if (hasLockedConnection)
