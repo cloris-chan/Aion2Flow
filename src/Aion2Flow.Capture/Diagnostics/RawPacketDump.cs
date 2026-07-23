@@ -77,7 +77,13 @@ internal static class RawPacketDump
         }
     }
 
-    public static void AppendReassembled(string direction, in TcpConnection connection, uint sequenceNumber, long captureTimestampMilliseconds, ReadOnlySpan<byte> payload)
+    public static void AppendReassembled(
+        string direction,
+        in TcpConnection connection,
+        uint sequenceNumber,
+        long captureTimestampMilliseconds,
+        long connectionOrdinal,
+        ReadOnlySpan<byte> payload)
     {
         if (!IsEnabled || _streamWriter is null)
         {
@@ -87,7 +93,7 @@ internal static class RawPacketDump
         try
         {
             var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(captureTimestampMilliseconds);
-            var line = $"{timestamp:O}|dir={direction}|{connection.SourceAddress}:{connection.SourcePort}->{connection.DestinationAddress}:{connection.DestinationPort}|seq={sequenceNumber}|len={payload.Length}|data={Convert.ToHexString(payload)}";
+            var line = $"{timestamp:O}|dir={direction}|{connection.SourceAddress}:{connection.SourcePort}->{connection.DestinationAddress}:{connection.DestinationPort}|seq={sequenceNumber}|attempt={connectionOrdinal}|len={payload.Length}|data={Convert.ToHexString(payload)}";
             lock (SyncRoot)
             {
                 _streamWriter.WriteLine(line);

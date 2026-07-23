@@ -66,6 +66,24 @@ public sealed class TcpStreamReassemblerTests
         Assert.Equal([247], collector.Payloads[^1]);
     }
 
+    [Fact]
+    public void Drains_OutOfOrder_Segments_Across_Sequence_Wrap()
+    {
+        using var reassembler = new TcpStreamReassembler();
+        var collector = new ChunkCollector();
+        const uint start = uint.MaxValue - 3;
+
+        reassembler.StartAt(start);
+        reassembler.Feed(0, [5, 6, 7], 3_000, ref collector, Capture);
+        reassembler.Feed(uint.MaxValue - 1, [3, 4], 2_000, ref collector, Capture);
+        reassembler.Feed(start, [1, 2], 1_000, ref collector, Capture);
+
+        Assert.Equal([start, uint.MaxValue - 1, 0u], collector.SequenceNumbers);
+        Assert.Equal([1, 2], collector.Payloads[0]);
+        Assert.Equal([3, 4], collector.Payloads[1]);
+        Assert.Equal([5, 6, 7], collector.Payloads[2]);
+    }
+
     private static void Capture(uint sequenceNumber, ReadOnlySpan<byte> chunk, long captureTimestampMilliseconds, ref ChunkCollector collector)
     {
         collector.SequenceNumbers.Add(sequenceNumber);

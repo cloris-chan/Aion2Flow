@@ -12,6 +12,13 @@ internal sealed class TcpStreamReassembler : IDisposable
     private uint _nextExpectedSequence;
     private int _pendingBytes;
 
+    public void StartAt(uint nextExpectedSequence)
+    {
+        Reset();
+        _hasExpectedSequence = true;
+        _nextExpectedSequence = nextExpectedSequence;
+    }
+
     public void Feed<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, long captureTimestampMilliseconds, ref TState state, TcpReassembledChunkHandler<TState> handler)
     {
         if (payload.IsEmpty)
@@ -89,33 +96,78 @@ internal sealed class TcpStreamReassembler : IDisposable
 
     private bool TryTakeNextPending(out uint sequenceNumber, out PendingSegment chunk, out int offset)
     {
-        while (TryGetFirstPending(out var pendingSequenceNumber, out chunk))
+        while (_pending.Count != 0)
         {
-            if (pendingSequenceNumber == _nextExpectedSequence)
+            var foundUsable = false;
+            var foundConsumed = false;
+            var selectedSequenceNumber = 0u;
+            var selectedChunk = default(PendingSegment);
+            var selectedOffset = 0;
+            var selectedRemainingLength = 0;
+            var consumedSequenceNumber = 0u;
+            var consumedChunk = default(PendingSegment);
+
+            foreach (var (pendingSequenceNumber, pendingChunk) in _pending)
             {
-                _pending.Remove(pendingSequenceNumber);
-                _pendingBytes -= chunk.Length;
-                sequenceNumber = pendingSequenceNumber;
-                offset = 0;
+                if (pendingSequenceNumber == _nextExpectedSequence)
+                {
+                    foundUsable = true;
+                    selectedSequenceNumber = pendingSequenceNumber;
+                    selectedChunk = pendingChunk;
+                    selectedOffset = 0;
+                    break;
+                }
+
+                if (!SequenceLessThan(pendingSequenceNumber, _nextExpectedSequence))
+                {
+                    continue;
+                }
+
+                var overlap = unchecked(_nextExpectedSequence - pendingSequenceNumber);
+                if (overlap >= (uint)pendingChunk.Length)
+                {
+                    if (!foundConsumed)
+                    {
+                        foundConsumed = true;
+                        consumedSequenceNumber = pendingSequenceNumber;
+                        consumedChunk = pendingChunk;
+                    }
+
+                    continue;
+                }
+
+                var remainingLength = pendingChunk.Length - (int)overlap;
+                if (!foundUsable || remainingLength > selectedRemainingLength)
+                {
+                    foundUsable = true;
+                    selectedSequenceNumber = pendingSequenceNumber;
+                    selectedChunk = pendingChunk;
+                    selectedOffset = (int)overlap;
+                    selectedRemainingLength = remainingLength;
+                }
+            }
+
+            if (foundUsable)
+            {
+                _pending.Remove(selectedSequenceNumber);
+                _pendingBytes -= selectedChunk.Length;
+                sequenceNumber = selectedOffset == 0
+                    ? selectedSequenceNumber
+                    : _nextExpectedSequence;
+                chunk = selectedChunk;
+                offset = selectedOffset;
                 return true;
             }
 
-            if (!SequenceLessThan(pendingSequenceNumber, _nextExpectedSequence))
+            if (foundConsumed)
             {
-                break;
-            }
-
-            offset = (int)(_nextExpectedSequence - pendingSequenceNumber);
-            _pending.Remove(pendingSequenceNumber);
-            _pendingBytes -= chunk.Length;
-            if (offset >= chunk.Length)
-            {
-                chunk.Dispose();
+                _pending.Remove(consumedSequenceNumber);
+                _pendingBytes -= consumedChunk.Length;
+                consumedChunk.Dispose();
                 continue;
             }
 
-            sequenceNumber = _nextExpectedSequence;
-            return true;
+            break;
         }
 
         sequenceNumber = 0;
