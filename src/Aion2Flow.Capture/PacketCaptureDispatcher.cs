@@ -153,7 +153,7 @@ public sealed class PacketCaptureDispatcher
         var wasPromoted = false;
         try
         {
-            if (promotion.IsCancelled)
+            if (!promotion.TryAcquireForDispatch())
             {
                 return false;
             }

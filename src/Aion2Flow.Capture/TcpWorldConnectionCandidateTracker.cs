@@ -24,17 +24,32 @@ internal sealed class CaptureConnectionPromotion(
     long candidateOrdinal,
     List<CapturedPacket> packets)
 {
+    private enum DispatchState : byte
+    {
+        Queued,
+        Dispatching,
+        Cancelled
+    }
+
     private List<CapturedPacket>? _packets = packets;
-    private int _cancelled;
+    private int _dispatchState = (int)DispatchState.Queued;
 
     public TcpConnection Connection { get; } = connection;
     public uint? ReplayStartSequenceNumber { get; } = replayStartSequenceNumber;
     public long CandidateOrdinal { get; } = candidateOrdinal;
     public IReadOnlyList<CapturedPacket> Packets => _packets ?? throw new ObjectDisposedException(nameof(CaptureConnectionPromotion));
 
-    public bool IsCancelled => Volatile.Read(ref _cancelled) != 0;
+    internal bool TryAcquireForDispatch() =>
+        Interlocked.CompareExchange(
+            ref _dispatchState,
+            (int)DispatchState.Dispatching,
+            (int)DispatchState.Queued) == (int)DispatchState.Queued;
 
-    public void Cancel() => Interlocked.Exchange(ref _cancelled, 1);
+    internal bool TryCancelQueued() =>
+        Interlocked.CompareExchange(
+            ref _dispatchState,
+            (int)DispatchState.Cancelled,
+            (int)DispatchState.Queued) == (int)DispatchState.Queued;
 
     public void Return()
     {

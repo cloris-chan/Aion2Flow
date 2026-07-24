@@ -59,36 +59,19 @@ public sealed class PacketLogReplayService
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
 
-        if (TryDetectLogKindFromSourceName(sourceName, out var sourceLogKind))
-        {
-            return sourceLogKind switch
-            {
-                ReplayLogKind.Stream => ReplayStreamLines(ReadLines(reader), sourceName, cancellationToken, combatOccurrenceObserver, auraLifecycleObserver),
-                ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
-                _ => throw new InvalidOperationException($"Unsupported replay log kind: {sourceLogKind}.")
-            };
-        }
-
-        var lines = new List<string>();
-        while (reader.ReadLine() is { } line)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            lines.Add(line);
-        }
-
-        var logKind = DetectLogKind(lines, sourceName);
-        return logKind switch
-        {
-            ReplayLogKind.Stream => ReplayStreamLines(lines, sourceName, cancellationToken, combatOccurrenceObserver, auraLifecycleObserver),
-            ReplayLogKind.Raw => throw new NotSupportedException("Raw log replay is not supported yet. Use stream logs for whole-encounter replay."),
-            _ => throw new NotSupportedException("Only stream log replay is supported. Raw logs are not supported yet.")
-        };
+        return ReplayStreamLines(
+            ReadLines(reader, cancellationToken),
+            sourceName,
+            cancellationToken,
+            combatOccurrenceObserver,
+            auraLifecycleObserver);
     }
 
-    private static IEnumerable<string> ReadLines(TextReader reader)
+    private static IEnumerable<string> ReadLines(TextReader reader, CancellationToken cancellationToken)
     {
         while (reader.ReadLine() is { } line)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             yield return line;
         }
     }
@@ -204,7 +187,7 @@ public sealed class PacketLogReplayService
                     acceptedPayload,
                     entry.Connection,
                     entry.Timestamp.ToUnixTimeMilliseconds());
-                // Legacy logs have no transport-attempt identity, so require a parsed payload before replacing the active connection.
+                // Ordinal-less stream logs require a parsed payload before replacing the active connection.
                 if (parsed && needsActivation && replayConnection.ConnectionOrdinal == 0)
                 {
                     var source = new PacketObservationSource(
@@ -216,7 +199,7 @@ public sealed class PacketLogReplayService
                         default);
                     if (!inboundProcessors.TryActivate(in replayConnection, inboundProcessor, in source))
                     {
-                        throw new InvalidOperationException("The parsed legacy replay connection could not become active.");
+                        throw new InvalidOperationException("The parsed ordinal-less replay connection could not become active.");
                     }
                 }
             }
@@ -610,59 +593,6 @@ public sealed class PacketLogReplayService
         return entityId.ToString(CultureInfo.InvariantCulture);
     }
 
-
-    private static ReplayLogKind DetectLogKind(IReadOnlyList<string> lines, string sourceName)
-    {
-        if (TryDetectLogKindFromSourceName(sourceName, out var sourceLogKind))
-        {
-            return sourceLogKind;
-        }
-
-        foreach (var line in lines)
-        {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                continue;
-            }
-
-            if (!TryReadLineSegments(line, out _, out var secondSegment, out var thirdSegment, out _, out _))
-            {
-                continue;
-            }
-
-            if (!secondSegment.StartsWith("dir=", StringComparison.Ordinal))
-            {
-                return ReplayLogKind.Unknown;
-            }
-
-            return thirdSegment.Contains(':')
-                ? ReplayLogKind.Stream
-                : ReplayLogKind.Raw;
-        }
-
-        return ReplayLogKind.Unknown;
-    }
-
-    private static bool TryDetectLogKindFromSourceName(string sourceName, out ReplayLogKind logKind)
-    {
-        if (sourceName.Contains(".stream.", StringComparison.OrdinalIgnoreCase) ||
-            sourceName.EndsWith("stream.log", StringComparison.OrdinalIgnoreCase))
-        {
-            logKind = ReplayLogKind.Stream;
-            return true;
-        }
-
-        if (sourceName.Contains(".raw.", StringComparison.OrdinalIgnoreCase) ||
-            sourceName.EndsWith("raw.log", StringComparison.OrdinalIgnoreCase))
-        {
-            logKind = ReplayLogKind.Raw;
-            return true;
-        }
-
-        logKind = default;
-        return false;
-    }
-
     private static bool TryParseStreamEntry(string line, out StreamReplayEntry entry)
     {
         entry = default;
@@ -673,7 +603,8 @@ public sealed class PacketLogReplayService
                 out var connectionSegment,
                 out var dataText,
                 out var metadata) ||
-            !TryParseConnectionOrdinal(metadata, out var connectionOrdinal))
+            !TryParseConnectionOrdinal(metadata, out var connectionOrdinal) ||
+            !TryParsePayloadLength(metadata, out var payloadLength))
         {
             return false;
         }
@@ -691,12 +622,18 @@ public sealed class PacketLogReplayService
 
         try
         {
+            var payload = Convert.FromHexString(dataText);
+            if (payload.Length != payloadLength)
+            {
+                return false;
+            }
+
             entry = new StreamReplayEntry(
                 timestamp,
                 directionSegment["dir=".Length..],
                 connection,
                 connectionOrdinal,
-                Convert.FromHexString(dataText));
+                payload);
             return true;
         }
         catch (FormatException)
@@ -803,6 +740,29 @@ public sealed class PacketLogReplayService
                    CultureInfo.InvariantCulture,
                    out connectionOrdinal) &&
                connectionOrdinal >= 0;
+    }
+
+    private static bool TryParsePayloadLength(string metadata, out int payloadLength)
+    {
+        const string marker = "len=";
+        payloadLength = 0;
+        var markerIndex = metadata.IndexOf(marker, StringComparison.Ordinal);
+        if (markerIndex < 0 || (markerIndex != 0 && metadata[markerIndex - 1] != '|'))
+        {
+            return false;
+        }
+
+        var valueStart = markerIndex + marker.Length;
+        var valueEnd = metadata.IndexOf('|', valueStart);
+        var value = valueEnd < 0
+            ? metadata.AsSpan(valueStart)
+            : metadata.AsSpan(valueStart, valueEnd - valueStart);
+        return int.TryParse(
+                   value,
+                   NumberStyles.None,
+                   CultureInfo.InvariantCulture,
+                   out payloadLength) &&
+               payloadLength >= 0;
     }
 
     private static bool TryParseEndpoint(string text, out uint address, out ushort port)
@@ -1048,14 +1008,6 @@ public sealed class PacketLogReplayService
             Processor.Dispose();
         }
     }
-
-    private enum ReplayLogKind
-    {
-        Unknown,
-        Stream,
-        Raw
-    }
-
     private sealed class MutableCombatantSummary(int combatantId, string displayName)
     {
         public int CombatantId { get; } = combatantId;

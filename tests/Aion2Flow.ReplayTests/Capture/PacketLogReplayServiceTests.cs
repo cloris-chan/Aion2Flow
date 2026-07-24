@@ -12,6 +12,21 @@ namespace Cloris.Aion2Flow.Tests.Capture;
 public sealed class PacketLogReplayServiceTests
 {
     [Fact]
+    public void Replay_Skips_Stream_Entry_When_Length_Does_Not_Match_Payload()
+    {
+        const string line =
+            "2026-07-01T19:10:11.8450000+00:00|dir=inbound|16777343:52475->16777343:54260|seq=1|len=2|data=00";
+
+        using var reader = new StringReader(line);
+        var replay = PacketLogReplayService.Replay(reader, "invalid-length.stream.log");
+
+        Assert.Equal(1, replay.TotalLines);
+        Assert.Equal(0, replay.ReplayedLines);
+        Assert.Equal(1, replay.SkippedLines);
+        Assert.Equal(1, replay.SkippedEventCounts["<invalid>"]);
+    }
+
+    [Fact]
     public void Replay_Observer_Receives_Production_Occurrences_After_Initial_Reset()
     {
         SetResources();

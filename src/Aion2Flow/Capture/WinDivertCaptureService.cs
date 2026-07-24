@@ -23,8 +23,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
     private readonly ProtocolRoundTripEstimator _protocolRttEstimator = new();
     private readonly TcpWorldConnectionCandidateTracker _candidateConnections = new();
     private readonly TcpDownstreamConnectionTracker _downstreamConnections = new();
-    private readonly Lock _pendingPromotionGate = new();
-    private readonly Dictionary<TcpConnection, CaptureConnectionPromotion> _pendingPromotions = [];
+    private readonly PendingPromotionRegistry _pendingPromotions = new();
     private readonly CaptureTimestampMapper _captureTimestampMapper = new();
     private long _nextConnectionOrdinal;
 
@@ -68,10 +67,10 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             return;
 
         CaptureConnectionGate.Unlock();
+        _pendingPromotions.CancelAll();
         PacketCaptureChannel.Drain();
         _candidateConnections.DiscardAll();
         _downstreamConnections.Clear();
-        CancelPendingPromotions();
         _protocolRttEstimator.Clear();
         try
         {
@@ -176,7 +175,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         if (startsNewConnection)
                         {
                             _candidateConnections.Reset(in startedDownstream);
-                            RemovePendingPromotion(in startedDownstream);
+                            _pendingPromotions.CancelForSupersededAttempt(in startedDownstream);
                         }
                     }
 
@@ -228,7 +227,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                                  _cts.Token);
                         }
 
-                        var hasQueuedPromotion = TryGetPendingPromotionForClose(
+                        var hasQueuedPromotion = _pendingPromotions.TryGetForClose(
                             in connection,
                             packetConnectionOrdinal,
                             out var closingPromotion);
@@ -239,33 +238,45 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         var closeGeneration = admission.Kind == CapturePacketAdmissionKind.ActiveConnection
                             ? admission.Generation
                             : 0;
+                        var closeQueued = false;
                         if (ShouldDispatchConnectionClose(
                                 in connection,
                                 admission,
                                 closeConnectionOrdinal,
                                 hasQueuedPromotion))
                         {
-                            PacketCaptureChannel.WriteConnectionClose(
+                            closeQueued = PacketCaptureChannel.WriteConnectionClose(
                                 in connection,
                                 closeGeneration,
                                 closeConnectionOrdinal,
                                 _cts.Token);
                         }
                         var reverseConnection = connection.Reverse();
+                        if (closingPromotion is not null)
+                        {
+                            if (closeQueued)
+                            {
+                                _pendingPromotions.DetachAfterQueuedClose(in connection, closingPromotion);
+                            }
+                            else
+                            {
+                                _pendingPromotions.CancelAfterFailedClose(in connection, closingPromotion);
+                            }
+                        }
+                        _pendingPromotions.CancelUnselectedForClose(
+                            in connection,
+                            closeConnectionOrdinal,
+                            closingPromotion);
                         if (closeConnectionOrdinal > 0)
                         {
                             _candidateConnections.Reset(in connection, closeConnectionOrdinal);
                             _candidateConnections.Reset(in reverseConnection, closeConnectionOrdinal);
-                            RemovePendingPromotion(in connection, closeConnectionOrdinal);
-                            RemovePendingPromotion(in reverseConnection, closeConnectionOrdinal);
                             _downstreamConnections.Remove(in connection, closeConnectionOrdinal);
                         }
                         else
                         {
                             _candidateConnections.Reset(in connection);
                             _candidateConnections.Reset(in reverseConnection);
-                            RemovePendingPromotion(in connection);
-                            RemovePendingPromotion(in reverseConnection);
                             _downstreamConnections.Remove(in connection);
                         }
 
@@ -339,8 +350,8 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         long observedTimestamp,
         CancellationToken cancellationToken)
     {
-        var hasPendingPromotion = TryGetPendingPromotion(in connection, out var pendingPromotion) &&
-            (connectionOrdinal <= 0 || pendingPromotion!.CandidateOrdinal == connectionOrdinal);
+        var hasPendingPromotion = _pendingPromotions.TryGetForPayload(in connection, connectionOrdinal, out var pendingPromotion) &&
+            pendingPromotion is not null;
         var activeConnectionOrdinal = 0L;
         var hasActiveConnectionOrdinal = admission.Kind == CapturePacketAdmissionKind.ActiveConnection &&
             CaptureConnectionGate.TryGetActiveConnectionOrdinal(
@@ -433,10 +444,10 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             return;
         }
 
-        SetPendingPromotion(in connection, promotion);
+        _pendingPromotions.Register(in connection, promotion);
         if (!PacketCaptureChannel.WritePromotion(promotion, cancellationToken))
         {
-            RemovePendingPromotion(in connection, promotion);
+            _pendingPromotions.DetachPromotion(promotion);
             promotion.Return();
         }
     }
@@ -543,28 +554,6 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                 : 0;
     }
 
-    internal static CaptureConnectionPromotion? SelectPendingPromotionForClose(
-        long packetConnectionOrdinal,
-        CaptureConnectionPromotion? directPromotion,
-        CaptureConnectionPromotion? reversePromotion)
-    {
-        if (directPromotion is not null &&
-            (packetConnectionOrdinal <= 0 ||
-             directPromotion.CandidateOrdinal == packetConnectionOrdinal))
-        {
-            return directPromotion;
-        }
-
-        if (reversePromotion is not null &&
-            (packetConnectionOrdinal <= 0 ||
-             reversePromotion.CandidateOrdinal == packetConnectionOrdinal))
-        {
-            return reversePromotion;
-        }
-
-        return null;
-    }
-
     private long AllocateConnectionOrdinal()
     {
         var ordinal = Interlocked.Increment(ref _nextConnectionOrdinal);
@@ -598,7 +587,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
 
         _candidateConnections.DiscardAll();
         _downstreamConnections.Clear();
-        CancelPendingPromotions();
+        _pendingPromotions.CancelAll();
 
         await Dispatcher.StopAsync().ConfigureAwait(false);
         PacketCaptureChannel.Drain();
@@ -632,75 +621,6 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         StatusChanged?.Invoke(message);
     }
 
-    private bool TryGetPendingPromotion(
-        in TcpConnection connection,
-        out CaptureConnectionPromotion? promotion)
-    {
-        lock (_pendingPromotionGate)
-        {
-            return _pendingPromotions.TryGetValue(connection, out promotion);
-        }
-    }
-
-    private bool TryGetPendingPromotionForClose(
-        in TcpConnection connection,
-        long packetConnectionOrdinal,
-        out CaptureConnectionPromotion? promotion)
-    {
-        lock (_pendingPromotionGate)
-        {
-            _pendingPromotions.TryGetValue(connection, out var directPromotion);
-            _pendingPromotions.TryGetValue(connection.Reverse(), out var reversePromotion);
-            promotion = SelectPendingPromotionForClose(
-                packetConnectionOrdinal,
-                directPromotion,
-                reversePromotion);
-            return promotion is not null;
-        }
-    }
-
-    private void SetPendingPromotion(in TcpConnection connection, CaptureConnectionPromotion promotion)
-    {
-        lock (_pendingPromotionGate)
-        {
-            _pendingPromotions[connection] = promotion;
-        }
-    }
-
-    private void RemovePendingPromotion(in TcpConnection connection)
-    {
-        lock (_pendingPromotionGate)
-        {
-            _pendingPromotions.Remove(connection);
-        }
-    }
-
-    private void RemovePendingPromotion(in TcpConnection connection, long expectedConnectionOrdinal)
-    {
-        lock (_pendingPromotionGate)
-        {
-            if (_pendingPromotions.TryGetValue(connection, out var promotion) &&
-                promotion.CandidateOrdinal == expectedConnectionOrdinal)
-            {
-                _pendingPromotions.Remove(connection);
-            }
-        }
-    }
-
-    private void RemovePendingPromotion(
-        in TcpConnection connection,
-        CaptureConnectionPromotion expectedPromotion)
-    {
-        lock (_pendingPromotionGate)
-        {
-            if (_pendingPromotions.TryGetValue(connection, out var currentPromotion) &&
-                ReferenceEquals(currentPromotion, expectedPromotion))
-            {
-                _pendingPromotions.Remove(connection);
-            }
-        }
-    }
-
     private void OnPromotionCompleted(CaptureConnectionPromotion promotion, bool wasPromoted)
     {
         var connection = promotion.Connection;
@@ -709,20 +629,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             _downstreamConnections.MarkPromoted(in connection, promotion.CandidateOrdinal);
         }
 
-        RemovePendingPromotion(in connection, promotion);
-    }
-
-    private void CancelPendingPromotions()
-    {
-        lock (_pendingPromotionGate)
-        {
-            foreach (var promotion in _pendingPromotions.Values)
-            {
-                promotion.Cancel();
-            }
-
-            _pendingPromotions.Clear();
-        }
+        _pendingPromotions.DetachPromotion(promotion);
     }
 
     private void OnProtocolRoundTripObserved(ProtocolRoundTripObservation observation)

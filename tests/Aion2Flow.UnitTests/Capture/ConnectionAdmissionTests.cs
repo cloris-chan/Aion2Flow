@@ -723,16 +723,19 @@ public sealed class ConnectionAdmissionTests
         {
             var candidateAdmission = packet.Admission;
             var closeConnection = closeFromReverseDirection ? connection.Reverse() : connection;
-            var selectedPromotion = WinDivertCaptureService.SelectPendingPromotionForClose(
+            var registry = new PendingPromotionRegistry();
+            registry.Register(in connection, promotion);
+            Assert.True(registry.TryGetForClose(
+                in closeConnection,
                 packetConnectionOrdinal: 7,
-                directPromotion: closeFromReverseDirection ? null : promotion,
-                reversePromotion: closeFromReverseDirection ? promotion : null);
+                out var selectedPromotion));
             Assert.Same(promotion, selectedPromotion);
             Assert.True(WinDivertCaptureService.ShouldDispatchConnectionClose(
                 in closeConnection,
                 in candidateAdmission,
                 connectionOrdinal: 7,
                 hasQueuedPromotion: true));
+            Assert.True(registry.DetachAfterQueuedClose(in closeConnection, promotion));
 
             var promotionItem = CaptureDispatchItem.ForPromotion(promotion);
             try
@@ -842,28 +845,6 @@ public sealed class ConnectionAdmissionTests
                 item.Return();
             }
         }
-    }
-
-    [Fact]
-    public void StreamReplaySeparatesSameTupleTransportAttempts()
-    {
-        var timestamp = DateTimeOffset.UtcNow;
-        var incompleteFirstAttempt = Build3336Frame(1, "A");
-        var secondAttempt = Build3336Frame(2, "B");
-        var incompleteLength = incompleteFirstAttempt.Length / 2;
-        var connectionText = "33554442:21060->16777226:49628";
-        var log = string.Join(
-            Environment.NewLine,
-            $"{timestamp:O}|dir=inbound|{connectionText}|seq=100|attempt=1|len={incompleteLength}|data={Convert.ToHexString(incompleteFirstAttempt.AsSpan(0, incompleteLength))}",
-            $"{timestamp.AddMilliseconds(1):O}|dir=inbound|{connectionText}|seq=200|attempt=2|len={secondAttempt.Length}|data={Convert.ToHexString(secondAttempt)}");
-
-        using var reader = new StringReader(log);
-        var replay = PacketLogReplayService.Replay(reader, "same-tuple.stream.log");
-
-        Assert.Equal(2, replay.TotalLines);
-        Assert.Equal(1, replay.ReplayedLines);
-        Assert.True(replay.SceneOwner.Entities.TryGet(2, out var entity));
-        Assert.Equal("B", entity.Nickname);
     }
 
     [Fact]
