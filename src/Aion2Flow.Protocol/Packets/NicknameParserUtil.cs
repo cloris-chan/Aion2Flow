@@ -45,58 +45,6 @@ internal static class NicknameParserUtil
         return true;
     }
 
-    public static bool TryReadServerLegionBlock(ReadOnlySpan<byte> packet, int firstServerOffset, int repeatedServerDistance, LegionIdentityTrailerKind trailerKind, out int originServerId, out string legionName)
-    {
-        originServerId = 0;
-        legionName = string.Empty;
-
-        if (!TryReadOriginServerIdLe16(packet, firstServerOffset, out var firstServerId))
-        {
-            return false;
-        }
-
-        originServerId = firstServerId;
-
-        if (repeatedServerDistance <= 0)
-        {
-            return true;
-        }
-
-        var repeatedServerOffset = firstServerOffset + repeatedServerDistance;
-        if (!TryReadOriginServerIdLe16(packet, repeatedServerOffset, out var repeatedServerId) || repeatedServerId != firstServerId)
-        {
-            originServerId = 0;
-            return false;
-        }
-
-        var legionNameLengthOffset = repeatedServerOffset + sizeof(ushort);
-        if (!TryReadLengthPrefixedIdentityText(packet, legionNameLengthOffset, out var parsedLegionName, out _, out var tailOffset) ||
-            !IsLegionIdentityTrailer(packet, tailOffset, trailerKind))
-        {
-            originServerId = 0;
-            return false;
-        }
-
-        legionName = parsedLegionName;
-        return true;
-    }
-
-    private static bool IsLegionIdentityTrailer(ReadOnlySpan<byte> packet, int offset, LegionIdentityTrailerKind trailerKind)
-    {
-        if (TryReadFactionCode(packet, offset) == 0)
-        {
-            return false;
-        }
-
-        return trailerKind switch
-        {
-            LegionIdentityTrailerKind.Legacy => offset + 3 <= packet.Length && packet[offset + 1] == 0x00 && packet[offset + 2] == 0x02,
-            LegionIdentityTrailerKind.Current4536 => offset + 6 <= packet.Length && packet[offset + 2] == 0x00 && packet[offset + 3] == 0x08 && packet[offset + 4] == 0x02 && packet[offset + 5] == 0x00,
-            LegionIdentityTrailerKind.Latest4536 => offset + 8 <= packet.Length && packet[offset + 1] == 0x00 && packet[offset + 2] == 0x02 && packet[offset + 4] == 0x00 && packet[offset + 5] == 0x06 && packet[offset + 6] == 0x02 && packet[offset + 7] == 0x00,
-            _ => false
-        };
-    }
-
     public static bool TryReadOriginServerIdLe16(ReadOnlySpan<byte> packet, int offset, out int originServerId)
     {
         originServerId = 0;
@@ -144,11 +92,4 @@ internal static class NicknameParserUtil
     }
 
     private static bool IsCurrentClassCode(int value) => value is >= 5 and <= 36 or >= 45 and <= 48;
-}
-
-internal enum LegionIdentityTrailerKind
-{
-    Legacy,
-    Current4536,
-    Latest4536
 }
