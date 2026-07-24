@@ -20,6 +20,10 @@ env:
   RELEASES_DIR: ./Releases
   VELOPACK_RUNTIME: win-x64
   ICON_PATH: ./assets/Aion2Flow.ico
+  S3_ENDPOINT: https://ff0ee347878cedfaf9d799603716d78c.r2.cloudflarestorage.com
+  S3_BUCKET: aion2flow
+  S3_PREFIX: releases
+  S3_PUBLIC_BASE_URL: https://aion2flow.cloris.me/releases
 
 jobs:
   release:
@@ -33,14 +37,20 @@ jobs:
         id: meta
         run: |
           $tag = "${{ github.ref_name }}"
-          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)(?:-(?<channel>[0-9A-Za-z][0-9A-Za-z.-]*))?$') {
+          if ($tag -notmatch '^v(?<core>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(?:-(?<channel>[A-Za-z][0-9A-Za-z-]*)(?<suffix>(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?$') {
             Write-Error "Invalid tag format. Expected vX.X.X or vX.X.X-<channel>."
             exit 1
           }
 
-          $version = $tag -replace '^v', ''
-          $packChannel = if ([string]::IsNullOrWhiteSpace($Matches['channel'])) { 'stable' } else { $Matches['channel'].ToLowerInvariant() }
-          $isPrerelease = $packChannel -ne 'stable'
+          $version = $tag.Substring(1)
+          $prereleaseChannel = $Matches['channel']
+          $isPrerelease = -not [string]::IsNullOrWhiteSpace($prereleaseChannel)
+          if ($isPrerelease -and $prereleaseChannel.Equals('stable', [StringComparison]::OrdinalIgnoreCase)) {
+            Write-Error "The prerelease channel name 'stable' is reserved."
+            exit 1
+          }
+
+          $packChannel = if ($isPrerelease) { $prereleaseChannel.ToLowerInvariant() } else { 'stable' }
 
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -51,6 +61,51 @@ jobs:
           Write-Host "Version     : $version"
           Write-Host "Channel     : $packChannel"
           Write-Host "Prerelease  : $isPrerelease"
+
+      - name: Resolve S3 backup configuration
+        id: s3
+        env:
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: |
+          $credentials = [ordered]@{
+            S3_ACCESS_KEY_ID = $env:S3_ACCESS_KEY_ID
+            S3_SECRET_ACCESS_KEY = $env:S3_SECRET_ACCESS_KEY
+          }
+
+          $configuredCount = @($credentials.Values | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+          if ($configuredCount -eq 0) {
+            "enabled=false" >> $env:GITHUB_OUTPUT
+            Write-Warning "S3 backup publishing is not configured; this release will use GitHub only."
+            return
+          }
+
+          $missing = @($credentials.GetEnumerator() | Where-Object { [string]::IsNullOrWhiteSpace($_.Value) } | ForEach-Object Key)
+          if ($missing.Count -gt 0) {
+            throw "S3 backup configuration is incomplete. Missing: $($missing -join ', ')."
+          }
+
+          $publicBaseUrl = $env:S3_PUBLIC_BASE_URL.Trim()
+          $publicUri = $null
+          if (-not [Uri]::TryCreate($publicBaseUrl, [UriKind]::Absolute, [ref]$publicUri) -or
+              $publicUri.Scheme -ne [Uri]::UriSchemeHttps -or
+              -not [string]::IsNullOrEmpty($publicUri.UserInfo) -or
+              -not [string]::IsNullOrEmpty($publicUri.Query) -or
+              -not [string]::IsNullOrEmpty($publicUri.Fragment)) {
+            throw "S3_PUBLIC_BASE_URL must be an absolute HTTPS directory URL without credentials, a query, or a fragment."
+          }
+
+          $expectedPathSuffix = "/$($env:S3_PREFIX)"
+          if (-not $publicUri.AbsolutePath.TrimEnd("/").EndsWith($expectedPathSuffix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "S3_PUBLIC_BASE_URL must point to the '$($env:S3_BUCKET)/$($env:S3_PREFIX)' object path and end with '$expectedPathSuffix'."
+          }
+
+          "enabled=true" >> $env:GITHUB_OUTPUT
+          "public_base_url=$($publicUri.AbsoluteUri.TrimEnd('/'))" >> $env:GITHUB_OUTPUT
+
+          Write-Host "S3 backup publishing is enabled."
+          Write-Host "Public feed : $($publicUri.AbsoluteUri.TrimEnd('/'))"
+          Write-Host "Object path : $($env:S3_BUCKET)/$($env:S3_PREFIX)"
 
       - name: Setup .NET 10 SDK
         uses: actions/setup-dotnet@v5
@@ -81,7 +136,9 @@ jobs:
         run: dotnet test ${{ env.SOLUTION_PATH }} -c Release --no-build -m:1 --verbosity normal
 
       - name: Publish
-        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -o ${{ env.PUBLISH_DIR }}
+        env:
+          AION2FLOW_BACKUP_UPDATE_FEED_URL: ${{ steps.s3.outputs.public_base_url }}
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -o ${{ env.PUBLISH_DIR }} -p:Aion2FlowBackupUpdateFeedUrl="$env:AION2FLOW_BACKUP_UPDATE_FEED_URL"
 
       - name: Download previous releases for delta generation
         run: |
@@ -112,6 +169,57 @@ jobs:
             --icon "${{ env.ICON_PATH }}" `
             --delta BestSize `
             --noInst
+
+      - name: Upload S3 backup release
+        if: ${{ steps.s3.outputs.enabled == 'true' }}
+        env:
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: |
+          $arguments = @(
+            "upload",
+            "s3",
+            "--outputDir", $env:RELEASES_DIR,
+            "--channel", "${{ steps.meta.outputs.pack_channel }}",
+            "--keyId", $env:S3_ACCESS_KEY_ID,
+            "--secret", $env:S3_SECRET_ACCESS_KEY,
+            "--endpoint", $env:S3_ENDPOINT,
+            "--bucket", $env:S3_BUCKET,
+            "--prefix", $env:S3_PREFIX
+          )
+
+          vpk @arguments
+
+      - name: Verify S3 backup feed
+        if: ${{ steps.s3.outputs.enabled == 'true' }}
+        run: |
+          $smokeDirectory = Join-Path $env:RUNNER_TEMP "aion2flow-s3-smoke"
+          vpk download http `
+            --outputDir $smokeDirectory `
+            --channel "${{ steps.meta.outputs.pack_channel }}" `
+            --url $env:S3_PUBLIC_BASE_URL
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          $feedPath = Join-Path $env:RELEASES_DIR "releases.${{ steps.meta.outputs.pack_channel }}.json"
+          $feed = Get-Content -LiteralPath $feedPath -Raw | ConvertFrom-Json
+          $matchingFullPackages = @($feed.Assets | Where-Object {
+            $_.PackageId -eq "${{ env.APP_ID }}" -and
+            $_.Version -eq "${{ steps.meta.outputs.version }}" -and
+            $_.Type -eq "Full"
+          })
+
+          if ($matchingFullPackages.Count -ne 1) {
+            throw "Expected exactly one full package for Aion2Flow ${{ steps.meta.outputs.version }} in '$feedPath', found $($matchingFullPackages.Count)."
+          }
+
+          $expectedPackage = Join-Path $smokeDirectory $matchingFullPackages[0].FileName
+          if (-not (Test-Path -LiteralPath $expectedPackage -PathType Leaf)) {
+            $downloadedFiles = @(Get-ChildItem -LiteralPath $smokeDirectory -File | ForEach-Object Name)
+            throw "S3 backup feed did not return the expected package '$expectedPackage'. Downloaded: $($downloadedFiles -join ', ')."
+          }
 
       - name: Upload GitHub release
         run: |

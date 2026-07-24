@@ -22,6 +22,10 @@
     <PackageReference Include="Velopack" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(Aion2FlowBackupUpdateFeedUrl)' != ''">
+    <AssemblyMetadata Include="Aion2Flow.BackupUpdateFeedUrl" Value="$(Aion2FlowBackupUpdateFeedUrl)" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Aion2Flow.Capture\Aion2Flow.Capture.csproj" />
     <ProjectReference Include="..\Aion2Flow.Resources\Aion2Flow.Resources.csproj" />
