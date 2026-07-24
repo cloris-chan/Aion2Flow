@@ -117,7 +117,7 @@ public sealed class ResourceOnlyProjectionTests
         Assert.Equal(eventCount, sourceDetail.ResourceEvents.Count);
         Assert.Equal(eventCount, targetDetail.ResourceEvents.Count);
 
-        var payload = owner.CreateArchivePayload(snapshot);
+        var payload = owner.CreateArchivePayload();
         var playback = new ScenePlaybackSession(new TestPlaybackSource(owner.EncounterId, payload.TimelineSegment, snapshot));
         var frame = playback.Seek(100, TestContext.Current.CancellationToken);
         var playbackDetail = playback.CreateCombatantDetail(targetId);
@@ -136,13 +136,13 @@ public sealed class ResourceOnlyProjectionTests
         const int targetId = 200;
         var owner = CreateOwner(sourceId, targetId);
         var snapshot = owner.CreateSnapshot();
-        var payload = owner.CreateArchivePayload(snapshot);
+        var payload = owner.CreateArchivePayload();
         var service = new EncounterArchiveService();
 
-        var record = service.Archive(snapshot, payload, "resource-only", isAutomatic: false);
+        var record = service.Archive(payload, "resource-only", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.True(service.TryGetEncounter(record!.EncounterId, out var restored));
+        Assert.True(service.TryGetEncounter(record!.ScenePayload.Snapshot.EncounterId, out var restored));
         var pair = Assert.Single(restored!.ScenePayload.Pairs);
         Assert.Equal(new DirectedPairKey(sourceId, targetId), pair.Key);
         Assert.Equal(0, pair.TotalDamage);
@@ -168,13 +168,13 @@ public sealed class ResourceOnlyProjectionTests
         const int targetId = 200;
         var owner = CreateOwner(sourceId: 0, targetId);
         var snapshot = owner.CreateSnapshot();
-        var payload = owner.CreateArchivePayload(snapshot);
+        var payload = owner.CreateArchivePayload();
         var service = new EncounterArchiveService();
 
-        var record = service.Archive(snapshot, payload, "unknown-resource-source", isAutomatic: false);
+        var record = service.Archive(payload, "unknown-resource-source", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.True(service.TryGetEncounter(record!.EncounterId, out var restored));
+        Assert.True(service.TryGetEncounter(record!.ScenePayload.Snapshot.EncounterId, out var restored));
         Assert.Empty(restored!.ScenePayload.Pairs);
         var target = Assert.Single(restored.ScenePayload.Combatants);
         Assert.Equal(targetId, target.CombatantId);

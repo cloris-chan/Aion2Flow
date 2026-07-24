@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -34,13 +35,13 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private const int LiveCombatantInitialCapacity = 128;
     private const int LivePairInitialCapacity = 512;
     private readonly Lock _gate = new();
-    private readonly Queue<SceneArchiveCapture> _pendingArchives = [];
+    private readonly Queue<SceneArchivePayload> _pendingArchives = [];
     private readonly HashSet<int> _seededBossSceneRuntimeStates = [];
     private long _nextFlushId;
     private SceneKind _kind;
     private BossSceneState _bossState;
     private long _frozenEndObservationOrdinalExclusive = -1;
-    private SceneArchiveCapture? _frozenArchive;
+    private SceneArchivePayload? _frozenArchive;
     private LiveScenePlaybackState? _playbackState;
     private int _playbackSourceCount;
 
@@ -157,49 +158,72 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         }
     }
 
-    public SceneArchiveCapture? ChangeKind(SceneKind kind, DateTimeOffset sessionStarted, bool archiveCurrent)
+    public SceneArchivePayload? ChangeKind(SceneKind kind, DateTimeOffset sessionStarted, bool archiveCurrent)
     {
         lock (_gate)
         {
-            SceneArchiveCapture? archive = archiveCurrent ? CreateArchiveCaptureCore() : null;
-            if (archive is { } capture)
-                FinalizePlaybackStateCore(capture);
+            SceneArchivePayload? archive = archiveCurrent ? CreateArchivePayloadCore() : null;
+            if (archive is { } payload)
+                FinalizePlaybackStateCore(payload);
             ResetCore(sessionStarted, kind);
             return archive;
         }
     }
 
-    public SceneArchiveCapture? ChangeKind(SceneKind kind, Func<DateTimeOffset> resolveSessionStarted, bool archiveCurrent)
+    public SceneArchivePayload? ChangeKind(SceneKind kind, Func<DateTimeOffset> resolveSessionStarted, bool archiveCurrent)
     {
         lock (_gate)
         {
-            SceneArchiveCapture? archive = archiveCurrent ? CreateArchiveCaptureCore() : null;
-            if (archive is { } capture)
-                FinalizePlaybackStateCore(capture);
+            SceneArchivePayload? archive = archiveCurrent ? CreateArchivePayloadCore() : null;
+            if (archive is { } payload)
+                FinalizePlaybackStateCore(payload);
             ResetCore(resolveSessionStarted(), kind);
             return archive;
         }
     }
 
-    public bool TryDequeuePendingArchive(out SceneArchiveCapture archive)
+    public bool TryDequeuePendingArchive(out SceneArchivePayload payload)
     {
         lock (_gate)
         {
             if (_pendingArchives.Count == 0)
             {
-                archive = default;
+                payload = default!;
                 return false;
             }
 
-            archive = _pendingArchives.Dequeue();
+            payload = _pendingArchives.Dequeue();
             return true;
         }
     }
 
-    public SceneArchiveCapture CreateArchiveCapture()
+    public SceneArchivePayload CreateArchivePayload()
     {
         lock (_gate)
-            return CreateArchiveCaptureCore();
+            return CreateArchivePayloadCore();
+    }
+
+    internal bool TryHandleMapTransition(
+        Func<DateTimeOffset> resolveSessionStarted,
+        out SceneArchivePayload? payload,
+        out SceneTransitionKind transitionKind)
+    {
+        ArgumentNullException.ThrowIfNull(resolveSessionStarted);
+
+        lock (_gate)
+        {
+            if (_kind == SceneKind.Boss ||
+                !Owner.TryCreateTransitionArchive(out payload, out transitionKind, out var boundaryOrdinal))
+            {
+                payload = null;
+                transitionKind = SceneTransitionKind.None;
+                return false;
+            }
+
+            if (payload is not null)
+                ResetCore(resolveSessionStarted(), _kind, boundaryOrdinal, payload);
+            return true;
+        }
     }
 
     public LiveScenePlaybackSource CreatePlaybackSource()
@@ -207,7 +231,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         lock (_gate)
         {
             if (_kind == SceneKind.Boss && _bossState == BossSceneState.Frozen)
-                return new LiveScenePlaybackSource(LiveScenePlaybackState.CreateFrozen(this, GetFrozenArchiveCore()));
+                return new LiveScenePlaybackSource(LiveScenePlaybackState.CreateFrozen(this, GetFrozenArchivePayloadCore()));
 
             var state = _playbackState;
             if (state is null)
@@ -270,8 +294,11 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         => ResetCore(sessionStarted, _kind);
 
     private void ResetCore(DateTimeOffset sessionStarted, SceneKind kind)
+        => ResetCore(sessionStarted, kind, Clock.NextObservationOrdinal);
+
+    private void ResetCore(DateTimeOffset sessionStarted, SceneKind kind, long startOrdinal, SceneArchivePayload? playbackPayload = null)
     {
-        FinalizePlaybackStateCore();
+        FinalizePlaybackStateCore(playbackPayload);
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
         Clock.Reset(sessionStarted);
@@ -282,7 +309,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         _seededBossSceneRuntimeStates.Clear();
         Owner.ResetCombat(
             SessionId,
-            Clock.NextObservationOrdinal,
+            startOrdinal,
             sessionStarted,
             kind,
             trackBossFocus: kind == SceneKind.Standard);
@@ -313,7 +340,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             if (Owner.EntityVitals.TryGet(focusTargetId, out var focusTargetVital) && focusTargetVital.CurrentHp == 0)
                 return false;
 
-            _pendingArchives.Enqueue(GetFrozenArchiveCore());
+            _pendingArchives.Enqueue(GetFrozenArchivePayloadCore());
         }
 
         var started = packet.CaptureTimestampMilliseconds > 0
@@ -369,37 +396,37 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             return;
 
         _frozenEndObservationOrdinalExclusive = Owner.AppliedNextObservationOrdinal;
-        _frozenArchive = Owner.CreateArchiveCapture(_frozenEndObservationOrdinalExclusive);
-        FinalizePlaybackStateCore(_frozenArchive.Value);
+        _frozenArchive = Owner.CreateArchivePayload(_frozenEndObservationOrdinalExclusive);
+        FinalizePlaybackStateCore(_frozenArchive);
         _bossState = BossSceneState.Frozen;
         Owner.SetBossFocusTracking(false);
     }
 
-    private void FinalizePlaybackStateCore(SceneArchiveCapture? capture = null)
+    private void FinalizePlaybackStateCore(SceneArchivePayload? payload = null)
     {
         var state = _playbackState;
         if (state is null)
             return;
 
-        state.Freeze(capture ?? CreateArchiveCaptureCore());
+        state.Freeze(payload ?? CreateArchivePayloadCore());
         _playbackState = null;
         _playbackSourceCount = 0;
     }
 
-    private SceneArchiveCapture CreateArchiveCaptureCore()
+    private SceneArchivePayload CreateArchivePayloadCore()
     {
         if (_kind == SceneKind.Boss &&
             _bossState == BossSceneState.Frozen &&
             _frozenEndObservationOrdinalExclusive >= 0)
         {
-            return GetFrozenArchiveCore();
+            return GetFrozenArchivePayloadCore();
         }
 
-        return Owner.CreateArchiveCapture();
+        return Owner.CreateArchivePayload();
     }
 
-    private SceneArchiveCapture GetFrozenArchiveCore() =>
-        _frozenArchive ?? throw new InvalidOperationException("Frozen boss scene has no archive capture.");
+    private SceneArchivePayload GetFrozenArchivePayloadCore() =>
+        _frozenArchive ?? throw new InvalidOperationException("Frozen boss scene has no archive payload.");
 
     private bool TryResolveFocusTargetPlayerCombat(int sourceId, int targetId, out int focusTargetId)
     {

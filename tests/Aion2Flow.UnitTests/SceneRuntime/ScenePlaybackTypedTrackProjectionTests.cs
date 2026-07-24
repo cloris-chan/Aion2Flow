@@ -138,7 +138,7 @@ public sealed class ScenePlaybackTypedTrackProjectionTests
     {
         var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.UnixEpoch);
         var snapshot = owner.CreateSnapshot();
-        return (owner.CreateArchivePayload(snapshot).TimelineSegment, snapshot);
+        return (owner.CreateArchivePayload().TimelineSegment, snapshot);
     }
 
     private static void AppendCombat(

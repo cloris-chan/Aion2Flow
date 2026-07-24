@@ -409,8 +409,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteFlush(2);
 
         var snapshot = scene.Owner.CreateSnapshot();
-        var payload = scene.Owner.CreateArchivePayload(snapshot);
-        var record = archive.Archive(snapshot, payload, "manual", isAutomatic: false);
+        var payload = scene.Owner.CreateArchivePayload();
+        var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
@@ -445,11 +445,11 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteFlush(2);
 
         var snapshot = scene.Owner.CreateSnapshot();
-        var payload = scene.Owner.CreateArchivePayload(snapshot);
-        var record = archive.Archive(snapshot, payload, "manual", isAutomatic: false);
+        var payload = scene.Owner.CreateArchivePayload();
+        var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
-        Assert.Equal(snapshot.EncounterId, record!.EncounterId);
+        Assert.Equal(snapshot.EncounterId, record!.ScenePayload.Snapshot.EncounterId);
 
         scene.Reset();
         SelectArchivedSceneCombatant(viewModel, record, playerId);
@@ -516,8 +516,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteFlush(2);
 
         var snapshot = scene.Owner.CreateSnapshot();
-        var payload = scene.Owner.CreateArchivePayload(snapshot);
-        var record = archive.Archive(snapshot, payload, "manual", isAutomatic: false);
+        var payload = scene.Owner.CreateArchivePayload();
+        var record = archive.Archive(payload, "manual", isAutomatic: false);
 
         Assert.NotNull(record);
 
@@ -1379,7 +1379,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     private static void SelectArchivedSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, ArchivedEncounterRecord record, int combatantId, bool forceRefresh = false)
     {
         var detail = record.ScenePayload.CreateDetailDelta(combatantId);
-        viewModel.SelectSceneEncounterCombatant(record.EncounterId, combatantId, record.Snapshot, detail, forceRefresh);
+        viewModel.SelectSceneEncounterCombatant(record.ScenePayload.Snapshot.EncounterId, combatantId, record.ScenePayload.Snapshot, detail, forceRefresh);
     }
 
     [Fact]
@@ -1443,8 +1443,8 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         sink.CompleteFlush(2);
 
         var archivedSnapshot = scene.Owner.CreateSnapshot();
-        var payload = scene.Owner.CreateArchivePayload(archivedSnapshot);
-        var record = archive.Archive(archivedSnapshot, payload, "manual", isAutomatic: false);
+        var payload = scene.Owner.CreateArchivePayload();
+        var record = archive.Archive(payload, "manual", isAutomatic: false);
         Assert.NotNull(record);
 
         scene.Reset();

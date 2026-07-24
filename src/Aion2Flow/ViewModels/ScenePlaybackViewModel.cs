@@ -865,11 +865,11 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         var snapshot = _source.CreateSnapshot();
         var frozenIdentityScope = SceneIdentityScope.Empty;
         var isFrozen = false;
-        if (_source is LiveScenePlaybackSource liveSource && liveSource.TryGetFrozenArchive(out var frozenArchive))
+        if (_source is LiveScenePlaybackSource liveSource && liveSource.TryGetFrozenPayload(out var frozenPayload))
         {
             isFrozen = true;
-            snapshot = frozenArchive.Snapshot;
-            frozenIdentityScope = frozenArchive.Payload.IdentityScope;
+            snapshot = frozenPayload.Snapshot;
+            frozenIdentityScope = frozenPayload.IdentityScope;
         }
 
         if (!ReferenceEquals(_sceneDescriptorSnapshot, snapshot) || isFrozen && DisplayContext.MetadataRegistry is not null)

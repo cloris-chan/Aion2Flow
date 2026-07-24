@@ -360,8 +360,8 @@ public sealed class BossSceneCollectionTests
         Assert.True(scene.TryDequeuePendingArchive(out var archived));
         Assert.Equal(SceneKind.Boss, archived.Snapshot.Kind);
         Assert.Equal(700, archived.Snapshot.Combatants[100].DamageAmount);
-        Assert.Equal([2_100_002], archived.Payload.BossNpcCodes);
-        Assert.Equal(frozenEnd, archived.Payload.TimelineSegment.EndObservationOrdinalExclusive);
+        Assert.Equal([2_100_002], archived.BossNpcCodes);
+        Assert.Equal(frozenEnd, archived.TimelineSegment.EndObservationOrdinalExclusive);
 
         var current = scene.CreateFrame().Snapshot;
         Assert.Equal(BossSceneState.Recording, scene.BossState);
@@ -384,15 +384,10 @@ public sealed class BossSceneCollectionTests
         sink.AppendNpcHp(Source(2_000), 300, 0, 100_000);
         timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
         _ = scene.CreateFrame();
-        var archive = scene.CreateArchiveCapture();
+        var archive = scene.CreateArchivePayload();
 
         await using var controller = new ScenePlaybackController(
-            new ArchivedScenePlaybackSource(new()
-            {
-                EncounterId = archive.Snapshot.EncounterId,
-                Snapshot = archive.Snapshot,
-                ScenePayload = archive.Payload
-            }),
+            new ArchivedScenePlaybackSource(archive),
             new ManualTickSourceFactory(),
             TimeSpan.FromMilliseconds(33));
 

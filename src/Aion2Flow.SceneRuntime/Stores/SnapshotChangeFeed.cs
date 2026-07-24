@@ -1,10 +1,5 @@
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
-public interface IRevisionedSnapshot
-{
-    long Revision { get; }
-}
-
 public readonly record struct SnapshotChangeCursor(long Revision, int Offset);
 
 public readonly record struct SnapshotChangeBatch<TChange>(long FromRevision, long ToRevision, IReadOnlyList<TChange> Changes, bool HasMore);

@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
-
 namespace Cloris.Aion2Flow.SceneRuntime.Archive;
 
 public sealed class EncounterArchiveService
@@ -17,13 +16,14 @@ public sealed class EncounterArchiveService
 
     public IReadOnlyList<ArchivedEncounterRecord> History => _historySnapshot;
 
-    public ArchivedEncounterRecord? Archive(SceneCombatSnapshot snapshot, SceneArchivePayload payload, string trigger, bool isAutomatic)
+    public ArchivedEncounterRecord? Archive(SceneArchivePayload payload, string trigger, bool isAutomatic)
     {
-        return AddArchiveRecord(snapshot, payload, trigger, isAutomatic);
+        return AddArchiveRecord(payload, trigger, isAutomatic);
     }
 
-    private ArchivedEncounterRecord? AddArchiveRecord(SceneCombatSnapshot archivedSnapshot, SceneArchivePayload scenePayload, string trigger, bool isAutomatic)
+    private ArchivedEncounterRecord? AddArchiveRecord(SceneArchivePayload scenePayload, string trigger, bool isAutomatic)
     {
+        var archivedSnapshot = scenePayload.Snapshot;
         if (archivedSnapshot.EncounterTime <= 0 || archivedSnapshot.EncounterEndTime < archivedSnapshot.EncounterStartTime || archivedSnapshot.Combatants.Count == 0)
         {
             return null;
@@ -33,28 +33,26 @@ public sealed class EncounterArchiveService
         bool historyChanged;
         lock (_lock)
         {
-            if (_history.Count > 0 && IsEquivalent(_history[0].Snapshot, archivedSnapshot))
+            if (_history.Count > 0 && IsEquivalent(_history[0].ScenePayload.Snapshot, archivedSnapshot))
             {
                 return null;
             }
 
             record = new ArchivedEncounterRecord
             {
-                EncounterId = archivedSnapshot.EncounterId,
                 ArchivedAt = scenePayload.SceneStarted.ToLocalTime(),
                 Trigger = trigger,
                 IsAutomatic = isAutomatic,
-                Snapshot = archivedSnapshot,
                 ScenePayload = scenePayload
             };
 
             _history.Insert(0, record);
-            _historyByEncounterId[record.EncounterId] = record;
+            _historyByEncounterId[archivedSnapshot.EncounterId] = record;
             if (_history.Count > MaxHistoryCount)
             {
                 for (var i = MaxHistoryCount; i < _history.Count; i++)
                 {
-                    _historyByEncounterId.Remove(_history[i].EncounterId);
+                    _historyByEncounterId.Remove(_history[i].ScenePayload.Snapshot.EncounterId);
                 }
 
                 _history.RemoveRange(MaxHistoryCount, _history.Count - MaxHistoryCount);

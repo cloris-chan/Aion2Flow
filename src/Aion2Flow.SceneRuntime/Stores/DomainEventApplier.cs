@@ -451,42 +451,28 @@ public sealed class DomainEventApplier
 
     private void ApplyScene(in SceneObservation scene)
     {
-        if (scene.DiagnosticKey == "stage-destination-map")
-        {
-            _boundary.StageDestinationMap(scene.MapId, scene.Value0 != 0);
-            return;
-        }
-
-        if (scene.DiagnosticKey == "pending-destination-map")
-        {
-            _boundary.StagePendingDestinationMap(scene.MapId, scene.Value0 != 0);
-            return;
-        }
+        _boundary.ApplySceneObservation(in scene);
 
         if (scene.DiagnosticKey == "confirm-destination-map")
         {
-            _boundary.ConfirmDestinationMap(scene.MapId, scene.Value0 != 0);
             _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
             return;
         }
 
         if (scene.DiagnosticKey == "confirm-pending-destination-map-arrival")
         {
-            _boundary.ConfirmPendingDestinationMapArrival();
             _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
             return;
         }
 
         if (scene.DiagnosticKey == "stage-destination-instance")
         {
-            _boundary.StageDestinationMapInstance(scene.MapInstanceId);
             _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
             return;
         }
 
         if (scene.DiagnosticKey == "confirm-destination-instance")
         {
-            _boundary.ConfirmDestinationMapInstance(scene.MapInstanceId);
             _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
             return;
         }
@@ -494,7 +480,6 @@ public sealed class DomainEventApplier
         if (scene.DiagnosticKey == "scene-transport-boundary")
         {
             _compactDirectValue.ResetPendingAssociations();
-            _boundary.MarkSceneTransportBoundary();
             _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
         }
     }

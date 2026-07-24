@@ -13,6 +13,7 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -363,7 +364,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         }
 
         IsViewingArchivedEncounter = true;
-        _displayedSnapshot = value.Record.Snapshot;
+        _displayedSnapshot = value.Record.ScenePayload.Snapshot;
         ApplySnapshot(_displayedSnapshot);
     }
 
@@ -395,15 +396,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             return;
         }
 
-        var previousLiveSnapshot = _latestLiveSnapshot;
         DrainPendingBossArchives();
+        DrainMapTransitionArchives();
         var selectedCombatantId = IsViewingArchivedEncounter ? 0 : SelectedCombatant?.Id ?? 0;
         var nextLiveFrame = CreateLiveFrame(selectedCombatantId);
         DrainPendingBossArchives();
-        if (TryAutoResetEncounter(previousLiveSnapshot, nextLiveFrame.Snapshot))
-        {
-            nextLiveFrame = CreateLiveFrame(selectedCombatantId);
-        }
 
         _latestLiveFrame = nextLiveFrame;
         _latestLiveSnapshot = nextLiveFrame.Snapshot;
@@ -533,7 +530,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         if (IsViewingArchivedEncounter && SelectedEncounterHistory is not null)
         {
-            _displayedSnapshot = SelectedEncounterHistory.Record.Snapshot;
+            _displayedSnapshot = SelectedEncounterHistory.Record.ScenePayload.Snapshot;
             ApplySnapshot(_displayedSnapshot, forceDetailRefresh);
             return;
         }
@@ -960,7 +957,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             EncounterHistory.Add(new EncounterHistoryItemViewModel(
                 record,
                 displayContext,
-                displayContext.ResolveSceneName(record.ScenePayload.Kind, record.Snapshot.MapId, record.ScenePayload.BossNpcCodes),
+                displayContext.ResolveSceneName(record.ScenePayload.Kind, record.ScenePayload.Snapshot.MapId, record.ScenePayload.BossNpcCodes),
                 record.ArchivedAt.ToString("HH:mm:ss")));
         }
 
@@ -997,7 +994,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         => CreateDisplayContext(snapshot, SceneIdentityScope.Empty, _captureService.Scene.Owner.MetadataRegistry);
 
     private SceneDisplayContext CreateArchivedDisplayContext(ArchivedEncounterRecord record)
-        => CreateDisplayContext(record.Snapshot, record.ScenePayload.IdentityScope, null);
+        => CreateDisplayContext(record.ScenePayload.Snapshot, record.ScenePayload.IdentityScope, null);
 
     internal ScenePlaybackOpenContext CreateCurrentPlaybackContext()
     {
@@ -1010,73 +1007,16 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     }
 
     internal static ScenePlaybackOpenContext CreatePlaybackContext(EncounterHistoryItemViewModel item)
-        => new(new ArchivedScenePlaybackSource(item.Record), item.DisplayContext);
+        => new(new ArchivedScenePlaybackSource(item.Record.ScenePayload), item.DisplayContext);
 
     private SceneDisplayContext CreateDisplayContext(SceneCombatSnapshot snapshot, SceneIdentityScope scope, RuntimeMetadataRegistry? metadataRegistry)
         => new(scope, metadataRegistry, snapshot, _gameResourceService, Localization["Scene_Unknown"]);
 
-    private ArchivedEncounterRecord? ArchiveEncounter(string trigger, bool isAutomatic, SceneCombatSnapshot? archivedSnapshot = null)
+    private ArchivedEncounterRecord? ArchiveEncounter(string trigger, bool isAutomatic)
     {
-        var owner = _captureService.Scene.Owner;
-        if (archivedSnapshot is null)
-        {
-            var archive = _captureService.Scene.CreateArchiveCapture();
-            return _encounterArchiveService.Archive(archive.Snapshot, archive.Payload, trigger, isAutomatic);
-        }
-
-        var payload = owner.CreateArchivePayload(archivedSnapshot);
-        return _encounterArchiveService.Archive(archivedSnapshot, payload, trigger, isAutomatic);
+        var payload = _captureService.Scene.CreateArchivePayload();
+        return _encounterArchiveService.Archive(payload, trigger, isAutomatic);
     }
-
-    private bool TryAutoResetEncounter(SceneCombatSnapshot previousLiveSnapshot, SceneCombatSnapshot latestLiveSnapshot)
-    {
-        if (_captureService.Scene.Kind == SceneKind.Boss)
-            return false;
-
-        if (TryResolveMapTransitionResetReason(previousLiveSnapshot, latestLiveSnapshot, out var mapTransitionReason))
-        {
-            ArchiveEncounter(mapTransitionReason, isAutomatic: true, previousLiveSnapshot);
-            ResetLiveModels(RawPacketDump.RotateLogs);
-            return true;
-        }
-
-        return false;
-    }
-
-    internal static bool TryResolveMapTransitionResetReason(
-        SceneCombatSnapshot previousLiveSnapshot,
-        SceneCombatSnapshot latestLiveSnapshot,
-        out string reason)
-    {
-        reason = string.Empty;
-
-        if (!HasArchivableEncounter(previousLiveSnapshot))
-        {
-            return false;
-        }
-
-        var previousMapId = previousLiveSnapshot.MapId;
-        var latestMapId = latestLiveSnapshot.MapId;
-        var previousInstanceId = previousLiveSnapshot.MapInstanceId;
-        var latestInstanceId = latestLiveSnapshot.MapInstanceId;
-
-        if (previousMapId != latestMapId)
-        {
-            reason = "map-transition";
-            return true;
-        }
-
-        if (previousInstanceId != latestInstanceId)
-        {
-            reason = "map-instance-transition";
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool HasArchivableEncounter(SceneCombatSnapshot snapshot)
-        => snapshot.EncounterTime > 0 && snapshot.Combatants.Count > 0;
 
     private void ResetLiveModels(Func<DateTimeOffset> resolveSessionStarted)
     {
@@ -1093,8 +1033,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         {
             DrainPendingBossArchives();
             var archive = _captureService.Scene.ChangeKind(SettingsFlyout.SceneKind, RawPacketDump.RotateLogs, archiveCurrent: true);
-            if (archive is { } capture)
-                ArchiveCapture(in capture, "scene-kind-change", isAutomatic: true);
+            if (archive is { } payload)
+                _encounterArchiveService.Archive(payload, "scene-kind-change", isAutomatic: true);
             ResetLivePresentation();
         }
         finally
@@ -1105,12 +1045,24 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private void DrainPendingBossArchives()
     {
-        while (_captureService.Scene.TryDequeuePendingArchive(out var capture))
-            ArchiveCapture(in capture, "boss-encounter-completed", isAutomatic: true);
+        while (_captureService.Scene.TryDequeuePendingArchive(out var payload))
+            _encounterArchiveService.Archive(payload, "boss-encounter-completed", isAutomatic: true);
     }
 
-    private ArchivedEncounterRecord? ArchiveCapture(in SceneArchiveCapture capture, string trigger, bool isAutomatic) =>
-        _encounterArchiveService.Archive(capture.Snapshot, capture.Payload, trigger, isAutomatic);
+    private void DrainMapTransitionArchives()
+    {
+        while (_captureService.Scene.TryHandleMapTransition(RawPacketDump.RotateLogs, out var payload, out var transitionKind))
+        {
+            var trigger = transitionKind switch
+            {
+                SceneTransitionKind.MapChanged => "map-transition",
+                SceneTransitionKind.InstanceChanged => "map-instance-transition",
+                _ => throw new InvalidOperationException($"Unexpected scene transition kind {transitionKind}.")
+            };
+            if (payload is not null)
+                _encounterArchiveService.Archive(payload, trigger, isAutomatic: true);
+        }
+    }
 
     private void ResetLivePresentation()
     {
@@ -1138,11 +1090,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         }
 
         var encounterContextId = IsViewingArchivedEncounter
-            ? SelectedEncounterHistory?.Record.EncounterId ?? Guid.Empty
+            ? SelectedEncounterHistory?.Record.ScenePayload.Snapshot.EncounterId ?? Guid.Empty
             : _displayedSnapshot.EncounterId;
 
         var snapshot = IsViewingArchivedEncounter && SelectedEncounterHistory is not null
-            ? SelectedEncounterHistory.Record.Snapshot
+            ? SelectedEncounterHistory.Record.ScenePayload.Snapshot
             : _displayedSnapshot;
 
         if (IsViewingArchivedEncounter && SelectedEncounterHistory is { } history)

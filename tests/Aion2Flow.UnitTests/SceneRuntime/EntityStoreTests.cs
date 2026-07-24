@@ -1519,10 +1519,10 @@ public class SceneReadModelOwnerTests
 
             if (snapshot.EncounterTime > 0 && snapshot.Combatants.Count > 0)
             {
-                var archive = scene.Owner.CreateArchiveCapture();
+                var archive = scene.Owner.CreateArchivePayload();
                 if (archive.Snapshot.EncounterTime > 0 && archive.Snapshot.Combatants.Count > 0)
                 {
-                    Assert.False(archive.Payload.CombatEvents.IsEmpty);
+                    Assert.False(archive.CombatEvents.IsEmpty);
                     Assert.True(archive.Snapshot.EncounterEndTime >= archive.Snapshot.EncounterStartTime);
                 }
             }

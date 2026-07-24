@@ -13,6 +13,7 @@ public sealed class SceneArchivePayload
     private readonly ArchivePayloadIndex _detailIndex;
 
     private SceneArchivePayload(
+        SceneCombatSnapshot snapshot,
         SceneKind kind,
         DateTimeOffset sceneStarted,
         SceneJournalSegment timelineSegment,
@@ -28,6 +29,7 @@ public sealed class SceneArchivePayload
         int[] bossNpcCodes,
         ArchivePayloadIndex detailIndex)
     {
+        Snapshot = snapshot;
         Kind = kind;
         SceneStarted = sceneStarted;
         TimelineSegment = timelineSegment;
@@ -44,6 +46,7 @@ public sealed class SceneArchivePayload
         _detailIndex = detailIndex;
     }
 
+    public SceneCombatSnapshot Snapshot { get; }
     public SceneKind Kind { get; }
     public DateTimeOffset SceneStarted { get; }
     public SceneJournalSegment TimelineSegment { get; }
@@ -107,6 +110,7 @@ public sealed class SceneArchivePayload
             combatants);
 
         return new SceneArchivePayload(
+            archivedSnapshot,
             archivedSnapshot.Kind,
             sceneStarted,
             timelineSegment,

@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Runtime;
+using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -67,11 +68,13 @@ public sealed class SceneBoundaryStore
             _revision++;
     }
 
-    public SceneTransitionKind MarkSceneTransportBoundary()
+    internal SceneTransitionKind ApplySceneObservation(in SceneObservation scene)
     {
-        var kind = _sceneBoundary.MarkSceneTransportBoundary();
-        if (kind != SceneTransitionKind.None)
+        var before = _sceneBoundary.CreateSnapshot();
+        var kind = _sceneBoundary.ApplySceneObservation(in scene);
+        if (before != _sceneBoundary.CreateSnapshot())
             _revision++;
+
         return kind;
     }
 

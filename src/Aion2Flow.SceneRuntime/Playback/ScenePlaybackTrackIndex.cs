@@ -45,11 +45,7 @@ public sealed class ScenePlaybackTrackIndex
             return new ScenePlaybackTrackIndex(startObservationOrdinal, endObservationOrdinalExclusive, segment.IsLiveGrowing, [], [], []);
 
         var fixedSegment = new SceneJournalSegment(segment.Journal, startObservationOrdinal, endObservationOrdinalExclusive, IsLiveGrowing: false);
-        var entities = new EntityStore();
-        var boundary = new SceneBoundaryStore();
-        var metadata = new RuntimeMetadataRegistry();
-        var combat = new CombatStore(observationCount);
-        var applier = new DomainEventApplier(entities, boundary, metadata, combat);
+        var projection = SceneProjectionState.Create(Guid.Empty, observationCount);
         var indexedMarkers = new List<IndexedTrackMarker>(observationCount);
         var cursor = fixedSegment.CreateCursor();
         var observationIndex = 0;
@@ -73,12 +69,12 @@ public sealed class ScenePlaybackTrackIndex
                     var flushId = entry.Stamp.FlushId;
                     if (currentFlushId > 0 && flushId != currentFlushId && currentFlushId > completedFlushId)
                     {
-                        applier.CompleteFlush();
+                        projection.CompleteFlush();
                         completedFlushId = currentFlushId;
                     }
 
                     currentFlushId = flushId;
-                    var materialization = applier.ApplyEntry(entry);
+                    var materialization = projection.ApplyEntry(entry);
                     if (entry.Domain == ObservedEventDomain.Combat)
                     {
                         observationIndex++;
@@ -91,7 +87,7 @@ public sealed class ScenePlaybackTrackIndex
                     if (entry.Domain == ObservedEventDomain.EntityVital)
                     {
                         ref readonly var vital = ref entry.EntityVital;
-                        if (applier.EntityVitals.TryGet(vital.EntityId, out var state))
+                        if (projection.Applier.EntityVitals.TryGet(vital.EntityId, out var state))
                             marker = marker with { MaxHp = state.MaxHp };
                     }
 
@@ -113,18 +109,11 @@ public sealed class ScenePlaybackTrackIndex
         var canCompleteFinalFlush = !segment.IsLiveGrowing ||
             (fixedSegment.Journal?.LastCompletedFlushId ?? -1) >= currentFlushId;
         if (currentFlushId > 0 && currentFlushId > completedFlushId && canCompleteFinalFlush)
-            applier.CompleteFlush();
+            projection.CompleteFlush();
 
-        var adapter = new SceneCombatSnapshotAdapter(
-            entities,
-            applier.EntityVitals,
-            combat,
-            applier.Mechanics,
-            applier.Resources,
-            boundary,
-            applier.BossFocus);
+        var adapter = projection.Adapter;
         _ = adapter.PrepareCurrentFrameEventProjection();
-        AppendMaterializedMarkers(indexedMarkers, combat, applier.Mechanics, applier.Resources, adapter, ref sequence, cancellationToken);
+        AppendMaterializedMarkers(indexedMarkers, projection.Combat, projection.Applier.Mechanics, projection.Applier.Resources, adapter, ref sequence, cancellationToken);
         indexedMarkers.Sort(static (left, right) => CompareIndexedMarkers(in left, in right));
 
         var markers = new ScenePlaybackTrackMarker[indexedMarkers.Count];

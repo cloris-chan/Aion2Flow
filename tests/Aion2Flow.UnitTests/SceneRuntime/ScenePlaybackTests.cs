@@ -41,7 +41,7 @@ public sealed class ScenePlaybackTests
     public void ArchivedSource_UsesFixedTimelineSegment()
     {
         var record = CreateArchiveRecord();
-        var source = new ArchivedScenePlaybackSource(record);
+        var source = new ArchivedScenePlaybackSource(record.ScenePayload);
         var segment = source.CreateTimelineSegment();
 
         Assert.False(segment.IsLiveGrowing);
@@ -162,10 +162,10 @@ public sealed class ScenePlaybackTests
 
         scene.Reset(started.AddSeconds(10));
 
-        Assert.True(source.TryGetFrozenArchive(out var archive));
+        Assert.True(source.TryGetFrozenPayload(out var payload));
         Assert.False(source.CreateTimelineSegment().IsLiveGrowing);
-        Assert.Equal(source.EncounterId, archive.Snapshot.EncounterId);
-        Assert.Equal(source.CreateTimelineSegment().EndObservationOrdinalExclusive, archive.Payload.TimelineSegment.EndObservationOrdinalExclusive);
+        Assert.Equal(source.EncounterId, payload.Snapshot.EncounterId);
+        Assert.Equal(source.CreateTimelineSegment().EndObservationOrdinalExclusive, payload.TimelineSegment.EndObservationOrdinalExclusive);
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public sealed class ScenePlaybackTests
     public void Session_ReadNextTimelineBatch_ContinuesFromLoadedOrdinal()
     {
         var record = CreateArchiveRecord();
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
         long[] firstOrdinals = [];
         long[] secondOrdinals = [];
 
@@ -213,7 +213,7 @@ public sealed class ScenePlaybackTests
     public void Seek_Midpoint_ProjectsCombatEntityVitalAndTracks()
     {
         var record = CreateArchiveRecord();
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(1_500, TestContext.Current.CancellationToken);
 
@@ -230,7 +230,7 @@ public sealed class ScenePlaybackTests
     public void Session_AdvanceTo_ContinuesCurrentProjector()
     {
         var record = CreateArchiveRecord();
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var first = session.Seek(1_500, TestContext.Current.CancellationToken);
         var second = session.AdvanceTo(2_500, TestContext.Current.CancellationToken);
@@ -247,7 +247,7 @@ public sealed class ScenePlaybackTests
         const int measurementPassCount = 3;
         const long maxSteadyStateOverheadBytes = 4 * 1024;
         var record = CreateArchiveRecord();
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
         var index = session.CreateTrackIndex(TestContext.Current.CancellationToken);
 
         var window = index.ReadWindow(0, 2_500, 5, 3);
@@ -275,8 +275,8 @@ public sealed class ScenePlaybackTests
     public void Session_CreateCombatantDetail_UsesCurrentProjectionBoundary()
     {
         var record = CreateArchiveRecord();
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
-        var targetSession = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
+        var targetSession = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         session.Seek(1_500, TestContext.Current.CancellationToken);
         var midpoint = session.CreateCombatantDetail(100);
@@ -309,7 +309,7 @@ public sealed class ScenePlaybackTests
         AppendCombat(journal, sceneId, combatantId, bossId, 300, 3, 1_400);
         AppendCombat(journal, sceneId, combatantId, bossId, 1_000, 4, 2_000);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(1_500, TestContext.Current.CancellationToken);
         var projection = session.CreateCombatantDetail(combatantId);
@@ -336,7 +336,7 @@ public sealed class ScenePlaybackTests
         AppendCompactCombatOpener(journal, sceneId, sourceId, headerSkillCode, marker, 3, 1_200, scopeId: 43, siblingIndex: 2, parentScopeId: 900);
         journal.CompleteFlush(1);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         session.Seek(1_200, TestContext.Current.CancellationToken);
         var projection = session.CreateCombatantDetail(sourceId);
@@ -381,7 +381,7 @@ public sealed class ScenePlaybackTests
             ResourceKind = CombatResourceKind.Mana
         }, 3, 1_400, opcode: 0x0538);
         journal.CompleteFlush(1);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId).ScenePayload));
         session.Seek(1_500, TestContext.Current.CancellationToken);
 
         var all = ReadMaterializedEvents(session, ScenePlaybackEventScope.All, 0, 1_500);
@@ -432,7 +432,7 @@ public sealed class ScenePlaybackTests
         }, 3, 1_200, opcode: 0x0538);
         AppendCombat(journal, sceneId, sourceId, targetId, 200, 4, 1_300);
         journal.CompleteFlush(1);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId).ScenePayload));
 
         session.Seek(1_000, TestContext.Current.CancellationToken);
         var rebuilt = ReadMaterializedEvents(session, ScenePlaybackEventScope.All, 0, 1_300);
@@ -477,7 +477,7 @@ public sealed class ScenePlaybackTests
         AppendCompactCombatOpener(journal, sceneId, sourceId, headerSkillCode, marker, 3, 1_200, scopeId: 43, siblingIndex: 2, parentScopeId: 900);
         journal.CompleteFlush(1);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(1_200, TestContext.Current.CancellationToken);
         var appliedMarkers = ReadAppliedMarkers(record, frame);
@@ -510,11 +510,9 @@ public sealed class ScenePlaybackTests
         var snapshot = owner.CreateSnapshot();
         var record = new ArchivedEncounterRecord
         {
-            EncounterId = sceneId,
-            Snapshot = snapshot,
-            ScenePayload = owner.CreateArchivePayload(snapshot)
+            ScenePayload = owner.CreateArchivePayload()
         };
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(1_500, TestContext.Current.CancellationToken);
 
@@ -538,11 +536,9 @@ public sealed class ScenePlaybackTests
         var snapshot = owner.CreateSnapshot();
         var record = new ArchivedEncounterRecord
         {
-            EncounterId = sceneId,
-            Snapshot = snapshot,
-            ScenePayload = owner.CreateArchivePayload(snapshot)
+            ScenePayload = owner.CreateArchivePayload()
         };
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(1_000, TestContext.Current.CancellationToken);
 
@@ -558,7 +554,7 @@ public sealed class ScenePlaybackTests
     public void Seek_TrackWindows_PreserveFirstAndLastOrdinals()
     {
         var record = CreateArchiveRecord();
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(1_500, TestContext.Current.CancellationToken);
 
@@ -581,7 +577,7 @@ public sealed class ScenePlaybackTests
         AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 800);
         AppendAuraResult(journal, sceneId, 200, 7, 19, 3, 1_800);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var afterRemove = session.Seek(1_800, TestContext.Current.CancellationToken);
         var beforeRemove = session.Seek(1_799, TestContext.Current.CancellationToken);
@@ -602,7 +598,7 @@ public sealed class ScenePlaybackTests
         AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 800);
         AppendCombat(journal, sceneId, 100, 200, 1, 3, 2_000);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var beforeOriginalExpiry = session.Seek(999, TestContext.Current.CancellationToken);
         var afterOriginalExpiry = session.Seek(1_799, TestContext.Current.CancellationToken);
@@ -622,7 +618,7 @@ public sealed class ScenePlaybackTests
         AppendCombat(journal, sceneId, 100, 200, 1, 2, 1_000);
         AppendAuraRenew(journal, sceneId, 200, 100, 7, 3, 1_200);
         AppendCombat(journal, sceneId, 100, 200, 1, 4, 2_500);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId)));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord(journal, sceneId).ScenePayload));
 
         var expired = session.Seek(1_000, TestContext.Current.CancellationToken);
         var renewed = session.AdvanceTo(1_200, TestContext.Current.CancellationToken);
@@ -741,7 +737,7 @@ public sealed class ScenePlaybackTests
         AppendAuraResult(journal, sceneId, 200, 7, 5, 3, 200);
         AppendCombat(journal, sceneId, 100, 200, 1, 4, 1_000);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(250, TestContext.Current.CancellationToken);
         var timeline = ScenePlaybackAuraTimelineReader.Read(record.ScenePayload.TimelineSegment, 200, 1_000, TestContext.Current.CancellationToken);
@@ -773,7 +769,7 @@ public sealed class ScenePlaybackTests
         AppendAuraOpen(journal, sceneId, 200, 100, 7, ushort.MaxValue, 2, 200, 3_629_313_792, groupCode: 17);
         AppendCombat(journal, sceneId, 100, 200, 1, 3, 1_000);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(200, TestContext.Current.CancellationToken);
         var timeline = ScenePlaybackAuraTimelineReader.Read(record.ScenePayload.TimelineSegment, 200, 1_000, TestContext.Current.CancellationToken);
@@ -794,7 +790,7 @@ public sealed class ScenePlaybackTests
         AppendAuraBatchResult(journal, sceneId, 200, 7, 7, 2, 0, 3, 1_000);
         AppendAuraBatchResult(journal, sceneId, 200, 8, 7, 2, 1, 4, 1_000);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(1_000, TestContext.Current.CancellationToken);
 
@@ -837,7 +833,7 @@ public sealed class ScenePlaybackTests
         AppendAuraRenew(journal, sceneId, 200, 100, 8, 2, 250);
         AppendAuraRenew(journal, sceneId, 200, 100, 7, 3, 500);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(500, TestContext.Current.CancellationToken);
 
@@ -854,7 +850,7 @@ public sealed class ScenePlaybackTests
         AppendAuraOpen(journal, sceneId, 200, 100, 7, 1_000, 1, 0);
         AppendAuraRenew(journal, sceneId, 200, 100, 7, 2, 500, phase: 17);
         var record = CreateArchiveRecord(journal, sceneId);
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(record.ScenePayload));
 
         var frame = session.Seek(500, TestContext.Current.CancellationToken);
 
@@ -896,7 +892,7 @@ public sealed class ScenePlaybackTests
     public void Controller_OptionsRejectInvalidCheckpointInterval()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ScenePlaybackController(
-            new ArchivedScenePlaybackSource(CreateArchiveRecord()),
+            new ArchivedScenePlaybackSource(CreateArchiveRecord().ScenePayload),
             new ManualTickSourceFactory(),
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 0, RebuildCheckpointsOnCreate: false)));
     }
@@ -928,9 +924,7 @@ public sealed class ScenePlaybackTests
         var snapshot = owner.CreateSnapshot();
         var record = new ArchivedEncounterRecord
         {
-            EncounterId = sceneId,
-            Snapshot = snapshot,
-            ScenePayload = owner.CreateArchivePayload(snapshot)
+            ScenePayload = owner.CreateArchivePayload()
         };
         await using var controller = CreateController(record);
 
@@ -1031,7 +1025,7 @@ public sealed class ScenePlaybackTests
     {
         var record = CreateArchiveRecordWithLongCombatTimeline();
         await using var controller = new ScenePlaybackController(
-            new ArchivedScenePlaybackSource(record),
+            new ArchivedScenePlaybackSource(record.ScenePayload),
             new ManualTickSourceFactory(),
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
         await controller.RebuildCheckpointsAsync(TestContext.Current.CancellationToken);
@@ -1083,7 +1077,7 @@ public sealed class ScenePlaybackTests
     {
         var record = CreateArchiveRecord();
         await using var controller = CreateController(record);
-        AppendCombat(record.ScenePayload.TimelineSegment.Journal!, record.EncounterId, 100, 200, 400, 6, 4_000);
+        AppendCombat(record.ScenePayload.TimelineSegment.Journal!, record.ScenePayload.Snapshot.EncounterId, 100, 200, 400, 6, 4_000);
 
         var frame = await controller.RefreshAsync(TestContext.Current.CancellationToken);
 
@@ -1151,7 +1145,7 @@ public sealed class ScenePlaybackTests
     [Fact]
     public async Task Controller_DefaultOptionsPrebuildArchivedCheckpoints()
     {
-        await using var controller = new ScenePlaybackController(new ArchivedScenePlaybackSource(CreateArchiveRecord()));
+        await using var controller = new ScenePlaybackController(new ArchivedScenePlaybackSource(CreateArchiveRecord().ScenePayload));
 
         await WaitUntil(() => !controller.IsCheckpointing && controller.CheckpointCount == 2);
 
@@ -1178,7 +1172,7 @@ public sealed class ScenePlaybackTests
     public async Task Controller_RebuildCheckpoints_BuildsRuntimeCache()
     {
         await using var controller = new ScenePlaybackController(
-            new ArchivedScenePlaybackSource(CreateArchiveRecord()),
+            new ArchivedScenePlaybackSource(CreateArchiveRecord().ScenePayload),
             new ManualTickSourceFactory(),
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
 
@@ -1219,7 +1213,7 @@ public sealed class ScenePlaybackTests
     public async Task Controller_CreateTimelineSegment_DoesNotSkipMarkersAtCheckpointBoundary()
     {
         await using var controller = new ScenePlaybackController(
-            new ArchivedScenePlaybackSource(CreateArchiveRecord()),
+            new ArchivedScenePlaybackSource(CreateArchiveRecord().ScenePayload),
             new ManualTickSourceFactory(),
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
 
@@ -1240,7 +1234,7 @@ public sealed class ScenePlaybackTests
     public async Task Controller_StartCheckpointRebuild_RunsInBackground()
     {
         await using var controller = new ScenePlaybackController(
-            new ArchivedScenePlaybackSource(CreateArchiveRecord()),
+            new ArchivedScenePlaybackSource(CreateArchiveRecord().ScenePayload),
             new ManualTickSourceFactory(),
             new ScenePlaybackControllerOptions(TimeSpan.FromMilliseconds(33), 1_000, RebuildCheckpointsOnCreate: false));
 
@@ -1387,7 +1381,7 @@ public sealed class ScenePlaybackTests
     [Fact]
     public void Session_CanceledForwardAdvance_DiscardsPartialProjectionAndRemainsReusable()
     {
-        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord()));
+        var session = new ScenePlaybackSession(new ArchivedScenePlaybackSource(CreateArchiveRecord().ScenePayload));
         var initial = session.Seek(500, TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -1464,11 +1458,9 @@ public sealed class ScenePlaybackTests
     {
         var owner = new SceneReadModelOwner(journal, sceneId, DateTimeOffset.Now);
         var snapshot = owner.CreateSnapshot();
-        var payload = owner.CreateArchivePayload(snapshot);
+        var payload = owner.CreateArchivePayload();
         return new ArchivedEncounterRecord
         {
-            EncounterId = snapshot.EncounterId,
-            Snapshot = snapshot,
             ScenePayload = payload
         };
     }
@@ -1694,7 +1686,7 @@ public sealed class ScenePlaybackTests
         => CreateController(record, new ManualTickSourceFactory());
 
     private static ScenePlaybackController CreateController(ArchivedEncounterRecord record, ManualTickSourceFactory tickSourceFactory)
-        => new(new ArchivedScenePlaybackSource(record), tickSourceFactory, TimeSpan.FromMilliseconds(33));
+        => new(new ArchivedScenePlaybackSource(record.ScenePayload), tickSourceFactory, TimeSpan.FromMilliseconds(33));
 
     private static async Task WaitUntil(Func<bool> predicate)
     {
@@ -1737,7 +1729,7 @@ public sealed class ScenePlaybackTests
 
     private sealed class BlockingPlaybackSource(ArchivedEncounterRecord record) : IScenePlaybackSource
     {
-        private readonly ArchivedScenePlaybackSource _inner = new(record);
+        private readonly ArchivedScenePlaybackSource _inner = new(record.ScenePayload);
         private readonly ManualResetEventSlim _blocked = new();
         private readonly ManualResetEventSlim _release = new();
         private int _blockNextTimelineRead;

@@ -1,3 +1,5 @@
+using Cloris.Aion2Flow.SceneRuntime.Observation;
+
 namespace Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 public sealed class SceneBoundaryService
@@ -75,9 +77,40 @@ public sealed class SceneBoundaryService
         return changed;
     }
 
-#pragma warning disable CA1822
-    public SceneTransitionKind MarkSceneTransportBoundary() => SceneTransitionKind.None;
-#pragma warning restore CA1822
+    internal SceneTransitionKind ApplySceneObservation(in SceneObservation scene)
+    {
+        var previousMapId = CurrentMapId;
+        var previousMapInstanceId = CurrentMapInstanceId;
+
+        switch (scene.DiagnosticKey)
+        {
+            case "stage-destination-map":
+                StageDestinationMap(scene.MapId, scene.Value0 != 0);
+                break;
+            case "pending-destination-map":
+                StagePendingDestinationMap(scene.MapId, scene.Value0 != 0);
+                break;
+            case "confirm-destination-map":
+                ConfirmDestinationMap(scene.MapId, scene.Value0 != 0);
+                break;
+            case "confirm-pending-destination-map-arrival":
+                ConfirmPendingDestinationMapArrival();
+                break;
+            case "stage-destination-instance":
+                StageDestinationMapInstance(scene.MapInstanceId);
+                break;
+            case "confirm-destination-instance":
+                ConfirmDestinationMapInstance(scene.MapInstanceId);
+                break;
+        }
+
+        if (CurrentMapId != previousMapId)
+            return SceneTransitionKind.MapChanged;
+
+        return CurrentMapInstanceId != previousMapInstanceId
+            ? SceneTransitionKind.InstanceChanged
+            : SceneTransitionKind.None;
+    }
 
     internal SceneBoundaryServiceSnapshot CreateSnapshot() => new(CurrentMapId, CurrentMapInstanceId, SceneTransitionRevision, _pendingMapId, _pendingAllowSameMapReload);
 
@@ -127,6 +160,6 @@ public sealed class SceneBoundaryService
     }
 }
 
-public enum SceneTransitionKind : byte { None, MapChanged, InstanceChanged, SceneReload, TransportBoundary }
+public enum SceneTransitionKind : byte { None, MapChanged, InstanceChanged }
 
 internal readonly record struct SceneBoundaryServiceSnapshot(uint CurrentMapId, uint CurrentMapInstanceId, long SceneTransitionRevision, uint PendingMapId, bool PendingAllowSameMapReload);

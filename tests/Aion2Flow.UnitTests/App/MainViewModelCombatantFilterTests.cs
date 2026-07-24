@@ -33,85 +33,6 @@ public sealed class MainViewModelCombatantFilterTests
         context.Source.Dispose();
     }
 
-    [Theory]
-    [InlineData(1010u, 0u, 200003u, 113515u, true, "map-transition")]
-    [InlineData(1010u, 0u, 1010u, 0u, false, "")]
-    [InlineData(200003u, 113515u, 200003u, 113515u, false, "")]
-    [InlineData(200003u, 113515u, 200003u, 113526u, true, "map-instance-transition")]
-    [InlineData(200003u, 0u, 200003u, 113515u, true, "map-instance-transition")]
-    [InlineData(0u, 0u, 20u, 0u, true, "map-transition")]
-    [InlineData(1010u, 0u, 20u, 0u, true, "map-transition")]
-    [InlineData(20u, 0u, 1010u, 0u, true, "map-transition")]
-    [InlineData(1010u, 0u, 130u, 0u, true, "map-transition")]
-    [InlineData(0u, 0u, 1010u, 0u, true, "map-transition")]
-    [InlineData(0u, 0u, 50u, 0u, true, "map-transition")]
-    [InlineData(0u, 0u, 0u, 0u, false, "")]
-    [InlineData(0u, 100u, 0u, 101u, true, "map-instance-transition")]
-    [InlineData(600002u, 396972u, 1010u, 0u, true, "map-transition")]
-    [InlineData(1010u, 0u, 1020u, 0u, true, "map-transition")]
-    [InlineData(1010u, 0u, 500020u, 0u, true, "map-transition")]
-    [InlineData(500020u, 0u, 1010u, 0u, true, "map-transition")]
-    [InlineData(600011u, 679397u, 600012u, 679397u, true, "map-transition")]
-    public void Map_Transitions_Select_Automatic_Reset_Scope(uint previousMapId, uint previousInstanceId, uint latestMapId, uint latestInstanceId, bool expected, string expectedReason)
-    {
-        var previous = SceneSnapshotTestFactory.Create(mapId: previousMapId, mapInstanceId: previousInstanceId, encounterTime: 12_000, combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
-
-        var latest = SceneSnapshotTestFactory.Create(
-            mapId: latestMapId,
-            mapInstanceId: latestInstanceId);
-
-        var result = MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason);
-
-        Assert.Equal(expected, result);
-        Assert.Equal(expectedReason, reason);
-    }
-
-    [Fact]
-    public void Map_Change_Without_Battle_Does_Not_Trigger_Reset()
-    {
-        var previous = SceneSnapshotTestFactory.Create(mapId: 600002);
-
-        var latest = SceneSnapshotTestFactory.Create(mapId: 1010);
-
-        var result = MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason);
-
-        Assert.False(result);
-        Assert.Equal(string.Empty, reason);
-    }
-
-    [Fact]
-    public void Predictive_MapId_Flip_Without_Confirmation_Does_Not_Archive()
-    {
-        var previous = SceneSnapshotTestFactory.Create(mapId: 1010, encounterTime: 12_000, combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
-
-        var latest = SceneSnapshotTestFactory.Create(mapId: 1010);
-
-        Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
-        Assert.Equal(string.Empty, reason);
-    }
-
-    [Fact]
-    public void Scene_Transition_Revision_Does_Not_Archive_When_Map_And_Instance_Are_Unchanged()
-    {
-        var previous = SceneSnapshotTestFactory.Create(mapId: 1010, mapInstanceId: 0, sceneTransitionRevision: 7, encounterTime: 12_000, combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
-
-        var latest = SceneSnapshotTestFactory.Create(mapId: 1010, mapInstanceId: 0, sceneTransitionRevision: 8);
-
-        Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
-        Assert.Equal(string.Empty, reason);
-    }
-
-    [Fact]
-    public void Sub_Instance_Boss_Room_Does_Not_Archive()
-    {
-        var previous = SceneSnapshotTestFactory.Create(mapId: 910036, mapInstanceId: 113515, encounterTime: 12_000, combatants: [SceneSnapshotTestFactory.Combatant(1, SceneSnapshotTestFactory.VisibleMetrics())]);
-
-        var latest = SceneSnapshotTestFactory.Create(mapId: 910036, mapInstanceId: 113515);
-
-        Assert.False(MainViewModel.TryResolveMapTransitionResetReason(previous, latest, out var reason));
-        Assert.Equal(string.Empty, reason);
-    }
-
     [Fact]
     public void ShouldDisplayCombatant_Hides_Known_Npc_Even_If_Class_Was_Previously_Inferred()
     {
@@ -897,8 +818,8 @@ public sealed class MainViewModelCombatantFilterTests
         var record = Assert.Single(fixture.Archive.History);
         Assert.Equal("map-transition", record.Trigger);
         Assert.True(record.IsAutomatic);
-        Assert.Equal(600002u, record.Snapshot.MapId);
-        Assert.Equal(396972u, record.Snapshot.MapInstanceId);
+        Assert.Equal(600002u, record.ScenePayload.Snapshot.MapId);
+        Assert.Equal(396972u, record.ScenePayload.Snapshot.MapInstanceId);
         Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
     }
 

@@ -14,17 +14,17 @@ public interface IScenePlaybackSource : IDisposable
     SceneCombatSnapshot CreateSnapshot();
 }
 
-public sealed class ArchivedScenePlaybackSource(ArchivedEncounterRecord record) : IScenePlaybackSource
+public sealed class ArchivedScenePlaybackSource(SceneArchivePayload payload) : IScenePlaybackSource
 {
-    public Guid EncounterId => record.EncounterId;
+    public Guid EncounterId => payload.Snapshot.EncounterId;
 
-    public DateTimeOffset SceneStarted => record.ScenePayload.SceneStarted;
+    public DateTimeOffset SceneStarted => payload.SceneStarted;
 
     public ScenePlaybackSourceKind SourceKind => ScenePlaybackSourceKind.Archived;
 
-    public SceneJournalSegment CreateTimelineSegment() => record.ScenePayload.TimelineSegment;
+    public SceneJournalSegment CreateTimelineSegment() => payload.TimelineSegment;
 
-    public SceneCombatSnapshot CreateSnapshot() => record.Snapshot;
+    public SceneCombatSnapshot CreateSnapshot() => payload.Snapshot;
 
     public void Dispose()
     {
@@ -59,10 +59,10 @@ public sealed class LiveScenePlaybackSource : IScenePlaybackSource
         return _state.CreateSnapshot();
     }
 
-    public bool TryGetFrozenArchive(out SceneArchiveCapture capture)
+    public bool TryGetFrozenPayload(out SceneArchivePayload payload)
     {
         ThrowIfDisposed();
-        return _state.TryGetFrozenArchive(out capture);
+        return _state.TryGetFrozenPayload(out payload);
     }
 
     public void Dispose()
@@ -80,7 +80,7 @@ internal sealed class LiveScenePlaybackState
     private readonly SceneJournalLiveBoundary _timelineBoundary;
     private readonly SceneJournalSegment _timelineSegment;
     private readonly Lock _gate = new();
-    private SceneArchiveCapture? _frozenCapture;
+    private SceneArchivePayload? _frozenPayload;
 
     public LiveScenePlaybackState(
         SceneLiveReadModel scene,
@@ -101,17 +101,17 @@ internal sealed class LiveScenePlaybackState
 
     private LiveScenePlaybackState(
         SceneLiveReadModel scene,
-        SceneArchiveCapture frozenCapture)
+        SceneArchivePayload frozenPayload)
         : this(
             scene,
-            frozenCapture.Snapshot.EncounterId,
-            frozenCapture.Payload.SceneStarted,
-            frozenCapture.Snapshot,
-            frozenCapture.Payload.TimelineSegment.Journal ?? throw new InvalidOperationException("Frozen playback timeline has no journal."),
-            frozenCapture.Payload.TimelineSegment.StartObservationOrdinal,
-            frozenCapture.Payload.TimelineSegment.EndObservationOrdinalExclusive)
+            frozenPayload.Snapshot.EncounterId,
+            frozenPayload.SceneStarted,
+            frozenPayload.Snapshot,
+            frozenPayload.TimelineSegment.Journal ?? throw new InvalidOperationException("Frozen playback timeline has no journal."),
+            frozenPayload.TimelineSegment.StartObservationOrdinal,
+            frozenPayload.TimelineSegment.EndObservationOrdinalExclusive)
     {
-        Freeze(frozenCapture);
+        Freeze(frozenPayload);
     }
 
     public Guid EncounterId { get; }
@@ -122,48 +122,48 @@ internal sealed class LiveScenePlaybackState
 
     public SceneJournalSegment TimelineSegment => _timelineSegment;
 
-    public static LiveScenePlaybackState CreateFrozen(SceneLiveReadModel scene, SceneArchiveCapture capture) => new(scene, capture);
+    public static LiveScenePlaybackState CreateFrozen(SceneLiveReadModel scene, SceneArchivePayload payload) => new(scene, payload);
 
     public SceneCombatSnapshot CreateSnapshot()
     {
         lock (_gate)
         {
-            if (_frozenCapture is { } capture)
-                return capture.Snapshot;
+            if (_frozenPayload is { } payload)
+                return payload.Snapshot;
         }
 
         return _scene.CreatePlaybackSnapshot(this);
     }
 
-    public void Freeze(SceneArchiveCapture capture)
+    public void Freeze(SceneArchivePayload payload)
     {
-        if (capture.Snapshot.EncounterId != EncounterId)
+        if (payload.Snapshot.EncounterId != EncounterId)
             throw new InvalidOperationException("Cannot freeze a live playback state with a different encounter.");
 
         lock (_gate)
-            _frozenCapture = capture;
-        _timelineBoundary.Freeze(capture.Payload.TimelineSegment.EndObservationOrdinalExclusive);
+            _frozenPayload = payload;
+        _timelineBoundary.Freeze(payload.TimelineSegment.EndObservationOrdinalExclusive);
     }
 
-    public bool TryGetFrozenArchive(out SceneArchiveCapture capture)
+    public bool TryGetFrozenPayload(out SceneArchivePayload payload)
     {
         lock (_gate)
         {
-            if (_frozenCapture is { } frozen)
+            if (_frozenPayload is { } frozen)
             {
-                capture = frozen;
+                payload = frozen;
                 return true;
             }
         }
 
-        capture = default;
+        payload = default!;
         return false;
     }
 
     public SceneCombatSnapshot GetFrozenSnapshot()
     {
         lock (_gate)
-            return _frozenCapture?.Snapshot ?? OpeningSnapshot;
+            return _frozenPayload?.Snapshot ?? OpeningSnapshot;
     }
 
     public void Release() => _scene.ReleasePlaybackSource(this);

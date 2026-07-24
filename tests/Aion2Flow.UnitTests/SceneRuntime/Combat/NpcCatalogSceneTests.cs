@@ -78,7 +78,7 @@ public sealed class NpcCatalogSceneTests
         AppendDamage(scene, playerId, npcInstanceId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
-        var archive = scene.Owner.CreateArchivePayload(snapshot);
+        var archive = scene.Owner.CreateArchivePayload();
 
         Assert.True(catalog.TryGetValue(npcCode, out var expectedEntry));
         Assert.Equal(npcInstanceId, snapshot.TargetObservation?.InstanceId);
@@ -106,7 +106,7 @@ public sealed class NpcCatalogSceneTests
         AppendDamage(scene, playerId, targetEntityId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
-        var archive = scene.Owner.CreateArchivePayload(snapshot);
+        var archive = scene.Owner.CreateArchivePayload();
 
         Assert.True(archive.IdentityScope.TryGetNpcCode(playbackOnlyEntityId, out var scopedNpcCode));
         Assert.Equal(playbackOnlyNpcCode, scopedNpcCode);
@@ -130,7 +130,7 @@ public sealed class NpcCatalogSceneTests
         AppendDamage(scene, playerId, npcInstanceId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
-        var archive = scene.Owner.CreateArchivePayload(snapshot);
+        var archive = scene.Owner.CreateArchivePayload();
 
         Assert.Equal(npcInstanceId, snapshot.TargetObservation?.InstanceId);
         Assert.True(archive.IdentityScope.TryGetNpcCode(npcInstanceId, out var scopedNpcCode));
@@ -153,7 +153,7 @@ public sealed class NpcCatalogSceneTests
         AppendDamage(scene, playerId, npcInstanceId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
-        var archive = scene.Owner.CreateArchivePayload(snapshot);
+        var archive = scene.Owner.CreateArchivePayload();
 
         Assert.Equal(npcInstanceId, snapshot.TargetObservation?.InstanceId);
         Assert.True(archive.IdentityScope.TryGetPcMetadata(npcInstanceId, out var pc));
@@ -223,7 +223,7 @@ public sealed class NpcCatalogSceneTests
         AppendDamage(scene, playerId, npcEntityId, 17070000, 1, 1_050);
 
         var snapshot = scene.CreateSnapshot();
-        var archive = scene.Owner.CreateArchivePayload(snapshot);
+        var archive = scene.Owner.CreateArchivePayload();
 
         var identity = Assert.Single(archive.Entities, static e => e.EntityId == npcEntityId);
         Assert.Equal(npcCode, identity.NpcCode);
@@ -262,7 +262,7 @@ public sealed class NpcCatalogSceneTests
         AppendDamage(scene, playerId, npcEntityId, 17730000, 4_092, 10_100);
 
         var snapshot = scene.CreateSnapshot();
-        var archive = scene.Owner.CreateArchivePayload(snapshot);
+        var archive = scene.Owner.CreateArchivePayload();
 
         Assert.Equal(npcEntityId, snapshot.TargetObservation?.InstanceId);
         var identity = Assert.Single(archive.Entities, static e => e.EntityId == npcEntityId);

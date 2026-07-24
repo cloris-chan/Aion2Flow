@@ -227,12 +227,7 @@ public sealed class ScenePlaybackSession
     {
         private readonly Guid _encounterId;
         private readonly SceneKind _kind;
-        private readonly EntityStore _entities;
-        private readonly SceneBoundaryStore _boundary;
-        private readonly RuntimeMetadataRegistry _metadata;
-        private readonly CombatStore _combat;
-        private readonly DomainEventApplier _applier;
-        private readonly SceneCombatSnapshotAdapter _adapter;
+        private readonly SceneProjectionState _projection;
         private readonly ScenePlaybackMaterializedEventIndex _materializedEventIndex;
         private readonly Dictionary<ScenePlaybackTrack, TrackAccumulator> _tracks;
         private readonly Dictionary<ScenePlaybackTrack, TrackAccumulator> _materializedTracks;
@@ -258,10 +253,7 @@ public sealed class ScenePlaybackSession
             _kind = kind;
             _segment = segment;
             _timeRange = timeRange;
-            _entities = new EntityStore();
-            _boundary = new SceneBoundaryStore();
-            _metadata = new RuntimeMetadataRegistry();
-            _combat = new CombatStore();
+            _projection = SceneProjectionState.Create(_encounterId);
             _tracks = [];
             _materializedTracks = [];
             _cursor = segment.CreateCursor();
@@ -275,8 +267,6 @@ public sealed class ScenePlaybackSession
             _trackedMechanicEventCount = 0;
             _trackedResourceEventCount = 0;
             _hasTrackProjectionVersion = false;
-            _applier = new DomainEventApplier(_entities, _boundary, _metadata, _combat);
-            _adapter = new SceneCombatSnapshotAdapter(_entities, _applier.EntityVitals, _combat, _applier.Mechanics, _applier.Resources, _boundary, _applier.BossFocus, _encounterId);
             _materializedEventIndex = new ScenePlaybackMaterializedEventIndex();
         }
 
@@ -288,15 +278,15 @@ public sealed class ScenePlaybackSession
 
         public ScenePlaybackCombatantDetail CreateCombatantDetail(int combatantId)
         {
-            var snapshot = _adapter.CreateSnapshot(_kind);
+            var snapshot = _projection.Adapter.CreateSnapshot(_kind);
             if (_detailSubscription is null || _detailCombatantId != combatantId)
             {
                 _detailCombatantId = combatantId;
-                _detailSubscription = new CombatDetailSubscription(_combat, _applier.Mechanics, _applier.Resources, combatantId);
+                _detailSubscription = new CombatDetailSubscription(_projection.Combat, _projection.Applier.Mechanics, _projection.Applier.Resources, combatantId);
             }
 
             var writer = new PlaybackDetailEventWriter();
-            var update = _detailSubscription!.CreateSnapshotUpdate(_adapter, snapshot, CombatDetailProjectionScope.CurrentFrame, writer);
+            var update = _detailSubscription!.CreateSnapshotUpdate(_projection.Adapter, snapshot, CombatDetailProjectionScope.CurrentFrame, writer);
             return new ScenePlaybackCombatantDetail(_positionMilliseconds, _appliedEndOrdinal, snapshot, update, writer.Events);
         }
 
@@ -306,10 +296,10 @@ public sealed class ScenePlaybackSession
             long endPositionMilliseconds,
             Span<ScenePlaybackEventMarker> destination)
             => _materializedEventIndex.CopyLatest(
-                _combat,
-                _applier.Mechanics,
-                _applier.Resources,
-                _adapter,
+                _projection.Combat,
+                _projection.Applier.Mechanics,
+                _projection.Applier.Resources,
+                _projection.Adapter,
                 scope,
                 startPositionMilliseconds,
                 endPositionMilliseconds,
@@ -367,7 +357,7 @@ public sealed class ScenePlaybackSession
 
         private ScenePlaybackFrame BuildFrame()
         {
-            var snapshot = _adapter.CreateSnapshot(_kind);
+            var snapshot = _projection.Adapter.CreateSnapshot(_kind);
             var totals = CreateTotals(snapshot);
             return new ScenePlaybackFrame
             {
@@ -377,8 +367,8 @@ public sealed class ScenePlaybackSession
                 AppliedSegment = new SceneJournalSegment(_segment.Journal, _segment.StartObservationOrdinal, _appliedEndOrdinal, IsLiveGrowing: false),
                 Snapshot = snapshot,
                 CombatTotals = totals,
-                EntityVitals = _applier.EntityVitals.CreateStateSnapshot(),
-                ActiveAuras = _applier.Auras.CreateActiveSnapshot(_targetOffsetMilliseconds),
+                EntityVitals = _projection.Applier.EntityVitals.CreateStateSnapshot(),
+                ActiveAuras = _projection.Applier.Auras.CreateActiveSnapshot(_targetOffsetMilliseconds),
                 Tracks = CreateTrackSnapshot()
             };
         }
@@ -484,7 +474,7 @@ public sealed class ScenePlaybackSession
                 CompleteFlush(_currentFlushId);
 
             _currentFlushId = flushId;
-            var materialization = _applier.ApplyEntry(entry);
+            var materialization = _projection.ApplyEntry(entry);
             ApplyObservationTrack(entry, offset, in materialization);
             RefreshMaterializedTracks();
             _appliedEndOrdinal = entry.Stamp.ObservationOrdinal + 1;
@@ -496,7 +486,7 @@ public sealed class ScenePlaybackSession
             if (flushId <= 0 || flushId <= _completedFlushId)
                 return;
 
-            _applier.CompleteFlush();
+            _projection.CompleteFlush();
             RefreshMaterializedTracks();
             _completedFlushId = flushId;
         }
@@ -524,10 +514,10 @@ public sealed class ScenePlaybackSession
 
         private void RefreshMaterializedTracks()
         {
-            var projectionVersion = _adapter.PrepareCurrentFrameEventProjection();
-            var metricEvents = _combat.EventSpan;
-            var mechanicEvents = _applier.Mechanics.Events;
-            var resourceEvents = _applier.Resources.Events;
+            var projectionVersion = _projection.Adapter.PrepareCurrentFrameEventProjection();
+            var metricEvents = _projection.Combat.EventSpan;
+            var mechanicEvents = _projection.Applier.Mechanics.Events;
+            var resourceEvents = _projection.Applier.Resources.Events;
             if (!_hasTrackProjectionVersion ||
                 projectionVersion != _trackProjectionVersion ||
                 _trackedMetricEventCount > metricEvents.Length ||
@@ -545,14 +535,14 @@ public sealed class ScenePlaybackSession
             for (var eventIndex = _trackedMetricEventCount; eventIndex < metricEvents.Length; eventIndex++)
             {
                 ref readonly var record = ref metricEvents[eventIndex];
-                if (_adapter.TryResolveCurrentFrameEventSourcePrepared(in record, out _))
+                if (_projection.Adapter.TryResolveCurrentFrameEventSourcePrepared(in record, out _))
                     ApplyTrack(_materializedTracks, ScenePlaybackTrack.Combat, record.SourceObservationOrdinal);
             }
 
             for (var eventIndex = _trackedMechanicEventCount; eventIndex < mechanicEvents.Count; eventIndex++)
             {
                 var record = mechanicEvents[eventIndex];
-                if (_adapter.TryResolveCurrentFrameEventSourcePrepared(in record, out _))
+                if (_projection.Adapter.TryResolveCurrentFrameEventSourcePrepared(in record, out _))
                     ApplyTrack(_materializedTracks, ScenePlaybackTrack.Mechanic, record.SourceObservationOrdinal);
             }
 
