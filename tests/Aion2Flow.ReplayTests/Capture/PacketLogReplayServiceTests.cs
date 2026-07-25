@@ -4,6 +4,7 @@ using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Tests.Protocol;
 
@@ -56,6 +57,67 @@ public sealed class PacketLogReplayServiceTests
             Assert.True(context.SourceObservationOrdinal >= 0);
             Assert.True(context.FlushId >= 0);
         });
+    }
+
+    [Fact]
+    public void Replay_20260725192105_UsesCountdownAsSingleSameMapTransitionBoundary()
+    {
+        var replay = PacketLogReplayService.Replay(
+            FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentSameMapTransitionPhases}"));
+        var observations = ReadDirectMapEventObservations(replay);
+
+        Assert.Collection(
+            observations,
+            static announced =>
+            {
+                Assert.Equal((ushort)0x0161, announced.Opcode);
+                Assert.Equal(SceneObservationKind.DestinationMapTransitionAnnounced, announced.Kind);
+                Assert.Equal(SceneTransitionKind.None, announced.TransitionKind);
+            },
+            static announced =>
+            {
+                Assert.Equal((ushort)0x0061, announced.Opcode);
+                Assert.Equal(SceneObservationKind.DestinationMapTransitionAnnounced, announced.Kind);
+                Assert.Equal(SceneTransitionKind.None, announced.TransitionKind);
+            },
+            static countdown =>
+            {
+                Assert.Equal((ushort)0x0061, countdown.Opcode);
+                Assert.Equal(SceneObservationKind.DestinationMapTransitionCountdown, countdown.Kind);
+                Assert.Equal(SceneTransitionKind.MapTransition, countdown.TransitionKind);
+            },
+            static current =>
+            {
+                Assert.Equal((ushort)0x0061, current.Opcode);
+                Assert.Equal(SceneObservationKind.CurrentMap, current.Kind);
+                Assert.Equal(SceneTransitionKind.None, current.TransitionKind);
+            });
+
+        var countdown = observations[2];
+        var current = observations[3];
+        Assert.All(observations, static observation => Assert.Equal(610010u, observation.MapId));
+        Assert.True(current.ObservedAtMilliseconds - countdown.ObservedAtMilliseconds >= 29_000);
+        Assert.Equal([(ushort)0x0061], ReadSceneTransitionOpcodes(replay));
+    }
+
+    [Fact]
+    public void Replay_20260726065616_UsesArrivedDirectTransitionAndFirstChangedInstanceAsSameMapBoundary()
+    {
+        var replay = PacketLogReplayService.Replay(
+            FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentSameMapInstanceReload}"));
+        var transitions = ReadSceneTransitions(replay);
+
+        var sameMapReload = Assert.Single(
+            transitions,
+            static transition => transition.Opcode == 0x2E92);
+        Assert.Equal(SceneObservationKind.MapInstanceConfirmed, sameMapReload.Kind);
+        Assert.Equal(229839u, sameMapReload.MapInstanceId);
+        Assert.DoesNotContain(
+            transitions,
+            static transition => transition.Opcode == 0x2336);
+        Assert.Equal(910055u, replay.Snapshot.MapId);
+        Assert.Equal(229838u, replay.Snapshot.MapInstanceId);
+        Assert.Equal(2, replay.Snapshot.SceneTransitionRevision);
     }
 
     [Fact]
@@ -740,6 +802,88 @@ public sealed class PacketLogReplayServiceTests
             System.Globalization.CultureInfo.InvariantCulture,
             $"{row.SourceId}|{row.TargetId}|{row.Observation.SkillCode}|{row.Observation.BodyResourceEffectRef.RawId}|{row.Observation.DetailResourceEffectRef.RawId}|{row.Observation.ChainId}|{row.Observation.Damage}");
 
+    private static IReadOnlyList<DirectMapEventObservation> ReadDirectMapEventObservations(PacketLogReplayResult replay)
+    {
+        var observations = new List<DirectMapEventObservation>();
+        var boundary = new SceneBoundaryService();
+        var cursor = replay.SceneJournal.CreateCursor(replay.SceneJournal.FirstObservationOrdinal);
+        while (true)
+        {
+            var result = replay.SceneJournal.ReadEntries(cursor, 1024, entries =>
+            {
+                foreach (var entry in entries)
+                {
+                    if (entry.Domain != ObservedEventDomain.Scene)
+                    {
+                        continue;
+                    }
+
+                    var transitionKind = boundary.ApplySceneObservation(in entry.Scene);
+                    if (entry.Raw.Opcode is not (0x0061 or 0x0161))
+                    {
+                        continue;
+                    }
+
+                    observations.Add(new DirectMapEventObservation(
+                        entry.Raw.Opcode,
+                        entry.Scene.MapId,
+                        entry.Scene.Kind,
+                        entry.ObservedAtMilliseconds,
+                        transitionKind));
+                }
+            });
+
+            if (result.Count == 0)
+            {
+                return observations;
+            }
+
+            cursor = result.Cursor;
+        }
+    }
+
+    private static IReadOnlyList<ushort> ReadSceneTransitionOpcodes(PacketLogReplayResult replay)
+    {
+        var transitions = ReadSceneTransitions(replay);
+        var opcodes = new ushort[transitions.Count];
+        for (var index = 0; index < transitions.Count; index++)
+            opcodes[index] = transitions[index].Opcode;
+
+        return opcodes;
+    }
+
+    private static IReadOnlyList<SceneTransitionObservation> ReadSceneTransitions(PacketLogReplayResult replay)
+    {
+        var transitions = new List<SceneTransitionObservation>();
+        var boundary = new SceneBoundaryService();
+        var cursor = replay.SceneJournal.CreateCursor(replay.SceneJournal.FirstObservationOrdinal);
+        while (true)
+        {
+            var result = replay.SceneJournal.ReadEntries(cursor, 1024, entries =>
+            {
+                foreach (var entry in entries)
+                {
+                    if (entry.Domain != ObservedEventDomain.Scene)
+                        continue;
+
+                    if (boundary.ApplySceneObservation(in entry.Scene) == SceneTransitionKind.MapTransition)
+                    {
+                        transitions.Add(new SceneTransitionObservation(
+                            entry.Raw.Opcode,
+                            entry.Scene.MapId,
+                            entry.Scene.MapInstanceId,
+                            entry.Scene.Kind));
+                    }
+                }
+            });
+
+            if (result.Count == 0)
+                return transitions;
+
+            cursor = result.Cursor;
+        }
+    }
+
     private static IReadOnlyList<ReplayJournalEntrySnapshot> ReadAllJournalEntries(PacketLogReplayResult replay)
     {
         var entries = new List<ReplayJournalEntrySnapshot>(replay.SceneJournal.Count);
@@ -920,6 +1064,19 @@ public sealed class PacketLogReplayServiceTests
 
     private static int CountHitsWith(SceneReplayPacket packet, DamageModifiers modifier)
         => (packet.Modifiers & modifier) != 0 ? packet.HitCount : 0;
+
+    private readonly record struct DirectMapEventObservation(
+        ushort Opcode,
+        uint MapId,
+        SceneObservationKind Kind,
+        long ObservedAtMilliseconds,
+        SceneTransitionKind TransitionKind);
+
+    private readonly record struct SceneTransitionObservation(
+        ushort Opcode,
+        uint MapId,
+        uint MapInstanceId,
+        SceneObservationKind Kind);
 
     private readonly record struct ReplayJournalEntrySnapshot(
         TimelineStamp Stamp,

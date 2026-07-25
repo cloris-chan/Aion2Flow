@@ -1174,8 +1174,8 @@ public sealed class MainViewModelCombatantFilterTests
     private static void AppendSceneMap(SceneLiveReadModel scene, uint mapId, uint instanceId)
     {
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
-        sink.StageDestinationMap(mapId);
-        sink.StageDestinationMapInstance(instanceId);
+        sink.SetCurrentMap(mapId);
+        sink.StageMapInstance(instanceId);
     }
 
     private static void AppendScopedCombatants(MainViewModelFixture fixture)

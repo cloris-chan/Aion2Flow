@@ -65,39 +65,44 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RememberNpcObservationSource(instanceId);
     }
 
-    public void StageDestinationMap(in PacketObservationSource packet, uint mapId)
+    public void SetCurrentMap(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.StageDestinationMap(in packet, mapId);
+        lock (gate) inner.SetCurrentMap(in packet, mapId);
     }
 
-    public void StageDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload)
+    public void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.StageDestinationMap(in packet, mapId, allowSameMapReload);
+        lock (gate) inner.AnnounceDestinationMapTransition(in packet, mapId);
     }
 
-    public void StagePendingDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload)
+    public void CommitDestinationMapTransition(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.StagePendingDestinationMap(in packet, mapId, allowSameMapReload);
+        lock (gate) inner.CommitDestinationMapTransition(in packet, mapId);
     }
 
-    public void ConfirmDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload)
+    public void StageSceneMapCandidate(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.ConfirmDestinationMap(in packet, mapId, allowSameMapReload);
+        lock (gate) inner.StageSceneMapCandidate(in packet, mapId);
     }
 
-    public void ConfirmPendingDestinationMapArrival(in PacketObservationSource packet)
+    public void ConfirmSceneMap(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.ConfirmPendingDestinationMapArrival(in packet);
+        lock (gate) inner.ConfirmSceneMap(in packet, mapId);
     }
 
-    public void StageDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
+    public void ConfirmDestinationMapArrival(in PacketObservationSource packet)
     {
-        lock (gate) inner.StageDestinationMapInstance(in packet, instanceId);
+        lock (gate) inner.ConfirmDestinationMapArrival(in packet);
     }
 
-    public void ConfirmDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
+    public void StageMapInstance(in PacketObservationSource packet, uint instanceId)
     {
-        lock (gate) inner.ConfirmDestinationMapInstance(in packet, instanceId);
+        lock (gate) inner.StageMapInstance(in packet, instanceId);
+    }
+
+    public void ConfirmMapInstance(in PacketObservationSource packet, uint instanceId)
+    {
+        lock (gate) inner.ConfirmMapInstance(in packet, instanceId);
     }
 
     public void MarkSceneTransportBoundary(in PacketObservationSource packet)

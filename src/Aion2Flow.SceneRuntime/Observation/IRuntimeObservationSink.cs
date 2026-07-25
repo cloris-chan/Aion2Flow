@@ -24,19 +24,21 @@ public interface IRuntimeObservationSink
 
     void RememberNpcObservationSource(int instanceId);
 
-    void StageDestinationMap(in PacketObservationSource packet, uint mapId);
+    void SetCurrentMap(in PacketObservationSource packet, uint mapId);
 
-    void StageDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload);
+    void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId);
 
-    void StagePendingDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload);
+    void CommitDestinationMapTransition(in PacketObservationSource packet, uint mapId);
 
-    void ConfirmDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload);
+    void StageSceneMapCandidate(in PacketObservationSource packet, uint mapId);
 
-    void ConfirmPendingDestinationMapArrival(in PacketObservationSource packet);
+    void ConfirmSceneMap(in PacketObservationSource packet, uint mapId);
 
-    void StageDestinationMapInstance(in PacketObservationSource packet, uint instanceId);
+    void ConfirmDestinationMapArrival(in PacketObservationSource packet);
 
-    void ConfirmDestinationMapInstance(in PacketObservationSource packet, uint instanceId);
+    void StageMapInstance(in PacketObservationSource packet, uint instanceId);
+
+    void ConfirmMapInstance(in PacketObservationSource packet, uint instanceId);
 
     void MarkSceneTransportBoundary(in PacketObservationSource packet);
 

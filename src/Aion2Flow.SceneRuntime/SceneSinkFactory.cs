@@ -1,5 +1,5 @@
-using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -40,6 +40,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private long _nextFlushId;
     private SceneKind _kind;
     private BossSceneState _bossState;
+    private bool _hydrateBossSceneRuntimeStateOnCombat;
     private long _frozenEndObservationOrdinalExclusive = -1;
     private SceneArchivePayload? _frozenArchive;
     private LiveScenePlaybackState? _playbackState;
@@ -205,18 +206,16 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
     internal bool TryHandleMapTransition(
         Func<DateTimeOffset> resolveSessionStarted,
-        out SceneArchivePayload? payload,
-        out SceneTransitionKind transitionKind)
+        out SceneArchivePayload? payload)
     {
         ArgumentNullException.ThrowIfNull(resolveSessionStarted);
 
         lock (_gate)
         {
             if (_kind == SceneKind.Boss ||
-                !Owner.TryCreateTransitionArchive(out payload, out transitionKind, out var boundaryOrdinal))
+                !Owner.TryCreateTransitionArchive(out payload, out var boundaryOrdinal))
             {
                 payload = null;
-                transitionKind = SceneTransitionKind.None;
                 return false;
             }
 
@@ -291,19 +290,28 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     }
 
     private void ResetCore(DateTimeOffset sessionStarted)
-        => ResetCore(sessionStarted, _kind);
+        => ResetCore(sessionStarted, _kind, Clock.NextObservationOrdinal);
 
     private void ResetCore(DateTimeOffset sessionStarted, SceneKind kind)
         => ResetCore(sessionStarted, kind, Clock.NextObservationOrdinal);
 
-    private void ResetCore(DateTimeOffset sessionStarted, SceneKind kind, long startOrdinal, SceneArchivePayload? playbackPayload = null)
+    private void ResetCore(
+        DateTimeOffset sessionStarted,
+        SceneKind kind,
+        long startOrdinal,
+        SceneArchivePayload? playbackPayload = null)
     {
+        var shouldHydrateBossSceneRuntimeState =
+            _kind == SceneKind.Standard &&
+            kind == SceneKind.Standard;
+
         FinalizePlaybackStateCore(playbackPayload);
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
         Clock.Reset(sessionStarted);
         _kind = kind;
         _bossState = BossSceneState.Waiting;
+        _hydrateBossSceneRuntimeStateOnCombat = shouldHydrateBossSceneRuntimeState;
         _frozenEndObservationOrdinalExclusive = -1;
         _frozenArchive = null;
         _seededBossSceneRuntimeStates.Clear();
@@ -318,7 +326,17 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     bool ILiveSceneCollectionPolicy.ShouldAppendCombat(in PacketObservationSource packet, int sourceId, int targetId, IRuntimeObservationSink sink)
     {
         if (_kind == SceneKind.Standard)
+        {
+            if (_hydrateBossSceneRuntimeStateOnCombat &&
+                TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var activeTargetId))
+            {
+                SeedBossSceneRuntimeState(in packet, activeTargetId, sink);
+                if (_seededBossSceneRuntimeStates.Contains(activeTargetId))
+                    _hydrateBossSceneRuntimeStateOnCombat = false;
+            }
+
             return true;
+        }
 
         RefreshBossStateCore();
         if (_bossState == BossSceneState.Recording)

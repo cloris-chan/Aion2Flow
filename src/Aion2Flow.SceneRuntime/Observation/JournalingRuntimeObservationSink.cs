@@ -126,15 +126,22 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         AddKnownEntity(instanceId);
     }
 
-    public void StageDestinationMap(in PacketObservationSource packet, uint mapId) => StageDestinationMap(in packet, mapId, allowSameMapReload: false);
+    public void SetCurrentMap(in PacketObservationSource packet, uint mapId)
+        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.CurrentMap);
 
-    public void StageDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(in packet, mapId, allowSameMapReload, "stage-destination-map");
+    public void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId)
+        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapTransitionAnnounced);
 
-    public void StagePendingDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(in packet, mapId, allowSameMapReload, "pending-destination-map");
+    public void CommitDestinationMapTransition(in PacketObservationSource packet, uint mapId)
+        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapTransitionCountdown);
 
-    public void ConfirmDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => AppendSceneMapObservation(in packet, mapId, allowSameMapReload, "confirm-destination-map");
+    public void StageSceneMapCandidate(in PacketObservationSource packet, uint mapId)
+        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.SceneMapCandidate);
 
-    public void ConfirmPendingDestinationMapArrival(in PacketObservationSource packet)
+    public void ConfirmSceneMap(in PacketObservationSource packet, uint mapId)
+        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.SceneMapConfirmed);
+
+    public void ConfirmDestinationMapArrival(in PacketObservationSource packet)
     {
         var stamp = CreateStamp(in packet);
         journal.Append(
@@ -143,13 +150,11 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 MapId = 0,
                 MapInstanceId = 0,
-                Value0 = 0,
-                Value1 = 0,
-                DiagnosticKey = "confirm-pending-destination-map-arrival"
+                Kind = SceneObservationKind.DestinationMapArrival
             });
     }
 
-    private void AppendSceneMapObservation(in PacketObservationSource packet, uint mapId, bool allowSameMapReload, string diagnosticKey)
+    private void AppendSceneMapObservation(in PacketObservationSource packet, uint mapId, SceneObservationKind kind)
     {
         var stamp = CreateStamp(in packet);
         journal.Append(
@@ -158,13 +163,11 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 MapId = mapId,
                 MapInstanceId = 0,
-                Value0 = allowSameMapReload ? 1 : 0,
-                Value1 = 0,
-                DiagnosticKey = diagnosticKey
+                Kind = kind
             });
     }
 
-    public void StageDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
+    public void StageMapInstance(in PacketObservationSource packet, uint instanceId)
     {
         var stamp = CreateStamp(in packet);
         journal.Append(
@@ -173,13 +176,11 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 MapId = 0,
                 MapInstanceId = instanceId,
-                Value0 = 0,
-                Value1 = 0,
-                DiagnosticKey = "stage-destination-instance"
+                Kind = SceneObservationKind.MapInstanceStaged
             });
     }
 
-    public void ConfirmDestinationMapInstance(in PacketObservationSource packet, uint instanceId)
+    public void ConfirmMapInstance(in PacketObservationSource packet, uint instanceId)
     {
         var stamp = CreateStamp(in packet);
         journal.Append(
@@ -188,9 +189,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 MapId = 0,
                 MapInstanceId = instanceId,
-                Value0 = 0,
-                Value1 = 0,
-                DiagnosticKey = "confirm-destination-instance"
+                Kind = SceneObservationKind.MapInstanceConfirmed
             });
     }
 
@@ -203,9 +202,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 MapId = 0,
                 MapInstanceId = 0,
-                Value0 = 0,
-                Value1 = 0,
-                DiagnosticKey = "scene-transport-boundary"
+                Kind = SceneObservationKind.TransportBoundary
             });
     }
 

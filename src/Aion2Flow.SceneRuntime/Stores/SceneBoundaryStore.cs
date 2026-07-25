@@ -1,5 +1,5 @@
-using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
@@ -26,56 +26,62 @@ public sealed class SceneBoundaryStore
 
     public long Revision => _revision;
 
-    public void StageDestinationMap(uint mapId)
+    public void SetCurrentMap(uint mapId)
     {
-        if (_sceneBoundary.StageDestinationMap(mapId))
+        if (_sceneBoundary.SetCurrentMap(mapId))
             _revision++;
     }
 
-    public void StageDestinationMap(uint mapId, bool allowSameMapReload)
+    public void AnnounceDestinationMapTransition(uint mapId)
     {
-        if (_sceneBoundary.StageDestinationMap(mapId, allowSameMapReload))
+        if (_sceneBoundary.AnnounceDestinationMapTransition(mapId))
             _revision++;
     }
 
-    public void StagePendingDestinationMap(uint mapId, bool allowSameMapReload)
+    public void CommitDestinationMapTransition(uint mapId)
     {
-        if (_sceneBoundary.StagePendingDestinationMap(mapId, allowSameMapReload))
+        if (_sceneBoundary.CommitDestinationMapTransition(mapId))
             _revision++;
     }
 
-    public void ConfirmDestinationMap(uint mapId, bool allowSameMapReload)
+    public void StageSceneMapCandidate(uint mapId)
     {
-        if (_sceneBoundary.ConfirmDestinationMap(mapId, allowSameMapReload))
+        if (_sceneBoundary.StageSceneMapCandidate(mapId))
             _revision++;
     }
 
-    public void ConfirmPendingDestinationMapArrival()
+    public void ConfirmSceneMap(uint mapId)
     {
-        if (_sceneBoundary.ConfirmPendingDestinationMapArrival())
+        if (_sceneBoundary.ConfirmSceneMap(mapId))
             _revision++;
     }
 
-    public void StageDestinationMapInstance(uint instanceId)
+    public void ConfirmDestinationMapArrival()
     {
-        if (_sceneBoundary.StageDestinationMapInstance(instanceId))
+        if (_sceneBoundary.ConfirmDestinationMapArrival())
             _revision++;
     }
 
-    public void ConfirmDestinationMapInstance(uint instanceId)
+    public void StageMapInstance(uint instanceId)
     {
-        if (_sceneBoundary.ConfirmDestinationMapInstance(instanceId))
+        if (_sceneBoundary.StageMapInstance(instanceId))
+            _revision++;
+    }
+
+    public void ConfirmMapInstance(uint instanceId)
+    {
+        if (_sceneBoundary.ConfirmMapInstance(instanceId))
             _revision++;
     }
 
     internal SceneTransitionKind ApplySceneObservation(in SceneObservation scene)
     {
         var before = _sceneBoundary.CreateSnapshot();
-        var kind = _sceneBoundary.ApplySceneObservation(in scene);
+        var transitionKind = _sceneBoundary.ApplySceneObservation(in scene);
         if (before != _sceneBoundary.CreateSnapshot())
             _revision++;
 
-        return kind;
+        return transitionKind;
     }
 
     internal SceneBoundaryStoreSnapshot CreateSnapshot() => new(_sceneBoundary.CreateSnapshot(), _revision);

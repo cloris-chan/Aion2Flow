@@ -25,7 +25,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private JournalEntriesReader? _transitionScanReader;
     private SceneBoundaryStore? _transitionScanBoundary;
     private long _transitionScanOrdinal;
-    private SceneTransitionKind _transitionScanKind;
     private bool _transitionScanFound;
     private JournalCursor _cursor = journal.CreateCursor(0);
     private long _lastAppliedFlushId = -1;
@@ -161,15 +160,14 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             return CreateArchivePayloadCore(endObservationOrdinalExclusive);
     }
 
-    internal bool TryCreateTransitionArchive(out SceneArchivePayload? payload, out SceneTransitionKind transitionKind, out long boundaryOrdinal)
+    internal bool TryCreateTransitionArchive(out SceneArchivePayload? payload, out long boundaryOrdinal)
     {
         lock (_gate)
         {
             payload = null;
-            transitionKind = SceneTransitionKind.None;
             boundaryOrdinal = -1;
 
-            if (!TryFindNextSceneTransitionCore(out boundaryOrdinal, out transitionKind))
+            if (!TryFindNextSceneTransitionCore(out boundaryOrdinal))
                 return false;
 
             var candidate = CreateArchivePayloadCore(boundaryOrdinal);
@@ -303,13 +301,11 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             : endOrdinalExclusive;
     }
 
-    private bool TryFindNextSceneTransitionCore(out long boundaryOrdinal, out SceneTransitionKind transitionKind)
+    private bool TryFindNextSceneTransitionCore(out long boundaryOrdinal)
     {
         boundaryOrdinal = -1;
-        transitionKind = SceneTransitionKind.None;
         _transitionScanBoundary = SceneBoundaryStore.FromSnapshot(_projection.Boundary.CreateSnapshot());
         _transitionScanOrdinal = -1;
-        _transitionScanKind = SceneTransitionKind.None;
         _transitionScanFound = false;
         _transitionScanReader ??= ScanTransitionEntries;
 
@@ -323,7 +319,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             if (_transitionScanFound)
             {
                 boundaryOrdinal = _transitionScanOrdinal;
-                transitionKind = _transitionScanKind;
                 return true;
             }
 
@@ -343,11 +338,10 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
                 continue;
 
             var kind = boundary.ApplySceneObservation(in entry.Scene);
-            if (kind is not (SceneTransitionKind.MapChanged or SceneTransitionKind.InstanceChanged))
+            if (kind != SceneTransitionKind.MapTransition)
                 continue;
 
             _transitionScanOrdinal = entry.Stamp.ObservationOrdinal;
-            _transitionScanKind = kind;
             _transitionScanFound = true;
             return;
         }

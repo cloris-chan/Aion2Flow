@@ -4,52 +4,121 @@ namespace Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 public sealed class SceneBoundaryService
 {
-    private uint _pendingMapId;
-    private bool _pendingAllowSameMapReload;
+    private uint _sceneMapCandidate;
+    private DirectMapTransition _directTransition;
 
     public uint CurrentMapId { get; private set; }
     public uint CurrentMapInstanceId { get; private set; }
     public long SceneTransitionRevision { get; private set; }
-    public bool IsEmpty => CurrentMapId == 0 && CurrentMapInstanceId == 0 && SceneTransitionRevision == 0 && _pendingMapId == 0;
+    public bool IsEmpty => CurrentMapId == 0 && CurrentMapInstanceId == 0 && SceneTransitionRevision == 0 && _sceneMapCandidate == 0 && _directTransition.IsEmpty;
 
-    public bool StageDestinationMap(uint mapId) => StageDestinationMap(mapId, allowSameMapReload: false);
-
-    public bool StageDestinationMap(uint mapId, bool allowSameMapReload) => CommitConfirmedMap(mapId, allowSameMapReload);
-
-    public bool StagePendingDestinationMap(uint mapId, bool allowSameMapReload)
+    public bool SetCurrentMap(uint mapId)
     {
         if (mapId == 0)
             return false;
 
-        if (_pendingMapId == mapId && _pendingAllowSameMapReload == allowSameMapReload)
+        var changed = false;
+        if (_directTransition.IsCommitted && _directTransition.MapId == mapId)
+        {
+            changed |= ClearDirectTransition();
+        }
+        else if (!_directTransition.IsPending || _directTransition.MapId != mapId || mapId != CurrentMapId)
+        {
+            changed |= ClearDirectTransition();
+            changed |= CommitChangedMap(mapId);
+        }
+
+        changed |= ClearSceneMapCandidate();
+        return changed;
+    }
+
+    public bool AnnounceDestinationMapTransition(uint mapId)
+    {
+        if (mapId == 0)
             return false;
 
-        _pendingMapId = mapId;
-        _pendingAllowSameMapReload = allowSameMapReload;
+        if (!_directTransition.IsEmpty && _directTransition.MapId == mapId)
+            return false;
+
+        _directTransition = DirectMapTransition.Announced(mapId, CurrentMapInstanceId);
         return true;
     }
 
-    public bool ConfirmDestinationMap(uint mapId, bool allowSameMapReload)
+    public bool CommitDestinationMapTransition(uint mapId)
     {
         if (mapId == 0)
             return false;
 
-        var confirmsPendingMap = _pendingMapId == mapId;
-        ClearPendingDestination();
-        return CommitConfirmedMap(mapId, allowSameMapReload && confirmsPendingMap);
-    }
-
-    public bool ConfirmPendingDestinationMapArrival()
-    {
-        if (_pendingMapId == 0)
+        if (_directTransition.IsCommitted && _directTransition.MapId == mapId)
             return false;
 
-        var mapId = _pendingMapId;
-        ClearPendingDestination();
-        return CommitConfirmedMap(mapId, allowSameMapReload: false);
+        var changed = CommitMapBoundary(mapId);
+        changed |= ClearSceneMapCandidate();
+        changed |= SetDirectTransition(DirectMapTransition.Committed(mapId));
+        return changed;
     }
 
-    public bool StageDestinationMapInstance(uint instanceId)
+    public bool StageSceneMapCandidate(uint mapId)
+    {
+        if (mapId == 0 || _sceneMapCandidate == mapId)
+            return false;
+
+        _sceneMapCandidate = mapId;
+        return true;
+    }
+
+    public bool ConfirmSceneMap(uint mapId)
+    {
+        if (mapId == 0)
+            return false;
+
+        var changed = false;
+        if (_directTransition.MapId == mapId)
+        {
+            if (_directTransition.IsCommitted)
+            {
+                changed |= ClearDirectTransition();
+            }
+            else if (mapId != CurrentMapId)
+            {
+                changed |= CommitChangedMap(mapId);
+                changed |= ClearDirectTransition();
+            }
+        }
+        else
+        {
+            changed |= CommitChangedMap(mapId);
+            changed |= ClearDirectTransition();
+        }
+
+        changed |= ClearSceneMapCandidate();
+        return changed;
+    }
+
+    public bool ConfirmDestinationMapArrival()
+    {
+        var changed = false;
+        if (_sceneMapCandidate != 0)
+        {
+            if (_sceneMapCandidate != CurrentMapId)
+            {
+                changed |= CommitChangedMap(_sceneMapCandidate);
+                changed |= ClearDirectTransition();
+            }
+
+            changed |= ClearSceneMapCandidate();
+        }
+
+        if (_directTransition.IsAnnounced)
+        {
+            _directTransition = _directTransition.WithArrivalConfirmed();
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    public bool StageMapInstance(uint instanceId)
     {
         if (instanceId == 0)
             return false;
@@ -61,105 +130,167 @@ public sealed class SceneBoundaryService
         return true;
     }
 
-    public bool ConfirmDestinationMapInstance(uint instanceId)
+    public bool ConfirmMapInstance(uint instanceId)
     {
         if (instanceId == 0)
             return false;
 
         var changed = false;
-        if (_pendingMapId != 0)
+        if (_directTransition.IsArrivalConfirmed &&
+            _directTransition.MapId == CurrentMapId &&
+            _directTransition.BaselineMapInstanceId != 0 &&
+            _directTransition.BaselineMapInstanceId != instanceId)
         {
-            changed |= CommitConfirmedMap(_pendingMapId, _pendingAllowSameMapReload && _pendingMapId == CurrentMapId);
-            ClearPendingDestination();
+            changed |= CommitMapBoundary(CurrentMapId);
+            changed |= SetDirectTransition(DirectMapTransition.Committed(CurrentMapId));
+            changed |= ClearSceneMapCandidate();
+        }
+        else if (_directTransition.IsEmpty && _sceneMapCandidate != 0 && _sceneMapCandidate != CurrentMapId)
+        {
+            changed |= CommitChangedMap(_sceneMapCandidate);
+            changed |= ClearSceneMapCandidate();
         }
 
-        changed |= StageDestinationMapInstance(instanceId);
+        changed |= StageMapInstance(instanceId);
         return changed;
     }
 
     internal SceneTransitionKind ApplySceneObservation(in SceneObservation scene)
     {
-        var previousMapId = CurrentMapId;
-        var previousMapInstanceId = CurrentMapInstanceId;
+        var previousTransitionRevision = SceneTransitionRevision;
 
-        switch (scene.DiagnosticKey)
+        switch (scene.Kind)
         {
-            case "stage-destination-map":
-                StageDestinationMap(scene.MapId, scene.Value0 != 0);
+            case SceneObservationKind.CurrentMap:
+                SetCurrentMap(scene.MapId);
                 break;
-            case "pending-destination-map":
-                StagePendingDestinationMap(scene.MapId, scene.Value0 != 0);
+            case SceneObservationKind.DestinationMapTransitionAnnounced:
+                AnnounceDestinationMapTransition(scene.MapId);
                 break;
-            case "confirm-destination-map":
-                ConfirmDestinationMap(scene.MapId, scene.Value0 != 0);
+            case SceneObservationKind.DestinationMapTransitionCountdown:
+                CommitDestinationMapTransition(scene.MapId);
                 break;
-            case "confirm-pending-destination-map-arrival":
-                ConfirmPendingDestinationMapArrival();
+            case SceneObservationKind.SceneMapCandidate:
+                StageSceneMapCandidate(scene.MapId);
                 break;
-            case "stage-destination-instance":
-                StageDestinationMapInstance(scene.MapInstanceId);
+            case SceneObservationKind.SceneMapConfirmed:
+                ConfirmSceneMap(scene.MapId);
                 break;
-            case "confirm-destination-instance":
-                ConfirmDestinationMapInstance(scene.MapInstanceId);
+            case SceneObservationKind.DestinationMapArrival:
+                ConfirmDestinationMapArrival();
+                break;
+            case SceneObservationKind.MapInstanceStaged:
+                StageMapInstance(scene.MapInstanceId);
+                break;
+            case SceneObservationKind.MapInstanceConfirmed:
+                ConfirmMapInstance(scene.MapInstanceId);
                 break;
         }
 
-        if (CurrentMapId != previousMapId)
-            return SceneTransitionKind.MapChanged;
-
-        return CurrentMapInstanceId != previousMapInstanceId
-            ? SceneTransitionKind.InstanceChanged
+        return SceneTransitionRevision != previousTransitionRevision
+            ? SceneTransitionKind.MapTransition
             : SceneTransitionKind.None;
     }
 
-    internal SceneBoundaryServiceSnapshot CreateSnapshot() => new(CurrentMapId, CurrentMapInstanceId, SceneTransitionRevision, _pendingMapId, _pendingAllowSameMapReload);
+    internal SceneBoundaryServiceSnapshot CreateSnapshot() => new(CurrentMapId, CurrentMapInstanceId, SceneTransitionRevision, _sceneMapCandidate, _directTransition);
 
     internal static SceneBoundaryService FromSnapshot(SceneBoundaryServiceSnapshot snapshot) => new()
     {
         CurrentMapId = snapshot.CurrentMapId,
         CurrentMapInstanceId = snapshot.CurrentMapInstanceId,
         SceneTransitionRevision = snapshot.SceneTransitionRevision,
-        _pendingMapId = snapshot.PendingMapId,
-        _pendingAllowSameMapReload = snapshot.PendingAllowSameMapReload
+        _sceneMapCandidate = snapshot.SceneMapCandidate,
+        _directTransition = snapshot.DirectTransition
     };
 
-    private bool CommitConfirmedMap(uint mapId, bool allowSameMapReload)
+    private bool CommitMapBoundary(uint mapId)
     {
         if (mapId == 0)
             return false;
 
         if (mapId == CurrentMapId)
         {
-            if (!allowSameMapReload)
-                return false;
-
-            ClearPendingDestination();
             SceneTransitionRevision++;
             return true;
         }
 
+        return CommitChangedMap(mapId);
+    }
+
+    private bool CommitChangedMap(uint mapId)
+    {
+        if (mapId == 0 || mapId == CurrentMapId)
+            return false;
+
         CurrentMapId = mapId;
         CurrentMapInstanceId = 0;
         SceneTransitionRevision++;
-        ClearPendingDestination();
         return true;
     }
 
-    private void ClearPendingDestination()
+    private bool ClearSceneMapCandidate()
     {
-        _pendingMapId = 0;
-        _pendingAllowSameMapReload = false;
+        if (_sceneMapCandidate == 0)
+            return false;
+
+        _sceneMapCandidate = 0;
+        return true;
+    }
+
+    private bool SetDirectTransition(DirectMapTransition transition)
+    {
+        if (_directTransition == transition)
+            return false;
+
+        _directTransition = transition;
+        return true;
+    }
+
+    private bool ClearDirectTransition()
+    {
+        if (_directTransition.IsEmpty)
+            return false;
+
+        _directTransition = default;
+        return true;
     }
 
     public void Clear()
     {
-        ClearPendingDestination();
+        _sceneMapCandidate = 0;
+        _directTransition = default;
         CurrentMapId = 0;
         CurrentMapInstanceId = 0;
         SceneTransitionRevision = 0;
     }
 }
 
-public enum SceneTransitionKind : byte { None, MapChanged, InstanceChanged }
+public enum SceneTransitionKind : byte { None, MapTransition }
 
-internal readonly record struct SceneBoundaryServiceSnapshot(uint CurrentMapId, uint CurrentMapInstanceId, long SceneTransitionRevision, uint PendingMapId, bool PendingAllowSameMapReload);
+internal readonly record struct SceneBoundaryServiceSnapshot(
+    uint CurrentMapId,
+    uint CurrentMapInstanceId,
+    long SceneTransitionRevision,
+    uint SceneMapCandidate,
+    DirectMapTransition DirectTransition);
+
+internal readonly record struct DirectMapTransition(uint MapId, uint BaselineMapInstanceId, DirectMapTransitionPhase Phase)
+{
+    public bool IsEmpty => Phase == DirectMapTransitionPhase.None;
+    public bool IsAnnounced => Phase == DirectMapTransitionPhase.Announced;
+    public bool IsArrivalConfirmed => Phase == DirectMapTransitionPhase.ArrivalConfirmed;
+    public bool IsPending => IsAnnounced || IsArrivalConfirmed;
+    public bool IsCommitted => Phase == DirectMapTransitionPhase.Committed;
+
+    public static DirectMapTransition Announced(uint mapId, uint baselineMapInstanceId) => new(mapId, baselineMapInstanceId, DirectMapTransitionPhase.Announced);
+    public static DirectMapTransition Committed(uint mapId) => new(mapId, 0, DirectMapTransitionPhase.Committed);
+    public DirectMapTransition WithArrivalConfirmed() => this with { Phase = DirectMapTransitionPhase.ArrivalConfirmed };
+}
+
+internal enum DirectMapTransitionPhase : byte
+{
+    None,
+    Announced,
+    ArrivalConfirmed,
+    Committed
+}

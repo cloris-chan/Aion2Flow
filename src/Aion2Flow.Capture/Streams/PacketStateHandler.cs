@@ -117,7 +117,7 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(opcode, packet.Length);
-        if (!context.Writer.ConfirmDestinationMapFromMapEvent(in source, parsed.MapId))
+        if (!context.Writer.ApplyDestinationMapEvent(in source, parsed.MapId, parsed.Signal))
         {
             return false;
         }
@@ -192,7 +192,7 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x2136, packet.Length);
-        context.Writer.StagePendingDestinationMapFromSceneState(in source, parsed.Value0);
+        context.Writer.StageSceneMapCandidateFromSceneState(in source, parsed.Value0);
 
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -214,7 +214,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.ConfirmPendingDestinationMapArrival(context.CreateObservationSource(0x2336, packet.Length));
+        context.Sink.ConfirmDestinationMapArrival(context.CreateObservationSource(0x2336, packet.Length));
         return context.MarkParsed();
     }
 
@@ -225,7 +225,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.ConfirmDestinationMapInstance(context.CreateObservationSource(0x2E92, packet.Length), parsed.InstanceId);
+        context.Sink.ConfirmMapInstance(context.CreateObservationSource(0x2E92, packet.Length), parsed.InstanceId);
 
         return context.MarkParsed();
     }

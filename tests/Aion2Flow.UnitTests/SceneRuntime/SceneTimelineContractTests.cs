@@ -1,5 +1,5 @@
-using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -36,7 +36,7 @@ public class SceneTimelineContractTests
     {
         var journal = new ObservedEventJournal();
         var header = CreateHeader(Guid.NewGuid(), 0);
-        var scene = new SceneObservation(910035, 0, 0, 0, "test");
+        var scene = new SceneObservation(910035, 0, SceneObservationKind.None);
 
         journal.Append(in header, in scene);
 
@@ -129,7 +129,7 @@ public class SceneTimelineContractTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
         var header = new ObservedEventHeader(sceneId, new TimelineStamp(500, 0, 1), 0, 0, default);
-        var scene = new SceneObservation(910035, 0, 0, 0, "test");
+        var scene = new SceneObservation(910035, 0, SceneObservationKind.None);
         journal.Append(in header, in scene);
 
         journal.ReadEntry(0, entry =>
@@ -534,17 +534,19 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void JournalingSink_RecordsStageDestinationMap()
+    public void JournalingSink_RecordsTypedCurrentMapObservation()
     {
         var journal = new ObservedEventJournal();
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
-        sink.StageDestinationMap(910035);
+        sink.SetCurrentMap(910035);
 
         Assert.Equal(1, journal.Count);
         Assert.Equal(ObservedEventDomain.Scene, ReadDomain(journal, 0));
-        Assert.Equal(910035u, ReadScene(journal, 0).MapId);
+        var observation = ReadScene(journal, 0);
+        Assert.Equal(910035u, observation.MapId);
+        Assert.Equal(SceneObservationKind.CurrentMap, observation.Kind);
     }
 
     [Fact]
@@ -600,150 +602,261 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void Boundary_StageDestinationMap_IgnoresZero()
+    public void Boundary_CurrentMapCommitsOnceAndPreservesItsInstanceOnRepeat()
     {
         var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(0);
-        Assert.Equal(0u, svc.CurrentMapId);
-    }
+        Assert.True(svc.SetCurrentMap(910035));
+        Assert.True(svc.StageMapInstance(516446));
+        var revision = svc.SceneTransitionRevision;
 
-    [Fact]
-    public void Boundary_StageDestinationMap_CommitsImmediately()
-    {
-        var svc = new SceneBoundaryService();
-        Assert.True(svc.StageDestinationMap(910035));
-        Assert.Equal(910035u, svc.CurrentMapId);
-        Assert.Equal(1, svc.SceneTransitionRevision);
-        Assert.Equal(910035u, svc.CurrentMapId);
-    }
-
-    [Fact]
-    public void Boundary_PendingDestinationMap_DoesNotCommitUntilConfirmed()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(1010);
-        var before = svc.SceneTransitionRevision;
-
-        Assert.True(svc.StagePendingDestinationMap(500015, allowSameMapReload: true));
-        Assert.Equal(1010u, svc.CurrentMapId);
-        Assert.Equal(before, svc.SceneTransitionRevision);
-
-        Assert.True(svc.ConfirmDestinationMap(500015, allowSameMapReload: true));
-        Assert.Equal(500015u, svc.CurrentMapId);
-        Assert.Equal(before + 1, svc.SceneTransitionRevision);
-    }
-
-    [Fact]
-    public void Boundary_PendingDestinationMap_CommitsOnArrivalSignal()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(1010);
-        var before = svc.SceneTransitionRevision;
-
-        Assert.True(svc.StagePendingDestinationMap(500015, allowSameMapReload: true));
-        Assert.True(svc.ConfirmPendingDestinationMapArrival());
-
-        Assert.Equal(500015u, svc.CurrentMapId);
-        Assert.Equal(0u, svc.CurrentMapInstanceId);
-        Assert.Equal(before + 1, svc.SceneTransitionRevision);
-    }
-
-    [Fact]
-    public void Boundary_PendingEventMap_CommitsWithConfirmedInstance()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(1010);
-        var before = svc.SceneTransitionRevision;
-
-        Assert.True(svc.StagePendingDestinationMap(500015, allowSameMapReload: true));
-        Assert.Equal(1010u, svc.CurrentMapId);
-
-        Assert.True(svc.ConfirmDestinationMapInstance(719460));
-        Assert.Equal(500015u, svc.CurrentMapId);
-        Assert.Equal(719460u, svc.CurrentMapInstanceId);
-        Assert.Equal(before + 1, svc.SceneTransitionRevision);
-    }
-
-    [Fact]
-    public void Boundary_SameMap_DoesNotTriggerTransition()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(100);
-        var before = svc.SceneTransitionRevision;
-        svc.StageDestinationMap(100);
-        Assert.Equal(before, svc.SceneTransitionRevision);
-    }
-
-    [Fact]
-    public void Boundary_InstanceWithoutPendingMap_AppliesDirectly()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(200003);
-        svc.StageDestinationMapInstance(113515);
-        Assert.Equal(113515u, svc.CurrentMapInstanceId);
-    }
-
-    [Fact]
-    public void Boundary_MapChange_ResetsInstance()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(200003);
-        svc.StageDestinationMapInstance(113515);
-        svc.StageDestinationMap(1010);
-        Assert.Equal(1010u, svc.CurrentMapId);
-        Assert.Equal(0u, svc.CurrentMapInstanceId);
-    }
-
-    [Fact]
-    public void Boundary_SameMapReloadCandidate_AdvancesTransitionRevision()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(1010);
-        var before = svc.SceneTransitionRevision;
-
-        Assert.True(svc.StagePendingDestinationMap(1010, allowSameMapReload: true));
-        Assert.True(svc.ConfirmDestinationMap(1010, allowSameMapReload: true));
-
-        Assert.Equal(1010u, svc.CurrentMapId);
-        Assert.Equal(0u, svc.CurrentMapInstanceId);
-        Assert.Equal(before + 1, svc.SceneTransitionRevision);
-    }
-
-    [Fact]
-    public void Boundary_SameMapReloadCandidate_WithInstance_KeepsInstance()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(154001);
-        svc.StageDestinationMapInstance(89730);
-        var before = svc.SceneTransitionRevision;
-
-        Assert.True(svc.StagePendingDestinationMap(154001, allowSameMapReload: true));
-        Assert.True(svc.ConfirmDestinationMap(154001, allowSameMapReload: true));
-
-        Assert.Equal(154001u, svc.CurrentMapId);
-        Assert.Equal(89730u, svc.CurrentMapInstanceId);
-        Assert.Equal(before + 1, svc.SceneTransitionRevision);
-    }
-
-    [Fact]
-    public void Boundary_InstanceStagedAlongsideMap_CommitsTogether()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(200003);
-        svc.StageDestinationMapInstance(515552);
-        Assert.Equal(200003u, svc.CurrentMapId);
-        Assert.Equal(515552u, svc.CurrentMapInstanceId);
-    }
-
-    [Fact]
-    public void Boundary_RedundantMapStage_DoesNotClobberInstance()
-    {
-        var svc = new SceneBoundaryService();
-        svc.StageDestinationMap(910035);
-        svc.StageDestinationMapInstance(516446);
-        svc.StageDestinationMap(910035);
+        Assert.False(svc.SetCurrentMap(910035));
         Assert.Equal(910035u, svc.CurrentMapId);
         Assert.Equal(516446u, svc.CurrentMapInstanceId);
+        Assert.Equal(revision, svc.SceneTransitionRevision);
+    }
+
+    [Fact]
+    public void Boundary_WeakSceneCandidateCommitsDifferentMapOnArrival()
+    {
+        var svc = new SceneBoundaryService();
+        svc.SetCurrentMap(1010);
+        var before = svc.SceneTransitionRevision;
+
+        Assert.True(svc.StageSceneMapCandidate(500015));
+        Assert.Equal(1010u, svc.CurrentMapId);
+        Assert.Equal(before, svc.SceneTransitionRevision);
+
+        Assert.True(svc.ConfirmDestinationMapArrival());
+        Assert.Equal(500015u, svc.CurrentMapId);
+        Assert.Equal(0u, svc.CurrentMapInstanceId);
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+    }
+
+    [Fact]
+    public void Boundary_WeakSameMapCandidateNeverCreatesReloadBoundary()
+    {
+        var svc = new SceneBoundaryService();
+        svc.SetCurrentMap(1010);
+        svc.StageMapInstance(719459);
+        var before = svc.SceneTransitionRevision;
+
+        Assert.True(svc.StageSceneMapCandidate(1010));
+        Assert.True(svc.ConfirmDestinationMapArrival());
+        Assert.True(svc.ConfirmMapInstance(719460));
+
+        Assert.Equal(1010u, svc.CurrentMapId);
+        Assert.Equal(719460u, svc.CurrentMapInstanceId);
+        Assert.Equal(before, svc.SceneTransitionRevision);
+    }
+
+    [Fact]
+    public void Boundary_DirectArrivalAndChangedInstanceCreateSingleSameMapTransition()
+    {
+        var svc = new SceneBoundaryService();
+        svc.SetCurrentMap(910055);
+        svc.StageMapInstance(229782);
+        var before = svc.SceneTransitionRevision;
+
+        Assert.True(svc.AnnounceDestinationMapTransition(910055));
+        Assert.True(svc.ConfirmDestinationMapArrival());
+
+        var confirmation = new SceneObservation(0, 229839, SceneObservationKind.MapInstanceConfirmed);
+        Assert.Equal(SceneTransitionKind.MapTransition, svc.ApplySceneObservation(in confirmation));
+        Assert.Equal(910055u, svc.CurrentMapId);
+        Assert.Equal(229839u, svc.CurrentMapInstanceId);
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+
+        var replacement = new SceneObservation(0, 229838, SceneObservationKind.MapInstanceConfirmed);
+        Assert.Equal(SceneTransitionKind.None, svc.ApplySceneObservation(in replacement));
+        Assert.Equal(229838u, svc.CurrentMapInstanceId);
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+    }
+
+    [Fact]
+    public void Boundary_DirectArrivalDoesNotCommitPlaceholderMapBeforeDifferentMapConfirmation()
+    {
+        var svc = new SceneBoundaryService();
+        svc.SetCurrentMap(610010);
+        svc.StageMapInstance(19129);
+        var before = svc.SceneTransitionRevision;
+
+        Assert.True(svc.AnnounceDestinationMapTransition(610010));
+        Assert.True(svc.ConfirmDestinationMapArrival());
+        Assert.Equal(before, svc.SceneTransitionRevision);
+
+        Assert.True(svc.ConfirmSceneMap(1010));
+        Assert.Equal(1010u, svc.CurrentMapId);
+        Assert.Equal(0u, svc.CurrentMapInstanceId);
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+    }
+
+    [Fact]
+    public void Boundary_CountdownConsumesDirectTransitionBeforeLateWeakArrivalAndInstances()
+    {
+        var svc = new SceneBoundaryService();
+        svc.SetCurrentMap(610010);
+        svc.StageMapInstance(144773);
+        var before = svc.SceneTransitionRevision;
+
+        Assert.True(svc.AnnounceDestinationMapTransition(610010));
+        Assert.True(svc.CommitDestinationMapTransition(610010));
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+
+        Assert.True(svc.StageSceneMapCandidate(610010));
+        Assert.True(svc.ConfirmDestinationMapArrival());
+        Assert.True(svc.ConfirmMapInstance(144825));
+        Assert.True(svc.ConfirmMapInstance(144826));
+        Assert.Equal(before + 1, svc.SceneTransitionRevision);
+        Assert.Equal(144826u, svc.CurrentMapInstanceId);
+    }
+
+    [Fact]
+    public void LiveScene_InitialInstanceConfirmationFillsUnknownSceneWithoutArchive()
+    {
+        var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
+        var instanceSource = new PacketObservationSource(100, 0, 0x2E92, 0, 1, default);
+
+        sink.ConfirmMapInstance(in instanceSource, 173414);
+        sink.CompleteFlush(1);
+
+        Assert.False(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out _));
+
+        var frame = scene.CreateFrame();
+        Assert.Equal(0u, frame.Snapshot.MapId);
+        Assert.Equal(173414u, frame.Snapshot.MapInstanceId);
+        Assert.Equal(0, frame.Snapshot.SceneTransitionRevision);
+    }
+
+    [Fact]
+    public void LiveScene_DirectArrivalAndChangedInstanceArchiveSameMapReloadAtInstanceEvidence()
+    {
+        const uint mapId = 910055;
+        var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
+
+        sink.SetCurrentMap(new PacketObservationSource(100, 0, 0x0061, 0, 1, default), mapId);
+        sink.ConfirmMapInstance(new PacketObservationSource(200, 0, 0x2E92, 0, 2, default), 229782);
+
+        var oldCombat = new CombatWireObservation
+        {
+            SkillCode = 11000010,
+            Damage = 200,
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        sink.AppendCombatWireObservation(new PacketObservationSource(1_000, 1, 0x0438, 0, 3, default), 100, 200, in oldCombat);
+        sink.CompleteFlush(1);
+        var oldFrame = scene.CreateFrame();
+        Assert.Equal(200, oldFrame.Snapshot.Combatants[100].DamageAmount);
+
+        sink.AnnounceDestinationMapTransition(new PacketObservationSource(2_000, 2, 0x0161, 0, 4, default), mapId);
+        sink.AppendCombatWireObservation(new PacketObservationSource(2_500, 2, 0x0438, 0, 5, default), 100, 200, in oldCombat);
+        sink.CompleteFlush(2);
+        var pendingFrame = scene.CreateFrame();
+        Assert.Equal(400, pendingFrame.Snapshot.Combatants[100].DamageAmount);
+
+        sink.ConfirmDestinationMapArrival(new PacketObservationSource(10_000, 3, 0x2336, 0, 6, default));
+
+        var transitionOrdinal = scene.Journal.NextObservationOrdinal;
+        sink.ConfirmMapInstance(new PacketObservationSource(10_050, 3, 0x2E92, 0, 7, default), 229839);
+        sink.SetCurrentMap(new PacketObservationSource(20_000, 4, 0x0061, 0, 8, default), mapId);
+        sink.ConfirmMapInstance(new PacketObservationSource(20_050, 4, 0x2E92, 0, 9, default), 229838);
+
+        var newCombat = oldCombat with { Damage = 900 };
+        sink.AppendCombatWireObservation(new PacketObservationSource(22_000, 5, 0x0438, 0, 10, default), 100, 200, in newCombat);
+        sink.CompleteFlush(3);
+
+        var rotationCount = 0;
+        DateTimeOffset RotateLogs()
+        {
+            rotationCount++;
+            return DateTimeOffset.UnixEpoch;
+        }
+
+        Assert.True(scene.TryHandleMapTransition(RotateLogs, out var payload));
+        Assert.NotNull(payload);
+        Assert.Equal(400, payload.Snapshot.Combatants[100].DamageAmount);
+        Assert.Equal(transitionOrdinal, payload.TimelineSegment.EndObservationOrdinalExclusive);
+        Assert.True(scene.TryHandleMapTransition(RotateLogs, out var emptyPayload));
+        Assert.Null(emptyPayload);
+        Assert.False(scene.TryHandleMapTransition(RotateLogs, out _));
+        Assert.Equal(1, rotationCount);
+
+        var newFrame = scene.CreateFrame();
+        Assert.Equal(900, newFrame.Snapshot.Combatants[100].DamageAmount);
+        Assert.Equal(229838u, newFrame.Snapshot.MapInstanceId);
+    }
+
+    [Fact]
+    public void LiveScene_CountdownArchivesSameMapReloadBeforeNewSceneEntries()
+    {
+        const uint mapId = 610010;
+        var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
+        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
+
+        var initialMapSource = new PacketObservationSource(100, 0, 0x0061, 0, 1, default);
+        var initialInstanceSource = new PacketObservationSource(200, 0, 0x2E92, 0, 2, default);
+        sink.SetCurrentMap(in initialMapSource, mapId);
+        sink.StageMapInstance(in initialInstanceSource, 173413);
+
+        var oldCombat = new CombatWireObservation
+        {
+            SkillCode = 11000010,
+            Damage = 200,
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        var firstOldCombatSource = new PacketObservationSource(1_000, 1, 0x0438, 0, 3, default);
+        var secondOldCombatSource = new PacketObservationSource(1_500, 1, 0x0438, 0, 4, default);
+        sink.AppendCombatWireObservation(in firstOldCombatSource, 100, 200, in oldCombat);
+        sink.AppendCombatWireObservation(in secondOldCombatSource, 100, 200, in oldCombat);
+        sink.CompleteFlush(1);
+
+        var oldFrame = scene.CreateFrame();
+        Assert.Equal(400, oldFrame.Snapshot.Combatants[100].DamageAmount);
+
+        var announcementSource = new PacketObservationSource(2_000, 2, 0x0161, 0, 5, default);
+        sink.AnnounceDestinationMapTransition(in announcementSource, mapId);
+        var countdownOrdinal = scene.Journal.NextObservationOrdinal;
+        var countdownSource = new PacketObservationSource(10_000, 3, 0x0061, 0, 6, default);
+        sink.CommitDestinationMapTransition(in countdownSource, mapId);
+        var currentSource = new PacketObservationSource(40_000, 4, 0x0061, 0, 7, default);
+        sink.SetCurrentMap(in currentSource, mapId);
+
+        var newCombat = oldCombat with { Damage = 900 };
+        var firstNewCombatSource = new PacketObservationSource(40_050, 4, 0x0438, 0, 8, default);
+        sink.AppendCombatWireObservation(in firstNewCombatSource, 100, 200, in newCombat);
+        var firstInstanceSource = new PacketObservationSource(40_100, 4, 0x2E92, 0, 9, default);
+        var secondInstanceSource = new PacketObservationSource(40_200, 4, 0x2E92, 0, 10, default);
+        sink.ConfirmMapInstance(in firstInstanceSource, 173414);
+        sink.ConfirmMapInstance(in secondInstanceSource, 173415);
+        var secondNewCombatSource = new PacketObservationSource(41_500, 5, 0x0438, 0, 11, default);
+        sink.AppendCombatWireObservation(in secondNewCombatSource, 100, 200, in newCombat);
+        sink.CompleteFlush(2);
+
+        var rotationCount = 0;
+        DateTimeOffset RotateLogs()
+        {
+            rotationCount++;
+            return DateTimeOffset.UnixEpoch;
+        }
+
+        Assert.True(scene.TryHandleMapTransition(RotateLogs, out var payload));
+        Assert.NotNull(payload);
+        Assert.Equal(mapId, payload.Snapshot.MapId);
+        Assert.Equal(400, payload.Snapshot.Combatants[100].DamageAmount);
+        Assert.Equal(countdownOrdinal, payload.TimelineSegment.EndObservationOrdinalExclusive);
+
+        Assert.True(scene.TryHandleMapTransition(RotateLogs, out var emptyPayload));
+        Assert.Null(emptyPayload);
+        Assert.False(scene.TryHandleMapTransition(RotateLogs, out _));
+        Assert.Equal(1, rotationCount);
+
+        var newFrame = scene.CreateFrame();
+        Assert.Equal(mapId, newFrame.Snapshot.MapId);
+        Assert.Equal(1_800, newFrame.Snapshot.Combatants[100].DamageAmount);
+        Assert.Equal(173415u, newFrame.Snapshot.MapInstanceId);
     }
 
     [Fact]
@@ -752,8 +865,8 @@ public class SceneTimelineContractTests
         var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
-        sink.ConfirmDestinationMap(new PacketObservationSource(100, 0, 0x0061, 0, 1, default), 200003, allowSameMapReload: false);
-        sink.ConfirmDestinationMapInstance(new PacketObservationSource(200, 0, 0x2E92, 0, 2, default), 113515);
+        sink.SetCurrentMap(new PacketObservationSource(100, 0, 0x0061, 0, 1, default), 200003);
+        sink.ConfirmMapInstance(new PacketObservationSource(200, 0, 0x2E92, 0, 2, default), 113515);
         var oldCombatSource = new PacketObservationSource(1_000, 1, 0x0438, 0, 3, default);
         var oldCombat = new CombatWireObservation
         {
@@ -770,16 +883,15 @@ public class SceneTimelineContractTests
         Assert.Equal(400, oldFrame.Snapshot.Combatants[100].DamageAmount);
 
         var transitionOrdinal = scene.Journal.NextObservationOrdinal;
-        sink.ConfirmDestinationMap(new PacketObservationSource(2_000, 2, 0x0061, 0, 4, default), 200004, allowSameMapReload: false);
-        sink.ConfirmDestinationMapInstance(new PacketObservationSource(2_100, 2, 0x2E92, 0, 5, default), 113516);
+        sink.SetCurrentMap(new PacketObservationSource(2_000, 2, 0x0061, 0, 4, default), 200004);
+        sink.ConfirmMapInstance(new PacketObservationSource(2_100, 2, 0x2E92, 0, 5, default), 113516);
         var newCombatSource = new PacketObservationSource(3_000, 3, 0x0438, 0, 6, default);
         var newCombat = oldCombat with { Damage = 900 };
         sink.AppendCombatWireObservation(in newCombatSource, 100, 200, in newCombat);
         sink.CompleteFlush(2);
         sink.CompleteFlush(3);
 
-        Assert.True(scene.TryHandleMapTransition(static () => DateTimeOffset.FromUnixTimeMilliseconds(4_000), out var payload, out var transitionKind));
-        Assert.Equal(SceneTransitionKind.MapChanged, transitionKind);
+        Assert.True(scene.TryHandleMapTransition(static () => DateTimeOffset.FromUnixTimeMilliseconds(4_000), out var payload));
         Assert.NotNull(payload);
         Assert.Equal(200003u, payload.Snapshot.MapId);
         Assert.Equal(113515u, payload.Snapshot.MapInstanceId);
@@ -808,10 +920,10 @@ public class SceneTimelineContractTests
         var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
-        sink.ConfirmDestinationMap(new PacketObservationSource(100, 0, 0x0061, 0, 1, default), 200003, allowSameMapReload: false);
+        sink.SetCurrentMap(new PacketObservationSource(100, 0, 0x0061, 0, 1, default), 200003);
         _ = scene.CreateFrame();
 
-        sink.ConfirmDestinationMap(new PacketObservationSource(200, 0, 0x0061, 0, 2, default), 200004, allowSameMapReload: false);
+        sink.SetCurrentMap(new PacketObservationSource(200, 0, 0x0061, 0, 2, default), 200004);
         var combat = new CombatWireObservation
         {
             SkillCode = 11000010,
@@ -824,15 +936,13 @@ public class SceneTimelineContractTests
         sink.AppendCombatWireObservation(in firstCombatSource, 100, 200, in combat);
         sink.AppendCombatWireObservation(in secondCombatSource, 100, 200, in combat);
         sink.CompleteFlush(1);
-        sink.ConfirmDestinationMap(new PacketObservationSource(3_000, 2, 0x0061, 0, 5, default), 200005, allowSameMapReload: false);
+        sink.SetCurrentMap(new PacketObservationSource(3_000, 2, 0x0061, 0, 5, default), 200005);
 
-        Assert.True(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out var emptyPayload, out var emptyKind));
+        Assert.True(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out var emptyPayload));
         Assert.Null(emptyPayload);
-        Assert.Equal(SceneTransitionKind.MapChanged, emptyKind);
 
-        Assert.True(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out var payload, out var transitionKind));
+        Assert.True(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out var payload));
         Assert.NotNull(payload);
-        Assert.Equal(SceneTransitionKind.MapChanged, transitionKind);
         Assert.Equal(200004u, payload.Snapshot.MapId);
         Assert.Equal(600, payload.CreateDetailDelta(100).Combatant!.Value.OutgoingDamage);
 
@@ -844,10 +954,9 @@ public class SceneTimelineContractTests
         });
         Assert.Equal([2L, 3L], timelineOrdinals);
 
-        Assert.True(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out var finalPayload, out var finalKind));
+        Assert.True(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out var finalPayload));
         Assert.Null(finalPayload);
-        Assert.Equal(SceneTransitionKind.MapChanged, finalKind);
-        Assert.False(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out _, out _));
+        Assert.False(scene.TryHandleMapTransition(static () => DateTimeOffset.UnixEpoch, out _));
     }
 
     private static long s_observationChecksum;

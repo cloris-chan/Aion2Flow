@@ -20,7 +20,7 @@ public sealed class BossSceneCollectionTests
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 200, 2_100_001, NpcKind.Monster, 20);
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 30);
-        sink.ConfirmDestinationMap(Source(40), 910_035, false);
+        sink.SetCurrentMap(Source(40), 910_035);
 
         AppendDamage(sink, 100, 200, 400, 50, 1);
         sink.AppendNpcHp(Source(55), 300, 100_000, 100_000);
@@ -109,6 +109,90 @@ public sealed class BossSceneCollectionTests
         Assert.Contains(
             ReadJournal(scene).Where(entry => entry.Stamp.ObservationOrdinal >= scene.Owner.SceneStartObservationOrdinal),
             static entry => entry.EntityVital is { EntityId: 300, CurrentHp: 243_719_813, MaxHp: 243_750_000 });
+    }
+
+    [Fact]
+    public void StandardResetRehydratesActiveBossStateBeforeNextCombat()
+    {
+        var timeProvider = new MutableTimeProvider(Started);
+        var scene = new SceneLiveReadModel(Started, timeProvider);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        sink.AppendNpcHp(Source(30), 300, 99_500, 100_000);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteFlush(1);
+
+        var beforeReset = scene.CreateFrame();
+        var beforeResetBoss = Assert.Single(beforeReset.BossFocuses.AsSpan().ToArray());
+        Assert.True(beforeResetBoss.HasHp);
+        Assert.True(beforeResetBoss.HasMaxHp);
+
+        scene.Reset(Started.AddSeconds(2));
+        AppendDamage(sink, 100, 300, 200, 3_000, 2);
+        sink.CompleteFlush(2);
+
+        var afterReset = scene.CreateFrame();
+        var afterResetBoss = Assert.Single(afterReset.BossFocuses.AsSpan().ToArray());
+        Assert.True(afterResetBoss.HasHp);
+        Assert.True(afterResetBoss.HasMaxHp);
+        Assert.Equal(100_000, afterResetBoss.MaxHp);
+        Assert.Equal(100_000, afterResetBoss.EffectiveHp);
+        Assert.Equal(200, afterReset.Snapshot.Combatants[100].DamageAmount);
+        Assert.Contains(
+            afterReset.BossDamageContributions,
+            static contribution => contribution is { BossId: 300, SourceCombatantId: 100, DamageAmount: 200 });
+    }
+
+    [Fact]
+    public void StandardMapTransitionRehydratesUpcomingBossStateBeforeFirstCombat()
+    {
+        var timeProvider = new MutableTimeProvider(Started);
+        var scene = new SceneLiveReadModel(Started, timeProvider);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        sink.SetCurrentMap(Source(1), 200_003);
+        sink.ConfirmMapInstance(Source(2), 113_515);
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 200, 2_100_001, NpcKind.Monster, 20);
+        AppendDamage(sink, 100, 200, 500, 1_000, 1);
+        AppendDamage(sink, 100, 200, 500, 1_200, 1);
+        sink.CompleteFlush(1);
+
+        var beforeTransition = scene.CreateFrame();
+        Assert.Empty(beforeTransition.BossFocuses);
+
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 1_500);
+        sink.AppendNpcHp(Source(1_510), 300, 99_500, 100_000);
+        sink.SetCurrentMap(Source(2_000, 2), 200_004);
+        sink.ConfirmMapInstance(Source(2_010, 2), 113_516);
+        sink.CompleteFlush(2);
+
+        Assert.True(scene.TryHandleMapTransition(
+            static () => Started.AddSeconds(2),
+            out var archived));
+        Assert.NotNull(archived);
+        Assert.Equal(1_000, archived.Snapshot.Combatants[100].DamageAmount);
+        Assert.Empty(archived.Snapshot.BossFocuses);
+        Assert.True(scene.TryHandleMapTransition(
+            static () => Started.AddSeconds(2),
+            out var repeatedPayload));
+        Assert.Null(repeatedPayload);
+
+        AppendDamage(sink, 100, 300, 200, 3_000, 3);
+        sink.CompleteFlush(3);
+
+        var afterTransition = scene.CreateFrame();
+        Assert.Equal(200_004u, afterTransition.Snapshot.MapId);
+        Assert.Equal(113_516u, afterTransition.Snapshot.MapInstanceId);
+        var afterTransitionBoss = Assert.Single(afterTransition.BossFocuses.AsSpan().ToArray());
+        Assert.True(afterTransitionBoss.HasHp);
+        Assert.True(afterTransitionBoss.HasMaxHp);
+        Assert.Equal(100_000, afterTransitionBoss.MaxHp);
+        Assert.Equal(100_000, afterTransitionBoss.EffectiveHp);
+        Assert.Equal(200, afterTransition.Snapshot.Combatants[100].DamageAmount);
+        Assert.Contains(
+            afterTransition.BossDamageContributions,
+            static contribution => contribution is { BossId: 300, SourceCombatantId: 100, DamageAmount: 200 });
     }
 
     [Fact]

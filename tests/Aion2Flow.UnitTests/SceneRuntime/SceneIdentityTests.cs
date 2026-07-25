@@ -225,8 +225,8 @@ public sealed class SceneIdentityTests
         var registry = new RuntimeMetadataRegistry();
         var applier = new DomainEventApplier(new EntityStore(), boundary, registry, new CombatStore());
 
-        ApplyScene(applier, new SceneObservation(200003, 0, 0, 0, "stage-destination-map"));
-        ApplyScene(applier, new SceneObservation(0, 515552, 0, 0, "stage-destination-instance"));
+        ApplyScene(applier, new SceneObservation(200003, 0, SceneObservationKind.CurrentMap));
+        ApplyScene(applier, new SceneObservation(0, 515552, SceneObservationKind.MapInstanceStaged));
 
         Assert.True(registry.TryGetMapCode(515552, out var mapCode));
         Assert.Equal(200003u, mapCode);

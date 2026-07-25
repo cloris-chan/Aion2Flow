@@ -40,7 +40,7 @@ public sealed class PacketLogReplayTransportAttemptTests
             static boundary =>
             {
                 Assert.Equal(ObservedEventDomain.Scene, boundary.Domain);
-                Assert.Equal("scene-transport-boundary", boundary.DiagnosticKey);
+                Assert.Equal(SceneObservationKind.TransportBoundary, boundary.SceneKind);
             },
             static identity =>
             {
@@ -73,15 +73,15 @@ public sealed class PacketLogReplayTransportAttemptTests
                     {
                         ObservedEventDomain.Scene => new JournalObservation(
                             entry.Domain,
-                            entry.Scene.DiagnosticKey,
+                            entry.Scene.Kind,
                             0,
                             null),
                         ObservedEventDomain.State => new JournalObservation(
                             entry.Domain,
-                            null,
+                            SceneObservationKind.None,
                             entry.State.EntityId,
                             entry.State.Text),
-                        _ => new JournalObservation(entry.Domain, null, 0, null)
+                        _ => new JournalObservation(entry.Domain, SceneObservationKind.None, 0, null)
                     });
                 }
             });
@@ -128,7 +128,7 @@ public sealed class PacketLogReplayTransportAttemptTests
 
     private readonly record struct JournalObservation(
         ObservedEventDomain Domain,
-        string? DiagnosticKey,
+        SceneObservationKind SceneKind,
         int EntityId,
         string? Text);
 }

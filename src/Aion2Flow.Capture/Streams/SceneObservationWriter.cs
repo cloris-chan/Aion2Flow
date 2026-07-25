@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -48,14 +49,14 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
         }
     }
 
-    public bool StagePendingDestinationMapFromSceneState(in PacketObservationSource packet, uint value)
+    public bool StageSceneMapCandidateFromSceneState(in PacketObservationSource packet, uint value)
     {
         if (!SceneMapIdClassifier.IsAmbiguousSceneStateMapId(value))
         {
             return false;
         }
 
-        sink.StagePendingDestinationMap(in packet, value, allowSameMapReload: true);
+        sink.StageSceneMapCandidate(in packet, value);
         return true;
     }
 
@@ -66,18 +67,32 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
             return false;
         }
 
-        sink.ConfirmDestinationMap(in packet, value, allowSameMapReload: true);
+        sink.ConfirmSceneMap(in packet, value);
         return true;
     }
 
-    public bool ConfirmDestinationMapFromMapEvent(in PacketObservationSource packet, uint value)
+    public bool ApplyDestinationMapEvent(in PacketObservationSource packet, uint value, PacketMapEventSignal signal)
     {
         if (!SceneMapIdClassifier.IsPacketMapEventId(value))
         {
             return false;
         }
 
-        sink.ConfirmDestinationMap(in packet, value, allowSameMapReload: true);
+        switch (signal)
+        {
+            case PacketMapEventSignal.Current:
+                sink.SetCurrentMap(in packet, value);
+                break;
+            case PacketMapEventSignal.TransitionAnnounced:
+                sink.AnnounceDestinationMapTransition(in packet, value);
+                break;
+            case PacketMapEventSignal.TransitionCountdown:
+                sink.CommitDestinationMapTransition(in packet, value);
+                break;
+            default:
+                return false;
+        }
+
         return true;
     }
 }

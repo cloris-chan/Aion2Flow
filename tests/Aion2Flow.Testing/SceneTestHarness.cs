@@ -151,13 +151,14 @@ public sealed class SceneTestHarness : IDisposable
         public void SeedNpcRuntimeState(in PacketObservationSource packet, int instanceId, in RuntimeNpcStateSnapshot state) => inner.SeedNpcRuntimeState(in packet, instanceId, in state);
         public int ResolveNpcObservationSource() => inner.ResolveNpcObservationSource();
         public void RememberNpcObservationSource(int instanceId) => inner.RememberNpcObservationSource(instanceId);
-        public void StageDestinationMap(in PacketObservationSource packet, uint mapId) => inner.StageDestinationMap(in packet, mapId);
-        public void StageDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => inner.StageDestinationMap(in packet, mapId, allowSameMapReload);
-        public void StagePendingDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => inner.StagePendingDestinationMap(in packet, mapId, allowSameMapReload);
-        public void ConfirmDestinationMap(in PacketObservationSource packet, uint mapId, bool allowSameMapReload) => inner.ConfirmDestinationMap(in packet, mapId, allowSameMapReload);
-        public void ConfirmPendingDestinationMapArrival(in PacketObservationSource packet) => inner.ConfirmPendingDestinationMapArrival(in packet);
-        public void StageDestinationMapInstance(in PacketObservationSource packet, uint instanceId) => inner.StageDestinationMapInstance(in packet, instanceId);
-        public void ConfirmDestinationMapInstance(in PacketObservationSource packet, uint instanceId) => inner.ConfirmDestinationMapInstance(in packet, instanceId);
+        public void SetCurrentMap(in PacketObservationSource packet, uint mapId) => inner.SetCurrentMap(in packet, mapId);
+        public void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId) => inner.AnnounceDestinationMapTransition(in packet, mapId);
+        public void CommitDestinationMapTransition(in PacketObservationSource packet, uint mapId) => inner.CommitDestinationMapTransition(in packet, mapId);
+        public void StageSceneMapCandidate(in PacketObservationSource packet, uint mapId) => inner.StageSceneMapCandidate(in packet, mapId);
+        public void ConfirmSceneMap(in PacketObservationSource packet, uint mapId) => inner.ConfirmSceneMap(in packet, mapId);
+        public void ConfirmDestinationMapArrival(in PacketObservationSource packet) => inner.ConfirmDestinationMapArrival(in packet);
+        public void StageMapInstance(in PacketObservationSource packet, uint instanceId) => inner.StageMapInstance(in packet, instanceId);
+        public void ConfirmMapInstance(in PacketObservationSource packet, uint instanceId) => inner.ConfirmMapInstance(in packet, instanceId);
         public void MarkSceneTransportBoundary(in PacketObservationSource packet) => inner.MarkSceneTransportBoundary(in packet);
         public void AppendCombatWireObservation(in PacketObservationSource source, int sourceId, int targetId, in CombatWireObservation observation)
         {

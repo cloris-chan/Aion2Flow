@@ -127,8 +127,8 @@ public class EntityStoreTests
     public void SceneBoundaryStore_Clear_ResetsMapIdentity()
     {
         var store = new SceneBoundaryStore();
-        store.StageDestinationMap(200003);
-        store.StageDestinationMapInstance(515552);
+        store.SetCurrentMap(200003);
+        store.StageMapInstance(515552);
 
         store.Clear();
 
@@ -373,8 +373,8 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 200003, DiagnosticKey = "stage-destination-map" });
-        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 1 }, 0, 0, new SceneObservation { MapInstanceId = 515552, DiagnosticKey = "stage-destination-instance" });
+        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 200003, Kind = SceneObservationKind.CurrentMap });
+        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 1 }, 0, 0, new SceneObservation { MapInstanceId = 515552, Kind = SceneObservationKind.MapInstanceStaged });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -392,7 +392,7 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal();
         var sceneId = Guid.NewGuid();
 
-        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 910035, DiagnosticKey = "stage-destination-map" });
+        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 910035, Kind = SceneObservationKind.CurrentMap });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -754,8 +754,8 @@ public class SceneSnapshotAdapterBasicTests
         var combat = new CombatStore();
         var mechanics = new MechanicStore();
         var resources = new ResourceStore();
-        metadata.StageDestinationMap(200003);
-        metadata.StageDestinationMapInstance(515552);
+        metadata.SetCurrentMap(200003);
+        metadata.StageMapInstance(515552);
 
         var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, metadata);
         var snapshot = adapter.CreateSnapshot();
@@ -782,8 +782,8 @@ public class SceneCombatSnapshotAdapterTests
         var resources = new ResourceStore();
         entities.ApplyNickname(100, "Perigee");
         entities.ApplyNpcCode(200, 9_999_999);
-        metadata.StageDestinationMap(200003);
-        metadata.StageDestinationMapInstance(515552);
+        metadata.SetCurrentMap(200003);
+        metadata.StageMapInstance(515552);
 
         combat.ApplyResolvedCombat(mechanics, resources, 100, 200, new CombatWireObservation
         {

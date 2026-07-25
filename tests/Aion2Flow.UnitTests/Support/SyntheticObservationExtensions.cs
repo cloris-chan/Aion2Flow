@@ -25,16 +25,16 @@ internal static class SyntheticObservationExtensions
 
     public static PacketObservationSource Source(long timestamp = 0, ushort opcode = 0) => new(timestamp, 0, opcode, 0, 0, default);
 
-    public static void StageDestinationMap(this IRuntimeObservationSink sink, uint mapId)
+    public static void SetCurrentMap(this IRuntimeObservationSink sink, uint mapId)
     {
         var source = Source();
-        sink.StageDestinationMap(in source, mapId);
+        sink.SetCurrentMap(in source, mapId);
     }
 
-    public static void StageDestinationMapInstance(this IRuntimeObservationSink sink, uint instanceId)
+    public static void StageMapInstance(this IRuntimeObservationSink sink, uint instanceId)
     {
         var source = Source();
-        sink.StageDestinationMapInstance(in source, instanceId);
+        sink.StageMapInstance(in source, instanceId);
     }
 
     public static void AppendNickname(this IRuntimeObservationSink sink, int uid, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null, string legionName = "")

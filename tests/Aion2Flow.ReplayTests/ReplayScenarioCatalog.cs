@@ -23,4 +23,6 @@ public static class ReplayScenarioCatalog
     public const string CurrentTenPlayerForceStatus = "aion2flow.stream.20260715002239.log";
     public const string CurrentOwnedEntityHeaderLayout = "aion2flow.stream.20260722171214.log";
     public const string CurrentOwnedEntityLayouts = "aion2flow.stream.20260722171240.log";
+    public const string CurrentSameMapTransitionPhases = "aion2flow.stream.20260725192105.log";
+    public const string CurrentSameMapInstanceReload = "aion2flow.stream.20260726065616.log";
 }

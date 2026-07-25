@@ -103,7 +103,7 @@ public class CombatPacketFactTests
         journal.CompleteFlush(100);
         owner.Refresh();
 
-        var boundary = new SceneObservation { DiagnosticKey = "scene-transport-boundary" };
+        var boundary = new SceneObservation { Kind = SceneObservationKind.TransportBoundary };
         journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 1, FlushId = 101 }, 0, 0, in boundary);
         journal.CompleteFlush(101);
         owner.Refresh();

@@ -111,7 +111,21 @@ public readonly record struct CombatWireObservation
 
 public readonly record struct StateObservation(int EntityId, int StateCode, long Value0, long Value1, long DetailRaw, string? Text, Faction Faction = Faction.Unknown, CharacterClass? CharacterClass = null, bool IsLocalPlayer = false, int? OriginServerId = null, string? LegionName = null, PlayerGroupMembership GroupMembership = default);
 
-public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, int Value0, int Value1, string? DiagnosticKey);
+public readonly record struct SceneObservation(uint MapId, uint MapInstanceId, SceneObservationKind Kind);
+
+public enum SceneObservationKind : byte
+{
+    None,
+    CurrentMap,
+    DestinationMapTransitionAnnounced,
+    DestinationMapTransitionCountdown,
+    SceneMapCandidate,
+    SceneMapConfirmed,
+    DestinationMapArrival,
+    MapInstanceStaged,
+    MapInstanceConfirmed,
+    TransportBoundary
+}
 
 public readonly record struct EntityVitalObservation(int EntityId, long CurrentHp, long? MaxHp);
 

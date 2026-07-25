@@ -13,7 +13,6 @@ using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
-using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Settings;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -1051,16 +1050,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private void DrainMapTransitionArchives()
     {
-        while (_captureService.Scene.TryHandleMapTransition(RawPacketDump.RotateLogs, out var payload, out var transitionKind))
+        while (_captureService.Scene.TryHandleMapTransition(RawPacketDump.RotateLogs, out var payload))
         {
-            var trigger = transitionKind switch
-            {
-                SceneTransitionKind.MapChanged => "map-transition",
-                SceneTransitionKind.InstanceChanged => "map-instance-transition",
-                _ => throw new InvalidOperationException($"Unexpected scene transition kind {transitionKind}.")
-            };
             if (payload is not null)
-                _encounterArchiveService.Archive(payload, trigger, isAutomatic: true);
+                _encounterArchiveService.Archive(payload, "map-transition", isAutomatic: true);
         }
     }
 

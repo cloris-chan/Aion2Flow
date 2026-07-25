@@ -453,34 +453,18 @@ public sealed class DomainEventApplier
     {
         _boundary.ApplySceneObservation(in scene);
 
-        if (scene.DiagnosticKey == "confirm-destination-map")
+        switch (scene.Kind)
         {
-            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
-            return;
-        }
-
-        if (scene.DiagnosticKey == "confirm-pending-destination-map-arrival")
-        {
-            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
-            return;
-        }
-
-        if (scene.DiagnosticKey == "stage-destination-instance")
-        {
-            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
-            return;
-        }
-
-        if (scene.DiagnosticKey == "confirm-destination-instance")
-        {
-            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
-            return;
-        }
-
-        if (scene.DiagnosticKey == "scene-transport-boundary")
-        {
-            _compactDirectValue.ResetPendingAssociations();
-            _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
+            case SceneObservationKind.SceneMapConfirmed:
+            case SceneObservationKind.DestinationMapArrival:
+            case SceneObservationKind.MapInstanceStaged:
+            case SceneObservationKind.MapInstanceConfirmed:
+                _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
+                break;
+            case SceneObservationKind.TransportBoundary:
+                _compactDirectValue.ResetPendingAssociations();
+                _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
+                break;
         }
     }
 
