@@ -12,11 +12,11 @@ public sealed class UiScaleService(SettingsService settingsService) : IDisposabl
     private readonly ConditionalWeakTable<Window, SurfaceScaleState> _windowStates = [];
     private readonly List<WeakReference<Window>> _windows = [];
     private int _scalePercent = settingsService.Current.UiScalePercent;
-    private bool _disposed;
+    private int _disposeState;
 
     public void RegisterWindow(Window window)
     {
-        if (_disposed)
+        if (Volatile.Read(ref _disposeState) != 0)
             return;
 
         if (!Dispatcher.UIThread.CheckAccess())
@@ -48,7 +48,7 @@ public sealed class UiScaleService(SettingsService settingsService) : IDisposabl
 
     public void SetScalePercent(int percent)
     {
-        if (_scalePercent == percent)
+        if (Volatile.Read(ref _disposeState) != 0 || _scalePercent == percent)
             return;
 
         _scalePercent = percent;
@@ -59,7 +59,12 @@ public sealed class UiScaleService(SettingsService settingsService) : IDisposabl
 
     public void Dispose()
     {
-        _disposed = true;
+        if (Volatile.Read(ref _disposeState) != 0)
+            return;
+
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+            return;
+
         for (var i = _windows.Count - 1; i >= 0; i--)
         {
             if (_windows[i].TryGetTarget(out var window))
@@ -98,7 +103,7 @@ public sealed class UiScaleService(SettingsService settingsService) : IDisposabl
         _windowStates.Remove(window);
     }
 
-    private bool IsWindowUsable(Window window) => !_disposed && window.PlatformImpl is not null;
+    private bool IsWindowUsable(Window window) => Volatile.Read(ref _disposeState) == 0 && window.PlatformImpl is not null;
 
     private bool ContainsWindow(Window window)
     {

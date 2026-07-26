@@ -97,6 +97,7 @@ internal static class Program
 
     private static Task ShutdownAsync(ServiceProvider serviceProvider, MainViewModel mainViewModel)
     {
+        DisposeUiThreadServices(serviceProvider);
         return Task.Run(async () =>
         {
             try
@@ -115,6 +116,11 @@ internal static class Program
                 }
             }
         });
+    }
+
+    internal static void DisposeUiThreadServices(IServiceProvider serviceProvider)
+    {
+        serviceProvider.GetRequiredService<UiScaleService>().Dispose();
     }
 
     private static AppLogLevel MapLogLevel(CaptureLogLevel level) => level switch
