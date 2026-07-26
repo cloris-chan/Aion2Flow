@@ -40,8 +40,7 @@ internal static class Packet4136Parser
         int? currentHp = null;
         int? maxHp = null;
         int? ownerId = null;
-        if (TryReadSummonCreateNpcCode(packet, tailStart, mode0, mode1, mode2, out var summonNpcCode, out var ownerSearchOffset) &&
-            TryExtractSummonOwnerId(packet, entityId, ownerSearchOffset, out var parsedOwnerId))
+        if (TryReadOwnedNpc(packet, tailStart, entityId, mode0, mode1, mode2, out var summonNpcCode, out var parsedOwnerId))
         {
             npcCode = summonNpcCode;
             ownerId = parsedOwnerId;
@@ -77,53 +76,80 @@ internal static class Packet4136Parser
         return PacketNpcStateFields.StateHpPairOffsetFromNpcCodeStart;
     }
 
-    private static bool TryReadSummonCreateNpcCode(
+    private static bool TryReadOwnedNpc(
         ReadOnlySpan<byte> packet,
         int tailStart,
+        int entityId,
         byte mode0,
         byte mode1,
         byte mode2,
         out int npcCode,
-        out int ownerSearchOffset)
+        out int ownerId)
     {
         npcCode = 0;
-        ownerSearchOffset = 0;
+        ownerId = 0;
 
-        if (mode2 == 0x00 &&
-            ((mode0 == 0x5f && mode1 == 0x10) ||
-             (mode0 == 0x1d && mode1 == 0x10) ||
-             (mode0 == 0x1f && mode1 is 0x00 or 0x10)))
+        if (mode2 == 0x00 && IsDirectNpcCodeLayout(mode0, mode1))
         {
-            return TryReadSummonNpcCodeAt(packet, tailStart + NpcCodeOffsetFromModes, out npcCode, out ownerSearchOffset);
+            return TryReadOwnedNpcAt(packet, entityId, tailStart + NpcCodeOffsetFromModes, out npcCode, out ownerId);
         }
 
-        if (mode0 == 0x5f && mode1 == 0x00 && mode2 == 0x01)
-        {
-            return TryReadSummonNpcCodeAt(packet, tailStart + SummonCreateNpcCodeOffsetFromModes, out npcCode, out ownerSearchOffset);
-        }
-
-        if (mode0 != 0x1f || mode1 != 0x00 || mode2 != 0x01)
+        if (mode1 != 0x00 || mode2 != 0x01)
         {
             return false;
         }
 
-        var nameReader = new PacketSpanReader(packet[(tailStart + NpcCodeOffsetFromModes)..]);
-        if (!nameReader.TryReadVarInt(out var nameByteLength) || !nameReader.TryAdvance(nameByteLength))
+        if (mode0 == 0x5f)
         {
-            return false;
+            return TryReadOwnedNpcAt(packet, entityId, tailStart + SummonCreateNpcCodeOffsetFromModes, out npcCode, out ownerId) ||
+                   TryReadNamePrefixedOwnedNpc(packet, tailStart, entityId, out npcCode, out ownerId);
         }
 
-        return TryReadSummonNpcCodeAt(
-            packet,
-            tailStart + NpcCodeOffsetFromModes + nameReader.Offset,
-            out npcCode,
-            out ownerSearchOffset);
+        if (mode0 == 0x1f)
+        {
+            return TryReadNamePrefixedOwnedNpc(packet, tailStart, entityId, out npcCode, out ownerId);
+        }
+
+        return false;
     }
 
-    private static bool TryReadSummonNpcCodeAt(ReadOnlySpan<byte> packet, int npcCodeOffset, out int npcCode, out int ownerSearchOffset)
+    private static bool IsDirectNpcCodeLayout(byte mode0, byte mode1) =>
+        (mode0, mode1) is
+            (0x17, 0x00) or
+            (0x1d, 0x10) or
+            (0x1f, 0x00) or
+            (0x1f, 0x10) or
+            (0x5d, 0x10) or
+            (0x5f, 0x00) or
+            (0x5f, 0x10);
+
+    private static bool TryReadNamePrefixedOwnedNpc(ReadOnlySpan<byte> packet, int tailStart, int entityId, out int npcCode, out int ownerId)
     {
-        ownerSearchOffset = npcCodeOffset + sizeof(int);
-        return PacketNpcStateFields.TryReadNpcCatalogCode(packet, npcCodeOffset, out npcCode);
+        npcCode = 0;
+        ownerId = 0;
+        var nameOffset = tailStart + NpcCodeOffsetFromModes;
+        if ((uint)nameOffset > (uint)packet.Length)
+        {
+            return false;
+        }
+
+        var nameReader = new PacketSpanReader(packet[nameOffset..]);
+        if (!nameReader.TryReadVarInt(out var nameByteLength) ||
+            nameByteLength <= 0 ||
+            !nameReader.TryAdvance(nameByteLength))
+        {
+            return false;
+        }
+
+        return TryReadOwnedNpcAt(packet, entityId, nameOffset + nameReader.Offset, out npcCode, out ownerId);
+    }
+
+    private static bool TryReadOwnedNpcAt(ReadOnlySpan<byte> packet, int entityId, int npcCodeOffset, out int npcCode, out int ownerId)
+    {
+        npcCode = 0;
+        ownerId = 0;
+        return PacketNpcStateFields.TryReadNpcCatalogCode(packet, npcCodeOffset, out npcCode) &&
+               TryExtractSummonOwnerId(packet, entityId, npcCodeOffset + sizeof(int), out ownerId);
     }
 
     private static bool TryExtractSummonOwnerId(ReadOnlySpan<byte> packet, int entityId, int ownerSearchOffset, out int ownerId)
