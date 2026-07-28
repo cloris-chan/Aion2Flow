@@ -12,7 +12,6 @@ using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
-using Cloris.Aion2Flow.Tests.SceneRuntime;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
@@ -746,6 +745,32 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.True(history.Record.ScenePayload!.IdentityScope.TryGetPcMetadata(300, out var archivedPc));
         Assert.Equal("Scene Player", archivedPc.Nickname);
         Assert.Equal(400, detail.Combatant!.Value.OutgoingDamage);
+        Assert.Empty(fixture.CreateSceneSnapshot().Combatants);
+    }
+
+    [Fact]
+    public void ArchiveCurrentEncounter_WithoutValidCombat_ResetsArchiveScopeWithoutAddingHistory()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneMap(1010, 123);
+        fixture.AppendSceneIdentity(300, "Scene Player");
+        fixture.AppendSceneDamage(300, 900_002, 11000010, 100, 3_000, 1);
+        var previous = fixture.CreateSceneSnapshot();
+
+        fixture.ViewModel.ArchiveCurrentEncounterCommand.Execute(null);
+
+        Assert.Empty(fixture.Archive.History);
+        var reset = fixture.CreateSceneSnapshot();
+        Assert.NotEqual(previous.EncounterId, reset.EncounterId);
+        Assert.Empty(reset.Combatants);
+        Assert.Equal(1010u, reset.MapId);
+        Assert.Equal(123u, reset.MapInstanceId);
+        Assert.True(fixture.MetadataRegistry.TryGetPcMetadata(300, out var livePc));
+        Assert.Equal("Scene Player", livePc.Nickname);
+
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 6_000, 8_000);
+        var next = fixture.CreateSceneSnapshot();
+        Assert.Equal(400, next.Combatants[300].DamageAmount);
     }
 
     [Fact]
@@ -830,7 +855,9 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        fixture.AppendSceneMap(20, 0);
+        var sink = fixture.CreateLiveSink();
+        var mapSource = new PacketObservationSource(fixture.SceneStartedMilliseconds + 6_000, 0, 0x2136, 0, 1, default);
+        sink.SetCurrentMap(in mapSource, 20);
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
         var record = Assert.Single(fixture.Archive.History);
@@ -1173,9 +1200,20 @@ public sealed class MainViewModelCombatantFilterTests
 
     private static void AppendSceneMap(SceneLiveReadModel scene, uint mapId, uint instanceId)
     {
-        var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
-        sink.SetCurrentMap(mapId);
-        sink.StageMapInstance(instanceId);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        var source = SyntheticObservationExtensions.Source(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        if (scene.Journal.Count == 0)
+        {
+            sink.SetCurrentMap(in source, mapId);
+        }
+        else
+        {
+            sink.AnnounceDestinationMapTransition(in source, mapId);
+            sink.ConfirmDestinationMapArrival(in source);
+        }
+
+        if (instanceId != 0)
+            sink.RegisterMapEvent(in source, instanceId);
     }
 
     private static void AppendScopedCombatants(MainViewModelFixture fixture)

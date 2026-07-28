@@ -17,10 +17,10 @@ public sealed class BossSceneCollectionTests
     {
         var scene = CreateBossScene();
         var sink = SceneSinkFactory.CreateForLive(scene)();
+        sink.SetCurrentMap(Source(1), 910_035);
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 200, 2_100_001, NpcKind.Monster, 20);
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 30);
-        sink.SetCurrentMap(Source(40), 910_035);
 
         AppendDamage(sink, 100, 200, 400, 50, 1);
         sink.AppendNpcHp(Source(55), 300, 100_000, 100_000);
@@ -145,13 +145,15 @@ public sealed class BossSceneCollectionTests
     }
 
     [Fact]
-    public void StandardMapTransitionRehydratesUpcomingBossStateBeforeFirstCombat()
+    public void StandardMapTransitionRequiresNewMapBossStateBeforeFirstCombat()
     {
         var timeProvider = new MutableTimeProvider(Started);
         var scene = new SceneLiveReadModel(Started, timeProvider);
         var sink = SceneSinkFactory.CreateForLive(scene)();
         sink.SetCurrentMap(Source(1), 200_003);
-        sink.ConfirmMapInstance(Source(2), 113_515);
+        Assert.True(scene.TryDequeueMapTransition(out var initialArchive));
+        Assert.Null(initialArchive);
+        sink.RegisterMapEvent(Source(2), 113_515);
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 200, 2_100_001, NpcKind.Monster, 20);
         AppendDamage(sink, 100, 200, 500, 1_000, 1);
@@ -163,21 +165,20 @@ public sealed class BossSceneCollectionTests
 
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 1_500);
         sink.AppendNpcHp(Source(1_510), 300, 99_500, 100_000);
-        sink.SetCurrentMap(Source(2_000, 2), 200_004);
-        sink.ConfirmMapInstance(Source(2_010, 2), 113_516);
+        sink.AnnounceDestinationMapTransition(Source(2_000, 2), 200_004);
+        sink.UnregisterMapEvent(Source(2_005, 2), 113_515);
+        sink.ConfirmDestinationMapArrival(Source(2_010, 2));
         sink.CompleteFlush(2);
 
-        Assert.True(scene.TryHandleMapTransition(
-            static () => Started.AddSeconds(2),
-            out var archived));
+        Assert.True(scene.TryDequeueMapTransition(out var archived));
         Assert.NotNull(archived);
         Assert.Equal(1_000, archived.Snapshot.Combatants[100].DamageAmount);
-        Assert.Empty(archived.Snapshot.BossFocuses);
-        Assert.True(scene.TryHandleMapTransition(
-            static () => Started.AddSeconds(2),
-            out var repeatedPayload));
-        Assert.Null(repeatedPayload);
+        Assert.False(scene.TryDequeueMapTransition(out _));
 
+        AppendPlayer(sink, 100, "Player", 2_020);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 2_030);
+        sink.AppendNpcHp(Source(2_040), 300, 99_500, 100_000);
+        sink.RegisterMapEvent(Source(2_050, 2), 113_516);
         AppendDamage(sink, 100, 300, 200, 3_000, 3);
         sink.CompleteFlush(3);
 

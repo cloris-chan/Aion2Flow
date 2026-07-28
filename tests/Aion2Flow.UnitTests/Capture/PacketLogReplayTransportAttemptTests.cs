@@ -10,7 +10,49 @@ namespace Cloris.Aion2Flow.Tests.Capture;
 public sealed class PacketLogReplayTransportAttemptTests
 {
     [Fact]
-    public void NewAttemptBoundaryPrecedesItsFirstObservationAndStaleAttemptCannotResume()
+    public void OrdinalLessNewConnectionActivationPrecedesBufferedFirstObservation()
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+        const string firstConnection = "33554442:21060->16777226:49628";
+        const string secondConnection = "33554442:21060->16777226:49629";
+        var log = string.Join(
+            Environment.NewLine,
+            FormatLegacyLine(timestamp, firstConnection, sequenceNumber: 100, Build3336Frame(1, "Old")),
+            FormatLegacyLine(timestamp.AddMilliseconds(1), secondConnection, sequenceNumber: 200, Build3336Frame(2, "New")));
+
+        using var reader = new StringReader(log);
+        var replay = PacketLogReplayService.Replay(reader, "ordinal-less-connections.stream.log");
+
+        Assert.Equal(2, replay.ReplayedLines);
+        Assert.True(replay.SceneOwner.Entities.TryGet(1, out var oldPlayer));
+        Assert.Equal("Old", oldPlayer.Nickname);
+        Assert.True(replay.SceneOwner.Entities.TryGet(2, out var currentPlayer));
+        Assert.Equal("New", currentPlayer.Nickname);
+
+        var entries = ReadJournal(replay.SceneJournal);
+        Assert.Collection(
+            entries,
+            static oldIdentity =>
+            {
+                Assert.Equal(ObservedEventDomain.State, oldIdentity.Domain);
+                Assert.Equal(1, oldIdentity.EntityId);
+                Assert.Equal("Old", oldIdentity.Text);
+            },
+            static boundary =>
+            {
+                Assert.Equal(ObservedEventDomain.Scene, boundary.Domain);
+                Assert.Equal(SceneObservationKind.TransportStreamActivated, boundary.SceneKind);
+            },
+            static newIdentity =>
+            {
+                Assert.Equal(ObservedEventDomain.State, newIdentity.Domain);
+                Assert.Equal(2, newIdentity.EntityId);
+                Assert.Equal("New", newIdentity.Text);
+            });
+    }
+
+    [Fact]
+    public void NewAttemptActivationPrecedesItsFirstObservationAndStaleAttemptCannotResume()
     {
         var timestamp = DateTimeOffset.UtcNow;
         var firstAttemptFrame = Build3336Frame(1, "Old");
@@ -40,7 +82,7 @@ public sealed class PacketLogReplayTransportAttemptTests
             static boundary =>
             {
                 Assert.Equal(ObservedEventDomain.Scene, boundary.Domain);
-                Assert.Equal(SceneObservationKind.TransportBoundary, boundary.SceneKind);
+                Assert.Equal(SceneObservationKind.TransportStreamActivated, boundary.SceneKind);
             },
             static identity =>
             {
@@ -57,6 +99,13 @@ public sealed class PacketLogReplayTransportAttemptTests
         long connectionOrdinal,
         ReadOnlySpan<byte> payload) =>
         $"{timestamp:O}|dir=inbound|{connection}|seq={sequenceNumber}|attempt={connectionOrdinal}|len={payload.Length}|data={Convert.ToHexString(payload)}";
+
+    private static string FormatLegacyLine(
+        DateTimeOffset timestamp,
+        string connection,
+        uint sequenceNumber,
+        ReadOnlySpan<byte> payload) =>
+        $"{timestamp:O}|dir=inbound|{connection}|seq={sequenceNumber}|len={payload.Length}|data={Convert.ToHexString(payload)}";
 
     private static List<JournalObservation> ReadJournal(ObservedEventJournal journal)
     {

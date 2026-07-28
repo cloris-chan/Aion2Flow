@@ -70,24 +70,19 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.SetCurrentMap(in packet, mapId);
     }
 
+    public void StageMapCandidate(in PacketObservationSource packet, uint mapId)
+    {
+        lock (gate) inner.StageMapCandidate(in packet, mapId);
+    }
+
     public void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId)
     {
         lock (gate) inner.AnnounceDestinationMapTransition(in packet, mapId);
     }
 
-    public void CommitDestinationMapTransition(in PacketObservationSource packet, uint mapId)
+    public void ObserveDestinationMapTransitionCountdown(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.CommitDestinationMapTransition(in packet, mapId);
-    }
-
-    public void StageSceneMapCandidate(in PacketObservationSource packet, uint mapId)
-    {
-        lock (gate) inner.StageSceneMapCandidate(in packet, mapId);
-    }
-
-    public void ConfirmSceneMap(in PacketObservationSource packet, uint mapId)
-    {
-        lock (gate) inner.ConfirmSceneMap(in packet, mapId);
+        lock (gate) inner.ObserveDestinationMapTransitionCountdown(in packet, mapId);
     }
 
     public void ConfirmDestinationMapArrival(in PacketObservationSource packet)
@@ -95,19 +90,19 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.ConfirmDestinationMapArrival(in packet);
     }
 
-    public void StageMapInstance(in PacketObservationSource packet, uint instanceId)
+    public void RegisterMapEvent(in PacketObservationSource packet, uint instanceId)
     {
-        lock (gate) inner.StageMapInstance(in packet, instanceId);
+        lock (gate) inner.RegisterMapEvent(in packet, instanceId);
     }
 
-    public void ConfirmMapInstance(in PacketObservationSource packet, uint instanceId)
+    public void UnregisterMapEvent(in PacketObservationSource packet, uint instanceId)
     {
-        lock (gate) inner.ConfirmMapInstance(in packet, instanceId);
+        lock (gate) inner.UnregisterMapEvent(in packet, instanceId);
     }
 
-    public void MarkSceneTransportBoundary(in PacketObservationSource packet)
+    public void MarkTransportStreamActivated(in PacketObservationSource packet)
     {
-        lock (gate) inner.MarkSceneTransportBoundary(in packet);
+        lock (gate) inner.MarkTransportStreamActivated(in packet);
     }
 
     public void AppendCombatWireObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatWireObservation observation)

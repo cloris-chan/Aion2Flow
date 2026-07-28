@@ -49,31 +49,9 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
         }
     }
 
-    public bool StageSceneMapCandidateFromSceneState(in PacketObservationSource packet, uint value)
-    {
-        if (!SceneMapIdClassifier.IsAmbiguousSceneStateMapId(value))
-        {
-            return false;
-        }
-
-        sink.StageSceneMapCandidate(in packet, value);
-        return true;
-    }
-
-    public bool ConfirmDestinationMapFromSceneState(in PacketObservationSource packet, uint value)
-    {
-        if (!SceneMapIdClassifier.IsAmbiguousSceneStateMapId(value))
-        {
-            return false;
-        }
-
-        sink.ConfirmSceneMap(in packet, value);
-        return true;
-    }
-
     public bool ApplyDestinationMapEvent(in PacketObservationSource packet, uint value, PacketMapEventSignal signal)
     {
-        if (!SceneMapIdClassifier.IsPacketMapEventId(value))
+        if (!SceneMapIdClassifier.IsKnownMapId(value))
         {
             return false;
         }
@@ -87,12 +65,34 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
                 sink.AnnounceDestinationMapTransition(in packet, value);
                 break;
             case PacketMapEventSignal.TransitionCountdown:
-                sink.CommitDestinationMapTransition(in packet, value);
+                sink.ObserveDestinationMapTransitionCountdown(in packet, value);
                 break;
             default:
                 return false;
         }
 
+        return true;
+    }
+
+    public bool ApplyCurrentMapFromCompositeSceneState(in PacketObservationSource packet, uint value)
+    {
+        if (!SceneMapIdClassifier.IsKnownMapId(value))
+        {
+            return false;
+        }
+
+        sink.SetCurrentMap(in packet, value);
+        return true;
+    }
+
+    public bool StageMapCandidateFromCompositeSceneState(in PacketObservationSource packet, uint value)
+    {
+        if (!SceneMapIdClassifier.IsKnownMapId(value))
+        {
+            return false;
+        }
+
+        sink.StageMapCandidate(in packet, value);
         return true;
     }
 }

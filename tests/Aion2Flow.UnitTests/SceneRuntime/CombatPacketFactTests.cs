@@ -90,7 +90,7 @@ public class CombatPacketFactTests
     }
 
     [Fact]
-    public void ScenePath_TransportBoundaryDiscardsPendingRecoveryOpener()
+    public void ScenePath_TransportStreamActivationDiscardsPendingRecoveryOpener()
     {
         const int playerId = 15931;
         const int skillCode = 18720001;
@@ -103,7 +103,7 @@ public class CombatPacketFactTests
         journal.CompleteFlush(100);
         owner.Refresh();
 
-        var boundary = new SceneObservation { Kind = SceneObservationKind.TransportBoundary };
+        var boundary = new SceneObservation { Kind = SceneObservationKind.TransportStreamActivated };
         journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 1, FlushId = 101 }, 0, 0, in boundary);
         journal.CompleteFlush(101);
         owner.Refresh();

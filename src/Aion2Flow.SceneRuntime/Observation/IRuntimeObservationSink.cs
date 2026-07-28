@@ -26,21 +26,19 @@ public interface IRuntimeObservationSink
 
     void SetCurrentMap(in PacketObservationSource packet, uint mapId);
 
+    void StageMapCandidate(in PacketObservationSource packet, uint mapId);
+
     void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId);
 
-    void CommitDestinationMapTransition(in PacketObservationSource packet, uint mapId);
-
-    void StageSceneMapCandidate(in PacketObservationSource packet, uint mapId);
-
-    void ConfirmSceneMap(in PacketObservationSource packet, uint mapId);
+    void ObserveDestinationMapTransitionCountdown(in PacketObservationSource packet, uint mapId);
 
     void ConfirmDestinationMapArrival(in PacketObservationSource packet);
 
-    void StageMapInstance(in PacketObservationSource packet, uint instanceId);
+    void RegisterMapEvent(in PacketObservationSource packet, uint instanceId);
 
-    void ConfirmMapInstance(in PacketObservationSource packet, uint instanceId);
+    void UnregisterMapEvent(in PacketObservationSource packet, uint instanceId);
 
-    void MarkSceneTransportBoundary(in PacketObservationSource packet);
+    void MarkTransportStreamActivated(in PacketObservationSource packet);
 
     void AppendCombatWireObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatWireObservation observation);
 

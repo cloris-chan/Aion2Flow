@@ -4,13 +4,22 @@ using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
-using Cloris.Aion2Flow.SceneRuntime.Runtime;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encounterId, DateTimeOffset sceneStarted, EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, TimeProvider? timeProvider = null, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null)
+public sealed class SceneReadModelOwner(
+    ObservedEventJournal journal,
+    Guid encounterId,
+    DateTimeOffset sceneStarted,
+    EntityStore entities,
+    SceneBoundaryStore boundary,
+    RuntimeMetadataRegistry metadataRegistry,
+    CombatStore combat,
+    TimeProvider? timeProvider = null,
+    ICombatOccurrenceObserver? combatOccurrenceObserver = null,
+    IAuraLifecycleObserver? auraLifecycleObserver = null,
+    long? startObservationOrdinal = null)
 {
     public const long BossFocusVisibilityTimeoutMilliseconds = 10_000;
     private readonly Lock _gate = new();
@@ -22,13 +31,9 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     private readonly Dictionary<BossDamageContributionKey, BossDamageContributionAccumulator> _bossDamageContributionScratch = [];
     private readonly List<BossDamageContribution> _bossDamageContributionBuffer = [];
     private JournalEntriesReader? _applyEntriesReader;
-    private JournalEntriesReader? _transitionScanReader;
-    private SceneBoundaryStore? _transitionScanBoundary;
-    private long _transitionScanOrdinal;
-    private bool _transitionScanFound;
-    private JournalCursor _cursor = journal.CreateCursor(0);
-    private long _lastAppliedFlushId = -1;
-    private long _appliedFlushId = -1;
+    private JournalCursor _cursor = journal.CreateCursor(startObservationOrdinal ?? journal.FirstObservationOrdinal);
+    private long _lastAppliedFlushId = startObservationOrdinal.HasValue ? journal.LastCompletedFlushId : -1;
+    private long _appliedFlushId = startObservationOrdinal.HasValue ? journal.LastCompletedFlushId : -1;
     private SnapshotCacheKey _snapshotCacheKey;
     private SceneCombatSnapshot? _snapshotCache;
     private long _snapshotCacheValidUntilMilliseconds = -1;
@@ -91,7 +96,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
     public Guid EncounterId { get; private set; } = encounterId;
     public SceneKind Kind { get; private set; } = SceneKind.Standard;
     public DateTimeOffset SceneStarted { get; private set; } = sceneStarted;
-    public long SceneStartObservationOrdinal { get; private set; } = journal.FirstObservationOrdinal;
+    public long SceneStartObservationOrdinal { get; private set; } = startObservationOrdinal ?? journal.FirstObservationOrdinal;
     public long AppliedObservationOrdinal { get; private set; }
     public long AppliedNextObservationOrdinal => _cursor.NextObservationOrdinal;
     public long AppliedFlushId => _appliedFlushId;
@@ -160,25 +165,29 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             return CreateArchivePayloadCore(endObservationOrdinalExclusive);
     }
 
-    internal bool TryCreateTransitionArchive(out SceneArchivePayload? payload, out long boundaryOrdinal)
+    internal SceneArchivePayload CreateMapBoundaryArchive(long endObservationOrdinalExclusive)
     {
         lock (_gate)
         {
-            payload = null;
-            boundaryOrdinal = -1;
+            if (endObservationOrdinalExclusive < _cursor.NextObservationOrdinal)
+                throw new InvalidOperationException("Cannot create a map-boundary archive before the applied journal cursor.");
 
-            if (!TryFindNextSceneTransitionCore(out boundaryOrdinal))
-                return false;
-
-            var candidate = CreateArchivePayloadCore(boundaryOrdinal);
-            if (candidate.Snapshot.EncounterTime <= 0 || candidate.Snapshot.Combatants.Count == 0)
-            {
-                AdvanceThroughTransitionCore(boundaryOrdinal);
-                return true;
-            }
-
-            payload = candidate;
-            return true;
+            RefreshCore(endObservationOrdinalExclusive, completeFlushes: false);
+            _projection.CompleteFlush();
+            var snapshot = CreateSnapshotCore();
+            return SceneArchivePayload.CreateLocked(
+                snapshot,
+                SceneStarted,
+                _projection.Entities,
+                _projection.Boundary,
+                _projection.MetadataRegistry,
+                _projection.Applier.BossFocus,
+                _projection.Applier.EntityVitals,
+                _projection.Combat,
+                _projection.Applier.Mechanics,
+                _projection.Applier.Resources,
+                CreateAdapter(),
+                CreateTimelineSegment(isLiveGrowing: false, endObservationOrdinalExclusive));
         }
     }
 
@@ -290,63 +299,6 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
             CreateTimelineSegment(isLiveGrowing: false, endObservationOrdinalExclusive));
     }
 
-    private void AdvanceThroughTransitionCore(long transitionOrdinal)
-    {
-        var endOrdinalExclusive = transitionOrdinal == long.MaxValue
-            ? long.MaxValue
-            : transitionOrdinal + 1;
-        RefreshCore(endOrdinalExclusive, completeFlushes: true);
-        SceneStartObservationOrdinal = endOrdinalExclusive == long.MaxValue
-            ? AppliedNextObservationOrdinal
-            : endOrdinalExclusive;
-    }
-
-    private bool TryFindNextSceneTransitionCore(out long boundaryOrdinal)
-    {
-        boundaryOrdinal = -1;
-        _transitionScanBoundary = SceneBoundaryStore.FromSnapshot(_projection.Boundary.CreateSnapshot());
-        _transitionScanOrdinal = -1;
-        _transitionScanFound = false;
-        _transitionScanReader ??= ScanTransitionEntries;
-
-        var cursor = _cursor;
-        while (cursor.NextObservationOrdinal < journal.NextObservationOrdinal)
-        {
-            var result = journal.ReadEntries(cursor, long.MaxValue, 256, _transitionScanReader);
-            if (result.Count == 0)
-                break;
-
-            if (_transitionScanFound)
-            {
-                boundaryOrdinal = _transitionScanOrdinal;
-                return true;
-            }
-
-            cursor = result.Cursor;
-        }
-
-        return false;
-    }
-
-    private void ScanTransitionEntries(JournalEntryBatch entries)
-    {
-        var boundary = _transitionScanBoundary!;
-        for (var i = 0; i < entries.Count; i++)
-        {
-            var entry = entries[i];
-            if (entry.Domain != ObservedEventDomain.Scene)
-                continue;
-
-            var kind = boundary.ApplySceneObservation(in entry.Scene);
-            if (kind != SceneTransitionKind.MapTransition)
-                continue;
-
-            _transitionScanOrdinal = entry.Stamp.ObservationOrdinal;
-            _transitionScanFound = true;
-            return;
-        }
-    }
-
     private bool HasPendingProjectionChangesCore()
     {
         if (_cursor.NextObservationOrdinal < journal.NextObservationOrdinal)
@@ -424,6 +376,7 @@ public sealed class SceneReadModelOwner(ObservedEventJournal journal, Guid encou
         return new SceneReadModelFrame
         {
             Snapshot = snapshot,
+            MetadataRegistry = MetadataRegistry,
             ReadModelRevision = snapshot.ReadModelRevision,
             DetailCombatantId = detailCombatantId,
             Detail = detail,
@@ -665,6 +618,7 @@ public readonly record struct SceneReadModelFrame
     public SceneReadModelFrame()
     {
         Snapshot = SceneCombatSnapshot.Empty;
+        MetadataRegistry = null;
         ReadModelRevision = 0;
         DetailCombatantId = 0;
         Detail = null;
@@ -674,6 +628,7 @@ public readonly record struct SceneReadModelFrame
     }
 
     public SceneCombatSnapshot Snapshot { get; init; }
+    public RuntimeMetadataRegistry? MetadataRegistry { get; init; }
     public long ReadModelRevision { get; init; }
     public int DetailCombatantId { get; init; }
     public CombatDetailDelta? Detail { get; init; }

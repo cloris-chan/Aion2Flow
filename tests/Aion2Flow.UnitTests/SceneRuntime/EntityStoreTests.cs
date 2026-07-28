@@ -128,7 +128,7 @@ public class EntityStoreTests
     {
         var store = new SceneBoundaryStore();
         store.SetCurrentMap(200003);
-        store.StageMapInstance(515552);
+        store.SetMapInstance(515552);
 
         store.Clear();
 
@@ -374,7 +374,7 @@ public class DomainEventApplierTests
         var sceneId = Guid.NewGuid();
 
         journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 200003, Kind = SceneObservationKind.CurrentMap });
-        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 1 }, 0, 0, new SceneObservation { MapInstanceId = 515552, Kind = SceneObservationKind.MapInstanceStaged });
+        journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 1 }, 0, 0, new SceneObservation { MapInstanceId = 515552, Kind = SceneObservationKind.MapEventRegistered });
 
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
@@ -755,7 +755,7 @@ public class SceneSnapshotAdapterBasicTests
         var mechanics = new MechanicStore();
         var resources = new ResourceStore();
         metadata.SetCurrentMap(200003);
-        metadata.StageMapInstance(515552);
+        metadata.SetMapInstance(515552);
 
         var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, metadata);
         var snapshot = adapter.CreateSnapshot();
@@ -783,7 +783,7 @@ public class SceneCombatSnapshotAdapterTests
         entities.ApplyNickname(100, "Perigee");
         entities.ApplyNpcCode(200, 9_999_999);
         metadata.SetCurrentMap(200003);
-        metadata.StageMapInstance(515552);
+        metadata.SetMapInstance(515552);
 
         combat.ApplyResolvedCombat(mechanics, resources, 100, 200, new CombatWireObservation
         {
@@ -1732,6 +1732,26 @@ public class SceneReadModelOwnerTests
         finally
         {
         }
+    }
+
+    [Fact]
+    public void ReplaySinkHolder_FollowsArrivedMapContextOwnerReplacement()
+    {
+        using var holder = SceneSinkFactory.CreateForReplay();
+        var previousOwner = holder.Owner;
+        holder.Sink.AppendNickname(100, "Old Player");
+
+        var candidate = new PacketObservationSource(1_900, 0, 0x2136, 0, 0, default);
+        holder.Sink.StageMapCandidate(in candidate, 1_001);
+        var boundary = new PacketObservationSource(2_000, 0, 0x2336, 0, 0, default);
+        holder.Sink.ConfirmDestinationMapArrival(in boundary);
+        holder.Sink.AppendNpcCode(100, 2_000_002);
+        holder.Owner.Refresh();
+
+        Assert.NotSame(previousOwner, holder.Owner);
+        Assert.False(holder.Owner.MetadataRegistry.TryGetPcMetadata(100, out _));
+        Assert.True(holder.Owner.Entities.TryGet(100, out var entity));
+        Assert.Equal(2_000_002, entity.NpcCode);
     }
 
     private static SkillDisplayCatalog BuildSkillMap()

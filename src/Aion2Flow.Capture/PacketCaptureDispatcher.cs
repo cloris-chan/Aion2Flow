@@ -286,7 +286,7 @@ public sealed class PacketCaptureDispatcher
                     0,
                     packet.SequenceNumber,
                     default);
-                tcpStream.Sink.MarkSceneTransportBoundary(in source);
+                tcpStream.Sink.MarkTransportStreamActivated(in source);
             }
 
             _lastActiveConnection = connection;

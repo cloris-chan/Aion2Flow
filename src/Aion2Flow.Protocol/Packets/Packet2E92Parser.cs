@@ -1,14 +1,13 @@
 using System.Buffers.Binary;
-using System.Text;
 using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet2E92MapInstance(uint InstanceId, string ContentKey);
+internal readonly record struct Packet2E92MapEventRegistration(uint InstanceId);
 
 internal static class Packet2E92Parser
 {
-    public static bool TryParse(ReadOnlySpan<byte> packet, out Packet2E92MapInstance result)
+    public static bool TryParse(ReadOnlySpan<byte> packet, out Packet2E92MapEventRegistration result)
     {
         result = default;
 
@@ -32,7 +31,7 @@ internal static class Packet2E92Parser
             if (b < 0x20 || b > 0x7E) return false;
         }
 
-        result = new Packet2E92MapInstance(instanceId, Encoding.ASCII.GetString(keySpan));
+        result = new Packet2E92MapEventRegistration(instanceId);
         return true;
     }
 }

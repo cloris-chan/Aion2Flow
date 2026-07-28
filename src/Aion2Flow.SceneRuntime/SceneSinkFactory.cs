@@ -18,13 +18,17 @@ public static class SceneSinkFactory
 
     public static ReplaySinkHolder CreateForReplay()
     {
-        var journal = new ObservedEventJournal();
-        var sceneId = Guid.NewGuid();
-        var sceneStarted = DateTimeOffset.UtcNow;
-        var clock = new SceneRuntimeClock(0);
-        var journaling = new JournalingRuntimeObservationSink(journal, clock, sceneId);
-        var metadataRegistry = new RuntimeMetadataRegistry();
-        return new ReplaySinkHolder(journaling, journal, new SceneReadModelOwner(journal, sceneId, sceneStarted, metadataRegistry));
+        var scene = new SceneLiveReadModel(
+            DateTimeOffset.UnixEpoch,
+            ReplaySinkTimeProvider.Instance);
+        return new ReplaySinkHolder(scene.CreateSink(), scene);
+    }
+
+    private sealed class ReplaySinkTimeProvider : TimeProvider
+    {
+        public static ReplaySinkTimeProvider Instance { get; } = new();
+
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch;
     }
 }
 
@@ -36,7 +40,13 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private const int LivePairInitialCapacity = 512;
     private readonly Lock _gate = new();
     private readonly Queue<SceneArchivePayload> _pendingArchives = [];
+    private readonly Queue<SceneArchivePayload?> _pendingMapTransitions = [];
     private readonly HashSet<int> _seededBossSceneRuntimeStates = [];
+    private readonly MapRuntimeObservationContext _mapRuntime = new();
+    private readonly TimeProvider _timeProvider;
+    private readonly ICombatOccurrenceObserver? _combatOccurrenceObserver;
+    private readonly IAuraLifecycleObserver? _auraLifecycleObserver;
+    private SceneReadModelOwner _owner;
     private long _nextFlushId;
     private SceneKind _kind;
     private BossSceneState _bossState;
@@ -50,8 +60,8 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     public DateTimeOffset SessionStarted { get; private set; }
     public ObservedEventJournal Journal { get; }
     public SceneRuntimeClock Clock { get; }
-    public RuntimeMetadataRegistry MetadataRegistry { get; } = new();
-    public SceneReadModelOwner Owner { get; }
+    public RuntimeMetadataRegistry MetadataRegistry => Volatile.Read(ref _owner).MetadataRegistry;
+    public SceneReadModelOwner Owner => Volatile.Read(ref _owner);
     public SceneKind Kind
     {
         get
@@ -73,7 +83,9 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         get
         {
             lock (_gate)
-                return _pendingArchives.Count > 0 || Owner.HasPendingProjectionChanges;
+                return _pendingArchives.Count > 0 ||
+                       _pendingMapTransitions.Count > 0 ||
+                       _owner.HasPendingProjectionChanges;
         }
     }
 
@@ -86,20 +98,24 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     }
 
     public SceneLiveReadModel(DateTimeOffset sessionStarted, TimeProvider timeProvider)
+        : this(sessionStarted, timeProvider, null, null)
     {
+    }
+
+    public SceneLiveReadModel(
+        DateTimeOffset sessionStarted,
+        TimeProvider timeProvider,
+        ICombatOccurrenceObserver? combatOccurrenceObserver,
+        IAuraLifecycleObserver? auraLifecycleObserver)
+    {
+        _timeProvider = timeProvider;
+        _combatOccurrenceObserver = combatOccurrenceObserver;
+        _auraLifecycleObserver = auraLifecycleObserver;
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
         Clock = new SceneRuntimeClock(sessionStarted.ToUnixTimeMilliseconds());
         Journal = new ObservedEventJournal(LiveJournalInitialCapacity);
-        Owner = new SceneReadModelOwner(
-            Journal,
-            SessionId,
-            sessionStarted,
-            new EntityStore(),
-            new SceneBoundaryStore(),
-            MetadataRegistry,
-            new CombatStore(LiveCombatEventInitialCapacity, LiveCombatantInitialCapacity, LivePairInitialCapacity),
-            timeProvider);
+        _owner = CreateOwner(SessionId, sessionStarted, Journal.FirstObservationOrdinal);
         _kind = SceneKind.Standard;
         _bossState = BossSceneState.Waiting;
     }
@@ -129,13 +145,35 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         }
     }
 
+    public SceneArchivePayload ArchiveAndReset(Func<DateTimeOffset> resolveSessionStarted)
+    {
+        ArgumentNullException.ThrowIfNull(resolveSessionStarted);
+
+        lock (_gate)
+        {
+            var archive = CreateArchivePayloadCore();
+            ResetCore(
+                resolveSessionStarted(),
+                _kind,
+                Clock.NextObservationOrdinal,
+                archive);
+            return archive;
+        }
+    }
+
     public long NextFlushId() => Interlocked.Increment(ref _nextFlushId);
 
     public IRuntimeObservationSink Synchronize(IRuntimeObservationSink sink) => new SynchronizedRuntimeObservationSink(sink, _gate);
 
     internal IRuntimeObservationSink CreateSink()
     {
-        var journaling = new JournalingRuntimeObservationSink(Journal, Clock, () => SessionId, NextFlushId, this);
+        var journaling = new JournalingRuntimeObservationSink(
+            Journal,
+            Clock,
+            () => SessionId,
+            NextFlushId,
+            this,
+            _mapRuntime);
         return Synchronize(journaling);
     }
 
@@ -204,23 +242,17 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             return CreateArchivePayloadCore();
     }
 
-    internal bool TryHandleMapTransition(
-        Func<DateTimeOffset> resolveSessionStarted,
-        out SceneArchivePayload? payload)
+    public bool TryDequeueMapTransition(out SceneArchivePayload? payload)
     {
-        ArgumentNullException.ThrowIfNull(resolveSessionStarted);
-
         lock (_gate)
         {
-            if (_kind == SceneKind.Boss ||
-                !Owner.TryCreateTransitionArchive(out payload, out var boundaryOrdinal))
+            if (_pendingMapTransitions.Count == 0)
             {
                 payload = null;
                 return false;
             }
 
-            if (payload is not null)
-                ResetCore(resolveSessionStarted(), _kind, boundaryOrdinal, payload);
+            payload = _pendingMapTransitions.Dequeue();
             return true;
         }
     }
@@ -228,27 +260,15 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     public LiveScenePlaybackSource CreatePlaybackSource()
     {
         lock (_gate)
+            return CreatePlaybackSourceCore();
+    }
+
+    public LiveScenePlaybackSource CreatePlaybackSource(out RuntimeMetadataRegistry metadataRegistry)
+    {
+        lock (_gate)
         {
-            if (_kind == SceneKind.Boss && _bossState == BossSceneState.Frozen)
-                return new LiveScenePlaybackSource(LiveScenePlaybackState.CreateFrozen(this, GetFrozenArchivePayloadCore()));
-
-            var state = _playbackState;
-            if (state is null)
-            {
-                var snapshot = Owner.CreateSnapshot();
-                state = new LiveScenePlaybackState(
-                    this,
-                    SessionId,
-                    SessionStarted,
-                    snapshot,
-                    Journal,
-                    Owner.SceneStartObservationOrdinal,
-                    Owner.AppliedNextObservationOrdinal);
-                _playbackState = state;
-            }
-
-            _playbackSourceCount++;
-            return new LiveScenePlaybackSource(state);
+            metadataRegistry = _owner.MetadataRegistry;
+            return CreatePlaybackSourceCore();
         }
     }
 
@@ -321,6 +341,29 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             sessionStarted,
             kind,
             trackBossFocus: kind == SceneKind.Standard);
+    }
+
+    void ILiveSceneCollectionPolicy.StartMapContext(in PacketObservationSource packet, uint mapId)
+    {
+        var boundaryOrdinal = Clock.NextObservationOrdinal;
+        var archive = _owner.CreateMapBoundaryArchive(boundaryOrdinal);
+        var retainedArchive = archive.Snapshot.Combatants.Count > 0
+            ? archive
+            : null;
+
+        FinalizePlaybackStateCore(archive);
+        SessionId = Guid.NewGuid();
+        SessionStarted = packet.CaptureTimestampMilliseconds > 0
+            ? DateTimeOffset.FromUnixTimeMilliseconds(packet.CaptureTimestampMilliseconds)
+            : _timeProvider.GetLocalNow();
+        Clock.Reset(SessionStarted);
+        _bossState = BossSceneState.Waiting;
+        _hydrateBossSceneRuntimeStateOnCombat = false;
+        _frozenEndObservationOrdinalExclusive = -1;
+        _frozenArchive = null;
+        _seededBossSceneRuntimeStates.Clear();
+        Volatile.Write(ref _owner, CreateOwner(SessionId, SessionStarted, boundaryOrdinal));
+        _pendingMapTransitions.Enqueue(retainedArchive);
     }
 
     bool ILiveSceneCollectionPolicy.ShouldAppendCombat(in PacketObservationSource packet, int sourceId, int targetId, IRuntimeObservationSink sink)
@@ -446,6 +489,30 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private SceneArchivePayload GetFrozenArchivePayloadCore() =>
         _frozenArchive ?? throw new InvalidOperationException("Frozen boss scene has no archive payload.");
 
+    private LiveScenePlaybackSource CreatePlaybackSourceCore()
+    {
+        if (_kind == SceneKind.Boss && _bossState == BossSceneState.Frozen)
+            return new LiveScenePlaybackSource(LiveScenePlaybackState.CreateFrozen(this, GetFrozenArchivePayloadCore()));
+
+        var state = _playbackState;
+        if (state is null)
+        {
+            var snapshot = _owner.CreateSnapshot();
+            state = new LiveScenePlaybackState(
+                this,
+                SessionId,
+                SessionStarted,
+                snapshot,
+                Journal,
+                _owner.SceneStartObservationOrdinal,
+                _owner.AppliedNextObservationOrdinal);
+            _playbackState = state;
+        }
+
+        _playbackSourceCount++;
+        return new LiveScenePlaybackSource(state);
+    }
+
     private bool TryResolveFocusTargetPlayerCombat(int sourceId, int targetId, out int focusTargetId)
     {
         var sourceIsFocusTarget = IsFocusTarget(sourceId);
@@ -504,15 +571,48 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
         return false;
     }
+
+    private SceneReadModelOwner CreateOwner(
+        Guid sessionId,
+        DateTimeOffset sessionStarted,
+        long startObservationOrdinal)
+    {
+        var owner = new SceneReadModelOwner(
+            Journal,
+            sessionId,
+            sessionStarted,
+            new EntityStore(),
+            new SceneBoundaryStore(),
+            new RuntimeMetadataRegistry(),
+            new CombatStore(LiveCombatEventInitialCapacity, LiveCombatantInitialCapacity, LivePairInitialCapacity),
+            _timeProvider,
+            _combatOccurrenceObserver,
+            _auraLifecycleObserver,
+            startObservationOrdinal);
+
+        if (_kind != SceneKind.Standard)
+        {
+            owner.ResetCombat(
+                sessionId,
+                startObservationOrdinal,
+                sessionStarted,
+                _kind,
+                trackBossFocus: false);
+        }
+
+        return owner;
+    }
 }
 
-public readonly struct ReplaySinkHolder(IRuntimeObservationSink sink, ObservedEventJournal journal, SceneReadModelOwner owner) : IDisposable
+public sealed class ReplaySinkHolder(
+    IRuntimeObservationSink sink,
+    SceneLiveReadModel scene) : IDisposable
 {
     public IRuntimeObservationSink Sink { get; } = sink;
 
-    public ObservedEventJournal Journal { get; } = journal;
+    public ObservedEventJournal Journal => scene.Journal;
 
-    public SceneReadModelOwner Owner { get; } = owner;
+    public SceneReadModelOwner Owner => scene.Owner;
 
     public void Dispose() { }
 }

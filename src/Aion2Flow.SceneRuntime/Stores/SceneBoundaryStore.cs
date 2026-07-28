@@ -32,61 +32,31 @@ public sealed class SceneBoundaryStore
             _revision++;
     }
 
-    public void AnnounceDestinationMapTransition(uint mapId)
+    public void StartMapContext(uint mapId)
     {
-        if (_sceneBoundary.AnnounceDestinationMapTransition(mapId))
+        if (_sceneBoundary.StartMapContext(mapId))
             _revision++;
     }
 
-    public void CommitDestinationMapTransition(uint mapId)
+    public void SetMapInstance(uint instanceId)
     {
-        if (_sceneBoundary.CommitDestinationMapTransition(mapId))
+        if (_sceneBoundary.SetMapInstance(instanceId))
             _revision++;
     }
 
-    public void StageSceneMapCandidate(uint mapId)
-    {
-        if (_sceneBoundary.StageSceneMapCandidate(mapId))
-            _revision++;
-    }
-
-    public void ConfirmSceneMap(uint mapId)
-    {
-        if (_sceneBoundary.ConfirmSceneMap(mapId))
-            _revision++;
-    }
-
-    public void ConfirmDestinationMapArrival()
-    {
-        if (_sceneBoundary.ConfirmDestinationMapArrival())
-            _revision++;
-    }
-
-    public void StageMapInstance(uint instanceId)
-    {
-        if (_sceneBoundary.StageMapInstance(instanceId))
-            _revision++;
-    }
-
-    public void ConfirmMapInstance(uint instanceId)
-    {
-        if (_sceneBoundary.ConfirmMapInstance(instanceId))
-            _revision++;
-    }
-
-    internal SceneTransitionKind ApplySceneObservation(in SceneObservation scene)
+    internal void ApplySceneObservation(in SceneObservation scene)
     {
         var before = _sceneBoundary.CreateSnapshot();
-        var transitionKind = _sceneBoundary.ApplySceneObservation(in scene);
+        _sceneBoundary.ApplySceneObservation(in scene);
         if (before != _sceneBoundary.CreateSnapshot())
             _revision++;
-
-        return transitionKind;
     }
 
-    internal SceneBoundaryStoreSnapshot CreateSnapshot() => new(_sceneBoundary.CreateSnapshot(), _revision);
+    internal SceneBoundaryStoreSnapshot CreateSnapshot() =>
+        new(_sceneBoundary.CreateSnapshot(), _revision);
 
-    internal static SceneBoundaryStore FromSnapshot(SceneBoundaryStoreSnapshot snapshot) => new(SceneBoundaryService.FromSnapshot(snapshot.Boundary), snapshot.Revision);
+    internal static SceneBoundaryStore FromSnapshot(SceneBoundaryStoreSnapshot snapshot) =>
+        new(SceneBoundaryService.FromSnapshot(snapshot.Boundary), snapshot.Revision);
 
     public void Clear()
     {
@@ -96,7 +66,8 @@ public sealed class SceneBoundaryStore
         _sceneBoundary.Clear();
         _revision++;
     }
-
 }
 
-internal readonly record struct SceneBoundaryStoreSnapshot(SceneBoundaryServiceSnapshot Boundary, long Revision);
+internal readonly record struct SceneBoundaryStoreSnapshot(
+    SceneBoundaryServiceSnapshot Boundary,
+    long Revision);

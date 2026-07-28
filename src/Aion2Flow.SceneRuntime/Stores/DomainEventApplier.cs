@@ -455,13 +455,13 @@ public sealed class DomainEventApplier
 
         switch (scene.Kind)
         {
-            case SceneObservationKind.SceneMapConfirmed:
+            case SceneObservationKind.CurrentMap:
             case SceneObservationKind.DestinationMapArrival:
-            case SceneObservationKind.MapInstanceStaged:
-            case SceneObservationKind.MapInstanceConfirmed:
+            case SceneObservationKind.MapEventRegistered:
                 _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
                 break;
-            case SceneObservationKind.TransportBoundary:
+            case SceneObservationKind.MapContextStarted:
+            case SceneObservationKind.TransportStreamActivated:
                 _compactDirectValue.ResetPendingAssociations();
                 _metadataRegistry.UpsertMapCode(_boundary.CurrentMapInstanceId, _boundary.CurrentMapId);
                 break;

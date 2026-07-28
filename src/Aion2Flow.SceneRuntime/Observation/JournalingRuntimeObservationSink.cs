@@ -13,51 +13,62 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     private readonly Func<Guid> sceneSessionId;
     private readonly Func<long>? nextFlushId;
     private readonly ILiveSceneCollectionPolicy? collectionPolicy;
-    private readonly LifecycleRemapService _lifecycle = new();
+    private readonly MapRuntimeObservationContext _mapContext;
     private readonly Dictionary<long, long> _mappedFlushIds = [];
-    private readonly Dictionary<int, RuntimeNpcState> _npcStates = [];
-    private readonly HashSet<int> _knownEntities = [];
-    private readonly Dictionary<int, int> _summonOwnerByInstance = [];
 
-    public JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Guid sceneSessionId) : this(journal, clock, () => sceneSessionId, null, null)
+    public JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Guid sceneSessionId)
+        : this(journal, clock, () => sceneSessionId, null, null, new MapRuntimeObservationContext())
     {
     }
 
     public JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextFlushId = null)
-        : this(journal, clock, sceneSessionId, nextFlushId, null)
+        : this(journal, clock, sceneSessionId, nextFlushId, null, new MapRuntimeObservationContext())
     {
     }
 
-    internal JournalingRuntimeObservationSink(ObservedEventJournal journal, SceneRuntimeClock clock, Func<Guid> sceneSessionId, Func<long>? nextFlushId, ILiveSceneCollectionPolicy? collectionPolicy)
+    internal JournalingRuntimeObservationSink(
+        ObservedEventJournal journal,
+        SceneRuntimeClock clock,
+        Func<Guid> sceneSessionId,
+        Func<long>? nextFlushId,
+        ILiveSceneCollectionPolicy? collectionPolicy,
+        MapRuntimeObservationContext mapContext)
     {
         this.journal = journal;
         this.clock = clock;
         this.sceneSessionId = sceneSessionId;
         this.nextFlushId = nextFlushId;
         this.collectionPolicy = collectionPolicy;
+        _mapContext = mapContext;
     }
 
     public ObservedEventJournal Journal => journal;
 
     public int CurrentTarget
     {
-        get => _lifecycle.CurrentTarget;
-        set => _lifecycle.CurrentTarget = value;
+        get => EntityIngress.Lifecycle.CurrentTarget;
+        set => EntityIngress.Lifecycle.CurrentTarget = value;
     }
 
-    public int ResolveLifecycleId(int rawInstanceId) => _lifecycle.Resolve(rawInstanceId);
+    public int ResolveLifecycleId(int rawInstanceId) => EntityIngress.Lifecycle.Resolve(rawInstanceId);
 
-    public int RebindInstanceLifecycle(int rawInstanceId) => _lifecycle.Rebind(rawInstanceId);
+    public int RebindInstanceLifecycle(int rawInstanceId) => EntityIngress.Lifecycle.Rebind(rawInstanceId);
 
-    public void SetLifecycleId(int rawInstanceId, int mappedInstanceId) => _lifecycle.Set(rawInstanceId, mappedInstanceId);
+    public void SetLifecycleId(int rawInstanceId, int mappedInstanceId) => EntityIngress.Lifecycle.Set(rawInstanceId, mappedInstanceId);
 
-    public bool IsKnownEntity(int id) => id > 0 && (_knownEntities.Contains(id) || _npcStates.ContainsKey(id) || _summonOwnerByInstance.ContainsKey(id));
+    public bool IsKnownEntity(int id) =>
+        id > 0 &&
+        (EntityIngress.KnownEntities.Contains(id) ||
+         EntityIngress.NpcStates.ContainsKey(id) ||
+         EntityIngress.SummonOwnerByInstance.ContainsKey(id));
 
-    public bool HasSummonOwner(int instanceId) => instanceId > 0 && _summonOwnerByInstance.ContainsKey(ResolveLifecycleId(instanceId));
+    public bool HasSummonOwner(int instanceId) =>
+        instanceId > 0 &&
+        EntityIngress.SummonOwnerByInstance.ContainsKey(ResolveLifecycleId(instanceId));
 
     public bool TryGetNpcRuntimeState(int instanceId, out RuntimeNpcStateSnapshot state)
     {
-        if (_npcStates.TryGetValue(ResolveLifecycleId(instanceId), out var current))
+        if (EntityIngress.NpcStates.TryGetValue(ResolveLifecycleId(instanceId), out var current))
         {
             state = current.ToSnapshot();
             return true;
@@ -70,7 +81,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     public void SeedNpcRuntimeState(in PacketObservationSource packet, int instanceId, in RuntimeNpcStateSnapshot state)
     {
         instanceId = ResolveLifecycleId(instanceId);
-        _npcStates.TryGetValue(instanceId, out var cached);
+        EntityIngress.NpcStates.TryGetValue(instanceId, out var cached);
         AddKnownEntity(instanceId);
 
         if (state.NpcCode is int npcCode)
@@ -117,44 +128,62 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         }
     }
 
-    public int ResolveNpcObservationSource() => _lifecycle.CurrentTarget > 0 ? _lifecycle.CurrentTarget : _lifecycle.LastObservedNpcSource;
+    public int ResolveNpcObservationSource() =>
+        EntityIngress.Lifecycle.CurrentTarget > 0
+            ? EntityIngress.Lifecycle.CurrentTarget
+            : EntityIngress.Lifecycle.LastObservedNpcSource;
 
     public void RememberNpcObservationSource(int instanceId)
     {
         instanceId = ResolveLifecycleId(instanceId);
-        _lifecycle.RememberNpcObservationSource(instanceId);
+        EntityIngress.Lifecycle.RememberNpcObservationSource(instanceId);
         AddKnownEntity(instanceId);
     }
 
     public void SetCurrentMap(in PacketObservationSource packet, uint mapId)
-        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.CurrentMap);
+    {
+        if (_mapContext.TryConfirmCurrentMap(mapId, out var boundaryMapId))
+        {
+            StartMapContext(in packet, boundaryMapId);
+            return;
+        }
+
+        AppendSceneMapObservation(in packet, mapId, SceneObservationKind.CurrentMap);
+    }
+
+    public void StageMapCandidate(in PacketObservationSource packet, uint mapId)
+    {
+        _mapContext.StageMapCandidate(mapId);
+        AppendSceneMapObservation(in packet, mapId, SceneObservationKind.MapCandidateObserved);
+    }
 
     public void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId)
-        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapTransitionAnnounced);
+    {
+        _mapContext.StageMapCandidate(mapId);
+        AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapTransitionAnnounced);
+    }
 
-    public void CommitDestinationMapTransition(in PacketObservationSource packet, uint mapId)
-        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapTransitionCountdown);
-
-    public void StageSceneMapCandidate(in PacketObservationSource packet, uint mapId)
-        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.SceneMapCandidate);
-
-    public void ConfirmSceneMap(in PacketObservationSource packet, uint mapId)
-        => AppendSceneMapObservation(in packet, mapId, SceneObservationKind.SceneMapConfirmed);
+    public void ObserveDestinationMapTransitionCountdown(in PacketObservationSource packet, uint mapId)
+    {
+        _mapContext.StageMapCandidate(mapId);
+        AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapTransitionCountdown);
+    }
 
     public void ConfirmDestinationMapArrival(in PacketObservationSource packet)
     {
-        var stamp = CreateStamp(in packet);
-        journal.Append(
-            CreateHeader(in stamp, 0, 0, packet.Raw),
-            new SceneObservation
-            {
-                MapId = 0,
-                MapInstanceId = 0,
-                Kind = SceneObservationKind.DestinationMapArrival
-            });
+        if (_mapContext.TryCommitArrival(out var mapId))
+        {
+            StartMapContext(in packet, mapId);
+            return;
+        }
+
+        AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapArrival);
     }
 
-    private void AppendSceneMapObservation(in PacketObservationSource packet, uint mapId, SceneObservationKind kind)
+    private void AppendSceneMapObservation(
+        in PacketObservationSource packet,
+        uint mapId,
+        SceneObservationKind kind)
     {
         var stamp = CreateStamp(in packet);
         journal.Append(
@@ -167,8 +196,9 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             });
     }
 
-    public void StageMapInstance(in PacketObservationSource packet, uint instanceId)
+    public void RegisterMapEvent(in PacketObservationSource packet, uint instanceId)
     {
+        _mapContext.RegisterMapEvent(instanceId);
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, 0, 0, packet.Raw),
@@ -176,12 +206,13 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 MapId = 0,
                 MapInstanceId = instanceId,
-                Kind = SceneObservationKind.MapInstanceStaged
+                Kind = SceneObservationKind.MapEventRegistered
             });
     }
 
-    public void ConfirmMapInstance(in PacketObservationSource packet, uint instanceId)
+    public void UnregisterMapEvent(in PacketObservationSource packet, uint instanceId)
     {
+        _mapContext.UnregisterMapEvent(instanceId);
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, 0, 0, packet.Raw),
@@ -189,11 +220,11 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 MapId = 0,
                 MapInstanceId = instanceId,
-                Kind = SceneObservationKind.MapInstanceConfirmed
+                Kind = SceneObservationKind.MapEventUnregistered
             });
     }
 
-    public void MarkSceneTransportBoundary(in PacketObservationSource packet)
+    public void MarkTransportStreamActivated(in PacketObservationSource packet)
     {
         var stamp = CreateStamp(in packet);
         journal.Append(
@@ -202,7 +233,24 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             {
                 MapId = 0,
                 MapInstanceId = 0,
-                Kind = SceneObservationKind.TransportBoundary
+                Kind = SceneObservationKind.TransportStreamActivated
+            });
+    }
+
+    private void StartMapContext(
+        in PacketObservationSource packet,
+        uint mapId)
+    {
+        collectionPolicy?.StartMapContext(in packet, mapId);
+        _mapContext.StartMapContext(mapId);
+        var stamp = CreateStamp(in packet);
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new SceneObservation
+            {
+                MapId = mapId,
+                MapInstanceId = 0,
+                Kind = SceneObservationKind.MapContextStarted
             });
     }
 
@@ -701,7 +749,7 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         summonInstanceId = ResolveLifecycleId(summonInstanceId);
         AddKnownEntity(ownerId);
         AddKnownEntity(summonInstanceId);
-        _summonOwnerByInstance[summonInstanceId] = ownerId;
+        EntityIngress.SummonOwnerByInstance[summonInstanceId] = ownerId;
         GetOrAddNpcState(summonInstanceId).Kind = NpcKind.Summon;
         var stamp = CreateStamp(in packet);
         journal.Append(
@@ -729,8 +777,8 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         return mapped;
     }
 
-    private TimelineStamp CreateStamp(in PacketObservationSource packet)
-        => clock.CreateStamp(packet.CaptureTimestampMilliseconds, MapFlushId(packet.FlushId));
+    private TimelineStamp CreateStamp(in PacketObservationSource packet) =>
+        clock.CreateStamp(packet.CaptureTimestampMilliseconds, MapFlushId(packet.FlushId));
 
     private ObservedEventHeader CreateHeader(in TimelineStamp stamp, int sourceEntityId, int targetEntityId, RawPacketReference raw)
         => new(sceneSessionId(), stamp, sourceEntityId, targetEntityId, raw);
@@ -738,12 +786,14 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     private long ResolvePacketOffsetMilliseconds(in PacketObservationSource packet) =>
         Math.Max(0, packet.CaptureTimestampMilliseconds - clock.SceneStartedAtMilliseconds);
 
+    private MapEntityIngressState EntityIngress => _mapContext.Entities;
+
     private RuntimeNpcState GetOrAddNpcState(int instanceId)
     {
-        if (!_npcStates.TryGetValue(instanceId, out var state))
+        if (!EntityIngress.NpcStates.TryGetValue(instanceId, out var state))
         {
             state = new RuntimeNpcState();
-            _npcStates[instanceId] = state;
+            EntityIngress.NpcStates[instanceId] = state;
         }
 
         return state;
@@ -752,27 +802,6 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
     private void AddKnownEntity(int entityId)
     {
         if (entityId > 0)
-            _knownEntities.Add(entityId);
-    }
-
-    private sealed class RuntimeNpcState
-    {
-        public int? NpcCode { get; set; }
-        public long? Hp { get; set; }
-        public long? MaxHp { get; set; }
-        public RawPacketReference? NpcCodeRaw { get; set; }
-        public RawPacketReference? KindRaw { get; set; }
-        public RawPacketReference? HpRaw { get; set; }
-        public long? HpObservedAtMilliseconds { get; set; }
-        public bool? BattleToggledOn { get; set; }
-        public NpcKind? Kind { get; set; }
-        public long? Value2136 { get; set; }
-        public long? Sequence2136 { get; set; }
-        public long? Value0140 { get; set; }
-        public long? Value0240 { get; set; }
-        public (byte State0, byte State1)? State4636 { get; set; }
-        public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
-
-        public RuntimeNpcStateSnapshot ToSnapshot() => new(NpcCode, Hp, MaxHp, HpObservedAtMilliseconds, BattleToggledOn, Kind, Value2136, Sequence2136, Value0140, Value0240, State4636, Latest2C38);
+            EntityIngress.KnownEntities.Add(entityId);
     }
 }

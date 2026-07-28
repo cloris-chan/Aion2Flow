@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Globalization;
 using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Protocol.Combat;
+using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
@@ -78,34 +80,19 @@ public sealed class PacketLogReplayService
 
     private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver)
     {
-        var journal = new ObservedEventJournal(lines is ICollection<string> collection ? ResolveJournalCapacity(collection.Count) : 16_384);
-        var sceneId = Guid.NewGuid();
         var sceneStarted = DateTimeOffset.UtcNow;
-        var clock = new SceneRuntimeClock(sceneStarted.ToUnixTimeMilliseconds());
-        var metadataRegistry = new RuntimeMetadataRegistry();
         var replayTimeProvider = new ReplayTimeProvider(sceneStarted);
-        var owner = new SceneReadModelOwner(
-            journal,
-            sceneId,
+        var scene = new SceneLiveReadModel(
             sceneStarted,
-            metadataRegistry,
             replayTimeProvider,
             combatOccurrenceObserver,
             auraLifecycleObserver);
-        long nextFlushId = 0;
+        var journal = scene.Journal;
+        var sinkFactory = SceneSinkFactory.CreateForLive(scene);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        using var inboundProcessors = new ReplayTransportProcessorSet(() =>
-        {
-            var connectionSink = new JournalingRuntimeObservationSink(
-                journal,
-                clock,
-                () => sceneId,
-                () => Interlocked.Increment(ref nextFlushId));
-            return new ReplayConnectionProcessor(
-                connectionSink,
-                new PacketStreamProcessor(connectionSink));
-        });
+        using var inboundProcessors = new ReplayTransportProcessorSet(
+            () => new ReplayConnectionProcessor(sinkFactory));
         var totalLines = 0;
         var replayedLines = 0;
         var skippedLines = 0;
@@ -134,8 +121,7 @@ public sealed class PacketLogReplayService
             if (!hasSceneStarted)
             {
                 sceneStarted = entry.Timestamp;
-                clock.Reset(sceneStarted);
-                owner.ResetCombat(sceneId, clock.NextObservationOrdinal, sceneStarted);
+                scene.Reset(sceneStarted);
                 hasSceneStarted = true;
             }
 
@@ -183,24 +169,31 @@ public sealed class PacketLogReplayService
                     }
                 }
 
-                parsed = inboundProcessor.Processor.AppendAndProcess(
-                    acceptedPayload,
-                    entry.Connection,
-                    entry.Timestamp.ToUnixTimeMilliseconds());
-                // Ordinal-less stream logs require a parsed payload before replacing the active connection.
-                if (parsed && needsActivation && replayConnection.ConnectionOrdinal == 0)
+                if (needsActivation && replayConnection.ConnectionOrdinal == 0)
                 {
-                    var source = new PacketObservationSource(
-                        entry.Timestamp.ToUnixTimeMilliseconds(),
-                        0,
-                        0,
-                        acceptedPayload.Length,
-                        0,
-                        default);
-                    if (!inboundProcessors.TryActivate(in replayConnection, inboundProcessor, in source))
+                    parsed = inboundProcessor.ProbeAndBuffer(
+                        acceptedPayload,
+                        entry.Connection,
+                        entry.Timestamp.ToUnixTimeMilliseconds());
+                    if (parsed)
                     {
-                        throw new InvalidOperationException("The parsed ordinal-less replay connection could not become active.");
+                        var source = new PacketObservationSource(
+                            entry.Timestamp.ToUnixTimeMilliseconds(),
+                            0,
+                            0,
+                            acceptedPayload.Length,
+                            0,
+                            default);
+                        if (!inboundProcessors.TryActivate(in replayConnection, inboundProcessor, in source))
+                            throw new InvalidOperationException("The parsed ordinal-less replay connection could not become active.");
                     }
+                }
+                else
+                {
+                    parsed = inboundProcessor.AppendActive(
+                        acceptedPayload,
+                        entry.Connection,
+                        entry.Timestamp.ToUnixTimeMilliseconds());
                 }
             }
             finally
@@ -226,12 +219,19 @@ public sealed class PacketLogReplayService
         var ingestCounter = CaptureBaselineCounter(ingestStart);
 
         var snapshotStart = CaptureBaselineStart();
+        var owner = scene.Owner;
         var snapshot = owner.CreateSnapshot();
         var snapshotCounter = CaptureBaselineCounter(snapshotStart);
 
         var summaryStart = CaptureBaselineStart();
         var summaries = owner.ReadLocked((entities, _, metadataRegistry, combat, mechanics, resources, adapter) => BuildCombatantSummaries(combat, mechanics, resources, entities, metadataRegistry, adapter, snapshot));
         var summaryCounter = CaptureBaselineCounter(summaryStart);
+        var mapTransitionArchives = new List<SceneArchivePayload>();
+        while (scene.TryDequeueMapTransition(out var mapTransitionArchive))
+        {
+            if (mapTransitionArchive is not null)
+                mapTransitionArchives.Add(mapTransitionArchive);
+        }
 
         return new PacketLogReplayResult(
             sourceName,
@@ -250,14 +250,12 @@ public sealed class PacketLogReplayService
                 ingestCounter,
                 snapshotCounter,
                 summaryCounter),
+            MapTransitionArchives = mapTransitionArchives
         };
     }
 
     private static BaselineStart CaptureBaselineStart()
         => new(Stopwatch.GetTimestamp(), GC.GetAllocatedBytesForCurrentThread());
-
-    private static int ResolveJournalCapacity(int lineCount) =>
-        lineCount <= 0 ? 0 : lineCount <= int.MaxValue / 2 ? lineCount * 2 : int.MaxValue;
 
     private static PacketLogReplayBaselineCounter CaptureBaselineCounter(BaselineStart start)
     {
@@ -861,10 +859,8 @@ public sealed class PacketLogReplayService
 
             var previousProcessor = _activeProcessor;
             var previousConnection = _activeConnection;
-            if (_hasActiveConnection)
-            {
-                processor.Sink.MarkSceneTransportBoundary(in source);
-            }
+            if (!processor.Activate(in source, markTransportStreamActivated: _hasActiveConnection))
+                return false;
 
             _candidateProcessors.Remove(connection);
             _activeConnection = connection;
@@ -986,15 +982,25 @@ public sealed class PacketLogReplayService
         }
     }
 
-    private sealed class ReplayConnectionProcessor(IRuntimeObservationSink sink, PacketStreamProcessor processor) : IDisposable
+    private readonly record struct ReplayAcceptedPayload(
+        byte[] Payload,
+        TcpConnection Connection,
+        long TimestampMilliseconds);
+
+    private sealed class ReplayConnectionProcessor : IDisposable
     {
         private readonly TcpConnectionStartClassifier _classifier = new();
+        private readonly Func<IRuntimeObservationSink> _liveSinkFactory;
+        private readonly List<ReplayAcceptedPayload> _pendingPayloads = [];
+        private PacketStreamProcessor? _probeProcessor;
+        private PacketStreamProcessor? _activeProcessor;
+
+        public ReplayConnectionProcessor(Func<IRuntimeObservationSink> liveSinkFactory)
+        {
+            _liveSinkFactory = liveSinkFactory;
+        }
 
         public long LastUseOrdinal { get; set; }
-
-        public IRuntimeObservationSink Sink { get; } = sink;
-
-        public PacketStreamProcessor Processor { get; } = processor;
 
         public TcpConnectionStartResult Classify(ReadOnlySpan<byte> payload) => _classifier.Classify(payload);
 
@@ -1003,9 +1009,84 @@ public sealed class PacketLogReplayService
             _classifier.MarkGameStream();
         }
 
+        public bool ProbeAndBuffer(
+            ReadOnlySpan<byte> payload,
+            TcpConnection connection,
+            long timestampMilliseconds)
+        {
+            if (_activeProcessor is not null)
+                throw new InvalidOperationException("An active replay connection cannot accept probe payloads.");
+
+            var bufferedPayload = payload.ToArray();
+            _pendingPayloads.Add(new ReplayAcceptedPayload(
+                bufferedPayload,
+                connection,
+                timestampMilliseconds));
+            _probeProcessor ??= CreateProbeProcessor();
+            return _probeProcessor.AppendAndProcess(
+                bufferedPayload,
+                connection,
+                timestampMilliseconds);
+        }
+
+        public bool Activate(
+            in PacketObservationSource source,
+            bool markTransportStreamActivated)
+        {
+            if (_activeProcessor is not null)
+                return true;
+
+            var sink = _liveSinkFactory();
+            _activeProcessor = new PacketStreamProcessor(sink);
+            if (markTransportStreamActivated)
+                sink.MarkTransportStreamActivated(in source);
+
+            var parsed = _pendingPayloads.Count == 0;
+            foreach (var pending in _pendingPayloads)
+            {
+                parsed |= _activeProcessor.AppendAndProcess(
+                    pending.Payload,
+                    pending.Connection,
+                    pending.TimestampMilliseconds);
+            }
+
+            _pendingPayloads.Clear();
+            _probeProcessor?.Dispose();
+            _probeProcessor = null;
+            return parsed;
+        }
+
+        public bool AppendActive(
+            ReadOnlySpan<byte> payload,
+            TcpConnection connection,
+            long timestampMilliseconds)
+        {
+            if (_activeProcessor is null)
+                throw new InvalidOperationException("The replay connection has not been activated.");
+
+            return _activeProcessor.AppendAndProcess(
+                payload,
+                connection,
+                timestampMilliseconds);
+        }
+
         public void Dispose()
         {
-            Processor.Dispose();
+            _probeProcessor?.Dispose();
+            _probeProcessor = null;
+            _activeProcessor?.Dispose();
+            _activeProcessor = null;
+            _pendingPayloads.Clear();
+        }
+
+        private static PacketStreamProcessor CreateProbeProcessor()
+        {
+            var journal = new ObservedEventJournal();
+            var sink = new JournalingRuntimeObservationSink(
+                journal,
+                new SceneRuntimeClock(0),
+                Guid.NewGuid());
+            return new PacketStreamProcessor(sink);
         }
     }
     private sealed class MutableCombatantSummary(int combatantId, string displayName)
@@ -1085,6 +1166,8 @@ public sealed record PacketLogReplayResult(
     IReadOnlyDictionary<string, int> SkippedEventCounts)
 {
     public PacketLogReplayBaselineCounters BaselineCounters { get; init; } = PacketLogReplayBaselineCounters.Empty;
+
+    public IReadOnlyList<SceneArchivePayload> MapTransitionArchives { get; init; } = [];
 }
 
 public sealed record PacketLogReplayBaselineCounters(

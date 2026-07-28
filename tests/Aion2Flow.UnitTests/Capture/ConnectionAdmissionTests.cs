@@ -2,7 +2,6 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text;
 using Cloris.Aion2Flow.Capture;
-using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
@@ -1694,11 +1693,13 @@ public sealed class ConnectionAdmissionTests
                 captureTimestampMilliseconds: earlierTimestamp,
                 candidateOrdinal: 2);
 
-            var offsets = ReadJournalOffsets(scene);
-            Assert.True(offsets.Length >= 3);
-            for (var index = 1; index < offsets.Length; index++)
+            var timeline = ReadJournalTimeline(scene);
+            Assert.True(timeline.Length >= 3);
+            foreach (var sceneTimeline in timeline.GroupBy(static entry => entry.SceneSessionId))
             {
-                Assert.True(offsets[index] >= offsets[index - 1]);
+                var offsets = sceneTimeline.Select(static entry => entry.OffsetTicks).ToArray();
+                for (var index = 1; index < offsets.Length; index++)
+                    Assert.True(offsets[index] >= offsets[index - 1]);
             }
 
             using var source = scene.CreatePlaybackSource();
@@ -1911,8 +1912,11 @@ public sealed class ConnectionAdmissionTests
     }
 
     private static long[] ReadJournalOffsets(SceneLiveReadModel scene)
+        => [.. ReadJournalTimeline(scene).Select(static entry => entry.OffsetTicks)];
+
+    private static JournalTimelineEntry[] ReadJournalTimeline(SceneLiveReadModel scene)
     {
-        var offsets = new List<long>(scene.Journal.Count);
+        var timeline = new List<JournalTimelineEntry>(scene.Journal.Count);
         var cursor = scene.Journal.CreateCursor(scene.Journal.FirstObservationOrdinal);
         while (cursor.NextObservationOrdinal < scene.Journal.NextObservationOrdinal)
         {
@@ -1920,7 +1924,8 @@ public sealed class ConnectionAdmissionTests
             {
                 for (var index = 0; index < entries.Count; index++)
                 {
-                    offsets.Add(entries[index].Stamp.OffsetTicks);
+                    var entry = entries[index];
+                    timeline.Add(new JournalTimelineEntry(entry.SceneSessionId, entry.Stamp.OffsetTicks));
                 }
             });
             if (result.Count == 0)
@@ -1931,8 +1936,10 @@ public sealed class ConnectionAdmissionTests
             cursor = result.Cursor;
         }
 
-        return [.. offsets];
+        return [.. timeline];
     }
+
+    private readonly record struct JournalTimelineEntry(Guid SceneSessionId, long OffsetTicks);
 
     private static int CountStateObservations(ObservedEventJournal journal, int entityId)
     {

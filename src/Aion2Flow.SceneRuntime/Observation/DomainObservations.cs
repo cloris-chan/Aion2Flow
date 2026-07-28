@@ -117,14 +117,14 @@ public enum SceneObservationKind : byte
 {
     None,
     CurrentMap,
+    MapCandidateObserved,
     DestinationMapTransitionAnnounced,
     DestinationMapTransitionCountdown,
-    SceneMapCandidate,
-    SceneMapConfirmed,
     DestinationMapArrival,
-    MapInstanceStaged,
-    MapInstanceConfirmed,
-    TransportBoundary
+    MapEventRegistered,
+    MapEventUnregistered,
+    MapContextStarted,
+    TransportStreamActivated
 }
 
 public readonly record struct EntityVitalObservation(int EntityId, long CurrentHp, long? MaxHp);

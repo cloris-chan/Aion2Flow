@@ -1,16 +1,12 @@
+using System.Collections.Frozen;
+using Cloris.Aion2Flow.Resources.Catalog;
+
 namespace Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 internal static class SceneMapIdClassifier
 {
-    private const uint MinimumDirectMapEventId = 1000;
+    private static readonly FrozenSet<uint> KnownMapIds =
+        ResourceCatalog.Load(ResourceLanguage.English).Maps.Keys.ToFrozenSet();
 
-    public static bool IsPacketMapEventId(uint value) => value >= MinimumDirectMapEventId;
-
-    public static bool IsAmbiguousSceneStateMapId(uint value)
-        => value is (>= 20 and < 2000)
-            or (>= 100000 and < 200000)
-            or (>= 200000 and < 300000)
-            or (>= 300000 and < 400000)
-            or (>= 500000 and < 700000)
-            or (>= 800000 and < 900000);
+    public static bool IsKnownMapId(uint value) => KnownMapIds.Contains(value);
 }

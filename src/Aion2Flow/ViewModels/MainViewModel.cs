@@ -60,6 +60,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private int _displayContextVersion;
     private int _displayContextBuiltVersion = -1;
     private long _displayContextMetadataRevision = -1;
+    private RuntimeMetadataRegistry? _displayContextMetadataRegistry;
     private bool _displayContextIsArchived;
     private Guid _barBrushEncounterId;
     private uint _barBrushSeed;
@@ -213,7 +214,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService);
         ApplyCombatantMetricDisplaySettings();
         CombatantColumns.SetBossShareColumnVisibility(SettingsFlyout.SceneKind == SceneKind.Boss);
-        DisplayContext = CreateLiveDisplayContext(_displayedSnapshot);
+        DisplayContext = CreateDisplayContext(
+            _displayedSnapshot,
+            SceneIdentityScope.Empty,
+            _captureService.Scene.Owner.MetadataRegistry);
         _combatantDetails.DisplayContext = DisplayContext;
 
         _captureService.StatusChanged += OnCaptureStatusChanged;
@@ -337,10 +341,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _suppressRefresh = true;
         try
         {
-            DrainPendingBossArchives();
-            ArchiveEncounter("manual-reset", isAutomatic: true);
-            ResetLiveModels(RawPacketDump.RotateLogs);
-
+            CloseCurrentArchiveScope("manual-reset", isAutomatic: true);
             ResetLivePresentation();
             RefreshCaptureIndicators();
         }
@@ -370,14 +371,29 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     [RelayCommand]
     private void ArchiveCurrentEncounter()
     {
-        var record = ArchiveEncounter("manual", isAutomatic: false);
-        if (record is null)
+        if (_suppressRefresh)
         {
             return;
         }
 
-        RebuildEncounterHistory();
-        SelectedEncounterHistory = EncounterHistory.FirstOrDefault(x => x.Record.Id == record.Id);
+        _suppressRefresh = true;
+        try
+        {
+            var record = CloseCurrentArchiveScope("manual", isAutomatic: false);
+            ResetLivePresentation();
+            RefreshCaptureIndicators();
+            if (record is null)
+            {
+                return;
+            }
+
+            RebuildEncounterHistory();
+            SelectedEncounterHistory = EncounterHistory.FirstOrDefault(x => x.Record.Id == record.Id);
+        }
+        finally
+        {
+            _suppressRefresh = false;
+        }
     }
 
     [RelayCommand]
@@ -968,9 +984,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         var isArchived = IsViewingArchivedEncounter && SelectedEncounterHistory is not null;
         var archivedRecord = isArchived ? SelectedEncounterHistory!.Record : null;
-        var metadataRevision = isArchived ? -1 : _captureService.Scene.Owner.MetadataRegistry.Revision;
+        var metadataRegistry = isArchived ? null : _latestLiveFrame.MetadataRegistry;
+        var metadataRevision = metadataRegistry?.Revision ?? -1;
         if (ReferenceEquals(_displayContextSnapshot, snapshot) &&
             ReferenceEquals(_displayContextArchivedRecord, archivedRecord) &&
+            ReferenceEquals(_displayContextMetadataRegistry, metadataRegistry) &&
             _displayContextBuiltVersion == _displayContextVersion &&
             _displayContextMetadataRevision == metadataRevision &&
             _displayContextIsArchived == isArchived)
@@ -982,15 +1000,13 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _displayContextArchivedRecord = archivedRecord;
         _displayContextBuiltVersion = _displayContextVersion;
         _displayContextMetadataRevision = metadataRevision;
+        _displayContextMetadataRegistry = metadataRegistry;
         _displayContextIsArchived = isArchived;
         DisplayContext = isArchived
             ? CreateArchivedDisplayContext(archivedRecord!)
-            : CreateLiveDisplayContext(snapshot);
+            : CreateDisplayContext(snapshot, SceneIdentityScope.Empty, metadataRegistry);
         _combatantDetails.DisplayContext = DisplayContext;
     }
-
-    private SceneDisplayContext CreateLiveDisplayContext(SceneCombatSnapshot snapshot)
-        => CreateDisplayContext(snapshot, SceneIdentityScope.Empty, _captureService.Scene.Owner.MetadataRegistry);
 
     private SceneDisplayContext CreateArchivedDisplayContext(ArchivedEncounterRecord record)
         => CreateDisplayContext(record.ScenePayload.Snapshot, record.ScenePayload.IdentityScope, null);
@@ -1000,8 +1016,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         if (IsViewingArchivedEncounter && SelectedEncounterHistory is { } archived)
             return CreatePlaybackContext(archived);
 
-        var source = _captureService.Scene.CreatePlaybackSource();
-        var displayContext = CreateDisplayContext(source.CreateSnapshot(), SceneIdentityScope.Empty, _captureService.Scene.Owner.MetadataRegistry);
+        var source = _captureService.Scene.CreatePlaybackSource(out var metadataRegistry);
+        var displayContext = CreateDisplayContext(source.CreateSnapshot(), SceneIdentityScope.Empty, metadataRegistry);
         return new ScenePlaybackOpenContext(source, displayContext);
     }
 
@@ -1011,9 +1027,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private SceneDisplayContext CreateDisplayContext(SceneCombatSnapshot snapshot, SceneIdentityScope scope, RuntimeMetadataRegistry? metadataRegistry)
         => new(scope, metadataRegistry, snapshot, _gameResourceService, Localization["Scene_Unknown"]);
 
-    private ArchivedEncounterRecord? ArchiveEncounter(string trigger, bool isAutomatic)
+    private ArchivedEncounterRecord? CloseCurrentArchiveScope(string trigger, bool isAutomatic)
     {
-        var payload = _captureService.Scene.CreateArchivePayload();
+        DrainPendingBossArchives();
+        var payload = _captureService.Scene.ArchiveAndReset(RawPacketDump.RotateLogs);
         return _encounterArchiveService.Archive(payload, trigger, isAutomatic);
     }
 
@@ -1050,8 +1067,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private void DrainMapTransitionArchives()
     {
-        while (_captureService.Scene.TryHandleMapTransition(RawPacketDump.RotateLogs, out var payload))
+        while (_captureService.Scene.TryDequeueMapTransition(out var payload))
         {
+            RawPacketDump.RotateLogs();
             if (payload is not null)
                 _encounterArchiveService.Archive(payload, "map-transition", isAutomatic: true);
         }

@@ -170,7 +170,7 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x0140, packet.Length);
-        context.Writer.ConfirmDestinationMapFromSceneState(in source, parsed.Value0);
+        context.Writer.ApplyCurrentMapFromCompositeSceneState(in source, parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -192,8 +192,7 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x2136, packet.Length);
-        context.Writer.StageSceneMapCandidateFromSceneState(in source, parsed.Value0);
-
+        context.Writer.StageMapCandidateFromCompositeSceneState(in source, parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -207,7 +206,7 @@ internal sealed class PacketStateHandler
         return context.MarkParsed();
     }
 
-    public static bool ParsePendingMapArrival2336Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    public static bool ParseMapArrival2336Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (!Packet2336ArrivalParser.TryParse(packet))
         {
@@ -225,7 +224,23 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.ConfirmMapInstance(context.CreateObservationSource(0x2E92, packet.Length), parsed.InstanceId);
+        context.Sink.RegisterMapEvent(
+            context.CreateObservationSource(0x2E92, packet.Length),
+            parsed.InstanceId);
+
+        return context.MarkParsed();
+    }
+
+    public static bool ParseMap2F92Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        if (!Packet2F92Parser.TryParse(packet, out var instanceId))
+        {
+            return false;
+        }
+
+        context.Sink.UnregisterMapEvent(
+            context.CreateObservationSource(0x2F92, packet.Length),
+            instanceId);
 
         return context.MarkParsed();
     }
@@ -238,7 +253,7 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x0240, packet.Length);
-        context.Writer.ConfirmDestinationMapFromSceneState(in source, parsed.Value0);
+        context.Writer.ApplyCurrentMapFromCompositeSceneState(in source, parsed.Value0);
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {

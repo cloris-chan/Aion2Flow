@@ -31,10 +31,10 @@ internal static class SyntheticObservationExtensions
         sink.SetCurrentMap(in source, mapId);
     }
 
-    public static void StageMapInstance(this IRuntimeObservationSink sink, uint instanceId)
+    public static void RegisterMapEvent(this IRuntimeObservationSink sink, uint instanceId)
     {
         var source = Source();
-        sink.StageMapInstance(in source, instanceId);
+        sink.RegisterMapEvent(in source, instanceId);
     }
 
     public static void AppendNickname(this IRuntimeObservationSink sink, int uid, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null, string legionName = "")
