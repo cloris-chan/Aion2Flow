@@ -19,8 +19,8 @@ public sealed class ResourcePackTests
 
         Assert.Same(shared, snapshot.Shared);
         Assert.Equal(language, snapshot.Language);
-        Assert.Equal(15_515, snapshot.SkillDefinitions.Count);
-        Assert.Equal(15_515, snapshot.Skills.Count);
+        Assert.Equal(15_581, snapshot.SkillDefinitions.Count);
+        Assert.Equal(15_581, snapshot.Skills.Count);
         Assert.Equal(12_615, snapshot.NpcCatalog.Count);
         Assert.True(snapshot.Maps.Count > 600);
         Assert.True(snapshot.ServerNames.Count > 100);
@@ -128,8 +128,8 @@ public sealed class ResourcePackTests
     {
         var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
 
-        Assert.Equal(16_260, runtime.SkillCount);
-        Assert.Equal(25_419, runtime.SlotCount);
+        Assert.Equal(16_328, runtime.SkillCount);
+        Assert.Equal(25_573, runtime.SlotCount);
         Assert.True(runtime.NodeCount > 50_000);
         Assert.True(runtime.NodeSlotReferenceCount > runtime.SlotCount);
         Assert.True(runtime.TryResolveEffect(101000011, out var directHeal));
@@ -223,12 +223,18 @@ public sealed class ResourcePackTests
 
     [Theory]
     [InlineData(20u, "渾沌艾雷修藍塔下層")]
+    [InlineData(23u, "渾沌艾雷修藍塔表層")]
     [InlineData(50u, "萬神殿")]
+    [InlineData(60u, "火之神殿競技場")]
+    [InlineData(63u, "暴風沉睡的雪原")]
+    [InlineData(80u, "深淵裂縫地帶")]
     [InlineData(1000u, "波伊塔")]
+    [InlineData(143008u, "達爾巴塔監視基地")]
     [InlineData(154001u, "科赫塔監視哨所")]
     [InlineData(200003u, "惡夢")]
     [InlineData(503006u, "深淵迴廊")]
     [InlineData(600091u, "凶猛的角岩窟")]
+    [InlineData(600153u, "墮落守護者之城")]
     [InlineData(840037u, "褪色的脈動書庫")]
     public void Maps_Resolve_Client_Table_Scene_Id_Aliases(uint mapId, string expectedName)
         => Assert.Equal(expectedName, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).ResolveMapName(mapId));

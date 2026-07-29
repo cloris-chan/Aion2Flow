@@ -32,7 +32,7 @@ internal sealed class SkillSemanticValueIndex
         "Dpot", "Dpot_Item", "Dpot_Ratio", "DpotRatio_Item", "EndCastSkill", "EndCastSkillByCaster", "EndCastSkillToCaster", "EndMotion",
         "EquipItemStatAmplify_Accessory", "EquipItemStatAmplify_Weapon", "ExposeMinimapAsGenocider", "Fear", "FixSkillLevel",
         "ForceCriticalDamage", "ForceCriticalDamageByCaster", "ForceKill", "ForceKillByGetDamage", "ForceMissDamage",
-        "ForceMissDamageToCaster", "Fot", "Fot_Item", "Fot_Ratio", "FotRatio_Item", "Frozen", "GetDamageMultiply",
+        "ForceMissDamageToCaster", "Fot", "Fot_Item", "Fot_Ratio", "FotRatio_Item", "Frozen", "GaugeEffect", "GetDamageMultiply",
         "GetDamageMultiplyByCaster", "GimmickA", "GimmickB", "Groggy", "GroggyGuard", "GroggyPause", "HandToHandCombat", "Hold",
         "IgnoreBackAttack", "IgnoreCollision", "IgnoreFrontAttack", "IgnorePenaltyLoss_Exp_PvE", "IgnorePenaltyLoss_Exp_PvP",
         "IgnorePenaltyLoss_Item_PvE", "IgnorePenaltyLoss_Item_PvP", "ImmuneAbnormal", "ImmuneBind", "ImmuneDecreaseHP",
