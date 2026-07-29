@@ -19,6 +19,24 @@ namespace Cloris.Aion2Flow.Tests.App;
 public sealed class MainViewModelCombatantFilterTests
 {
     [Fact]
+    public void EncounterTimeDisplayFormat_PropagatesToCombatantDetails()
+    {
+        var fixture = MainViewModelFixture.Create();
+
+        fixture.Settings.EncounterTimeDisplayFormat =
+            EncounterTimeDisplayFormat.MinutesSeconds;
+
+        Assert.Equal(
+            EncounterTimeDisplayFormat.MinutesSeconds,
+            fixture.ViewModel.CombatantDetails
+                .OutgoingDetail.EncounterTimeDisplayFormat);
+        Assert.Equal(
+            EncounterTimeDisplayFormat.MinutesSeconds,
+            fixture.ViewModel.CombatantDetails
+                .IncomingDetail.EncounterTimeDisplayFormat);
+    }
+
+    [Fact]
     public void CurrentPlaybackContextUsesSessionBoundLiveSource()
     {
         var fixture = MainViewModelFixture.Create();
@@ -139,7 +157,7 @@ public sealed class MainViewModelCombatantFilterTests
         var row = Assert.Single(fixture.ViewModel.Combatants);
         Assert.Equal(300, row.Id);
         Assert.Equal(400, row.Damage);
-        Assert.Equal(2d, fixture.ViewModel.EncounterTimeSeconds);
+        Assert.Equal(TimeSpan.FromSeconds(2), fixture.ViewModel.EncounterDuration);
     }
 
     [Fact]

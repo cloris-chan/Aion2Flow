@@ -71,6 +71,7 @@ public partial class MainWindow : Window
         _overlayRoot = Content as Control;
         DataContext.EncounterHistory.CollectionChanged += OnEncounterHistoryCollectionChanged;
         DataContext.SettingsFlyout.PropertyChanged += OnSettingsFlyoutPropertyChanged;
+        RefreshHeaderVisibilityPreference();
         RebuildEncounterHistoryMenuItems();
         _globalHotkeyService.Triggered += OnGlobalHotkeyTriggered;
         _overlayInteractionController.ModeChanged += OnOverlayInteractionModeChanged;
@@ -441,12 +442,23 @@ public partial class MainWindow : Window
 
     private void OnSettingsFlyoutPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsFlyoutViewModel.IsAlwaysOnTop) &&
-            !SynchronizeOverlayTopmostBand())
+        if (e.PropertyName == nameof(SettingsFlyoutViewModel.IsAlwaysOnTop))
         {
-            ScheduleNativeStyleRefresh();
+            if (!SynchronizeOverlayTopmostBand())
+            {
+                ScheduleNativeStyleRefresh();
+            }
+            return;
+        }
+
+        if (e.PropertyName == nameof(SettingsFlyoutViewModel.HideHeaderWhenClickThrough))
+        {
+            RefreshHeaderVisibilityPreference();
         }
     }
+
+    private void RefreshHeaderVisibilityPreference() =>
+        MainHudShell.Classes.Set("hide-header-when-click-through", DataContext.SettingsFlyout.HideHeaderWhenClickThrough);
 
     private void UpdateClickThroughCursorState(TimeSpan timestamp)
     {
@@ -791,7 +803,11 @@ public partial class MainWindow : Window
         ScenePlaybackViewModel viewModel;
         try
         {
-            viewModel = new ScenePlaybackViewModel(context.Source, context.DisplayContext, DataContext.Localization);
+            viewModel = new ScenePlaybackViewModel(
+                context.Source,
+                context.DisplayContext,
+                DataContext.Localization,
+                DataContext.SettingsFlyout);
         }
         catch
         {

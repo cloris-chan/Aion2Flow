@@ -36,15 +36,13 @@
                                                          Classes="DetailBannerMetric"
                                                          Label="{markups:Translate Metric_Dps}"
                                                          Value="{Binding DamageSection.PerSecond}"
-                                                         FractionDigits="1"
-                                                         TrimTrailingZeros="False" />
-                                    <controls:MetricTile Grid.Column="1"
-                                                         Classes="DetailBannerMetric"
-                                                         Label="{markups:Translate Metric_Duration}"
-                                                         Value="{Binding DamageSection.DurationSeconds}"
-                                                         FractionDigits="1"
-                                                         TrimTrailingZeros="False"
-                                                         Suffix="s" />
+                                                         Formatter="N1" />
+                                    <controls:DurationMetricTile Grid.Column="1"
+                                                                 Classes="DetailBannerMetric"
+                                                                 Label="{markups:Translate Metric_Duration}"
+                                                                 Duration="{Binding DamageSection.Duration}"
+                                                                 DisplayFormat="{Binding EncounterTimeDisplayFormat}"
+                                                                 StableWidthScopeKey="{Binding EncounterContextId}" />
                                     <controls:MetricTile Grid.Column="2"
                                                          Classes="DetailBannerMetric"
                                                          Label="{markups:Translate Metric_Total}"
@@ -125,7 +123,8 @@
                                                                                                    Value="{Binding DamageAmount}" />
                                                                             <controls:NumericBlock Grid.Column="3"
                                                                                                    Classes="CounterpartMetricValue CounterpartMetricRate"
-                                                                                                   Value="{Binding DamageShare}" />
+                                                                                                   Value="{Binding DamageShare}"
+                                                                                                   Formatter="P1" />
                                                                         </Grid>
                                                                     </Border>
                                                                 </DataTemplate>
@@ -159,7 +158,7 @@
                                                           Label="{markups:Translate Metric_HitCount}"
                                                           PrimaryValue="{Binding DamageSection.Hits}"
                                                           SecondaryValue="{Binding DamageSection.HitRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricTile Grid.Column="3"
                                                      Classes="DetailLineMetric"
                                                      Label="{markups:Translate MetricShort_PeriodicHits}"
@@ -175,37 +174,37 @@
                                                           Label="{markups:Translate Stat_Critical}"
                                                           PrimaryValue="{Binding DamageSection.Criticals}"
                                                           SecondaryValue="{Binding DamageSection.CriticalRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="1"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_Smite}"
                                                           PrimaryValue="{Binding DamageSection.SmiteCount}"
                                                           SecondaryValue="{Binding DamageSection.SmiteRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="2"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_Perfect}"
                                                           PrimaryValue="{Binding DamageSection.PerfectCount}"
                                                           SecondaryValue="{Binding DamageSection.PerfectRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="3"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_MultiHit}"
                                                           PrimaryValue="{Binding DamageSection.MultiHitCount}"
                                                           SecondaryValue="{Binding DamageSection.MultiHitRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="4"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_Front}"
                                                           PrimaryValue="{Binding DamageSection.FrontCount}"
                                                           SecondaryValue="{Binding DamageSection.FrontRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="5"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_Back}"
                                                           PrimaryValue="{Binding DamageSection.BackCount}"
                                                           SecondaryValue="{Binding DamageSection.BackRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                             </Grid>
                         </Border>
 
@@ -217,25 +216,25 @@
                                                           Label="{markups:Translate Stat_Evade}"
                                                           PrimaryValue="{Binding DamageSection.Evades}"
                                                           SecondaryValue="{Binding DamageSection.EvadeRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="1"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_Invincible}"
                                                           PrimaryValue="{Binding DamageSection.Invincible}"
                                                           SecondaryValue="{Binding DamageSection.InvincibleRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="2"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_Endurance}"
                                                           PrimaryValue="{Binding DamageSection.EnduranceCount}"
                                                           SecondaryValue="{Binding DamageSection.EnduranceRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="3"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_Regeneration}"
                                                           PrimaryValue="{Binding DamageSection.RegenerationCount}"
                                                           SecondaryValue="{Binding DamageSection.RegenerationRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                             </Grid>
                         </Border>
 
@@ -247,25 +246,25 @@
                                                           Label="{markups:Translate Stat_Parry}"
                                                           PrimaryValue="{Binding DamageSection.ParryCount}"
                                                           SecondaryValue="{Binding DamageSection.ParryRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="1"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_PerfectParry}"
                                                           PrimaryValue="{Binding DamageSection.PerfectParryCount}"
                                                           SecondaryValue="{Binding DamageSection.PerfectParryRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="2"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_Block}"
                                                           PrimaryValue="{Binding DamageSection.BlockCount}"
                                                           SecondaryValue="{Binding DamageSection.BlockRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                                 <controls:MetricSplitTile Grid.Column="3"
                                                           Classes="DetailLineMetric"
                                                           Label="{markups:Translate Stat_PerfectBlock}"
                                                           PrimaryValue="{Binding DamageSection.PerfectBlockCount}"
                                                           SecondaryValue="{Binding DamageSection.PerfectBlockRate}"
-                                                          SecondaryUsePercentageNotation="True" />
+                                                          SecondaryFormatter="P1" />
                             </Grid>
                                 </Border>
                             </StackPanel>
@@ -459,7 +458,7 @@
                                             <controls:NumericBlock Grid.Column="6"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding AverageDamage}"
-                                                                   FractionDigits="1" />
+                                                                   Formatter="#,##0.#" />
                                             <controls:NumericBlock Grid.Column="7"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding Hits}" />
@@ -469,9 +468,7 @@
                                             <controls:NumericBlock Grid.Column="9"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding SharePercent}"
-                                                                   FractionDigits="1"
-                                                                   TrimTrailingZeros="False"
-                                                                   UsePercentageNotation="True" />
+                                                                   Formatter="P1" />
                                             <StackPanel Grid.Column="10"
                                                         Classes="DetailMetricPair"
                                                         Margin="0,2">
@@ -480,7 +477,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding CriticalRate}" />
+                                                                       Value="{Binding CriticalRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="11"
                                                         Classes="DetailMetricPair"
@@ -490,7 +488,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding PerfectRate}" />
+                                                                       Value="{Binding PerfectRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="12"
                                                         Classes="DetailMetricPair"
@@ -500,7 +499,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding SmiteRate}" />
+                                                                       Value="{Binding SmiteRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="13"
                                                         Classes="DetailMetricPair"
@@ -510,7 +510,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding MultiHitRate}" />
+                                                                       Value="{Binding MultiHitRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="14"
                                                         Classes="DetailMetricPair"
@@ -520,7 +521,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding FrontRate}" />
+                                                                       Value="{Binding FrontRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="15"
                                                         Classes="DetailMetricPair"
@@ -530,7 +532,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding BackRate}" />
+                                                                       Value="{Binding BackRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="16"
                                                         Classes="DetailMetricPair"
@@ -540,7 +543,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding ParryRate}" />
+                                                                       Value="{Binding ParryRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="17"
                                                         Classes="DetailMetricPair"
@@ -550,7 +554,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding PerfectParryRate}" />
+                                                                       Value="{Binding PerfectParryRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="18"
                                                         Classes="DetailMetricPair"
@@ -560,7 +565,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding BlockRate}" />
+                                                                       Value="{Binding BlockRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="19"
                                                         Classes="DetailMetricPair"
@@ -570,7 +576,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding PerfectBlockRate}" />
+                                                                       Value="{Binding PerfectBlockRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="20"
                                                         Classes="DetailMetricPair"
@@ -580,7 +587,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding EnduranceRate}" />
+                                                                       Value="{Binding EnduranceRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="21"
                                                         Classes="DetailMetricPair"
@@ -590,7 +598,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding RegenerationRate}" />
+                                                                       Value="{Binding RegenerationRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="22"
                                                         Classes="DetailMetricPair"
@@ -600,7 +609,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding EvadeRate}" />
+                                                                       Value="{Binding EvadeRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="23"
                                                         Classes="DetailMetricPair"
@@ -610,7 +620,8 @@
                                                 <TextBlock Classes="DetailMetricSlash"
                                                            Text="/" />
                                                 <controls:NumericBlock Classes="DetailMetricValue DetailMetricRate"
-                                                                       Value="{Binding InvincibleRate}" />
+                                                                       Value="{Binding InvincibleRate}"
+                                                                       Formatter="P1" />
                                             </StackPanel>
                                             <controls:NumericBlock Grid.Column="24"
                                                                    Classes="DetailRowValue"

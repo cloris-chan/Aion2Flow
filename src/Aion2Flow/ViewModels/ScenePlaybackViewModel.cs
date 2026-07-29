@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -32,6 +33,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private readonly ScenePlaybackController _controller;
     private readonly PlaybackSeekCoordinator _seekCoordinator;
     private readonly IScenePlaybackSource _source;
+    private readonly SettingsFlyoutViewModel _settings;
     private SceneCombatSnapshot _sceneDescriptorSnapshot;
     private readonly UiFrameBatchService _frameBatchService;
     private readonly Dictionary<int, EntityVitalState> _vitalScratch = [];
@@ -85,36 +87,52 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private long _timelineProjectionGeneration;
     private long _lastAuraTimelineEndObservationOrdinalExclusive;
 
-    public ScenePlaybackViewModel(IScenePlaybackSource source, SceneDisplayContext displayContext, LocalizationService localization)
-        : this(source, displayContext, localization, Ioc.Default.GetRequiredService<IScenePlaybackTickSourceFactory>())
+    public ScenePlaybackViewModel(
+        IScenePlaybackSource source,
+        SceneDisplayContext displayContext,
+        LocalizationService localization,
+        SettingsFlyoutViewModel settings)
+        : this(
+            source,
+            displayContext,
+            localization,
+            Ioc.Default.GetRequiredService<IScenePlaybackTickSourceFactory>(),
+            Ioc.Default.GetRequiredService<UiFrameBatchService>(),
+            settings)
     {
     }
 
-    internal ScenePlaybackViewModel(IScenePlaybackSource source, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory)
-        : this(source, displayContext, localization, tickSourceFactory, Ioc.Default.GetRequiredService<UiFrameBatchService>())
-    {
-    }
-
-    internal ScenePlaybackViewModel(IScenePlaybackSource source, SceneDisplayContext displayContext, LocalizationService localization, IScenePlaybackTickSourceFactory tickSourceFactory, UiFrameBatchService frameBatchService)
+    internal ScenePlaybackViewModel(
+        IScenePlaybackSource source,
+        SceneDisplayContext displayContext,
+        LocalizationService localization,
+        IScenePlaybackTickSourceFactory tickSourceFactory,
+        UiFrameBatchService frameBatchService,
+        SettingsFlyoutViewModel settings)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(displayContext);
         ArgumentNullException.ThrowIfNull(localization);
         ArgumentNullException.ThrowIfNull(tickSourceFactory);
         ArgumentNullException.ThrowIfNull(frameBatchService);
+        ArgumentNullException.ThrowIfNull(settings);
         _source = source;
+        _settings = settings;
         _sceneDescriptorSnapshot = source.CreateSnapshot();
         _frameBatchService = frameBatchService;
         DisplayContext = displayContext;
         Localization = localization;
         CombatantDetails = new CombatantDetailsFlyoutViewModel(localization, frameBatchService)
         {
-            DisplayContext = displayContext
+            DisplayContext = displayContext,
+            EncounterTimeDisplayFormat =
+                settings.EncounterTimeDisplayFormat
         };
         _controller = new ScenePlaybackController(_source, tickSourceFactory, ScenePlaybackControllerOptions.Default);
         _seekCoordinator = new PlaybackSeekCoordinator(SeekCoreAsync, ReportSeekError, ReportSeekIdle);
         _controller.FrameChanged += OnFrameChanged;
         Localization.LanguageChanged += OnLanguageChanged;
+        _settings.PropertyChanged += OnSettingsPropertyChanged;
         SceneName = displayContext.ResolveSceneName(_sceneDescriptorSnapshot.Kind, _sceneDescriptorSnapshot.MapId, _sceneDescriptorSnapshot.BossNpcCodes);
         WindowTitle = string.Format(CultureInfo.CurrentCulture, Localization["Playback_WindowTitleFormat"], SceneName);
         SceneStartedText = source.SceneStarted.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
@@ -1909,6 +1927,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _auraTimelineCancellation?.Cancel();
         _liveRefreshCancellation?.Cancel();
         Localization.LanguageChanged -= OnLanguageChanged;
+        _settings.PropertyChanged -= OnSettingsPropertyChanged;
         _controller.FrameChanged -= OnFrameChanged;
         await _seekCoordinator.DisposeAsync().ConfigureAwait(false);
         if (_detailTask is not null)
@@ -2006,6 +2025,15 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         OnPropertyChanged(nameof(EventScopeCategoryText));
         OnPropertyChanged(nameof(EventScopeSkillText));
         ApplyFrame(_currentFrame, _controller.State);
+    }
+
+    private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SettingsFlyoutViewModel.EncounterTimeDisplayFormat))
+        {
+            CombatantDetails.EncounterTimeDisplayFormat =
+                _settings.EncounterTimeDisplayFormat;
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia.Threading;
+using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
@@ -52,7 +53,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             ShowDamagePerSecondColumn = persisted.ShowDamagePerSecondColumn;
             ShowDamageColumn = persisted.ShowDamageColumn;
             ShowTotalDamagePerSecond = persisted.ShowTotalDamagePerSecond;
+            EncounterTimeDisplayFormat = persisted.EncounterTimeDisplayFormat;
             ShowFocusStatusBar = persisted.ShowFocusStatusBar;
+            HideHeaderWhenClickThrough = persisted.HideHeaderWhenClickThrough;
             ShowPlayerNames = persisted.ShowPlayerNames;
             PlayerSelfMarkerDisplayMode = persisted.PlayerSelfMarkerDisplayMode;
             ShowPlayerShortServerName = persisted.ShowPlayerShortServerName;
@@ -103,6 +106,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public IReadOnlyList<SceneKind> SceneKindOptions { get; } = [SceneKind.Standard, SceneKind.Boss];
 
+    public IReadOnlyList<EncounterTimeDisplayFormat> EncounterTimeDisplayFormatOptions { get; } =
+        [EncounterTimeDisplayFormat.DecimalSeconds, EncounterTimeDisplayFormat.MinutesSeconds];
+
     public IReadOnlyList<PlayerSelfMarkerDisplayMode> PlayerSelfMarkerDisplayModeOptions { get; } = [PlayerSelfMarkerDisplayMode.Always, PlayerSelfMarkerDisplayMode.WhenNamesHidden, PlayerSelfMarkerDisplayMode.Hidden];
 
     [ObservableProperty]
@@ -150,8 +156,16 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public partial bool ShowTotalDamagePerSecond { get; set; } = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EncounterTimeDisplayFormatDisplay))]
+    public partial EncounterTimeDisplayFormat EncounterTimeDisplayFormat { get; set; } = EncounterTimeDisplayFormat.DecimalSeconds;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowFocusStatusBarDisplay))]
     public partial bool ShowFocusStatusBar { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HideHeaderWhenClickThroughDisplay))]
+    public partial bool HideHeaderWhenClickThrough { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowPlayerNamesDisplay))]
@@ -265,7 +279,11 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public string MainMetricVisibilityDisplay => $"{Convert.ToInt32(ShowDamagePerSecondColumn) + Convert.ToInt32(ShowDamageColumn) + Convert.ToInt32(ShowTotalDamagePerSecond)}/3";
 
+    public string EncounterTimeDisplayFormatDisplay => Localization[$"Settings_TimeDisplayFormat_{EncounterTimeDisplayFormat}"];
+
     public string ShowFocusStatusBarDisplay => Localization[ShowFocusStatusBar ? "Settings_FocusStatusBar_On" : "Settings_FocusStatusBar_Off"];
+
+    public string HideHeaderWhenClickThroughDisplay => Localization[HideHeaderWhenClickThrough ? "Settings_HideHeaderWhenClickThrough_On" : "Settings_HideHeaderWhenClickThrough_Off"];
 
     public string ShowPlayerNamesDisplay => Localization[ShowPlayerNames ? "Settings_ShowPlayerNames_On" : "Settings_ShowPlayerNames_Off"];
 
@@ -346,7 +364,11 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     partial void OnShowTotalDamagePerSecondChanged(bool value) => PersistSettings();
 
+    partial void OnEncounterTimeDisplayFormatChanged(EncounterTimeDisplayFormat value) => PersistSettings();
+
     partial void OnShowFocusStatusBarChanged(bool value) => PersistSettings();
+
+    partial void OnHideHeaderWhenClickThroughChanged(bool value) => PersistSettings();
 
     partial void OnShowPlayerNamesChanged(bool value)
     {
@@ -550,7 +572,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.ShowDamagePerSecondColumn = ShowDamagePerSecondColumn;
             s.ShowDamageColumn = ShowDamageColumn;
             s.ShowTotalDamagePerSecond = ShowTotalDamagePerSecond;
+            s.EncounterTimeDisplayFormat = EncounterTimeDisplayFormat;
             s.ShowFocusStatusBar = ShowFocusStatusBar;
+            s.HideHeaderWhenClickThrough = HideHeaderWhenClickThrough;
             s.ShowPlayerNames = ShowPlayerNames;
             s.PlayerSelfMarkerDisplayMode = PlayerSelfMarkerDisplayMode;
             s.ShowPlayerShortServerName = ShowPlayerShortServerName;
@@ -583,7 +607,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowDamageColumnDisplay));
         OnPropertyChanged(nameof(ShowTotalDamagePerSecondDisplay));
         OnPropertyChanged(nameof(MainMetricVisibilityDisplay));
+        OnPropertyChanged(nameof(EncounterTimeDisplayFormatDisplay));
         OnPropertyChanged(nameof(ShowFocusStatusBarDisplay));
+        OnPropertyChanged(nameof(HideHeaderWhenClickThroughDisplay));
         OnPropertyChanged(nameof(ShowPlayerNamesDisplay));
         OnPropertyChanged(nameof(PlayerSelfMarkerDisplayModeDisplay));
         OnPropertyChanged(nameof(ShowPlayerShortServerNameDisplay));

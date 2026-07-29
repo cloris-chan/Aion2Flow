@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.Protocol.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -74,6 +75,21 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     public ResourceDetailSectionViewModel OutgoingResource => OutgoingDetail.ResourceSection;
 
     public ResourceDetailSectionViewModel IncomingResource => IncomingDetail.ResourceSection;
+
+    public EncounterTimeDisplayFormat EncounterTimeDisplayFormat
+    {
+        get => OutgoingDetail.EncounterTimeDisplayFormat;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, null);
+            }
+
+            OutgoingDetail.EncounterTimeDisplayFormat = value;
+            IncomingDetail.EncounterTimeDisplayFormat = value;
+        }
+    }
 
     public void SynchronizeSkillSelection(bool isOutgoing, CombatContributionCategory category, SkillBaseKey baseKey)
     {
@@ -179,7 +195,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
 
     public void Clear()
     {
-        _encounterContextId = Guid.Empty;
+        SetEncounterContextId(Guid.Empty);
         _combatantId = null;
         _currentSnapshot = new SceneCombatSnapshot();
         ClearDetailEvents();
@@ -256,7 +272,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             !snapshot.Combatants.ContainsKey(combatantId.Value) && detail.Combatant is null &&
             detail.MetricEvents.Count == 0 && detail.MechanicEvents.Count == 0 && detail.ResourceEvents.Count == 0)
         {
-            _encounterContextId = encounterContextId;
+            SetEncounterContextId(encounterContextId);
             _combatantId = combatantId;
             _currentSnapshot = new SceneCombatSnapshot();
             ClearDetailEvents();
@@ -272,7 +288,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             _combatantId == combatantId &&
             _detailRevision == nextDetailRevision;
 
-        _encounterContextId = encounterContextId;
+        SetEncounterContextId(encounterContextId);
         _combatantId = combatantId;
         _currentSnapshot = snapshot;
         SelectedCombatantId = combatantId.Value;
@@ -299,7 +315,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             encounterContextId == Guid.Empty ||
             !snapshot.Combatants.ContainsKey(combatantId.Value) && update.Combatant is null && !HasDetailEvents)
         {
-            _encounterContextId = encounterContextId;
+            SetEncounterContextId(encounterContextId);
             _combatantId = combatantId;
             _currentSnapshot = new SceneCombatSnapshot();
             ClearDetailEvents();
@@ -316,7 +332,7 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
             !update.IsFullSnapshot &&
             !update.HasChanges;
 
-        _encounterContextId = encounterContextId;
+        SetEncounterContextId(encounterContextId);
         _combatantId = combatantId;
         _currentSnapshot = snapshot;
         SelectedCombatantId = combatantId.Value;
@@ -699,10 +715,10 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         else
             SkillDetailRowBuilder.BuildHealingRows(metrics, aggregation.EventCounts, DisplayContext, _localization, _sectionRows, _sectionRowIndexes);
 
-        var durationSeconds = aggregation.HasSubsetFilter
-            ? ResolveObservedDurationSeconds(aggregation.FirstObserved, aggregation.LastObserved)
-            : ResolveSceneDurationSeconds();
-        SkillDetailSectionSummaryApplier.Apply(section, metrics, _sectionRows, sectionKind, durationSeconds, !aggregation.HasSubsetFilter);
+        var duration = aggregation.HasSubsetFilter
+            ? ResolveObservedDuration(aggregation.FirstObserved, aggregation.LastObserved)
+            : ResolveSceneDuration();
+        SkillDetailSectionSummaryApplier.Apply(section, metrics, _sectionRows, sectionKind, duration, !aggregation.HasSubsetFilter);
     }
 
     private void ApplyResourceSection(ResourceDetailSectionViewModel section, ResourceDetailSectionAggregation aggregation)
@@ -716,11 +732,15 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
         ResourceDetailRowBuilder.ApplySummary(section, _resourceSectionRows);
     }
 
-    private double ResolveSceneDurationSeconds()
-        => _currentSnapshot.EncounterTime > 0 ? Math.Max(1d, _currentSnapshot.EncounterTime / 1000d) : 0d;
+    private TimeSpan ResolveSceneDuration()
+        => _currentSnapshot.EncounterTime > 0
+            ? TimeSpan.FromMilliseconds(Math.Max(1_000L, _currentSnapshot.EncounterTime))
+            : TimeSpan.Zero;
 
-    private static double ResolveObservedDurationSeconds(long firstObserved, long lastObserved)
-        => firstObserved != long.MaxValue && lastObserved != long.MinValue ? Math.Max(1d, Math.Max(0, lastObserved - firstObserved) / 1000d) : 0d;
+    private static TimeSpan ResolveObservedDuration(long firstObserved, long lastObserved)
+        => firstObserved != long.MaxValue && lastObserved != long.MinValue
+            ? TimeSpan.FromMilliseconds(Math.Max(1_000L, Math.Max(0L, lastObserved - firstObserved)))
+            : TimeSpan.Zero;
 
     private void RefreshSectionRatesOnly()
     {
@@ -736,10 +756,18 @@ public sealed partial class CombatantDetailsFlyoutViewModel : ObservableObject, 
     {
         if (section.UsesSceneDuration)
         {
-            section.DurationSeconds = ResolveSceneDurationSeconds();
+            section.Duration = ResolveSceneDuration();
         }
 
-        section.PerSecond = section.DurationSeconds > 0 ? section.Total / section.DurationSeconds : 0d;
+        var durationSeconds = section.Duration.TotalSeconds;
+        section.PerSecond = durationSeconds > 0d ? section.Total / durationSeconds : 0d;
+    }
+
+    private void SetEncounterContextId(Guid encounterContextId)
+    {
+        _encounterContextId = encounterContextId;
+        OutgoingDetail.EncounterContextId = encounterContextId;
+        IncomingDetail.EncounterContextId = encounterContextId;
     }
 
     private void ClearSectionsOnly()

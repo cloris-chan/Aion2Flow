@@ -12,20 +12,14 @@
                         Spacing="4">
                 <controls:NumericBlock Classes="MetricSplitValue"
                                        Value="{Binding PrimaryValue, ElementName=Root}"
-                                       FractionDigits="{Binding PrimaryFractionDigits, ElementName=Root}"
-                                       TrimTrailingZeros="{Binding PrimaryTrimTrailingZeros, ElementName=Root}"
-                                       UseGrouping="{Binding PrimaryUseGrouping, ElementName=Root}"
-                                       UsePercentageNotation="{Binding PrimaryUsePercentageNotation, ElementName=Root}"
+                                       Formatter="{Binding PrimaryFormatter, ElementName=Root}"
                                        Prefix="{Binding PrimaryPrefix, ElementName=Root}"
                                        Suffix="{Binding PrimarySuffix, ElementName=Root}" />
                 <TextBlock Classes="MetricSplitSlash"
                            Text="/" />
                 <controls:NumericBlock Classes="MetricSplitSecondary"
                                        Value="{Binding SecondaryValue, ElementName=Root}"
-                                       FractionDigits="{Binding SecondaryFractionDigits, ElementName=Root}"
-                                       TrimTrailingZeros="{Binding SecondaryTrimTrailingZeros, ElementName=Root}"
-                                       UseGrouping="{Binding SecondaryUseGrouping, ElementName=Root}"
-                                       UsePercentageNotation="{Binding SecondaryUsePercentageNotation, ElementName=Root}"
+                                       Formatter="{Binding SecondaryFormatter, ElementName=Root}"
                                        Prefix="{Binding SecondaryPrefix, ElementName=Root}"
                                        Suffix="{Binding SecondarySuffix, ElementName=Root}" />
             </StackPanel>

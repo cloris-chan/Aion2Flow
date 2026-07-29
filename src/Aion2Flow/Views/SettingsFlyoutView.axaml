@@ -32,6 +32,9 @@
                 <MenuItem x:Name="MainMetricVisibilityMenuItem"
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="MainMetricVisibilityMenuItemLoaded" />
+                <MenuItem x:Name="EncounterTimeDisplayFormatMenuItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
+                          Loaded="EncounterTimeDisplayFormatMenuItemLoaded" />
                 <MenuItem x:Name="SceneKindMenuItem"
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="SceneKindMenuItemLoaded" />
@@ -43,6 +46,10 @@
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="FocusStatusBarMenuItemLoaded"
                           Click="FocusStatusBarMenuItemClicked" />
+                <MenuItem x:Name="HideHeaderWhenClickThroughMenuItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
+                          Loaded="HideHeaderWhenClickThroughMenuItemLoaded"
+                          Click="HideHeaderWhenClickThroughMenuItemClicked" />
                 <MenuItem x:Name="PlayerNameSettingsMenuItem"
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="PlayerNameSettingsMenuItemLoaded" />

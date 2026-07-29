@@ -34,12 +34,18 @@
   <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>底部總秒傷</value></data>
   <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>顯示</value></data>
   <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>隱藏</value></data>
+  <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>時間格式</value></data>
+  <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
+  <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
   <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>主數值緊湊顯示</value></data>
   <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>開啟</value></data>
   <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>目標狀態條</value></data>
   <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>開啟</value></data>
   <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>關閉</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>點擊穿透時標題列</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>隱藏</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>顯示</value></data>
   <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>名稱顯示</value></data>
   <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>顯示</value></data>
   <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>隱藏</value></data>

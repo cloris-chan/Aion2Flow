@@ -149,19 +149,19 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var snapshot = scene.CreateSnapshot();
         SelectSceneCombatant(viewModel, scene, snapshot, playerId);
 
-        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingDamage.DurationSeconds, 10);
-        Assert.Equal(2500d / viewModel.OutgoingDamage.DurationSeconds, viewModel.OutgoingDamage.PerSecond, 10);
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingDamage.Duration.TotalSeconds, 10);
+        Assert.Equal(2500d / viewModel.OutgoingDamage.Duration.TotalSeconds, viewModel.OutgoingDamage.PerSecond, 10);
 
         SelectCounterparts(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId, addId);
 
         Assert.Equal(2000, viewModel.OutgoingDamage.Total);
-        Assert.Equal(40d, viewModel.OutgoingDamage.DurationSeconds, 10);
+        Assert.Equal(40d, viewModel.OutgoingDamage.Duration.TotalSeconds, 10);
         Assert.Equal(50d, viewModel.OutgoingDamage.PerSecond, 10);
 
         SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
 
         Assert.Equal(1000, viewModel.OutgoingDamage.Total);
-        Assert.Equal(10d, viewModel.OutgoingDamage.DurationSeconds, 10);
+        Assert.Equal(10d, viewModel.OutgoingDamage.Duration.TotalSeconds, 10);
         Assert.Equal(100d, viewModel.OutgoingDamage.PerSecond, 10);
     }
 
@@ -213,30 +213,30 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         var snapshot = scene.CreateSnapshot();
         SelectSceneCombatant(viewModel, scene, snapshot, playerId);
 
-        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingHealing.DurationSeconds, 10);
-        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingShield.DurationSeconds, 10);
-        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.IncomingHealing.DurationSeconds, 10);
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingHealing.Duration.TotalSeconds, 10);
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingShield.Duration.TotalSeconds, 10);
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.IncomingHealing.Duration.TotalSeconds, 10);
 
         SelectCounterparts(viewModel.OutgoingDetail.HealingCounterpartFilter, allyOneId, allyTwoId);
 
         Assert.Equal(2000, viewModel.OutgoingHealing.Total);
-        Assert.Equal(40d, viewModel.OutgoingHealing.DurationSeconds, 10);
+        Assert.Equal(40d, viewModel.OutgoingHealing.Duration.TotalSeconds, 10);
         Assert.Equal(50d, viewModel.OutgoingHealing.PerSecond, 10);
         Assert.Equal(1500, viewModel.OutgoingShield.Total);
-        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingShield.DurationSeconds, 10);
+        Assert.Equal(snapshot.EncounterTime / 1000d, viewModel.OutgoingShield.Duration.TotalSeconds, 10);
 
         SelectCounterparts(viewModel.OutgoingDetail.ShieldCounterpartFilter, allyTwoId, allyThreeId);
 
         Assert.Equal(2000, viewModel.OutgoingHealing.Total);
-        Assert.Equal(40d, viewModel.OutgoingHealing.DurationSeconds, 10);
+        Assert.Equal(40d, viewModel.OutgoingHealing.Duration.TotalSeconds, 10);
         Assert.Equal(900, viewModel.OutgoingShield.Total);
-        Assert.Equal(30d, viewModel.OutgoingShield.DurationSeconds, 10);
+        Assert.Equal(30d, viewModel.OutgoingShield.Duration.TotalSeconds, 10);
         Assert.Equal(30d, viewModel.OutgoingShield.PerSecond, 10);
 
         SelectCounterparts(viewModel.IncomingDetail.HealingCounterpartFilter, healerOneId, healerTwoId);
 
         Assert.Equal(1600, viewModel.IncomingHealing.Total);
-        Assert.Equal(40d, viewModel.IncomingHealing.DurationSeconds, 10);
+        Assert.Equal(40d, viewModel.IncomingHealing.Duration.TotalSeconds, 10);
         Assert.Equal(40d, viewModel.IncomingHealing.PerSecond, 10);
     }
 
@@ -265,7 +265,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         SelectOnlyCounterpart(viewModel.OutgoingDetail.DamageCounterpartFilter, bossId);
 
         Assert.Equal(700, viewModel.OutgoingDamage.Total);
-        Assert.Equal(1d, viewModel.OutgoingDamage.DurationSeconds, 10);
+        Assert.Equal(1d, viewModel.OutgoingDamage.Duration.TotalSeconds, 10);
         Assert.Equal(700d, viewModel.OutgoingDamage.PerSecond, 10);
     }
 
@@ -300,7 +300,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         SelectOnlyCounterpart(viewModel.OutgoingDetail.HealingCounterpartFilter, allyId);
 
         Assert.Equal(1000, viewModel.OutgoingHealing.Total);
-        Assert.Equal(1d, viewModel.OutgoingHealing.DurationSeconds, 10);
+        Assert.Equal(1d, viewModel.OutgoingHealing.Duration.TotalSeconds, 10);
         Assert.Equal(1000d, viewModel.OutgoingHealing.PerSecond, 10);
     }
 

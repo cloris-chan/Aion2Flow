@@ -38,15 +38,13 @@
                                                          Classes="DetailBannerMetric"
                                                          Label="{markups:Translate Metric_Hps}"
                                                          Value="{Binding HealingSection.PerSecond}"
-                                                         FractionDigits="1"
-                                                         TrimTrailingZeros="False" />
-                                    <controls:MetricTile Grid.Column="1"
-                                                         Classes="DetailBannerMetric"
-                                                         Label="{markups:Translate Metric_Duration}"
-                                                         Value="{Binding HealingSection.DurationSeconds}"
-                                                         FractionDigits="1"
-                                                         TrimTrailingZeros="False"
-                                                         Suffix="s" />
+                                                         Formatter="N1" />
+                                    <controls:DurationMetricTile Grid.Column="1"
+                                                                 Classes="DetailBannerMetric"
+                                                                 Label="{markups:Translate Metric_Duration}"
+                                                                 Duration="{Binding HealingSection.Duration}"
+                                                                 DisplayFormat="{Binding EncounterTimeDisplayFormat}"
+                                                                 StableWidthScopeKey="{Binding EncounterContextId}" />
                                     <controls:MetricTile Grid.Column="2"
                                                          Classes="DetailBannerMetric"
                                                          Label="{markups:Translate Metric_TotalHealing}"
@@ -119,7 +117,8 @@
                                                                                                    Value="{Binding HealingAmount}" />
                                                                             <controls:NumericBlock Grid.Column="3"
                                                                                                    Classes="CounterpartMetricValue CounterpartMetricRate"
-                                                                                                   Value="{Binding HealingShare}" />
+                                                                                                   Value="{Binding HealingShare}"
+                                                                                                   Formatter="P1" />
                                                                         </Grid>
                                                                     </Border>
                                                                 </DataTemplate>
@@ -278,9 +277,7 @@
                                             <controls:NumericBlock Grid.Column="6"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding SharePercent}"
-                                                                   FractionDigits="1"
-                                                                   TrimTrailingZeros="False"
-                                                                   UsePercentageNotation="True" />
+                                                                   Formatter="P1" />
                                             <controls:NumericBlock Grid.Column="7"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding EventCount}" />

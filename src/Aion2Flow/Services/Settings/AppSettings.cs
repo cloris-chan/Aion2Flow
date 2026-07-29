@@ -1,4 +1,5 @@
 using System.Drawing;
+using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.ViewModels;
 
@@ -24,7 +25,17 @@ public sealed class AppSettings
 
     public bool ShowTotalDamagePerSecond { get; set; } = true;
 
+    public EncounterTimeDisplayFormat EncounterTimeDisplayFormat
+    {
+        get;
+        set => field = Enum.IsDefined(value)
+            ? value
+            : EncounterTimeDisplayFormat.DecimalSeconds;
+    } = EncounterTimeDisplayFormat.DecimalSeconds;
+
     public bool ShowFocusStatusBar { get; set; } = true;
+
+    public bool HideHeaderWhenClickThrough { get; set; }
 
     public bool ShowPlayerNames { get; set; } = true;
 

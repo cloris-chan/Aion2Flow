@@ -38,48 +38,61 @@
                       ColumnDefinitions="Auto,*,Auto"
                       ColumnSpacing="2"
                       Margin="1,0">
-                    <Button Grid.Column="0"
-                            Classes="WindowBtn RefreshBtn"
-                            Command="{Binding ResetCommand}"
-                            IsEnabled="{Binding IsCapturing}"
-                            VerticalAlignment="Center"
-                            ToolTip.Tip="{markups:Translate Action_BattleReset}">
-                        <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
-                    </Button>
+                    <StackPanel Grid.Column="0"
+                                Classes="TitleBarActions"
+                                Orientation="Horizontal"
+                                Spacing="2">
+                        <Button Classes="WindowBtn RefreshBtn"
+                                Command="{Binding ResetCommand}"
+                                IsEnabled="{Binding IsCapturing}"
+                                Margin="0,0,4,0"
+                                ToolTip.Tip="{markups:Translate Action_BattleReset}">
+                            <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
+                        </Button>
+
+                        <Button Classes="WindowBtn"
+                                IsEnabled="{Binding IsViewingArchivedEncounter}"
+                                Command="{Binding ReturnToLiveCommand}"
+                                ToolTip.Tip="{markups:Translate Action_Live}">
+                            <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
+                        </Button>
+
+                        <Button Classes="WindowBtn"
+                                Click="OpenCurrentPlayback"
+                                ToolTip.Tip="{markups:Translate Playback_Open}">
+                            <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
+                        </Button>
+
+                        <Button x:Name="EncounterHistoryButton"
+                                Classes="WindowBtn"
+                                IsEnabled="{Binding HasArchivedEncounters}"
+                                ToolTip.Tip="{markups:Translate Column_History}">
+                            <Path Classes="Glyph GlyphMd" Data="{StaticResource history}" />
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft"
+                                            ShowMode="Transient"
+                                            FlyoutPresenterClasses="EncounterHistoryMenuFlyout" />
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
 
                     <Border Grid.Column="1"
                             Classes="TitleBarDragRegion"
                             PointerPressed="TitleBarDragRegionPointerPressed">
-                        <Grid ColumnDefinitions="*,Auto"
-                              ColumnSpacing="8"
-                              IsHitTestVisible="False">
-                            <TextBlock Grid.Column="0"
-                                       Classes="OverlayHeaderScene"
-                                       Text="{Binding SceneName}"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center" />
-                            <controls:NumericBlock Grid.Column="1"
-                                                   Classes="OverlayHeaderMetric"
-                                                   Value="{Binding EncounterTimeSeconds}"
-                                                   FractionDigits="1"
-                                                   TrimTrailingZeros="False"
-                                                   Suffix="s"
-                                                   TextAlignment="Right"
-                                                   StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
-                                                   VerticalAlignment="Center" />
-                        </Grid>
+                        <controls:MapDisplay Classes="OverlayHeaderScene"
+                                             MapId="{Binding LiveSceneMapId}"
+                                             ShowIcon="False"
+                                             UseBrackets="False"
+                                             MinWidth="0"
+                                             IsHitTestVisible="False"
+                                             HorizontalAlignment="Stretch"
+                                             VerticalAlignment="Center" />
                     </Border>
 
                     <StackPanel Grid.Column="2"
                                 Classes="TitleBarActions"
                                 Orientation="Horizontal"
                                 Spacing="2">
-                        <Border x:Name="OverlayPinSlot"
-                                Width="26"
-                                Height="26"
-                                VerticalAlignment="Center"
-                                IsHitTestVisible="False" />
-
                         <Button Classes="WindowBtn MinBtn"
                                 Click="Minimize">
                             <Path Classes="Glyph GlyphSm" Data="{StaticResource minus}" />
@@ -150,7 +163,7 @@
                                 <controls:NumericBlock Grid.Column="1"
                                                        Classes="BossFocusHp"
                                                        Value="{Binding Hp}"
-                                                       UseGrouping="True"
+                                                       Formatter="N0"
                                                        UseCompactNotation="{Binding $parent[Window].DataContext.CombatantColumns.UseCompactMainMetrics}"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3"
@@ -165,7 +178,7 @@
                                 <controls:NumericBlock Grid.Column="2"
                                                        Classes="BossFocusHpMuted"
                                                        Value="{Binding MaxHp}"
-                                                       UseGrouping="True"
+                                                       Formatter="N0"
                                                        UseCompactNotation="{Binding $parent[Window].DataContext.CombatantColumns.UseCompactMainMetrics}"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3"
@@ -185,8 +198,7 @@
                                 <controls:NumericBlock Grid.Column="3"
                                                        Classes="BossFocusPercent"
                                                        Value="{Binding HpRatio}"
-                                                       UsePercentageNotation="True"
-                                                       FractionDigits="0"
+                                                       Formatter="P0"
                                                        IsVisible="{Binding IsMaxHpVisible}"
                                                        VerticalAlignment="Center" />
                             </Grid>
@@ -252,7 +264,7 @@
                                                        VerticalAlignment="Center"
                                                        StableWidthScopeKey="{Binding Id}"
                                                        UseCompactNotation="{Binding Columns.UseCompactMainMetrics}"
-                                                       UseGrouping="True"
+                                                       Formatter="N0"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3"
                                                        Margin="6,0,0,0"
@@ -265,7 +277,7 @@
                                                        VerticalAlignment="Center"
                                                        StableWidthScopeKey="{Binding Id}"
                                                        UseCompactNotation="{Binding Columns.UseCompactMainMetrics}"
-                                                       UseGrouping="True"
+                                                       Formatter="N0"
                                                        CompactThreshold="1000"
                                                        CompactSignificantDigits="3"
                                                        Margin="6,0,0,0" />
@@ -274,9 +286,7 @@
                                                        Classes="CombatantBossShareValue"
                                                        Value="{Binding BossShareRatio}"
                                                        IsVisible="{Binding Columns.ShowBossShareColumn}"
-                                                       UsePercentageNotation="True"
-                                                       FractionDigits="1"
-                                                       TrimTrailingZeros="False"
+                                                       Formatter="P1"
                                                        Margin="6,0,0,0"
                                                        VerticalAlignment="Center" />
                             </Grid>
@@ -365,7 +375,7 @@
                                            IsVisible="{Binding CombatantColumns.ShowTotalDamagePerSecond}"
                                            Value="{Binding TotalFilteredDamagePerSecond}"
                                            Suffix="/s"
-                                           UseGrouping="True"
+                                           Formatter="N0"
                                            UseCompactNotation="{Binding CombatantColumns.UseCompactMainMetrics}"
                                            CompactThreshold="1000"
                                            CompactSignificantDigits="3"
@@ -374,31 +384,19 @@
                                            TextAlignment="Right"
                                            VerticalAlignment="Center" />
 
-                    <Button Classes="BottomBarButton"
-                            IsVisible="{Binding IsViewingArchivedEncounter}"
-                            IsEnabled="{Binding IsViewingArchivedEncounter}"
-                            Command="{Binding ReturnToLiveCommand}"
-                            ToolTip.Tip="{markups:Translate Action_Live}">
-                        <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
-                    </Button>
+                    <controls:DurationBlock Classes="BottomBarMetric"
+                                            Duration="{Binding EncounterDuration}"
+                                            DisplayFormat="{Binding SettingsFlyout.EncounterTimeDisplayFormat}"
+                                            StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
+                                            Margin="0,0,3,0"
+                                            VerticalAlignment="Center"
+                                            ToolTip.Tip="{markups:Translate Metric_Duration}" />
 
-                    <Button Classes="BottomBarButton"
-                            Click="OpenCurrentPlayback"
-                            ToolTip.Tip="{markups:Translate Playback_Open}">
-                        <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
-                    </Button>
-
-                    <Button x:Name="EncounterHistoryButton"
-                            Classes="BottomBarButton"
-                            IsEnabled="{Binding HasArchivedEncounters}"
-                            ToolTip.Tip="{markups:Translate Column_History}">
-                        <Path Classes="Glyph GlyphMd" Data="{StaticResource history}" />
-                        <Button.Flyout>
-                            <MenuFlyout Placement="TopEdgeAlignedRight"
-                                        ShowMode="Transient"
-                                        FlyoutPresenterClasses="BottomBarHistoryMenuFlyout" />
-                        </Button.Flyout>
-                    </Button>
+                    <Border x:Name="OverlayPinSlot"
+                            Width="26"
+                            Height="26"
+                            VerticalAlignment="Center"
+                            IsHitTestVisible="False" />
                 </StackPanel>
 
             </Grid>

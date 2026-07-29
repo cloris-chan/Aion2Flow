@@ -1599,6 +1599,17 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Click-through title bar.
+        /// </summary>
+        internal static string Settings_ClickThroughTitleBar
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_ClickThroughTitleBar", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Sort By.
         /// </summary>
         internal static string Settings_CombatantSortMetric
@@ -1727,6 +1738,28 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Settings_FocusStatusBar_On", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Show.
+        /// </summary>
+        internal static string Settings_HideHeaderWhenClickThrough_Off
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_HideHeaderWhenClickThrough_Off", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Hide.
+        /// </summary>
+        internal static string Settings_HideHeaderWhenClickThrough_On
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_HideHeaderWhenClickThrough_On", resourceCulture);
             }
         }
 
@@ -2112,6 +2145,39 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Settings_ShowPlayerNames_On", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Time format.
+        /// </summary>
+        internal static string Settings_TimeDisplayFormat
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_TimeDisplayFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to 68.3s.
+        /// </summary>
+        internal static string Settings_TimeDisplayFormat_DecimalSeconds
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_TimeDisplayFormat_DecimalSeconds", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to 01:08.
+        /// </summary>
+        internal static string Settings_TimeDisplayFormat_MinutesSeconds
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_TimeDisplayFormat_MinutesSeconds", resourceCulture);
             }
         }
 

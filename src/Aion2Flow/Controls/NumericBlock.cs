@@ -41,23 +41,17 @@ public sealed class NumericBlock : Control
             control => control.Value,
             (control, value) => control.Value = value);
 
-    public static readonly StyledProperty<int> FractionDigitsProperty =
-        AvaloniaProperty.Register<NumericBlock, int>(nameof(FractionDigits), 0);
-
-    public static readonly StyledProperty<bool> TrimTrailingZerosProperty =
-        AvaloniaProperty.Register<NumericBlock, bool>(nameof(TrimTrailingZeros), true);
-
-    public static readonly StyledProperty<bool> UseGroupingProperty =
-        AvaloniaProperty.Register<NumericBlock, bool>(nameof(UseGrouping), false);
+    public static readonly DirectProperty<NumericBlock, string?> FormatterProperty =
+        AvaloniaProperty.RegisterDirect<NumericBlock, string?>(
+            nameof(Formatter),
+            control => control.Formatter,
+            (control, value) => control.Formatter = value);
 
     public static readonly DirectProperty<NumericBlock, bool> UseCompactNotationProperty =
         AvaloniaProperty.RegisterDirect<NumericBlock, bool>(
             nameof(UseCompactNotation),
             control => control.UseCompactNotation,
             (control, value) => control.UseCompactNotation = value);
-
-    public static readonly StyledProperty<bool> UsePercentageNotationProperty =
-        AvaloniaProperty.Register<NumericBlock, bool>(nameof(UsePercentageNotation), false);
 
     public static readonly DirectProperty<NumericBlock, double> CompactThresholdProperty =
         AvaloniaProperty.RegisterDirect<NumericBlock, double>(
@@ -188,34 +182,16 @@ public sealed class NumericBlock : Control
         set => SetValue(ForegroundProperty, value);
     }
 
-    public int FractionDigits
+    public string? Formatter
     {
-        get => GetValue(FractionDigitsProperty);
-        set => SetValue(FractionDigitsProperty, value);
-    }
-
-    public bool TrimTrailingZeros
-    {
-        get => GetValue(TrimTrailingZerosProperty);
-        set => SetValue(TrimTrailingZerosProperty, value);
-    }
-
-    public bool UseGrouping
-    {
-        get => GetValue(UseGroupingProperty);
-        set => SetValue(UseGroupingProperty, value);
+        get;
+        set => SetAndRaise(FormatterProperty, ref field, value);
     }
 
     public bool UseCompactNotation
     {
         get;
         set => SetAndRaise(UseCompactNotationProperty, ref field, value);
-    }
-
-    public bool UsePercentageNotation
-    {
-        get => GetValue(UsePercentageNotationProperty);
-        set => SetValue(UsePercentageNotationProperty, value);
     }
 
     public double CompactThreshold
@@ -270,11 +246,8 @@ public sealed class NumericBlock : Control
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == FractionDigitsProperty ||
-            change.Property == TrimTrailingZerosProperty ||
-            change.Property == UseGroupingProperty ||
+        if (change.Property == FormatterProperty ||
             change.Property == UseCompactNotationProperty ||
-            change.Property == UsePercentageNotationProperty ||
             change.Property == CompactThresholdProperty ||
             change.Property == CompactSignificantDigitsProperty ||
             change.Property == PrefixProperty ||
@@ -418,13 +391,10 @@ public sealed class NumericBlock : Control
     private bool UpdateFormattedCharacters()
     {
         var formatOptions = new NumericFormatOptions(
-            FractionDigits,
-            TrimTrailingZeros,
-            UseGrouping,
             UseCompactNotation,
-            UsePercentageNotation,
             CompactThreshold,
             CompactSignificantDigits,
+            Formatter,
             Prefix,
             Suffix);
 

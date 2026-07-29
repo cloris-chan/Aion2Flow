@@ -34,12 +34,18 @@
   <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>하단 총 DPS</value></data>
   <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>표시</value></data>
   <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>숨김</value></data>
+  <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>시간 형식</value></data>
+  <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
+  <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
   <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>주요 수치 축약 표시</value></data>
   <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>켬</value></data>
   <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>끔</value></data>
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>대상 상태 바</value></data>
   <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>켬</value></data>
   <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>끔</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>클릭 통과 시 제목 표시줄</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>숨김</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>표시</value></data>
   <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>이름 표시</value></data>
   <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>표시</value></data>
   <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>숨김</value></data>

@@ -5,17 +5,30 @@ namespace Cloris.Aion2Flow.Tests.Controls;
 public sealed class NumericFormatterTests
 {
     [Theory]
-    [InlineData(12345d, false, false, false, 0, null, null, "12345")]
-    [InlineData(12345d, true, false, false, 0, null, null, "12,345")]
-    [InlineData(1234.5d, true, false, false, 2, null, null, "1,234.5")]
-    [InlineData(-9876.54d, true, false, false, 1, null, null, "-9,876.5")]
-    [InlineData(12.34d, false, false, false, 1, null, "%", "12.3%")]
-    [InlineData(0.8888d, false, false, true, 2, null, null, "88.88%")]
-    [InlineData(0.125d, false, false, true, 1, null, " of total", "12.5% of total")]
-    public void FormatsFixedPointValues(double value, bool useGrouping, bool useCompactNotation, bool usePercentageNotation, int fractionDigits, string? prefix, string? suffix, string expected)
+    [InlineData(12345d, null, null, null, "12,345")]
+    [InlineData(12345d, "0", null, null, "12345")]
+    [InlineData(12345d, "N0", null, null, "12,345")]
+    [InlineData(1234.5d, "#,##0.#", null, null, "1,234.5")]
+    [InlineData(-9876.54d, "N1", null, null, "-9,876.5")]
+    [InlineData(12.34d, "0.0", null, "%", "12.3%")]
+    [InlineData(0.8888d, "P2", null, null, "88.88%")]
+    [InlineData(0.125d, "P1", null, " of total", "12.5% of total")]
+    [InlineData(1d, "00", null, null, "01")]
+    public void FormatsValuesWithTheSuppliedFormatter(
+        double value,
+        string? formatter,
+        string? prefix,
+        string? suffix,
+        string expected)
     {
         Span<char> buffer = stackalloc char[64];
-        var options = new NumericFormatOptions(FractionDigits: fractionDigits, TrimTrailingZeros: true, UseGrouping: useGrouping, UseCompactNotation: useCompactNotation, UsePercentageNotation: usePercentageNotation, CompactThreshold: 1000d, CompactSignificantDigits: 3, Prefix: prefix, Suffix: suffix);
+        var options = new NumericFormatOptions(
+            UseCompactNotation: false,
+            CompactThreshold: 1000d,
+            CompactSignificantDigits: 3,
+            Formatter: formatter,
+            Prefix: prefix,
+            Suffix: suffix);
 
         var result = NumericFormatter.TryFormat(value, buffer, options, out var charsWritten);
 
@@ -31,11 +44,35 @@ public sealed class NumericFormatterTests
     public void FormatsCompactValues(double value, string expected)
     {
         Span<char> buffer = stackalloc char[64];
-        var options = new NumericFormatOptions(FractionDigits: 0, TrimTrailingZeros: true, UseGrouping: false, UseCompactNotation: true, UsePercentageNotation: false, CompactThreshold: 1000d, CompactSignificantDigits: 3, Prefix: null, Suffix: null);
+        var options = new NumericFormatOptions(
+            UseCompactNotation: true,
+            CompactThreshold: 1000d,
+            CompactSignificantDigits: 3,
+            Formatter: "N0",
+            Prefix: null,
+            Suffix: null);
 
         var result = NumericFormatter.TryFormat(value, buffer, options, out var charsWritten);
 
         Assert.True(result);
         Assert.Equal(expected, buffer[..charsWritten].ToString());
+    }
+
+    [Fact]
+    public void CompactThresholdBelowFirstUnitPreservesFormatterBelowOneThousand()
+    {
+        Span<char> buffer = stackalloc char[64];
+        var options = new NumericFormatOptions(
+            UseCompactNotation: true,
+            CompactThreshold: 100d,
+            CompactSignificantDigits: 3,
+            Formatter: "N1",
+            Prefix: null,
+            Suffix: null);
+
+        var result = NumericFormatter.TryFormat(123.4d, buffer, options, out var charsWritten);
+
+        Assert.True(result);
+        Assert.Equal("123.4", buffer[..charsWritten].ToString());
     }
 }

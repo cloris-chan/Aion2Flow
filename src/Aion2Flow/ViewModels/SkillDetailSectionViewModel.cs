@@ -55,7 +55,7 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
     public int SkillCount { get; set => SetFrameProperty(ref field, value); }
     public bool HasSkills { get; set => SetFrameProperty(ref field, value); }
     public double PerSecond { get; set => SetFrameProperty(ref field, value); }
-    public double DurationSeconds { get; set => SetFrameProperty(ref field, value); }
+    public TimeSpan Duration { get; set => SetFrameProperty(ref field, value); }
 
     public bool UsesSceneDuration { get; set; }
 
@@ -214,7 +214,7 @@ public sealed partial class SkillDetailSectionViewModel(UiFrameBatchService fram
         SkillCount = 0;
         HasSkills = false;
         PerSecond = 0d;
-        DurationSeconds = 0d;
+        Duration = TimeSpan.Zero;
         UsesSceneDuration = false;
         HitRate = 0d;
         CriticalRate = 0d;

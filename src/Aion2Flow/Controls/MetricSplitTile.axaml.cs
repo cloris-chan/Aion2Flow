@@ -6,8 +6,11 @@ namespace Cloris.Aion2Flow.Controls;
 
 public partial class MetricSplitTile : UserControl
 {
-    public static readonly StyledProperty<string?> LabelProperty =
-        AvaloniaProperty.Register<MetricSplitTile, string?>(nameof(Label));
+    public static readonly DirectProperty<MetricSplitTile, string?> LabelProperty =
+        AvaloniaProperty.RegisterDirect<MetricSplitTile, string?>(
+            nameof(Label),
+            control => control.Label,
+            (control, value) => control.Label = value);
 
     public static readonly DirectProperty<MetricSplitTile, double> PrimaryValueProperty =
         AvaloniaProperty.RegisterDirect<MetricSplitTile, double>(
@@ -21,65 +24,41 @@ public partial class MetricSplitTile : UserControl
             control => control.SecondaryValue,
             (control, value) => control.SecondaryValue = value);
 
-    public static readonly DirectProperty<MetricSplitTile, int> PrimaryFractionDigitsProperty =
-        AvaloniaProperty.RegisterDirect<MetricSplitTile, int>(
-            nameof(PrimaryFractionDigits),
-            control => control.PrimaryFractionDigits,
-            (control, value) => control.PrimaryFractionDigits = value);
+    public static readonly DirectProperty<MetricSplitTile, string?> PrimaryFormatterProperty =
+        AvaloniaProperty.RegisterDirect<MetricSplitTile, string?>(
+            nameof(PrimaryFormatter),
+            control => control.PrimaryFormatter,
+            (control, value) => control.PrimaryFormatter = value);
 
-    public static readonly DirectProperty<MetricSplitTile, int> SecondaryFractionDigitsProperty =
-        AvaloniaProperty.RegisterDirect<MetricSplitTile, int>(
-            nameof(SecondaryFractionDigits),
-            control => control.SecondaryFractionDigits,
-            (control, value) => control.SecondaryFractionDigits = value);
+    public static readonly DirectProperty<MetricSplitTile, string?> SecondaryFormatterProperty =
+        AvaloniaProperty.RegisterDirect<MetricSplitTile, string?>(
+            nameof(SecondaryFormatter),
+            control => control.SecondaryFormatter,
+            (control, value) => control.SecondaryFormatter = value);
 
-    public static readonly DirectProperty<MetricSplitTile, bool> PrimaryTrimTrailingZerosProperty =
-        AvaloniaProperty.RegisterDirect<MetricSplitTile, bool>(
-            nameof(PrimaryTrimTrailingZeros),
-            control => control.PrimaryTrimTrailingZeros,
-            (control, value) => control.PrimaryTrimTrailingZeros = value);
+    public static readonly DirectProperty<MetricSplitTile, string?> PrimaryPrefixProperty =
+        AvaloniaProperty.RegisterDirect<MetricSplitTile, string?>(
+            nameof(PrimaryPrefix),
+            control => control.PrimaryPrefix,
+            (control, value) => control.PrimaryPrefix = value);
 
-    public static readonly DirectProperty<MetricSplitTile, bool> SecondaryTrimTrailingZerosProperty =
-        AvaloniaProperty.RegisterDirect<MetricSplitTile, bool>(
-            nameof(SecondaryTrimTrailingZeros),
-            control => control.SecondaryTrimTrailingZeros,
-            (control, value) => control.SecondaryTrimTrailingZeros = value);
+    public static readonly DirectProperty<MetricSplitTile, string?> PrimarySuffixProperty =
+        AvaloniaProperty.RegisterDirect<MetricSplitTile, string?>(
+            nameof(PrimarySuffix),
+            control => control.PrimarySuffix,
+            (control, value) => control.PrimarySuffix = value);
 
-    public static readonly DirectProperty<MetricSplitTile, bool> PrimaryUseGroupingProperty =
-        AvaloniaProperty.RegisterDirect<MetricSplitTile, bool>(
-            nameof(PrimaryUseGrouping),
-            control => control.PrimaryUseGrouping,
-            (control, value) => control.PrimaryUseGrouping = value);
+    public static readonly DirectProperty<MetricSplitTile, string?> SecondaryPrefixProperty =
+        AvaloniaProperty.RegisterDirect<MetricSplitTile, string?>(
+            nameof(SecondaryPrefix),
+            control => control.SecondaryPrefix,
+            (control, value) => control.SecondaryPrefix = value);
 
-    public static readonly DirectProperty<MetricSplitTile, bool> SecondaryUseGroupingProperty =
-        AvaloniaProperty.RegisterDirect<MetricSplitTile, bool>(
-            nameof(SecondaryUseGrouping),
-            control => control.SecondaryUseGrouping,
-            (control, value) => control.SecondaryUseGrouping = value);
-
-    public static readonly DirectProperty<MetricSplitTile, bool> PrimaryUsePercentageNotationProperty =
-        AvaloniaProperty.RegisterDirect<MetricSplitTile, bool>(
-            nameof(PrimaryUsePercentageNotation),
-            control => control.PrimaryUsePercentageNotation,
-            (control, value) => control.PrimaryUsePercentageNotation = value);
-
-    public static readonly DirectProperty<MetricSplitTile, bool> SecondaryUsePercentageNotationProperty =
-        AvaloniaProperty.RegisterDirect<MetricSplitTile, bool>(
-            nameof(SecondaryUsePercentageNotation),
-            control => control.SecondaryUsePercentageNotation,
-            (control, value) => control.SecondaryUsePercentageNotation = value);
-
-    public static readonly StyledProperty<string?> PrimaryPrefixProperty =
-        AvaloniaProperty.Register<MetricSplitTile, string?>(nameof(PrimaryPrefix));
-
-    public static readonly StyledProperty<string?> PrimarySuffixProperty =
-        AvaloniaProperty.Register<MetricSplitTile, string?>(nameof(PrimarySuffix));
-
-    public static readonly StyledProperty<string?> SecondaryPrefixProperty =
-        AvaloniaProperty.Register<MetricSplitTile, string?>(nameof(SecondaryPrefix));
-
-    public static readonly StyledProperty<string?> SecondarySuffixProperty =
-        AvaloniaProperty.Register<MetricSplitTile, string?>(nameof(SecondarySuffix));
+    public static readonly DirectProperty<MetricSplitTile, string?> SecondarySuffixProperty =
+        AvaloniaProperty.RegisterDirect<MetricSplitTile, string?>(
+            nameof(SecondarySuffix),
+            control => control.SecondarySuffix,
+            (control, value) => control.SecondarySuffix = value);
 
     public MetricSplitTile()
     {
@@ -88,8 +67,8 @@ public partial class MetricSplitTile : UserControl
 
     public string? Label
     {
-        get => GetValue(LabelProperty);
-        set => SetValue(LabelProperty, value);
+        get;
+        set => SetAndRaise(LabelProperty, ref field, value);
     }
 
     public double PrimaryValue
@@ -104,75 +83,39 @@ public partial class MetricSplitTile : UserControl
         set => SetAndRaise(SecondaryValueProperty, ref field, value);
     }
 
-    public int PrimaryFractionDigits
+    public string? PrimaryFormatter
     {
         get;
-        set => SetAndRaise(PrimaryFractionDigitsProperty, ref field, value);
-    }
+        set => SetAndRaise(PrimaryFormatterProperty, ref field, value);
+    } = "N0";
 
-    public int SecondaryFractionDigits
+    public string? SecondaryFormatter
     {
         get;
-        set => SetAndRaise(SecondaryFractionDigitsProperty, ref field, value);
-    } = 1;
-
-    public bool PrimaryTrimTrailingZeros
-    {
-        get;
-        set => SetAndRaise(PrimaryTrimTrailingZerosProperty, ref field, value);
-    } = true;
-
-    public bool SecondaryTrimTrailingZeros
-    {
-        get;
-        set => SetAndRaise(SecondaryTrimTrailingZerosProperty, ref field, value);
-    }
-
-    public bool PrimaryUseGrouping
-    {
-        get;
-        set => SetAndRaise(PrimaryUseGroupingProperty, ref field, value);
-    } = true;
-
-    public bool SecondaryUseGrouping
-    {
-        get;
-        set => SetAndRaise(SecondaryUseGroupingProperty, ref field, value);
-    }
-
-    public bool PrimaryUsePercentageNotation
-    {
-        get;
-        set => SetAndRaise(PrimaryUsePercentageNotationProperty, ref field, value);
-    }
-
-    public bool SecondaryUsePercentageNotation
-    {
-        get;
-        set => SetAndRaise(SecondaryUsePercentageNotationProperty, ref field, value);
-    }
+        set => SetAndRaise(SecondaryFormatterProperty, ref field, value);
+    } = "0.0";
 
     public string? PrimaryPrefix
     {
-        get => GetValue(PrimaryPrefixProperty);
-        set => SetValue(PrimaryPrefixProperty, value);
+        get;
+        set => SetAndRaise(PrimaryPrefixProperty, ref field, value);
     }
 
     public string? PrimarySuffix
     {
-        get => GetValue(PrimarySuffixProperty);
-        set => SetValue(PrimarySuffixProperty, value);
+        get;
+        set => SetAndRaise(PrimarySuffixProperty, ref field, value);
     }
 
     public string? SecondaryPrefix
     {
-        get => GetValue(SecondaryPrefixProperty);
-        set => SetValue(SecondaryPrefixProperty, value);
+        get;
+        set => SetAndRaise(SecondaryPrefixProperty, ref field, value);
     }
 
     public string? SecondarySuffix
     {
-        get => GetValue(SecondarySuffixProperty);
-        set => SetValue(SecondarySuffixProperty, value);
+        get;
+        set => SetAndRaise(SecondarySuffixProperty, ref field, value);
     }
 }

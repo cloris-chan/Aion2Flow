@@ -34,12 +34,18 @@
   <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>Bottom total DPS</value></data>
   <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>Show</value></data>
   <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>Hide</value></data>
+  <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>Time format</value></data>
+  <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
+  <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
   <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>Compact main numbers</value></data>
   <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>On</value></data>
   <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>Off</value></data>
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>Target status bar</value></data>
   <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>On</value></data>
   <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>Click-through title bar</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>Hide</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>Show</value></data>
   <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>Name visibility</value></data>
   <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>Show</value></data>
   <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>Hide</value></data>

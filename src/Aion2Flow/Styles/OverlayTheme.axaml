@@ -106,6 +106,10 @@
         <Setter Property="Opacity" Value="0.4" />
     </Style>
 
+    <Style Selector="Grid.MainHudShell.click-through.hide-header-when-click-through Border.MainHudHeader">
+        <Setter Property="Opacity" Value="0" />
+    </Style>
+
     <Style Selector="Border.MainHudFooter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -164,12 +168,7 @@
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
-    <Style Selector="controls|NumericBlock.OverlayHeaderMetric">
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
-        <Setter Property="FontWeight" Value="Bold" />
-    </Style>
-
-    <Style Selector="TextBlock.OverlayHeaderScene">
+    <Style Selector="controls|MapDisplay.OverlayHeaderScene TextBlock#PART_Text">
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Opacity" Value="1" />
@@ -338,6 +337,14 @@
 
     <Style Selector="Button.WindowBtn:pointerover Path.Glyph">
         <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
+    </Style>
+
+    <Style Selector="Button.WindowBtn:disabled">
+        <Setter Property="Opacity" Value="0.35" />
+    </Style>
+
+    <Style Selector="Button.WindowBtn:disabled Path.Glyph">
+        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextSubtle}" />
     </Style>
 
     <Style Selector="Button.MinBtn Path.Glyph">
@@ -692,7 +699,7 @@
         <Setter Property="Opacity" Value="0.45" />
     </Style>
 
-    <Style Selector="MenuFlyoutPresenter.BottomBarHistoryMenuFlyout">
+    <Style Selector="MenuFlyoutPresenter.EncounterHistoryMenuFlyout">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.SettingsBackdrop}" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -726,6 +733,12 @@
     </Style>
 
     <Style Selector="controls|NumericBlock.BottomBarMetric">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="controls|DurationBlock.BottomBarMetric controls|NumericBlock">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -975,7 +988,20 @@
         <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
 
+    <Style Selector="controls|DurationMetricTile.DetailBannerMetric">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
     <Style Selector="controls|MetricTile.DetailBannerMetric Border.MetricCardSurface">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <Style Selector="controls|DurationMetricTile.DetailBannerMetric Border.MetricCardSurface">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -993,13 +1019,34 @@
         <Setter Property="Margin" Value="0,1,4,0" />
     </Style>
 
+    <Style Selector="controls|DurationMetricTile.DetailBannerMetric Border.MetricAccent">
+        <Setter Property="Width" Value="1" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Background" Value="#D8FFFFFF" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,1,4,0" />
+    </Style>
+
     <Style Selector="controls|MetricTile.DetailBannerMetric TextBlock.MetricLabel">
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="TextWrapping" Value="NoWrap" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
+    <Style Selector="controls|DurationMetricTile.DetailBannerMetric TextBlock.MetricLabel">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
     <Style Selector="controls|MetricTile.DetailBannerMetric controls|NumericBlock.MetricValue">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Emphasis}" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <Style Selector="controls|DurationMetricTile.DetailBannerMetric controls|DurationBlock.MetricValue controls|NumericBlock">
+        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Emphasis}" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
@@ -1104,14 +1151,12 @@
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="UseGrouping" Value="True" />
     </Style>
 
     <Style Selector="controls|NumericBlock.MetricSplitValue">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="UseGrouping" Value="True" />
     </Style>
 
     <Style Selector="TextBlock.MetricSplitSlash">
@@ -1344,13 +1389,6 @@
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="TextAlignment" Value="Right" />
-        <Setter Property="UseGrouping" Value="True" />
-    </Style>
-
-    <Style Selector="controls|NumericBlock.CounterpartMetricRate">
-        <Setter Property="FractionDigits" Value="1" />
-        <Setter Property="TrimTrailingZeros" Value="False" />
-        <Setter Property="UsePercentageNotation" Value="True" />
     </Style>
 
     <Style Selector="TextBlock.SectionTitle">
@@ -1483,15 +1521,11 @@
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />
-        <Setter Property="UseGrouping" Value="True" />
     </Style>
 
     <Style Selector="controls|NumericBlock.DetailMetricRate">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
-        <Setter Property="FractionDigits" Value="1" />
-        <Setter Property="TrimTrailingZeros" Value="False" />
-        <Setter Property="UsePercentageNotation" Value="True" />
     </Style>
 
     <Style Selector="controls|SkillDisplay.DetailRowText TextBlock#PART_Text">
@@ -1525,6 +1559,5 @@
         <Setter Property="Margin" Value="0,2" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="TextAlignment" Value="Right" />
-        <Setter Property="UseGrouping" Value="True" />
     </Style>
 </Styles>

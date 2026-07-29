@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
@@ -5,7 +6,7 @@ using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
-public sealed class SettingsFlyoutHotkeyTests
+public sealed class SettingsFlyoutViewModelTests
 {
     [Fact]
     public void SettingsService_PersistsBothGlobalHotkeys()
@@ -30,6 +31,50 @@ public sealed class SettingsFlyoutHotkeyTests
         Assert.Equal(0x52u, loaded.BattleResetHotkeyVirtualKey);
         Assert.Equal((uint)(HotkeyModifiers.Alt | HotkeyModifiers.Win), loaded.OverlayInteractionHotkeyModifiers);
         Assert.Equal(0x49u, loaded.OverlayInteractionHotkeyVirtualKey);
+    }
+
+    [Fact]
+    public void HideHeaderWhenClickThrough_LoadsAndPersistsThroughViewModel()
+    {
+        using var fixture = new SettingsViewModelFixture(static settings => settings.HideHeaderWhenClickThrough = true);
+
+        Assert.True(fixture.ViewModel.HideHeaderWhenClickThrough);
+
+        fixture.ViewModel.HideHeaderWhenClickThrough = false;
+
+        Assert.False(new SettingsService(fixture.SettingsPath).Current.HideHeaderWhenClickThrough);
+    }
+
+    [Fact]
+    public void EncounterTimeDisplayFormat_DefaultsAndPersistsThroughViewModel()
+    {
+        using var fixture = new SettingsViewModelFixture();
+
+        Assert.Equal(
+            EncounterTimeDisplayFormat.DecimalSeconds,
+            fixture.ViewModel.EncounterTimeDisplayFormat);
+
+        fixture.ViewModel.EncounterTimeDisplayFormat =
+            EncounterTimeDisplayFormat.MinutesSeconds;
+
+        Assert.Equal(
+            EncounterTimeDisplayFormat.MinutesSeconds,
+            new SettingsService(fixture.SettingsPath).Current.EncounterTimeDisplayFormat);
+    }
+
+    [Fact]
+    public void EncounterTimeDisplayFormat_InvalidPersistedValueFallsBackToDecimalSeconds()
+    {
+        using var fixture = new SettingsViewModelFixture();
+        File.WriteAllText(
+            fixture.SettingsPath,
+            """{"EncounterTimeDisplayFormat":999}""");
+
+        var loaded = new SettingsService(fixture.SettingsPath).Current;
+
+        Assert.Equal(
+            EncounterTimeDisplayFormat.DecimalSeconds,
+            loaded.EncounterTimeDisplayFormat);
     }
 
     [Fact]

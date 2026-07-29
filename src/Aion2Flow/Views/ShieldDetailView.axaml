@@ -35,13 +35,12 @@
                                       Grid.Column="1"
                                       Classes="DetailBannerMetrics"
                                       ColumnDefinitions="*,*">
-                                    <controls:MetricTile Grid.Column="0"
-                                                         Classes="DetailBannerMetric"
-                                                         Label="{markups:Translate Metric_Duration}"
-                                                         Value="{Binding ShieldSection.DurationSeconds}"
-                                                         FractionDigits="1"
-                                                         TrimTrailingZeros="False"
-                                                         Suffix="s" />
+                                    <controls:DurationMetricTile Grid.Column="0"
+                                                                 Classes="DetailBannerMetric"
+                                                                 Label="{markups:Translate Metric_Duration}"
+                                                                 Duration="{Binding ShieldSection.Duration}"
+                                                                 DisplayFormat="{Binding EncounterTimeDisplayFormat}"
+                                                                 StableWidthScopeKey="{Binding EncounterContextId}" />
                                     <controls:MetricTile Grid.Column="1"
                                                          Classes="DetailBannerMetric"
                                                          Label="{markups:Translate Metric_Total}"
@@ -114,7 +113,8 @@
                                                                                                    Value="{Binding ShieldAmount}" />
                                                                             <controls:NumericBlock Grid.Column="3"
                                                                                                    Classes="CounterpartMetricValue CounterpartMetricRate"
-                                                                                                   Value="{Binding ShieldShare}" />
+                                                                                                   Value="{Binding ShieldShare}"
+                                                                                                   Formatter="P1" />
                                                                         </Grid>
                                                                     </Border>
                                                                 </DataTemplate>
@@ -224,9 +224,7 @@
                                             <controls:NumericBlock Grid.Column="3"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding SharePercent}"
-                                                                   FractionDigits="1"
-                                                                   TrimTrailingZeros="False"
-                                                                   UsePercentageNotation="True" />
+                                                                   Formatter="P1" />
                                             <controls:NumericBlock Grid.Column="4"
                                                                    Classes="DetailRowValue"
                                                                    Value="{Binding EventCount}" />

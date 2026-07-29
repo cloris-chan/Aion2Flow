@@ -5,6 +5,7 @@ using Avalonia.LogicalTree;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Controls;
+using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.ViewModels;
 using Cloris.Aion2Flow.Views;
@@ -23,6 +24,7 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             AssertHealingAndShieldSkillTablesDoNotExposeDamageHitCountColumns();
             AssertDamageSkillTableIncludesPerDamageColumns();
             AssertHealingAndShieldUseIndependentSummaryCards();
+            AssertDetailDurationsUseConfiguredFormat();
             AssertResourceSectionUsesNeutralManaChangeColumn();
             AssertSkillListsUseAnimatedVirtualizationAndContextualSelection();
         });
@@ -119,10 +121,14 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             .OfType<MetricTile>()
             .Select(static tile => tile.Label)
             .ToArray();
+        var healingDurationMetric = Assert.Single(
+            healingBannerMetrics.Children.OfType<DurationMetricTile>());
         var shieldBannerLabels = shieldBannerMetrics!.Children
             .OfType<MetricTile>()
             .Select(static tile => tile.Label)
             .ToArray();
+        var shieldDurationMetric = Assert.Single(
+            shieldBannerMetrics.Children.OfType<DurationMetricTile>());
         var bannerTitles = compositeView.GetLogicalDescendants()
             .OfType<TextBlock>()
             .Where(static textBlock => textBlock.Classes.Contains("DetailBannerTitle"))
@@ -138,10 +144,12 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         Assert.NotNull(healingCard);
         Assert.NotNull(shieldCard);
         Assert.NotSame(healingCard, shieldCard);
-        Assert.Equal(3, healingBannerLabels.Length);
+        Assert.Equal(2, healingBannerLabels.Length);
+        Assert.Equal(localization["Metric_Duration"], healingDurationMetric.Label);
         Assert.Contains(localization["Metric_TotalHealing"], healingBannerLabels);
         Assert.DoesNotContain(localization["Category_Shield"], healingBannerLabels);
-        Assert.Equal(2, shieldBannerLabels.Length);
+        Assert.Single(shieldBannerLabels);
+        Assert.Equal(localization["Metric_Duration"], shieldDurationMetric.Label);
         Assert.Contains(localization["Metric_Total"], shieldBannerLabels);
         Assert.Equal(4, bannerTitles.Length);
         Assert.Contains(localization["Category_Damage"], bannerTitles);
@@ -149,6 +157,56 @@ public sealed class CombatantDetailsFlyoutLayoutTests
         Assert.Contains(localization["Category_Shield"], bannerTitles);
         Assert.Contains(localization["Category_Resource"], bannerTitles);
         Assert.Single(directHealingHeaders);
+    }
+
+    private static void AssertDetailDurationsUseConfiguredFormat()
+    {
+        var (localization, frameBatch) = CreateViewServices();
+        var encounterContextId = Guid.NewGuid();
+        var detail = new CombatDirectionDetailViewModel(
+            localization,
+            frameBatch,
+            "Direction_Targets")
+        {
+            EncounterContextId = encounterContextId,
+            EncounterTimeDisplayFormat =
+                EncounterTimeDisplayFormat.MinutesSeconds
+        };
+        detail.DamageSection.Duration = TimeSpan.FromSeconds(68);
+        detail.HealingSection.Duration = TimeSpan.FromSeconds(68);
+        detail.ShieldSection.Duration = TimeSpan.FromSeconds(68);
+        frameBatch.FlushFrame();
+
+        var view = new CombatDirectionDetailView { DataContext = detail };
+        Dispatcher.UIThread.RunJobs();
+        var durationTiles = view.GetLogicalDescendants()
+            .OfType<DurationMetricTile>()
+            .ToArray();
+        var durationBlocks = view.GetLogicalDescendants()
+            .OfType<DurationBlock>()
+            .ToArray();
+
+        Assert.Equal(3, durationTiles.Length);
+        Assert.All(durationTiles, tile =>
+        {
+            Assert.Equal(TimeSpan.FromSeconds(68), tile.Duration);
+            Assert.Equal(
+                EncounterTimeDisplayFormat.MinutesSeconds,
+                tile.DisplayFormat);
+            Assert.Equal(encounterContextId, tile.StableWidthScopeKey);
+        });
+        Assert.Equal(3, durationBlocks.Length);
+        Assert.All(durationBlocks, static block =>
+        {
+            Assert.Equal(
+                "01",
+                block.MinutesBlockForDiagnostics
+                    .GetFormattedTextForDiagnostics());
+            Assert.Equal(
+                ":08",
+                block.SecondsBlockForDiagnostics
+                    .GetFormattedTextForDiagnostics());
+        });
     }
 
     private static void AssertResourceSectionUsesNeutralManaChangeColumn()

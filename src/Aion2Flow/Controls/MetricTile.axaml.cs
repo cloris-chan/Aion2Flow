@@ -6,8 +6,11 @@ namespace Cloris.Aion2Flow.Controls;
 
 public partial class MetricTile : UserControl
 {
-    public static readonly StyledProperty<string?> LabelProperty =
-        AvaloniaProperty.Register<MetricTile, string?>(nameof(Label));
+    public static readonly DirectProperty<MetricTile, string?> LabelProperty =
+        AvaloniaProperty.RegisterDirect<MetricTile, string?>(
+            nameof(Label),
+            control => control.Label,
+            (control, value) => control.Label = value);
 
     public static readonly DirectProperty<MetricTile, double> ValueProperty =
         AvaloniaProperty.RegisterDirect<MetricTile, double>(
@@ -15,35 +18,17 @@ public partial class MetricTile : UserControl
             control => control.Value,
             (control, value) => control.Value = value);
 
-    public static readonly DirectProperty<MetricTile, int> FractionDigitsProperty =
-        AvaloniaProperty.RegisterDirect<MetricTile, int>(
-            nameof(FractionDigits),
-            control => control.FractionDigits,
-            (control, value) => control.FractionDigits = value);
-
-    public static readonly DirectProperty<MetricTile, bool> TrimTrailingZerosProperty =
-        AvaloniaProperty.RegisterDirect<MetricTile, bool>(
-            nameof(TrimTrailingZeros),
-            control => control.TrimTrailingZeros,
-            (control, value) => control.TrimTrailingZeros = value);
-
-    public static readonly DirectProperty<MetricTile, bool> UseGroupingProperty =
-        AvaloniaProperty.RegisterDirect<MetricTile, bool>(
-            nameof(UseGrouping),
-            control => control.UseGrouping,
-            (control, value) => control.UseGrouping = value);
+    public static readonly DirectProperty<MetricTile, string?> FormatterProperty =
+        AvaloniaProperty.RegisterDirect<MetricTile, string?>(
+            nameof(Formatter),
+            control => control.Formatter,
+            (control, value) => control.Formatter = value);
 
     public static readonly DirectProperty<MetricTile, bool> UseCompactNotationProperty =
         AvaloniaProperty.RegisterDirect<MetricTile, bool>(
             nameof(UseCompactNotation),
             control => control.UseCompactNotation,
             (control, value) => control.UseCompactNotation = value);
-
-    public static readonly DirectProperty<MetricTile, bool> UsePercentageNotationProperty =
-        AvaloniaProperty.RegisterDirect<MetricTile, bool>(
-            nameof(UsePercentageNotation),
-            control => control.UsePercentageNotation,
-            (control, value) => control.UsePercentageNotation = value);
 
     public static readonly DirectProperty<MetricTile, double> CompactThresholdProperty =
         AvaloniaProperty.RegisterDirect<MetricTile, double>(
@@ -57,11 +42,17 @@ public partial class MetricTile : UserControl
             control => control.CompactSignificantDigits,
             (control, value) => control.CompactSignificantDigits = value);
 
-    public static readonly StyledProperty<string?> PrefixProperty =
-        AvaloniaProperty.Register<MetricTile, string?>(nameof(Prefix));
+    public static readonly DirectProperty<MetricTile, string?> PrefixProperty =
+        AvaloniaProperty.RegisterDirect<MetricTile, string?>(
+            nameof(Prefix),
+            control => control.Prefix,
+            (control, value) => control.Prefix = value);
 
-    public static readonly StyledProperty<string?> SuffixProperty =
-        AvaloniaProperty.Register<MetricTile, string?>(nameof(Suffix));
+    public static readonly DirectProperty<MetricTile, string?> SuffixProperty =
+        AvaloniaProperty.RegisterDirect<MetricTile, string?>(
+            nameof(Suffix),
+            control => control.Suffix,
+            (control, value) => control.Suffix = value);
 
     public MetricTile()
     {
@@ -70,8 +61,8 @@ public partial class MetricTile : UserControl
 
     public string? Label
     {
-        get => GetValue(LabelProperty);
-        set => SetValue(LabelProperty, value);
+        get;
+        set => SetAndRaise(LabelProperty, ref field, value);
     }
 
     public double Value
@@ -80,34 +71,16 @@ public partial class MetricTile : UserControl
         set => SetAndRaise(ValueProperty, ref field, value);
     }
 
-    public int FractionDigits
+    public string? Formatter
     {
         get;
-        set => SetAndRaise(FractionDigitsProperty, ref field, value);
-    }
-
-    public bool TrimTrailingZeros
-    {
-        get;
-        set => SetAndRaise(TrimTrailingZerosProperty, ref field, value);
-    } = true;
-
-    public bool UseGrouping
-    {
-        get;
-        set => SetAndRaise(UseGroupingProperty, ref field, value);
-    } = true;
+        set => SetAndRaise(FormatterProperty, ref field, value);
+    } = "N0";
 
     public bool UseCompactNotation
     {
         get;
         set => SetAndRaise(UseCompactNotationProperty, ref field, value);
-    }
-
-    public bool UsePercentageNotation
-    {
-        get;
-        set => SetAndRaise(UsePercentageNotationProperty, ref field, value);
     }
 
     public double CompactThreshold
@@ -124,13 +97,13 @@ public partial class MetricTile : UserControl
 
     public string? Prefix
     {
-        get => GetValue(PrefixProperty);
-        set => SetValue(PrefixProperty, value);
+        get;
+        set => SetAndRaise(PrefixProperty, ref field, value);
     }
 
     public string? Suffix
     {
-        get => GetValue(SuffixProperty);
-        set => SetValue(SuffixProperty, value);
+        get;
+        set => SetAndRaise(SuffixProperty, ref field, value);
     }
 }

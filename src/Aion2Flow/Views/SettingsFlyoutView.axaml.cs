@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
@@ -22,9 +23,11 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _showDamagePerSecondColumnMenuItem;
     private MenuItem? _showDamageColumnMenuItem;
     private MenuItem? _showTotalDamagePerSecondMenuItem;
+    private MenuItem? _encounterTimeDisplayFormatMenuItem;
     private MenuItem? _sceneKindMenuItem;
     private MenuItem? _compactMainMetricsMenuItem;
     private MenuItem? _focusStatusBarMenuItem;
+    private MenuItem? _hideHeaderWhenClickThroughMenuItem;
     private MenuItem? _playerNameSettingsMenuItem;
     private MenuItem? _showPlayerNamesMenuItem;
     private MenuItem? _playerSelfMarkerMenuItem;
@@ -90,9 +93,11 @@ public partial class SettingsFlyoutView : UserControl
         RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildMainMetricVisibilityMenuItems();
+        RebuildEncounterTimeDisplayFormatMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
+        RefreshHideHeaderWhenClickThroughMenuItem();
         RebuildPlayerNameSettingsMenuItems();
         RebuildLanguageMenuItems();
     }
@@ -104,9 +109,11 @@ public partial class SettingsFlyoutView : UserControl
         RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildMainMetricVisibilityMenuItems();
+        RebuildEncounterTimeDisplayFormatMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
+        RefreshHideHeaderWhenClickThroughMenuItem();
         RebuildPlayerNameSettingsMenuItems();
         RebuildLanguageMenuItems();
     }
@@ -144,6 +151,11 @@ public partial class SettingsFlyoutView : UserControl
             case nameof(SettingsFlyoutViewModel.MainMetricVisibilityDisplay):
                 RefreshMainMetricVisibilityMenuItems();
                 break;
+            case nameof(SettingsFlyoutViewModel.EncounterTimeDisplayFormat):
+            case nameof(SettingsFlyoutViewModel.EncounterTimeDisplayFormatDisplay):
+                RefreshEncounterTimeDisplayFormatHeader();
+                RefreshEncounterTimeDisplayFormatCheckmarks();
+                break;
             case nameof(SettingsFlyoutViewModel.SceneKind):
             case nameof(SettingsFlyoutViewModel.SceneKindDisplay):
                 RefreshSceneKindHeader();
@@ -156,6 +168,10 @@ public partial class SettingsFlyoutView : UserControl
             case nameof(SettingsFlyoutViewModel.ShowFocusStatusBar):
             case nameof(SettingsFlyoutViewModel.ShowFocusStatusBarDisplay):
                 RefreshFocusStatusBarMenuItem();
+                break;
+            case nameof(SettingsFlyoutViewModel.HideHeaderWhenClickThrough):
+            case nameof(SettingsFlyoutViewModel.HideHeaderWhenClickThroughDisplay):
+                RefreshHideHeaderWhenClickThroughMenuItem();
                 break;
             case nameof(SettingsFlyoutViewModel.ShowPlayerNames):
             case nameof(SettingsFlyoutViewModel.ShowPlayerNamesDisplay):
@@ -185,9 +201,11 @@ public partial class SettingsFlyoutView : UserControl
         RebuildCombatantStatisticsScopeMenuItems();
         RebuildCombatantSortMetricMenuItems();
         RebuildMainMetricVisibilityMenuItems();
+        RebuildEncounterTimeDisplayFormatMenuItems();
         RebuildSceneKindMenuItems();
         RefreshCompactMainMetricsMenuItem();
         RefreshFocusStatusBarMenuItem();
+        RefreshHideHeaderWhenClickThroughMenuItem();
         RebuildPlayerNameSettingsMenuItems();
     }
 
@@ -254,6 +272,15 @@ public partial class SettingsFlyoutView : UserControl
         }
     }
 
+    private void EncounterTimeDisplayFormatMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _encounterTimeDisplayFormatMenuItem != mi)
+        {
+            _encounterTimeDisplayFormatMenuItem = mi;
+            RebuildEncounterTimeDisplayFormatMenuItems();
+        }
+    }
+
     private void PlayerNameSettingsMenuItemLoaded(object? sender, RoutedEventArgs e)
     {
         if (sender is MenuItem mi && _playerNameSettingsMenuItem != mi)
@@ -278,6 +305,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _focusStatusBarMenuItem = mi;
             RefreshFocusStatusBarMenuItem();
+        }
+    }
+
+    private void HideHeaderWhenClickThroughMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _hideHeaderWhenClickThroughMenuItem != mi)
+        {
+            _hideHeaderWhenClickThroughMenuItem = mi;
+            RefreshHideHeaderWhenClickThroughMenuItem();
         }
     }
 
@@ -405,6 +441,37 @@ public partial class SettingsFlyoutView : UserControl
         RefreshToggleMenuItem(_showTotalDamagePerSecondMenuItem, vm.Localization["Settings_MainMetricVisibility_TotalDamagePerSecond"], vm.ShowTotalDamagePerSecondDisplay, vm.ShowTotalDamagePerSecond);
     }
 
+    private void RebuildEncounterTimeDisplayFormatMenuItems()
+    {
+        RefreshEncounterTimeDisplayFormatHeader();
+        var vm = ViewModel;
+        if (vm is null)
+        {
+            return;
+        }
+
+        RebuildTaggedMenuItems(
+            _encounterTimeDisplayFormatMenuItem,
+            vm.EncounterTimeDisplayFormatOptions,
+            format => vm.Localization[$"Settings_TimeDisplayFormat_{format}"],
+            static format => format,
+            format => format == vm.EncounterTimeDisplayFormat,
+            EncounterTimeDisplayFormatItemClicked);
+    }
+
+    private void RefreshEncounterTimeDisplayFormatCheckmarks()
+    {
+        var vm = ViewModel;
+        if (vm is null)
+        {
+            return;
+        }
+
+        RefreshTaggedMenuCheckmarks<EncounterTimeDisplayFormat>(
+            _encounterTimeDisplayFormatMenuItem,
+            format => format == vm.EncounterTimeDisplayFormat);
+    }
+
     private void RebuildSceneKindMenuItems()
     {
         RefreshSceneKindHeader();
@@ -515,6 +582,21 @@ public partial class SettingsFlyoutView : UserControl
         RefreshToggleMenuItem(_focusStatusBarMenuItem, vm.Localization["Settings_FocusStatusBar"], vm.ShowFocusStatusBarDisplay, vm.ShowFocusStatusBar);
     }
 
+    private void RefreshHideHeaderWhenClickThroughMenuItem()
+    {
+        var vm = ViewModel;
+        if (_hideHeaderWhenClickThroughMenuItem is null || vm is null)
+        {
+            return;
+        }
+
+        RefreshToggleMenuItem(
+            _hideHeaderWhenClickThroughMenuItem,
+            vm.Localization["Settings_ClickThroughTitleBar"],
+            vm.HideHeaderWhenClickThroughDisplay,
+            vm.HideHeaderWhenClickThrough);
+    }
+
     private void RebuildLanguageMenuItems()
     {
         RefreshLanguageHeader();
@@ -574,6 +656,15 @@ public partial class SettingsFlyoutView : UserControl
     {
         if (ViewModel is { } vm && sender is MenuItem { Tag: SceneKind kind })
             vm.SceneKind = kind;
+    }
+
+    private void EncounterTimeDisplayFormatItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm &&
+            sender is MenuItem { Tag: EncounterTimeDisplayFormat displayFormat })
+        {
+            vm.EncounterTimeDisplayFormat = displayFormat;
+        }
     }
 
     private void ShowPlayerNamesMenuItemClicked(object? sender, RoutedEventArgs e)
@@ -639,6 +730,14 @@ public partial class SettingsFlyoutView : UserControl
         if (ViewModel is { } vm)
         {
             vm.ShowFocusStatusBar = !vm.ShowFocusStatusBar;
+        }
+    }
+
+    private void HideHeaderWhenClickThroughMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            vm.HideHeaderWhenClickThrough = !vm.HideHeaderWhenClickThrough;
         }
     }
 
@@ -724,6 +823,15 @@ public partial class SettingsFlyoutView : UserControl
         var vm = ViewModel;
         if (_mainMetricVisibilityMenuItem is null || vm is null) return;
         _mainMetricVisibilityMenuItem.Header = CreateRowHeader(vm.Localization["Settings_MainMetricVisibility"], vm.MainMetricVisibilityDisplay);
+    }
+
+    private void RefreshEncounterTimeDisplayFormatHeader()
+    {
+        var vm = ViewModel;
+        if (_encounterTimeDisplayFormatMenuItem is null || vm is null) return;
+        _encounterTimeDisplayFormatMenuItem.Header = CreateRowHeader(
+            vm.Localization["Settings_TimeDisplayFormat"],
+            vm.EncounterTimeDisplayFormatDisplay);
     }
 
     private void RefreshLanguageHeader()

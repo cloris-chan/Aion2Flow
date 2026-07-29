@@ -95,7 +95,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         set => SetFrameProperty(ref field, value);
     }
 
-    public double EncounterTimeSeconds
+    public TimeSpan EncounterDuration
     {
         get;
         set => SetFrameProperty(ref field, value);
@@ -118,12 +118,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         get;
         set => SetFrameProperty(ref field, value);
     }
-
-    public string SceneName
-    {
-        get;
-        set => SetFrameProperty(ref field, value);
-    } = string.Empty;
 
     public string DriverIndicatorColor
     {
@@ -209,6 +203,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _frameBatchService = frameBatchService;
         Localization = localization;
         SettingsFlyout = settingsFlyout;
+        _combatantDetails.EncounterTimeDisplayFormat = SettingsFlyout.EncounterTimeDisplayFormat;
         if (_captureService.Scene.Kind != SettingsFlyout.SceneKind)
             _captureService.Scene.ChangeKind(SettingsFlyout.SceneKind, _captureService.Scene.SessionStarted, archiveCurrent: false);
         CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService);
@@ -293,6 +288,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                  e.PropertyName == nameof(SettingsFlyoutViewModel.ShowDamageColumn) ||
                  e.PropertyName == nameof(SettingsFlyoutViewModel.ShowTotalDamagePerSecond))
             ApplyCombatantMetricDisplaySettings();
+        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.EncounterTimeDisplayFormat))
+            _combatantDetails.EncounterTimeDisplayFormat = SettingsFlyout.EncounterTimeDisplayFormat;
         else if (e.PropertyName == nameof(SettingsFlyoutViewModel.ShowFocusStatusBar) ||
                  e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantStatisticsScope))
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
@@ -482,10 +479,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         UpdateDisplayContext(snapshot);
         NumericStableWidthScopeKey = snapshot.EncounterId;
-        var encounterSeconds = snapshot.EncounterTime / 1000.0;
-        EncounterTimeSeconds = encounterSeconds;
+        EncounterDuration = TimeSpan.FromMilliseconds(snapshot.EncounterTime);
         LiveSceneMapId = snapshot.MapId;
-        SceneName = DisplayContext?.ResolveSceneName(snapshot.Kind, snapshot.MapId, snapshot.BossNpcCodes) ?? string.Empty;
         EnsureBarBrushScope(snapshot.EncounterId);
 
         using var deferral = Combatants.SuspendNotifications();
@@ -955,11 +950,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         Status = Localization["Status_Ready"];
         NumericStableWidthScopeKey = _displayedSnapshot.EncounterId;
-        EncounterTimeSeconds = 0d;
+        EncounterDuration = TimeSpan.Zero;
         RoundTripTimeMilliseconds = 0;
         LiveSceneMapId = _displayedSnapshot.MapId;
         UpdateDisplayContext(_displayedSnapshot);
-        SceneName = DisplayContext?.ResolveSceneName(_displayedSnapshot.Kind, _displayedSnapshot.MapId, _displayedSnapshot.BossNpcCodes) ?? string.Empty;
     }
 
     private void RebuildEncounterHistory()

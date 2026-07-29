@@ -10,14 +10,15 @@ internal static class SkillDetailSectionSummaryApplier
         Dictionary<CombatEventKey, SkillMetrics> skills,
         List<SkillDetailRowData> rows,
         DetailSectionKind sectionKind,
-        double durationSeconds,
+        TimeSpan duration,
         bool usesSceneDuration)
     {
         section.ReplaceRows(rows);
         section.SkillCount = rows.Count;
         section.HasSkills = rows.Count > 0;
-        section.DurationSeconds = durationSeconds;
+        section.Duration = duration;
         section.UsesSceneDuration = usesSceneDuration;
+        var durationSeconds = duration.TotalSeconds;
 
         if (sectionKind is DetailSectionKind.OutgoingDamage or DetailSectionKind.IncomingDamage)
         {
