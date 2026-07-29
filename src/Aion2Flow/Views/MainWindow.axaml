@@ -380,6 +380,7 @@
                                            CompactThreshold="1000"
                                            CompactSignificantDigits="3"
                                            StableWidthScopeKey="{Binding NumericStableWidthScopeKey}"
+                                           Margin="0,0,5,0"
                                            HorizontalAlignment="Right"
                                            TextAlignment="Right"
                                            VerticalAlignment="Center" />

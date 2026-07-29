@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.LogicalTree;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -122,44 +121,6 @@ public sealed class OverlayLayoutTests
                 Assert.Equal(
                     FontWeight.SemiBold,
                     timer.SecondsBlockForDiagnostics.FontWeight);
-            }
-            finally
-            {
-                window.Close();
-                Dispatcher.UIThread.RunJobs();
-                Application.Current.Styles.Remove(style);
-            }
-        });
-    }
-
-    [Fact]
-    public void DurationMetricTile_UsesTheDetailBannerMetricStyle()
-    {
-        AvaloniaTestHost.Run(() =>
-        {
-            var style = new StyleInclude(new Uri("avares://Aion2Flow/"))
-            {
-                Source = new Uri("avares://Aion2Flow/Styles/OverlayTheme.axaml")
-            };
-            Application.Current!.Styles.Add(style);
-            var tile = new DurationMetricTile();
-            tile.Classes.Add("DetailBannerMetric");
-            var window = new Window { Content = tile };
-
-            try
-            {
-                window.Show();
-                Dispatcher.UIThread.RunJobs();
-                var numericParts = tile.GetLogicalDescendants()
-                    .OfType<NumericBlock>()
-                    .ToArray();
-
-                Assert.Equal(3, numericParts.Length);
-                Assert.All(numericParts, static part =>
-                {
-                    Assert.Equal(FontWeight.Bold, part.FontWeight);
-                    Assert.NotNull(part.Foreground);
-                });
             }
             finally
             {

@@ -16,7 +16,8 @@
                 <controls:DurationBlock Classes="MetricValue"
                                         Duration="{Binding Duration, ElementName=Root}"
                                         DisplayFormat="{Binding DisplayFormat, ElementName=Root}"
-                                        StableWidthScopeKey="{Binding StableWidthScopeKey, ElementName=Root}" />
+                                        StableWidthScopeKey="{Binding StableWidthScopeKey, ElementName=Root}"
+                                        HorizontalAlignment="Left" />
             </StackPanel>
         </Grid>
     </Border>

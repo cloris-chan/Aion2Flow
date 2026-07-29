@@ -1047,8 +1047,8 @@
 
     <Style Selector="controls|DurationMetricTile.DetailBannerMetric controls|DurationBlock.MetricValue controls|NumericBlock">
         <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Emphasis}" />
-        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="Border.DetailMetricRowsPanel">
