@@ -287,7 +287,6 @@ public sealed class AnimatedItemsView : Panel
         }
 
         _verticalOffset = ResolveVerticalOffset(_verticalOffset, viewportHeight);
-        EnsureRealizedRange(viewportHeight);
 
         var animateMoves = _hasArrangedOnce && _animateMovesOnNextArrange;
         for (var index = _realizedStart; index < _realizedEndExclusive; index++)

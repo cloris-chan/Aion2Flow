@@ -620,6 +620,40 @@ public sealed class AnimatedItemsViewTests
     }
 
     [Fact]
+    public void AnimatedScroll_WithRepeatedCombatantSortsMaintainsLayoutStability()
+    {
+        AvaloniaTestHost.Run(() =>
+        {
+            var rows = CreateCollection(128);
+            var view = CreateView(rows, maxVisibleItems: 5);
+            var window = CreateFixedWindow(view);
+
+            try
+            {
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+
+                for (var iteration = 0; iteration < 80; iteration++)
+                {
+                    var descending = (iteration & 1) == 0;
+                    rows.Sort((left, right) => descending
+                        ? right.Id.CompareTo(left.Id)
+                        : left.Id.CompareTo(right.Id));
+                    view.ScrollByRowsAnimated(descending ? 1.5 : -1.25);
+                    view.AdvanceScrollAnimation(TimeSpan.FromMilliseconds(iteration * 16));
+                    Dispatcher.UIThread.RunJobs();
+                }
+
+                Assert.NotEmpty(GetRealizedContainers(view));
+            }
+            finally
+            {
+                Close(window);
+            }
+        });
+    }
+
+    [Fact]
     public void InsertAndRemove_UpdateSizeToContentHeightInOneLayoutCycle()
     {
         AvaloniaTestHost.Run(() =>
