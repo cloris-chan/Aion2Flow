@@ -210,6 +210,16 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
         }
     }
 
+    public void ResetOlderThan(in TcpConnection connection, long newerConnectionOrdinal)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(newerConnectionOrdinal);
+        if (_candidates.TryGetValue(connection, out var candidate) &&
+            candidate.Ordinal < newerConnectionOrdinal)
+        {
+            RemoveAndDispose(connection);
+        }
+    }
+
     public void DiscardAll()
     {
         foreach (var candidate in _candidates.Values)
@@ -231,12 +241,16 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
         List<TcpConnection>? expired = null;
         foreach (var (connection, candidate) in _candidates)
         {
-            if (observedTimestamp >= candidate.FirstObservedTimestamp &&
-                Stopwatch.GetElapsedTime(candidate.FirstObservedTimestamp, observedTimestamp) > CaptureBufferLimits.CandidateStreamLifetime)
+            if (candidate.Priority >= CandidateConnectionPriority.ObservedHandshake ||
+                observedTimestamp < candidate.FirstObservedTimestamp ||
+                Stopwatch.GetElapsedTime(candidate.FirstObservedTimestamp, observedTimestamp) <=
+                CaptureBufferLimits.CandidateStreamLifetime)
             {
-                expired ??= [];
-                expired.Add(connection);
+                continue;
             }
+
+            expired ??= [];
+            expired.Add(connection);
         }
 
         if (expired is null)

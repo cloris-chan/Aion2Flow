@@ -152,10 +152,9 @@ public sealed class SceneTestHarness : IDisposable
         public int ResolveNpcObservationSource() => inner.ResolveNpcObservationSource();
         public void RememberNpcObservationSource(int instanceId) => inner.RememberNpcObservationSource(instanceId);
         public void SetCurrentMap(in PacketObservationSource packet, uint mapId) => inner.SetCurrentMap(in packet, mapId);
-        public void StageMapCandidate(in PacketObservationSource packet, uint mapId) => inner.StageMapCandidate(in packet, mapId);
-        public void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId) => inner.AnnounceDestinationMapTransition(in packet, mapId);
-        public void ObserveDestinationMapTransitionCountdown(in PacketObservationSource packet, uint mapId) => inner.ObserveDestinationMapTransitionCountdown(in packet, mapId);
-        public void ConfirmDestinationMapArrival(in PacketObservationSource packet) => inner.ConfirmDestinationMapArrival(in packet);
+        public void EnsureUnknownMapScope(in PacketObservationSource packet) => inner.EnsureUnknownMapScope(in packet);
+        public bool StageMapCandidate(in PacketObservationSource packet, uint mapId) => inner.StageMapCandidate(in packet, mapId);
+        public bool ConfirmDestinationMapArrival(in PacketObservationSource packet) => inner.ConfirmDestinationMapArrival(in packet);
         public void RegisterMapEvent(in PacketObservationSource packet, uint instanceId) => inner.RegisterMapEvent(in packet, instanceId);
         public void UnregisterMapEvent(in PacketObservationSource packet, uint instanceId) => inner.UnregisterMapEvent(in packet, instanceId);
         public void MarkTransportStreamActivated(in PacketObservationSource packet) => inner.MarkTransportStreamActivated(in packet);

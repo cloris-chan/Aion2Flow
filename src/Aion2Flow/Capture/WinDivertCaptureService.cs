@@ -157,25 +157,22 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                     var isKnownProcessPort = _processPortDiscoveryService.AllPorts.Contains(dstPort);
 
                     var startsNewConnection = false;
+                    var startedConnectionOrdinal = 0L;
                     if (hasSynFlag)
                     {
+                        startedConnectionOrdinal = AllocateConnectionOrdinal();
                         startsNewConnection = _downstreamConnections.ObserveSyn(
                             in connection,
                             hasAcknowledgmentFlag,
                             acceptUnpairedAcknowledgment: !address.Outbound,
                             tcp.HostSequenceNumber,
                             tcp.HostAcknowledgmentNumber,
-                            AllocateConnectionOrdinal(),
+                            startedConnectionOrdinal,
                             observedTimestamp);
                         var startedDownstream = hasAcknowledgmentFlag ? connection : connection.Reverse();
                         if (!hasAcknowledgmentFlag && startsNewConnection)
                         {
                             CaptureConnectionGate.ObserveConnectionStart(in startedDownstream);
-                        }
-                        if (startsNewConnection)
-                        {
-                            _candidateConnections.Reset(in startedDownstream);
-                            _pendingPromotions.CancelForSupersededAttempt(in startedDownstream);
                         }
                     }
 
@@ -192,6 +189,16 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                     var packetConnectionOrdinal = transportResolution.HasResolvedConnectionOrdinal
                         ? transportResolution.ResolvedConnectionOrdinal
                         : connectionOrdinal;
+                    if (startsNewConnection && startedConnectionOrdinal > 0)
+                    {
+                        var startedDownstream = hasAcknowledgmentFlag ? connection : connection.Reverse();
+                        _candidateConnections.ResetOlderThan(
+                            in startedDownstream,
+                            startedConnectionOrdinal);
+                        _pendingPromotions.CancelForSupersededAttempt(
+                            in startedDownstream,
+                            startedConnectionOrdinal);
+                    }
                     var packetIsExpectedDownstream = isExpectedDownstream &&
                         (!transportResolution.HasResolvedConnectionOrdinal ||
                          transportResolution.ResolvedConnectionOrdinal == connectionOrdinal);

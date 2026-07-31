@@ -118,8 +118,6 @@ public enum SceneObservationKind : byte
     None,
     CurrentMap,
     MapCandidateObserved,
-    DestinationMapTransitionAnnounced,
-    DestinationMapTransitionCountdown,
     DestinationMapArrival,
     MapEventRegistered,
     MapEventUnregistered,

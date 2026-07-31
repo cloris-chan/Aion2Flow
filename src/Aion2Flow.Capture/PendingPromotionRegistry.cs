@@ -64,13 +64,40 @@ internal sealed class PendingPromotionRegistry
     }
 
     internal bool CancelForSupersededAttempt(in TcpConnection connection)
+        => CancelForSupersededAttempt(in connection, newerConnectionOrdinal: 0);
+
+    internal bool CancelForSupersededAttempt(
+        in TcpConnection connection,
+        long newerConnectionOrdinal)
     {
-        if (!TryRemoveAtKey(in connection, expectedPromotion: null, out var promotion))
+        ArgumentOutOfRangeException.ThrowIfNegative(newerConnectionOrdinal);
+        CaptureConnectionPromotion? directPromotion;
+        CaptureConnectionPromotion? reversePromotion;
+        lock (_gate)
         {
-            return false;
+            directPromotion = RemoveSupersededPromotionLocked(
+                in connection,
+                newerConnectionOrdinal);
+            var reverseConnection = connection.Reverse();
+            reversePromotion = reverseConnection == connection
+                ? null
+                : RemoveSupersededPromotionLocked(
+                    in reverseConnection,
+                    newerConnectionOrdinal);
         }
 
-        return promotion!.TryCancelQueued();
+        var cancelled = false;
+        if (directPromotion is not null)
+        {
+            cancelled |= directPromotion.TryCancelQueued();
+        }
+
+        if (reversePromotion is not null)
+        {
+            cancelled |= reversePromotion.TryCancelQueued();
+        }
+
+        return cancelled;
     }
 
     internal bool DetachAfterQueuedClose(
@@ -207,6 +234,21 @@ internal sealed class PendingPromotionRegistry
         if (!_promotions.TryGetValue(connection, out var promotion) ||
             ReferenceEquals(promotion, selectedPromotion) ||
             expectedConnectionOrdinal > 0 && promotion.CandidateOrdinal != expectedConnectionOrdinal)
+        {
+            return null;
+        }
+
+        _promotions.Remove(connection);
+        return promotion;
+    }
+
+    private CaptureConnectionPromotion? RemoveSupersededPromotionLocked(
+        in TcpConnection connection,
+        long newerConnectionOrdinal)
+    {
+        if (!_promotions.TryGetValue(connection, out var promotion) ||
+            newerConnectionOrdinal > 0 &&
+            promotion.CandidateOrdinal >= newerConnectionOrdinal)
         {
             return null;
         }

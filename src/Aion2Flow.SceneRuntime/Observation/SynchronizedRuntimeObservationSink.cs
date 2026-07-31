@@ -70,24 +70,19 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.SetCurrentMap(in packet, mapId);
     }
 
-    public void StageMapCandidate(in PacketObservationSource packet, uint mapId)
+    public void EnsureUnknownMapScope(in PacketObservationSource packet)
     {
-        lock (gate) inner.StageMapCandidate(in packet, mapId);
+        lock (gate) inner.EnsureUnknownMapScope(in packet);
     }
 
-    public void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId)
+    public bool StageMapCandidate(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.AnnounceDestinationMapTransition(in packet, mapId);
+        lock (gate) return inner.StageMapCandidate(in packet, mapId);
     }
 
-    public void ObserveDestinationMapTransitionCountdown(in PacketObservationSource packet, uint mapId)
+    public bool ConfirmDestinationMapArrival(in PacketObservationSource packet)
     {
-        lock (gate) inner.ObserveDestinationMapTransitionCountdown(in packet, mapId);
-    }
-
-    public void ConfirmDestinationMapArrival(in PacketObservationSource packet)
-    {
-        lock (gate) inner.ConfirmDestinationMapArrival(in packet);
+        lock (gate) return inner.ConfirmDestinationMapArrival(in packet);
     }
 
     public void RegisterMapEvent(in PacketObservationSource packet, uint instanceId)

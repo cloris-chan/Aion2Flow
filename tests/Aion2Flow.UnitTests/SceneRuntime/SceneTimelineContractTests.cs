@@ -1,5 +1,5 @@
-using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -649,29 +649,26 @@ public class SceneTimelineContractTests
     }
 
     [Fact]
-    public void LiveScene_UnknownMapCandidateStartsCleanContextAtArrival()
+    public void LiveScene_InitialMapCandidateStartsContextImmediately()
     {
         var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
         var sink = SceneSinkFactory.CreateForLive(scene)();
+        var initialOwner = scene.Owner;
 
-        sink.RegisterMapEvent(Source(100, 1, 0x2E92), 173414);
-        sink.AppendNickname(Source(105, 2, 0x3336), 200, "Unknown Map Player");
-        _ = scene.CreateFrame();
-        var unknownMapOwner = scene.Owner;
         sink.StageMapCandidate(Source(110, 3, 0x2136), 910055);
 
-        Assert.Same(unknownMapOwner, scene.Owner);
-        Assert.False(scene.TryDequeueMapTransition(out _));
+        Assert.Same(initialOwner, scene.Owner);
+        Assert.True(scene.TryDequeueMapTransition(out var archive));
+        Assert.Null(archive);
 
-        sink.ConfirmDestinationMapArrival(Source(120, 4, 0x2336));
+        sink.AppendNickname(Source(115, 4, 0x3336), 200, "Initial Map Player");
+        sink.ConfirmDestinationMapArrival(Source(120, 5, 0x2336));
 
-        Assert.NotSame(unknownMapOwner, scene.Owner);
         var snapshot = scene.CreateFrame().Snapshot;
         Assert.Equal(910055u, snapshot.MapId);
         Assert.Equal(0u, snapshot.MapInstanceId);
-        Assert.False(scene.Owner.MetadataRegistry.TryGetPcMetadata(200, out _));
-        Assert.True(scene.TryDequeueMapTransition(out var archive));
-        Assert.Null(archive);
+        Assert.True(scene.Owner.MetadataRegistry.TryGetPcMetadata(200, out var metadata));
+        Assert.Equal("Initial Map Player", metadata.Nickname);
         Assert.False(scene.TryDequeueMapTransition(out _));
     }
 
@@ -683,7 +680,7 @@ public class SceneTimelineContractTests
         var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
         var sink = SceneSinkFactory.CreateForLive(scene)();
 
-        sink.SetCurrentMap(Source(100, 1, 0x0061), mapId);
+        sink.SetCurrentMap(Source(100, 1, 0x0240), mapId);
         Assert.True(scene.TryDequeueMapTransition(out var initialArchive));
         Assert.Null(initialArchive);
         sink.RegisterMapEvent(Source(200, 2, 0x2E92), 229782);
@@ -744,16 +741,16 @@ public class SceneTimelineContractTests
         var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
         var sink = SceneSinkFactory.CreateForLive(scene)();
 
-        sink.SetCurrentMap(Source(100, 1, 0x0061), 1001);
+        sink.SetCurrentMap(Source(100, 1, 0x0240), 1001);
         sink.AppendNickname(Source(110, 2, 0x3336), reusedId, "Map A Player");
         _ = scene.CreateFrame();
 
-        sink.SetCurrentMap(Source(200, 3, 0x0061), 1002);
+        sink.SetCurrentMap(Source(200, 3, 0x0240), 1002);
         var mapBOwner = scene.Owner;
         sink.AppendNpcCode(Source(210, 4, 0x4136), reusedId, 2_000_002);
         _ = scene.CreateFrame();
 
-        sink.SetCurrentMap(Source(300, 5, 0x0061), 1003);
+        sink.SetCurrentMap(Source(300, 5, 0x0240), 1003);
         var mapCOwner = scene.Owner;
         sink.AppendNickname(Source(310, 6, 0x3336), reusedId, "Map C Player");
 
@@ -776,7 +773,7 @@ public class SceneTimelineContractTests
         _ = scene.CreateFrame();
 
         var boundarySource = Source(200, 2, 0x2336) with { FlushId = 2 };
-        sink.AnnounceDestinationMapTransition(boundarySource, 1002);
+        sink.StageMapCandidate(boundarySource, 1002);
         sink.ConfirmDestinationMapArrival(boundarySource);
         var pending = new CombatWireObservation
         {
@@ -820,7 +817,7 @@ public class SceneTimelineContractTests
     {
         var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
         var sink = SceneSinkFactory.CreateForLive(scene)();
-        sink.SetCurrentMap(Source(100, 1, 0x0061), 1001);
+        sink.SetCurrentMap(Source(100, 1, 0x0240), 1001);
         Assert.True(scene.TryDequeueMapTransition(out var initialArchive));
         Assert.Null(initialArchive);
         sink.AppendNickname(Source(110, 2, 0x3336), 300, "Old Player");
@@ -842,7 +839,7 @@ public class SceneTimelineContractTests
     {
         var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
         var sink = SceneSinkFactory.CreateForLive(scene)();
-        sink.SetCurrentMap(Source(100, 1, 0x0061), 1001);
+        sink.SetCurrentMap(Source(100, 1, 0x0240), 1001);
         Assert.True(scene.TryDequeueMapTransition(out var initialArchive));
         Assert.Null(initialArchive);
         sink.AppendNickname(Source(110, 2, 0x3336), 300, "Old Player");

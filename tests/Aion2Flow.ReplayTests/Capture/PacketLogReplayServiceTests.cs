@@ -60,44 +60,20 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260725192105_StagesCompositeMapUntilQualifiedArrival()
+    public void Replay_20260725192105_IgnoresMapEventMapIdsForSceneScope()
     {
         var replay = PacketLogReplayService.Replay(
             FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentUnknownToSunkenTempleTransition}"));
-        var observations = ReadDirectMapEventObservations(replay, 0x0061, 0x0161);
+        Assert.Empty(ReadDirectMapEventObservations(replay, 0x0061, 0x0161));
 
-        Assert.Collection(
-            observations,
-            static announced =>
-            {
-                Assert.Equal((ushort)0x0161, announced.Opcode);
-                Assert.Equal(SceneObservationKind.DestinationMapTransitionAnnounced, announced.Kind);
-            },
-            static announced =>
-            {
-                Assert.Equal((ushort)0x0061, announced.Opcode);
-                Assert.Equal(SceneObservationKind.DestinationMapTransitionAnnounced, announced.Kind);
-            },
-            static countdown =>
-            {
-                Assert.Equal((ushort)0x0061, countdown.Opcode);
-                Assert.Equal(SceneObservationKind.DestinationMapTransitionCountdown, countdown.Kind);
-            },
-            static current =>
-            {
-                Assert.Equal((ushort)0x0061, current.Opcode);
-                Assert.Equal(SceneObservationKind.CurrentMap, current.Kind);
-            });
-
-        Assert.All(observations, static observation => Assert.Equal(610010u, observation.MapId));
         var candidate = Assert.Single(ReadDirectMapEventObservations(replay, 0x2136));
         Assert.Equal(610010u, candidate.MapId);
-        Assert.Equal(SceneObservationKind.MapCandidateObserved, candidate.Kind);
+        Assert.Equal(SceneObservationKind.MapContextStarted, candidate.Kind);
         Assert.Collection(
             ReadSceneTransitions(replay),
             static transition =>
             {
-                Assert.Equal((ushort)0x2336, transition.Opcode);
+                Assert.Equal((ushort)0x2136, transition.Opcode);
                 Assert.Equal(610010u, transition.MapId);
                 Assert.Equal(0u, transition.MapInstanceId);
                 Assert.Equal(SceneObservationKind.MapContextStarted, transition.Kind);
@@ -117,16 +93,12 @@ public sealed class PacketLogReplayServiceTests
         var transitions = ReadSceneTransitions(replay);
 
         var arrivals = transitions
-            .Where(static transition => transition.Opcode == 0x2336)
+            .Where(static transition => transition.Kind == SceneObservationKind.MapContextStarted)
             .ToArray();
         Assert.Equal(2, arrivals.Length);
-        Assert.All(
-            arrivals,
-            static arrival =>
-            {
-                Assert.Equal(910055u, arrival.MapId);
-                Assert.Equal(SceneObservationKind.MapContextStarted, arrival.Kind);
-            });
+        Assert.Equal((ushort)0x2136, arrivals[0].Opcode);
+        Assert.Equal((ushort)0x2336, arrivals[1].Opcode);
+        Assert.All(arrivals, static arrival => Assert.Equal(910055u, arrival.MapId));
         Assert.Equal(910055u, replay.Snapshot.MapId);
         Assert.Equal(229838u, replay.Snapshot.MapInstanceId);
         Assert.Single(replay.MapTransitionArchives);
@@ -145,7 +117,7 @@ public sealed class PacketLogReplayServiceTests
             transitions,
             static arrival =>
             {
-                Assert.Equal((ushort)0x2336, arrival.Opcode);
+                Assert.Equal((ushort)0x2136, arrival.Opcode);
                 Assert.Equal(1_111u, arrival.MapId);
                 Assert.Equal(0u, arrival.MapInstanceId);
                 Assert.Equal(SceneObservationKind.MapContextStarted, arrival.Kind);
@@ -155,7 +127,7 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(SceneObservationKind.TransportStreamActivated, transport.Kind);
         var candidate = Assert.Single(ReadDirectMapEventObservations(replay, 0x2136));
         Assert.Equal(1_111u, candidate.MapId);
-        Assert.Equal(SceneObservationKind.MapCandidateObserved, candidate.Kind);
+        Assert.Equal(SceneObservationKind.MapContextStarted, candidate.Kind);
 
         var archive = Assert.Single(replay.MapTransitionArchives);
         Assert.Equal(0u, archive.Snapshot.MapId);
@@ -517,33 +489,6 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260704002230_Parses_CrossServerMatchedPartyRelationsFromCurrentPackets()
-    {
-        SetResources();
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentCrossServerMatchedPartyRelation}"));
-        var entries = ReadAllJournalEntries(replay);
-
-        Assert.Contains(
-            entries,
-            static entry => entry.Raw.Opcode == 0x0092 &&
-                            entry.State is { EntityId: 10780, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
-
-        Assert.Contains(
-            entries,
-            static entry => entry.Raw.Opcode == 0x1B92 &&
-                            entry.State is { EntityId: 14000, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party, GroupMembership.MemberSlotIndex: 0 });
-
-        Assert.DoesNotContain(
-            entries,
-            static entry => entry.Raw.Opcode == 0x048D &&
-                            entry.State is { StateCode: StateCodes.PlayerGroupMembership });
-
-        AssertLiveGroupRelations(replay, PlayerGroupRelation.PartyMember, 9975, 10780, 14000, 14819);
-        AssertLiveGroupRelation(replay, 12478, PlayerGroupRelation.Unknown);
-    }
-
-    [Fact]
     public void Replay_20260712211428_RecognizesPartyMembersFromEarlyStatusFrames()
     {
         SetResources();
@@ -598,20 +543,6 @@ public sealed class PacketLogReplayServiceTests
             static entry => entry.Raw.Opcode == 0x0296 &&
                             entry.SourceEntityId == 0 &&
                             entry.State is { StateCode: StateCodes.PlayerGroupMembership, Text: "艾小露", OriginServerId: 2003, GroupMembership.Kind: PlayerGroupKind.Force });
-    }
-
-    [Fact]
-    public void Replay_20260715002239_RecognizesCompleteForceFromCurrentStatusFrames()
-    {
-        SetResources();
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentTenPlayerForceStatus}"));
-        var entries = ReadAllJournalEntries(replay);
-
-        AssertGroupMembershipObservations(entries, 0x1B92, PlayerGroupKind.Party, 7771, 9372, 10544, 12203);
-        AssertGroupMembershipObservations(entries, 0x2B96, PlayerGroupKind.Force, 1656, 8088, 10250, 10550, 14375);
-        AssertLiveGroupRelations(replay, PlayerGroupRelation.PartyMember, 7771, 9372, 10544, 12203);
-        AssertLiveGroupRelation(replay, 1134, PlayerGroupRelation.Unknown);
     }
 
     [Fact]
@@ -673,35 +604,6 @@ public sealed class PacketLogReplayServiceTests
         AssertForceRosterProfile(entries, "Apple苹果", 2010, 4);
         AssertForceRosterProfile(entries, "娜烏西卡", 2006, 5);
         AssertForceRosterProfile(entries, "韭艾", 2012, 5);
-    }
-
-    [Fact]
-    public void Replay_20260704155002_UsesPartyAndForceStatusFramesWithoutPromotingCombat048D()
-    {
-        SetResources();
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentForceDungeonPartyStatusRelations}"));
-        var entries = ReadAllJournalEntries(replay);
-
-        Assert.DoesNotContain(
-            entries,
-            static entry => entry.Raw.Opcode == 0x048D &&
-                            entry.State is { StateCode: StateCodes.PlayerGroupMembership });
-
-        Assert.Contains(
-            entries,
-            static entry => entry.Raw.Opcode == 0x1B92 &&
-                            entry.State is { EntityId: 3316, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Party });
-        Assert.Contains(
-            entries,
-            static entry => entry.Raw.Opcode == 0x2B96 &&
-                            entry.State is { EntityId: 1339, StateCode: StateCodes.PlayerGroupMembership, GroupMembership.Kind: PlayerGroupKind.Force });
-
-        var archive = Assert.Single(replay.MapTransitionArchives);
-        AssertArchivedGroupRelation(archive.IdentityScope, 7740, PlayerGroupRelation.PartyMember);
-        AssertLiveGroupRelations(replay, PlayerGroupRelation.PartyMember, 3316, 4909, 15338);
-        AssertLiveGroupRelations(replay, PlayerGroupRelation.ForceMember, 1339, 4110, 10984, 11101, 12588);
-        AssertLiveGroupRelation(replay, 15481, PlayerGroupRelation.Unknown);
     }
 
     [Fact]

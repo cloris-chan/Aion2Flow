@@ -109,15 +109,9 @@ internal sealed class PacketStateHandler
         return context.MarkParsed();
     }
 
-    public static bool ParseMapEventPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context, ushort opcode)
+    public static bool ParseMapScopeSignalPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context, ushort opcode)
     {
-        if (!PacketMapEventParser.TryParse(packet, out var parsed))
-        {
-            return false;
-        }
-
-        var source = context.CreateObservationSource(opcode, packet.Length);
-        if (!context.Writer.ApplyDestinationMapEvent(in source, parsed.MapId, parsed.Signal))
+        if (!PacketScopeSignalParser.TryParse(packet, opcode, out _))
         {
             return false;
         }
@@ -170,7 +164,16 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x0140, packet.Length);
-        context.Writer.ApplyCurrentMapFromCompositeSceneState(in source, parsed.Value0);
+        if (!context.Writer.ApplyCurrentMapFromCompositeSceneState(in source, parsed.Value0, out var mapScopeStarted))
+        {
+            return false;
+        }
+
+        if (mapScopeStarted)
+        {
+            context.ResetPlayerGroupStatus();
+        }
+
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -192,7 +195,16 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x2136, packet.Length);
-        context.Writer.StageMapCandidateFromCompositeSceneState(in source, parsed.Value0);
+        if (!context.Writer.StageMapCandidateFromCompositeSceneState(in source, parsed.Value0, out var mapScopeStarted))
+        {
+            return false;
+        }
+
+        if (mapScopeStarted)
+        {
+            context.ResetPlayerGroupStatus();
+        }
+
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {
@@ -213,7 +225,11 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.ConfirmDestinationMapArrival(context.CreateObservationSource(0x2336, packet.Length));
+        if (context.Sink.ConfirmDestinationMapArrival(context.CreateObservationSource(0x2336, packet.Length)))
+        {
+            context.ResetPlayerGroupStatus();
+        }
+
         return context.MarkParsed();
     }
 
@@ -253,7 +269,16 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x0240, packet.Length);
-        context.Writer.ApplyCurrentMapFromCompositeSceneState(in source, parsed.Value0);
+        if (!context.Writer.ApplyCurrentMapFromCompositeSceneState(in source, parsed.Value0, out var mapScopeStarted))
+        {
+            return false;
+        }
+
+        if (mapScopeStarted)
+        {
+            context.ResetPlayerGroupStatus();
+        }
+
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
         {

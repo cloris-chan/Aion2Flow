@@ -110,6 +110,18 @@ public sealed class SceneReadModelOwner(
         }
     }
 
+    internal bool HasCombatData
+    {
+        get
+        {
+            lock (_gate)
+            {
+                RefreshCore();
+                return _projection.Combat.Combatants.Count > 0;
+            }
+        }
+    }
+
     public SceneCombatSnapshot CreateSnapshot()
     {
         lock (_gate)

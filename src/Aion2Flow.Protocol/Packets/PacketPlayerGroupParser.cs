@@ -169,10 +169,15 @@ internal static class PacketPlayerGroupParser
             ? ProfileListExtendedOffset
             : ProfileListOffset;
         var count = 0;
-        while (count < destination.Length && count < MaxPartyMemberRows)
+        while (count < destination.Length &&
+               count < MaxPartyMemberRows &&
+               offset <= body.Length - ProfileListNameLengthOffset - 1)
         {
             if (!TryReadProfileListMemberRow(body, offset, out var member, out var rowTailOffset))
-                break;
+            {
+                offset++;
+                continue;
+            }
 
             destination[count++] = member;
             if (!TryFindNextProfileListMemberRow(body, Math.Max(rowTailOffset + 32, offset + ProfileListMinimumRowStride), out offset))
@@ -327,13 +332,15 @@ internal static class PacketPlayerGroupParser
 
         var entityId = BinaryPrimitives.ReadInt32LittleEndian(body[(rowOffset + 2)..]);
         var originServerId = BinaryPrimitives.ReadUInt16LittleEndian(body[(rowOffset + 6)..]);
-        var originServerIdCopy = BinaryPrimitives.ReadUInt16LittleEndian(body[(rowOffset + 8)..]);
-        if (entityId <= 0 || !IsKnownServerId(originServerId) || originServerId != originServerIdCopy)
+        if (entityId <= 0 || !IsKnownServerId(originServerId))
             return false;
 
         var uuidLength = body[rowOffset + 10];
-        var nameLengthOffset = rowOffset + 11 + uuidLength + 8;
-        if (uuidLength != ExpectedUuidLength || nameLengthOffset >= body.Length)
+        var repeatedServerOffset = rowOffset + 11 + uuidLength + 6;
+        var nameLengthOffset = repeatedServerOffset + sizeof(ushort);
+        if (uuidLength != ExpectedUuidLength ||
+            nameLengthOffset >= body.Length ||
+            BinaryPrimitives.ReadUInt16LittleEndian(body[repeatedServerOffset..]) != originServerId)
             return false;
 
         var nameLength = body[nameLengthOffset];
@@ -363,8 +370,7 @@ internal static class PacketPlayerGroupParser
         }
 
         var originServerId = BinaryPrimitives.ReadUInt16LittleEndian(body[(rowOffset + 6)..]);
-        var originServerIdCopy = BinaryPrimitives.ReadUInt16LittleEndian(body[(rowOffset + 8)..]);
-        if (!IsKnownServerId(originServerId) || originServerId != originServerIdCopy)
+        if (!IsKnownServerId(originServerId))
             return false;
 
         var uuidLength = body[rowOffset + 10];
@@ -432,7 +438,7 @@ internal static class PacketPlayerGroupParser
             return false;
 
         var memberSlotIndex = body[rowOffset + 2];
-        if (body[rowOffset] > 0x04 ||
+        if (body[rowOffset] > 0x05 ||
             body[rowOffset + 1] > 0x07 ||
             memberSlotIndex is < 1 or > 6)
         {

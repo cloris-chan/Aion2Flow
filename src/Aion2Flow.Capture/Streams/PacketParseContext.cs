@@ -24,6 +24,8 @@ internal ref struct PacketParseContext(
 
     public readonly bool TryRegisterForceStatusMember(int entityId) => playerGroupState.TryRegisterForceStatusMember(entityId);
 
+    public readonly void ResetPlayerGroupStatus() => playerGroupState.Reset();
+
     public readonly long FlushId => flushState.CurrentFlushId;
 
     public readonly PacketObservationSource CreateObservationSource(ushort opcode, int payloadLength, long captureSequence = 0)

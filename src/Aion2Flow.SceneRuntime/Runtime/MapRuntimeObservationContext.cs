@@ -11,14 +11,46 @@ internal sealed class MapRuntimeObservationContext
     private uint _currentMapInstanceId;
     private uint _candidateMapId;
     private bool _mapEventDepartureObserved;
+    private bool _currentMapIsProvisional;
+    private bool _provisionalCombatObserved;
+    private bool _arrivalConfirmed;
 
     public MapEntityIngressState Entities => _entities;
+
+    public bool HasMapScope => _currentMapId != 0 || _currentMapIsProvisional;
+
+    public void MarkCombatObserved()
+    {
+        if (_currentMapIsProvisional)
+            _provisionalCombatObserved = true;
+    }
 
     public bool TryConfirmCurrentMap(uint mapId, out uint boundaryMapId)
     {
         boundaryMapId = 0;
         if (mapId == 0)
             return false;
+
+        if (_currentMapIsProvisional)
+        {
+            if (_provisionalCombatObserved)
+            {
+                boundaryMapId = mapId;
+                return true;
+            }
+
+            _currentMapId = mapId;
+            _currentMapIsProvisional = false;
+            if (_candidateMapId == mapId)
+                _candidateMapId = 0;
+            return false;
+        }
+
+        if (_currentMapId == 0)
+        {
+            boundaryMapId = mapId;
+            return true;
+        }
 
         if (_currentMapId == mapId)
         {
@@ -38,12 +70,49 @@ internal sealed class MapRuntimeObservationContext
         return true;
     }
 
-    public void StageMapCandidate(uint mapId)
+    public MapScopeCandidateResult StageMapCandidate(uint mapId)
     {
         if (mapId == 0)
-            return;
+            return MapScopeCandidateResult.Ignored;
+
+        if (_currentMapIsProvisional)
+        {
+            if (_provisionalCombatObserved)
+            {
+                _candidateMapId = mapId;
+                _arrivalConfirmed = false;
+                return MapScopeCandidateResult.ArrivalBoundary;
+            }
+
+            _currentMapId = mapId;
+            _currentMapIsProvisional = false;
+            _candidateMapId = 0;
+            _arrivalConfirmed = false;
+            return MapScopeCandidateResult.CurrentMapAdopted;
+        }
+
+        if (_currentMapId == 0)
+        {
+            _candidateMapId = 0;
+            _arrivalConfirmed = false;
+            return MapScopeCandidateResult.ArrivalBoundary;
+        }
+
+        if (_currentMapId == mapId)
+        {
+            _candidateMapId = 0;
+            _arrivalConfirmed = false;
+            return MapScopeCandidateResult.CurrentMapAdopted;
+        }
 
         _candidateMapId = mapId;
+        if (_arrivalConfirmed)
+        {
+            _arrivalConfirmed = false;
+            return MapScopeCandidateResult.ArrivalBoundary;
+        }
+
+        return MapScopeCandidateResult.CandidateStaged;
     }
 
     public void RegisterMapEvent(uint instanceId)
@@ -70,24 +139,51 @@ internal sealed class MapRuntimeObservationContext
     public bool TryCommitArrival(out uint mapId)
     {
         mapId = _candidateMapId != 0 ? _candidateMapId : _currentMapId;
+        _arrivalConfirmed = true;
+
+        if (_currentMapIsProvisional && _candidateMapId != 0)
+        {
+            _currentMapId = _candidateMapId;
+            _candidateMapId = 0;
+            _currentMapIsProvisional = false;
+            _arrivalConfirmed = false;
+            return false;
+        }
+
         var startsMapContext =
             (_candidateMapId != 0 && _candidateMapId != _currentMapId) ||
             _mapEventDepartureObserved;
         if (!startsMapContext)
             _candidateMapId = 0;
 
+        if (startsMapContext)
+            _arrivalConfirmed = false;
+
         return startsMapContext;
     }
 
-    public void StartMapContext(uint mapId)
+    public void StartMapContext(uint mapId, bool provisional = false, bool preserveEntities = false)
     {
-        _entities = new MapEntityIngressState();
+        if (!preserveEntities)
+            _entities = new MapEntityIngressState();
         _mapEventRegistrations.Clear();
         _currentMapId = mapId;
         _currentMapInstanceId = 0;
         _candidateMapId = 0;
         _mapEventDepartureObserved = false;
+        _currentMapIsProvisional = provisional;
+        _provisionalCombatObserved = false;
+        _arrivalConfirmed = false;
     }
+
+}
+
+internal enum MapScopeCandidateResult : byte
+{
+    Ignored,
+    CurrentMapAdopted,
+    CandidateStaged,
+    ArrivalBoundary
 }
 
 internal sealed class MapEntityIngressState

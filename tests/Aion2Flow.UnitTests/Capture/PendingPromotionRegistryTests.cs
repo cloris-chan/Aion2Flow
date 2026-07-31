@@ -22,6 +22,37 @@ public sealed class PendingPromotionRegistryTests
     }
 
     [Fact]
+    public void SupersededAttemptDoesNotCancelPromotionWithTheCurrentOrdinal()
+    {
+        var connection = CreateConnection();
+        var registry = new PendingPromotionRegistry();
+        var promotion = CreatePromotion(connection, candidateOrdinal: 7);
+
+        registry.Register(in connection, promotion);
+
+        Assert.False(registry.CancelForSupersededAttempt(in connection, newerConnectionOrdinal: 7));
+        Assert.True(registry.TryGetForPayload(in connection, 7, out var selected));
+        Assert.Same(promotion, selected);
+
+        promotion.Return();
+    }
+
+    [Fact]
+    public void SupersededAttemptCancelsOnlyOlderPromotion()
+    {
+        var connection = CreateConnection();
+        var registry = new PendingPromotionRegistry();
+        var promotion = CreatePromotion(connection, candidateOrdinal: 7);
+
+        registry.Register(in connection, promotion);
+
+        Assert.True(registry.CancelForSupersededAttempt(in connection, newerConnectionOrdinal: 8));
+        Assert.False(promotion.TryAcquireForDispatch());
+
+        promotion.Return();
+    }
+
+    [Fact]
     public void CloseSelectionRequiresTheMatchingTupleAndOrdinal()
     {
         var connection = CreateConnection();

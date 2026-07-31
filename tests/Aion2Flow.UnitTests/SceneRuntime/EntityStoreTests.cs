@@ -1735,7 +1735,7 @@ public class SceneReadModelOwnerTests
     }
 
     [Fact]
-    public void ReplaySinkHolder_FollowsArrivedMapContextOwnerReplacement()
+    public void ReplaySinkHolder_AttachesInitialMapContextToCurrentOwner()
     {
         using var holder = SceneSinkFactory.CreateForReplay();
         var previousOwner = holder.Owner;
@@ -1745,12 +1745,13 @@ public class SceneReadModelOwnerTests
         holder.Sink.StageMapCandidate(in candidate, 1_001);
         var boundary = new PacketObservationSource(2_000, 0, 0x2336, 0, 0, default);
         holder.Sink.ConfirmDestinationMapArrival(in boundary);
-        holder.Sink.AppendNpcCode(100, 2_000_002);
+        holder.Sink.AppendNpcCode(101, 2_000_002);
         holder.Owner.Refresh();
 
-        Assert.NotSame(previousOwner, holder.Owner);
-        Assert.False(holder.Owner.MetadataRegistry.TryGetPcMetadata(100, out _));
-        Assert.True(holder.Owner.Entities.TryGet(100, out var entity));
+        Assert.Same(previousOwner, holder.Owner);
+        Assert.True(holder.Owner.MetadataRegistry.TryGetPcMetadata(100, out var metadata));
+        Assert.Equal("Old Player", metadata.Nickname);
+        Assert.True(holder.Owner.Entities.TryGet(101, out var entity));
         Assert.Equal(2_000_002, entity.NpcCode);
     }
 

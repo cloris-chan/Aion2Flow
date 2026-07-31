@@ -1226,7 +1226,7 @@ public sealed class MainViewModelCombatantFilterTests
         }
         else
         {
-            sink.AnnounceDestinationMapTransition(in source, mapId);
+            sink.StageMapCandidate(in source, mapId);
             sink.ConfirmDestinationMapArrival(in source);
         }
 

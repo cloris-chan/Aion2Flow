@@ -272,6 +272,35 @@ public sealed class TcpWorldConnectionCandidatePriorityTests
     }
 
     [Fact]
+    public void ResetOlderThanKeepsCandidateForTheCurrentAttempt()
+    {
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var frame = Build0036Frame(captureMilliseconds);
+        var connection = CreateConnection(0);
+        using var candidates = new TcpWorldConnectionCandidateTracker();
+
+        Assert.Equal(
+            CandidatePacketDisposition.Buffered,
+            Add(
+                candidates,
+                connection,
+                frame.AsSpan(0, 4),
+                sequenceNumber: 10_000,
+                connectionOrdinal: 11,
+                CandidateConnectionPriority.ObservedHandshake,
+                Stopwatch.GetTimestamp(),
+                initialSequenceNumber: 10_000,
+                allowMidstreamRecovery: false,
+                out _));
+
+        candidates.ResetOlderThan(in connection, newerConnectionOrdinal: 10);
+        Assert.True(candidates.Contains(in connection));
+
+        candidates.ResetOlderThan(in connection, newerConnectionOrdinal: 12);
+        Assert.False(candidates.Contains(in connection));
+    }
+
+    [Fact]
     public void UnknownCandidateByteFloodCannotEvictProtocolEvidenceCandidate()
     {
         var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -538,6 +567,103 @@ public sealed class TcpWorldConnectionCandidatePriorityTests
                     out promotion));
             Assert.NotNull(promotion);
             Assert.Equal(10_005u, promotion.ReplayStartSequenceNumber);
+        }
+        finally
+        {
+            promotion?.Return();
+        }
+    }
+
+    [Fact]
+    public void LargeUnknownBootstrapIsRetainedUntilLaterProtocolEvidence()
+    {
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var unknownFrame = BuildFrame(0x7a, 0x7b, new byte[116_000]);
+        var tickFrame = Build0036Frame(captureMilliseconds);
+        var connection = CreateConnection(0);
+        using var candidates = new TcpWorldConnectionCandidateTracker();
+        CaptureConnectionPromotion? promotion = null;
+
+        try
+        {
+            Assert.Equal(
+                CandidatePacketDisposition.Buffered,
+                Add(
+                    candidates,
+                    connection,
+                    unknownFrame,
+                    sequenceNumber: 10_000,
+                    connectionOrdinal: 1,
+                    CandidateConnectionPriority.UnknownInbound,
+                    Stopwatch.GetTimestamp(),
+                    initialSequenceNumber: null,
+                    allowMidstreamRecovery: true,
+                    out _));
+            Assert.True(candidates.Contains(in connection));
+
+            Assert.Equal(
+                CandidatePacketDisposition.Confirmed,
+                Add(
+                    candidates,
+                    connection,
+                    tickFrame,
+                    sequenceNumber: 10_000u + (uint)unknownFrame.Length,
+                    connectionOrdinal: 1,
+                    CandidateConnectionPriority.UnknownInbound,
+                    Stopwatch.GetTimestamp(),
+                    initialSequenceNumber: null,
+                    allowMidstreamRecovery: true,
+                    out promotion));
+            Assert.NotNull(promotion);
+            Assert.Equal(2, promotion.Packets.Count);
+        }
+        finally
+        {
+            promotion?.Return();
+        }
+    }
+
+    [Fact]
+    public void ObservedHandshakeCandidateIsRetainedUntilProtocolEvidenceArrives()
+    {
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var frame = Build0036Frame(captureMilliseconds);
+        var connection = CreateConnection(0);
+        var observedTimestamp = Stopwatch.GetTimestamp();
+        using var candidates = new TcpWorldConnectionCandidateTracker();
+        CaptureConnectionPromotion? promotion = null;
+
+        try
+        {
+            Assert.Equal(
+                CandidatePacketDisposition.Buffered,
+                Add(
+                    candidates,
+                    connection,
+                    frame.AsSpan(0, 4),
+                    sequenceNumber: 10_000,
+                    connectionOrdinal: 1,
+                    CandidateConnectionPriority.ObservedHandshake,
+                    observedTimestamp,
+                    initialSequenceNumber: 10_000,
+                    allowMidstreamRecovery: false,
+                    out _));
+
+            Assert.Equal(
+                CandidatePacketDisposition.Confirmed,
+                Add(
+                    candidates,
+                    connection,
+                    frame.AsSpan(4),
+                    sequenceNumber: 10_004,
+                    connectionOrdinal: 1,
+                    CandidateConnectionPriority.ObservedHandshake,
+                    observedTimestamp + Stopwatch.Frequency * 31L,
+                    initialSequenceNumber: 10_000,
+                    allowMidstreamRecovery: false,
+                    out promotion));
+            Assert.NotNull(promotion);
+            Assert.Equal(2, promotion.Packets.Count);
         }
         finally
         {

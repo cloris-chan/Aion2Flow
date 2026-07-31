@@ -26,13 +26,11 @@ public interface IRuntimeObservationSink
 
     void SetCurrentMap(in PacketObservationSource packet, uint mapId);
 
-    void StageMapCandidate(in PacketObservationSource packet, uint mapId);
+    void EnsureUnknownMapScope(in PacketObservationSource packet);
 
-    void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId);
+    bool StageMapCandidate(in PacketObservationSource packet, uint mapId);
 
-    void ObserveDestinationMapTransitionCountdown(in PacketObservationSource packet, uint mapId);
-
-    void ConfirmDestinationMapArrival(in PacketObservationSource packet);
+    bool ConfirmDestinationMapArrival(in PacketObservationSource packet);
 
     void RegisterMapEvent(in PacketObservationSource packet, uint instanceId);
 

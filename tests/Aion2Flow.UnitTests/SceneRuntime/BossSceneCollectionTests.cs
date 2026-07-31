@@ -165,7 +165,7 @@ public sealed class BossSceneCollectionTests
 
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 1_500);
         sink.AppendNpcHp(Source(1_510), 300, 99_500, 100_000);
-        sink.AnnounceDestinationMapTransition(Source(2_000, 2), 200_004);
+        sink.StageMapCandidate(Source(2_000, 2), 200_004);
         sink.UnregisterMapEvent(Source(2_005, 2), 113_515);
         sink.ConfirmDestinationMapArrival(Source(2_010, 2));
         sink.CompleteFlush(2);

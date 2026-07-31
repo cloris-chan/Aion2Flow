@@ -151,33 +151,45 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         AppendSceneMapObservation(in packet, mapId, SceneObservationKind.CurrentMap);
     }
 
-    public void StageMapCandidate(in PacketObservationSource packet, uint mapId)
+    public void EnsureUnknownMapScope(in PacketObservationSource packet)
     {
-        _mapContext.StageMapCandidate(mapId);
-        AppendSceneMapObservation(in packet, mapId, SceneObservationKind.MapCandidateObserved);
+        if (_mapContext.HasMapScope)
+        {
+            return;
+        }
+
+        StartMapContext(in packet, 0, provisional: true);
     }
 
-    public void AnnounceDestinationMapTransition(in PacketObservationSource packet, uint mapId)
+    public bool StageMapCandidate(in PacketObservationSource packet, uint mapId)
     {
-        _mapContext.StageMapCandidate(mapId);
-        AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapTransitionAnnounced);
+        switch (_mapContext.StageMapCandidate(mapId))
+        {
+            case MapScopeCandidateResult.CurrentMapAdopted:
+                AppendSceneMapObservation(in packet, mapId, SceneObservationKind.CurrentMap);
+                return false;
+            case MapScopeCandidateResult.CandidateStaged:
+                AppendSceneMapObservation(in packet, mapId, SceneObservationKind.MapCandidateObserved);
+                return false;
+            case MapScopeCandidateResult.ArrivalBoundary:
+                var hadMapScope = _mapContext.HasMapScope;
+                StartMapContext(in packet, mapId);
+                return hadMapScope;
+            default:
+                return false;
+        }
     }
 
-    public void ObserveDestinationMapTransitionCountdown(in PacketObservationSource packet, uint mapId)
-    {
-        _mapContext.StageMapCandidate(mapId);
-        AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapTransitionCountdown);
-    }
-
-    public void ConfirmDestinationMapArrival(in PacketObservationSource packet)
+    public bool ConfirmDestinationMapArrival(in PacketObservationSource packet)
     {
         if (_mapContext.TryCommitArrival(out var mapId))
         {
             StartMapContext(in packet, mapId);
-            return;
+            return true;
         }
 
         AppendSceneMapObservation(in packet, mapId, SceneObservationKind.DestinationMapArrival);
+        return false;
     }
 
     private void AppendSceneMapObservation(
@@ -239,10 +251,15 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
 
     private void StartMapContext(
         in PacketObservationSource packet,
-        uint mapId)
+        uint mapId,
+        bool provisional = false)
     {
+        var hadMapScope = _mapContext.HasMapScope;
         collectionPolicy?.StartMapContext(in packet, mapId);
-        _mapContext.StartMapContext(mapId);
+        _mapContext.StartMapContext(mapId, provisional, preserveEntities: !hadMapScope);
+        if (provisional)
+            return;
+
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, 0, 0, packet.Raw),
@@ -256,10 +273,12 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
 
     public void AppendCombatWireObservation(in PacketObservationSource packet, int sourceId, int targetId, in CombatWireObservation observation)
     {
+        EnsureUnknownMapScope(in packet);
         sourceId = ResolveLifecycleId(sourceId);
         targetId = ResolveLifecycleId(targetId);
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
             return;
+        _mapContext.MarkCombatObserved();
         AddKnownEntity(sourceId);
         AddKnownEntity(targetId);
         var stamp = CreateStamp(in packet);
@@ -270,10 +289,12 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
 
     public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type)
     {
+        EnsureUnknownMapScope(in packet);
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
             return;
+        _mapContext.MarkCombatObserved();
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, sourceId, targetId, packet.Raw),
@@ -293,10 +314,12 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
 
     public void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type, int value)
     {
+        EnsureUnknownMapScope(in packet);
         targetId = ResolveLifecycleId(targetId);
         sourceId = ResolveLifecycleId(sourceId);
         if (collectionPolicy is not null && !collectionPolicy.ShouldAppendCombat(in packet, sourceId, targetId, this))
             return;
+        _mapContext.MarkCombatObserved();
         var stamp = CreateStamp(in packet);
         journal.Append(
             CreateHeader(in stamp, sourceId, targetId, packet.Raw),

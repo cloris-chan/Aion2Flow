@@ -345,6 +345,12 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
     void ILiveSceneCollectionPolicy.StartMapContext(in PacketObservationSource packet, uint mapId)
     {
+        if (!_mapRuntime.HasMapScope && !_owner.HasCombatData)
+        {
+            _pendingMapTransitions.Enqueue(null);
+            return;
+        }
+
         var boundaryOrdinal = Clock.NextObservationOrdinal;
         var archive = _owner.CreateMapBoundaryArchive(boundaryOrdinal);
         var retainedArchive = archive.Snapshot.Combatants.Count > 0

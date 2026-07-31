@@ -8,4 +8,10 @@ internal sealed class PacketPlayerGroupState
     public bool TryRegisterPartyStatusMember(int entityId) => entityId > 0 && _observedPartyStatusMemberIds.Add(entityId);
 
     public bool TryRegisterForceStatusMember(int entityId) => entityId > 0 && _observedForceStatusMemberIds.Add(entityId);
+
+    public void Reset()
+    {
+        _observedPartyStatusMemberIds.Clear();
+        _observedForceStatusMemberIds.Clear();
+    }
 }
