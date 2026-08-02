@@ -37,11 +37,30 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void CurrentPlaybackContextUsesSessionBoundLiveSource()
+    public void LivePlaybackContextUsesSessionBoundSource()
     {
         var fixture = MainViewModelFixture.Create();
 
-        var context = fixture.ViewModel.CreateCurrentPlaybackContext();
+        var context = fixture.ViewModel.CreateLivePlaybackContext();
+
+        Assert.Equal(ScenePlaybackSourceKind.Live, context.Source.SourceKind);
+        Assert.Equal(fixture.SceneId, context.Source.EncounterId);
+        Assert.Same(fixture.MetadataRegistry, context.DisplayContext.MetadataRegistry);
+        Assert.True(context.Source.CreateTimelineSegment().IsLiveGrowing);
+        context.Source.Dispose();
+    }
+
+    [Fact]
+    public void LivePlaybackContextRemainsLiveWhenArchivedSceneIsSelected()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Archived Player", 400, 3_000, 5_000);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        fixture.ViewModel.ArchiveCurrentEncounterCommand.Execute(null);
+        var history = Assert.Single(fixture.ViewModel.EncounterHistory);
+        fixture.ViewModel.SelectedEncounterHistory = history;
+
+        var context = fixture.ViewModel.CreateLivePlaybackContext();
 
         Assert.Equal(ScenePlaybackSourceKind.Live, context.Source.SourceKind);
         Assert.Equal(fixture.SceneId, context.Source.EncounterId);

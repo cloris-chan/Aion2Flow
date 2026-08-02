@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private const int MaxPinNativeRetries = 3;
     private const int MaxNativeStyleRetries = 3;
     private static readonly TimeSpan CursorProbeInterval = TimeSpan.FromMilliseconds(33);
+    private static readonly object LiveSceneMenuItemTag = new();
 
     private readonly GlobalHotkeyService _globalHotkeyService;
     private readonly OverlayInteractionController _overlayInteractionController;
@@ -416,6 +417,10 @@ public partial class MainWindow : Window
         CommitWindowInputState(nextInputState);
         _appliedOverlayInteractionMode = mode;
         _hasAppliedOverlayInteractionMode = true;
+        if (mode == OverlayInteractionMode.ClickThrough && DataContext.IsViewingArchivedEncounter)
+        {
+            DataContext.ReturnToLiveCommand.Execute(null);
+        }
     }
 
     private bool SynchronizeOverlayTopmostBand()
@@ -689,6 +694,7 @@ public partial class MainWindow : Window
         }
 
         menu.Items.Clear();
+        menu.Items.Add(CreateLiveSceneMenuItem());
         if (DataContext.EncounterHistory.Count == 0)
         {
             var placeholder = new MenuItem
@@ -737,24 +743,7 @@ public partial class MainWindow : Window
             Grid.SetColumn(archivedAt, 1);
             header.Children.Add(archivedAt);
 
-            var playbackButton = new Button
-            {
-                Tag = item,
-                VerticalAlignment = VerticalAlignment.Center,
-                Content = new Avalonia.Controls.Shapes.Path
-                {
-                    Data = IconGeometries.Play
-                }
-            };
-            ToolTip.SetTip(playbackButton, DataContext.Localization["Playback_Open"]);
-            playbackButton.Classes.Add("FlyoutInlineButton");
-            if (playbackButton.Content is Avalonia.Controls.Shapes.Path playbackIcon)
-            {
-                playbackIcon.Classes.Add("Glyph");
-                playbackIcon.Classes.Add("GlyphSm");
-            }
-
-            playbackButton.Click += EncounterHistoryPlaybackButtonClicked;
+            var playbackButton = CreatePlaybackButton(item);
             Grid.SetColumn(playbackButton, 2);
             header.Children.Add(playbackButton);
 
@@ -770,9 +759,86 @@ public partial class MainWindow : Window
         }
     }
 
+    private MenuItem CreateLiveSceneMenuItem()
+    {
+        var header = new Grid
+        {
+            ColumnDefinitions =
+            [
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto)
+            ],
+            ColumnSpacing = 6,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        DisplayContextProvider.SetDisplayContext(header, DataContext.DisplayContext);
+
+        var sceneName = new TextBlock
+        {
+            Text = DataContext.Localization["Action_Live"],
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        sceneName.Classes.Add("SettingsRowLabel");
+        Grid.SetColumn(sceneName, 0);
+        header.Children.Add(sceneName);
+
+        var playbackButton = CreatePlaybackButton(LiveSceneMenuItemTag);
+        Grid.SetColumn(playbackButton, 1);
+        header.Children.Add(playbackButton);
+
+        var menuItem = new MenuItem
+        {
+            Header = header,
+            Tag = LiveSceneMenuItemTag
+        };
+        menuItem.Classes.Add("FlyoutMenuItem");
+        menuItem.Classes.Add("FlyoutPanelRow");
+        menuItem.Click += EncounterHistoryMenuItemClicked;
+        return menuItem;
+    }
+
+    private Button CreatePlaybackButton(object tag)
+    {
+        var playbackButton = new Button
+        {
+            Tag = tag,
+            VerticalAlignment = VerticalAlignment.Center,
+            Content = new Avalonia.Controls.Shapes.Path
+            {
+                Data = IconGeometries.Play
+            }
+        };
+        ToolTip.SetTip(playbackButton, DataContext.Localization["Playback_Open"]);
+        playbackButton.Classes.Add("FlyoutInlineButton");
+        if (playbackButton.Content is Avalonia.Controls.Shapes.Path playbackIcon)
+        {
+            playbackIcon.Classes.Add("Glyph");
+            playbackIcon.Classes.Add("GlyphSm");
+        }
+
+        playbackButton.Click += EncounterHistoryPlaybackButtonClicked;
+        return playbackButton;
+    }
+
     private void EncounterHistoryMenuItemClicked(object? sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem { Tag: EncounterHistoryItemViewModel item })
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(menuItem.Tag, LiveSceneMenuItemTag))
+        {
+            if (DataContext.ReturnToLiveCommand.CanExecute(null))
+            {
+                DataContext.ReturnToLiveCommand.Execute(null);
+            }
+            return;
+        }
+
+        if (menuItem.Tag is EncounterHistoryItemViewModel item)
         {
             DataContext.SelectedEncounterHistory = item;
         }
@@ -781,15 +847,21 @@ public partial class MainWindow : Window
     private void EncounterHistoryPlaybackButtonClicked(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        if (sender is Button { Tag: EncounterHistoryItemViewModel item })
+        if (sender is not Button { Tag: var tag })
+        {
+            return;
+        }
+
+        if (ReferenceEquals(tag, LiveSceneMenuItemTag))
+        {
+            OpenPlayback(DataContext.CreateLivePlaybackContext());
+            return;
+        }
+
+        if (tag is EncounterHistoryItemViewModel item)
         {
             OpenPlayback(MainViewModel.CreatePlaybackContext(item));
         }
-    }
-
-    private void OpenCurrentPlayback(object? sender, RoutedEventArgs e)
-    {
-        OpenPlayback(DataContext.CreateCurrentPlaybackContext());
     }
 
     private void OpenPlayback(ScenePlaybackOpenContext context)

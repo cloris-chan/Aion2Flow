@@ -179,9 +179,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     [ObservableProperty]
     public partial bool IsViewingArchivedEncounter { get; set; }
 
-    [ObservableProperty]
-    public partial bool HasArchivedEncounters { get; set; }
-
     public MainViewModel(
         WinDivertCaptureService captureService,
         ProcessPortDiscoveryService processPortDiscoveryService,
@@ -970,7 +967,6 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                 record.ArchivedAt.ToString("HH:mm:ss")));
         }
 
-        HasArchivedEncounters = EncounterHistory.Count > 0;
         SelectedEncounterHistory = EncounterHistory.FirstOrDefault(x => x.Record.Id == selectedId);
     }
 
@@ -1005,11 +1001,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private SceneDisplayContext CreateArchivedDisplayContext(ArchivedEncounterRecord record)
         => CreateDisplayContext(record.ScenePayload.Snapshot, record.ScenePayload.IdentityScope, null);
 
-    internal ScenePlaybackOpenContext CreateCurrentPlaybackContext()
+    internal ScenePlaybackOpenContext CreateLivePlaybackContext()
     {
-        if (IsViewingArchivedEncounter && SelectedEncounterHistory is { } archived)
-            return CreatePlaybackContext(archived);
-
         var source = _captureService.Scene.CreatePlaybackSource(out var metadataRegistry);
         var displayContext = CreateDisplayContext(source.CreateSnapshot(), SceneIdentityScope.Empty, metadataRegistry);
         return new ScenePlaybackOpenContext(source, displayContext);

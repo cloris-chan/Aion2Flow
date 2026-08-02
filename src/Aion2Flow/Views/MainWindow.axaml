@@ -45,27 +45,13 @@
                         <Button Classes="WindowBtn RefreshBtn"
                                 Command="{Binding ResetCommand}"
                                 IsEnabled="{Binding IsCapturing}"
-                                Margin="0,0,4,0"
                                 ToolTip.Tip="{markups:Translate Action_BattleReset}">
                             <Path Classes="Glyph GlyphSm" Data="{StaticResource rotate-cw}" />
                         </Button>
 
-                        <Button Classes="WindowBtn"
-                                IsEnabled="{Binding IsViewingArchivedEncounter}"
-                                Command="{Binding ReturnToLiveCommand}"
-                                ToolTip.Tip="{markups:Translate Action_Live}">
-                            <Path Classes="Glyph GlyphMd" Data="{StaticResource radio}" />
-                        </Button>
-
-                        <Button Classes="WindowBtn"
-                                Click="OpenCurrentPlayback"
-                                ToolTip.Tip="{markups:Translate Playback_Open}">
-                            <Path Classes="Glyph GlyphMd" Data="{StaticResource play}" />
-                        </Button>
-
                         <Button x:Name="EncounterHistoryButton"
                                 Classes="WindowBtn"
-                                IsEnabled="{Binding HasArchivedEncounters}"
+                                Classes.active="{Binding IsViewingArchivedEncounter}"
                                 ToolTip.Tip="{markups:Translate Column_History}">
                             <Path Classes="Glyph GlyphMd" Data="{StaticResource history}" />
                             <Button.Flyout>
@@ -86,6 +72,7 @@
                                              MinWidth="0"
                                              IsHitTestVisible="False"
                                              HorizontalAlignment="Stretch"
+                                             HorizontalContentAlignment="Center"
                                              VerticalAlignment="Center" />
                     </Border>
 

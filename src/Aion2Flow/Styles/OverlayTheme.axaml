@@ -339,6 +339,10 @@
         <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
     </Style>
 
+    <Style Selector="Button.WindowBtn.active Path.Glyph">
+        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
+    </Style>
+
     <Style Selector="Button.WindowBtn:disabled">
         <Setter Property="Opacity" Value="0.35" />
     </Style>
