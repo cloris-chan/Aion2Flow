@@ -357,7 +357,7 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
-    public void RefreshCombatStats_SceneMode_MergesTrainingDummyFocusDisplayByNpcCode()
+    public void RefreshCombatStats_SceneMode_DoesNotDisplayTrainingDummyFocus()
     {
         const int dummyNpcCode = 2_400_032;
         var fixture = MainViewModelFixture.Create();
@@ -368,15 +368,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         fixture.ViewModel.RefreshCombatStatsForTesting();
 
-        var focus = Assert.Single(fixture.ViewModel.BossFocuses);
-        Assert.Equal(-dummyNpcCode, focus.DisplayKey);
-        Assert.Equal(900_003, focus.InstanceId);
-        Assert.Equal(dummyNpcCode, focus.NpcCode);
-        Assert.Equal(3, focus.InstanceCount);
-        Assert.True(focus.HasMultipleInstances);
-        Assert.Equal("x3", focus.InstanceCountText);
-        Assert.Equal(60_000, focus.Hp);
-        Assert.Equal(100_000, focus.MaxHp);
+        Assert.Empty(fixture.ViewModel.BossFocuses);
         Assert.Equal(3, fixture.ViewModel.DisplayContext!.Snapshot.BossFocuses.Count);
     }
 

@@ -1,4 +1,3 @@
-using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -22,11 +21,14 @@ internal static class BossFocusDisplayBuilder
         for (var i = 0; i < snapshots.Count; i++)
         {
             var snapshot = snapshots[i];
+            if (snapshot.Kind != NpcKind.Boss)
+                continue;
+
             if (!TryResolveDisplayActivity(snapshot, damageContributions, statisticsScope, isDisplayedCombatant, out var displayObservedAtMilliseconds))
                 continue;
 
             var npcCode = ResolveNpcCode(displayContext, snapshot.InstanceId);
-            var displayKey = ResolveDisplayKey(displayContext, snapshot.InstanceId, npcCode);
+            var displayKey = snapshot.InstanceId;
             var existingIndex = FindDisplayIndex(groups, displayKey);
             if (existingIndex < 0)
             {
@@ -149,18 +151,6 @@ internal static class BossFocusDisplayBuilder
 
         return hasDisplayActivity &&
                Math.Max(0, snapshot.LastObservedAtMilliseconds - observedAtMilliseconds) <= SceneReadModelOwner.BossFocusVisibilityTimeoutMilliseconds;
-    }
-
-    private static long ResolveDisplayKey(SceneDisplayContext? displayContext, int instanceId, int npcCode)
-    {
-        if (npcCode > 0 &&
-            displayContext?.ResolveNpcCodeCatalogEntry(npcCode) is { Kind: var kind } &&
-            kind == NpcCatalogKind.TrainingDummy)
-        {
-            return -(long)npcCode;
-        }
-
-        return instanceId;
     }
 
     private static bool IsBetterRepresentative(
