@@ -212,14 +212,17 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
 
     public IReadOnlyCollection<(int, int)> GetIncomingPairs(int targetId) => _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
 
-    public bool TryGetLastCombatActivityObservedAt(int combatantId, out long observedAtMilliseconds)
+    public bool TryGetLastCombatActivityObservedAt(int combatantId, out long observedAtMilliseconds) => TryGetLastCombatActivityObservedAt(combatantId, static _ => true, out observedAtMilliseconds);
+
+    public bool TryGetLastCombatActivityObservedAt(int combatantId, Func<int, bool> includeCounterpart, out long observedAtMilliseconds)
     {
+        ArgumentNullException.ThrowIfNull(includeCounterpart);
         observedAtMilliseconds = 0;
         if (combatantId <= 0)
             return false;
 
-        var hasActivity = TryApplyLastCombatActivityObservedAt(_outgoingBySource, combatantId, ref observedAtMilliseconds);
-        hasActivity |= TryApplyLastCombatActivityObservedAt(_incomingByTarget, combatantId, ref observedAtMilliseconds);
+        var hasActivity = TryApplyLastCombatActivityObservedAt(_outgoingBySource, combatantId, includeCounterpart, outgoing: true, ref observedAtMilliseconds);
+        hasActivity |= TryApplyLastCombatActivityObservedAt(_incomingByTarget, combatantId, includeCounterpart, outgoing: false, ref observedAtMilliseconds);
         return hasActivity;
     }
 
@@ -330,7 +333,12 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         current = exists ? Math.Max(current, revision) : revision;
     }
 
-    private bool TryApplyLastCombatActivityObservedAt(Dictionary<int, HashSet<(int, int)>> index, int combatantId, ref long observedAtMilliseconds)
+    private bool TryApplyLastCombatActivityObservedAt(
+        Dictionary<int, HashSet<(int, int)>> index,
+        int combatantId,
+        Func<int, bool> includeCounterpart,
+        bool outgoing,
+        ref long observedAtMilliseconds)
     {
         if (!index.TryGetValue(combatantId, out var pairs))
             return false;
@@ -338,7 +346,8 @@ public sealed class CombatStore(int eventCapacity = 0, int combatantCapacity = 0
         var hasActivity = false;
         foreach (var key in pairs)
         {
-            if (_pairs.TryGetValue(key, out var pair) && HasCombatActivity(pair))
+            var counterpartId = outgoing ? key.Item2 : key.Item1;
+            if (includeCounterpart(counterpartId) && _pairs.TryGetValue(key, out var pair) && HasCombatActivity(pair))
             {
                 observedAtMilliseconds = Math.Max(observedAtMilliseconds, pair.LastObserved);
                 hasActivity = true;

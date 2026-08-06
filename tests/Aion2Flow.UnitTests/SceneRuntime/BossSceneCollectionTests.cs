@@ -315,6 +315,100 @@ public sealed class BossSceneCollectionTests
         Assert.Equal(200, expiredSnapshot.EncounterTime);
     }
 
+    [Theory]
+    [InlineData(CombatantStatisticsScope.Self, BossSceneState.Frozen, 0, NpcKind.Boss)]
+    [InlineData(CombatantStatisticsScope.All, BossSceneState.Recording, 1, NpcKind.Boss)]
+    [InlineData(CombatantStatisticsScope.Self, BossSceneState.Frozen, 0, NpcKind.TrainingDummy)]
+    [InlineData(CombatantStatisticsScope.All, BossSceneState.Recording, 1, NpcKind.TrainingDummy)]
+    public void BossSceneActivityTimeoutUsesConfiguredPlayerScope(CombatantStatisticsScope scope, BossSceneState expectedState, int expectedFocusCount, NpcKind targetKind)
+    {
+        var scene = CreateBossScene(out var timeProvider);
+        scene.SetCombatantStatisticsScope(scope);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Local", 10, isLocalPlayer: true);
+        AppendPlayer(sink, 200, "Other", 20);
+        AppendNpc(sink, 300, 2_100_002, targetKind, 30);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteFlush(1);
+        _ = scene.CreateFrame();
+
+        AppendDamage(sink, 200, 300, 700, 5_000, 2);
+        sink.CompleteFlush(2);
+
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        var frame = scene.CreateFrame();
+
+        Assert.Equal(expectedState, scene.BossState);
+        Assert.Equal(expectedFocusCount, frame.BossFocuses.Count);
+    }
+
+    [Fact]
+    public void StandardSceneActivityTimeoutUsesConfiguredPlayerScope()
+    {
+        var timeProvider = new MutableTimeProvider(Started);
+        var scene = new SceneLiveReadModel(Started, timeProvider);
+        scene.SetCombatantStatisticsScope(CombatantStatisticsScope.Self);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Local", 10, isLocalPlayer: true);
+        AppendPlayer(sink, 200, "Other", 20);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 30);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteFlush(1);
+        _ = scene.CreateFrame();
+
+        AppendDamage(sink, 200, 300, 700, 5_000, 2);
+        sink.CompleteFlush(2);
+
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        var frame = scene.CreateFrame();
+
+        Assert.Empty(frame.BossFocuses);
+    }
+
+    [Fact]
+    public void ChangingCombatantStatisticsScopeReconcilesExistingBossActivity()
+    {
+        var scene = CreateBossScene(out var timeProvider);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Local", 10, isLocalPlayer: true);
+        AppendPlayer(sink, 200, "Other", 20);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 30);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteFlush(1);
+        _ = scene.CreateFrame();
+
+        AppendDamage(sink, 200, 300, 700, 5_000, 2);
+        sink.CompleteFlush(2);
+        _ = scene.CreateFrame();
+
+        scene.SetCombatantStatisticsScope(CombatantStatisticsScope.Self);
+        scene.SetCombatantStatisticsScope(CombatantStatisticsScope.All);
+        var widened = scene.CreateFrame();
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Single(widened.BossFocuses);
+
+        scene.SetCombatantStatisticsScope(CombatantStatisticsScope.Self);
+        timeProvider.SetUtcNow(Started.AddMilliseconds(11_001));
+        var expired = scene.CreateFrame();
+
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
+        Assert.Empty(expired.BossFocuses);
+
+        scene.SetCombatantStatisticsScope(CombatantStatisticsScope.All);
+        var widenedAfterExpiry = scene.CreateFrame();
+
+        Assert.Equal(BossSceneState.Frozen, scene.BossState);
+        Assert.Single(widenedAfterExpiry.BossFocuses);
+
+        scene.SetCombatantStatisticsScope(CombatantStatisticsScope.Self);
+        AppendDamage(sink, 100, 300, 900, 12_000, 3);
+        sink.CompleteFlush(3);
+        var resumed = scene.CreateFrame();
+
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.Single(resumed.BossFocuses);
+    }
+
     [Fact]
     public void LivePlaybackSourceFreezesWhenBossSceneFreezes()
     {
@@ -494,9 +588,9 @@ public sealed class BossSceneCollectionTests
         return scene;
     }
 
-    private static void AppendPlayer(IRuntimeObservationSink sink, int entityId, string name, long offsetMilliseconds)
+    private static void AppendPlayer(IRuntimeObservationSink sink, int entityId, string name, long offsetMilliseconds, bool isLocalPlayer = false)
     {
-        sink.AppendNickname(Source(offsetMilliseconds), entityId, name, characterClass: CharacterClass.Gladiator);
+        sink.AppendNickname(Source(offsetMilliseconds), entityId, name, characterClass: CharacterClass.Gladiator, isLocalPlayer: isLocalPlayer);
     }
 
     private static void AppendNpc(IRuntimeObservationSink sink, int instanceId, int npcCode, NpcKind kind, long offsetMilliseconds)

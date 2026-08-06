@@ -49,6 +49,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private SceneReadModelOwner _owner;
     private long _nextFlushId;
     private SceneKind _kind;
+    private CombatantStatisticsScope _combatantStatisticsScope = CombatantStatisticsScope.All;
     private BossSceneState _bossState;
     private bool _hydrateBossSceneRuntimeStateOnCombat;
     private long _frozenEndObservationOrdinalExclusive = -1;
@@ -78,6 +79,14 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
                 return _bossState;
         }
     }
+    public CombatantStatisticsScope CombatantStatisticsScope
+    {
+        get
+        {
+            lock (_gate)
+                return _combatantStatisticsScope;
+        }
+    }
     public bool HasPendingProjectionChanges
     {
         get
@@ -86,6 +95,18 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
                 return _pendingArchives.Count > 0 ||
                        _pendingMapTransitions.Count > 0 ||
                        _owner.HasPendingProjectionChanges;
+        }
+    }
+
+    public void SetCombatantStatisticsScope(CombatantStatisticsScope scope)
+    {
+        lock (_gate)
+        {
+            if (_combatantStatisticsScope == scope)
+                return;
+
+            _combatantStatisticsScope = scope;
+            _owner.SetCombatantStatisticsScope(scope);
         }
     }
 
@@ -377,7 +398,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         if (_kind == SceneKind.Standard)
         {
             if (_hydrateBossSceneRuntimeStateOnCombat &&
-                TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var activeTargetId))
+                TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var activeTargetId, out _))
             {
                 SeedBossSceneRuntimeState(in packet, activeTargetId, sink);
                 if (_seededBossSceneRuntimeStates.Contains(activeTargetId))
@@ -390,16 +411,16 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         RefreshBossStateCore();
         if (_bossState == BossSceneState.Recording)
         {
-            if (TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var activeTargetId))
+            if (TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var activeTargetId, out var recordingActivitySourceId))
             {
                 SeedBossSceneRuntimeState(in packet, activeTargetId, sink);
-                Owner.ObserveBossCombatTrigger(activeTargetId, ResolveObservedAtMilliseconds(in packet));
+                Owner.ObserveBossCombatTrigger(activeTargetId, recordingActivitySourceId, ResolveObservedAtMilliseconds(in packet));
             }
             return true;
         }
 
         Owner.Refresh();
-        if (!TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var focusTargetId))
+        if (!TryResolveFocusTargetPlayerCombat(sourceId, targetId, out var focusTargetId, out var activitySourceId))
             return false;
 
         if (_bossState == BossSceneState.Frozen)
@@ -417,7 +438,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         _bossState = BossSceneState.Recording;
         SeedBossSceneRuntimeState(in packet, focusTargetId, sink);
         Owner.SetBossFocusTracking(true);
-        Owner.ObserveBossCombatTrigger(focusTargetId, 0);
+        Owner.ObserveBossCombatTrigger(focusTargetId, activitySourceId, 0);
         return true;
     }
 
@@ -519,23 +540,26 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         return new LiveScenePlaybackSource(state);
     }
 
-    private bool TryResolveFocusTargetPlayerCombat(int sourceId, int targetId, out int focusTargetId)
+    private bool TryResolveFocusTargetPlayerCombat(int sourceId, int targetId, out int focusTargetId, out int activitySourceId)
     {
         var sourceIsFocusTarget = IsFocusTarget(sourceId);
         var targetIsFocusTarget = IsFocusTarget(targetId);
-        if (sourceIsFocusTarget && IsPlayerSide(targetId))
+        if (sourceIsFocusTarget && IsBossFocusActivitySource(targetId))
         {
             focusTargetId = sourceId;
+            activitySourceId = targetId;
             return true;
         }
 
-        if (targetIsFocusTarget && IsPlayerSide(sourceId))
+        if (targetIsFocusTarget && IsBossFocusActivitySource(sourceId))
         {
             focusTargetId = targetId;
+            activitySourceId = sourceId;
             return true;
         }
 
         focusTargetId = 0;
+        activitySourceId = 0;
         return false;
     }
 
@@ -549,34 +573,8 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         Owner.Entities.TryGet(entityId, out var entity) &&
         BossModeFocusTargets.IsFocusTarget(entity.Kind);
 
-    private bool IsPlayerSide(int entityId)
-    {
-        if (entityId <= 0)
-            return false;
-
-        var currentId = entityId;
-        for (var depth = 0; depth < 4; depth++)
-        {
-            if (Owner.MetadataRegistry.TryGetPcMetadata(currentId, out _))
-                return true;
-
-            if (!Owner.Entities.TryGet(currentId, out var entity))
-                return true;
-
-            if (entity.IsPlayer || entity.CharacterClass is not null and not CharacterClass.None)
-                return true;
-
-            if (entity.Kind == NpcKind.Summon && entity.OwnerEntityId is int ownerId && ownerId > 0 && ownerId != currentId)
-            {
-                currentId = ownerId;
-                continue;
-            }
-
-            return entity.Kind == NpcKind.Unknown && entity.NpcCode is null;
-        }
-
-        return false;
-    }
+    private bool IsBossFocusActivitySource(int entityId) =>
+        Owner.IsBossFocusActivitySource(entityId);
 
     private SceneReadModelOwner CreateOwner(
         Guid sessionId,
@@ -605,6 +603,8 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
                 _kind,
                 trackBossFocus: false);
         }
+
+        owner.SetCombatantStatisticsScope(_combatantStatisticsScope);
 
         return owner;
     }

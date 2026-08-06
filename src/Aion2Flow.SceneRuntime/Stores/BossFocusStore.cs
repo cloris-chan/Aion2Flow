@@ -84,6 +84,12 @@ public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entity
             RememberActivity(instanceId, observedAtMilliseconds);
     }
 
+    public void ApplyNpcKindState(int instanceId, NpcKind kind, long observedAtMilliseconds)
+    {
+        if (!IsFocusTargetKind(kind))
+            Clear(instanceId, observedAtMilliseconds);
+    }
+
     public void ApplyNpcHp(int instanceId, long hp, long maxHp, long observedAtMilliseconds)
     {
         var resolvedMaxHp = ResolveMaxHp(instanceId, maxHp);
@@ -97,6 +103,15 @@ public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entity
 
         if (_observed.ContainsKey(instanceId) || IsActiveFocusTargetInstance(instanceId))
             Remember(instanceId, hp, resolvedMaxHp, hasMaxHp, observedAtMilliseconds);
+    }
+
+    public void ApplyNpcHpState(int instanceId, long hp, long maxHp)
+    {
+        if (!_observed.ContainsKey(instanceId))
+            return;
+
+        var resolvedMaxHp = ResolveMaxHp(instanceId, maxHp);
+        RememberState(instanceId, hp, resolvedMaxHp, resolvedMaxHp > 0);
     }
 
     public bool ApplyBattle(int instanceId, bool isActive, long observedAtMilliseconds)
@@ -123,6 +138,61 @@ public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entity
         }
 
         RememberActivity(instanceId, observedAtMilliseconds);
+    }
+
+    internal void ReconcileActivity(Func<int, long?> resolveActivity)
+    {
+        ArgumentNullException.ThrowIfNull(resolveActivity);
+        if (_observed.Count == 0 && _encounterBossOrder.Count == 0 && entities.Entities.Count == 0)
+            return;
+
+        var candidates = new HashSet<int>(_encounterBossOrder);
+        foreach (var instanceId in _observed.Keys)
+            candidates.Add(instanceId);
+        foreach (var entity in entities.Entities.Values)
+        {
+            if (IsFocusTargetKind(entity.Kind))
+                candidates.Add(entity.EntityId);
+        }
+
+        var changed = false;
+        foreach (var instanceId in candidates)
+        {
+            var activityObservedAtMilliseconds = resolveActivity(instanceId);
+            if (activityObservedAtMilliseconds is not long observedAt || !IsAfterLastClear(instanceId, observedAt))
+            {
+                changed |= _observed.Remove(instanceId);
+                continue;
+            }
+
+            var nextSnapshot = ResolveActivitySnapshot(instanceId, Math.Max(0, observedAt));
+
+            if (!_observed.TryGetValue(instanceId, out var snapshot))
+            {
+                _observed[instanceId] = nextSnapshot;
+                RememberEncounterBoss(instanceId, in nextSnapshot);
+                changed = true;
+                continue;
+            }
+
+            var resolved = nextSnapshot with
+            {
+                Hp = nextSnapshot.HasHp ? nextSnapshot.Hp : snapshot.Hp,
+                MaxHp = nextSnapshot.HasMaxHp ? nextSnapshot.MaxHp : snapshot.MaxHp,
+                CumulativeLostHp = Math.Max(snapshot.CumulativeLostHp, nextSnapshot.CumulativeLostHp),
+                HasHp = snapshot.HasHp || nextSnapshot.HasHp,
+                HasMaxHp = snapshot.HasMaxHp || nextSnapshot.HasMaxHp
+            };
+            if (resolved.Equals(snapshot))
+                continue;
+
+            _observed[instanceId] = resolved;
+            RememberEncounterBoss(instanceId, in resolved);
+            changed = true;
+        }
+
+        if (changed)
+            _revision++;
     }
 
     internal BossFocusStoreSnapshot CreateSnapshot()
@@ -195,8 +265,8 @@ public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entity
         for (var i = 0; i < expired.Count; i++)
         {
             var instanceId = expired[i];
-            var snapshot = _observed[instanceId];
-            _lastClearedAtMilliseconds[instanceId] = Math.Max(nowMilliseconds, snapshot.LastObservedAtMilliseconds);
+            // Expiry only removes the current visibility projection. A later scope
+            // reconciliation may legitimately restore activity from encounter history.
             _observed.Remove(instanceId);
         }
         _revision++;
@@ -240,12 +310,58 @@ public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entity
         }
     }
 
-    private void Remember(int instanceId, long hp, long maxHp, bool hasMaxHp, long observedAtMilliseconds)
+    private void Remember(int instanceId, long hp, long maxHp, bool hasMaxHp, long observedAtMilliseconds) =>
+        RememberCore(instanceId, hp, maxHp, hasMaxHp, Math.Max(0, observedAtMilliseconds));
+
+    private void RememberState(int instanceId, long hp, long maxHp, bool hasMaxHp)
+    {
+        if (_observed.TryGetValue(instanceId, out var previous))
+            RememberCore(instanceId, hp, maxHp, hasMaxHp, previous.LastObservedAtMilliseconds);
+    }
+
+    private Snapshot ResolveActivitySnapshot(int instanceId, long observedAtMilliseconds)
+    {
+        _encounterBosses.TryGetValue(instanceId, out var historical);
+        if (entityVitals.TryGet(instanceId, out var vital))
+        {
+            var hp = Math.Max(0, vital.CurrentHp);
+            var maxHp = ResolveMaxHp(instanceId, vital.MaxHp ?? 0);
+            var cumulativeLostHp = historical.HasHp && hp < historical.Hp
+                ? historical.CumulativeLostHp + historical.Hp - hp
+                : historical.CumulativeLostHp;
+            return new Snapshot
+            {
+                InstanceId = instanceId,
+                Hp = hp,
+                MaxHp = maxHp,
+                CumulativeLostHp = cumulativeLostHp,
+                LastObservedAtMilliseconds = observedAtMilliseconds,
+                HasHp = true,
+                HasMaxHp = maxHp > 0
+            };
+        }
+
+        if (historical.InstanceId != 0)
+            return historical with { LastObservedAtMilliseconds = observedAtMilliseconds };
+
+        return new Snapshot
+        {
+            InstanceId = instanceId,
+            Hp = 0,
+            MaxHp = 1,
+            LastObservedAtMilliseconds = observedAtMilliseconds,
+            HasHp = false,
+            HasMaxHp = false
+        };
+    }
+
+    private void RememberCore(int instanceId, long hp, long maxHp, bool hasMaxHp, long observedAtMilliseconds)
     {
         var resolvedHp = Math.Max(0, hp);
         var resolvedMaxHp = hasMaxHp ? Math.Max(1, maxHp) : 0;
         var cumulativeLostHp = 0L;
-        if (_observed.TryGetValue(instanceId, out var previous) && previous.HasHp)
+        var hasPrevious = _observed.TryGetValue(instanceId, out var previous);
+        if (hasPrevious && previous.HasHp)
         {
             cumulativeLostHp = previous.CumulativeLostHp;
             if (resolvedHp < previous.Hp)
@@ -258,11 +374,11 @@ public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entity
             Hp = resolvedHp,
             MaxHp = resolvedMaxHp,
             CumulativeLostHp = cumulativeLostHp,
-            LastObservedAtMilliseconds = Math.Max(0, observedAtMilliseconds),
+            LastObservedAtMilliseconds = observedAtMilliseconds,
             HasHp = true,
             HasMaxHp = hasMaxHp
         };
-        if (!_observed.TryGetValue(instanceId, out var current) || !current.Equals(snapshot))
+        if (!hasPrevious || !previous.Equals(snapshot))
         {
             _observed[instanceId] = snapshot;
             RememberEncounterBoss(instanceId, in snapshot);

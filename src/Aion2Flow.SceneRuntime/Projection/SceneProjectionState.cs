@@ -2,7 +2,6 @@ using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
-using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
@@ -10,6 +9,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 internal sealed class SceneProjectionState
 {
     private SceneCombatSnapshotAdapter? _adapter;
+    private CombatantStatisticsScope _combatantStatisticsScope = CombatantStatisticsScope.All;
 
     public static SceneProjectionState Create(
         Guid encounterId,
@@ -56,6 +56,8 @@ internal sealed class SceneProjectionState
 
     public DomainEventApplier Applier { get; private set; }
 
+    public CombatantStatisticsScope CombatantStatisticsScope => _combatantStatisticsScope;
+
     public SceneCombatSnapshotAdapter Adapter =>
         _adapter ??= new(
             Entities,
@@ -84,6 +86,12 @@ internal sealed class SceneProjectionState
         _adapter = null;
     }
 
+    public void SetCombatantStatisticsScope(CombatantStatisticsScope scope)
+    {
+        _combatantStatisticsScope = scope;
+        Applier.CombatantStatisticsScope = scope;
+    }
+
     private DomainEventApplier CreateApplier(bool trackBossFocus)
     {
         return new DomainEventApplier(
@@ -94,7 +102,8 @@ internal sealed class SceneProjectionState
             CombatOccurrenceObserver,
             AuraLifecycleObserver)
         {
-            TrackBossFocus = trackBossFocus
+            TrackBossFocus = trackBossFocus,
+            CombatantStatisticsScope = _combatantStatisticsScope
         };
     }
 }

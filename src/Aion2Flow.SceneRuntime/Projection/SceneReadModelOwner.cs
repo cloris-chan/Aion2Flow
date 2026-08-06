@@ -93,6 +93,7 @@ public sealed class SceneReadModelOwner(
     public AuraStore Auras => _projection.Applier.Auras;
     public DomainEventApplier Applier => _projection.Applier;
     public BossFocusStore BossFocus => _projection.Applier.BossFocus;
+    public CombatantStatisticsScope CombatantStatisticsScope => _projection.CombatantStatisticsScope;
     public Guid EncounterId { get; private set; } = encounterId;
     public SceneKind Kind { get; private set; } = SceneKind.Standard;
     public DateTimeOffset SceneStarted { get; private set; } = sceneStarted;
@@ -268,12 +269,26 @@ public sealed class SceneReadModelOwner(
         }
     }
 
-    public void ObserveBossCombatTrigger(int bossInstanceId, long observedAtMilliseconds)
+    public void SetCombatantStatisticsScope(CombatantStatisticsScope scope)
     {
         lock (_gate)
         {
             RefreshCore();
-            if (_projection.Applier.TrackBossFocus)
+            _projection.SetCombatantStatisticsScope(scope);
+            _snapshotCache = null;
+            _snapshotCacheValidUntilMilliseconds = -1;
+        }
+    }
+
+    internal bool IsBossFocusActivitySource(int instanceId) =>
+        _projection.Applier.IsBossFocusActivitySource(instanceId);
+
+    public void ObserveBossCombatTrigger(int bossInstanceId, int activitySourceId, long observedAtMilliseconds)
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            if (_projection.Applier.TrackBossFocus && _projection.Applier.IsBossFocusActivitySource(activitySourceId))
                 _projection.Applier.BossFocus.ApplyCombatActivity(bossInstanceId, observedAtMilliseconds, observedAtMilliseconds);
             _snapshotCache = null;
             _snapshotCacheValidUntilMilliseconds = -1;

@@ -27,6 +27,7 @@ public sealed class DomainEventApplier
     private readonly EntityVitalStore _entityVitals;
     private readonly AuraStore _auras;
     private readonly BossFocusStore _bossFocus;
+    private readonly Func<int, bool> _bossFocusActivitySourcePredicate;
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null)
         : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactDirectValueCanonicalizer(), new CompactAvoidanceCanonicalizer(), new EntityVitalStore(), new AuraStore(), new MechanicStore(), new ResourceStore(), combatOccurrenceObserver, auraLifecycleObserver)
     {
@@ -66,6 +67,7 @@ public sealed class DomainEventApplier
         _entityVitals = entityVitals;
         _auras = auras;
         _bossFocus = new BossFocusStore(entities, entityVitals);
+        _bossFocusActivitySourcePredicate = IsBossFocusActivitySource;
     }
 
     public EntityStore Entities => _entities;
@@ -78,6 +80,20 @@ public sealed class DomainEventApplier
     public AuraStore Auras => _auras;
     public BossFocusStore BossFocus => _bossFocus;
     public bool TrackBossFocus { get; set; } = true;
+    private CombatantStatisticsScope _combatantStatisticsScope = CombatantStatisticsScope.All;
+
+    public CombatantStatisticsScope CombatantStatisticsScope
+    {
+        get => _combatantStatisticsScope;
+        set
+        {
+            if (_combatantStatisticsScope == value)
+                return;
+
+            _combatantStatisticsScope = value;
+            _bossFocus.ReconcileActivity(ResolveBossCombatActivityObservedAt);
+        }
+    }
 
     internal DomainEventApplierSnapshot CreateSnapshot() => new(
         _systemPeriodicRecovery.CreateSnapshot(),
@@ -154,9 +170,8 @@ public sealed class DomainEventApplier
                 var vital = _entityVitals.Apply(entry);
                 if (vital.CurrentHp == 0)
                     _entities.ApplyBattleToggle(vital.EntityId, false);
-                if (TrackBossFocus)
-                    _bossFocus.ApplyNpcHp(vital.EntityId, vital.CurrentHp, vital.MaxHp ?? 0, observedAtMilliseconds);
-                TryApplyBossCombatActivity(vital.EntityId, observedAtMilliseconds);
+                ApplyBossFocusNpcHp(vital.EntityId, vital.CurrentHp, vital.MaxHp ?? 0, observedAtMilliseconds);
+                TryApplyBossCombatActivity(vital.EntityId);
                 break;
             case ObservedEventDomain.Scene:
                 ApplyScene(in entry.Scene);
@@ -325,8 +340,7 @@ public sealed class DomainEventApplier
             _combat.ApplyCombat(sourceId, targetId, in observation, in contribution, observedAtMilliseconds, sourceObservationOrdinal, raw);
         }
 
-        TryApplyBossCombatActivity(sourceId, observedAtMilliseconds);
-        TryApplyBossCombatActivity(targetId, observedAtMilliseconds);
+        ApplyBossCombatActivity(sourceId, targetId, observedAtMilliseconds);
     }
 
     private void MaterializeSecondaryContributions(in CombatCanonicalizationResult result, long observedAtMilliseconds, in TimelineStamp stamp, RawPacketReference raw)
@@ -473,6 +487,7 @@ public sealed class DomainEventApplier
         if (entry.TargetEntityId != 0 && state.EntityId == entry.TargetEntityId && entry.SourceEntityId != entry.TargetEntityId)
         {
             _entities.ApplySummon(entry.SourceEntityId, entry.TargetEntityId);
+            ReconcileBossFocusActivity();
             return;
         }
 
@@ -493,6 +508,7 @@ public sealed class DomainEventApplier
                 if (!string.IsNullOrWhiteSpace(nickname) || metadataClass is not null || state.IsLocalPlayer || state.OriginServerId is not null || !string.IsNullOrWhiteSpace(legionName))
                     _metadataRegistry.UpsertPcMetadata(entry.SourceEntityId, nickname, state.Faction, metadataClass, state.IsLocalPlayer, state.OriginServerId, legionName);
             }
+            ReconcileBossFocusActivity();
             return;
         }
 
@@ -506,6 +522,7 @@ public sealed class DomainEventApplier
             {
                 _metadataRegistry.UpsertPlayerGroupProfile(state.OriginServerId.Value, state.Text, state.GroupMembership);
             }
+            ReconcileBossFocusActivity();
             return;
         }
 
@@ -518,9 +535,8 @@ public sealed class DomainEventApplier
         {
             var kind = state.Value0 is >= int.MinValue and <= int.MaxValue && Enum.IsDefined((NpcKind)(int)state.Value0) ? (NpcKind)(int)state.Value0 : NpcKind.Unknown;
             _entities.ApplyNpcKind(state.EntityId, kind);
-            if (TrackBossFocus)
-                _bossFocus.ApplyNpcKind(state.EntityId, kind, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
-            TryApplyBossCombatActivity(state.EntityId, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+            ApplyBossFocusNpcKind(state.EntityId, kind, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+            TryApplyBossCombatActivity(state.EntityId);
             return;
         }
 
@@ -528,8 +544,11 @@ public sealed class DomainEventApplier
         {
             var isActive = state.Value0 != 0 && CanNpcBattleActivate(state.EntityId);
             _entities.ApplyBattleToggle(state.EntityId, isActive);
-            if (TrackBossFocus)
-                _bossFocus.ApplyBattle(state.EntityId, isActive, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+            if (TrackBossFocus && CombatantStatisticsScope == CombatantStatisticsScope.All)
+                _bossFocus.ApplyBattle(
+                    state.EntityId,
+                    isActive,
+                    entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
 
@@ -537,8 +556,11 @@ public sealed class DomainEventApplier
         {
             var isActive = !_entities.GetOrAdd(state.EntityId).NpcCombatActive && CanNpcBattleActivate(state.EntityId);
             _entities.ApplyBattleToggle(state.EntityId, isActive);
-            if (TrackBossFocus)
-                _bossFocus.ApplyBattleToggle(state.EntityId, isActive, entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
+            if (TrackBossFocus && CombatantStatisticsScope == CombatantStatisticsScope.All)
+                _bossFocus.ApplyBattleToggle(
+                    state.EntityId,
+                    isActive,
+                    entry.Stamp.OffsetTicks / TimeSpan.TicksPerMillisecond);
             return;
         }
 
@@ -578,29 +600,124 @@ public sealed class DomainEventApplier
 
     private bool CanNpcBattleActivate(int instanceId) => !_entityVitals.TryGet(instanceId, out var vital) || vital.CurrentHp != 0;
 
-    private void TryApplyBossCombatActivity(int instanceId, long observedAtMilliseconds)
+    private void ApplyBossFocusNpcKind(int instanceId, NpcKind kind, long observedAtMilliseconds)
     {
-        var hasActivity = _combat.TryGetLastCombatActivityObservedAt(instanceId, out var activityObservedAtMilliseconds);
-        if (_mechanics.TryGetCombatant(instanceId, out var mechanicCombatant))
-        {
-            activityObservedAtMilliseconds = hasActivity
-                ? Math.Max(activityObservedAtMilliseconds, mechanicCombatant!.LastObserved)
-                : mechanicCombatant!.LastObserved;
-            hasActivity = true;
-        }
+        if (!TrackBossFocus)
+            return;
 
-        if (!TrackBossFocus ||
-            instanceId <= 0 ||
-            !_entities.TryGet(instanceId, out var entity) ||
-            !BossModeFocusTargets.IsFocusTarget(entity.Kind) ||
-            _entityVitals.TryGet(instanceId, out var vital) && vital.CurrentHp == 0 ||
-            !hasActivity)
+        if (CombatantStatisticsScope == CombatantStatisticsScope.All)
+            _bossFocus.ApplyNpcKind(instanceId, kind, observedAtMilliseconds);
+        else
+            _bossFocus.ApplyNpcKindState(instanceId, kind, observedAtMilliseconds);
+    }
+
+    private void ApplyBossFocusNpcHp(int instanceId, long hp, long maxHp, long observedAtMilliseconds)
+    {
+        if (!TrackBossFocus)
+            return;
+
+        if (CombatantStatisticsScope == CombatantStatisticsScope.All)
+            _bossFocus.ApplyNpcHp(instanceId, hp, maxHp, observedAtMilliseconds);
+        else
+            _bossFocus.ApplyNpcHpState(instanceId, hp, maxHp);
+    }
+
+    private void TryApplyBossCombatActivity(int instanceId)
+    {
+        if (!TrackBossFocus)
+            return;
+
+        if (!IsEligibleBossFocusTarget(instanceId) ||
+            ResolveBossCombatActivityObservedAt(instanceId) is not long activityObservedAtMilliseconds)
         {
             return;
         }
 
-        _bossFocus.ApplyCombatActivity(instanceId, activityObservedAtMilliseconds, observedAtMilliseconds);
+        _bossFocus.ApplyCombatActivity(instanceId, activityObservedAtMilliseconds, activityObservedAtMilliseconds);
     }
+
+    private long? ResolveBossCombatActivityObservedAt(int instanceId)
+    {
+        if (!IsFocusTargetInstance(instanceId))
+            return null;
+
+        var hasActivity = _combat.TryGetLastCombatActivityObservedAt(instanceId, _bossFocusActivitySourcePredicate, out var activityObservedAtMilliseconds);
+        if (_mechanics.TryGetLastCombatActivityObservedAt(instanceId, _bossFocusActivitySourcePredicate, out var mechanicActivityObservedAtMilliseconds))
+        {
+            activityObservedAtMilliseconds = hasActivity
+                ? Math.Max(activityObservedAtMilliseconds, mechanicActivityObservedAtMilliseconds)
+                : mechanicActivityObservedAtMilliseconds;
+            hasActivity = true;
+        }
+
+        return hasActivity ? activityObservedAtMilliseconds : null;
+    }
+
+    private void ReconcileBossFocusActivity() => _bossFocus.ReconcileActivity(ResolveBossCombatActivityObservedAt);
+
+    private void ApplyBossCombatActivity(int sourceId, int targetId, long observedAtMilliseconds)
+    {
+        if (!TrackBossFocus)
+            return;
+
+        if (IsEligibleBossFocusTarget(sourceId) && IsBossFocusActivitySource(targetId))
+        {
+            _bossFocus.ApplyCombatActivity(sourceId, observedAtMilliseconds, observedAtMilliseconds);
+        }
+
+        if (IsEligibleBossFocusTarget(targetId) && IsBossFocusActivitySource(sourceId))
+        {
+            _bossFocus.ApplyCombatActivity(targetId, observedAtMilliseconds, observedAtMilliseconds);
+        }
+    }
+
+    internal bool IsBossFocusActivitySource(int instanceId)
+    {
+        if (instanceId <= 0)
+            return false;
+
+        var currentId = instanceId;
+        for (var depth = 0; depth < 4; depth++)
+        {
+            if (_metadataRegistry.TryGetPcMetadata(currentId, out var metadata))
+                return IsInBossFocusActivityScope(in metadata);
+
+            if (!_entities.TryGet(currentId, out var entity))
+                return CombatantStatisticsScope == CombatantStatisticsScope.All;
+
+            if (entity.IsPlayer || entity.CharacterClass is not null and not CharacterClass.None)
+                return CombatantStatisticsScope == CombatantStatisticsScope.All;
+
+            if (entity.Kind == NpcKind.Summon && entity.OwnerEntityId is int ownerId && ownerId > 0 && ownerId != currentId)
+            {
+                currentId = ownerId;
+                continue;
+            }
+
+            return CombatantStatisticsScope == CombatantStatisticsScope.All && entity.Kind == NpcKind.Unknown && entity.NpcCode is null;
+        }
+
+        return false;
+    }
+
+    private bool IsFocusTargetInstance(int instanceId) =>
+        instanceId > 0 &&
+        _entities.TryGet(instanceId, out var entity) &&
+        BossModeFocusTargets.IsFocusTarget(entity.Kind);
+
+    private bool IsEligibleBossFocusTarget(int instanceId) =>
+        IsFocusTargetInstance(instanceId) &&
+        (!_entityVitals.TryGet(instanceId, out var vital) || vital.CurrentHp != 0);
+
+    private bool IsInBossFocusActivityScope(in PcMetadata metadata) =>
+        CombatantStatisticsScope switch
+        {
+            CombatantStatisticsScope.All => true,
+            CombatantStatisticsScope.Self => metadata.IsLocalPlayer,
+            CombatantStatisticsScope.Party => metadata.IsLocalPlayer || metadata.GroupRelation == PlayerGroupRelation.PartyMember,
+            CombatantStatisticsScope.Force => metadata.IsLocalPlayer || metadata.GroupRelation is PlayerGroupRelation.PartyMember or PlayerGroupRelation.ForceMember,
+            _ => false
+        };
 }
 
 internal sealed record DomainEventApplierSnapshot(

@@ -2,7 +2,6 @@ using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
-using Cloris.Aion2Flow.Services.Settings;
 
 namespace Cloris.Aion2Flow.ViewModels;
 

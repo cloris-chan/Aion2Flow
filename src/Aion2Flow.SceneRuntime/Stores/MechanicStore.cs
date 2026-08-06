@@ -97,6 +97,21 @@ public sealed class MechanicStore(int eventCapacity = 0, int pairCapacity = 0, i
     public IReadOnlyCollection<(int Source, int Target)> GetIncomingPairs(int targetId) =>
         _incomingByTarget.TryGetValue(targetId, out var pairs) ? pairs : [];
 
+    public bool TryGetLastCombatActivityObservedAt(int combatantId, out long observedAtMilliseconds)
+        => TryGetLastCombatActivityObservedAt(combatantId, static _ => true, out observedAtMilliseconds);
+
+    public bool TryGetLastCombatActivityObservedAt(int combatantId, Func<int, bool> includeCounterpart, out long observedAtMilliseconds)
+    {
+        ArgumentNullException.ThrowIfNull(includeCounterpart);
+        observedAtMilliseconds = 0;
+        if (combatantId <= 0)
+            return false;
+
+        var hasActivity = TryApplyLastCombatActivityObservedAt(_outgoingBySource, combatantId, includeCounterpart, outgoing: true, ref observedAtMilliseconds);
+        hasActivity |= TryApplyLastCombatActivityObservedAt(_incomingByTarget, combatantId, includeCounterpart, outgoing: false, ref observedAtMilliseconds);
+        return hasActivity;
+    }
+
     public bool TryGetEventByRevision(long revision, out CombatMechanicEventRecord record)
     {
         var index = revision - 1;
@@ -231,6 +246,39 @@ public sealed class MechanicStore(int eventCapacity = 0, int pairCapacity = 0, i
         ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_detailRevisionByCombatant, combatantId, out var exists);
         current = exists ? Math.Max(current, revision) : revision;
     }
+
+    private bool TryApplyLastCombatActivityObservedAt(
+        Dictionary<int, HashSet<(int Source, int Target)>> index,
+        int combatantId,
+        Func<int, bool> includeCounterpart,
+        bool outgoing,
+        ref long observedAtMilliseconds)
+    {
+        if (!index.TryGetValue(combatantId, out var pairs))
+            return false;
+
+        var hasActivity = false;
+        foreach (var key in pairs)
+        {
+            var counterpartId = outgoing ? key.Target : key.Source;
+            if (includeCounterpart(counterpartId) && _pairs.TryGetValue(key, out var pair) && HasCombatActivity(pair))
+            {
+                observedAtMilliseconds = Math.Max(observedAtMilliseconds, pair.LastObserved);
+                hasActivity = true;
+            }
+        }
+
+        return hasActivity;
+    }
+
+    private static bool HasCombatActivity(CombatMechanicPairRecord pair) =>
+        pair.Modifiers != DamageModifiers.None ||
+        pair.HitCount > 0 ||
+        pair.AttemptCount > 0 ||
+        pair.EvadeCount > 0 ||
+        pair.InvincibleCount > 0 ||
+        pair.MultiHitCount > 0 ||
+        pair.MultiHitSubCount > 0;
 
     private (int Start, int Count) ResolveChangeReadBounds(SnapshotChangeCursor cursor, int maxChanges)
     {

@@ -1,4 +1,4 @@
-namespace Cloris.Aion2Flow.Services.Settings;
+namespace Cloris.Aion2Flow.SceneRuntime.Model;
 
 public enum CombatantStatisticsScope
 {
