@@ -237,6 +237,75 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Fact]
+    public void RefreshCombatStats_BossSceneWithoutBossFocus_HidesBossShareColumn()
+    {
+        var fixture = MainViewModelFixture.Create(SceneKind.Boss);
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Empty(fixture.ViewModel.BossFocuses);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_StandardScene_BossFocusTimeoutHidesBossShareColumn()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
+        fixture.AppendSceneBossFocus(900_002, "Scene Boss", 700, 1_000, 5_500);
+
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
+
+        fixture.ExpireBossFocusData();
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Empty(fixture.ViewModel.BossFocuses);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
+        Assert.Equal(0d, Assert.Single(fixture.ViewModel.Combatants).BossShareRatio);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_FrozenBossScene_KeepsBossShareColumnAfterFocusTimeout()
+    {
+        var fixture = MainViewModelFixture.Create(SceneKind.Boss);
+        var sink = fixture.CreateLiveSink();
+        var origin = fixture.SceneStartedMilliseconds;
+        var metadataSource = new PacketObservationSource(origin + 100, 0, 0, 0, 100, default);
+        sink.AppendNickname(in metadataSource, 100, "Player", characterClass: CharacterClass.Gladiator);
+        sink.AppendNpcCode(in metadataSource, 300, 2_100_002);
+        sink.AppendNpcKind(in metadataSource, 300, NpcKind.Boss);
+
+        AppendDamage(sink, 100, 300, 11000010, 700, origin + 1_000, 1);
+        sink.CompleteFlush(1);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal(BossSceneState.Recording, fixture.BossState);
+        var beforeFreeze = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.Single(fixture.ViewModel.Combatants);
+
+        var deathSource = new PacketObservationSource(origin + 2_000, 2, 0, 0, 2_000, default);
+        sink.AppendNpcHp(in deathSource, 300, 0, 1_000);
+        sink.CompleteFlush(2);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Equal(BossSceneState.Frozen, fixture.BossState);
+        Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
+        var beforeTimeoutShare = Assert.Single(fixture.ViewModel.Combatants).BossShareRatio;
+
+        fixture.ExpireBossFocusData();
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var afterTimeout = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.Equal(beforeFreeze.InstanceId, afterTimeout.InstanceId);
+        Assert.Equal(BossSceneState.Frozen, fixture.BossState);
+        Assert.True(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
+        Assert.Equal(beforeTimeoutShare, Assert.Single(fixture.ViewModel.Combatants).BossShareRatio);
+    }
+
+    [Fact]
     public void RefreshCombatStats_FocusStatusSetting_HidesOnlyFocusRows()
     {
         var fixture = MainViewModelFixture.Create();
@@ -559,9 +628,9 @@ public sealed class MainViewModelCombatantFilterTests
     }
 
     [Theory]
-    [InlineData(SceneKind.Boss, true)]
-    [InlineData(SceneKind.Standard, false)]
-    public void ArchivedEncounter_BossShareColumnUsesArchivedSceneKind(SceneKind archivedSceneKind, bool expectedVisible)
+    [InlineData(SceneKind.Boss)]
+    [InlineData(SceneKind.Standard)]
+    public void ArchivedEncounter_WithoutBossFocus_HidesBossShareColumn(SceneKind archivedSceneKind)
     {
         var fixture = MainViewModelFixture.Create(archivedSceneKind);
         fixture.AppendSceneEncounter(300, "Scene Player", 400, 3_000, 5_000);
@@ -572,7 +641,7 @@ public sealed class MainViewModelCombatantFilterTests
         fixture.ViewModel.ReturnToLiveCommand.Execute(null);
         fixture.ViewModel.SelectedEncounterHistory = history;
 
-        Assert.Equal(expectedVisible, fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
+        Assert.False(fixture.ViewModel.CombatantColumns.ShowBossShareColumn);
     }
 
     [Fact]
@@ -1073,6 +1142,7 @@ public sealed class MainViewModelCombatantFilterTests
         public EncounterArchiveService Archive { get; }
         public RuntimeMetadataRegistry MetadataRegistry => _captureService.Scene.Owner.MetadataRegistry;
         public ProjectionCacheStats ProjectionCacheStats => _captureService.Scene.Owner.ProjectionCacheStats;
+        public BossSceneState BossState => _captureService.Scene.BossState;
         public Guid SceneId => _captureService.Scene.SessionId;
         public long SceneStartedMilliseconds => _captureService.Scene.SessionStarted.ToUnixTimeMilliseconds();
 
@@ -1122,6 +1192,8 @@ public sealed class MainViewModelCombatantFilterTests
         public void AppendSceneBossFocusUnknownHp(int instanceId, string name, long timestamp) => MainViewModelCombatantFilterTests.AppendSceneBossFocusUnknownHp(_captureService.Scene, instanceId, name, timestamp);
 
         public void AppendSceneMap(uint mapId, uint instanceId) => MainViewModelCombatantFilterTests.AppendSceneMap(_captureService.Scene, mapId, instanceId);
+
+        public void ExpireBossFocusData() => _captureService.Scene.Owner.BossFocus.GetObservedBosses(long.MaxValue, SceneReadModelOwner.BossFocusVisibilityTimeoutMilliseconds);
 
         public void FlushFrame() => _frameBatch.FlushFrame();
     }
