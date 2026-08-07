@@ -54,6 +54,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private bool _hydrateBossSceneRuntimeStateOnCombat;
     private long _frozenEndObservationOrdinalExclusive = -1;
     private SceneArchivePayload? _frozenArchive;
+    private BossResumeIdentity[]? _frozenBossIdentities;
     private LiveScenePlaybackState? _playbackState;
     private int _playbackSourceCount;
 
@@ -355,6 +356,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         _hydrateBossSceneRuntimeStateOnCombat = shouldHydrateBossSceneRuntimeState;
         _frozenEndObservationOrdinalExclusive = -1;
         _frozenArchive = null;
+        _frozenBossIdentities = null;
         _seededBossSceneRuntimeStates.Clear();
         Owner.ResetCombat(
             SessionId,
@@ -388,6 +390,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         _hydrateBossSceneRuntimeStateOnCombat = false;
         _frozenEndObservationOrdinalExclusive = -1;
         _frozenArchive = null;
+        _frozenBossIdentities = null;
         _seededBossSceneRuntimeStates.Clear();
         Volatile.Write(ref _owner, CreateOwner(SessionId, SessionStarted, boundaryOrdinal));
         _pendingMapTransitions.Enqueue(retainedArchive);
@@ -425,7 +428,13 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
         if (_bossState == BossSceneState.Frozen)
         {
-            if (Owner.EntityVitals.TryGet(focusTargetId, out var focusTargetVital) && focusTargetVital.CurrentHp == 0)
+            if (CanResumeFrozenBoss(focusTargetId, sink))
+            {
+                ResumeFrozenBoss(in packet, focusTargetId, activitySourceId, sink);
+                return true;
+            }
+
+            if (IsDeadFocusTarget(focusTargetId, sink))
                 return false;
 
             _pendingArchives.Enqueue(GetFrozenArchivePayloadCore());
@@ -485,9 +494,81 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
         _frozenEndObservationOrdinalExclusive = Owner.AppliedNextObservationOrdinal;
         _frozenArchive = Owner.CreateArchivePayload(_frozenEndObservationOrdinalExclusive);
+        _frozenBossIdentities = CaptureBossResumeIdentities();
         FinalizePlaybackStateCore(_frozenArchive);
         _bossState = BossSceneState.Frozen;
         Owner.SetBossFocusTracking(false);
+    }
+
+    private bool CanResumeFrozenBoss(int focusTargetId, IRuntimeObservationSink sink)
+    {
+        if (_frozenBossIdentities is not { Length: > 0 } ||
+            !sink.TryGetNpcRuntimeState(focusTargetId, out var state) ||
+            state.NpcCode is not int npcCode ||
+            state.Kind is not NpcKind.Boss ||
+            state.Hp is not long hp ||
+            state.MaxHp is not long maxHp ||
+            hp <= 0 ||
+            hp >= maxHp)
+        {
+            return false;
+        }
+
+        var identity = new BossResumeIdentity(focusTargetId, npcCode, NpcKind.Boss);
+        for (var i = 0; i < _frozenBossIdentities.Length; i++)
+        {
+            if (_frozenBossIdentities[i] == identity)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsDeadFocusTarget(int focusTargetId, IRuntimeObservationSink sink)
+    {
+        if (sink.TryGetNpcRuntimeState(focusTargetId, out var state) && state.Hp is long hp)
+            return hp == 0;
+
+        return Owner.EntityVitals.TryGet(focusTargetId, out var vital) && vital.CurrentHp == 0;
+    }
+
+    private void ResumeFrozenBoss(in PacketObservationSource packet, int focusTargetId, int activitySourceId, IRuntimeObservationSink sink)
+    {
+        _bossState = BossSceneState.Recording;
+        _frozenEndObservationOrdinalExclusive = -1;
+        _frozenArchive = null;
+        _frozenBossIdentities = null;
+        _seededBossSceneRuntimeStates.Remove(focusTargetId);
+        Owner.SetBossFocusTracking(true);
+        SeedBossSceneRuntimeState(in packet, focusTargetId, sink);
+        Owner.ObserveBossCombatTrigger(focusTargetId, activitySourceId, ResolveObservedAtMilliseconds(in packet));
+    }
+
+    private BossResumeIdentity[] CaptureBossResumeIdentities()
+    {
+        var encounterBosses = Owner.BossFocus.GetEncounterBosses();
+        if (encounterBosses.Count == 0)
+            return [];
+
+        var identities = new List<BossResumeIdentity>(encounterBosses.Count);
+        for (var i = 0; i < encounterBosses.Count; i++)
+        {
+            var instanceId = encounterBosses[i].InstanceId;
+            if (!Owner.Entities.TryGet(instanceId, out var entity) ||
+                entity.Kind != NpcKind.Boss)
+            {
+                continue;
+            }
+
+            var npcCode = entity.NpcCode;
+            if (npcCode is null && Owner.MetadataRegistry.TryGetNpcCode(instanceId, out var metadataNpcCode))
+                npcCode = metadataNpcCode;
+
+            if (npcCode is int resolvedNpcCode)
+                identities.Add(new BossResumeIdentity(instanceId, resolvedNpcCode, entity.Kind));
+        }
+
+        return [.. identities];
     }
 
     private void FinalizePlaybackStateCore(SceneArchivePayload? payload = null)
@@ -608,6 +689,8 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
 
         return owner;
     }
+
+    private readonly record struct BossResumeIdentity(int InstanceId, int NpcCode, NpcKind Kind);
 }
 
 public sealed class ReplaySinkHolder(

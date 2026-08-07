@@ -410,6 +410,95 @@ public sealed class BossSceneCollectionTests
     }
 
     [Fact]
+    public void FrozenBossSceneResumesSameNonFullBossWithoutArchiving()
+    {
+        var scene = CreateBossScene(out var timeProvider);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        sink.AppendNpcHp(Source(30), 300, 99_500, 100_000);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteFlush(1);
+        _ = scene.CreateFrame();
+
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        _ = scene.CreateFrame();
+        var frozenSessionId = scene.SessionId;
+
+        sink.AppendNpcHp(Source(13_000), 300, 90_000, 100_000);
+        AppendDamage(sink, 100, 300, 700, 13_500, 2);
+        sink.CompleteFlush(2);
+
+        var resumed = scene.CreateFrame();
+        var focus = Assert.Single(resumed.BossFocuses.AsSpan().ToArray());
+
+        Assert.Equal(frozenSessionId, scene.SessionId);
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.False(scene.TryDequeuePendingArchive(out _));
+        Assert.Equal(1_200, resumed.Snapshot.Combatants[100].DamageAmount);
+        Assert.Equal(90_000, focus.Hp);
+        Assert.Equal(100_000, focus.MaxHp);
+    }
+
+    [Fact]
+    public void FrozenBossSceneArchivesSameBossWhenItReturnsAtFullHealth()
+    {
+        var scene = CreateBossScene(out var timeProvider);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        sink.AppendNpcHp(Source(30), 300, 99_500, 100_000);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteFlush(1);
+        _ = scene.CreateFrame();
+
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        _ = scene.CreateFrame();
+        var frozenSessionId = scene.SessionId;
+
+        sink.AppendNpcHp(Source(13_000), 300, 100_000, 100_000);
+        AppendDamage(sink, 100, 300, 700, 13_500, 2);
+        sink.CompleteFlush(2);
+
+        var resumed = scene.CreateFrame();
+
+        Assert.NotEqual(frozenSessionId, scene.SessionId);
+        Assert.Equal(BossSceneState.Recording, scene.BossState);
+        Assert.True(scene.TryDequeuePendingArchive(out var archived));
+        Assert.Equal(500, archived.Snapshot.Combatants[100].DamageAmount);
+        Assert.Equal(700, resumed.Snapshot.Combatants[100].DamageAmount);
+    }
+
+    [Fact]
+    public void FrozenBossSceneArchivesWhenBossIdentityChanges()
+    {
+        var scene = CreateBossScene(out var timeProvider);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+        AppendPlayer(sink, 100, "Player", 10);
+        AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
+        sink.AppendNpcHp(Source(30), 300, 99_500, 100_000);
+        AppendDamage(sink, 100, 300, 500, 1_000, 1);
+        sink.CompleteFlush(1);
+        _ = scene.CreateFrame();
+
+        timeProvider.SetUtcNow(Started.AddMilliseconds(12_001));
+        _ = scene.CreateFrame();
+        var frozenSessionId = scene.SessionId;
+
+        AppendNpc(sink, 300, 2_100_003, NpcKind.Boss, 13_000);
+        sink.AppendNpcHp(Source(13_000), 300, 90_000, 100_000);
+        AppendDamage(sink, 100, 300, 700, 13_500, 2);
+        sink.CompleteFlush(2);
+
+        var resumed = scene.CreateFrame();
+
+        Assert.NotEqual(frozenSessionId, scene.SessionId);
+        Assert.True(scene.TryDequeuePendingArchive(out var archived));
+        Assert.Equal(2_100_002, Assert.Single(archived.Snapshot.BossNpcCodes));
+        Assert.Equal(700, resumed.Snapshot.Combatants[100].DamageAmount);
+    }
+
+    [Fact]
     public void LivePlaybackSourceFreezesWhenBossSceneFreezes()
     {
         var scene = CreateBossScene();
