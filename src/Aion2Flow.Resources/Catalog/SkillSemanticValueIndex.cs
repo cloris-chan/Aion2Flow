@@ -45,7 +45,7 @@ internal sealed class SkillSemanticValueIndex
         "Stealth", "StealthSeek", "Stiffen", "Stone", "Stun", "Taunt", "TeleportCasterTarget", "ToggleAbnormal",
         "TriggerSkillByAddAbnormal", "TriggerSkillByAttackAll", "TriggerSkillByGetAbnormal", "TriggerSkillByGetDamage", "TriggerSkillByKill",
         "TriggerSkillBySelfBlock", "TriggerSkillBySelfEvade", "TriggerSkillBySelfShieldBlock", "TriggerSkillBySelfWeaponBlock", "TriggerSkillCheck_BossMonster",
-        "UndeletableFear", "UnLockNpcLanguageType", "UseRebirth", "WeaponEquipable"
+        "UndeletableFear", "UnLockNpcLanguageType", "UsableItemCooltimeChange", "UseRebirth", "WeaponEquipable"
     }.ToFrozenSet(StringComparer.Ordinal);
 
     private SkillSemanticValueIndex(
