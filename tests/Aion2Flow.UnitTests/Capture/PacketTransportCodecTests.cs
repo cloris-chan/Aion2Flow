@@ -31,4 +31,10 @@ public sealed class PacketTransportCodecTests
 
         Assert.Equal(35 + written - 4, packetLength);
     }
+
+    [Fact]
+    public void GameplayOpcodeRegistryIncludesMap2F92()
+    {
+        Assert.True(PacketTransportCodec.IsKnownGameplayOpcode(0x2f, 0x92));
+    }
 }

@@ -510,9 +510,9 @@ public sealed class ConnectionAdmissionTests
     }
 
     [Fact]
-    public void ClassifierKeepsSplitTlsPendingThenRejectsTheCompleteHeader()
+    public void ClassifierKeepsSplitTlsPendingThenRejectsANonCollidingHeader()
     {
-        byte[] tlsRecord = [0x17, 0x03, 0x03, 0x00, 0x01, 0x00];
+        byte[] tlsRecord = [0x17, 0x03, 0x03, 0x40, 0x00, 0x00];
         Assert.True(TcpWorldStreamClassifier.IsPlausibleConnectionStart(tlsRecord.AsSpan(0, 1)));
 
         using var classifier = new TcpWorldStreamClassifier(allowMidstreamRecovery: false);
@@ -1666,6 +1666,188 @@ public sealed class ConnectionAdmissionTests
     }
 
     [Fact]
+    public async Task LengthPrefixedPromotionReplaysTheOuterEnvelope()
+    {
+        var connection = new TcpConnection(0x0100000A, 0x0200000A, 21_060, 49_628);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        const int playerId = 23;
+        var envelope = BuildLengthPrefixedEnvelope(Build3336Frame(playerId, "Player"));
+        const uint sequenceNumber = 5_000;
+        var admission = new CapturePacketAdmission(CapturePacketAdmissionKind.Candidate, 1, ReleasedLock: false);
+        using var candidates = new TcpWorldConnectionCandidateTracker();
+        CaptureConnectionPromotion? promotion = null;
+        var scene = new SceneLiveReadModel();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+
+        try
+        {
+            var packet = CapturedPacket.CreateCopy(
+                connection,
+                admission,
+                envelope,
+                sequenceNumber,
+                captureMilliseconds);
+            Assert.Equal(
+                CandidatePacketDisposition.Confirmed,
+                candidates.Add(
+                    packet,
+                    allowNewCandidate: true,
+                    allowMidstreamRecovery: false,
+                    initialSequenceNumber: sequenceNumber,
+                    connectionOrdinal: 1,
+                    observedTimestamp: Stopwatch.GetTimestamp(),
+                    out promotion));
+            Assert.NotNull(promotion);
+            Assert.Equal(sequenceNumber, promotion.ReplayStartSequenceNumber);
+
+            var item = CaptureDispatchItem.ForPromotion(promotion);
+            try
+            {
+                Assert.True(dispatcher.DispatchItem(item));
+            }
+            finally
+            {
+                item.Return();
+            }
+
+            _ = scene.CreateFrame();
+            Assert.True(scene.Owner.Entities.TryGet(playerId, out var player));
+            Assert.Equal("Player", player.Nickname);
+        }
+        finally
+        {
+            promotion?.Return();
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task MidstreamLengthPrefixedPromotionReplaysFromOuterHeader()
+    {
+        var connection = new TcpConnection(0x0100000A, 0x0200000A, 21_060, 49_628);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        const int rawPrefixLength = 9;
+        const int playerId = 23;
+        const uint sequenceNumber = 5_000;
+        var oldFrame = BuildFrame(0x7a, 0x7b, new byte[24]);
+        var continuation = oldFrame.AsSpan(oldFrame.Length - 7).ToArray();
+        var tick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds));
+        var identity = Build3336Frame(playerId, "Player");
+        var gameplay = BuildFrame(0x15, 0x36, new byte[32]);
+        var firstEnvelope = BuildLengthPrefixedEnvelope(Concat(continuation, tick));
+        var payload = Concat(
+            Enumerable.Repeat((byte)0x7a, rawPrefixLength).ToArray(),
+            firstEnvelope,
+            BuildLengthPrefixedEnvelope(identity),
+            BuildLengthPrefixedEnvelope(gameplay));
+        var admission = new CapturePacketAdmission(CapturePacketAdmissionKind.Candidate, 1, ReleasedLock: false);
+        using var candidates = new TcpWorldConnectionCandidateTracker();
+        CaptureConnectionPromotion? promotion = null;
+        var scene = new SceneLiveReadModel();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+
+        try
+        {
+            var packet = CapturedPacket.CreateCopy(
+                connection,
+                admission,
+                payload,
+                sequenceNumber,
+                captureMilliseconds);
+            Assert.Equal(
+                CandidatePacketDisposition.Confirmed,
+                candidates.Add(
+                    packet,
+                    allowNewCandidate: true,
+                    allowMidstreamRecovery: true,
+                    initialSequenceNumber: null,
+                    connectionOrdinal: 1,
+                    observedTimestamp: Stopwatch.GetTimestamp(),
+                    out promotion));
+            Assert.NotNull(promotion);
+            Assert.Equal(sequenceNumber + rawPrefixLength, promotion.ReplayStartSequenceNumber);
+
+            var item = CaptureDispatchItem.ForPromotion(promotion);
+            try
+            {
+                Assert.True(dispatcher.DispatchItem(item));
+            }
+            finally
+            {
+                item.Return();
+            }
+
+            _ = scene.CreateFrame();
+            Assert.True(scene.Owner.Entities.TryGet(playerId, out var player));
+            Assert.Equal("Player", player.Nickname);
+        }
+        finally
+        {
+            promotion?.Return();
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public void MaximumCanonicalFrameAcrossLengthPrefixedEnvelopesPromotesCandidate()
+    {
+        var connection = new TcpConnection(0x0100000A, 0x0200000A, 21_060, 49_628);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        const uint sequenceNumber = 5_000;
+        var frame = BuildFrame(
+            0x15,
+            0x36,
+            new byte[CaptureBufferLimits.StreamTailBufferSize - 5]);
+        var payload = Concat(
+            BuildLengthPrefixedEnvelope(frame.AsSpan(0, PacketTransportCodec.MaximumEnvelopeBodyLength)),
+            BuildLengthPrefixedEnvelope(frame.AsSpan(PacketTransportCodec.MaximumEnvelopeBodyLength)),
+            BuildLengthPrefixedEnvelope(BuildFrame(0x21, 0x36, new byte[32])));
+        var admission = new CapturePacketAdmission(CapturePacketAdmissionKind.Candidate, 1, ReleasedLock: false);
+        using var candidates = new TcpWorldConnectionCandidateTracker();
+        CaptureConnectionPromotion? promotion = null;
+        var offset = 0;
+
+        try
+        {
+            while (offset < payload.Length)
+            {
+                var chunkLength = Math.Min(CaptureBufferLimits.WinDivertPacketBufferSize, payload.Length - offset);
+                var packet = CapturedPacket.CreateCopy(
+                    connection,
+                    admission,
+                    payload.AsSpan(offset, chunkLength),
+                    sequenceNumber + (uint)offset,
+                    captureMilliseconds);
+                var disposition = candidates.Add(
+                    packet,
+                    allowNewCandidate: true,
+                    allowMidstreamRecovery: false,
+                    initialSequenceNumber: sequenceNumber,
+                    connectionOrdinal: 1,
+                    observedTimestamp: Stopwatch.GetTimestamp(),
+                    out promotion);
+                offset += chunkLength;
+
+                Assert.Equal(
+                    offset == payload.Length
+                        ? CandidatePacketDisposition.Confirmed
+                        : CandidatePacketDisposition.Buffered,
+                    disposition);
+            }
+
+            Assert.NotNull(promotion);
+            Assert.Equal(sequenceNumber, promotion.ReplayStartSequenceNumber);
+        }
+        finally
+        {
+            promotion?.Return();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
     public async Task DispatcherKeepsTimelineMonotonicWhenPromotionReplaysOlderPackets()
     {
         var started = DateTimeOffset.UtcNow.AddSeconds(-10);
@@ -1998,10 +2180,31 @@ public sealed class ConnectionAdmissionTests
         return frame;
     }
 
+    private static byte[] BuildLengthPrefixedEnvelope(ReadOnlySpan<byte> body)
+    {
+        var envelope = new byte[sizeof(int) + body.Length];
+        BinaryPrimitives.WriteInt32LittleEndian(envelope, body.Length);
+        body.CopyTo(envelope.AsSpan(sizeof(int)));
+        return envelope;
+    }
+
     private static byte[] WriteInt64(long value)
     {
         var bytes = new byte[sizeof(long)];
         BinaryPrimitives.WriteInt64LittleEndian(bytes, value);
         return bytes;
+    }
+
+    private static byte[] Concat(params byte[][] parts)
+    {
+        var result = new byte[parts.Sum(static part => part.Length)];
+        var offset = 0;
+        foreach (var part in parts)
+        {
+            part.CopyTo(result, offset);
+            offset += part.Length;
+        }
+
+        return result;
     }
 }

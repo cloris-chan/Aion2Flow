@@ -66,14 +66,23 @@ public sealed class PacketLogReplayServiceTests
             FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentUnknownToSunkenTempleTransition}"));
         Assert.Empty(ReadDirectMapEventObservations(replay, 0x0061, 0x0161));
 
-        var candidate = Assert.Single(ReadDirectMapEventObservations(replay, 0x2136));
-        Assert.Equal(610010u, candidate.MapId);
-        Assert.Equal(SceneObservationKind.MapContextStarted, candidate.Kind);
+        Assert.Collection(
+            ReadDirectMapEventObservations(replay, 0x2136),
+            static candidate =>
+            {
+                Assert.Equal(610010u, candidate.MapId);
+                Assert.Equal(SceneObservationKind.CurrentMap, candidate.Kind);
+            },
+            static candidate =>
+            {
+                Assert.Equal(610010u, candidate.MapId);
+                Assert.Equal(SceneObservationKind.CurrentMap, candidate.Kind);
+            });
         Assert.Collection(
             ReadSceneTransitions(replay),
             static transition =>
             {
-                Assert.Equal((ushort)0x2136, transition.Opcode);
+                Assert.Equal((ushort)0x0140, transition.Opcode);
                 Assert.Equal(610010u, transition.MapId);
                 Assert.Equal(0u, transition.MapInstanceId);
                 Assert.Equal(SceneObservationKind.MapContextStarted, transition.Kind);
@@ -437,6 +446,35 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(Faction.Light, metadata.Faction);
         Assert.Equal(1007, metadata.OriginServerId);
         Assert.True(metadata.IsLocalPlayer);
+    }
+
+    [Fact]
+    public void Replay_20260809021609_ParsesFixed32CrossServerIdentityAndCombat()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentFixed32CrossServerCombat}"));
+
+        const int playerId = 2300;
+        Assert.Contains(
+            ReadAllJournalEntries(replay),
+            static entry => entry.Raw.Opcode == 0x3336 &&
+                            entry.State is { EntityId: playerId, StateCode: StateCodes.PlayerIdentity, Text: "코자", IsLocalPlayer: true, OriginServerId: 2007, Faction: Faction.Dark });
+
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(playerId, out var metadata));
+        Assert.Equal("코자", metadata.Nickname);
+        Assert.Equal(Faction.Dark, metadata.Faction);
+        Assert.Equal(2007, metadata.OriginServerId);
+        Assert.True(metadata.IsLocalPlayer);
+
+        var combatant = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == playerId);
+        Assert.Equal(886_473, combatant.OutgoingDamage);
+        Assert.Equal(269, combatant.OutgoingHits);
+        Assert.Equal(269, combatant.OutgoingAttempts);
+        Assert.Equal(138, combatant.OutgoingCriticals);
+        Assert.Equal(34_217, combatant.IncomingDamage);
+        Assert.Equal(37_170, combatant.OutgoingHealing);
+        Assert.Equal(96_889, combatant.IncomingHealing);
     }
 
     [Fact]

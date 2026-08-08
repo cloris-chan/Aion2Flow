@@ -27,4 +27,5 @@ public static class ReplayScenarioCatalog
     public const string CurrentUnknownMapArrival = "aion2flow.stream.20260728234353.log";
     public const string CurrentOldMapCombatDuringTransfer = "aion2flow.stream.20260729002254.log";
     public const string CurrentArrivalAfterOldMapCombat = "aion2flow.stream.20260729002341.log";
+    public const string CurrentFixed32CrossServerCombat = "aion2flow.stream.20260809021609.log";
 }

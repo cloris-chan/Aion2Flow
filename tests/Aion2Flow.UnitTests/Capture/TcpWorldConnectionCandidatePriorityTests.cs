@@ -510,7 +510,7 @@ public sealed class TcpWorldConnectionCandidatePriorityTests
     {
         var payloads = new[]
         {
-            new byte[] { 0x16, 0x03, 0x03, 0x00, 0x00 },
+            [0x16, 0x03, 0x03, 0x40, 0x00],
             "GET / HTTP/1.1\r\n\r\n"u8.ToArray(),
             "SSH-2.0-test\r\n"u8.ToArray(),
             BuildFrame(0x00, 0x39, ReadOnlySpan<byte>.Empty)
