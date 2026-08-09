@@ -1952,6 +1952,258 @@ public sealed class ConnectionAdmissionTests
     }
 
     [Fact]
+    public async Task DispatcherRecoversAnAcknowledgedCaptureGapWithoutResettingTheScene()
+    {
+        var started = DateTimeOffset.UtcNow.AddSeconds(-10);
+        var captureMilliseconds = started.AddSeconds(5).ToUnixTimeMilliseconds();
+        var connection = new TcpConnection(0x0100000A, 0x0200000A, 21_060, 49_628);
+        var scene = new SceneLiveReadModel(started);
+        var acknowledgments = new LatestTcpAcknowledgmentTracker();
+        var dispatcher = new PacketCaptureDispatcher(
+            SceneSinkFactory.CreateForLive(scene),
+            protocolRoundTripObserver: null,
+            connectionLockedObserver: null,
+            acknowledgments: acknowledgments,
+            transportOrdinalAllocator: static () => 2);
+        var initialIdentity = Build3336Frame(23, "Before");
+        var staleFrame = Build3336Frame(24, "Stale");
+        var stalePrefixLength = staleFrame.Length / 2;
+        var tick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds));
+        var recoveredIdentity = Build3336Frame(25, "Recovered");
+        var recoveredPayload = Concat(Enumerable.Repeat((byte)0x7a, 9).ToArray(), tick, recoveredIdentity);
+        const uint sequenceNumber = 10_000;
+        const uint missingByteCount = 156;
+
+        try
+        {
+            Assert.True(CaptureConnectionGate.TryPromote(
+                in connection,
+                out var admission,
+                out _,
+                connectionOrdinal: 1));
+            var initial = CapturedPacket.CreateCopy(
+                connection,
+                admission,
+                initialIdentity,
+                sequenceNumber,
+                captureMilliseconds);
+            try
+            {
+                Assert.True(dispatcher.DispatchCapturedPacket(initial, sequenceNumber, connectionOrdinal: 1));
+            }
+            finally
+            {
+                initial.Return();
+            }
+
+            var sessionId = scene.SessionId;
+            var stalePrefix = CapturedPacket.CreateCopy(
+                connection,
+                admission,
+                staleFrame.AsSpan(0, stalePrefixLength),
+                sequenceNumber + (uint)initialIdentity.Length,
+                captureMilliseconds + 10);
+            try
+            {
+                Assert.False(dispatcher.DispatchCapturedPacket(stalePrefix));
+            }
+            finally
+            {
+                stalePrefix.Return();
+            }
+
+            var resumeSequence = sequenceNumber + (uint)initialIdentity.Length + (uint)stalePrefixLength + missingByteCount;
+            var future = CapturedPacket.CreateCopy(
+                connection,
+                admission,
+                recoveredPayload,
+                resumeSequence,
+                captureMilliseconds + 20);
+            try
+            {
+                Assert.False(dispatcher.DispatchCapturedPacket(future));
+            }
+            finally
+            {
+                future.Return();
+            }
+
+            Assert.True(acknowledgments.Observe(in connection, admission.Generation, 1, resumeSequence));
+            Assert.True(dispatcher.DispatchItem(CaptureDispatchItem.ForAcknowledgmentAvailable()));
+
+            _ = scene.CreateFrame();
+            Assert.Equal(sessionId, scene.SessionId);
+            Assert.True(scene.Owner.Entities.TryGet(25, out var recovered));
+            Assert.Equal("Recovered", recovered.Nickname);
+        }
+        finally
+        {
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task DispatcherProcessesALateQueuedSegmentBeforeRecoveringAnAcknowledgedGap()
+    {
+        var started = DateTimeOffset.UtcNow.AddSeconds(-10);
+        var captureMilliseconds = started.AddSeconds(5).ToUnixTimeMilliseconds();
+        var connection = new TcpConnection(0x0100000A, 0x0200000A, 21_060, 49_628);
+        var scene = new SceneLiveReadModel(started);
+        var acknowledgments = new LatestTcpAcknowledgmentTracker();
+        var dispatcher = new PacketCaptureDispatcher(
+            SceneSinkFactory.CreateForLive(scene),
+            protocolRoundTripObserver: null,
+            connectionLockedObserver: null,
+            acknowledgments: acknowledgments,
+            transportOrdinalAllocator: static () => 2);
+        var initialIdentity = Build3336Frame(23, "Before");
+        var lateIdentity = Build3336Frame(24, "Late");
+        var tick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds));
+        var futureIdentity = Build3336Frame(25, "Future");
+        var futurePayload = Concat(tick, futureIdentity);
+        const uint sequenceNumber = 10_000;
+
+        try
+        {
+            Assert.True(CaptureConnectionGate.TryPromote(
+                in connection,
+                out var admission,
+                out _,
+                connectionOrdinal: 1));
+            DispatchCapturedPacket(
+                dispatcher,
+                connection,
+                admission,
+                initialIdentity,
+                sequenceNumber,
+                captureMilliseconds,
+                initialSequenceNumber: sequenceNumber,
+                connectionOrdinal: 1);
+
+            var lateSequence = sequenceNumber + (uint)initialIdentity.Length;
+            var futureSequence = lateSequence + (uint)lateIdentity.Length;
+            Assert.True(acknowledgments.Observe(
+                in connection,
+                admission.Generation,
+                1,
+                futureSequence,
+                captureOrdinal: 20));
+
+            DispatchCapturedPacket(
+                dispatcher,
+                connection,
+                admission,
+                futurePayload,
+                futureSequence,
+                captureMilliseconds + 10,
+                captureOrdinal: 10);
+            DispatchCapturedPacket(
+                dispatcher,
+                connection,
+                admission,
+                lateIdentity,
+                lateSequence,
+                captureMilliseconds + 11,
+                captureOrdinal: 21);
+            Assert.False(dispatcher.DispatchItem(CaptureDispatchItem.ForAcknowledgmentAvailable()));
+
+            _ = scene.CreateFrame();
+            Assert.True(scene.Owner.Entities.TryGet(24, out var late));
+            Assert.Equal("Late", late.Nickname);
+            Assert.True(scene.Owner.Entities.TryGet(25, out var future));
+            Assert.Equal("Future", future.Nickname);
+        }
+        finally
+        {
+            PacketCaptureChannel.Drain();
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task DispatcherRestartsRecoveryAfterASecondAcknowledgedGap()
+    {
+        var started = DateTimeOffset.UtcNow.AddSeconds(-10);
+        var captureMilliseconds = started.AddSeconds(5).ToUnixTimeMilliseconds();
+        var connection = new TcpConnection(0x0100000A, 0x0200000A, 21_060, 49_628);
+        var scene = new SceneLiveReadModel(started);
+        var acknowledgments = new LatestTcpAcknowledgmentTracker();
+        var dispatcher = new PacketCaptureDispatcher(
+            SceneSinkFactory.CreateForLive(scene),
+            protocolRoundTripObserver: null,
+            connectionLockedObserver: null,
+            acknowledgments: acknowledgments,
+            transportOrdinalAllocator: static () => 2);
+        var initialIdentity = Build3336Frame(23, "Before");
+        var staleFrame = Build3336Frame(24, "Stale");
+        var stalePrefixLength = staleFrame.Length / 2;
+        var firstRecoveryPayload = Enumerable.Repeat((byte)0x7a, 12).ToArray();
+        var tick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds));
+        var recoveredIdentity = Build3336Frame(25, "Recovered");
+        var secondRecoveryPayload = Concat(Enumerable.Repeat((byte)0x7a, 9).ToArray(), tick, recoveredIdentity);
+        const uint sequenceNumber = 10_000;
+        const uint missingByteCount = 156;
+
+        try
+        {
+            Assert.True(CaptureConnectionGate.TryPromote(
+                in connection,
+                out var admission,
+                out _,
+                connectionOrdinal: 1));
+            DispatchCapturedPacket(
+                dispatcher,
+                connection,
+                admission,
+                initialIdentity,
+                sequenceNumber,
+                captureMilliseconds,
+                initialSequenceNumber: sequenceNumber,
+                connectionOrdinal: 1);
+            DispatchCapturedPacket(
+                dispatcher,
+                connection,
+                admission,
+                staleFrame.AsSpan(0, stalePrefixLength),
+                sequenceNumber + (uint)initialIdentity.Length,
+                captureMilliseconds + 10);
+
+            var firstResumeSequence = sequenceNumber + (uint)initialIdentity.Length + (uint)stalePrefixLength + missingByteCount;
+            DispatchCapturedPacket(
+                dispatcher,
+                connection,
+                admission,
+                firstRecoveryPayload,
+                firstResumeSequence,
+                captureMilliseconds + 20);
+            Assert.True(acknowledgments.Observe(in connection, admission.Generation, 1, firstResumeSequence));
+            Assert.False(dispatcher.DispatchItem(CaptureDispatchItem.ForAcknowledgmentAvailable()));
+
+            var secondResumeSequence = firstResumeSequence + (uint)firstRecoveryPayload.Length + missingByteCount;
+            DispatchCapturedPacket(
+                dispatcher,
+                connection,
+                admission,
+                secondRecoveryPayload,
+                secondResumeSequence,
+                captureMilliseconds + 30);
+            Assert.True(acknowledgments.Observe(in connection, admission.Generation, 1, secondResumeSequence));
+            Assert.True(dispatcher.DispatchItem(CaptureDispatchItem.ForAcknowledgmentAvailable()));
+
+            _ = scene.CreateFrame();
+            Assert.True(scene.Owner.Entities.TryGet(25, out var recovered));
+            Assert.Equal("Recovered", recovered.Nickname);
+        }
+        finally
+        {
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
     public void SynPayloadSequenceStartsAfterTheSynByte()
     {
         Assert.Equal(100u, WinDivertCaptureService.ResolvePayloadSequenceNumber(100, hasSynFlag: false));
@@ -2061,6 +2313,34 @@ public sealed class ConnectionAdmissionTests
         offset += sizeof(int);
         body[offset] = 1;
         return BuildFrame(0x33, 0x36, body);
+    }
+
+    private static void DispatchCapturedPacket(
+        PacketCaptureDispatcher dispatcher,
+        in TcpConnection connection,
+        in CapturePacketAdmission admission,
+        ReadOnlySpan<byte> payload,
+        uint sequenceNumber,
+        long captureTimestampMilliseconds,
+        uint? initialSequenceNumber = null,
+        long connectionOrdinal = 0,
+        long captureOrdinal = 0)
+    {
+        var packet = CapturedPacket.CreateCopy(
+            connection,
+            admission,
+            payload,
+            sequenceNumber,
+            captureTimestampMilliseconds,
+            captureOrdinal: captureOrdinal);
+        try
+        {
+            _ = dispatcher.DispatchCapturedPacket(packet, initialSequenceNumber, connectionOrdinal);
+        }
+        finally
+        {
+            packet.Return();
+        }
     }
 
     private static void DispatchPromotion(

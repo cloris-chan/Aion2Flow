@@ -25,7 +25,9 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
     private readonly TcpDownstreamConnectionTracker _downstreamConnections = new();
     private readonly PendingPromotionRegistry _pendingPromotions = new();
     private readonly CaptureTimestampMapper _captureTimestampMapper = new();
+    private readonly LatestTcpAcknowledgmentTracker _acknowledgments = new();
     private long _nextConnectionOrdinal;
+    private long _nextCaptureOrdinal;
 
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService = processPortDiscoveryService;
     private readonly SceneLiveReadModel _scene = new(RawPacketDump.CurrentSessionStarted);
@@ -37,7 +39,9 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             OnProtocolRoundTripObserved,
             OnCaptureConnectionLocked,
             _protocolRttEstimator.Clear,
-            OnPromotionCompleted);
+            OnPromotionCompleted,
+            _acknowledgments,
+            AllocateConnectionOrdinal);
     }
     public SceneLiveReadModel Scene => _scene;
     public bool IsDriverActive => _divert is not null;
@@ -72,6 +76,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         _candidateConnections.DiscardAll();
         _downstreamConnections.Clear();
         _protocolRttEstimator.Clear();
+        _acknowledgments.Clear();
         try
         {
             _cts = new CancellationTokenSource();
@@ -154,6 +159,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                     var payloadLength = packetSpan.Length - payloadOffset;
                     var captureTicks = address.Timestamp;
                     var observedTimestamp = Stopwatch.GetTimestamp();
+                    var captureOrdinal = checked(++_nextCaptureOrdinal);
                     var isKnownProcessPort = _processPortDiscoveryService.AllPorts.Contains(dstPort);
 
                     var startsNewConnection = false;
@@ -206,6 +212,30 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         hasAcknowledgmentFlag &&
                         (isExpectedDownstream || (isKnownProcessPort && startsNewConnection));
 
+                    if (address.Outbound && hasAcknowledgmentFlag && !hasSynFlag)
+                    {
+                        var downstreamConnection = connection.Reverse();
+                        if (CaptureConnectionGate.TryGetActiveConnectionOrdinal(
+                                in downstreamConnection,
+                                out var activeConnectionOrdinal) &&
+                            CaptureConnectionGate.TryGetActiveAdmission(
+                                in downstreamConnection,
+                                activeConnectionOrdinal,
+                                out var activeAdmission))
+                        {
+                            if (_acknowledgments.Observe(
+                                    in downstreamConnection,
+                                    activeAdmission.Generation,
+                                    activeConnectionOrdinal,
+                                    tcp.HostAcknowledgmentNumber,
+                                    captureOrdinal) &&
+                                !PacketCaptureChannel.TryWriteAcknowledgmentAvailable())
+                            {
+                                _acknowledgments.CancelNotification();
+                            }
+                        }
+                    }
+
                     var admission = CaptureConnectionGate.EvaluatePacket(
                         in connection,
                         hasDownstreamStart,
@@ -224,14 +254,15 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                                 payloadSequenceNumber,
                                 tcp.HostAcknowledgmentNumber,
                                 closeCaptureMilliseconds,
-                                 captureTicks,
-                                 isInbound: !address.Outbound,
-                                 packetIsExpectedDownstream,
-                                 isKnownProcessPort,
-                                 initialSequenceNumber,
-                                 packetConnectionOrdinal,
-                                 observedTimestamp,
-                                 _cts.Token);
+                                captureTicks,
+                                captureOrdinal,
+                                isInbound: !address.Outbound,
+                                packetIsExpectedDownstream,
+                                isKnownProcessPort,
+                                initialSequenceNumber,
+                                packetConnectionOrdinal,
+                                observedTimestamp,
+                                _cts.Token);
                         }
 
                         var hasQueuedPromotion = _pendingPromotions.TryGetForClose(
@@ -309,6 +340,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
                         tcp.HostAcknowledgmentNumber,
                         captureTimestampMilliseconds,
                         captureTicks,
+                        captureOrdinal,
                         isInbound: !address.Outbound,
                         packetIsExpectedDownstream,
                         isKnownProcessPort,
@@ -349,6 +381,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         uint acknowledgmentNumber,
         long captureTimestampMilliseconds,
         long captureTimestamp,
+        long captureOrdinal,
         bool isInbound,
         bool isExpectedDownstream,
         bool isKnownProcessPort,
@@ -409,7 +442,8 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             sequenceNumber,
             captureTimestampMilliseconds,
             acknowledgmentNumber,
-            captureTimestamp);
+            captureTimestamp,
+            captureOrdinal);
         if (!admission.RequiresClassification)
         {
             if (!PacketCaptureChannel.WritePacket(capturedPacket, cancellationToken))
@@ -595,6 +629,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         _candidateConnections.DiscardAll();
         _downstreamConnections.Clear();
         _pendingPromotions.CancelAll();
+        _acknowledgments.Clear();
 
         await Dispatcher.StopAsync().ConfigureAwait(false);
         PacketCaptureChannel.Drain();

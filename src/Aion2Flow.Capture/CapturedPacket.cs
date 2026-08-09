@@ -18,6 +18,7 @@ public sealed class CapturedPacket
     public uint AcknowledgmentNumber { get; private set; }
     public long CaptureTimestamp { get; private set; }
     public long CaptureTimestampMilliseconds { get; private set; }
+    public long CaptureOrdinal { get; private set; }
 
     public ReadOnlySpan<byte> Payload => _bufferOwner!.Memory.Span.Slice(_payloadOffset, _payloadLength);
 
@@ -44,7 +45,8 @@ public sealed class CapturedPacket
         uint sequenceNumber,
         long captureTimestampMilliseconds,
         uint acknowledgmentNumber = 0,
-        long captureTimestamp = 0)
+        long captureTimestamp = 0,
+        long captureOrdinal = 0)
     {
         var instance = _pool.Get();
         instance.Connection = connection;
@@ -56,6 +58,7 @@ public sealed class CapturedPacket
         instance.AcknowledgmentNumber = acknowledgmentNumber;
         instance.CaptureTimestamp = captureTimestamp;
         instance.CaptureTimestampMilliseconds = captureTimestampMilliseconds;
+        instance.CaptureOrdinal = captureOrdinal;
         return instance;
     }
 
@@ -66,7 +69,8 @@ public sealed class CapturedPacket
         uint sequenceNumber,
         long captureTimestampMilliseconds,
         uint acknowledgmentNumber = 0,
-        long captureTimestamp = 0)
+        long captureTimestamp = 0,
+        long captureOrdinal = 0)
     {
         var owner = MemoryPool<byte>.Shared.Rent(payload.Length);
         payload.CopyTo(owner.Memory.Span);
@@ -79,7 +83,8 @@ public sealed class CapturedPacket
             sequenceNumber,
             captureTimestampMilliseconds,
             acknowledgmentNumber,
-            captureTimestamp);
+            captureTimestamp,
+            captureOrdinal);
     }
 
     internal void UpdateAdmission(CapturePacketAdmission admission)

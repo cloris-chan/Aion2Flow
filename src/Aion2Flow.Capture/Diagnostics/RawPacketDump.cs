@@ -57,6 +57,15 @@ internal static class RawPacketDump
         return sessionStarted;
     }
 
+    public static void Shutdown()
+    {
+        lock (SyncRoot)
+        {
+            DisposeWriter(ref _rawWriter);
+            DisposeWriter(ref _streamWriter);
+        }
+    }
+
     public static void Append(string direction, ushort srcPort, ushort dstPort, uint sequenceNumber, uint acknowledgmentNumber, long captureTicks, ReadOnlySpan<byte> payload)
     {
         if (!IsEnabled || _rawWriter is null)
@@ -113,9 +122,9 @@ internal static class RawPacketDump
         }
 
         var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-        return new StreamWriter(stream, new UTF8Encoding(false))
+        return new StreamWriter(new BufferedStream(stream, 64 * 1024), new UTF8Encoding(false))
         {
-            AutoFlush = true
+            AutoFlush = false
         };
     }
 

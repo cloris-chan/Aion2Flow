@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Cloris.Aion2Flow.Capture.Streams;
 
@@ -8,7 +9,8 @@ internal enum CaptureDispatchItemKind : byte
     Packet,
     CandidateContinuation,
     Promotion,
-    ConnectionClose
+    ConnectionClose,
+    AcknowledgmentAvailable
 }
 
 internal readonly struct CaptureDispatchItem
@@ -59,6 +61,9 @@ internal readonly struct CaptureDispatchItem
             connectionGeneration,
             connectionOrdinal);
 
+    public static CaptureDispatchItem ForAcknowledgmentAvailable() =>
+        new(CaptureDispatchItemKind.AcknowledgmentAvailable, null, null, default, 0, 0);
+
     public void Return()
     {
         Packet?.Return();
@@ -75,6 +80,8 @@ internal static class PacketCaptureChannel
         SingleWriter = true,
         FullMode = BoundedChannelFullMode.Wait
     });
+    private static readonly SemaphoreSlim _wake = new(0);
+    private static int _acknowledgmentPending;
 
     public static bool WritePacket(CapturedPacket packet, CancellationToken cancellationToken) =>
         Write(CaptureDispatchItem.ForPacket(packet), cancellationToken);
@@ -97,14 +104,50 @@ internal static class PacketCaptureChannel
             CaptureDispatchItem.ForConnectionClose(in connection, connectionGeneration, connectionOrdinal),
             cancellationToken);
 
-    public static IAsyncEnumerable<CaptureDispatchItem> ReadAllAsync(CancellationToken cancellationToken = default) =>
-        _channel.Reader.ReadAllAsync(cancellationToken);
+    public static bool TryWriteAcknowledgmentAvailable()
+    {
+        if (Interlocked.Exchange(ref _acknowledgmentPending, 1) != 0)
+        {
+            return true;
+        }
+
+        _wake.Release();
+        return true;
+    }
+
+    public static async IAsyncEnumerable<CaptureDispatchItem> ReadAllAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_channel.Reader.TryRead(out var packet))
+            {
+                _wake.Wait(0);
+                yield return packet;
+                continue;
+            }
+
+            if (Interlocked.Exchange(ref _acknowledgmentPending, 0) != 0)
+            {
+                yield return CaptureDispatchItem.ForAcknowledgmentAvailable();
+                continue;
+            }
+
+            await _wake.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     public static void Drain()
     {
         while (_channel.Reader.TryRead(out var item))
         {
             item.Return();
+        }
+
+        Interlocked.Exchange(ref _acknowledgmentPending, 0);
+        while (_wake.Wait(0))
+        {
         }
     }
 
@@ -120,6 +163,7 @@ internal static class PacketCaptureChannel
                 }
             }
 
+            _wake.Release();
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

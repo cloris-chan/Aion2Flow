@@ -108,7 +108,14 @@ internal static class Program
             {
                 try
                 {
-                    WinDivertRuntime.Shutdown();
+                    try
+                    {
+                        RawPacketDump.Shutdown();
+                    }
+                    finally
+                    {
+                        WinDivertRuntime.Shutdown();
+                    }
                 }
                 finally
                 {

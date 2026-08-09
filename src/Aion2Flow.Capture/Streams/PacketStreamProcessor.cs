@@ -23,10 +23,12 @@ public sealed class PacketStreamProcessor : IDisposable
         IRuntimeObservationSink sink,
         Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
         PacketTransportFraming framing,
-        int canonicalPrefixLength)
+        int canonicalPrefixLength,
+        PacketFlushState? flushState = null,
+        PacketPlayerGroupState? playerGroupState = null)
     {
         _sink = sink;
-        _parser = new PacketFrameParser(sink, protocolRoundTripObserver);
+        _parser = new PacketFrameParser(sink, protocolRoundTripObserver, flushState, playerGroupState);
         _transport = new PacketTransportStreamDeframer(framing, canonicalPrefixLength);
     }
 

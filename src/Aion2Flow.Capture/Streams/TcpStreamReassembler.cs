@@ -21,6 +21,44 @@ internal sealed class TcpStreamReassembler : IDisposable
         _nextExpectedSequence = nextExpectedSequence;
     }
 
+    public bool TryGetAcknowledgedGap(uint acknowledgmentNumber, out TcpReassemblyGap gap)
+    {
+        if (!_hasExpectedSequence ||
+            !TryGetNearestFuturePending(out var resumeSequence, out _) ||
+            !TcpSequence.IsAtOrAfter(acknowledgmentNumber, resumeSequence))
+        {
+            gap = default;
+            return false;
+        }
+
+        var byteCount = TcpSequence.ForwardDistance(_nextExpectedSequence, resumeSequence);
+        gap = new TcpReassemblyGap(
+            _nextExpectedSequence,
+            resumeSequence,
+            acknowledgmentNumber,
+            byteCount,
+            _pending.Count,
+            _pendingBytes);
+        return true;
+    }
+
+    public void SkipGapAndDrain<TState>(
+        in TcpReassemblyGap gap,
+        ref TState state,
+        TcpReassembledChunkHandler<TState> handler)
+    {
+        if (!_hasExpectedSequence ||
+            _nextExpectedSequence != gap.ExpectedSequence ||
+            !TryGetNearestFuturePending(out var resumeSequence, out _) ||
+            resumeSequence != gap.ResumeSequence)
+        {
+            return;
+        }
+
+        _nextExpectedSequence = resumeSequence;
+        DrainPending(ref state, handler);
+    }
+
     public void Feed<TState>(uint sequenceNumber, ReadOnlySpan<byte> payload, CapturedPacketTimestamp timestamp, ref TState state, TcpReassembledChunkHandler<TState> handler)
     {
         if (payload.IsEmpty)
@@ -41,7 +79,7 @@ internal sealed class TcpStreamReassembler : IDisposable
             return;
         }
 
-        if (SequenceLessThan(sequenceNumber, _nextExpectedSequence))
+        if (TcpSequence.IsBefore(sequenceNumber, _nextExpectedSequence))
         {
             var overlap = (int)(_nextExpectedSequence - sequenceNumber);
             if (overlap >= payload.Length)
@@ -123,7 +161,7 @@ internal sealed class TcpStreamReassembler : IDisposable
                     break;
                 }
 
-                if (!SequenceLessThan(pendingSequenceNumber, _nextExpectedSequence))
+                if (!TcpSequence.IsBefore(pendingSequenceNumber, _nextExpectedSequence))
                 {
                     continue;
                 }
@@ -201,13 +239,13 @@ internal sealed class TcpStreamReassembler : IDisposable
 
         while (_pending.Count > CaptureBufferLimits.ReassemblyPendingSegmentLimit || _pendingBytes > CaptureBufferLimits.ReassemblyPendingByteLimit)
         {
-            DropFirstPending();
+            DropFarthestPending();
         }
     }
 
-    private void DropFirstPending()
+    private void DropFarthestPending()
     {
-        if (!TryGetFirstPending(out var sequenceNumber, out var segment))
+        if (!TryGetFarthestPending(out var sequenceNumber, out var segment))
         {
             return;
         }
@@ -217,24 +255,51 @@ internal sealed class TcpStreamReassembler : IDisposable
         segment.Dispose();
     }
 
-    private bool TryGetFirstPending(out uint sequenceNumber, out PendingSegment segment)
+    private bool TryGetNearestFuturePending(out uint sequenceNumber, out PendingSegment segment)
     {
-        using var enumerator = _pending.GetEnumerator();
-        if (enumerator.MoveNext())
-        {
-            sequenceNumber = enumerator.Current.Key;
-            segment = enumerator.Current.Value;
-            return true;
-        }
-
+        var found = false;
+        var nearestDistance = uint.MaxValue;
         sequenceNumber = 0;
         segment = default;
-        return false;
+        foreach (var entry in _pending)
+        {
+            var distance = TcpSequence.ForwardDistance(_nextExpectedSequence, entry.Key);
+            if (distance == 0 || distance >= 0x80000000u || distance >= nearestDistance)
+            {
+                continue;
+            }
+
+            found = true;
+            nearestDistance = distance;
+            sequenceNumber = entry.Key;
+            segment = entry.Value;
+        }
+
+        return found;
     }
 
-    private static bool SequenceLessThan(uint left, uint right)
+    private bool TryGetFarthestPending(out uint sequenceNumber, out PendingSegment segment)
     {
-        return unchecked((int)(left - right)) < 0;
+        var found = false;
+        var farthestDistance = 0u;
+        sequenceNumber = 0;
+        segment = default;
+        foreach (var entry in _pending)
+        {
+            var distance = TcpSequence.ForwardDistance(_nextExpectedSequence, entry.Key);
+            if (distance == 0 || distance >= 0x80000000u ||
+                (found && distance <= farthestDistance))
+            {
+                continue;
+            }
+
+            found = true;
+            farthestDistance = distance;
+            sequenceNumber = entry.Key;
+            segment = entry.Value;
+        }
+
+        return found;
     }
 
     private CapturedPacketTimestamp ResolveDeliveryTimestamp(CapturedPacketTimestamp timestamp)
@@ -271,4 +336,21 @@ internal sealed class TcpStreamReassembler : IDisposable
             _owner?.Dispose();
         }
     }
+}
+
+internal readonly record struct TcpReassemblyGap(
+    uint ExpectedSequence,
+    uint ResumeSequence,
+    uint AcknowledgmentNumber,
+    uint ByteCount,
+    int PendingSegmentCount,
+    int PendingByteCount);
+
+internal static class TcpSequence
+{
+    public static bool IsBefore(uint left, uint right) => unchecked((int)(left - right)) < 0;
+
+    public static bool IsAtOrAfter(uint left, uint right) => !IsBefore(left, right);
+
+    public static uint ForwardDistance(uint start, uint end) => unchecked(end - start);
 }

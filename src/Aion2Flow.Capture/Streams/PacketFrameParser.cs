@@ -4,16 +4,31 @@ using K4os.Compression.LZ4;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal sealed class PacketFrameParser(IRuntimeObservationSink sink, Action<ProtocolRoundTripObservation>? protocolRoundTripObserver) : IDisposable
+internal sealed class PacketFrameParser : IDisposable
 {
     private const int MaxDecompressedSize = 4 * 1024 * 1024;
     private const int MaxRetainedDecompressionBufferSize = 512 * 1024;
-    private readonly SceneObservationWriter _writer = new(sink);
-    private readonly PacketFlushState _flushState = new();
-    private readonly PacketPlayerGroupState _playerGroupState = new();
+    private readonly IRuntimeObservationSink _sink;
+    private readonly Action<ProtocolRoundTripObservation>? _protocolRoundTripObserver;
+    private readonly SceneObservationWriter _writer;
+    private readonly PacketFlushState _flushState;
+    private readonly PacketPlayerGroupState _playerGroupState;
     private byte[]? _decompressionBuffer;
 
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
+
+    internal PacketFrameParser(
+        IRuntimeObservationSink sink,
+        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
+        PacketFlushState? flushState = null,
+        PacketPlayerGroupState? playerGroupState = null)
+    {
+        _sink = sink;
+        _protocolRoundTripObserver = protocolRoundTripObserver;
+        _writer = new SceneObservationWriter(sink);
+        _flushState = flushState ?? new PacketFlushState();
+        _playerGroupState = playerGroupState ?? new PacketPlayerGroupState();
+    }
 
     public long CurrentAppendFlushId => _flushState.CurrentAppendFlushId;
 
@@ -33,11 +48,11 @@ internal sealed class PacketFrameParser(IRuntimeObservationSink sink, Action<Pro
     public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
     {
         var context = new PacketParseContext(
-            sink,
+            _sink,
             _writer,
             _flushState,
             _playerGroupState,
-            protocolRoundTripObserver,
+            _protocolRoundTripObserver,
             connection,
             in timestamp);
         var previous = context.EnterStructure(PacketStructureKind.TransportPacket, 0, packet.Length, 0, packet.Length, 0);

@@ -98,6 +98,69 @@ public sealed class TcpStreamReassemblerTests
         Assert.Equal([30_000L, 30_000L], collector.MonotonicTimestamps);
     }
 
+    [Fact]
+    public void AcknowledgmentBelowResumeDoesNotSkipGap()
+    {
+        using var reassembler = new TcpStreamReassembler();
+        var collector = new ChunkCollector();
+
+        reassembler.StartAt(100);
+        reassembler.Feed(104, [5, 6], At(1_000), ref collector, Capture);
+
+        Assert.False(reassembler.TryGetAcknowledgedGap(103, out _));
+        Assert.Empty(collector.Payloads);
+    }
+
+    [Fact]
+    public void AcknowledgmentAtResumeSkipsGapAndDrainsPendingData()
+    {
+        using var reassembler = new TcpStreamReassembler();
+        var collector = new ChunkCollector();
+
+        reassembler.StartAt(100);
+        reassembler.Feed(104, [5, 6], At(1_000), ref collector, Capture);
+
+        Assert.True(reassembler.TryGetAcknowledgedGap(104, out var gap));
+        Assert.Equal(new TcpReassemblyGap(100, 104, 104, 4, 1, 2), gap);
+        reassembler.SkipGapAndDrain(in gap, ref collector, Capture);
+
+        Assert.Equal([104u], collector.SequenceNumbers);
+        Assert.Equal([5, 6], Assert.Single(collector.Payloads));
+    }
+
+    [Fact]
+    public void RetransmissionBeforeAcknowledgmentPreservesEveryByte()
+    {
+        using var reassembler = new TcpStreamReassembler();
+        var collector = new ChunkCollector();
+
+        reassembler.StartAt(100);
+        reassembler.Feed(104, [5, 6], At(2_000), ref collector, Capture);
+        reassembler.Feed(100, [1, 2, 3, 4], At(3_000), ref collector, Capture);
+
+        Assert.False(reassembler.TryGetAcknowledgedGap(106, out _));
+        Assert.Equal([100u, 104u], collector.SequenceNumbers);
+        Assert.Equal([1, 2, 3, 4], collector.Payloads[0]);
+        Assert.Equal([5, 6], collector.Payloads[1]);
+    }
+
+    [Fact]
+    public void AcknowledgedGapRecoversAcrossSequenceWrap()
+    {
+        using var reassembler = new TcpStreamReassembler();
+        var collector = new ChunkCollector();
+
+        reassembler.StartAt(uint.MaxValue - 1);
+        reassembler.Feed(1, [4, 5], At(1_000), ref collector, Capture);
+
+        Assert.True(reassembler.TryGetAcknowledgedGap(1, out var gap));
+        Assert.Equal(3u, gap.ByteCount);
+        reassembler.SkipGapAndDrain(in gap, ref collector, Capture);
+
+        Assert.Equal([1u], collector.SequenceNumbers);
+        Assert.Equal([4, 5], Assert.Single(collector.Payloads));
+    }
+
     private static CapturedPacketTimestamp At(long unixMilliseconds)
         => new(unixMilliseconds, unixMilliseconds * 10);
 
