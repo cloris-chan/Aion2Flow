@@ -1,5 +1,6 @@
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -718,6 +719,87 @@ public class SceneTimelineContractTests
         Assert.True(currentOwner.Entities.TryGet(reusedId, out var currentEntity));
         Assert.Equal(2_000_002, currentEntity.NpcCode);
         Assert.Equal(229839u, currentOwner.CreateSnapshot().MapInstanceId);
+    }
+
+    [Fact]
+    public void LiveScene_MapContextRehydratesPreBoundaryLocalAndGroupIdentity()
+    {
+        const int localEntityId = 100;
+        const int nextLocalEntityId = 300;
+        const int nextTeammateEntityId = 400;
+        const int targetEntityId = 900;
+        var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
+        scene.SetCombatantStatisticsScope(CombatantStatisticsScope.Party);
+        var sink = SceneSinkFactory.CreateForLive(scene)();
+
+        sink.SetCurrentMap(Source(100, 1, 0x0240), 1001);
+        Assert.True(scene.TryDequeueMapTransition(out var initialArchive));
+        Assert.Null(initialArchive);
+
+        sink.AppendNickname(
+            Source(110, 2, 0x3336),
+            localEntityId,
+            "Self",
+            Faction.Light,
+            CharacterClass.Cleric,
+            isLocalPlayer: true,
+            originServerId: 2001);
+        sink.AppendNickname(
+            Source(120, 3, 0x0D92),
+            201,
+            "Ally",
+            originServerId: 2002);
+        sink.AppendPlayerGroupMember(
+            Source(130, 4, 0x0D92),
+            201,
+            PlayerGroupMembership.Party(2));
+        sink.CompleteFlush(1);
+        _ = scene.CreateFrame();
+
+        sink.SetCurrentMap(Source(200, 5, 0x0240), 1002);
+
+        sink.AppendNickname(
+            Source(210, 6, 0x4536),
+            nextLocalEntityId,
+            "Self",
+            Faction.Light,
+            CharacterClass.Cleric,
+            isLocalPlayer: false,
+            originServerId: 2001);
+        sink.AppendNickname(
+            Source(211, 7, 0x4536),
+            nextTeammateEntityId,
+            "Ally",
+            originServerId: 2002);
+        var combat = new CombatWireObservation
+        {
+            SkillCode = 11_000_010,
+            BodySkillVariantRaw = 11_000_010,
+            Damage = 500,
+            HitCount = 1,
+            AttemptCount = 1
+        };
+        sink.AppendCombatWireObservation(
+            Source(220, 8, 0x0438),
+            nextLocalEntityId,
+            targetEntityId,
+            in combat);
+        sink.AppendCombatWireObservation(
+            Source(230, 9, 0x0438),
+            nextTeammateEntityId,
+            targetEntityId,
+            in combat);
+        sink.CompleteFlush(2);
+
+        var owner = scene.Owner;
+        owner.Refresh();
+        Assert.True(owner.MetadataRegistry.TryGetPcMetadata(nextLocalEntityId, out var local));
+        Assert.True(local.IsLocalPlayer);
+        Assert.False(owner.MetadataRegistry.TryGetPcMetadata(localEntityId, out var staleLocal) && staleLocal.IsLocalPlayer);
+        Assert.True(owner.MetadataRegistry.TryGetPcMetadata(nextTeammateEntityId, out var teammate));
+        Assert.Equal(PlayerGroupRelation.PartyMember, teammate.GroupRelation);
+        Assert.Contains(nextLocalEntityId, owner.Combat.Combatants.Keys);
+        Assert.Contains(nextTeammateEntityId, owner.Combat.Combatants.Keys);
     }
 
     [Fact]

@@ -379,6 +379,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         var retainedArchive = archive.Snapshot.Combatants.Count > 0
             ? archive
             : null;
+        var metadataContinuity = _owner.MetadataRegistry.CreateContinuity();
 
         FinalizePlaybackStateCore(archive);
         SessionId = Guid.NewGuid();
@@ -392,7 +393,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         _frozenArchive = null;
         _frozenBossIdentities = null;
         _seededBossSceneRuntimeStates.Clear();
-        Volatile.Write(ref _owner, CreateOwner(SessionId, SessionStarted, boundaryOrdinal));
+        Volatile.Write(ref _owner, CreateOwner(SessionId, SessionStarted, boundaryOrdinal, metadataContinuity));
         _pendingMapTransitions.Enqueue(retainedArchive);
     }
 
@@ -660,7 +661,8 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private SceneReadModelOwner CreateOwner(
         Guid sessionId,
         DateTimeOffset sessionStarted,
-        long startObservationOrdinal)
+        long startObservationOrdinal,
+        RuntimeMetadataContinuity? metadataContinuity = null)
     {
         var owner = new SceneReadModelOwner(
             Journal,
@@ -668,7 +670,9 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
             sessionStarted,
             new EntityStore(),
             new SceneBoundaryStore(),
-            new RuntimeMetadataRegistry(),
+            metadataContinuity is null
+                ? new RuntimeMetadataRegistry()
+                : new RuntimeMetadataRegistry(metadataContinuity),
             new CombatStore(LiveCombatEventInitialCapacity, LiveCombatantInitialCapacity, LivePairInitialCapacity),
             _timeProvider,
             _combatOccurrenceObserver,

@@ -219,6 +219,53 @@ public sealed class SceneIdentityTests
     }
 
     [Fact]
+    public void RuntimeMetadataRegistry_Continuity_RehydratesLocalAndGroupProfilesAcrossEntityIds()
+    {
+        var source = new RuntimeMetadataRegistry();
+        source.UpsertPcMetadata(
+            100,
+            "Self",
+            Faction.Light,
+            CharacterClass.Cleric,
+            isLocalPlayer: true,
+            originServerId: 2001);
+        source.UpsertPcMetadata(200, "Ally", originServerId: 2002);
+        source.UpsertPlayerGroupMembership(200, PlayerGroupMembership.Party(2));
+
+        var continuity = source.CreateContinuity();
+        var next = new RuntimeMetadataRegistry(continuity);
+
+        Assert.True(next.TryGetPcMetadata(100, out var carriedLocal));
+        Assert.True(carriedLocal.IsLocalPlayer);
+        Assert.Equal(CharacterClass.Cleric, carriedLocal.CharacterClass);
+
+        next.UpsertPcMetadata(300, "Self", Faction.Light, originServerId: 2001);
+        next.UpsertPcMetadata(400, "Ally", originServerId: 2002);
+
+        Assert.True(next.TryGetPcMetadata(300, out var local));
+        Assert.True(local.IsLocalPlayer);
+        Assert.False(next.TryGetPcMetadata(100, out var staleLocal) && staleLocal.IsLocalPlayer);
+        Assert.True(next.TryGetPcMetadata(400, out var ally));
+        Assert.Equal(PlayerGroupRelation.PartyMember, ally.GroupRelation);
+    }
+
+    [Fact]
+    public void RuntimeMetadataRegistry_Continuity_DemotesStaleEntityWhenIdentityChanges()
+    {
+        var source = new RuntimeMetadataRegistry();
+        source.UpsertPcMetadata(100, "Self", isLocalPlayer: true, originServerId: 2001);
+        var next = new RuntimeMetadataRegistry(source.CreateContinuity());
+
+        next.UpsertPcMetadata(100, "Other", originServerId: 2002);
+        next.UpsertPcMetadata(300, "Self", originServerId: 2001);
+
+        Assert.True(next.TryGetPcMetadata(100, out var other));
+        Assert.False(other.IsLocalPlayer);
+        Assert.True(next.TryGetPcMetadata(300, out var local));
+        Assert.True(local.IsLocalPlayer);
+    }
+
+    [Fact]
     public void DomainEventApplier_RecordsMapInstanceCodeInRuntimeMetadataRegistry()
     {
         var boundary = new SceneBoundaryStore();

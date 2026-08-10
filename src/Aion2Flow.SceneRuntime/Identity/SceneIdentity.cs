@@ -25,18 +25,60 @@ public readonly record struct NpcCodeEntry(int InstanceId, int NpcCode);
 
 public readonly record struct MapCodeEntry(uint InstanceId, uint MapCode);
 
-internal readonly record struct PlayerGroupProfileKey(int OriginServerId, string Nickname);
+internal readonly record struct PlayerIdentityProfileKey(int OriginServerId, string Nickname);
+
+internal readonly record struct PlayerGroupProfileEntry(
+    PlayerIdentityProfileKey Identity,
+    PlayerGroupMembership Membership);
+
+internal sealed class RuntimeMetadataContinuity(
+    PcMetadata? localPlayer,
+    PlayerIdentityProfileKey? localPlayerIdentity,
+    PlayerGroupProfileEntry[] groupProfiles)
+{
+    private readonly PlayerGroupProfileEntry[] _groupProfiles = groupProfiles;
+
+    public PcMetadata? LocalPlayer { get; } = localPlayer;
+    public PlayerIdentityProfileKey? LocalPlayerIdentity { get; } = localPlayerIdentity;
+    public ReadOnlySpan<PlayerGroupProfileEntry> GroupProfiles => _groupProfiles;
+}
 
 public sealed class RuntimeMetadataRegistry
 {
     private readonly Dictionary<int, PcMetadata> _pcMetadataByEntityId = [];
     private readonly Dictionary<int, PlayerGroupMembership> _partyMembershipByEntityId = [];
     private readonly Dictionary<int, PlayerGroupMembership> _forceMembershipByEntityId = [];
-    private readonly Dictionary<PlayerGroupProfileKey, PlayerGroupMembership> _profileMembershipByKey = [];
+    private readonly Dictionary<PlayerIdentityProfileKey, PlayerGroupMembership> _profileMembershipByKey = [];
     private readonly Dictionary<int, int> _npcCodesByInstanceId = [];
     private readonly Dictionary<uint, uint> _mapCodesByInstanceId = [];
     private int _localPlayerEntityId;
+    private PlayerIdentityProfileKey? _localPlayerIdentity;
     private long _revision;
+
+    public RuntimeMetadataRegistry()
+    {
+    }
+
+    internal RuntimeMetadataRegistry(RuntimeMetadataContinuity continuity)
+    {
+        ArgumentNullException.ThrowIfNull(continuity);
+
+        _localPlayerIdentity = continuity.LocalPlayerIdentity;
+        foreach (var profile in continuity.GroupProfiles)
+            _profileMembershipByKey[profile.Identity] = profile.Membership;
+
+        if (continuity.LocalPlayer is not { } localPlayer)
+            return;
+
+        UpsertPcMetadata(
+            localPlayer.EntityId,
+            localPlayer.Nickname,
+            localPlayer.Faction,
+            localPlayer.CharacterClass,
+            isLocalPlayer: true,
+            originServerId: localPlayer.OriginServerId,
+            legionName: localPlayer.LegionName);
+    }
 
     public IReadOnlyDictionary<int, PcMetadata> PcMetadataByEntityId => _pcMetadataByEntityId;
     public IReadOnlyDictionary<int, int> NpcCodesByInstanceId => _npcCodesByInstanceId;
@@ -50,9 +92,44 @@ public sealed class RuntimeMetadataRegistry
 
         nickname ??= string.Empty;
         legionName ??= string.Empty;
+        var exists = _pcMetadataByEntityId.TryGetValue(entityId, out var existing);
+        var incomingClass = characterClass is CharacterClass.None ? null : characterClass;
+        var resolvedNickname = !string.IsNullOrWhiteSpace(nickname)
+            ? nickname
+            : exists
+                ? existing.Nickname
+                : string.Empty;
+        var resolvedFaction = faction != Faction.Unknown
+            ? faction
+            : exists
+                ? existing.Faction
+                : Faction.Unknown;
+        var resolvedClass = incomingClass ?? (exists ? existing.CharacterClass : null);
+        var resolvedOriginServerId = originServerId is > 0 ? originServerId : exists ? existing.OriginServerId : null;
+        var resolvedLegionName = !string.IsNullOrWhiteSpace(legionName) ? legionName : exists ? existing.LegionName : string.Empty;
+        var hasIdentityProfile = TryCreateIdentityProfile(
+            resolvedOriginServerId,
+            resolvedNickname,
+            out var identityProfile);
+        var isKnownLocalIdentity = hasIdentityProfile &&
+                                   _localPlayerIdentity is { } localIdentity &&
+                                   localIdentity == identityProfile;
+        var supersedesStaleLocalBinding = exists &&
+                                          existing.IsLocalPlayer &&
+                                          !isLocalPlayer &&
+                                          hasIdentityProfile &&
+                                          (_localPlayerIdentity is not { } persistedIdentity ||
+                                           persistedIdentity != identityProfile);
+        var resolvedIsLocalPlayer = isLocalPlayer ||
+                                    isKnownLocalIdentity ||
+                                    exists && existing.IsLocalPlayer && !supersedesStaleLocalBinding;
         var changed = false;
         var recalculateGroupRelations = false;
-        if (isLocalPlayer)
+
+        if (resolvedIsLocalPlayer && hasIdentityProfile)
+            changed |= SetLocalPlayerIdentity(identityProfile);
+
+        if (resolvedIsLocalPlayer)
         {
             List<int>? previousLocalEntityIds = null;
             foreach (var (candidateId, candidate) in _pcMetadataByEntityId)
@@ -81,27 +158,17 @@ public sealed class RuntimeMetadataRegistry
                 recalculateGroupRelations = true;
             }
         }
+        else if (supersedesStaleLocalBinding && _localPlayerEntityId == entityId)
+        {
+            _localPlayerEntityId = 0;
+            recalculateGroupRelations = true;
+        }
 
-        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_pcMetadataByEntityId, entityId, out var exists);
-        var incomingClass = characterClass is CharacterClass.None ? null : characterClass;
-        var resolvedNickname = !string.IsNullOrWhiteSpace(nickname)
-            ? nickname
-            : exists
-                ? current.Nickname
-                : string.Empty;
-        var resolvedFaction = faction != Faction.Unknown
-            ? faction
-            : exists
-                ? current.Faction
-                : Faction.Unknown;
-        var resolvedClass = incomingClass ?? (exists ? current.CharacterClass : null);
-        var resolvedIsLocalPlayer = isLocalPlayer || exists && current.IsLocalPlayer;
-        var resolvedOriginServerId = originServerId is > 0 ? originServerId : exists ? current.OriginServerId : null;
-        var resolvedLegionName = !string.IsNullOrWhiteSpace(legionName) ? legionName : exists ? current.LegionName : string.Empty;
+        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_pcMetadataByEntityId, entityId, out _);
         var resolvedGroupRelation = resolvedIsLocalPlayer
             ? PlayerGroupRelation.Unknown
             : exists
-                ? current.GroupRelation
+                ? existing.GroupRelation
                 : PlayerGroupRelation.Unknown;
         var next = new PcMetadata(entityId, resolvedNickname, resolvedFaction, resolvedClass, resolvedIsLocalPlayer, resolvedOriginServerId, resolvedLegionName, resolvedGroupRelation);
         if (!exists || !current.Equals(next))
@@ -110,8 +177,11 @@ public sealed class RuntimeMetadataRegistry
             changed = true;
         }
 
-        if (resolvedOriginServerId is > 0 && !string.IsNullOrWhiteSpace(resolvedNickname))
-            changed |= ApplyProfileGroupMembership(entityId, resolvedOriginServerId.Value, resolvedNickname);
+        if (hasIdentityProfile)
+        {
+            changed |= ApplyProfileGroupMembership(entityId, identityProfile);
+            changed |= PersistEntityGroupProfile(entityId, identityProfile);
+        }
 
         if (recalculateGroupRelations)
             changed |= RecalculateGroupRelations();
@@ -127,6 +197,12 @@ public sealed class RuntimeMetadataRegistry
             return false;
 
         var changed = UpsertPlayerGroupMembershipCore(entityId, membership);
+        if (_pcMetadataByEntityId.TryGetValue(entityId, out var metadata) &&
+            TryCreateIdentityProfile(metadata.OriginServerId, metadata.Nickname, out var identityProfile))
+        {
+            changed |= UpsertProfileMembership(identityProfile, membership);
+        }
+
         if (changed)
             _revision++;
         return changed;
@@ -137,15 +213,10 @@ public sealed class RuntimeMetadataRegistry
         if (originServerId <= 0 || string.IsNullOrWhiteSpace(nickname) || !membership.IsKnown)
             return false;
 
-        var key = new PlayerGroupProfileKey(originServerId, nickname);
+        var key = new PlayerIdentityProfileKey(originServerId, nickname);
         var changed = false;
-        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(_profileMembershipByKey, key, out var exists);
-        var effectiveMembership = exists ? ResolveProfileMembership(current, membership) : membership;
-        if (!exists || !current.Equals(effectiveMembership))
-        {
-            current = effectiveMembership;
-            changed = true;
-        }
+        changed |= UpsertProfileMembership(key, membership);
+        var effectiveMembership = _profileMembershipByKey[key];
 
         List<int>? matchingEntityIds = null;
         foreach (var (entityId, metadata) in _pcMetadataByEntityId)
@@ -160,7 +231,7 @@ public sealed class RuntimeMetadataRegistry
         if (matchingEntityIds is not null)
         {
             for (var i = 0; i < matchingEntityIds.Count; i++)
-                changed |= UpsertPlayerGroupMembershipCore(matchingEntityIds[i], current);
+                changed |= UpsertPlayerGroupMembershipCore(matchingEntityIds[i], effectiveMembership);
         }
 
         if (changed)
@@ -205,6 +276,35 @@ public sealed class RuntimeMetadataRegistry
     public bool TryGetMapCode(uint mapInstanceId, out uint mapCode) =>
         _mapCodesByInstanceId.TryGetValue(mapInstanceId, out mapCode);
 
+    internal RuntimeMetadataContinuity CreateContinuity()
+    {
+        PcMetadata? localPlayer = null;
+        if (_localPlayerEntityId > 0 &&
+            _pcMetadataByEntityId.TryGetValue(_localPlayerEntityId, out var currentLocalPlayer) &&
+            currentLocalPlayer.IsLocalPlayer)
+        {
+            localPlayer = currentLocalPlayer;
+        }
+        else
+        {
+            foreach (var metadata in _pcMetadataByEntityId.Values)
+            {
+                if (metadata.IsLocalPlayer)
+                {
+                    localPlayer = metadata;
+                    break;
+                }
+            }
+        }
+
+        var groupProfiles = new PlayerGroupProfileEntry[_profileMembershipByKey.Count];
+        var index = 0;
+        foreach (var (identity, membership) in _profileMembershipByKey)
+            groupProfiles[index++] = new PlayerGroupProfileEntry(identity, membership);
+
+        return new RuntimeMetadataContinuity(localPlayer, _localPlayerIdentity, groupProfiles);
+    }
+
     internal RuntimeMetadataRegistrySnapshot CreateSnapshot()
     {
         var pcMetadata = new PcMetadataEntry[_pcMetadataByEntityId.Count];
@@ -236,7 +336,11 @@ public sealed class RuntimeMetadataRegistry
             var entry = snapshot.PcMetadata[i];
             registry._pcMetadataByEntityId[entry.EntityId] = entry.Metadata;
             if (entry.Metadata.IsLocalPlayer)
+            {
                 registry._localPlayerEntityId = entry.EntityId;
+                if (TryCreateIdentityProfile(entry.Metadata.OriginServerId, entry.Metadata.Nickname, out var localIdentity))
+                    registry._localPlayerIdentity = localIdentity;
+            }
         }
 
         for (var i = 0; i < snapshot.NpcCodes.Length; i++)
@@ -256,7 +360,13 @@ public sealed class RuntimeMetadataRegistry
 
     public void Clear()
     {
-        if (_pcMetadataByEntityId.Count == 0 && _partyMembershipByEntityId.Count == 0 && _forceMembershipByEntityId.Count == 0 && _profileMembershipByKey.Count == 0 && _npcCodesByInstanceId.Count == 0 && _mapCodesByInstanceId.Count == 0)
+        if (_pcMetadataByEntityId.Count == 0 &&
+            _partyMembershipByEntityId.Count == 0 &&
+            _forceMembershipByEntityId.Count == 0 &&
+            _profileMembershipByKey.Count == 0 &&
+            _npcCodesByInstanceId.Count == 0 &&
+            _mapCodesByInstanceId.Count == 0 &&
+            _localPlayerIdentity is null)
             return;
 
         _pcMetadataByEntityId.Clear();
@@ -266,7 +376,63 @@ public sealed class RuntimeMetadataRegistry
         _npcCodesByInstanceId.Clear();
         _mapCodesByInstanceId.Clear();
         _localPlayerEntityId = 0;
+        _localPlayerIdentity = null;
         _revision++;
+    }
+
+    private bool SetLocalPlayerIdentity(in PlayerIdentityProfileKey identity)
+    {
+        if (_localPlayerIdentity is { } currentIdentity && currentIdentity == identity)
+            return false;
+
+        var hadPreviousIdentity = _localPlayerIdentity is not null;
+        _localPlayerIdentity = identity;
+        if (hadPreviousIdentity)
+            _profileMembershipByKey.Clear();
+
+        return true;
+    }
+
+    private bool UpsertProfileMembership(
+        in PlayerIdentityProfileKey identity,
+        in PlayerGroupMembership membership)
+    {
+        ref var current = ref CollectionsMarshal.GetValueRefOrAddDefault(
+            _profileMembershipByKey,
+            identity,
+            out var exists);
+        var effectiveMembership = exists
+            ? ResolveProfileMembership(current, membership)
+            : membership;
+        if (exists && current.Equals(effectiveMembership))
+            return false;
+
+        current = effectiveMembership;
+        return true;
+    }
+
+    private bool PersistEntityGroupProfile(int entityId, in PlayerIdentityProfileKey identity)
+    {
+        if (_partyMembershipByEntityId.TryGetValue(entityId, out var partyMembership))
+            return UpsertProfileMembership(identity, partyMembership);
+
+        return _forceMembershipByEntityId.TryGetValue(entityId, out var forceMembership) &&
+               UpsertProfileMembership(identity, forceMembership);
+    }
+
+    private static bool TryCreateIdentityProfile(
+        int? originServerId,
+        string nickname,
+        out PlayerIdentityProfileKey identity)
+    {
+        if (originServerId is > 0 && !string.IsNullOrWhiteSpace(nickname))
+        {
+            identity = new PlayerIdentityProfileKey(originServerId.Value, nickname);
+            return true;
+        }
+
+        identity = default;
+        return false;
     }
 
     private bool UpsertPlayerGroupMembershipCore(int entityId, in PlayerGroupMembership membership)
@@ -308,9 +474,9 @@ public sealed class RuntimeMetadataRegistry
         return incoming;
     }
 
-    private bool ApplyProfileGroupMembership(int entityId, int originServerId, string nickname)
+    private bool ApplyProfileGroupMembership(int entityId, in PlayerIdentityProfileKey identity)
     {
-        return _profileMembershipByKey.TryGetValue(new PlayerGroupProfileKey(originServerId, nickname), out var membership) &&
+        return _profileMembershipByKey.TryGetValue(identity, out var membership) &&
                UpsertPlayerGroupMembershipCore(entityId, membership);
     }
 
