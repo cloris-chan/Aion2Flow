@@ -139,12 +139,29 @@ internal static class PacketTransportCodec
         {
             return new PacketLengthPrefixedProbe(
                 PacketLengthPrefixedProbeKind.Complete,
-                0);
+                0,
+                -1);
         }
 
         if (!HasRecognizedCanonicalStart(body, CaptureBufferLimits.StreamTailBufferSize))
         {
             return ProbeUnalignedLengthPrefixedStream(payload, maximumEnvelopeLength);
+        }
+
+        var directTickProbe = ProbeDirectTickAfterEnvelopeBoundary(
+            payload,
+            nextHeaderOffset);
+        if (directTickProbe.Kind == DirectTickProbeKind.Complete)
+        {
+            return new PacketLengthPrefixedProbe(
+                PacketLengthPrefixedProbeKind.Ambiguous,
+                0,
+                directTickProbe.Offset);
+        }
+
+        if (directTickProbe.Kind == DirectTickProbeKind.NeedMore)
+        {
+            return PacketLengthPrefixedProbe.NeedMore;
         }
 
         if (payload.Length < nextHeaderOffset + LengthPrefixedHeaderLength)
@@ -158,7 +175,7 @@ internal static class PacketTransportCodec
             return PacketLengthPrefixedProbe.Invalid;
         }
 
-        return new PacketLengthPrefixedProbe(PacketLengthPrefixedProbeKind.Complete, 0);
+        return new PacketLengthPrefixedProbe(PacketLengthPrefixedProbeKind.Complete, 0, -1);
     }
 
     public static PacketLengthPrefixedBoundaryProbe ProbeLengthPrefixedStreamBoundary(
@@ -189,7 +206,19 @@ internal static class PacketTransportCodec
                 return new PacketLengthPrefixedBoundaryProbe(
                     PacketLengthPrefixedBoundaryProbeKind.Complete,
                     candidateOffset,
-                    probe.CanonicalPrefixLength);
+                    probe.CanonicalPrefixLength,
+                    -1);
+            }
+
+            if (probe.Kind == PacketLengthPrefixedProbeKind.Ambiguous &&
+                pending.Kind == PacketLengthPrefixedBoundaryProbeKind.None)
+            {
+                pending = new PacketLengthPrefixedBoundaryProbe(
+                    PacketLengthPrefixedBoundaryProbeKind.Ambiguous,
+                    candidateOffset,
+                    0,
+                    checked(candidateOffset + probe.DirectRecoveryTickOffset));
+                continue;
             }
 
             if (probe.Kind == PacketLengthPrefixedProbeKind.NeedMore &&
@@ -203,7 +232,8 @@ internal static class PacketTransportCodec
                 pending = new PacketLengthPrefixedBoundaryProbe(
                     PacketLengthPrefixedBoundaryProbeKind.Pending,
                     candidateOffset,
-                    0);
+                    0,
+                    -1);
                 pendingNextHeaderOffset = checked(candidateOffset + nextHeaderOffset);
             }
 
@@ -368,6 +398,66 @@ internal static class PacketTransportCodec
         return HasRecognizedCanonicalFrameStart(body, in frame);
     }
 
+    private static DirectTickProbe ProbeDirectTickAfterEnvelopeBoundary(
+        ReadOnlySpan<byte> payload,
+        int envelopeEndOffset)
+    {
+        const int canonicalStartOffset = LengthPrefixedHeaderLength;
+        var canonical = payload[canonicalStartOffset..];
+        var offset = 0;
+        var crossedEnvelopeBoundary = false;
+        while (offset < canonical.Length)
+        {
+            var frame = ProbeCanonicalFrame(canonical[offset..], CaptureBufferLimits.StreamTailBufferSize);
+            if (frame.Kind == PacketCanonicalFrameProbeKind.Invalid ||
+                frame.PrefixLength == 0 ||
+                canonical.Length < offset + frame.PrefixLength + sizeof(ushort))
+            {
+                return DirectTickProbe.None;
+            }
+
+            var frameStart = canonicalStartOffset + offset;
+            var frameEnd = checked(frameStart + frame.FrameLength);
+            var crossesEnvelopeBoundary =
+                frameStart < envelopeEndOffset && envelopeEndOffset < frameEnd;
+            if (!HasRecognizedCanonicalFrameStart(canonical[offset..], in frame))
+            {
+                return DirectTickProbe.None;
+            }
+
+            if (frame.Kind != PacketCanonicalFrameProbeKind.Complete)
+            {
+                return crossesEnvelopeBoundary || crossedEnvelopeBoundary
+                    ? DirectTickProbe.NeedMore
+                    : DirectTickProbe.None;
+            }
+
+            var opcodeOffset = offset + frame.PrefixLength;
+            var isTick = canonical[opcodeOffset] == 0x00 &&
+                         canonical[opcodeOffset + 1] == 0x36 &&
+                         frame.FrameLength == 11;
+            if (crossesEnvelopeBoundary)
+            {
+                if (isTick)
+                {
+                    return new DirectTickProbe(DirectTickProbeKind.Complete, frameStart);
+                }
+
+                crossedEnvelopeBoundary = true;
+            }
+            else if (crossedEnvelopeBoundary && frameStart >= envelopeEndOffset && isTick)
+            {
+                return new DirectTickProbe(DirectTickProbeKind.Complete, frameStart);
+            }
+
+            offset = frameEnd - canonicalStartOffset;
+        }
+
+        return crossedEnvelopeBoundary
+            ? DirectTickProbe.NeedMore
+            : DirectTickProbe.None;
+    }
+
     private static PacketLengthPrefixedProbe ProbeUnalignedLengthPrefixedStream(
         ReadOnlySpan<byte> payload,
         int maximumEnvelopeLength)
@@ -423,7 +513,8 @@ internal static class PacketTransportCodec
             return TryFindRecognizedCanonicalPair(canonical, out var prefixLength)
                 ? new PacketLengthPrefixedProbe(
                     PacketLengthPrefixedProbeKind.Complete,
-                    prefixLength)
+                    prefixLength,
+                    -1)
                 : PacketLengthPrefixedProbe.NeedMore;
         }
         finally
@@ -520,36 +611,56 @@ internal enum PacketLengthPrefixedProbeKind : byte
 {
     NeedMore,
     Invalid,
+    Ambiguous,
     Complete
 }
 
 internal readonly record struct PacketLengthPrefixedProbe(
     PacketLengthPrefixedProbeKind Kind,
-    int CanonicalPrefixLength)
+    int CanonicalPrefixLength,
+    int DirectRecoveryTickOffset)
 {
     public static PacketLengthPrefixedProbe NeedMore { get; } = new(
         PacketLengthPrefixedProbeKind.NeedMore,
-        0);
+        0,
+        -1);
 
     public static PacketLengthPrefixedProbe Invalid { get; } = new(
         PacketLengthPrefixedProbeKind.Invalid,
-        0);
+        0,
+        -1);
+}
+
+internal enum DirectTickProbeKind : byte
+{
+    None,
+    NeedMore,
+    Complete
+}
+
+internal readonly record struct DirectTickProbe(DirectTickProbeKind Kind, int Offset)
+{
+    public static DirectTickProbe None { get; } = new(DirectTickProbeKind.None, -1);
+    public static DirectTickProbe NeedMore { get; } = new(DirectTickProbeKind.NeedMore, -1);
 }
 
 internal enum PacketLengthPrefixedBoundaryProbeKind : byte
 {
     None,
     Pending,
+    Ambiguous,
     Complete
 }
 
 internal readonly record struct PacketLengthPrefixedBoundaryProbe(
     PacketLengthPrefixedBoundaryProbeKind Kind,
     int RawOffset,
-    int CanonicalPrefixLength)
+    int CanonicalPrefixLength,
+    int DirectRecoveryTickOffset)
 {
     public static PacketLengthPrefixedBoundaryProbe None { get; } = new(
         PacketLengthPrefixedBoundaryProbeKind.None,
         0,
-        0);
+        0,
+        -1);
 }

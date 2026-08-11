@@ -23,13 +23,13 @@ public sealed class PacketStreamProcessor : IDisposable
         IRuntimeObservationSink sink,
         Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
         PacketTransportFraming framing,
-        int canonicalPrefixLength,
+        int transportPrefixLength,
         PacketFlushState? flushState = null,
         PacketPlayerGroupState? playerGroupState = null)
     {
         _sink = sink;
         _parser = new PacketFrameParser(sink, protocolRoundTripObserver, flushState, playerGroupState);
-        _transport = new PacketTransportStreamDeframer(framing, canonicalPrefixLength);
+        _transport = new PacketTransportStreamDeframer(framing, transportPrefixLength);
     }
 
     public void Dispose()
@@ -86,6 +86,11 @@ public sealed class PacketStreamProcessor : IDisposable
             var availability = _transport.PrepareCanonicalData();
             if (availability == PacketTransportDataAvailability.NeedMore)
             {
+                if (TryResolvePendingTransportFraming(in timestamp))
+                {
+                    continue;
+                }
+
                 return;
             }
 
@@ -184,6 +189,29 @@ public sealed class PacketStreamProcessor : IDisposable
 
     private bool EmitPacket(ReadOnlySpan<byte> data, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
         => _parser.ParsePacketEntry(data, in connection, in timestamp);
+
+    private bool TryResolvePendingTransportFraming(in PacketProcessingTimestamp timestamp)
+    {
+        if (!_transport.TryGetPendingDirectRecoveryTickOffset(out var tickOffset))
+            return false;
+
+        var data = _transport.RawData;
+        if (tickOffset > data.Length - 11)
+            return false;
+
+        if (TcpWorldStreamClassifier.IsConfirmed0036(
+                data.Slice(tickOffset, 11),
+                timestamp.TimelineUnixMilliseconds))
+        {
+            _transport.ResolvePendingDirectRecovery();
+            _transport.DiscardRawPrefix(PacketTransportCodec.LengthPrefixedHeaderLength);
+            _transport.MarkDirectCanonicalAlignment();
+
+            return true;
+        }
+
+        return _transport.ResolvePendingLengthPrefixed();
+    }
 
     private static bool TryFindConfirmedTick(
         ReadOnlySpan<byte> data,

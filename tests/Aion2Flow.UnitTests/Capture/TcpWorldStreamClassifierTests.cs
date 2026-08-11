@@ -27,6 +27,23 @@ public sealed class TcpWorldStreamClassifierTests
     }
 
     [Fact]
+    public void EnablingMidstreamRecoveryAfterAnchoredBootstrapReopensBoundaryScan()
+    {
+        const long captureMilliseconds = 1_800_000_000_000;
+        var bootstrap = BuildFrame(0x7a, 0x7b, new byte[32]);
+        var tick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds - 100));
+
+        using var classifier = new TcpWorldStreamClassifier(allowMidstreamRecovery: false);
+        Assert.Equal(TcpWorldStreamClassification.Pending, classifier.Append(bootstrap, captureMilliseconds));
+
+        classifier.AllowMidstreamRecovery();
+
+        Assert.Equal(
+            TcpWorldStreamClassification.Confirmed,
+            classifier.Append(Concat([0x7a, 0x7b, 0x7a], tick), captureMilliseconds));
+    }
+
+    [Fact]
     public void CompressedWeakGameplayFramesRequireTheDirectFrameEvidenceThreshold()
     {
         var firstGameplayFrame = BuildFrame(0x15, 0x36, new byte[32]);
@@ -169,6 +186,26 @@ public sealed class TcpWorldStreamClassifierTests
     }
 
     [Fact]
+    public void MidstreamLengthPrefixedTickCrossingAnEnvelopeStaysLengthPrefixed()
+    {
+        const long captureMilliseconds = 1_800_000_000_000;
+        const int rawPrefixLength = 7;
+        var tick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds - 100));
+        var payload = Concat(
+            new byte[rawPrefixLength],
+            BuildLengthPrefixedEnvelope(tick.AsSpan(0, 5)),
+            BuildLengthPrefixedEnvelope(tick.AsSpan(5)));
+        payload.AsSpan(0, rawPrefixLength).Fill(0x7a);
+
+        using var classifier = new TcpWorldStreamClassifier(allowMidstreamRecovery: true);
+
+        Assert.Equal(
+            TcpWorldStreamClassification.Confirmed,
+            classifier.Append(payload, captureMilliseconds));
+        Assert.Equal(rawPrefixLength, classifier.ReplayStartByteOffset);
+    }
+
+    [Fact]
     public void MidstreamLengthPrefixedRecoveryProtectsTickInsideEnvelopeBody()
     {
         const long captureMilliseconds = 1_800_000_000_000;
@@ -250,6 +287,34 @@ public sealed class TcpWorldStreamClassifierTests
             TcpWorldStreamClassification.Confirmed,
             classifier.Append(Concat(payload, tick, gameplay), captureMilliseconds));
         Assert.Equal(tickOffset, classifier.ReplayStartByteOffset);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DirectTickCrossingPlausibleEnvelopeHeaderConfirmsFromTheDirectTick(
+        bool allowMidstreamRecovery)
+    {
+        const long captureMilliseconds = 0x000000000546AD01;
+        var leadingFrame = BuildFrame(0x15, 0x36, new byte[392]);
+        var crossingFrame = BuildFrame(0x23, 0x36, new byte[24]);
+        crossingFrame[19] = 0xad;
+        crossingFrame[20] = 0x46;
+        crossingFrame[21] = 0x05;
+        crossingFrame[22] = 0x00;
+        var tick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds));
+        var payload = Concat(
+            [0x9f, 0x01, 0x00, 0x00],
+            leadingFrame,
+            crossingFrame,
+            tick);
+
+        using var classifier = new TcpWorldStreamClassifier(allowMidstreamRecovery);
+
+        Assert.Equal(
+            TcpWorldStreamClassification.Confirmed,
+            classifier.Append(payload, captureMilliseconds));
+        Assert.Equal(4, classifier.ReplayStartByteOffset);
     }
 
     [Fact]
@@ -398,6 +463,52 @@ public sealed class TcpWorldStreamClassifierTests
         var recovering = recoveryClassifier.Classify(midstream);
         Assert.Equal(TcpConnectionStartKind.Game, recovering.Kind);
         Assert.Equal(PacketTransportFraming.DirectRecovery, recovering.Framing);
+    }
+
+    [Fact]
+    public void ReplayStartClassifierResolvesTheCrossingTickBeforeChoosingTransportFraming()
+    {
+        const long captureMilliseconds = 0x000000000546AD01;
+        var leadingFrame = BuildFrame(0x15, 0x36, new byte[392]);
+        var crossingFrame = BuildFrame(0x23, 0x36, new byte[24]);
+        crossingFrame[19] = 0xad;
+        crossingFrame[20] = 0x46;
+        crossingFrame[21] = 0x05;
+        crossingFrame[22] = 0x00;
+        var directTick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds));
+        var directPayload = Concat(
+            [0x9f, 0x01, 0x00, 0x00],
+            leadingFrame,
+            crossingFrame,
+            directTick);
+        using var directClassifier = new TcpConnectionStartClassifier();
+        var direct = directClassifier.Classify(directPayload, captureMilliseconds);
+        try
+        {
+            Assert.Equal(TcpConnectionStartKind.Game, direct.Kind);
+            Assert.Equal(PacketTransportFraming.DirectAligned, direct.Framing);
+            Assert.Equal(PacketTransportCodec.LengthPrefixedHeaderLength, direct.TransportPrefixLength);
+        }
+        finally
+        {
+            direct.Return();
+        }
+
+        var fixedTick = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds - 100));
+        var fixedPayload = Concat(
+            BuildLengthPrefixedEnvelope(fixedTick.AsSpan(0, 5)),
+            BuildLengthPrefixedEnvelope(fixedTick.AsSpan(5)));
+        using var fixedClassifier = new TcpConnectionStartClassifier();
+        var fixedResult = fixedClassifier.Classify(fixedPayload, captureMilliseconds);
+        try
+        {
+            Assert.Equal(TcpConnectionStartKind.Game, fixedResult.Kind);
+            Assert.Equal(PacketTransportFraming.LengthPrefixed, fixedResult.Framing);
+        }
+        finally
+        {
+            fixedResult.Return();
+        }
     }
 
     private static byte[] BuildCompressedFrame(ReadOnlySpan<byte> inner)

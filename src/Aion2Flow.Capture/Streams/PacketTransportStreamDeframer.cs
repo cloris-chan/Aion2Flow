@@ -7,27 +7,31 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
     private readonly PacketTailBuffer _raw = new(CaptureBufferLimits.TransportRawBufferSize);
     private readonly PacketTailBuffer _canonical = new(CaptureBufferLimits.StreamTailBufferSize);
     private bool _allowUnalignedDirectRecovery;
+    private int _pendingDirectRecoveryTickOffset = -1;
     private int _remainingCanonicalPrefixLength;
+    private int _remainingDirectPrefixLength;
     private int _remainingEnvelopeBodyLength;
 
     public PacketTransportStreamDeframer(
         PacketTransportFraming framing = PacketTransportFraming.Auto,
-        int canonicalPrefixLength = 0)
+        int transportPrefixLength = 0)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(canonicalPrefixLength);
-        if (framing != PacketTransportFraming.LengthPrefixed && canonicalPrefixLength != 0)
+        ArgumentOutOfRangeException.ThrowIfNegative(transportPrefixLength);
+        if ((framing is PacketTransportFraming.Auto or PacketTransportFraming.DirectRecovery) &&
+            transportPrefixLength != 0)
         {
             throw new ArgumentException(
-                "A canonical prefix can only be discarded from a length-prefixed stream.",
-                nameof(canonicalPrefixLength));
+                "An automatic or unaligned direct stream cannot discard a transport prefix.",
+                nameof(transportPrefixLength));
         }
 
         if (framing == PacketTransportFraming.LengthPrefixed)
         {
-            ActivateLengthPrefixed(canonicalPrefixLength);
+            ActivateLengthPrefixed(transportPrefixLength);
         }
         else
         {
+            _remainingDirectPrefixLength = transportPrefixLength;
             _allowUnalignedDirectRecovery = framing == PacketTransportFraming.DirectRecovery;
         }
     }
@@ -47,7 +51,14 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
     public bool HasPendingData =>
         BufferedByteCount != 0 ||
         _remainingEnvelopeBodyLength != 0 ||
-        _remainingCanonicalPrefixLength != 0;
+        _remainingCanonicalPrefixLength != 0 ||
+        _remainingDirectPrefixLength != 0;
+
+    public bool TryGetPendingDirectRecoveryTickOffset(out int offset)
+    {
+        offset = _pendingDirectRecoveryTickOffset;
+        return offset >= 0;
+    }
 
     public ReadOnlySpan<byte> RawData => _raw.Data;
 
@@ -84,6 +95,15 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
 
         if (!IsLengthPrefixed)
         {
+            if (_remainingDirectPrefixLength != 0)
+            {
+                if (_raw.Length < _remainingDirectPrefixLength)
+                    return PacketTransportDataAvailability.NeedMore;
+
+                ConsumeRaw(_remainingDirectPrefixLength);
+                _remainingDirectPrefixLength = 0;
+            }
+
             if (_allowUnalignedDirectRecovery)
             {
                 return _raw.Length == 0
@@ -98,8 +118,14 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
             {
                 ActivateLengthPrefixed(probe.CanonicalPrefixLength);
             }
+            else if (probe.Kind == PacketLengthPrefixedProbeKind.Ambiguous)
+            {
+                _pendingDirectRecoveryTickOffset = probe.DirectRecoveryTickOffset;
+                return PacketTransportDataAvailability.NeedMore;
+            }
             else
             {
+                _pendingDirectRecoveryTickOffset = -1;
                 if (probe.Kind == PacketLengthPrefixedProbeKind.NeedMore)
                 {
                     var canonical = PacketTransportCodec.ProbeCanonicalFrame(
@@ -185,14 +211,47 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
         }
 
         IsLengthPrefixed = true;
+        _pendingDirectRecoveryTickOffset = -1;
+        _allowUnalignedDirectRecovery = false;
+        _remainingDirectPrefixLength = 0;
         LengthPrefixedStartByteOffset = TotalRawConsumedByteCount;
         _remainingCanonicalPrefixLength = canonicalPrefixLength;
+    }
+
+    public bool ResolvePendingDirectRecovery()
+    {
+        if (IsLengthPrefixed || _pendingDirectRecoveryTickOffset < 0)
+            return false;
+
+        _pendingDirectRecoveryTickOffset = -1;
+        _allowUnalignedDirectRecovery = true;
+        return true;
+    }
+
+    public bool ResolvePendingLengthPrefixed()
+    {
+        if (IsLengthPrefixed || _pendingDirectRecoveryTickOffset < 0)
+            return false;
+
+        ActivateLengthPrefixed();
+        return true;
+    }
+
+    public void ActivateDirectRecovery()
+    {
+        if (IsLengthPrefixed)
+            return;
+
+        _pendingDirectRecoveryTickOffset = -1;
+        _allowUnalignedDirectRecovery = true;
     }
 
     public void MarkDirectCanonicalAlignment()
     {
         if (!IsLengthPrefixed)
         {
+            _pendingDirectRecoveryTickOffset = -1;
+            _remainingDirectPrefixLength = 0;
             _allowUnalignedDirectRecovery = false;
         }
     }
@@ -267,7 +326,9 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
     {
         IsFaulted = true;
         _remainingCanonicalPrefixLength = 0;
+        _remainingDirectPrefixLength = 0;
         _remainingEnvelopeBodyLength = 0;
+        _pendingDirectRecoveryTickOffset = -1;
         _canonical.Clear();
         _raw.Clear();
     }

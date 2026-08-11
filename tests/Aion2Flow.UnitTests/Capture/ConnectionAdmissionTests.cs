@@ -499,7 +499,7 @@ public sealed class ConnectionAdmissionTests
     public void ClassifierRejectsInvalidClockAndDoesNotScanEmbedded0036()
     {
         const long captureMilliseconds = 1_800_000_000_000;
-        var staleFrame = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds - 10_001));
+        var staleFrame = BuildFrame(0x00, 0x36, WriteInt64(captureMilliseconds - 60_001));
         using var staleClassifier = new TcpWorldStreamClassifier(allowMidstreamRecovery: false);
         Assert.Equal(TcpWorldStreamClassification.Pending, staleClassifier.Append(staleFrame, captureMilliseconds));
 

@@ -17,7 +17,7 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
     private const int MaximumFrameLength = CaptureBufferLimits.StreamTailBufferSize;
     private const int MaximumDecompressedLength = 4 * 1024 * 1024;
     private const int MaximumInnerFrameCount = 4096;
-    private const long MaximumClockDifferenceMilliseconds = 10_000;
+    private const long MaximumClockDifferenceMilliseconds = 60_000;
     private readonly PacketTransportStreamDeframer _transport = new();
     private bool _hasCanonicalAlignment = !allowMidstreamRecovery;
     private int _consecutiveGameplayFrames;
@@ -31,7 +31,16 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
 
     public void AllowMidstreamRecovery()
     {
+        if (allowMidstreamRecovery)
+        {
+            return;
+        }
+
         allowMidstreamRecovery = true;
+        if (!HasProtocolEvidence)
+        {
+            _hasCanonicalAlignment = false;
+        }
     }
 
     public TcpWorldStreamClassification Append(ReadOnlySpan<byte> payload, long completionCaptureMilliseconds)
@@ -116,6 +125,31 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
             var availability = _transport.PrepareCanonicalData();
             if (availability == PacketTransportDataAvailability.NeedMore)
             {
+                if (_transport.TryGetPendingDirectRecoveryTickOffset(out var tickOffset))
+                {
+                    var pendingData = _transport.RawData;
+                    if (tickOffset <= pendingData.Length - 11 &&
+                        IsConfirmed0036(
+                            pendingData.Slice(tickOffset, 11),
+                            completionCaptureMilliseconds))
+                    {
+                        _transport.ResolvePendingDirectRecovery();
+                        _replayStartByteOffset = checked(
+                            (int)(_transport.TotalRawConsumedByteCount + PacketTransportCodec.LengthPrefixedHeaderLength));
+                        _transport.DiscardRawPrefix(PacketTransportCodec.LengthPrefixedHeaderLength);
+                        _transport.MarkDirectCanonicalAlignment();
+                        _hasCanonicalAlignment = true;
+                        HasProtocolEvidence = true;
+                        _consecutiveGameplayFrames = 0;
+                        return TcpWorldStreamClassification.Confirmed;
+                    }
+
+                    if (_transport.ResolvePendingLengthPrefixed())
+                    {
+                        continue;
+                    }
+                }
+
                 return TcpWorldStreamClassification.Pending;
             }
 
@@ -254,6 +288,39 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         var lengthPrefixed = PacketTransportCodec.ProbeLengthPrefixedStreamBoundary(
             payload,
             PacketTransportCodec.MaximumEnvelopeBodyLength);
+        if (lengthPrefixed.Kind == PacketLengthPrefixedBoundaryProbeKind.Ambiguous)
+        {
+            var tickOffset = lengthPrefixed.DirectRecoveryTickOffset;
+            if (tickOffset >= 0 &&
+                tickOffset <= payload.Length - 11 &&
+                IsConfirmed0036(
+                    payload.Slice(tickOffset, 11),
+                    completionCaptureMilliseconds))
+            {
+                _transport.ActivateDirectRecovery();
+                var canonicalStartOffset = checked(
+                    lengthPrefixed.RawOffset + PacketTransportCodec.LengthPrefixedHeaderLength);
+                _replayStartByteOffset = checked(
+                    (int)(_transport.TotalRawConsumedByteCount + canonicalStartOffset));
+                _transport.DiscardRawPrefix(canonicalStartOffset);
+                _transport.MarkDirectCanonicalAlignment();
+                _hasCanonicalAlignment = true;
+                HasProtocolEvidence = true;
+                _recoveryScanOffset = 0;
+                _sentinelRecoveryScanOffset = 0;
+                _consecutiveGameplayFrames = 0;
+                return RecoveryResult.Confirmed;
+            }
+
+            _transport.DiscardRawPrefix(lengthPrefixed.RawOffset);
+            _transport.ActivateLengthPrefixed();
+            _replayStartByteOffset = checked((int)_transport.LengthPrefixedStartByteOffset);
+            _recoveryScanOffset = 0;
+            _sentinelRecoveryScanOffset = 0;
+            _consecutiveGameplayFrames = 0;
+            return RecoveryResult.Boundary;
+        }
+
         var hasPendingLengthPrefixedBoundary =
             lengthPrefixed.Kind == PacketLengthPrefixedBoundaryProbeKind.Pending;
         if (lengthPrefixed.Kind == PacketLengthPrefixedBoundaryProbeKind.Complete)

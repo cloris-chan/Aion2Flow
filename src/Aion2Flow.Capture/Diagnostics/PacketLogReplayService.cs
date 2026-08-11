@@ -133,7 +133,9 @@ public sealed class PacketLogReplayService
                 continue;
             }
 
-            var result = inboundProcessor.Classify(entry.Payload);
+            var result = inboundProcessor.Classify(
+                entry.Payload,
+                entry.Timestamp.ToUnixTimeMilliseconds());
             if (result.Kind != TcpConnectionStartKind.Game)
             {
                 if (result.Kind == TcpConnectionStartKind.NonGame)
@@ -992,7 +994,7 @@ public sealed class PacketLogReplayService
         private readonly TcpConnectionStartClassifier _classifier = new();
         private readonly Func<IRuntimeObservationSink> _liveSinkFactory;
         private readonly List<ReplayAcceptedPayload> _pendingPayloads = [];
-        private int _canonicalPrefixLength;
+        private int _transportPrefixLength;
         private PacketTransportFraming _framing;
         private bool _hasFraming;
         private PacketStreamProcessor? _probeProcessor;
@@ -1005,14 +1007,16 @@ public sealed class PacketLogReplayService
 
         public long LastUseOrdinal { get; set; }
 
-        public TcpConnectionStartResult Classify(ReadOnlySpan<byte> payload)
+        public TcpConnectionStartResult Classify(
+            ReadOnlySpan<byte> payload,
+            long completionCaptureMilliseconds)
         {
-            var result = _classifier.Classify(payload);
+            var result = _classifier.Classify(payload, completionCaptureMilliseconds);
             if (!_hasFraming && result.Kind == TcpConnectionStartKind.Game)
             {
                 _hasFraming = true;
                 _framing = result.Framing;
-                _canonicalPrefixLength = result.CanonicalPrefixLength;
+                _transportPrefixLength = result.TransportPrefixLength;
             }
 
             return result;
@@ -1036,7 +1040,7 @@ public sealed class PacketLogReplayService
                 bufferedPayload,
                 connection,
                 timestampMilliseconds));
-            _probeProcessor ??= CreateProbeProcessor(_framing, _canonicalPrefixLength);
+            _probeProcessor ??= CreateProbeProcessor(_framing, _transportPrefixLength);
             return _probeProcessor.AppendAndProcess(
                 bufferedPayload,
                 connection,
@@ -1055,7 +1059,7 @@ public sealed class PacketLogReplayService
                 sink,
                 null,
                 _framing,
-                _canonicalPrefixLength);
+                _transportPrefixLength);
             if (markTransportStreamActivated)
                 sink.MarkTransportStreamActivated(in source);
 
@@ -1100,7 +1104,7 @@ public sealed class PacketLogReplayService
 
         private static PacketStreamProcessor CreateProbeProcessor(
             PacketTransportFraming framing,
-            int canonicalPrefixLength)
+            int transportPrefixLength)
         {
             var journal = new ObservedEventJournal();
             var sink = new JournalingRuntimeObservationSink(
@@ -1111,7 +1115,7 @@ public sealed class PacketLogReplayService
                 sink,
                 null,
                 framing,
-                canonicalPrefixLength);
+                transportPrefixLength);
         }
     }
     private sealed class MutableCombatantSummary(int combatantId, string displayName)

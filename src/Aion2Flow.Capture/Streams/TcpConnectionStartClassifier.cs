@@ -5,11 +5,13 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 internal sealed class TcpConnectionStartClassifier : IDisposable
 {
     private readonly PacketTailBuffer _pending = new(CaptureBufferLimits.TransportRawBufferSize);
-    private int _canonicalPrefixLength;
+    private int _transportPrefixLength;
     private PacketTransportFraming _framing;
     private TcpStreamKind _kind;
 
-    public TcpConnectionStartResult Classify(ReadOnlySpan<byte> payload)
+    public TcpConnectionStartResult Classify(
+        ReadOnlySpan<byte> payload,
+        long completionCaptureMilliseconds = 0)
     {
         if (_kind == TcpStreamKind.NonGame)
         {
@@ -18,7 +20,7 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
 
         if (_kind == TcpStreamKind.Game)
         {
-            return TcpConnectionStartResult.Game(_framing, _canonicalPrefixLength);
+            return TcpConnectionStartResult.Game(_framing, _transportPrefixLength);
         }
 
         if (_pending.Length == 0)
@@ -31,6 +33,16 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
                 return AcceptCurrent(
                     PacketTransportFraming.LengthPrefixed,
                     initialLengthPrefixed.CanonicalPrefixLength);
+            }
+
+            if (initialLengthPrefixed.Kind == PacketLengthPrefixedProbeKind.Ambiguous &&
+                completionCaptureMilliseconds > 0)
+            {
+                return ResolveAmbiguousStart(
+                    payload,
+                    initialLengthPrefixed,
+                    completionCaptureMilliseconds,
+                    acceptCurrent: true);
             }
 
             var isTls = CapturedNonAionPayload.IsNonGameConnectionStart(payload);
@@ -82,6 +94,18 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
                 lengthPrefixed.CanonicalPrefixLength);
         }
 
+        if (lengthPrefixed.Kind == PacketLengthPrefixedProbeKind.Ambiguous)
+        {
+            if (completionCaptureMilliseconds <= 0)
+                return TcpConnectionStartResult.Pending;
+
+            return ResolveAmbiguousStart(
+                pending,
+                lengthPrefixed,
+                completionCaptureMilliseconds,
+                acceptCurrent: false);
+        }
+
         if (lengthPrefixed.Kind == PacketLengthPrefixedProbeKind.NeedMore)
         {
             var canonical = PacketTransportCodec.ProbeCanonicalFrame(
@@ -122,19 +146,46 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
         _pending.Dispose();
     }
 
+    private TcpConnectionStartResult ResolveAmbiguousStart(
+        ReadOnlySpan<byte> payload,
+        PacketLengthPrefixedProbe probe,
+        long completionCaptureMilliseconds,
+        bool acceptCurrent)
+    {
+        var tickOffset = probe.DirectRecoveryTickOffset;
+        if (tickOffset >= 0 &&
+            tickOffset <= payload.Length - 11 &&
+            TcpWorldStreamClassifier.IsConfirmed0036(
+                payload.Slice(tickOffset, 11),
+                completionCaptureMilliseconds))
+        {
+            return acceptCurrent
+                ? AcceptCurrent(
+                    PacketTransportFraming.DirectAligned,
+                    PacketTransportCodec.LengthPrefixedHeaderLength)
+                : AcceptPending(
+                    PacketTransportFraming.DirectAligned,
+                    PacketTransportCodec.LengthPrefixedHeaderLength);
+        }
+
+        return acceptCurrent
+            ? AcceptCurrent(PacketTransportFraming.LengthPrefixed, 0)
+            : AcceptPending(PacketTransportFraming.LengthPrefixed, 0);
+    }
+
     private TcpConnectionStartResult AcceptCurrent(
         PacketTransportFraming framing,
-        int canonicalPrefixLength)
+        int transportPrefixLength)
     {
         _kind = TcpStreamKind.Game;
         _framing = framing;
-        _canonicalPrefixLength = canonicalPrefixLength;
-        return TcpConnectionStartResult.Game(framing, canonicalPrefixLength);
+        _transportPrefixLength = transportPrefixLength;
+        return TcpConnectionStartResult.Game(framing, transportPrefixLength);
     }
 
     private TcpConnectionStartResult AcceptPending(
         PacketTransportFraming framing,
-        int canonicalPrefixLength)
+        int transportPrefixLength)
     {
         var acceptedLength = _pending.Length;
         var acceptedOwner = MemoryPool<byte>.Shared.Rent(acceptedLength);
@@ -142,12 +193,12 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
         _pending.Clear();
         _kind = TcpStreamKind.Game;
         _framing = framing;
-        _canonicalPrefixLength = canonicalPrefixLength;
+        _transportPrefixLength = transportPrefixLength;
         return TcpConnectionStartResult.GameWithOwnedPayload(
             acceptedOwner,
             acceptedLength,
             framing,
-            canonicalPrefixLength);
+            transportPrefixLength);
     }
 
     private enum TcpStreamKind
@@ -167,13 +218,13 @@ internal readonly struct TcpConnectionStartResult
         int acceptedLength,
         IMemoryOwner<byte>? acceptedOwner,
         PacketTransportFraming framing,
-        int canonicalPrefixLength)
+        int transportPrefixLength)
     {
         Kind = kind;
         AcceptedLength = acceptedLength;
         _acceptedOwner = acceptedOwner;
         Framing = framing;
-        CanonicalPrefixLength = canonicalPrefixLength;
+        TransportPrefixLength = transportPrefixLength;
     }
 
     public TcpConnectionStartKind Kind { get; }
@@ -182,7 +233,7 @@ internal readonly struct TcpConnectionStartResult
 
     public PacketTransportFraming Framing { get; }
 
-    public int CanonicalPrefixLength { get; }
+    public int TransportPrefixLength { get; }
 
     public static TcpConnectionStartResult Pending { get; } = new(
         TcpConnectionStartKind.Pending,
@@ -200,24 +251,24 @@ internal readonly struct TcpConnectionStartResult
 
     public static TcpConnectionStartResult Game(
         PacketTransportFraming framing,
-        int canonicalPrefixLength) => new(
+        int transportPrefixLength) => new(
             TcpConnectionStartKind.Game,
             0,
             null,
             framing,
-            canonicalPrefixLength);
+            transportPrefixLength);
 
     public static TcpConnectionStartResult GameWithOwnedPayload(
         IMemoryOwner<byte> owner,
         int payloadLength,
         PacketTransportFraming framing,
-        int canonicalPrefixLength) =>
+        int transportPrefixLength) =>
         new(
             TcpConnectionStartKind.Game,
             payloadLength,
             owner,
             framing,
-            canonicalPrefixLength);
+            transportPrefixLength);
 
     public ReadOnlySpan<byte> ResolveAcceptedPayload(ReadOnlySpan<byte> originalPayload) =>
         _acceptedOwner is null
