@@ -113,6 +113,30 @@ internal static class RawPacketDump
         }
     }
 
+    public static void AppendTransportClose(
+        in TcpConnection connection,
+        long captureTimestampMilliseconds,
+        long connectionOrdinal)
+    {
+        if (!IsEnabled || _streamWriter is null || connectionOrdinal <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(captureTimestampMilliseconds);
+            var line = $"{timestamp:O}|event=transport-close|{connection.SourceAddress}:{connection.SourcePort}->{connection.DestinationAddress}:{connection.DestinationPort}|attempt={connectionOrdinal}";
+            lock (SyncRoot)
+            {
+                _streamWriter.WriteLine(line);
+            }
+        }
+        catch
+        {
+        }
+    }
+
     private static StreamWriter CreateWriter(string path)
     {
         var directory = Path.GetDirectoryName(path);

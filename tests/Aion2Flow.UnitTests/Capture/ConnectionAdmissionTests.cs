@@ -237,11 +237,11 @@ public sealed class ConnectionAdmissionTests
             }
 
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
-            Assert.Equal(newConnection, lockedConnection);
+            Assert.Equal(oldConnection, lockedConnection);
             Assert.True(CaptureConnectionGate.TryGetActiveConnectionOrdinal(
-                in newConnection,
+                in oldConnection,
                 out var activeConnectionOrdinal));
-            Assert.Equal(3, activeConnectionOrdinal);
+            Assert.Equal(1, activeConnectionOrdinal);
             _ = scene.CreateFrame();
             Assert.True(scene.Owner.Entities.TryGet(2, out var newPlayer));
             Assert.Equal("New", newPlayer.Nickname);
@@ -251,7 +251,7 @@ public sealed class ConnectionAdmissionTests
                 in oldConnection,
                 oldAdmission.Generation,
                 connectionOrdinal: 1);
-            Assert.False(dispatcher.DispatchItem(delayedOldClose));
+            Assert.True(dispatcher.DispatchItem(delayedOldClose));
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out lockedConnection));
             Assert.Equal(newConnection, lockedConnection);
         }
@@ -367,7 +367,7 @@ public sealed class ConnectionAdmissionTests
             var olderItem = CaptureDispatchItem.ForPromotion(olderPromotion);
             try
             {
-                Assert.False(dispatcher.DispatchItem(olderItem));
+                Assert.True(dispatcher.DispatchItem(olderItem));
             }
             finally
             {
@@ -376,38 +376,6 @@ public sealed class ConnectionAdmissionTests
 
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
             Assert.Equal(newerConnection, lockedConnection);
-
-            Assert.True(downstreamConnections.TryGet(
-                in olderConnection,
-                observedTimestamp + 4,
-                out olderInitialSequence,
-                out olderConnectionOrdinal));
-            var olderRetryPacket = CapturedPacket.CreateCopy(
-                olderConnection,
-                new CapturePacketAdmission(CapturePacketAdmissionKind.Candidate, 0, ReleasedLock: false),
-                Build3336Frame(1, "A"),
-                sequenceNumber: 100,
-                captureTimestampMilliseconds: captureMilliseconds);
-            Assert.Equal(
-                CandidatePacketDisposition.Confirmed,
-                candidates.Add(
-                    olderRetryPacket,
-                    allowNewCandidate: true,
-                    allowMidstreamRecovery: false,
-                    olderInitialSequence,
-                    olderConnectionOrdinal,
-                    observedTimestamp + 5,
-                    out var olderRetryPromotion));
-            Assert.NotNull(olderRetryPromotion);
-            var olderRetryItem = CaptureDispatchItem.ForPromotion(olderRetryPromotion);
-            try
-            {
-                Assert.False(dispatcher.DispatchItem(olderRetryItem));
-            }
-            finally
-            {
-                olderRetryItem.Return();
-            }
 
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out lockedConnection));
             Assert.Equal(newerConnection, lockedConnection);
@@ -690,6 +658,71 @@ public sealed class ConnectionAdmissionTests
             {
                 currentContinuation.Return();
             }
+        }
+        finally
+        {
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task SupplementalActivePacketsKeepTheirAttemptStream()
+    {
+        var primary = new TcpConnection(0x0100000A, 0x0200000A, 7_135, 1_541);
+        var supplemental = new TcpConnection(0x0300000A, 0x0400000A, 5_464, 1_542);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var scene = new SceneLiveReadModel();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+        var frame = Build3336Frame(4, "Relay");
+        var split = frame.Length / 2;
+
+        try
+        {
+            Assert.True(CaptureConnectionGate.TryPromote(
+                in primary,
+                out _,
+                out _,
+                forceNewGeneration: true,
+                connectionOrdinal: 129));
+            Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
+                in supplemental,
+                connectionOrdinal: 131,
+                out var admission));
+
+            var head = CapturedPacket.CreateCopy(
+                supplemental,
+                admission,
+                frame.AsSpan(0, split),
+                sequenceNumber: 1_000,
+                captureTimestampMilliseconds: captureMilliseconds);
+            try
+            {
+                Assert.False(dispatcher.DispatchItem(CaptureDispatchItem.ForPacket(head)));
+            }
+            finally
+            {
+                head.Return();
+            }
+
+            var tail = CapturedPacket.CreateCopy(
+                supplemental,
+                admission,
+                frame.AsSpan(split),
+                sequenceNumber: 1_000 + (uint)split,
+                captureTimestampMilliseconds: captureMilliseconds + 1);
+            try
+            {
+                Assert.True(dispatcher.DispatchItem(CaptureDispatchItem.ForPacket(tail)));
+            }
+            finally
+            {
+                tail.Return();
+            }
+
+            _ = scene.CreateFrame();
+            Assert.True(scene.Owner.Entities.TryGet(4, out var relay));
+            Assert.Equal("Relay", relay.Nickname);
         }
         finally
         {
@@ -1876,7 +1909,7 @@ public sealed class ConnectionAdmissionTests
                 candidateOrdinal: 2);
 
             var timeline = ReadJournalTimeline(scene);
-            Assert.True(timeline.Length >= 3);
+            Assert.True(timeline.Length >= 2);
             foreach (var sceneTimeline in timeline.GroupBy(static entry => entry.SceneSessionId))
             {
                 var offsets = sceneTimeline.Select(static entry => entry.OffsetTicks).ToArray();
@@ -1946,6 +1979,646 @@ public sealed class ConnectionAdmissionTests
         }
         finally
         {
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public void SupplementalAdmissionKeepsPrimaryConnectionLocked()
+    {
+        var primary = new TcpConnection(0x0100000A, 0x0200000A, 7_135, 1_541);
+        var supplemental = new TcpConnection(0x0100000A, 0x0200000A, 5_464, 1_542);
+
+        try
+        {
+            Assert.True(CaptureConnectionGate.TryPromote(
+                in primary,
+                out var primaryAdmission,
+                out _,
+                forceNewGeneration: true,
+                connectionOrdinal: 129));
+            Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
+                in supplemental,
+                connectionOrdinal: 131,
+                out var supplementalAdmission));
+            Assert.Equal(CaptureConnectionRole.Primary, primaryAdmission.Role);
+            Assert.Equal(CaptureConnectionRole.Supplemental, supplementalAdmission.Role);
+            Assert.True(CaptureConnectionGate.IsAdmissionCurrent(in primary, in primaryAdmission));
+            Assert.True(CaptureConnectionGate.IsAdmissionCurrent(in supplemental, in supplementalAdmission));
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
+            Assert.Equal(primary, lockedConnection);
+            var supplementalReverse = supplemental.Reverse();
+            Assert.Equal(
+                CapturePacketAdmissionKind.ActiveConnection,
+                CaptureConnectionGate.EvaluatePacket(in supplemental, hasStartFlag: false, hasCloseFlag: false).Kind);
+            Assert.Equal(
+                CapturePacketAdmissionKind.Rejected,
+                CaptureConnectionGate.EvaluatePacket(in supplementalReverse, hasStartFlag: false, hasCloseFlag: false).Kind);
+            Assert.False(CaptureConnectionGate.IsAdmissionCurrent(in supplementalReverse, in supplementalAdmission));
+            Assert.False(CaptureConnectionGate.TryGetActiveAdmission(in supplementalReverse, out _));
+            Assert.True(CaptureConnectionGate.TryGetActiveConnectionOrdinal(
+                in supplementalReverse,
+                out var reverseOrdinal));
+            Assert.Equal(supplementalAdmission.ConnectionOrdinal, reverseOrdinal);
+
+            Assert.True(CaptureConnectionGate.TryClose(
+                in supplementalReverse,
+                supplementalAdmission.Generation,
+                supplementalAdmission.ConnectionOrdinal,
+                out var closedSupplemental));
+            Assert.Equal(supplemental, closedSupplemental);
+            Assert.True(CaptureConnectionGate.IsAdmissionCurrent(in primary, in primaryAdmission));
+            Assert.False(CaptureConnectionGate.IsAdmissionCurrent(in supplemental, in supplementalAdmission));
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out lockedConnection));
+            Assert.Equal(primary, lockedConnection);
+        }
+        finally
+        {
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public void ActiveConnectionBudgetEvictsTheLeastRecentlyUsedSupplemental()
+    {
+        var primary = CreateBoundedTransport(0);
+        var supplementals = new List<(TcpConnection Connection, CapturePacketAdmission Admission)>();
+
+        try
+        {
+            Assert.True(CaptureConnectionGate.TryPromote(
+                in primary,
+                out var primaryAdmission,
+                out _,
+                forceNewGeneration: true,
+                connectionOrdinal: 1));
+
+            for (var index = 1; index < CaptureBufferLimits.CandidateStreamCountLimit; index++)
+            {
+                var connection = CreateBoundedTransport(index);
+                Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
+                    in connection,
+                    connectionOrdinal: index + 1,
+                    out var admission));
+                supplementals.Add((connection, admission));
+            }
+
+            var victim = supplementals[1];
+            var refreshTimestamp = Stopwatch.GetTimestamp() + CaptureBufferLimits.CandidateStreamCountLimit;
+            for (var index = 0; index < supplementals.Count; index++)
+            {
+                if (index == 1)
+                    continue;
+
+                var connection = supplementals[index].Connection;
+                Assert.Equal(
+                    CapturePacketAdmissionKind.ActiveConnection,
+                    CaptureConnectionGate.EvaluatePacket(
+                        in connection,
+                        hasStartFlag: false,
+                        hasCloseFlag: false,
+                        refreshTimestamp + index).Kind);
+            }
+
+            var incoming = CreateBoundedTransport(CaptureBufferLimits.CandidateStreamCountLimit);
+            Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
+                in incoming,
+                connectionOrdinal: CaptureBufferLimits.CandidateStreamCountLimit + 1,
+                out var incomingAdmission,
+                out var eviction));
+
+            Assert.True(eviction.HasValue);
+            Assert.Equal(victim.Connection, eviction.Connection);
+            Assert.Equal(victim.Admission.ConnectionOrdinal, eviction.ConnectionOrdinal);
+            Assert.True(CaptureConnectionGate.IsAdmissionCurrent(in primary, in primaryAdmission));
+            Assert.False(CaptureConnectionGate.IsAdmissionCurrent(in victim.Connection, in victim.Admission));
+            Assert.True(CaptureConnectionGate.IsAdmissionCurrent(in incoming, in incomingAdmission));
+
+            var activeCount = 2;
+            foreach (var supplemental in supplementals)
+            {
+                if (supplemental.Connection == victim.Connection)
+                    continue;
+
+                Assert.True(CaptureConnectionGate.IsAdmissionCurrent(
+                    in supplemental.Connection,
+                    in supplemental.Admission));
+                activeCount++;
+            }
+
+            Assert.Equal(CaptureBufferLimits.CandidateStreamCountLimit, activeCount);
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
+            Assert.Equal(primary, lockedConnection);
+            Assert.False(CaptureConnectionGate.TryPromoteSupplemental(
+                in victim.Connection,
+                victim.Admission.ConnectionOrdinal,
+                out _,
+                out _));
+            Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
+                in victim.Connection,
+                CaptureBufferLimits.CandidateStreamCountLimit + 2,
+                out var restartedAdmission,
+                out _));
+            Assert.True(CaptureConnectionGate.IsAdmissionCurrent(
+                in victim.Connection,
+                in restartedAdmission));
+        }
+        finally
+        {
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public void PrimaryCloseElectsTheMostRecentlyUsedOfThreeActiveConnections()
+    {
+        var primary = CreateBoundedTransport(0);
+        var firstSupplemental = CreateBoundedTransport(1);
+        var secondSupplemental = CreateBoundedTransport(2);
+
+        try
+        {
+            Assert.True(CaptureConnectionGate.TryPromote(
+                in primary,
+                out var primaryAdmission,
+                out _,
+                forceNewGeneration: true,
+                connectionOrdinal: 1));
+            Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
+                in firstSupplemental,
+                connectionOrdinal: 2,
+                out var firstAdmission));
+            Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
+                in secondSupplemental,
+                connectionOrdinal: 3,
+                out var secondAdmission));
+
+            Assert.Equal(
+                CapturePacketAdmissionKind.ActiveConnection,
+                CaptureConnectionGate.EvaluatePacket(
+                    in firstSupplemental,
+                    hasStartFlag: false,
+                    hasCloseFlag: false,
+                    Stopwatch.GetTimestamp() + CaptureBufferLimits.CandidateStreamCountLimit).Kind);
+            Assert.True(CaptureConnectionGate.TryClose(
+                in primary,
+                primaryAdmission.Generation,
+                primaryAdmission.ConnectionOrdinal,
+                out var closedPrimary));
+            Assert.Equal(primary, closedPrimary);
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
+            Assert.Equal(firstSupplemental, lockedConnection);
+
+            Assert.True(CaptureConnectionGate.TryGetActiveAdmission(
+                in firstSupplemental,
+                firstAdmission.ConnectionOrdinal,
+                out var electedAdmission));
+            Assert.Equal(CaptureConnectionRole.Primary, electedAdmission.Role);
+            Assert.True(CaptureConnectionGate.TryClose(
+                in firstSupplemental,
+                electedAdmission.Generation,
+                electedAdmission.ConnectionOrdinal,
+                out var closedFirstSupplemental));
+            Assert.Equal(firstSupplemental, closedFirstSupplemental);
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out lockedConnection));
+            Assert.Equal(secondSupplemental, lockedConnection);
+
+            Assert.True(CaptureConnectionGate.TryGetActiveAdmission(
+                in secondSupplemental,
+                secondAdmission.ConnectionOrdinal,
+                out var finalAdmission));
+            Assert.Equal(CaptureConnectionRole.Primary, finalAdmission.Role);
+            Assert.True(CaptureConnectionGate.TryClose(
+                in secondSupplemental,
+                finalAdmission.Generation,
+                finalAdmission.ConnectionOrdinal,
+                out var closedSecondSupplemental));
+            Assert.Equal(secondSupplemental, closedSecondSupplemental);
+            Assert.False(CaptureConnectionGate.IsLocked);
+        }
+        finally
+        {
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task QueuedSupplementalPacketIsDispatchedAfterBecomingPrimary()
+    {
+        var primary = new TcpConnection(0x0100000A, 0x0200000A, 7_135, 1_541);
+        var supplemental = new TcpConnection(0x0300000A, 0x0400000A, 5_464, 1_542);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var scene = new SceneLiveReadModel();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+
+        try
+        {
+            Assert.True(CaptureConnectionGate.TryPromote(
+                in primary,
+                out var primaryAdmission,
+                out _,
+                forceNewGeneration: true,
+                connectionOrdinal: 129));
+            Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
+                in supplemental,
+                connectionOrdinal: 131,
+                out var queuedAdmission));
+
+            var queuedPacket = CapturedPacket.CreateCopy(
+                supplemental,
+                queuedAdmission,
+                Build3336Frame(5, "Queued"),
+                sequenceNumber: 13_100,
+                captureTimestampMilliseconds: captureMilliseconds);
+            var queuedPacketItem = CaptureDispatchItem.ForPacket(queuedPacket);
+            try
+            {
+                var primaryClose = CaptureDispatchItem.ForConnectionClose(
+                    in primary,
+                    primaryAdmission.Generation,
+                    primaryAdmission.ConnectionOrdinal);
+                Assert.True(dispatcher.DispatchItem(primaryClose));
+                Assert.True(dispatcher.DispatchItem(queuedPacketItem));
+
+                _ = scene.CreateFrame();
+                Assert.True(scene.Owner.Entities.TryGet(5, out var queuedPlayer));
+                Assert.Equal("Queued", queuedPlayer.Nickname);
+            }
+            finally
+            {
+                queuedPacketItem.Return();
+            }
+
+            Assert.False(CaptureConnectionGate.TryGetActiveAdmission(in primary, out _));
+            Assert.True(CaptureConnectionGate.TryGetActiveAdmission(
+                in supplemental,
+                queuedAdmission.ConnectionOrdinal,
+                out var currentAdmission));
+            Assert.Equal(CaptureConnectionRole.Primary, currentAdmission.Role);
+
+            var wrongOrdinalAdmission = queuedAdmission with
+            {
+                ConnectionOrdinal = queuedAdmission.ConnectionOrdinal + 1
+            };
+            Assert.False(CaptureConnectionGate.IsAdmissionCurrent(in supplemental, in wrongOrdinalAdmission));
+        }
+        finally
+        {
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task DistinctNonLoopbackPromotionsRetainSupplementalObservations()
+    {
+        var scene = new SceneLiveReadModel();
+        var primary = new TcpConnection(0x0100000A, 0x0200000A, 7_135, 1_541);
+        var supplemental = new TcpConnection(0x0300000A, 0x0400000A, 5_464, 1_542);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+        CaptureConnectionPromotion? primaryPromotion = null;
+        CaptureConnectionPromotion? supplementalPromotion = null;
+
+        try
+        {
+            primaryPromotion = CreatePromotion(
+                primary,
+                candidateOrdinal: 129,
+                Build3336Frame(1, "Direct"),
+                captureMilliseconds);
+            supplementalPromotion = CreatePromotion(
+                supplemental,
+                candidateOrdinal: 131,
+                Build3336Frame(2, "Relay"),
+                captureMilliseconds + 1);
+
+            var primaryItem = CaptureDispatchItem.ForPromotion(primaryPromotion);
+            try
+            {
+                Assert.True(dispatcher.DispatchItem(primaryItem));
+            }
+            finally
+            {
+                primaryItem.Return();
+            }
+
+            var supplementalItem = CaptureDispatchItem.ForPromotion(supplementalPromotion);
+            try
+            {
+                Assert.True(dispatcher.DispatchItem(supplementalItem));
+            }
+            finally
+            {
+                supplementalItem.Return();
+            }
+
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
+            Assert.Equal(primary, lockedConnection);
+            _ = scene.CreateFrame();
+            Assert.True(scene.Owner.Entities.TryGet(1, out var direct));
+            Assert.Equal("Direct", direct.Nickname);
+            Assert.True(scene.Owner.Entities.TryGet(2, out var relay));
+            Assert.Equal("Relay", relay.Nickname);
+        }
+        finally
+        {
+            primaryPromotion?.Return();
+            supplementalPromotion?.Return();
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+
+    }
+
+    [Fact]
+    public async Task DispatcherDisposesTheEvictedTransportAndAcceptsItsFreshPromotion()
+    {
+        var scene = new SceneLiveReadModel();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+        var connections = new TcpConnection[CaptureBufferLimits.CandidateStreamCountLimit + 1];
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        try
+        {
+            for (var index = 0; index < CaptureBufferLimits.CandidateStreamCountLimit; index++)
+            {
+                connections[index] = CreateBoundedTransport(index);
+                DispatchPromotion(
+                    dispatcher,
+                    in connections[index],
+                    Build3336Frame(index + 1, $"Active{index}"),
+                    sequenceNumber: (uint)(10_000 + (index * 100)),
+                    captureTimestampMilliseconds: captureMilliseconds + index,
+                    candidateOrdinal: index + 1);
+            }
+
+            var victim = connections[1];
+            Assert.True(CaptureConnectionGate.TryGetActiveAdmission(
+                in victim,
+                expectedConnectionOrdinal: 2,
+                out var evictedAdmission));
+            var refreshTimestamp = Stopwatch.GetTimestamp() + CaptureBufferLimits.CandidateStreamCountLimit;
+            for (var index = 2; index < CaptureBufferLimits.CandidateStreamCountLimit; index++)
+            {
+                Assert.Equal(
+                    CapturePacketAdmissionKind.ActiveConnection,
+                    CaptureConnectionGate.EvaluatePacket(
+                        in connections[index],
+                        hasStartFlag: false,
+                        hasCloseFlag: false,
+                        refreshTimestamp + index).Kind);
+            }
+
+            var incomingIndex = CaptureBufferLimits.CandidateStreamCountLimit;
+            connections[incomingIndex] = CreateBoundedTransport(incomingIndex);
+            DispatchPromotion(
+                dispatcher,
+                in connections[incomingIndex],
+                Build3336Frame(65, "Incoming"),
+                sequenceNumber: 30_000,
+                captureTimestampMilliseconds: captureMilliseconds + incomingIndex,
+                candidateOrdinal: incomingIndex + 1);
+
+            var stalePacket = CapturedPacket.CreateCopy(
+                victim,
+                evictedAdmission,
+                Build3336Frame(66, "Stale"),
+                sequenceNumber: 31_000,
+                captureTimestampMilliseconds: captureMilliseconds + incomingIndex + 1);
+            try
+            {
+                Assert.False(dispatcher.DispatchItem(CaptureDispatchItem.ForPacket(stalePacket)));
+            }
+            finally
+            {
+                stalePacket.Return();
+            }
+
+            var stalePromotion = CreatePromotion(
+                victim,
+                evictedAdmission.ConnectionOrdinal,
+                Build3336Frame(67, "Rejected"),
+                captureMilliseconds + incomingIndex + 2,
+                sequenceNumber: 32_000);
+            var stalePromotionItem = CaptureDispatchItem.ForPromotion(stalePromotion);
+            try
+            {
+                Assert.False(dispatcher.DispatchItem(stalePromotionItem));
+            }
+            finally
+            {
+                stalePromotionItem.Return();
+            }
+
+            DispatchPromotion(
+                dispatcher,
+                in victim,
+                Build3336Frame(68, "Reactivated"),
+                sequenceNumber: 33_000,
+                captureTimestampMilliseconds: captureMilliseconds + incomingIndex + 3,
+                candidateOrdinal: CaptureBufferLimits.CandidateStreamCountLimit + 2);
+
+            _ = scene.CreateFrame();
+            Assert.False(scene.Owner.Entities.TryGet(66, out _));
+            Assert.False(scene.Owner.Entities.TryGet(67, out _));
+            Assert.True(scene.Owner.Entities.TryGet(65, out var incoming));
+            Assert.Equal("Incoming", incoming.Nickname);
+            Assert.True(scene.Owner.Entities.TryGet(68, out var reactivated));
+            Assert.Equal("Reactivated", reactivated.Nickname);
+        }
+        finally
+        {
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task RepeatedNonLoopbackPromotionsShareTheTransportSession()
+    {
+        var scene = new SceneLiveReadModel();
+        var relay = new TcpConnection(0x0100000A, 0x0200000A, 5_464, 1_542);
+        var direct = new TcpConnection(0x0300000A, 0x0400000A, 7_135, 1_541);
+        var secondRelay = new TcpConnection(0x0500000A, 0x0600000A, 5_464, 1_620);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+        CaptureConnectionPromotion? relayPromotion = null;
+        CaptureConnectionPromotion? directPromotion = null;
+        CaptureConnectionPromotion? relayContinuationPromotion = null;
+
+        try
+        {
+            relayPromotion = CreatePromotion(
+                relay,
+                candidateOrdinal: 131,
+                Build3336Frame(1, "Relay"),
+                captureMilliseconds);
+            directPromotion = CreatePromotion(
+                direct,
+                candidateOrdinal: 129,
+                Build3336Frame(2, "Direct"),
+                captureMilliseconds + 1);
+
+            var relayItem = CaptureDispatchItem.ForPromotion(relayPromotion);
+            try
+            {
+                Assert.True(dispatcher.DispatchItem(relayItem));
+            }
+            finally
+            {
+                relayItem.Return();
+            }
+
+            var directItem = CaptureDispatchItem.ForPromotion(directPromotion);
+            try
+            {
+                Assert.True(dispatcher.DispatchItem(directItem));
+            }
+            finally
+            {
+                directItem.Return();
+            }
+
+            relayContinuationPromotion = CreatePromotion(
+                secondRelay,
+                candidateOrdinal: 500,
+                Build3336Frame(3, "Relay2"),
+                captureMilliseconds + 2,
+                sequenceNumber: 13_120);
+            var relayContinuationItem = CaptureDispatchItem.ForPromotion(relayContinuationPromotion);
+            try
+            {
+                Assert.True(dispatcher.DispatchItem(relayContinuationItem));
+            }
+            finally
+            {
+                relayContinuationItem.Return();
+            }
+
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
+            Assert.Equal(relay, lockedConnection);
+            _ = scene.CreateFrame();
+            Assert.True(scene.Owner.Entities.TryGet(1, out var relayEntity));
+            Assert.Equal("Relay", relayEntity.Nickname);
+            Assert.True(scene.Owner.Entities.TryGet(2, out var directEntity));
+            Assert.Equal("Direct", directEntity.Nickname);
+            Assert.True(scene.Owner.Entities.TryGet(3, out var relayContinuation));
+            Assert.Equal("Relay2", relayContinuation.Nickname);
+            Assert.Equal(0, CountTransportActivations(scene.Journal));
+        }
+        finally
+        {
+            relayPromotion?.Return();
+            directPromotion?.Return();
+            relayContinuationPromotion?.Return();
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task NonLoopbackSupplementalDamageReachesTheSharedScene()
+    {
+        var scene = new SceneLiveReadModel();
+        var relay = new TcpConnection(0x0100000A, 0x0200000A, 5_464, 1_542);
+        var direct = new TcpConnection(0x0300000A, 0x0400000A, 7_135, 1_541);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var damageFrame = Convert.FromHexString(
+            "2704388BE00106048377581AAE000D030400026B4A024401000000A29F01AF200100DF06");
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+
+        try
+        {
+            DispatchPromotion(
+                dispatcher,
+                in relay,
+                Build3336Frame(1, "Relay"),
+                sequenceNumber: 13_100,
+                captureTimestampMilliseconds: captureMilliseconds,
+                candidateOrdinal: 131);
+            DispatchPromotion(
+                dispatcher,
+                in direct,
+                damageFrame,
+                sequenceNumber: 12_900,
+                captureTimestampMilliseconds: captureMilliseconds + 1,
+                candidateOrdinal: 129);
+
+            Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
+            Assert.Equal(relay, lockedConnection);
+            Assert.True(ContainsCombatDamage(scene.Journal, 4_143));
+            Assert.Equal(0, CountTransportActivations(scene.Journal));
+        }
+        finally
+        {
+            await dispatcher.StopAsync();
+            CaptureConnectionGate.Unlock();
+        }
+    }
+
+    [Fact]
+    public async Task NewSupplementalAttemptRecreatesOnlyItsOwnStreamProcessor()
+    {
+        var scene = new SceneLiveReadModel();
+        var primary = new TcpConnection(0x0100000A, 0x0200000A, 7_135, 1_541);
+        var supplemental = new TcpConnection(0x0300000A, 0x0400000A, 5_464, 1_542);
+        var captureMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var dispatcher = new PacketCaptureDispatcher(SceneSinkFactory.CreateForLive(scene));
+        CaptureConnectionPromotion? primaryPromotion = null;
+        CaptureConnectionPromotion? firstSupplementalPromotion = null;
+        CaptureConnectionPromotion? restartedSupplementalPromotion = null;
+
+        try
+        {
+            primaryPromotion = CreatePromotion(
+                primary,
+                candidateOrdinal: 1,
+                Build3336Frame(1, "Primary"),
+                captureMilliseconds);
+            firstSupplementalPromotion = CreatePromotion(
+                supplemental,
+                candidateOrdinal: 2,
+                Build3336Frame(2, "Before"),
+                captureMilliseconds + 1);
+            restartedSupplementalPromotion = CreatePromotion(
+                supplemental,
+                candidateOrdinal: 3,
+                Build3336Frame(3, "After"),
+                captureMilliseconds + 2,
+                sequenceNumber: 30_000);
+
+            foreach (var promotion in new[] { primaryPromotion, firstSupplementalPromotion, restartedSupplementalPromotion })
+            {
+                var item = CaptureDispatchItem.ForPromotion(promotion!);
+                try
+                {
+                    Assert.True(dispatcher.DispatchItem(item));
+                }
+                finally
+                {
+                    item.Return();
+                }
+            }
+
+            _ = scene.CreateFrame();
+            Assert.True(scene.Owner.Entities.TryGet(2, out var before));
+            Assert.Equal("Before", before.Nickname);
+            Assert.True(scene.Owner.Entities.TryGet(3, out var after));
+            Assert.Equal("After", after.Nickname);
+            Assert.True(CaptureConnectionGate.TryGetActiveAdmission(
+                in supplemental,
+                expectedConnectionOrdinal: 3,
+                out var activeAdmission));
+            Assert.Equal(CaptureConnectionRole.Supplemental, activeAdmission.Role);
+            Assert.Equal(0, CountTransportActivations(scene.Journal));
+        }
+        finally
+        {
+            primaryPromotion?.Return();
+            firstSupplementalPromotion?.Return();
+            restartedSupplementalPromotion?.Return();
             await dispatcher.StopAsync();
             CaptureConnectionGate.Unlock();
         }
@@ -2294,6 +2967,13 @@ public sealed class ConnectionAdmissionTests
         return BuildFrame(0x03, 0x36, body);
     }
 
+    private static TcpConnection CreateBoundedTransport(int index) =>
+        new(
+            0x0100000A + (uint)index,
+            0x0200000A + (uint)index,
+            (ushort)(10_000 + index),
+            (ushort)(20_000 + index));
+
     private static byte[] Build3336Frame(int playerId, string nickname)
     {
         Assert.InRange(playerId, 1, 0x7f);
@@ -2371,6 +3051,79 @@ public sealed class ConnectionAdmissionTests
         {
             item.Return();
         }
+    }
+
+    private static CaptureConnectionPromotion CreatePromotion(
+        in TcpConnection connection,
+        long candidateOrdinal,
+        byte[] payload,
+        long captureMilliseconds,
+        uint? sequenceNumber = null)
+    {
+        var packet = CapturedPacket.CreateCopy(
+            connection,
+            new CapturePacketAdmission(CapturePacketAdmissionKind.Candidate, 0, ReleasedLock: false),
+            payload,
+            sequenceNumber ?? (uint)(candidateOrdinal * 100),
+            captureTimestampMilliseconds: captureMilliseconds);
+        return new CaptureConnectionPromotion(
+            connection,
+            replayStartSequenceNumber: packet.SequenceNumber,
+            candidateOrdinal,
+            packets: [packet]);
+    }
+
+    private static int CountTransportActivations(ObservedEventJournal journal)
+    {
+        var count = 0;
+        var cursor = journal.CreateCursor(journal.FirstObservationOrdinal);
+        while (cursor.NextObservationOrdinal < journal.NextObservationOrdinal)
+        {
+            var result = journal.ReadEntries(cursor, ObservedEventJournal.SegmentCapacity, entries =>
+            {
+                for (var index = 0; index < entries.Count; index++)
+                {
+                    if (entries[index].Domain == ObservedEventDomain.Scene &&
+                        entries[index].Scene.Kind == SceneObservationKind.TransportStreamActivated)
+                    {
+                        count++;
+                    }
+                }
+            });
+            if (result.Count == 0)
+                break;
+
+            cursor = result.Cursor;
+        }
+
+        return count;
+    }
+
+    private static bool ContainsCombatDamage(ObservedEventJournal journal, long damage)
+    {
+        var found = false;
+        var cursor = journal.CreateCursor(journal.FirstObservationOrdinal);
+        while (!found && cursor.NextObservationOrdinal < journal.NextObservationOrdinal)
+        {
+            var result = journal.ReadEntries(cursor, ObservedEventJournal.SegmentCapacity, entries =>
+            {
+                for (var index = 0; index < entries.Count; index++)
+                {
+                    var entry = entries[index];
+                    if (entry.Domain == ObservedEventDomain.Combat && entry.Combat.Damage == damage)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+            });
+            if (result.Count == 0)
+                break;
+
+            cursor = result.Cursor;
+        }
+
+        return found;
     }
 
     private static long[] ReadJournalOffsets(SceneLiveReadModel scene)

@@ -6,6 +6,12 @@ namespace Cloris.Aion2Flow.Capture;
 
 public sealed class PacketCaptureDispatcher
 {
+    private enum PromotionAdmissionKind : byte
+    {
+        PrimaryReplacement,
+        Supplemental
+    }
+
     private readonly Func<IRuntimeObservationSink> _sinkFactory;
     private readonly Action<ProtocolRoundTripObservation>? _protocolRoundTripObserver;
     private readonly Action<TcpConnection>? _connectionLockedObserver;
@@ -13,10 +19,13 @@ public sealed class PacketCaptureDispatcher
     private readonly Action<CaptureConnectionPromotion, bool>? _promotionCompletedObserver;
     private readonly LatestTcpAcknowledgmentTracker _acknowledgments;
     private readonly Func<long>? _transportOrdinalAllocator;
+    private readonly CanonicalPacketMirrorDeduplicator _mirrorDeduplicator = new();
     private readonly Dictionary<TcpConnection, TcpCaptureStreamState> _tcpStreams = [];
+    private readonly Dictionary<TcpConnection, long> _lastPromotedCandidateOrdinals = [];
+    private readonly Dictionary<TcpConnection, LinkedListNode<RetiredCandidateOrdinal>> _retiredCandidateOrdinals = [];
+    private readonly LinkedList<RetiredCandidateOrdinal> _retiredCandidateOrder = [];
     private TcpConnection _lastActiveConnection;
     private long _lastActiveGeneration;
-    private long _lastPromotedCandidateOrdinal;
     private long _lastTimelineTimestampMilliseconds;
     private long _nextFallbackTransportOrdinal;
     private bool _hasLastActiveConnection;
@@ -133,7 +142,7 @@ public sealed class PacketCaptureDispatcher
         }
 
         AppendRawPacket(packet);
-        return DispatchCapturedPacket(packet);
+        return DispatchCapturedPacket(packet, connectionOrdinal: admission.ConnectionOrdinal);
     }
 
     private bool DispatchCandidateContinuation(CapturedPacket packet, long connectionOrdinal)
@@ -154,7 +163,7 @@ public sealed class PacketCaptureDispatcher
 
         packet.UpdateAdmission(admission);
         AppendRawPacket(packet);
-        return DispatchCapturedPacket(packet);
+        return DispatchCapturedPacket(packet, connectionOrdinal: admission.ConnectionOrdinal);
     }
 
     private bool DispatchPromotion(CaptureConnectionPromotion promotion)
@@ -167,30 +176,53 @@ public sealed class PacketCaptureDispatcher
                 return false;
             }
 
+            var connection = promotion.Connection;
+            var promotionKind = ResolvePromotionAdmissionKind(in promotion);
             if (promotion.CandidateOrdinal > 0 &&
-                promotion.CandidateOrdinal <= _lastPromotedCandidateOrdinal)
+                IsStalePromotion(in connection, promotion.CandidateOrdinal))
             {
                 return false;
             }
 
-            var connection = promotion.Connection;
-            if (!CaptureConnectionGate.TryPromote(
+            CapturePacketAdmission activeAdmission;
+            var eviction = default(CaptureConnectionEviction);
+            var promoted = promotionKind switch
+            {
+                PromotionAdmissionKind.Supplemental => CaptureConnectionGate.TryPromoteSupplemental(
                     in connection,
-                    out var activeAdmission,
+                    promotion.CandidateOrdinal,
+                    out activeAdmission,
+                    out eviction),
+                _ => CaptureConnectionGate.TryPromote(
+                    in connection,
+                    out activeAdmission,
                     out _,
                     forceNewGeneration: true,
-                    promotion.CandidateOrdinal))
+                    promotion.CandidateOrdinal)
+            };
+            if (!promoted)
             {
                 return false;
             }
+
+            if (eviction.HasValue)
+            {
+                var evictedConnection = eviction.Connection;
+                RetireCandidateOrdinal(in evictedConnection, eviction.ConnectionOrdinal);
+                DisposeStream(evictedConnection);
+            }
+
+            if (promotionKind == PromotionAdmissionKind.PrimaryReplacement)
+                _mirrorDeduplicator.Clear();
 
             wasPromoted = true;
             if (promotion.CandidateOrdinal > 0)
-            {
-                _lastPromotedCandidateOrdinal = promotion.CandidateOrdinal;
-            }
+                RememberPromotedCandidate(in connection, promotion.CandidateOrdinal);
 
-            _connectionChangedObserver?.Invoke();
+            if (promotionKind == PromotionAdmissionKind.PrimaryReplacement)
+            {
+                _connectionChangedObserver?.Invoke();
+            }
             foreach (var packet in promotion.Packets)
             {
                 AppendRawPacket(packet);
@@ -216,11 +248,25 @@ public sealed class PacketCaptureDispatcher
         }
     }
 
+    private static PromotionAdmissionKind ResolvePromotionAdmissionKind(in CaptureConnectionPromotion promotion)
+    {
+        if (!CaptureConnectionGate.TryGetLockedConnection(out var primaryConnection) ||
+            primaryConnection == promotion.Connection)
+        {
+            return PromotionAdmissionKind.PrimaryReplacement;
+        }
+
+        return promotion.CandidateOrdinal > 0
+            ? PromotionAdmissionKind.Supplemental
+            : PromotionAdmissionKind.PrimaryReplacement;
+    }
+
     private bool DispatchConnectionClose(
         TcpConnection connection,
         long connectionGeneration,
         long connectionOrdinal)
     {
+        var wasPrimary = CaptureConnectionGate.IsPrimaryConnection(in connection);
         if (!CaptureConnectionGate.TryClose(
                 in connection,
                 connectionGeneration,
@@ -230,8 +276,37 @@ public sealed class PacketCaptureDispatcher
             return false;
         }
 
-        _connectionChangedObserver?.Invoke();
-        DisposeStream(closedConnection);
+        var closeTimestampMilliseconds = _hasTimelineTimestamp
+            ? _lastTimelineTimestampMilliseconds
+            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        RawPacketDump.AppendTransportClose(
+            in closedConnection,
+            closeTimestampMilliseconds,
+            connectionOrdinal);
+
+        if (wasPrimary)
+        {
+            _connectionChangedObserver?.Invoke();
+            if (CaptureConnectionGate.TryGetLockedConnection(out var survivingConnection))
+            {
+                DisposeStream(closedConnection);
+                _lastActiveConnection = survivingConnection;
+                _lastActiveGeneration = CaptureConnectionGate.TryGetActiveAdmission(
+                    in survivingConnection,
+                    out var survivingAdmission)
+                        ? survivingAdmission.Generation
+                        : _lastActiveGeneration;
+                _hasLastActiveConnection = true;
+            }
+            else
+            {
+                DisposeAllStreams();
+            }
+        }
+        else
+        {
+            DisposeStream(closedConnection);
+        }
         return true;
     }
 
@@ -265,9 +340,14 @@ public sealed class PacketCaptureDispatcher
             return false;
         }
 
+        var streamConnectionOrdinal = admission.ConnectionOrdinal > 0
+            ? admission.ConnectionOrdinal
+            : connectionOrdinal;
         var createdStream = false;
         if (!_tcpStreams.TryGetValue(connection, out var tcpStream) ||
-            tcpStream.Generation != admission.Generation)
+            tcpStream.Generation != admission.Generation ||
+            admission.ConnectionOrdinal > 0 &&
+            tcpStream.ConnectionOrdinal != admission.ConnectionOrdinal)
         {
             if (tcpStream is not null)
             {
@@ -281,13 +361,15 @@ public sealed class PacketCaptureDispatcher
                 _protocolRoundTripObserver,
                 admission.Generation,
                 initialSequenceNumber,
-                connectionOrdinal);
+                streamConnectionOrdinal,
+                _mirrorDeduplicator);
             _tcpStreams[connection] = tcpStream;
             _nextFallbackTransportOrdinal = Math.Max(
                 _nextFallbackTransportOrdinal,
-                connectionOrdinal);
+                streamConnectionOrdinal);
 
-            if (_hasLastActiveConnection &&
+            if (admission.Role == CaptureConnectionRole.Primary &&
+                _hasLastActiveConnection &&
                 (_lastActiveConnection != connection || _lastActiveGeneration != admission.Generation))
             {
                 var timelineTimestampMilliseconds = NormalizeTimelineTimestamp(packet.CaptureTimestampMilliseconds);
@@ -301,10 +383,13 @@ public sealed class PacketCaptureDispatcher
                 tcpStream.Sink.MarkTransportStreamActivated(in source);
             }
 
-            _lastActiveConnection = connection;
-            _lastActiveGeneration = admission.Generation;
-            _hasLastActiveConnection = true;
-            DisposeOtherStreams(connection);
+            if (admission.Role == CaptureConnectionRole.Primary)
+            {
+                _lastActiveConnection = connection;
+                _lastActiveGeneration = admission.Generation;
+                _hasLastActiveConnection = true;
+                DisposeOtherStreams(connection);
+            }
         }
 
         var context = new DispatchContext(this, tcpStream, connection);
@@ -327,7 +412,10 @@ public sealed class PacketCaptureDispatcher
 
         if (createdStream)
         {
-            _connectionLockedObserver?.Invoke(connection);
+            if (admission.Role == CaptureConnectionRole.Primary)
+            {
+                _connectionLockedObserver?.Invoke(connection);
+            }
         }
 
         return context.HasParsed;
@@ -469,14 +557,97 @@ public sealed class PacketCaptureDispatcher
         _hasLastActiveConnection = false;
         _lastActiveConnection = default;
         _lastActiveGeneration = 0;
+        _lastPromotedCandidateOrdinals.Clear();
+        _retiredCandidateOrdinals.Clear();
+        _retiredCandidateOrder.Clear();
+        _mirrorDeduplicator.Clear();
     }
 
     private void DisposeStream(TcpConnection connection)
     {
+        _lastPromotedCandidateOrdinals.Remove(connection);
+        _lastPromotedCandidateOrdinals.Remove(connection.Reverse());
         if (_tcpStreams.Remove(connection, out var stream))
         {
             stream.Dispose();
         }
+    }
+
+    private bool IsStalePromotion(in TcpConnection connection, long candidateOrdinal)
+    {
+        if (_lastPromotedCandidateOrdinals.TryGetValue(connection, out var directOrdinal))
+            return directOrdinal >= candidateOrdinal;
+
+        var reverse = connection.Reverse();
+        if (_lastPromotedCandidateOrdinals.TryGetValue(reverse, out var reverseOrdinal))
+            return reverseOrdinal >= candidateOrdinal;
+
+        return TryGetRetiredCandidate(in connection, out var retired) &&
+               retired.Value.ConnectionOrdinal >= candidateOrdinal;
+    }
+
+    private void RememberPromotedCandidate(in TcpConnection connection, long candidateOrdinal)
+    {
+        RemoveRetiredCandidate(in connection);
+        if (_lastPromotedCandidateOrdinals.TryGetValue(connection, out var directOrdinal))
+        {
+            if (candidateOrdinal > directOrdinal)
+                _lastPromotedCandidateOrdinals[connection] = candidateOrdinal;
+            return;
+        }
+
+        var reverse = connection.Reverse();
+        if (_lastPromotedCandidateOrdinals.TryGetValue(reverse, out var reverseOrdinal))
+        {
+            if (candidateOrdinal > reverseOrdinal)
+                _lastPromotedCandidateOrdinals[reverse] = candidateOrdinal;
+            return;
+        }
+
+        _lastPromotedCandidateOrdinals[connection] = candidateOrdinal;
+    }
+
+    private void RetireCandidateOrdinal(in TcpConnection connection, long candidateOrdinal)
+    {
+        if (TryGetRetiredCandidate(in connection, out var existing))
+        {
+            var retainedConnection = existing.Value.Connection;
+            var retainedOrdinal = Math.Max(existing.Value.ConnectionOrdinal, candidateOrdinal);
+            _retiredCandidateOrder.Remove(existing);
+            var updated = _retiredCandidateOrder.AddLast(
+                new RetiredCandidateOrdinal(retainedConnection, retainedOrdinal));
+            _retiredCandidateOrdinals[retainedConnection] = updated;
+            return;
+        }
+
+        var node = _retiredCandidateOrder.AddLast(new RetiredCandidateOrdinal(connection, candidateOrdinal));
+        _retiredCandidateOrdinals.Add(connection, node);
+        while (_retiredCandidateOrdinals.Count > CaptureBufferLimits.CandidateStreamCountLimit)
+        {
+            var oldest = _retiredCandidateOrder.First!;
+            _retiredCandidateOrder.RemoveFirst();
+            _retiredCandidateOrdinals.Remove(oldest.Value.Connection);
+        }
+    }
+
+    private bool TryGetRetiredCandidate(
+        in TcpConnection connection,
+        out LinkedListNode<RetiredCandidateOrdinal> retired)
+    {
+        if (_retiredCandidateOrdinals.TryGetValue(connection, out retired!))
+            return true;
+
+        var reverse = connection.Reverse();
+        return _retiredCandidateOrdinals.TryGetValue(reverse, out retired!);
+    }
+
+    private void RemoveRetiredCandidate(in TcpConnection connection)
+    {
+        if (!TryGetRetiredCandidate(in connection, out var retired))
+            return;
+
+        _retiredCandidateOrder.Remove(retired);
+        _retiredCandidateOrdinals.Remove(retired.Value.Connection);
     }
 
     private struct DispatchContext(PacketCaptureDispatcher dispatcher, TcpCaptureStreamState stream, TcpConnection connection)
@@ -487,6 +658,10 @@ public sealed class PacketCaptureDispatcher
         public bool HasParsed;
     }
 
+    private readonly record struct RetiredCandidateOrdinal(
+        TcpConnection Connection,
+        long ConnectionOrdinal);
+
     private sealed class TcpCaptureStreamState(
         TcpStreamReassembler reassembler,
         PacketStreamProcessor processor,
@@ -495,7 +670,8 @@ public sealed class PacketCaptureDispatcher
         PacketFlushState flushState,
         PacketPlayerGroupState playerGroupState,
         long generation,
-        long connectionOrdinal) : IDisposable
+        long connectionOrdinal,
+        CanonicalPacketMirrorDeduplicator mirrorDeduplicator) : IDisposable
     {
         private PacketStreamProcessor _processor = processor;
         private TcpWorldStreamRecoveryBuffer? _recovery;
@@ -571,7 +747,9 @@ public sealed class PacketCaptureDispatcher
                 PacketTransportFraming.Auto,
                 0,
                 flushState,
-                playerGroupState);
+                playerGroupState,
+                mirrorDeduplicator,
+                ConnectionOrdinal);
             var replayConnection = connection;
             var activate = true;
             var parsed = recovery.Replay((replaySequence, replayPayload, replayTimestamp) =>
@@ -640,7 +818,8 @@ public sealed class PacketCaptureDispatcher
             Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
             long generation,
             uint? initialSequenceNumber,
-            long connectionOrdinal)
+            long connectionOrdinal,
+            CanonicalPacketMirrorDeduplicator mirrorDeduplicator)
         {
             var sink = sinkFactory();
             var flushState = new PacketFlushState();
@@ -659,13 +838,16 @@ public sealed class PacketCaptureDispatcher
                     PacketTransportFraming.Auto,
                     0,
                     flushState,
-                    playerGroupState),
+                    playerGroupState,
+                    mirrorDeduplicator,
+                    connectionOrdinal),
                 sink,
                 protocolRoundTripObserver,
                 flushState,
                 playerGroupState,
                 generation,
-                connectionOrdinal);
+                connectionOrdinal,
+                mirrorDeduplicator);
         }
     }
 }

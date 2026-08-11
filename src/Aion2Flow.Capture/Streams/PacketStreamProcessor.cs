@@ -7,6 +7,8 @@ public sealed class PacketStreamProcessor : IDisposable
     private readonly PacketTransportStreamDeframer _transport;
     private readonly IRuntimeObservationSink _sink;
     private readonly PacketFrameParser _parser;
+    private readonly CanonicalPacketMirrorDeduplicator? _mirrorDeduplicator;
+    private readonly long _connectionOrdinal;
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
 
     public PacketStreamProcessor(IRuntimeObservationSink sink)
@@ -25,11 +27,15 @@ public sealed class PacketStreamProcessor : IDisposable
         PacketTransportFraming framing,
         int transportPrefixLength,
         PacketFlushState? flushState = null,
-        PacketPlayerGroupState? playerGroupState = null)
+        PacketPlayerGroupState? playerGroupState = null,
+        CanonicalPacketMirrorDeduplicator? mirrorDeduplicator = null,
+        long connectionOrdinal = 0)
     {
         _sink = sink;
         _parser = new PacketFrameParser(sink, protocolRoundTripObserver, flushState, playerGroupState);
         _transport = new PacketTransportStreamDeframer(framing, transportPrefixLength);
+        _mirrorDeduplicator = mirrorDeduplicator;
+        _connectionOrdinal = connectionOrdinal;
     }
 
     public void Dispose()
@@ -188,7 +194,24 @@ public sealed class PacketStreamProcessor : IDisposable
     }
 
     private bool EmitPacket(ReadOnlySpan<byte> data, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
-        => _parser.ParsePacketEntry(data, in connection, in timestamp);
+    {
+        var deduplicator = _mirrorDeduplicator;
+        if (deduplicator is null)
+            return _parser.ParsePacketEntry(data, in connection, in timestamp);
+
+        var transport = new CanonicalPacketTransportIdentity(connection, _connectionOrdinal);
+        var probe = deduplicator.Probe(
+            in transport,
+            data,
+            timestamp.TimelineUnixMilliseconds);
+        if (probe.IsDuplicate)
+            return true;
+
+        var parsed = _parser.ParsePacketEntry(data, in connection, in timestamp);
+        if (parsed)
+            deduplicator.Remember(in transport, data, in probe);
+        return parsed;
+    }
 
     private bool TryResolvePendingTransportFraming(in PacketProcessingTimestamp timestamp)
     {
