@@ -132,8 +132,6 @@ public sealed class PacketLogReplayServiceTests
                 Assert.Equal(SceneObservationKind.MapContextStarted, arrival.Kind);
             });
 
-        var transport = Assert.Single(ReadDirectMapEventObservations(replay, 0));
-        Assert.Equal(SceneObservationKind.TransportStreamActivated, transport.Kind);
         var candidate = Assert.Single(ReadDirectMapEventObservations(replay, 0x2136));
         Assert.Equal(1_111u, candidate.MapId);
         Assert.Equal(SceneObservationKind.MapContextStarted, candidate.Kind);
@@ -181,6 +179,50 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(oldPlayer.DamageAmount >= transferDamage.Sum());
         Assert.DoesNotContain(6_393, replay.Snapshot.Combatants.Keys);
         Assert.Equal(1_010u, replay.Snapshot.MapId);
+    }
+
+    [Fact]
+    public void ReplayMany_20260728234348_And_20260728234353_PreservesOneTransportSession()
+    {
+        var preludePath = FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentUnknownMapTransportPrelude}");
+        var arrivalPath = FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentUnknownMapArrival}");
+
+        var replay = PacketLogReplayService.ReplayMany([preludePath, arrivalPath]);
+
+        Assert.Equal(1_111u, replay.Snapshot.MapId);
+        Assert.Single(replay.MapTransitionArchives);
+        Assert.Contains(
+            ReadSceneTransitions(replay),
+            static transition => transition.Kind == SceneObservationKind.MapContextStarted &&
+                                 transition.MapId == 1_111u);
+    }
+
+    [Fact]
+    public void ReplayDirectory_ConcatenatesChronologicalDumpSegments()
+    {
+        var preludePath = FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentUnknownMapTransportPrelude}");
+        var arrivalPath = FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentUnknownMapArrival}");
+        var root = Path.Combine(Path.GetTempPath(), $"aion2flow-replay-{Guid.NewGuid():N}");
+        var dumps = Path.Combine(root, "dumps");
+        Directory.CreateDirectory(Path.Combine(dumps, "20260728234348"));
+        Directory.CreateDirectory(Path.Combine(dumps, "20260728234353"));
+
+        try
+        {
+            File.Copy(preludePath, Path.Combine(dumps, "20260728234348", "stream.log"));
+            File.Copy(arrivalPath, Path.Combine(dumps, "20260728234353", "stream.log"));
+
+            var replay = PacketLogReplayService.ReplayDirectory(root);
+
+            Assert.True(replay.ReplayedLines > 0);
+            Assert.Single(replay.MapTransitionArchives);
+            Assert.Equal(1_111u, replay.Snapshot.MapId);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

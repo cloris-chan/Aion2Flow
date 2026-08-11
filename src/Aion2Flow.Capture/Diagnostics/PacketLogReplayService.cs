@@ -42,15 +42,53 @@ public sealed class PacketLogReplayService
         return ReplayCore(reader, path, cancellationToken, combatOccurrenceObserver, auraLifecycleObserver);
     }
 
-    public static IReadOnlyList<PacketLogReplayResult> ReplayMany(IEnumerable<string> paths)
+    public static PacketLogReplayResult ReplayMany(IEnumerable<string> paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
-        var results = new List<PacketLogReplayResult>();
-        foreach (var path in paths)
-            results.Add(Replay(path));
+        var replayPaths = paths
+            .Select(static path => Path.GetFullPath(path))
+            .ToArray();
+        if (replayPaths.Length == 0)
+            throw new ArgumentException("At least one replay path is required.", nameof(paths));
 
-        return results;
+        var sourceName = string.Join(
+            "+",
+            replayPaths.Select(static path =>
+            {
+                var fileName = Path.GetFileName(path);
+                if (!string.Equals(fileName, "stream.log", StringComparison.OrdinalIgnoreCase))
+                    return fileName;
+
+                var directory = Path.GetDirectoryName(path);
+                return directory is null
+                    ? fileName
+                    : Path.GetFileName(directory);
+            }));
+        return ReplayStreamLines(
+            ReadFileLines(replayPaths, CancellationToken.None),
+            sourceName,
+            CancellationToken.None,
+            null,
+            null);
+    }
+
+    public static PacketLogReplayResult ReplayDirectory(string directory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+
+        var fullDirectory = Path.GetFullPath(directory);
+        var dumpsDirectory = Path.Combine(fullDirectory, "dumps");
+        var replayRoot = Directory.Exists(dumpsDirectory) ? dumpsDirectory : fullDirectory;
+        var directLog = Path.Combine(replayRoot, "stream.log");
+        var replayPaths = File.Exists(directLog) && new FileInfo(directLog).Length > 0
+            ? [directLog]
+            : Directory.EnumerateDirectories(replayRoot)
+            .OrderBy(static path => Path.GetFileName(path), StringComparer.Ordinal)
+            .Select(static path => Path.Combine(path, "stream.log"))
+            .Where(static path => File.Exists(path) && new FileInfo(path).Length > 0)
+            .ToArray();
+        return ReplayMany(replayPaths);
     }
 
     public static PacketLogReplayResult Replay(TextReader reader, string sourceName)
@@ -78,6 +116,22 @@ public sealed class PacketLogReplayService
         }
     }
 
+    private static IEnumerable<string> ReadFileLines(
+        IReadOnlyList<string> paths,
+        CancellationToken cancellationToken)
+    {
+        for (var pathIndex = 0; pathIndex < paths.Count; pathIndex++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var reader = File.OpenText(paths[pathIndex]);
+            while (reader.ReadLine() is { } line)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return line;
+            }
+        }
+    }
+
     private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver)
     {
         var sceneStarted = DateTimeOffset.UtcNow;
@@ -91,8 +145,13 @@ public sealed class PacketLogReplayService
         var sinkFactory = SceneSinkFactory.CreateForLive(scene);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var skippedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var mirrorDeduplicator = new CanonicalPacketMirrorDeduplicator();
         using var inboundProcessors = new ReplayTransportProcessorSet(
-            () => new ReplayConnectionProcessor(sinkFactory));
+            connection => new ReplayConnectionProcessor(
+                sinkFactory,
+                mirrorDeduplicator,
+                connection.ConnectionOrdinal),
+            mirrorDeduplicator);
         var totalLines = 0;
         var replayedLines = 0;
         var skippedLines = 0;
@@ -111,6 +170,23 @@ public sealed class PacketLogReplayService
             }
 
             replayTimeProvider.SetUtcNow(entry.Timestamp);
+            var replayConnection = new ReplayConnectionKey(entry.Connection, entry.ConnectionOrdinal);
+            if (entry.Kind == StreamReplayEntryKind.TransportClose)
+            {
+                if (inboundProcessors.Retire(in replayConnection))
+                {
+                    IncrementCount(replayedEventCounts, "transport-close");
+                    replayedLines++;
+                }
+                else
+                {
+                    IncrementCount(skippedEventCounts, "stale-transport-close");
+                    skippedLines++;
+                }
+
+                continue;
+            }
+
             if (string.Equals(entry.Direction, "outbound", StringComparison.OrdinalIgnoreCase))
             {
                 IncrementCount(skippedEventCounts, "outbound-ignored");
@@ -125,7 +201,6 @@ public sealed class PacketLogReplayService
                 hasSceneStarted = true;
             }
 
-            var replayConnection = new ReplayConnectionKey(entry.Connection, entry.ConnectionOrdinal);
             if (!inboundProcessors.TryGetOrCreate(in replayConnection, out var inboundProcessor))
             {
                 IncrementCount(skippedEventCounts, "stale-transport-attempt");
@@ -596,6 +671,9 @@ public sealed class PacketLogReplayService
     private static bool TryParseStreamEntry(string line, out StreamReplayEntry entry)
     {
         entry = default;
+        if (TryParseTransportCloseEntry(line, out entry))
+            return true;
+
         if (!TryReadLineSegments(
                 line,
                 out var timestampText,
@@ -629,6 +707,7 @@ public sealed class PacketLogReplayService
             }
 
             entry = new StreamReplayEntry(
+                StreamReplayEntryKind.Payload,
                 timestamp,
                 directionSegment["dir=".Length..],
                 connection,
@@ -640,6 +719,54 @@ public sealed class PacketLogReplayService
         {
             return false;
         }
+    }
+
+    private static bool TryParseTransportCloseEntry(
+        string line,
+        out StreamReplayEntry entry)
+    {
+        entry = default;
+        if (string.IsNullOrWhiteSpace(line))
+            return false;
+
+        var firstSeparator = line.IndexOf('|');
+        if (firstSeparator <= 0)
+            return false;
+
+        var secondSeparator = line.IndexOf('|', firstSeparator + 1);
+        if (secondSeparator <= firstSeparator + 1 ||
+            !line.AsSpan(firstSeparator + 1, secondSeparator - firstSeparator - 1)
+                .SequenceEqual("event=transport-close"))
+        {
+            return false;
+        }
+
+        var thirdSeparator = line.IndexOf('|', secondSeparator + 1);
+        if (thirdSeparator <= secondSeparator + 1 ||
+            !DateTimeOffset.TryParse(
+                line[..firstSeparator],
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var timestamp) ||
+            !TryParseConnection(
+                line[(secondSeparator + 1)..thirdSeparator],
+                out var connection) ||
+            !TryParseConnectionOrdinal(
+                line[(thirdSeparator + 1)..],
+                out var connectionOrdinal) ||
+            connectionOrdinal <= 0)
+        {
+            return false;
+        }
+
+        entry = new StreamReplayEntry(
+            StreamReplayEntryKind.TransportClose,
+            timestamp,
+            string.Empty,
+            connection,
+            connectionOrdinal,
+            []);
+        return true;
     }
 
     private static bool TryReadLineSegments(
@@ -786,7 +913,14 @@ public sealed class PacketLogReplayService
     }
 
 
+    private enum StreamReplayEntryKind : byte
+    {
+        Payload,
+        TransportClose
+    }
+
     private readonly record struct StreamReplayEntry(
+        StreamReplayEntryKind Kind,
         DateTimeOffset Timestamp,
         string Direction,
         TcpConnection Connection,
@@ -795,18 +929,20 @@ public sealed class PacketLogReplayService
 
     private readonly record struct ReplayConnectionKey(TcpConnection Connection, long ConnectionOrdinal);
 
-    private sealed class ReplayTransportProcessorSet(Func<ReplayConnectionProcessor> processorFactory) : IDisposable
+    private sealed class ReplayTransportProcessorSet(
+        Func<ReplayConnectionKey, ReplayConnectionProcessor> processorFactory,
+        CanonicalPacketMirrorDeduplicator mirrorDeduplicator) : IDisposable
     {
         private readonly Dictionary<ReplayConnectionKey, ReplayConnectionProcessor> _candidateProcessors = [];
+        private readonly Dictionary<ReplayConnectionKey, ReplayConnectionProcessor> _activeProcessors = [];
+        private readonly Dictionary<TcpConnection, ReplayConnectionKey> _activeConnections = [];
         private readonly HashSet<ReplayConnectionKey> _retiredConnections = [];
-        private ReplayConnectionProcessor? _activeProcessor;
-        private ReplayConnectionKey _activeConnection;
-        private long _highestActiveConnectionOrdinal;
+        private readonly Queue<ReplayConnectionKey> _retiredConnectionOrder = [];
+        private ReplayConnectionKey _primaryConnection;
         private long _nextUseOrdinal;
-        private bool _hasActiveConnection;
 
         public bool IsActive(in ReplayConnectionKey connection) =>
-            _hasActiveConnection && _activeConnection == connection;
+            _activeProcessors.ContainsKey(connection);
 
         public bool TryGetOrCreate(
             in ReplayConnectionKey connection,
@@ -814,7 +950,7 @@ public sealed class PacketLogReplayService
         {
             if (IsActive(in connection))
             {
-                processor = _activeProcessor!;
+                processor = _activeProcessors[connection];
                 processor.LastUseOrdinal = ++_nextUseOrdinal;
                 return true;
             }
@@ -836,7 +972,7 @@ public sealed class PacketLogReplayService
                 EvictLeastRecentlyUsedCandidate();
             }
 
-            processor = processorFactory();
+            processor = processorFactory(connection);
             processor.LastUseOrdinal = ++_nextUseOrdinal;
             _candidateProcessors.Add(connection, processor);
             return true;
@@ -849,7 +985,7 @@ public sealed class PacketLogReplayService
         {
             if (IsActive(in connection))
             {
-                return ReferenceEquals(_activeProcessor, processor);
+                return ReferenceEquals(_activeProcessors[connection], processor);
             }
 
             if (IsStale(in connection) ||
@@ -859,24 +995,39 @@ public sealed class PacketLogReplayService
                 return false;
             }
 
-            var previousProcessor = _activeProcessor;
-            var previousConnection = _activeConnection;
-            if (!processor.Activate(in source, markTransportStreamActivated: _hasActiveConnection))
+            var hasActiveProcessor = _activeProcessors.Count != 0;
+            var replacesPrimary = hasActiveProcessor &&
+                                  (_primaryConnection.Connection == connection.Connection ||
+                                   connection.ConnectionOrdinal <= 0);
+            var isSupplemental = hasActiveProcessor && !replacesPrimary;
+            var markTransportStreamActivated = replacesPrimary;
+            if (!hasActiveProcessor || replacesPrimary)
+                mirrorDeduplicator.Clear();
+            if (!processor.Activate(in source, markTransportStreamActivated))
                 return false;
 
             _candidateProcessors.Remove(connection);
-            _activeConnection = connection;
-            _activeProcessor = processor;
-            _hasActiveConnection = true;
-            if (connection.ConnectionOrdinal > _highestActiveConnectionOrdinal)
+            if (replacesPrimary)
             {
-                _highestActiveConnectionOrdinal = connection.ConnectionOrdinal;
+                RetireAllActiveProcessors();
+                DisposeCandidatesForReplacement();
+            }
+            else if (_activeConnections.Remove(connection.Connection, out var previousConnection))
+            {
+                RetireActiveProcessor(previousConnection);
             }
 
-            if (previousProcessor is not null)
+            if (isSupplemental &&
+                _activeProcessors.Count >= CaptureBufferLimits.CandidateStreamCountLimit)
             {
-                _retiredConnections.Add(previousConnection);
-                previousProcessor.Dispose();
+                EvictLeastRecentlyUsedSupplemental();
+            }
+
+            _activeProcessors.Add(connection, processor);
+            _activeConnections[connection.Connection] = connection;
+            if (!isSupplemental)
+            {
+                _primaryConnection = connection;
             }
 
             DisposeStaleCandidates();
@@ -894,15 +1045,62 @@ public sealed class PacketLogReplayService
             }
 
             _candidateProcessors.Remove(connection);
-            _retiredConnections.Add(connection);
+            RememberRetiredConnection(in connection);
             candidate.Dispose();
+        }
+
+        public bool Retire(in ReplayConnectionKey connection)
+        {
+            var changed = RememberRetiredConnection(in connection);
+            if (_candidateProcessors.Remove(connection, out var candidate))
+            {
+                candidate.Dispose();
+                changed = true;
+            }
+
+            if (_activeProcessors.Remove(connection, out var active))
+            {
+                active.Dispose();
+                changed = true;
+            }
+
+            if (_activeConnections.TryGetValue(connection.Connection, out var current) &&
+                current == connection)
+            {
+                _activeConnections.Remove(connection.Connection);
+            }
+
+            if (_primaryConnection != connection)
+                return changed;
+
+            _primaryConnection = default;
+            var latestUseOrdinal = long.MinValue;
+            var hasPrimary = false;
+            foreach (var (candidateConnection, processor) in _activeProcessors)
+            {
+                if (processor.LastUseOrdinal <= latestUseOrdinal)
+                    continue;
+
+                _primaryConnection = candidateConnection;
+                latestUseOrdinal = processor.LastUseOrdinal;
+                hasPrimary = true;
+            }
+
+            if (!hasPrimary)
+                mirrorDeduplicator.Clear();
+            return changed;
         }
 
         public void Dispose()
         {
-            _activeProcessor?.Dispose();
-            _activeProcessor = null;
-            _hasActiveConnection = false;
+            foreach (var processor in _activeProcessors.Values)
+            {
+                processor.Dispose();
+            }
+
+            _activeProcessors.Clear();
+            _activeConnections.Clear();
+            _primaryConnection = default;
 
             foreach (var processor in _candidateProcessors.Values)
             {
@@ -911,6 +1109,7 @@ public sealed class PacketLogReplayService
 
             _candidateProcessors.Clear();
             _retiredConnections.Clear();
+            _retiredConnectionOrder.Clear();
         }
 
         private bool IsStale(in ReplayConnectionKey connection)
@@ -920,13 +1119,96 @@ public sealed class PacketLogReplayService
                 return true;
             }
 
-            if (_highestActiveConnectionOrdinal <= 0)
+            if (_activeConnections.TryGetValue(connection.Connection, out var activeConnection))
             {
-                return false;
+                if (activeConnection == connection)
+                    return false;
+
+                if (connection.ConnectionOrdinal <= 0)
+                    return activeConnection.ConnectionOrdinal > 0;
+
+                return activeConnection.ConnectionOrdinal >= connection.ConnectionOrdinal;
             }
 
-            return connection.ConnectionOrdinal <= 0 ||
-                   connection.ConnectionOrdinal <= _highestActiveConnectionOrdinal;
+            if (connection.ConnectionOrdinal > 0)
+                return false;
+
+            foreach (var active in _activeProcessors.Keys)
+            {
+                if (active.ConnectionOrdinal > 0)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void RetireAllActiveProcessors()
+        {
+            var activeConnections = _activeProcessors.Keys.ToArray();
+            foreach (var connection in activeConnections)
+                RetireActiveProcessor(connection);
+
+            _activeConnections.Clear();
+            _primaryConnection = default;
+        }
+
+        private void RetireActiveProcessor(in ReplayConnectionKey connection)
+        {
+            if (!_activeProcessors.Remove(connection, out var processor))
+                return;
+
+            _activeConnections.Remove(connection.Connection);
+            RememberRetiredConnection(in connection);
+            processor.Dispose();
+        }
+
+        private void DisposeCandidatesForReplacement()
+        {
+            foreach (var candidate in _candidateProcessors)
+            {
+                var connection = candidate.Key;
+                RememberRetiredConnection(in connection);
+                candidate.Value.Dispose();
+            }
+
+            _candidateProcessors.Clear();
+        }
+
+        private void EvictLeastRecentlyUsedSupplemental()
+        {
+            var oldestConnection = default(ReplayConnectionKey);
+            var oldestUseOrdinal = long.MaxValue;
+            var found = false;
+            foreach (var candidate in _activeProcessors)
+            {
+                if (candidate.Key == _primaryConnection ||
+                    candidate.Value.LastUseOrdinal >= oldestUseOrdinal)
+                {
+                    continue;
+                }
+
+                oldestConnection = candidate.Key;
+                oldestUseOrdinal = candidate.Value.LastUseOrdinal;
+                found = true;
+            }
+
+            if (found)
+                RetireActiveProcessor(in oldestConnection);
+        }
+
+        private bool RememberRetiredConnection(in ReplayConnectionKey connection)
+        {
+            if (!_retiredConnections.Add(connection))
+                return false;
+
+            _retiredConnectionOrder.Enqueue(connection);
+            while (_retiredConnectionOrder.Count > CaptureBufferLimits.CandidateStreamCountLimit)
+            {
+                var expired = _retiredConnectionOrder.Dequeue();
+                _retiredConnections.Remove(expired);
+            }
+
+            return true;
         }
 
         private void EvictLeastRecentlyUsedCandidate()
@@ -993,6 +1275,8 @@ public sealed class PacketLogReplayService
     {
         private readonly TcpConnectionStartClassifier _classifier = new();
         private readonly Func<IRuntimeObservationSink> _liveSinkFactory;
+        private readonly CanonicalPacketMirrorDeduplicator _mirrorDeduplicator;
+        private readonly long _connectionOrdinal;
         private readonly List<ReplayAcceptedPayload> _pendingPayloads = [];
         private int _transportPrefixLength;
         private PacketTransportFraming _framing;
@@ -1000,9 +1284,14 @@ public sealed class PacketLogReplayService
         private PacketStreamProcessor? _probeProcessor;
         private PacketStreamProcessor? _activeProcessor;
 
-        public ReplayConnectionProcessor(Func<IRuntimeObservationSink> liveSinkFactory)
+        public ReplayConnectionProcessor(
+            Func<IRuntimeObservationSink> liveSinkFactory,
+            CanonicalPacketMirrorDeduplicator mirrorDeduplicator,
+            long connectionOrdinal)
         {
             _liveSinkFactory = liveSinkFactory;
+            _mirrorDeduplicator = mirrorDeduplicator;
+            _connectionOrdinal = connectionOrdinal;
         }
 
         public long LastUseOrdinal { get; set; }
@@ -1059,7 +1348,9 @@ public sealed class PacketLogReplayService
                 sink,
                 null,
                 _framing,
-                _transportPrefixLength);
+                _transportPrefixLength,
+                mirrorDeduplicator: _mirrorDeduplicator,
+                connectionOrdinal: _connectionOrdinal);
             if (markTransportStreamActivated)
                 sink.MarkTransportStreamActivated(in source);
 
