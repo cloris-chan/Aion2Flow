@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.Protocol.Packets;
 
 namespace Cloris.Aion2Flow.Capture;
@@ -10,20 +9,20 @@ internal sealed class ProtocolRoundTripEstimator
 
     private RoundTripSample? _current;
 
-    public double? GetCurrentMilliseconds(in TcpConnection connection)
-        => GetCurrentMilliseconds(in connection, Stopwatch.GetTimestamp());
+    public double? GetCurrentMilliseconds(long sessionGeneration)
+        => GetCurrentMilliseconds(sessionGeneration, Stopwatch.GetTimestamp());
 
     public void Clear() => Volatile.Write(ref _current, null);
 
     public bool TryObserveEcho(
-        in TcpConnection connection,
+        long sessionGeneration,
         long clientSentUnixMilliseconds,
         long arrivalUnixMilliseconds,
         long arrivalTimestamp,
         out double roundTripMilliseconds)
     {
         return TryObserveEcho(
-            in connection,
+            sessionGeneration,
             clientSentUnixMilliseconds,
             arrivalUnixMilliseconds,
             arrivalTimestamp,
@@ -32,14 +31,15 @@ internal sealed class ProtocolRoundTripEstimator
     }
 
     internal bool TryObserveEcho(
-        in TcpConnection connection,
+        long sessionGeneration,
         long clientSentUnixMilliseconds,
         long arrivalUnixMilliseconds,
         long arrivalTimestamp,
         long nowTimestamp,
         out double roundTripMilliseconds)
     {
-        if (!IsFreshArrival(arrivalTimestamp, nowTimestamp) ||
+        if (sessionGeneration <= 0 ||
+            !IsFreshArrival(arrivalTimestamp, nowTimestamp) ||
             !Packet0336RoundTripParser.IsPlausibleClientEcho(clientSentUnixMilliseconds, arrivalUnixMilliseconds))
         {
             roundTripMilliseconds = 0;
@@ -48,12 +48,12 @@ internal sealed class ProtocolRoundTripEstimator
 
         var elapsedMilliseconds = arrivalUnixMilliseconds - clientSentUnixMilliseconds;
         roundTripMilliseconds = elapsedMilliseconds;
-        var next = new RoundTripSample(connection, roundTripMilliseconds, arrivalTimestamp);
+        var next = new RoundTripSample(sessionGeneration, roundTripMilliseconds, arrivalTimestamp);
         while (true)
         {
             var current = Volatile.Read(ref _current);
             if (current is not null &&
-                current.Connection == connection &&
+                current.SessionGeneration == sessionGeneration &&
                 current.ArrivalTimestamp > arrivalTimestamp)
             {
                 roundTripMilliseconds = 0;
@@ -67,10 +67,12 @@ internal sealed class ProtocolRoundTripEstimator
         }
     }
 
-    internal double? GetCurrentMilliseconds(in TcpConnection connection, long nowTimestamp)
+    internal double? GetCurrentMilliseconds(long sessionGeneration, long nowTimestamp)
     {
         var current = Volatile.Read(ref _current);
-        if (current is null || current.Connection != connection || nowTimestamp < current.ArrivalTimestamp)
+        if (current is null ||
+            current.SessionGeneration != sessionGeneration ||
+            nowTimestamp < current.ArrivalTimestamp)
         {
             return null;
         }
@@ -87,5 +89,8 @@ internal sealed class ProtocolRoundTripEstimator
                Stopwatch.GetElapsedTime(arrivalTimestamp, nowTimestamp).TotalMilliseconds <= SampleStaleAfterMilliseconds;
     }
 
-    private sealed record RoundTripSample(TcpConnection Connection, double RoundTripMilliseconds, long ArrivalTimestamp);
+    private sealed record RoundTripSample(
+        long SessionGeneration,
+        double RoundTripMilliseconds,
+        long ArrivalTimestamp);
 }

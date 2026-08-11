@@ -38,7 +38,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             RuntimeSinkFactory,
             OnProtocolRoundTripObserved,
             OnCaptureConnectionLocked,
-            _protocolRttEstimator.Clear,
+            null,
             OnPromotionCompleted,
             _acknowledgments,
             AllocateConnectionOrdinal);
@@ -50,13 +50,13 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
     {
         get
         {
-            if (!CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection))
+            if (!CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) ||
+                !CaptureConnectionGate.TryGetActiveAdmission(in lockedConnection, out var admission))
             {
-                _protocolRttEstimator.Clear();
                 return null;
             }
 
-            return _protocolRttEstimator.GetCurrentMilliseconds(in lockedConnection);
+            return _protocolRttEstimator.GetCurrentMilliseconds(admission.Generation);
         }
     }
     public string LastStatusMessage { get; private set; } = string.Empty;
@@ -681,32 +681,45 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             return;
         }
 
-        var observedConnection = observation.Connection;
-        var hasLockedConnection = CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection);
-        if (hasLockedConnection && lockedConnection != observedConnection)
+        if (TryObserveProtocolRoundTrip(
+                in observation,
+                _captureTimestampMapper.ToCurrentUtcUnixMilliseconds(observation.ArrivalTimestamp),
+                Stopwatch.GetTimestamp(),
+                out var roundTripMilliseconds))
         {
-            return;
+            RttResolved?.Invoke(roundTripMilliseconds);
+        }
+    }
+
+    internal bool TryObserveProtocolRoundTrip(
+        in ProtocolRoundTripObservation observation,
+        long arrivalUnixMilliseconds,
+        long nowTimestamp,
+        out double roundTripMilliseconds)
+    {
+        var observedConnection = observation.Connection;
+        if (observation.ArrivalTimestamp <= 0 ||
+            !CaptureConnectionGate.TryGetActiveAdmission(in observedConnection, out var admission))
+        {
+            roundTripMilliseconds = 0;
+            return false;
         }
 
-        if (_protocolRttEstimator.TryObserveEcho(
-            in observedConnection,
+        return _protocolRttEstimator.TryObserveEcho(
+            admission.Generation,
             observation.ClientSentUnixMilliseconds,
-            _captureTimestampMapper.ToCurrentUtcUnixMilliseconds(observation.ArrivalTimestamp),
+            arrivalUnixMilliseconds,
             observation.ArrivalTimestamp,
-            out var roundTripMilliseconds))
-        {
-            if (hasLockedConnection)
-            {
-                RttResolved?.Invoke(roundTripMilliseconds);
-            }
-        }
+            nowTimestamp,
+            out roundTripMilliseconds);
     }
 
     private void OnCaptureConnectionLocked(TcpConnection connection)
     {
         if (CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection) &&
             lockedConnection == connection &&
-            _protocolRttEstimator.GetCurrentMilliseconds(in connection) is { } roundTripMilliseconds)
+            CaptureConnectionGate.TryGetActiveAdmission(in connection, out var admission) &&
+            _protocolRttEstimator.GetCurrentMilliseconds(admission.Generation) is { } roundTripMilliseconds)
         {
             RttResolved?.Invoke(roundTripMilliseconds);
         }

@@ -47,7 +47,7 @@ public sealed class ProtocolRoundTripClockTests
             correctedArrivalUnixMilliseconds);
         Assert.NotEqual(roundTripMilliseconds, timelineArrivalUnixMilliseconds - clientSentUnixMilliseconds);
         Assert.True(estimator.TryObserveEcho(
-            in Connection,
+            1,
             clientSentUnixMilliseconds,
             correctedArrivalUnixMilliseconds,
             arrivalTimestamp,
