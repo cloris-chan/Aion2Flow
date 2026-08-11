@@ -226,6 +226,36 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void ReplayMany_20260810_CrossServerLifecycle_PreservesMapContextsAndCombat()
+    {
+        SetResources();
+
+        var paths = ReplayScenarioCatalog.CurrentCrossServerLifecycle
+            .Select(static fileName => FixtureHelper.GetPath($"logs/{fileName}"))
+            .ToArray();
+
+        var replay = PacketLogReplayService.ReplayMany(paths);
+        var transitions = ReadSceneTransitions(replay)
+            .Select(static transition => transition.MapId)
+            .ToArray();
+        var combat = ReadCombatWireEntries(replay);
+        var damage = combat
+            .Where(static entry => entry.Observation.Damage > 0)
+            .ToArray();
+
+        Assert.Equal(1_112, replay.ReplayedLines);
+        Assert.Equal([600132u, 600142u, 1110u, 600132u, 1110u], transitions);
+        Assert.Equal(726, combat.Count);
+        Assert.Equal(15, damage.Length);
+        Assert.Equal(103_966, damage.Sum(static entry => entry.Observation.Damage));
+
+        var archive = Assert.Single(replay.MapTransitionArchives);
+        Assert.Equal(600132u, archive.Snapshot.MapId);
+        Assert.Equal(23, archive.CombatEvents.Count);
+        Assert.Equal(1110u, replay.Snapshot.MapId);
+    }
+
+    [Fact]
     public void Replay_20260702031011_Parses_Current0438_Damage_And_Modifier_Layout()
     {
         SetResources();

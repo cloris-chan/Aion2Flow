@@ -28,4 +28,15 @@ public static class ReplayScenarioCatalog
     public const string CurrentOldMapCombatDuringTransfer = "aion2flow.stream.20260729002254.log";
     public const string CurrentArrivalAfterOldMapCombat = "aion2flow.stream.20260729002341.log";
     public const string CurrentFixed32CrossServerCombat = "aion2flow.stream.20260809021609.log";
+    public static readonly string[] CurrentCrossServerLifecycle =
+    [
+        "aion2flow.stream.20260810222345.log",
+        "aion2flow.stream.20260810222347.log",
+        "aion2flow.stream.20260810222410.log",
+        "aion2flow.stream.20260810222417.log",
+        "aion2flow.stream.20260810222512.log",
+        "aion2flow.stream.20260810222534.log",
+        "aion2flow.stream.20260810222552.log",
+        "aion2flow.stream.20260810222614.log"
+    ];
 }
