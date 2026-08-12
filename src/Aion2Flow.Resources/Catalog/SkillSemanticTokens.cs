@@ -6,6 +6,7 @@ public readonly record struct SkillSemanticHideFloaterType(string Value);
 public readonly record struct SkillSemanticCasterDirection(string Value);
 public readonly record struct SkillSemanticEffectConditionType(string Value);
 public readonly record struct SkillSemanticEffectRangeType(string Value);
+public readonly record struct SkillSemanticPcDieType(string Value);
 public readonly record struct SkillSemanticTargetFilterType(string Value);
 public readonly record struct SkillSemanticRangeNoticeSelectColor(string Value);
 public readonly record struct SkillSemanticRangeNoticeFillType(string Value);
