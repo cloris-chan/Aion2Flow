@@ -43,6 +43,11 @@ public sealed class PacketLogReplayService
     }
 
     public static PacketLogReplayResult ReplayMany(IEnumerable<string> paths)
+        => ReplayMany(paths, null);
+
+    internal static PacketLogReplayResult ReplayMany(
+        IEnumerable<string> paths,
+        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
@@ -70,7 +75,8 @@ public sealed class PacketLogReplayService
             sourceName,
             CancellationToken.None,
             null,
-            null);
+            null,
+            protocolRoundTripObserver);
     }
 
     public static PacketLogReplayResult ReplayDirectory(string directory)
@@ -104,7 +110,8 @@ public sealed class PacketLogReplayService
             sourceName,
             cancellationToken,
             combatOccurrenceObserver,
-            auraLifecycleObserver);
+            auraLifecycleObserver,
+            null);
     }
 
     private static IEnumerable<string> ReadLines(TextReader reader, CancellationToken cancellationToken)
@@ -132,7 +139,13 @@ public sealed class PacketLogReplayService
         }
     }
 
-    private static PacketLogReplayResult ReplayStreamLines(IEnumerable<string> lines, string sourceName, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver)
+    private static PacketLogReplayResult ReplayStreamLines(
+        IEnumerable<string> lines,
+        string sourceName,
+        CancellationToken cancellationToken,
+        ICombatOccurrenceObserver? combatOccurrenceObserver,
+        IAuraLifecycleObserver? auraLifecycleObserver,
+        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver)
     {
         var sceneStarted = DateTimeOffset.UtcNow;
         var replayTimeProvider = new ReplayTimeProvider(sceneStarted);
@@ -150,7 +163,8 @@ public sealed class PacketLogReplayService
             connection => new ReplayConnectionProcessor(
                 sinkFactory,
                 mirrorDeduplicator,
-                connection.ConnectionOrdinal),
+                connection.ConnectionOrdinal,
+                protocolRoundTripObserver),
             mirrorDeduplicator);
         var totalLines = 0;
         var replayedLines = 0;
@@ -1276,6 +1290,7 @@ public sealed class PacketLogReplayService
         private readonly TcpConnectionStartClassifier _classifier = new();
         private readonly Func<IRuntimeObservationSink> _liveSinkFactory;
         private readonly CanonicalPacketMirrorDeduplicator _mirrorDeduplicator;
+        private readonly Action<ProtocolRoundTripObservation>? _protocolRoundTripObserver;
         private readonly long _connectionOrdinal;
         private readonly List<ReplayAcceptedPayload> _pendingPayloads = [];
         private int _transportPrefixLength;
@@ -1287,11 +1302,13 @@ public sealed class PacketLogReplayService
         public ReplayConnectionProcessor(
             Func<IRuntimeObservationSink> liveSinkFactory,
             CanonicalPacketMirrorDeduplicator mirrorDeduplicator,
-            long connectionOrdinal)
+            long connectionOrdinal,
+            Action<ProtocolRoundTripObservation>? protocolRoundTripObserver)
         {
             _liveSinkFactory = liveSinkFactory;
             _mirrorDeduplicator = mirrorDeduplicator;
             _connectionOrdinal = connectionOrdinal;
+            _protocolRoundTripObserver = protocolRoundTripObserver;
         }
 
         public long LastUseOrdinal { get; set; }
@@ -1346,7 +1363,7 @@ public sealed class PacketLogReplayService
             var sink = _liveSinkFactory();
             _activeProcessor = new PacketStreamProcessor(
                 sink,
-                null,
+                _protocolRoundTripObserver,
                 _framing,
                 _transportPrefixLength,
                 mirrorDeduplicator: _mirrorDeduplicator,

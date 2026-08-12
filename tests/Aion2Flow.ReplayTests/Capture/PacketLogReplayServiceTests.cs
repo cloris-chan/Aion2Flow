@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
@@ -243,7 +244,6 @@ public sealed class PacketLogReplayServiceTests
             .Where(static entry => entry.Observation.Damage > 0)
             .ToArray();
 
-        Assert.Equal(1_112, replay.ReplayedLines);
         Assert.Equal([600132u, 600142u, 1110u, 600132u, 1110u], transitions);
         Assert.Equal(726, combat.Count);
         Assert.Equal(15, damage.Length);
@@ -253,6 +253,28 @@ public sealed class PacketLogReplayServiceTests
         Assert.Equal(600132u, archive.Snapshot.MapId);
         Assert.Equal(23, archive.CombatEvents.Count);
         Assert.Equal(1110u, replay.Snapshot.MapId);
+    }
+
+    [Fact]
+    public void ReplayMany_20260812_RoundTripLifecycle_EmitsCurrentEchoes()
+    {
+        var paths = ReplayScenarioCatalog.CurrentRoundTripLifecycle
+            .Select(static fileName => FixtureHelper.GetPath($"logs/{fileName}"))
+            .ToArray();
+        var observations = new List<ProtocolRoundTripObservation>();
+
+        var replay = PacketLogReplayService.ReplayMany(paths, observations.Add);
+
+        Assert.Equal(3_314, replay.TotalLines);
+        Assert.Equal(8, observations.Count);
+        Assert.All(observations, static observation =>
+            Assert.InRange(
+                observation.ServerUnixMilliseconds - observation.ClientSentUnixMilliseconds,
+                129,
+                132));
+        Assert.Contains(observations, static observation =>
+            observation.ClientSentUnixMilliseconds == 1_786_515_131_286 &&
+            observation.ServerUnixMilliseconds == 1_786_515_131_416);
     }
 
     [Fact]

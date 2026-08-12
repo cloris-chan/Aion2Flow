@@ -2959,11 +2959,13 @@ public sealed class ConnectionAdmissionTests
 
     private static byte[] Build0336(long captureMilliseconds)
     {
-        var body = new byte[18];
+        var body = new byte[20];
         body[0] = 0;
         body[1] = 0;
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(2), YearOneToUnixEpochMilliseconds + captureMilliseconds - 50);
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(10), captureMilliseconds);
+        body[18] = 0xd6;
+        body[19] = 0x20;
         return BuildFrame(0x03, 0x36, body);
     }
 

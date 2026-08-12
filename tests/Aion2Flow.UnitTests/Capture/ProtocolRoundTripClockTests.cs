@@ -80,6 +80,40 @@ public sealed class ProtocolRoundTripClockTests
     }
 
     [Fact]
+    public void CurrentEchoReachesObserverBeforeUtcCorrection()
+    {
+        const long clientSentUnixMilliseconds = 1_786_515_131_286;
+        const long serverUnixMilliseconds = 1_786_515_131_416;
+        const long arrivalTimestamp = 123_456_789;
+        var processingTimestamp = new PacketProcessingTimestamp(
+            clientSentUnixMilliseconds + 54,
+            arrivalTimestamp);
+        ProtocolRoundTripObservation? observation = null;
+        using var processor = new PacketStreamProcessor(
+            SceneSinkFactory.CreateForLive(new SceneLiveReadModel())(),
+            value => observation = value);
+
+        Assert.True(processor.AppendAndProcess(
+            Convert.FromHexString("1A033600009663C606233A0000188C99F49F010000D620"),
+            in Connection,
+            in processingTimestamp));
+        Assert.True(observation.HasValue);
+        Assert.Equal(clientSentUnixMilliseconds, observation.Value.ClientSentUnixMilliseconds);
+        Assert.Equal(serverUnixMilliseconds, observation.Value.ServerUnixMilliseconds);
+        Assert.Equal(arrivalTimestamp, observation.Value.ArrivalTimestamp);
+
+        var estimator = new ProtocolRoundTripEstimator();
+        Assert.True(estimator.TryObserveEcho(
+            1,
+            observation.Value.ClientSentUnixMilliseconds,
+            clientSentUnixMilliseconds + 54,
+            observation.Value.ArrivalTimestamp,
+            observation.Value.ArrivalTimestamp,
+            out var roundTripMilliseconds));
+        Assert.Equal(54, roundTripMilliseconds);
+    }
+
+    [Fact]
     public async Task DispatcherPreservesRawArrivalAcrossClampedSceneTimeline()
     {
         var laterUnixMilliseconds = Origin.AddSeconds(3).ToUnixTimeMilliseconds();
@@ -207,11 +241,13 @@ public sealed class ProtocolRoundTripClockTests
     private static byte[] Build0336(long clientSentUnixMilliseconds, long serverUnixMilliseconds)
     {
         const long yearOneToUnixEpochMilliseconds = 62_135_596_800_000;
-        var body = new byte[18];
+        var body = new byte[20];
         BinaryPrimitives.WriteInt64LittleEndian(
             body.AsSpan(2),
             yearOneToUnixEpochMilliseconds + clientSentUnixMilliseconds);
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(10), serverUnixMilliseconds);
+        body[18] = 0xd6;
+        body[19] = 0x20;
 
         Span<byte> prefix = stackalloc byte[5];
         Assert.True(PacketTransportCodec.TryWriteVarInt(body.Length + 6, prefix, out var prefixLength));

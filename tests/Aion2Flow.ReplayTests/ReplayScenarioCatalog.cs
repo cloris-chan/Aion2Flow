@@ -39,4 +39,11 @@ public static class ReplayScenarioCatalog
         "aion2flow.stream.20260810222552.log",
         "aion2flow.stream.20260810222614.log"
     ];
+
+    public static readonly string[] CurrentRoundTripLifecycle =
+    [
+        "aion2flow.stream.20260812141202.log",
+        "aion2flow.stream.20260812141205.log",
+        "aion2flow.stream.20260812141250.log"
+    ];
 }

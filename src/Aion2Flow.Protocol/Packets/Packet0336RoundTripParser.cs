@@ -9,8 +9,8 @@ internal static class Packet0336RoundTripParser
 {
     private const long UnixEpochOffsetMilliseconds = 62_135_596_800_000;
     private const long MaximumRoundTripMilliseconds = 10_000;
-    private const int FrameLength = 21;
-    private const int DeclaredLength = 24;
+    private const int FrameLength = 23;
+    private const int DeclaredLength = 26;
 
     public static bool TryParse(ReadOnlySpan<byte> packet, out Packet0336RoundTrip result)
     {
@@ -27,7 +27,7 @@ internal static class Packet0336RoundTripParser
             return false;
         }
 
-        if (reader.Remaining != 20 ||
+        if (reader.Remaining != 22 ||
             packet[reader.Offset] != 0x03 ||
             packet[reader.Offset + 1] != 0x36 ||
             packet[reader.Offset + 2] != 0 ||
