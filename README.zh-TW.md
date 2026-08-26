@@ -81,7 +81,7 @@ Aion2Flow 只在本機分析遊戲網路流量。
 
 ```powershell
 dotnet build Aion2Flow.slnx -c Release
-dotnet test Aion2Flow.slnx -c Release -m:1
+dotnet test --solution Aion2Flow.slnx -c Release --max-parallel-test-modules 1
 dotnet publish src/Aion2Flow/Aion2Flow.csproj -c Release
 ```
 
