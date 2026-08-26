@@ -160,6 +160,11 @@ public readonly record struct AuraObservation
     public int TailLength { get; init; }
     public ulong TailLow64 { get; init; }
     public ulong TailHigh64 { get; init; }
+
+    public long? PacketDurationMilliseconds =>
+        PacketDurationDecoder.TryDecodeMilliseconds(HeadValue, HeadMiddleRaw, out var durationMilliseconds)
+            ? durationMilliseconds
+            : null;
 }
 
 public readonly record struct ActionObservation

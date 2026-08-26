@@ -526,6 +526,9 @@ public sealed class DomainEventApplier
             return;
         }
 
+        if (state.StateCode is StateCodes.Cooldown4738 or StateCodes.CooldownStart0238 or StateCodes.CooldownCharge2238)
+            return;
+
         if (state.StateCode == StateCodes.LocalizedNpcName)
         {
             return;

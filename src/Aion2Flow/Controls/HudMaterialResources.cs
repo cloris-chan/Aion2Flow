@@ -87,6 +87,23 @@ internal sealed record QuestCompletionEdgeTextureData(
         HudTextureAsset.Read("UT_GradationBH.png"));
 }
 
+internal sealed record CooldownSkillMaterialTextureData(
+    byte[] TailGlowAdd,
+    byte[] TailGlow,
+    byte[] TailEffectFlare,
+    byte[] TailEffectGradient,
+    byte[][] CompletionFrames)
+{
+    internal static CooldownSkillMaterialTextureData Shared { get; } = new(
+        HudTextureAsset.Read("Cooldown/TailGlowAdd_UT_Circle_014.png"),
+        HudTextureAsset.Read("Cooldown/TailGlow_UT_Circle_003.png"),
+        HudTextureAsset.Read("Cooldown/TailEffect_UT_Flare_002.png"),
+        HudTextureAsset.Read("Cooldown/TailEffect_UT_Gradient_004.png"),
+        Enumerable.Range(1, 19)
+            .Select(index => HudTextureAsset.Read($"Cooldown/CanUse/CanUse_{index:D2}.png"))
+            .ToArray());
+}
+
 internal sealed class BossFocusMaterialSkiaTextures
 {
     [ThreadStatic]
@@ -277,6 +294,60 @@ internal sealed class QuestCompletionEdgeSkiaTextures
 
     private static SKImage DecodeImage(byte[] bytes, string name) =>
         SKImage.FromEncodedData(bytes) ?? throw new InvalidOperationException($"Unable to decode quest completion edge texture {name}.");
+}
+
+internal sealed class CooldownSkillMaterialSkiaTextures
+{
+    [ThreadStatic]
+    private static CooldownSkillMaterialSkiaTextures? s_current;
+
+    private readonly SKImage _tailGlowAddImage;
+    private readonly SKImage _tailGlowImage;
+    private readonly SKImage _tailEffectFlareImage;
+    private readonly SKImage _tailEffectGradientImage;
+    private readonly SKImage[] _completionFrames;
+
+    private CooldownSkillMaterialSkiaTextures()
+    {
+        var textures = CooldownSkillMaterialTextureData.Shared;
+        _tailGlowAddImage = DecodeImage(textures.TailGlowAdd, nameof(textures.TailGlowAdd));
+        _tailGlowImage = DecodeImage(textures.TailGlow, nameof(textures.TailGlow));
+        _tailEffectFlareImage = DecodeImage(textures.TailEffectFlare, nameof(textures.TailEffectFlare));
+        _tailEffectGradientImage = DecodeImage(textures.TailEffectGradient, nameof(textures.TailEffectGradient));
+        _completionFrames = textures.CompletionFrames
+            .Select((bytes, index) => DecodeImage(bytes, $"CompletionFrame{index + 1:D2}"))
+            .ToArray();
+
+        var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
+        TailGlowAddShader = _tailGlowAddImage.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, sampling);
+        TailGlowShader = _tailGlowImage.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, sampling);
+        TailEffectFlareShader = _tailEffectFlareImage.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, sampling);
+        TailEffectGradientShader = _tailEffectGradientImage.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, sampling);
+    }
+
+    internal SKShader TailGlowAddShader { get; }
+
+    internal SKShader TailGlowShader { get; }
+
+    internal SKShader TailEffectFlareShader { get; }
+
+    internal SKShader TailEffectGradientShader { get; }
+
+    internal SKPoint TailGlowAddTextureSize => new(_tailGlowAddImage.Width, _tailGlowAddImage.Height);
+
+    internal SKPoint TailGlowTextureSize => new(_tailGlowImage.Width, _tailGlowImage.Height);
+
+    internal SKPoint TailEffectFlareTextureSize => new(_tailEffectFlareImage.Width, _tailEffectFlareImage.Height);
+
+    internal SKPoint TailEffectGradientTextureSize => new(_tailEffectGradientImage.Width, _tailEffectGradientImage.Height);
+
+    internal IReadOnlyList<SKImage> CompletionFrames => _completionFrames;
+
+    internal static CooldownSkillMaterialSkiaTextures GetForCurrentThread() =>
+        s_current ??= new CooldownSkillMaterialSkiaTextures();
+
+    private static SKImage DecodeImage(byte[] bytes, string name) =>
+        SKImage.FromEncodedData(bytes) ?? throw new InvalidOperationException($"Unable to decode cooldown texture {name}.");
 }
 
 internal sealed class HudShaderInstance : IDisposable

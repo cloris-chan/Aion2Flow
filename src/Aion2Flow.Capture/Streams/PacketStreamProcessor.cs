@@ -9,6 +9,7 @@ public sealed class PacketStreamProcessor : IDisposable
     private readonly PacketFrameParser _parser;
     private readonly CanonicalPacketMirrorDeduplicator? _mirrorDeduplicator;
     private readonly long _connectionOrdinal;
+    private long _nextCaptureSequence;
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
 
     public PacketStreamProcessor(IRuntimeObservationSink sink)
@@ -195,9 +196,10 @@ public sealed class PacketStreamProcessor : IDisposable
 
     private bool EmitPacket(ReadOnlySpan<byte> data, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
     {
+        var captureSequence = ++_nextCaptureSequence;
         var deduplicator = _mirrorDeduplicator;
         if (deduplicator is null)
-            return _parser.ParsePacketEntry(data, in connection, in timestamp);
+            return _parser.ParsePacketEntry(data, in connection, in timestamp, captureSequence);
 
         var transport = new CanonicalPacketTransportIdentity(connection, _connectionOrdinal);
         var probe = deduplicator.Probe(
@@ -207,7 +209,7 @@ public sealed class PacketStreamProcessor : IDisposable
         if (probe.IsDuplicate)
             return true;
 
-        var parsed = _parser.ParsePacketEntry(data, in connection, in timestamp);
+        var parsed = _parser.ParsePacketEntry(data, in connection, in timestamp, captureSequence);
         if (parsed)
             deduplicator.Remember(in transport, data, in probe);
         return parsed;

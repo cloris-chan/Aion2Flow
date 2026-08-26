@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
+             xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
+             xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
+             x:Class="Cloris.Aion2Flow.Views.SkillMonitorSettingsView"
+             x:DataType="vm:SkillMonitorSettingsViewModel"
+             Width="430"
+             Height="560">
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
+        <Style Selector="Expander.MonitorClassGroup">
+            <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailSurface}" />
+            <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLine}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="Padding" Value="6" />
+        </Style>
+        <Style Selector="TextBlock.MonitorSkillName">
+            <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="controls|SkillIcon.MonitorSkillOptionIcon">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Stretch" Value="UniformToFill" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Classes="SettingsCard" Padding="10">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="8">
+            <TextBlock Classes="SettingsRowLabel"
+                       Text="{markups:Translate Settings_SkillMonitor_Configure}" />
+            <Grid Grid.Row="1"
+                  ColumnDefinitions="Auto,*,Auto,Auto"
+                  ColumnSpacing="6">
+                <TextBlock Classes="SettingsRowLabel"
+                           VerticalAlignment="Center"
+                           Text="{markups:Translate Settings_SkillMonitor_BuffDisplay}" />
+                <TextBlock Grid.Column="1"
+                           Classes="OverlayCaptionText"
+                           VerticalAlignment="Center"
+                           Text="{Binding BuffSelectionSummary}" />
+                <Button Grid.Column="2"
+                        Classes="FlyoutInlineButton"
+                        Command="{Binding SelectAllBuffsCommand}"
+                        Width="64"
+                        Height="24"
+                        Margin="0"
+                        Padding="4,0"
+                        Content="{markups:Translate Settings_SkillMonitor_SelectAll}" />
+                <Button Grid.Column="3"
+                        Classes="FlyoutInlineButton"
+                        Command="{Binding ClearAllBuffsCommand}"
+                        Width="64"
+                        Height="24"
+                        Margin="0"
+                        Padding="4,0"
+                        Content="{markups:Translate Settings_SkillMonitor_ClearAll}" />
+            </Grid>
+            <Grid Grid.Row="2"
+                  ColumnDefinitions="Auto,*,Auto,Auto"
+                  ColumnSpacing="6">
+                <TextBlock Classes="SettingsRowLabel"
+                           VerticalAlignment="Center"
+                           Text="{markups:Translate Settings_SkillMonitor_CooldownDisplay}" />
+                <TextBlock Grid.Column="1"
+                           Classes="OverlayCaptionText"
+                           VerticalAlignment="Center"
+                           Text="{Binding CooldownSelectionSummary}" />
+                <Button Grid.Column="2"
+                        Classes="FlyoutInlineButton"
+                        Command="{Binding SelectAllCooldownsCommand}"
+                        Width="64"
+                        Height="24"
+                        Margin="0"
+                        Padding="4,0"
+                        Content="{markups:Translate Settings_SkillMonitor_SelectAll}" />
+                <Button Grid.Column="3"
+                        Classes="FlyoutInlineButton"
+                        Command="{Binding ClearAllCooldownsCommand}"
+                        Width="64"
+                        Height="24"
+                        Margin="0"
+                        Padding="4,0"
+                        Content="{markups:Translate Settings_SkillMonitor_ClearAll}" />
+            </Grid>
+            <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                <TextBlock Classes="SettingsRowLabel"
+                           VerticalAlignment="Center"
+                           Text="{markups:Translate Settings_SkillMonitor_Scale}" />
+                <Slider x:Name="SkillMonitorScaleSlider"
+                        Grid.Column="1"
+                        Minimum="50"
+                        Maximum="200"
+                        TickFrequency="1"
+                        Value="{Binding SkillMonitorScalePercent, Mode=OneWay}"
+                        Loaded="SkillMonitorScaleSliderLoaded"
+                        KeyUp="SkillMonitorScaleSliderKeyUp" />
+                <TextBlock Grid.Column="2"
+                           Classes="SettingsScaleValue"
+                           Text="{Binding #SkillMonitorScaleSlider.Value, StringFormat='{}{0:F0}%'}" />
+            </Grid>
+            <Grid Grid.Row="4"
+                  Margin="6,0,18,0"
+                  ColumnDefinitions="38,*,64,64"
+                  ColumnSpacing="8">
+                <TextBlock Grid.Column="2"
+                           Classes="OverlayCaptionText"
+                           HorizontalAlignment="Center"
+                           FontWeight="SemiBold"
+                           Text="{markups:Translate Settings_SkillMonitor_BuffColumn}" />
+                <TextBlock Grid.Column="3"
+                           Classes="OverlayCaptionText"
+                           HorizontalAlignment="Center"
+                           FontWeight="SemiBold"
+                           Text="{markups:Translate Settings_SkillMonitor_CooldownColumn}" />
+            </Grid>
+            <ScrollViewer Grid.Row="5"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Groups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SkillMonitorClassGroup">
+                            <Expander Classes="MonitorClassGroup"
+                                      Header="{Binding HeaderText}"
+                                      IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                                <ItemsControl ItemsSource="{Binding Skills}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SkillMonitorSkillOption">
+                                            <Grid Margin="0,2"
+                                                  ColumnDefinitions="Auto,*,64,64"
+                                                  ColumnSpacing="8">
+                                                <controls:SkillIcon Classes="MonitorSkillOptionIcon"
+                                                                    AssetName="{Binding IconAssetName}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="MonitorSkillName"
+                                                           Text="{Binding DisplayName}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <CheckBox Grid.Column="2"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          ToolTip.Tip="{markups:Translate Settings_SkillMonitor_BuffDisplay}"
+                                                          IsChecked="{Binding IsBuffSelected, Mode=TwoWay}" />
+                                                <CheckBox Grid.Column="3"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          ToolTip.Tip="{markups:Translate Settings_SkillMonitor_CooldownDisplay}"
+                                                          IsChecked="{Binding IsCooldownSelected, Mode=TwoWay}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

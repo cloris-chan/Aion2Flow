@@ -4,7 +4,13 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet2A38Observation(int EntityId, int Mode, int GroupCode, int InstanceSequenceId, uint HeadCode, ushort HeadValue, ulong HeadMiddleRaw, uint TimelineValue, uint StableValue, int EchoSourceId, int StackValue, ResourceEffectRef BuffResourceEffectRef, int TailLength, ulong TailLow64, ulong TailHigh64);
+internal readonly record struct Packet2A38Observation(int EntityId, int Mode, int GroupCode, int InstanceSequenceId, uint HeadCode, ushort HeadValue, ulong HeadMiddleRaw, uint TimelineValue, uint StableValue, int EchoSourceId, int StackValue, ResourceEffectRef BuffResourceEffectRef, int TailLength, ulong TailLow64, ulong TailHigh64)
+{
+    public long? PacketDurationMilliseconds =>
+        PacketDurationDecoder.TryDecodeMilliseconds(HeadValue, HeadMiddleRaw, out var durationMilliseconds)
+            ? durationMilliseconds
+            : null;
+}
 
 internal static class Packet2A38Parser
 {

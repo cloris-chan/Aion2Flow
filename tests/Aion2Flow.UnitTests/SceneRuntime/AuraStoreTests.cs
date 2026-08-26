@@ -45,6 +45,23 @@ public sealed class AuraStoreTests
     }
 
     [Fact]
+    public void TrackableOpen_UsesPackedPacketDuration()
+    {
+        var harness = new Harness();
+
+        var transition = harness.Open(
+            targetEntityId: 1_001,
+            originEntityId: 2_001,
+            sequenceId: 31,
+            observedAtMilliseconds: 1_200,
+            durationMilliseconds: 37_856,
+            headMiddleRaw: 4);
+
+        Assert.Equal(300_000, transition.State.DurationMilliseconds);
+        Assert.Equal(301_200, transition.State.ExpiresAtMilliseconds);
+    }
+
+    [Fact]
     public void Phase19Renewal_BackfillsOriginAndResource()
     {
         var harness = new Harness();
@@ -155,6 +172,26 @@ public sealed class AuraStoreTests
     }
 
     [Fact]
+    public void CopyActiveSnapshotTo_ReusesDestinationAndPreservesSnapshotOrder()
+    {
+        var harness = new Harness();
+        _ = harness.Open(1_002, 2_002, 32, 1_000, durationMilliseconds: ushort.MaxValue);
+        _ = harness.Open(1_001, 2_001, 31, 1_000, durationMilliseconds: 500);
+        var destination = new List<AuraInstanceState> { default };
+
+        harness.Store.CopyActiveSnapshotTo(1_499, destination);
+
+        Assert.Equal(2, destination.Count);
+        Assert.Equal(new AuraInstanceKey(1_001, 31), destination[0].Key);
+        Assert.Equal(new AuraInstanceKey(1_002, 32), destination[1].Key);
+
+        harness.Store.CopyActiveSnapshotTo(1_500, destination);
+
+        Assert.Single(destination);
+        Assert.Equal(new AuraInstanceKey(1_002, 32), destination[0].Key);
+    }
+
+    [Fact]
     public void SnapshotRestore_PreservesStateAndRevision()
     {
         var harness = new Harness();
@@ -207,7 +244,8 @@ public sealed class AuraStoreTests
             int openMode = 1,
             int groupCode = 19,
             int stackCount = 1,
-            uint resourceEffectRefRaw = 0)
+            uint resourceEffectRefRaw = 0,
+            ulong headMiddleRaw = 0)
         {
             var stamp = CreateNextStamp(observedAtMilliseconds);
             var observation = new AuraObservation
@@ -219,6 +257,7 @@ public sealed class AuraStoreTests
                 OpenMode = openMode,
                 GroupCode = groupCode,
                 HeadValue = durationMilliseconds,
+                HeadMiddleRaw = headMiddleRaw,
                 StackCount = stackCount,
                 BuffResourceEffectRef = ResourceEffectRef.FromRaw(resourceEffectRefRaw)
             };

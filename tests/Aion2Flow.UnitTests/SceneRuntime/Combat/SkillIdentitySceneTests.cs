@@ -292,6 +292,31 @@ public sealed class SkillIdentitySceneTests
     }
 
     [Fact]
+    public void Compact0238_Cooldown_Is_Journaled_When_Extended_Observations_Are_Disabled()
+    {
+        var journal = new ObservedEventJournal();
+        var sessionId = Guid.NewGuid();
+        var sink = new JournalingRuntimeObservationSink(
+            journal,
+            new SceneRuntimeClock(0),
+            () => sessionId,
+            null,
+            new RejectingCollectionPolicy(),
+            new MapRuntimeObservationContext());
+        var source = new PacketObservationSource(1_000, 1, 0x0238, 32, 0, default);
+
+        sink.RegisterCompactControl0238(in source, 100, 0, 17_410_020, 3, 0, 100, cooldownMilliseconds: 4_800);
+
+        Assert.Equal(1, journal.Count);
+        var entry = journal.ReadSnapshot(0);
+        Assert.False(entry.Combat.HasValue);
+        Assert.True(entry.State.HasValue);
+        Assert.Equal(StateCodes.CooldownStart0238, entry.State.Value.StateCode);
+        Assert.Equal(17_410_020, entry.State.Value.Value0);
+        Assert.Equal(4_800, entry.State.Value.Value1);
+    }
+
+    [Fact]
     public void Compact0638_Body_Code_Is_Stored_As_ResourceEffectRef_Not_Skill_Code()
     {
         var journal = new ObservedEventJournal();
@@ -340,5 +365,22 @@ public sealed class SkillIdentitySceneTests
             AttemptCount = 1
         };
         scene.AppendCombatWireObservation(sourceId, targetId, in observation, timestamp);
+    }
+
+    private sealed class RejectingCollectionPolicy : ILiveSceneCollectionPolicy
+    {
+        public void StartMapContext(in PacketObservationSource packet, uint mapId)
+        {
+        }
+
+        public bool ShouldAppendCombat(in PacketObservationSource packet, int sourceId, int targetId, IRuntimeObservationSink sink) => false;
+
+        public bool ShouldAppendExtendedObservation() => false;
+
+        public bool ShouldAppendEntityVitalObservation() => false;
+
+        public void OnBossMetadataChanged()
+        {
+        }
     }
 }

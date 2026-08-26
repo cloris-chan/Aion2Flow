@@ -66,6 +66,43 @@ public sealed class GameResourceService : IDisposable
         }
     }
 
+    public int ResolveBaseSkillIdForCode(int skillCode)
+    {
+        lock (_lock)
+        {
+            return ResolveBaseSkillIdForCode(_catalog, skillCode);
+        }
+    }
+
+    public int ResolveMaxAvailableCount(int skillCode)
+    {
+        if (skillCode <= 0)
+        {
+            return 0;
+        }
+
+        lock (_lock)
+        {
+            var catalog = _catalog;
+            if (TryResolveMaxAvailableCount(catalog, skillCode, out var maxAvailableCount))
+            {
+                return maxAvailableCount;
+            }
+
+            if (TryResolveSkillIdByEffectRef(catalog, unchecked((uint)skillCode), out var ownerSkillId) &&
+                TryResolveMaxAvailableCount(catalog, ownerSkillId, out maxAvailableCount))
+            {
+                return maxAvailableCount;
+            }
+
+            var baseSkillId = ResolveBaseSkillIdForCode(catalog, skillCode);
+            return baseSkillId != skillCode &&
+                   TryResolveMaxAvailableCount(catalog, baseSkillId, out maxAvailableCount)
+                ? maxAvailableCount
+                : 0;
+        }
+    }
+
     public string? ResolveSkillIconAssetName(int skillCode)
     {
         var assetName = SkillIconCatalog.ResolveAssetName(skillCode);
@@ -138,6 +175,18 @@ public sealed class GameResourceService : IDisposable
         return snapshot.SkillBaseProjections.TryGetValue(skillCode, out var projection) && projection.BaseSkillId > 0
             ? projection.BaseSkillId
             : skillCode;
+    }
+
+    private static bool TryResolveMaxAvailableCount(ResourceCatalogSnapshot snapshot, int skillCode, out int maxAvailableCount)
+    {
+        if (snapshot.SkillDefinitions.TryGetValue(skillCode, out var definition) && definition.MaxAvailableCount > 1)
+        {
+            maxAvailableCount = definition.MaxAvailableCount;
+            return true;
+        }
+
+        maxAvailableCount = 0;
+        return false;
     }
 
     private static bool TryResolveSkillIdByEffectRef(ResourceCatalogSnapshot snapshot, uint rawId, out int skillId)

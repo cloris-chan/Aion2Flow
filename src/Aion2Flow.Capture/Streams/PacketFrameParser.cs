@@ -45,7 +45,11 @@ internal sealed class PacketFrameParser : IDisposable
         }
     }
 
-    public bool ParsePacketEntry(ReadOnlySpan<byte> packet, in TcpConnection connection, in PacketProcessingTimestamp timestamp)
+    public bool ParsePacketEntry(
+        ReadOnlySpan<byte> packet,
+        in TcpConnection connection,
+        in PacketProcessingTimestamp timestamp,
+        long captureSequence)
     {
         var context = new PacketParseContext(
             _sink,
@@ -54,7 +58,8 @@ internal sealed class PacketFrameParser : IDisposable
             _playerGroupState,
             _protocolRoundTripObserver,
             connection,
-            in timestamp);
+            in timestamp,
+            captureSequence);
         var previous = context.EnterStructure(PacketStructureKind.TransportPacket, 0, packet.Length, 0, packet.Length, 0);
         try
         {

@@ -173,6 +173,41 @@ public sealed class LocalizationServicesTests
         }
     }
 
+    [Fact]
+    public void GameResourceService_Resolves_RowBase_For_SameFamily_Skill()
+    {
+        var languageService = new LanguageService();
+        languageService.SetLanguage(LanguageService.TraditionalChinese);
+        using var resources = new GameResourceService(languageService);
+
+        Assert.Equal(13_160_000, resources.ResolveBaseSkillIdForCode(13_160_007));
+        Assert.Equal(13_160_000, resources.ResolveBaseSkillIdForCode(13_160_000));
+    }
+
+    [Theory]
+    [InlineData(12130030, "捕獲")]
+    [InlineData(12780001, "激昂")]
+    [InlineData(2210103, "疾走咒文書")]
+    [InlineData(11190000, "跳躍鑿擊")]
+    [InlineData(13130000, "紋樣爆炸")]
+    [InlineData(13050000, "閃光斬")]
+    public void GameResourceService_Resolves_Runtime_Aura_And_Cooldown_RowBase_Ids(int resourceId, string expectedName)
+    {
+        try
+        {
+            var languageService = new LanguageService();
+            languageService.SetLanguage(LanguageService.English);
+            languageService.SetLanguage(LanguageService.TraditionalChinese);
+            using var resources = new GameResourceService(languageService);
+
+            Assert.Equal(expectedName, resources.ResolveSkillName(resourceId));
+        }
+        finally
+        {
+            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
+        }
+    }
+
     [Theory]
     [InlineData(1607415, "攻擊", "ICON_TE_SKILL_001.webp")]
     [InlineData(1607400, "攻擊", "ICON_TE_SKILL_001.webp")]

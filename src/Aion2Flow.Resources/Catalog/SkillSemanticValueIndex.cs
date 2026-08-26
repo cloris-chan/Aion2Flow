@@ -22,12 +22,12 @@ internal sealed class SkillSemanticValueIndex
     private static readonly FrozenSet<string> KnownNonQuantifiedAbnormalEffectTypes = new[]
     {
         "AbnormalClear", "ActivateSkill", "AddAbnormalByCondition", "AdjustMaxAddDamage", "AdjustMaxSkillRate", "AdjustMinAddDamage",
-        "AdjustMinSkillRate", "AdjustSecondaryStatMaxValue", "AdjustSecondaryStatMinValue", "Aerial", "BattlePass", "BeamPierce", "Bind",
+        "AdjustMinSkillRate", "AdjustSecondaryStatMaxValue", "AdjustSecondaryStatMinValue", "Aerial", "ArenaActiveParticipation", "BattlePass", "BeamPierce", "Bind",
         "Bleed", "Blind", "BlockActive", "Blockade", "BlockAniHit", "BlockComposite", "BlockFlight", "BlockGlide", "BlockInteract", "BlockInteractGather",
         "BlockItemCasting", "BlockItemEquipItem", "BlockJump", "BlockLooting", "BlockMoveControl", "BlockMovePosition", "BlockRaidEnter",
         "BlockRotate", "BlockSelfRebirth", "BlockSkill", "BlockSpringboard", "BlockSprint", "BlockTargeting", "BlockTargetSkill",
         "CastingCancel", "CastSkill", "CastSkillByCaster", "CastSkillToCaster", "ChangeJumpZvelocity", "ChangeRelationshipEntity",
-        "CloneSkillEffect", "CondDefenceEvade", "CondDefenceMiss", "CondDefenceShieldBlock", "CondDefenceWeaponBlock", "ConvertDamageToMP",
+        "CloneSkillEffect", "CondDefenceBlock", "CondDefenceEvade", "CondDefenceMiss", "CondDefenceShieldBlock", "CondDefenceWeaponBlock", "ConvertDamageToMP",
         "DamageMultiply", "DamageTransfer", "DecreaseCastingTime", "DecreaseCooltimeByContribute", "DecreaseCooltimeByKill", "DeletableFear",
         "Dpot", "Dpot_Item", "Dpot_Ratio", "DpotRatio_Item", "EndCastSkill", "EndCastSkillByCaster", "EndCastSkillToCaster", "EndMotion",
         "EquipItemStatAmplify_Accessory", "EquipItemStatAmplify_Weapon", "ExposeMinimapAsGenocider", "Fear", "FixSkillLevel",

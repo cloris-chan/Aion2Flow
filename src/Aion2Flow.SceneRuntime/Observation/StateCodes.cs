@@ -8,4 +8,7 @@ public static class StateCodes
     public const int NpcBattle = -101;
     public const int NpcBattleToggle = -102;
     public const int PlayerGroupMembership = -103;
+    public const int Cooldown4738 = -104;
+    public const int CooldownStart0238 = -105;
+    public const int CooldownCharge2238 = -106;
 }

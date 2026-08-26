@@ -53,6 +53,9 @@
                 <MenuItem x:Name="PlayerNameSettingsMenuItem"
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="PlayerNameSettingsMenuItemLoaded" />
+                <MenuItem x:Name="SkillMonitorMenuItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
+                          Loaded="SkillMonitorMenuItemLoaded" />
                 <MenuItem x:Name="LanguageMenuItem"
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="LanguageMenuItemLoaded" />

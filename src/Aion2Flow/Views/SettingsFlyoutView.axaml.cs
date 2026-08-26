@@ -1,15 +1,18 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
+using CommunityToolkit.Mvvm.DependencyInjection;
 
 namespace Cloris.Aion2Flow.Views;
 
@@ -34,9 +37,14 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _showPlayerShortServerNameMenuItem;
     private MenuItem? _showPlayerLegionNameMenuItem;
     private MenuItem? _tintPlayerNamesByFactionMenuItem;
+    private MenuItem? _skillMonitorMenuItem;
+    private MenuItem? _skillMonitorEnableMenuItem;
+    private MenuItem? _skillMonitorSettingsMenuItem;
     private MenuItem? _languageMenuItem;
     private SettingsFlyoutViewModel? _viewModel;
     private Services.LocalizationService? _localization;
+    private Flyout? _skillMonitorSettingsFlyout;
+    private SkillMonitorSettingsViewModel? _skillMonitorSettingsViewModel;
 
     public SettingsFlyoutView()
     {
@@ -99,6 +107,7 @@ public partial class SettingsFlyoutView : UserControl
         RefreshFocusStatusBarMenuItem();
         RefreshHideHeaderWhenClickThroughMenuItem();
         RebuildPlayerNameSettingsMenuItems();
+        RebuildSkillMonitorMenuItems();
         RebuildLanguageMenuItems();
     }
 
@@ -115,6 +124,7 @@ public partial class SettingsFlyoutView : UserControl
         RefreshFocusStatusBarMenuItem();
         RefreshHideHeaderWhenClickThroughMenuItem();
         RebuildPlayerNameSettingsMenuItems();
+        RebuildSkillMonitorMenuItems();
         RebuildLanguageMenuItems();
     }
 
@@ -186,6 +196,10 @@ public partial class SettingsFlyoutView : UserControl
             case nameof(SettingsFlyoutViewModel.PlayerNameSettingsDisplay):
                 RefreshPlayerNameSettingsMenuItems();
                 break;
+            case nameof(SettingsFlyoutViewModel.SkillMonitorEnabled):
+            case nameof(SettingsFlyoutViewModel.SkillMonitorEnabledDisplay):
+                RefreshSkillMonitorMenuItems();
+                break;
             case nameof(SettingsFlyoutViewModel.SelectedLanguage):
             case nameof(SettingsFlyoutViewModel.LanguageDisplay):
                 RefreshLanguageHeader();
@@ -207,6 +221,7 @@ public partial class SettingsFlyoutView : UserControl
         RefreshFocusStatusBarMenuItem();
         RefreshHideHeaderWhenClickThroughMenuItem();
         RebuildPlayerNameSettingsMenuItems();
+        RebuildSkillMonitorMenuItems();
     }
 
     private void TopmostMenuItemLoaded(object? sender, RoutedEventArgs e)
@@ -287,6 +302,15 @@ public partial class SettingsFlyoutView : UserControl
         {
             _playerNameSettingsMenuItem = mi;
             RebuildPlayerNameSettingsMenuItems();
+        }
+    }
+
+    private void SkillMonitorMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && _skillMonitorMenuItem != mi)
+        {
+            _skillMonitorMenuItem = mi;
+            RebuildSkillMonitorMenuItems();
         }
     }
 
@@ -522,6 +546,84 @@ public partial class SettingsFlyoutView : UserControl
         _playerNameSettingsMenuItem.Items.Add(_showPlayerLegionNameMenuItem);
         _playerNameSettingsMenuItem.Items.Add(_tintPlayerNamesByFactionMenuItem);
         RefreshPlayerNameSettingsMenuItems();
+    }
+
+    private void RebuildSkillMonitorMenuItems()
+    {
+        RefreshSkillMonitorHeader();
+        var vm = ViewModel;
+        if (_skillMonitorMenuItem is null || vm is null)
+            return;
+
+        _skillMonitorMenuItem.Items.Clear();
+        _skillMonitorEnableMenuItem = CreateToggleMenuItem(
+            vm.Localization["Settings_SkillMonitor_Enable"],
+            vm.SkillMonitorEnabledDisplay,
+            vm.SkillMonitorEnabled,
+            SkillMonitorEnableMenuItemClicked);
+        _skillMonitorSettingsMenuItem = new MenuItem
+        {
+            Header = vm.Localization["Settings_SkillMonitor_Configure"],
+            StaysOpenOnClick = true
+        };
+        _skillMonitorSettingsMenuItem.Classes.Add("FlyoutMenuItem");
+        _skillMonitorSettingsMenuItem.Classes.Add("FlyoutPanelRow");
+        _skillMonitorSettingsMenuItem.Classes.Add("SettingsRowItem");
+        _skillMonitorSettingsMenuItem.Click += SkillMonitorSettingsMenuItemClicked;
+        _skillMonitorMenuItem.Items.Add(_skillMonitorEnableMenuItem);
+        _skillMonitorMenuItem.Items.Add(_skillMonitorSettingsMenuItem);
+    }
+
+    private void RefreshSkillMonitorMenuItems()
+    {
+        RefreshSkillMonitorHeader();
+        var vm = ViewModel;
+        if (vm is null)
+            return;
+
+        RefreshToggleMenuItem(
+            _skillMonitorEnableMenuItem,
+            vm.Localization["Settings_SkillMonitor_Enable"],
+            vm.SkillMonitorEnabledDisplay,
+            vm.SkillMonitorEnabled);
+        if (_skillMonitorSettingsMenuItem is not null)
+            _skillMonitorSettingsMenuItem.Header = vm.Localization["Settings_SkillMonitor_Configure"];
+    }
+
+    private void RefreshSkillMonitorHeader()
+    {
+        var vm = ViewModel;
+        if (_skillMonitorMenuItem is null || vm is null)
+            return;
+
+        _skillMonitorMenuItem.Header = CreateRowHeader(
+            vm.Localization["Settings_SkillMonitor"],
+            vm.SkillMonitorEnabledDisplay);
+    }
+
+    private void SkillMonitorEnableMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+            vm.SkillMonitorEnabled = !vm.SkillMonitorEnabled;
+        e.Handled = true;
+    }
+
+    private void SkillMonitorSettingsMenuItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+            return;
+
+        _skillMonitorSettingsViewModel ??= new SkillMonitorSettingsViewModel(
+            Ioc.Default.GetRequiredService<GameResourceService>(),
+            Ioc.Default.GetRequiredService<SettingsService>(),
+            Ioc.Default.GetRequiredService<Services.LocalizationService>());
+        _skillMonitorSettingsFlyout ??= new Flyout
+        {
+            Placement = PlacementMode.RightEdgeAlignedTop,
+            Content = new SkillMonitorSettingsView { DataContext = _skillMonitorSettingsViewModel }
+        };
+        _skillMonitorSettingsFlyout.ShowAt(menuItem);
+        e.Handled = true;
     }
 
     private void RefreshPlayerNameSettingsMenuItems()

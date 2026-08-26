@@ -46,9 +46,13 @@ public interface IRuntimeObservationSink
 
     void RegisterCompactValue0438(in PacketObservationSource packet, int targetId, int sourceId, int bodySkillVariantRaw, int marker, int layoutTag, int type, int value);
 
-    void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId);
+    void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId, int? availableCountAfterControl = null, int? cooldownMilliseconds = null);
 
     void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag);
+
+    void RegisterCooldownCharge2238(in PacketObservationSource packet, byte state, int packetSkillCode, int availableCount, int nextChargeRemainingMilliseconds);
+
+    void RegisterCooldown4738(in PacketObservationSource packet, int rowBaseSkillId, int remainingMilliseconds);
 
     void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64);
 

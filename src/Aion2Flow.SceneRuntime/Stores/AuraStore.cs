@@ -21,7 +21,7 @@ public readonly record struct AuraInstanceState(
     int StackCount,
     int OpenMode,
     int GroupCode,
-    ushort DurationMilliseconds,
+    long DurationMilliseconds,
     ResourceEffectRef ResourceEffectRef,
     AuraSemanticValue Semantics,
     long OpenedAtMilliseconds,
@@ -163,6 +163,19 @@ public sealed class AuraStore
         return result;
     }
 
+    public void CopyActiveSnapshotTo(long observedAtMilliseconds, List<AuraInstanceState> destination)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        destination.Clear();
+        foreach (var state in _instances.Values)
+        {
+            if (state.IsActiveAt(observedAtMilliseconds))
+                destination.Add(state);
+        }
+
+        destination.Sort(Compare);
+    }
+
     internal AuraStoreSnapshot CreateSnapshot()
     {
         var instances = _instances.Count == 0 ? [] : _instances.Values.ToArray();
@@ -198,6 +211,7 @@ public sealed class AuraStore
             return new AuraLifecycleTransition(AuraLifecycleEventKind.None, previous, default, RemovedByReplacement: true);
         }
 
+        var durationMilliseconds = observation.PacketDurationMilliseconds ?? ushort.MaxValue;
         var state = new AuraInstanceState(
             observation.EntityId,
             observation.EchoSourceEntityId,
@@ -205,12 +219,12 @@ public sealed class AuraStore
             observation.StackCount,
             observation.OpenMode,
             observation.GroupCode,
-            observation.HeadValue,
+            durationMilliseconds,
             observation.BuffResourceEffectRef,
             AuraSemanticEvidenceResolver.Evaluate(observation.BuffResourceEffectRef),
             observedAtMilliseconds,
             observedAtMilliseconds,
-            ResolveExpiration(observedAtMilliseconds, observation.HeadValue),
+            ResolveExpiration(observedAtMilliseconds, durationMilliseconds),
             observationOrdinal,
             observationOrdinal);
         _instances.Add(key, state);
@@ -223,7 +237,7 @@ public sealed class AuraStore
             ? previous.Semantics
             : AuraSemanticEvidenceResolver.Evaluate(resourceEffectRef);
 
-    private static long? ResolveExpiration(long observedAtMilliseconds, ushort durationMilliseconds)
+    private static long? ResolveExpiration(long observedAtMilliseconds, long durationMilliseconds)
     {
         if (durationMilliseconds == ushort.MaxValue)
             return null;
@@ -233,12 +247,13 @@ public sealed class AuraStore
             : observedAtMilliseconds + durationMilliseconds;
     }
 
-    private static void Sort(AuraInstanceState[] states) =>
-        Array.Sort(states, static (left, right) =>
-        {
-            var comparison = left.TargetEntityId.CompareTo(right.TargetEntityId);
-            return comparison != 0 ? comparison : left.InstanceSequenceId.CompareTo(right.InstanceSequenceId);
-        });
+    private static void Sort(AuraInstanceState[] states) => Array.Sort(states, Compare);
+
+    private static int Compare(AuraInstanceState left, AuraInstanceState right)
+    {
+        var comparison = left.TargetEntityId.CompareTo(right.TargetEntityId);
+        return comparison != 0 ? comparison : left.InstanceSequenceId.CompareTo(right.InstanceSequenceId);
+    }
 }
 
 internal sealed record AuraStoreSnapshot(AuraInstanceState[] Instances, long Revision);

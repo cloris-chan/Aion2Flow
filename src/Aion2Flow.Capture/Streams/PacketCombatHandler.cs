@@ -142,7 +142,16 @@ internal static class PacketCombatHandler
             return false;
         }
 
-        context.Sink.RegisterCompactControl0238(context.CreateObservationSource(0x0238, packet.Length), parsed.SourceId, parsed.Mode, parsed.BodyCodeRaw, parsed.Marker, parsed.Flag, parsed.EchoSourceId);
+        context.Sink.RegisterCompactControl0238(
+            context.CreateObservationSource(0x0238, packet.Length),
+            parsed.SourceId,
+            parsed.Mode,
+            parsed.BodyCodeRaw,
+            parsed.Marker,
+            parsed.Flag,
+            parsed.EchoSourceId,
+            parsed.AvailableCountAfterControl,
+            parsed.CooldownMilliseconds);
         return context.MarkParsed();
     }
 

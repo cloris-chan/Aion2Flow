@@ -111,6 +111,14 @@ internal static class NativeOverlayWindowStyles
         return true;
     }
 
+    public static bool IsCurrentProcessForeground()
+    {
+        var foreground = PInvoke.GetForegroundWindow();
+        return foreground != HWND.Null &&
+               PInvoke.GetWindowThreadProcessId(foreground, out var processId) != 0 &&
+               processId == (uint)Environment.ProcessId;
+    }
+
     public static bool SetScreenBounds(Window window, PixelRect bounds)
     {
         if (bounds.Width <= 0 || bounds.Height <= 0)

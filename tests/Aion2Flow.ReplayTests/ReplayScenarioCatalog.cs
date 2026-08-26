@@ -46,4 +46,6 @@ public static class ReplayScenarioCatalog
         "aion2flow.stream.20260812141205.log",
         "aion2flow.stream.20260812141250.log"
     ];
+
+    public const string CurrentChargeCooldown = "aion2flow.stream.20260809050345.log";
 }

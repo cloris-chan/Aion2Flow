@@ -120,14 +120,24 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RegisterCompactValue0438(in packet, targetId, sourceId, bodySkillVariantRaw, marker, layoutTag, type, value);
     }
 
-    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId)
+    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId, int? availableCountAfterControl = null, int? cooldownMilliseconds = null)
     {
-        lock (gate) inner.RegisterCompactControl0238(in packet, sourceId, mode, bodyCodeRaw, marker, flag, echoSourceId);
+        lock (gate) inner.RegisterCompactControl0238(in packet, sourceId, mode, bodyCodeRaw, marker, flag, echoSourceId, availableCountAfterControl, cooldownMilliseconds);
     }
 
     public void RegisterCompactControl0638(in PacketObservationSource packet, int sourceId, ResourceEffectRef bodyResourceEffectRef, int marker, int flag)
     {
         lock (gate) inner.RegisterCompactControl0638(in packet, sourceId, bodyResourceEffectRef, marker, flag);
+    }
+
+    public void RegisterCooldownCharge2238(in PacketObservationSource packet, byte state, int packetSkillCode, int availableCount, int nextChargeRemainingMilliseconds)
+    {
+        lock (gate) inner.RegisterCooldownCharge2238(in packet, state, packetSkillCode, availableCount, nextChargeRemainingMilliseconds);
+    }
+
+    public void RegisterCooldown4738(in PacketObservationSource packet, int rowBaseSkillId, int remainingMilliseconds)
+    {
+        lock (gate) inner.RegisterCooldown4738(in packet, rowBaseSkillId, remainingMilliseconds);
     }
 
     public void RegisterObservation2A38(in PacketObservationSource packet, int entityId, int mode, int groupCode, int instanceSequenceId, uint headCode, ushort headValue, ulong headMiddleRaw, uint timelineValue, uint stableValue, int echoSourceId, int stackValue, ResourceEffectRef buffResourceEffectRef, int tailLength, ulong tailLow64, ulong tailHigh64)

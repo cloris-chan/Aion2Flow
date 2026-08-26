@@ -61,6 +61,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             ShowPlayerShortServerName = persisted.ShowPlayerShortServerName;
             ShowPlayerLegionName = persisted.ShowPlayerLegionName;
             TintPlayerNamesByFaction = persisted.TintPlayerNamesByFaction;
+            SkillMonitorEnabled = persisted.SkillMonitorEnabled;
             UiScalePercent = persisted.UiScalePercent;
             BattleResetHotkey = CreateHotkey(persisted.BattleResetHotkeyModifiers, persisted.BattleResetHotkeyVirtualKey);
             OverlayInteractionHotkey = CreateHotkey(persisted.OverlayInteractionHotkeyModifiers, persisted.OverlayInteractionHotkeyVirtualKey);
@@ -189,6 +190,10 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public partial bool TintPlayerNamesByFaction { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SkillMonitorEnabledDisplay))]
+    public partial bool SkillMonitorEnabled { get; set; } = true;
+
+    [ObservableProperty]
     public partial int UiScalePercent { get; set; }
 
     [ObservableProperty]
@@ -295,6 +300,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public string TintPlayerNamesByFactionDisplay => Localization[TintPlayerNamesByFaction ? "Settings_PlayerFactionTint_On" : "Settings_PlayerFactionTint_Off"];
 
+    public string SkillMonitorEnabledDisplay => Localization[SkillMonitorEnabled ? "Settings_SkillMonitor_On" : "Settings_SkillMonitor_Off"];
+
     public string PlayerNameSettingsDisplay => ShowPlayerNamesDisplay;
 
     public string LanguageDisplay => SelectedLanguage?.DisplayName ?? string.Empty;
@@ -399,6 +406,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         _playerNameDisplay.TintPlayerNamesByFaction = value;
         PersistSettings();
     }
+
+    partial void OnSkillMonitorEnabledChanged(bool value) => PersistSettings();
 
     partial void OnUiScalePercentChanged(int value)
     {
@@ -580,6 +589,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             s.ShowPlayerShortServerName = ShowPlayerShortServerName;
             s.ShowPlayerLegionName = ShowPlayerLegionName;
             s.TintPlayerNamesByFaction = TintPlayerNamesByFaction;
+            s.SkillMonitorEnabled = SkillMonitorEnabled;
             s.UiScalePercent = UiScalePercent;
             s.Language = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
             s.BattleResetHotkeyModifiers = BattleResetHotkey is null ? null : (uint)BattleResetHotkey.Modifiers;
@@ -615,6 +625,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowPlayerShortServerNameDisplay));
         OnPropertyChanged(nameof(ShowPlayerLegionNameDisplay));
         OnPropertyChanged(nameof(TintPlayerNamesByFactionDisplay));
+        OnPropertyChanged(nameof(SkillMonitorEnabledDisplay));
         OnPropertyChanged(nameof(PlayerNameSettingsDisplay));
         OnPropertyChanged(nameof(LanguageDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));

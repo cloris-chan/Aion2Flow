@@ -58,7 +58,7 @@ internal static class ScenePlaybackTrackProjection
         long? maxHp = null;
         var resultCode = 0;
         var instanceSequenceId = 0;
-        var durationMilliseconds = 0;
+        var durationMilliseconds = 0L;
         var displayResourceEffectRef = default(ResourceEffectRef);
         var auraSemantics = default(AuraSemanticValue);
         var sourceEntityId = entry.SourceEntityId;

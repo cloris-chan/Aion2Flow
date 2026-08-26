@@ -142,7 +142,8 @@ internal static partial class ResourcePackReader
             result.Add(new SkillDefinition(
                 ReadInt32(ref cursor),
                 (SkillCategory)ReadByte(ref cursor),
-                (SkillSourceType)ReadByte(ref cursor)));
+                (SkillSourceType)ReadByte(ref cursor),
+                ReadInt32(ref cursor)));
         }
 
         RequireFullyRead(cursor);

@@ -165,6 +165,31 @@ public class DomainEventApplierTests
     }
 
     [Fact]
+    public void Applier_CooldownObservations_DoNotPopulateEntityStore()
+    {
+        var journal = new ObservedEventJournal();
+        var sceneId = Guid.NewGuid();
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 0 },
+            0,
+            0,
+            new StateObservation { EntityId = 0, StateCode = StateCodes.Cooldown4738, Value0 = 17_410_000, Value1 = 2_400 });
+        journal.AppendState(
+            sceneId,
+            new TimelineStamp { ObservationOrdinal = 1 },
+            100,
+            0,
+            new StateObservation { EntityId = 100, StateCode = StateCodes.CooldownStart0238, Value0 = 17_410_020, Value1 = 4_800 });
+        var entities = new EntityStore();
+        var applier = new DomainEventApplier(entities, new SceneBoundaryStore(), new CombatStore());
+
+        applier.ApplyJournal(journal);
+
+        Assert.Equal(0, entities.Count);
+    }
+
+    [Fact]
     public void Applier_EntityVitalObservation_UpdatesNpcHp()
     {
         var journal = new ObservedEventJournal();

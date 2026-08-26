@@ -9,13 +9,15 @@ internal ref struct PacketParseContext(
     PacketPlayerGroupState playerGroupState,
     Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
     in TcpConnection connection,
-    in PacketProcessingTimestamp timestamp)
+    in PacketProcessingTimestamp timestamp,
+    long captureSequence)
 {
     public readonly IRuntimeObservationSink Sink = sink;
     public readonly SceneObservationWriter Writer = writer;
     public readonly TcpConnection Connection = connection;
     public readonly long TimestampMilliseconds = timestamp.TimelineUnixMilliseconds;
     public readonly long ArrivalTimestamp = timestamp.ArrivalTimestamp;
+    public readonly long CaptureSequence = captureSequence;
     public bool Parsed;
     public PacketStructurePath CurrentStructurePath { get; private set; }
     public readonly PacketStructureReference CurrentStructure => CurrentStructurePath.Leaf;
@@ -29,7 +31,7 @@ internal ref struct PacketParseContext(
     public readonly long FlushId => flushState.CurrentFlushId;
 
     public readonly PacketObservationSource CreateObservationSource(ushort opcode, int payloadLength, long captureSequence = 0)
-        => new(TimestampMilliseconds, FlushId, opcode, payloadLength, captureSequence, CurrentStructurePath);
+        => new(TimestampMilliseconds, FlushId, opcode, payloadLength, captureSequence > 0 ? captureSequence : CaptureSequence, CurrentStructurePath);
 
     public readonly void ObserveProtocolRoundTrip(long clientSentUnixMilliseconds, long serverUnixMilliseconds)
         => protocolRoundTripObserver?.Invoke(new ProtocolRoundTripObservation(

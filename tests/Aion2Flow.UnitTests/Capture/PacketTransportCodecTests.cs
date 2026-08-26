@@ -36,5 +36,6 @@ public sealed class PacketTransportCodecTests
     public void GameplayOpcodeRegistryIncludesMap2F92()
     {
         Assert.True(PacketTransportCodec.IsKnownGameplayOpcode(0x2f, 0x92));
+        Assert.True(PacketTransportCodec.IsKnownGameplayOpcode(0x22, 0x38));
     }
 }

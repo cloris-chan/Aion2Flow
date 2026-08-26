@@ -47,6 +47,22 @@ public sealed class AppSettings
 
     public bool TintPlayerNamesByFaction { get; set; } = true;
 
+    public bool SkillMonitorEnabled { get; set; } = true;
+
+    public bool SkillMonitorBuffSelectAll { get; set; } = true;
+
+    public List<int> SkillMonitorBuffSkillIds { get; set => field = value ?? []; } = [];
+
+    public bool SkillMonitorCooldownSelectAll { get; set; } = true;
+
+    public List<int> SkillMonitorCooldownSkillIds { get; set => field = value ?? []; } = [];
+
+    public int SkillMonitorScalePercent { get; set => field = Math.Clamp(value, 50, 200); } = 100;
+
+    public Point? SkillMonitorPosition { get; set; }
+
+    public int SkillMonitorWidth { get; set => field = Math.Clamp(value, 100, 4_096); } = 680;
+
     public int UiScalePercent { get; set => field = Math.Clamp(value, 50, 200); } = 100;
 
     public string? Language { get; set; }

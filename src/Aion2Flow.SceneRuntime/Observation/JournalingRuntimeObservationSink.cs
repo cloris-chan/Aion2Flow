@@ -337,28 +337,48 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
             });
     }
 
-    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId)
+    public void RegisterCompactControl0238(in PacketObservationSource packet, int sourceId, int mode, uint bodyCodeRaw, int marker, int flag, int echoSourceId, int? availableCountAfterControl = null, int? cooldownMilliseconds = null)
     {
-        if (collectionPolicy is not null && !collectionPolicy.ShouldAppendExtendedObservation())
+        var shouldAppendExtendedObservation = collectionPolicy is null || collectionPolicy.ShouldAppendExtendedObservation();
+        if (!shouldAppendExtendedObservation && cooldownMilliseconds is not > 0)
             return;
+
         sourceId = ResolveLifecycleId(sourceId);
-        var stamp = CreateStamp(in packet);
+        if (shouldAppendExtendedObservation)
+        {
+            var stamp = CreateStamp(in packet);
+            journal.Append(
+                CreateHeader(in stamp, sourceId, 0, packet.Raw),
+                new CombatWireObservation
+                {
+                    SkillCode = 0,
+                    BodySkillVariantRaw = 0,
+                    BodyCodeRaw = bodyCodeRaw,
+                    Damage = 0,
+                    HitCount = 0,
+                    AttemptCount = 0,
+                    DetailRaw = marker,
+                    Marker = marker,
+                    Flag = flag,
+                    ChainId = echoSourceId,
+                    Type = mode,
+                    LayoutTag = 0
+                });
+        }
+
+        if (cooldownMilliseconds is not > 0)
+            return;
+
+        var cooldownStamp = CreateStamp(in packet);
         journal.Append(
-            CreateHeader(in stamp, sourceId, 0, packet.Raw),
-            new CombatWireObservation
+            CreateHeader(in cooldownStamp, sourceId, 0, packet.Raw),
+            new StateObservation
             {
-                SkillCode = 0,
-                BodySkillVariantRaw = 0,
-                BodyCodeRaw = bodyCodeRaw,
-                Damage = 0,
-                HitCount = 0,
-                AttemptCount = 0,
-                DetailRaw = marker,
-                Marker = marker,
-                Flag = flag,
-                ChainId = echoSourceId,
-                Type = mode,
-                LayoutTag = 0
+                EntityId = sourceId,
+                StateCode = StateCodes.CooldownStart0238,
+                Value0 = bodyCodeRaw,
+                Value1 = cooldownMilliseconds.Value,
+                DetailRaw = CooldownStartObservationDetail.Encode(mode, availableCountAfterControl)
             });
     }
 
@@ -383,6 +403,46 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 Flag = flag,
                 Type = 0,
                 LayoutTag = 0
+        });
+    }
+
+    public void RegisterCooldownCharge2238(in PacketObservationSource packet, byte state, int packetSkillCode, int availableCount, int nextChargeRemainingMilliseconds)
+    {
+        if (state is not 1 and not 3 || packetSkillCode <= 0 || availableCount < 0 ||
+            state == 1 && nextChargeRemainingMilliseconds != 0 ||
+            state == 3 && nextChargeRemainingMilliseconds <= 0)
+        {
+            return;
+        }
+
+        var stamp = CreateStamp(in packet);
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new StateObservation
+            {
+                EntityId = 0,
+                StateCode = StateCodes.CooldownCharge2238,
+                Value0 = packetSkillCode,
+                Value1 = nextChargeRemainingMilliseconds,
+                DetailRaw = CooldownChargeObservationDetail.Encode(state, availableCount)
+            });
+    }
+
+    public void RegisterCooldown4738(in PacketObservationSource packet, int rowBaseSkillId, int remainingMilliseconds)
+    {
+        if (rowBaseSkillId <= 0 || remainingMilliseconds < 0)
+            return;
+
+        var stamp = CreateStamp(in packet);
+        journal.Append(
+            CreateHeader(in stamp, 0, 0, packet.Raw),
+            new StateObservation
+            {
+                EntityId = 0,
+                StateCode = StateCodes.Cooldown4738,
+                Value0 = rowBaseSkillId,
+                Value1 = remainingMilliseconds,
+                DetailRaw = 0
             });
     }
 

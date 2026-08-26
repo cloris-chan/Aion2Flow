@@ -19,8 +19,8 @@ public sealed class ResourcePackTests
 
         Assert.Same(shared, snapshot.Shared);
         Assert.Equal(language, snapshot.Language);
-        Assert.Equal(15_798, snapshot.SkillDefinitions.Count);
-        Assert.Equal(15_798, snapshot.Skills.Count);
+        Assert.Equal(15_747, snapshot.SkillDefinitions.Count);
+        Assert.Equal(15_747, snapshot.Skills.Count);
         Assert.Equal(12_783, snapshot.NpcCatalog.Count);
         Assert.True(snapshot.Maps.Count > 600);
         Assert.True(snapshot.ServerNames.Count > 100);
@@ -124,12 +124,21 @@ public sealed class ResourcePackTests
     }
 
     [Fact]
+    public void Skills_Expose_Client_ConsecutiveUseCount()
+    {
+        var skills = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).SkillDefinitions;
+
+        Assert.True(skills.TryGetValue(13_060_250, out var ambush));
+        Assert.Equal(3, ambush.MaxAvailableCount);
+    }
+
+    [Fact]
     public void RuntimeSemanticIndex_Loads_Compact_Current_Client_Index()
     {
         var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
 
-        Assert.Equal(16_542, runtime.SkillCount);
-        Assert.Equal(25_986, runtime.SlotCount);
+        Assert.Equal(16_487, runtime.SkillCount);
+        Assert.Equal(25_990, runtime.SlotCount);
         Assert.True(runtime.NodeCount > 50_000);
         Assert.True(runtime.NodeSlotReferenceCount > runtime.SlotCount);
         Assert.True(runtime.TryResolveEffect(101000011, out var directHeal));
@@ -139,6 +148,20 @@ public sealed class ResourcePackTests
         Assert.Equal(SkillQuantifiedFacet.None, dotApplication.DirectSemantics.QuantifiedFacets);
         Assert.Equal(SkillQuantifiedFacet.PeriodicDamage, dotApplication.Semantics.QuantifiedFacets & SkillQuantifiedFacet.PeriodicDamage);
         Assert.Equal(SkillAuraFacet.Debuff, dotApplication.Semantics.AuraFacets & SkillAuraFacet.Debuff);
+    }
+
+    [Theory]
+    [InlineData(10_003u)]
+    [InlineData(300_711u)]
+    public void RuntimeSemanticIndex_Classifies_Current_NonQuantified_Abnormal_Effects(uint resourceId)
+    {
+        var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
+
+        Assert.True(runtime.TryResolvePeriodicResourceReference(resourceId, 0, out var resolution));
+        Assert.Equal(SkillSemanticResourceNodeKind.SkillAbnormalEffect, resolution.NodeKind);
+        Assert.Equal(SkillQuantifiedFacet.None, resolution.DirectSemantics.QuantifiedFacets);
+        Assert.Equal(SkillAuraFacet.None, resolution.DirectSemantics.AuraFacets);
+        Assert.Equal(SkillSemanticKnowledge.KnownNonQuantified, resolution.DirectSemantics.Knowledge);
     }
 
     [Fact]
@@ -168,6 +191,9 @@ public sealed class ResourcePackTests
     [InlineData(17040257, 17050000)]
     [InlineData(16030047, 16030000)]
     [InlineData(18370047, 18370000)]
+    [InlineData(13130230, 13130000)]
+    [InlineData(13160007, 13160000)]
+    [InlineData(13050240, 13050000)]
     public void SkillBaseProjections_Contain_Only_NonIdentity_Runtime_Mappings(int skillCode, int expectedBaseSkillId)
     {
         var projections = ResourceCatalog.LoadShared().SkillBaseProjections;

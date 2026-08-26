@@ -2149,6 +2149,160 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Skill monitor.
+        /// </summary>
+        internal static string Settings_SkillMonitor
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Buff.
+        /// </summary>
+        internal static string Settings_SkillMonitor_BuffColumn
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_BuffColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Buff duration.
+        /// </summary>
+        internal static string Settings_SkillMonitor_BuffDisplay
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_BuffDisplay", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Buffs {0}/{1}.
+        /// </summary>
+        internal static string Settings_SkillMonitor_BuffSelectedFormat
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_BuffSelectedFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Clear all.
+        /// </summary>
+        internal static string Settings_SkillMonitor_ClearAll
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_ClearAll", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Skill monitor settings.
+        /// </summary>
+        internal static string Settings_SkillMonitor_Configure
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_Configure", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Cooldown.
+        /// </summary>
+        internal static string Settings_SkillMonitor_CooldownColumn
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_CooldownColumn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Cooldown.
+        /// </summary>
+        internal static string Settings_SkillMonitor_CooldownDisplay
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_CooldownDisplay", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Cooldowns {0}/{1}.
+        /// </summary>
+        internal static string Settings_SkillMonitor_CooldownSelectedFormat
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_CooldownSelectedFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Enable.
+        /// </summary>
+        internal static string Settings_SkillMonitor_Enable
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_Enable", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Off.
+        /// </summary>
+        internal static string Settings_SkillMonitor_Off
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_Off", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to On.
+        /// </summary>
+        internal static string Settings_SkillMonitor_On
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_On", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Monitor scale.
+        /// </summary>
+        internal static string Settings_SkillMonitor_Scale
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_Scale", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Select all.
+        /// </summary>
+        internal static string Settings_SkillMonitor_SelectAll
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_SkillMonitor_SelectAll", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Time format.
         /// </summary>
         internal static string Settings_TimeDisplayFormat
@@ -2354,6 +2508,61 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Skill_UnknownEffect", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Buffs.
+        /// </summary>
+        internal static string SkillMonitor_Buffs
+        {
+            get
+            {
+                return ResourceManager.GetString("SkillMonitor_Buffs", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Cooldowns.
+        /// </summary>
+        internal static string SkillMonitor_Cooldowns
+        {
+            get
+            {
+                return ResourceManager.GetString("SkillMonitor_Cooldowns", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to ∞.
+        /// </summary>
+        internal static string SkillMonitor_Indefinite
+        {
+            get
+            {
+                return ResourceManager.GetString("SkillMonitor_Indefinite", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Skill monitor.
+        /// </summary>
+        internal static string SkillMonitor_Title
+        {
+            get
+            {
+                return ResourceManager.GetString("SkillMonitor_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Unresolved skill.
+        /// </summary>
+        internal static string SkillMonitor_UnknownSkill
+        {
+            get
+            {
+                return ResourceManager.GetString("SkillMonitor_UnknownSkill", resourceCulture);
             }
         }
 

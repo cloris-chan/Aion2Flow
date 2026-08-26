@@ -233,7 +233,7 @@ public readonly record struct ScenePlaybackTrackMarker(
     int ResultCode,
     AuraLifecycleEventKind LifecycleEventKind,
     int InstanceSequenceId,
-    int DurationMilliseconds,
+    long DurationMilliseconds,
     ResourceEffectRef DisplayResourceEffectRef,
     AuraSemanticValue AuraSemantics)
 {

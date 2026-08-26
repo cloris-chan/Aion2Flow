@@ -83,6 +83,7 @@ public sealed class RuntimeMetadataRegistry
     public IReadOnlyDictionary<int, PcMetadata> PcMetadataByEntityId => _pcMetadataByEntityId;
     public IReadOnlyDictionary<int, int> NpcCodesByInstanceId => _npcCodesByInstanceId;
     public IReadOnlyDictionary<uint, uint> MapCodesByInstanceId => _mapCodesByInstanceId;
+    public int LocalPlayerEntityId => _localPlayerEntityId;
     public long Revision => _revision;
 
     public bool UpsertPcMetadata(int entityId, string nickname, Faction faction = Faction.Unknown, CharacterClass? characterClass = null, bool isLocalPlayer = false, int? originServerId = null, string legionName = "")

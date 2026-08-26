@@ -13,6 +13,8 @@ public sealed class SettingsService
 
     public string FilePath { get; }
 
+    public event EventHandler? Changed;
+
     public SettingsService() : this(Path.Combine(WorkingDirectoryResolver.GetWorkingDirectory(), SettingsFileName))
     {
     }
@@ -30,6 +32,7 @@ public sealed class SettingsService
         mutate(snapshot);
         _current = snapshot;
         Save(snapshot);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private AppSettings Load()
@@ -98,6 +101,14 @@ public sealed class SettingsService
         ShowPlayerShortServerName = source.ShowPlayerShortServerName,
         ShowPlayerLegionName = source.ShowPlayerLegionName,
         TintPlayerNamesByFaction = source.TintPlayerNamesByFaction,
+        SkillMonitorEnabled = source.SkillMonitorEnabled,
+        SkillMonitorBuffSelectAll = source.SkillMonitorBuffSelectAll,
+        SkillMonitorBuffSkillIds = [.. source.SkillMonitorBuffSkillIds],
+        SkillMonitorCooldownSelectAll = source.SkillMonitorCooldownSelectAll,
+        SkillMonitorCooldownSkillIds = [.. source.SkillMonitorCooldownSkillIds],
+        SkillMonitorScalePercent = source.SkillMonitorScalePercent,
+        SkillMonitorPosition = source.SkillMonitorPosition,
+        SkillMonitorWidth = source.SkillMonitorWidth,
         UiScalePercent = source.UiScalePercent,
         Language = source.Language,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,

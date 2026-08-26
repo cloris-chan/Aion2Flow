@@ -572,6 +572,58 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260809050345_ParsesChargeCooldownAndRowBaseUpdates()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentChargeCooldown}"));
+        var entries = ReadAllJournalEntries(replay);
+
+        var combatAndControlEntries = entries.Where(static entry => entry.Raw.Opcode is 0x0238 or 0x0438).ToArray();
+        Assert.NotEmpty(combatAndControlEntries);
+        Assert.All(
+            combatAndControlEntries,
+            static entry => Assert.True(entry.Raw.CaptureSequence > 0));
+        var combat0238Sequences = combatAndControlEntries
+            .Where(static entry => entry.Raw.Opcode == 0x0238 && entry.State is null)
+            .Select(static entry => entry.Raw.CaptureSequence)
+            .ToHashSet();
+        Assert.NotEmpty(combat0238Sequences);
+        Assert.All(
+            entries.Where(static entry => entry.Raw.Opcode == 0x0238 && entry.State is not null),
+            entry => Assert.Contains(entry.Raw.CaptureSequence, combat0238Sequences));
+
+        Assert.True(replay.SceneOwner.MetadataRegistry.TryGetPcMetadata(9_150, out var metadata));
+        Assert.True(metadata.IsLocalPlayer);
+
+        var flashSliceStarts = entries
+            .Where(static entry => entry.State is { StateCode: StateCodes.CooldownStart0238, Value0: 13_050_240 })
+            .Select(static entry => entry.State!.Value)
+            .ToArray();
+        Assert.Collection(
+            flashSliceStarts,
+            static state => AssertCooldown(state, 13_050_240, 7_450),
+            static state => AssertCooldown(state, 13_050_240, 6_500));
+
+        var flashSliceCharges = entries
+            .Where(static entry => entry.State is { StateCode: StateCodes.CooldownCharge2238, Value0: 13_050_240 })
+            .Select(static entry => entry.State!.Value)
+            .ToArray();
+        Assert.Collection(
+            flashSliceCharges,
+            static state => AssertChargeCooldown(state, 3, 1, 7_450),
+            static state => AssertChargeCooldown(state, 1, 2, 0));
+
+        Assert.Contains(
+            entries,
+            static entry => entry.SourceEntityId == 9_150 &&
+                            entry.State is { StateCode: StateCodes.CooldownStart0238, Value0: 13_130_230, Value1: 7_450 });
+        Assert.Contains(
+            entries,
+            static entry => entry.State is { StateCode: StateCodes.Cooldown4738, Value0: 13_130_000, Value1: 5_800 });
+    }
+
+    [Fact]
     public void Replay_20260704202443_Applies_Current4536_Marker17PcProfiles()
     {
         SetResources();
@@ -649,6 +701,18 @@ public sealed class PacketLogReplayServiceTests
 
         AssertLiveGroupRelations(replay, PlayerGroupRelation.PartyMember, 4327, 9183, 9429, 16102);
         AssertLiveGroupRelation(replay, 13028, PlayerGroupRelation.Unknown);
+    }
+
+    [Fact]
+    public void Replay_20260712211428_ParsesFirstChargeCooldownWithTwoRemaining()
+    {
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentPartyStatusRelation}"));
+
+        Assert.Contains(
+            ReadAllJournalEntries(replay),
+            static entry => entry.State is { StateCode: StateCodes.CooldownStart0238, Value0: 13_060_250, Value1: 7_500 } state &&
+                            CooldownStartObservationDetail.TryDecode(state.DetailRaw, out var mode, out var availableCountAfterControl) &&
+                            mode == 12 && availableCountAfterControl == 2);
     }
 
     [Fact]
@@ -1053,6 +1117,25 @@ public sealed class PacketLogReplayServiceTests
 
             cursor = result.Cursor;
         }
+    }
+
+    private static void AssertCooldown(StateObservation state, int rowBaseSkillId, int remainingMilliseconds)
+    {
+        Assert.Equal(rowBaseSkillId, state.Value0);
+        Assert.Equal(remainingMilliseconds, state.Value1);
+    }
+
+    private static void AssertChargeCooldown(
+        StateObservation state,
+        byte expectedState,
+        int expectedAvailableCount,
+        int expectedRemainingMilliseconds)
+    {
+        Assert.Equal(13_050_240, state.Value0);
+        Assert.Equal(expectedRemainingMilliseconds, state.Value1);
+        Assert.True(CooldownChargeObservationDetail.TryDecode(state.DetailRaw, out var packetState, out var availableCount));
+        Assert.Equal(expectedState, packetState);
+        Assert.Equal(expectedAvailableCount, availableCount);
     }
 
     private static IReadOnlyList<CombatWireEntrySnapshot> ReadCombatWireEntries(PacketLogReplayResult replay)

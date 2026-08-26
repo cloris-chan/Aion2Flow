@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private readonly AvaloniaFrameClockService _frameClock;
     private readonly UiScaleService _uiScale;
     private readonly LocalizationService _localization;
+    private readonly SkillMonitorWindowController _skillMonitorWindowController;
     private readonly PlaybackWindowController _playbackWindowController = new();
     private readonly Control? _overlayRoot;
     private OverlayPinWindow? _pinWindow;
@@ -67,6 +68,7 @@ public partial class MainWindow : Window
         _frameClock = Ioc.Default.GetRequiredService<AvaloniaFrameClockService>();
         _uiScale = Ioc.Default.GetRequiredService<UiScaleService>();
         _localization = Ioc.Default.GetRequiredService<LocalizationService>();
+        _skillMonitorWindowController = Ioc.Default.GetRequiredService<SkillMonitorWindowController>();
         DataContext.InitializeAsync().ConfigureAwait(false);
         InitializeComponent();
         _overlayRoot = Content as Control;
@@ -93,6 +95,7 @@ public partial class MainWindow : Window
         AttachGlobalHotkeyHook();
         AttachFrameClock();
         ShowPinWindow();
+        _skillMonitorWindowController.ShowOrActivate(this);
         ApplyOverlayInteractionMode(_overlayInteractionController.Mode);
     }
 
@@ -182,6 +185,7 @@ public partial class MainWindow : Window
         _globalHotkeyService.DetachWindow();
         _settingsService.Update(settings => settings.MainWindowPosition = new(Position.X, Position.Y));
         _playbackWindowController.Close();
+        _skillMonitorWindowController.Close();
         ClosePinWindow();
         base.OnClosing(e);
     }

@@ -63,6 +63,20 @@
   <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>陣營著色</value></data>
   <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>開啟</value></data>
   <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>關閉</value></data>
+  <data name="Settings_SkillMonitor" xml:space="preserve"><value>技能監控</value></data>
+  <data name="Settings_SkillMonitor_Enable" xml:space="preserve"><value>啟用</value></data>
+  <data name="Settings_SkillMonitor_Configure" xml:space="preserve"><value>技能監控設定</value></data>
+  <data name="Settings_SkillMonitor_On" xml:space="preserve"><value>開啟</value></data>
+  <data name="Settings_SkillMonitor_Off" xml:space="preserve"><value>關閉</value></data>
+  <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>全選</value></data>
+  <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>全部取消</value></data>
+  <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>Buff 持續時間</value></data>
+  <data name="Settings_SkillMonitor_CooldownDisplay" xml:space="preserve"><value>冷卻時間</value></data>
+  <data name="Settings_SkillMonitor_BuffColumn" xml:space="preserve"><value>Buff</value></data>
+  <data name="Settings_SkillMonitor_CooldownColumn" xml:space="preserve"><value>冷卻</value></data>
+  <data name="Settings_SkillMonitor_BuffSelectedFormat" xml:space="preserve"><value>Buff 顯示 {0}/{1}</value></data>
+  <data name="Settings_SkillMonitor_CooldownSelectedFormat" xml:space="preserve"><value>冷卻顯示 {0}/{1}</value></data>
+  <data name="Settings_SkillMonitor_Scale" xml:space="preserve"><value>監控窗口縮放</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>顯示行數</value></data>
   <data name="Settings_CombatantStatisticsScope" xml:space="preserve"><value>統計範圍</value></data>
   <data name="Settings_CombatantStatisticsScope_Self" xml:space="preserve"><value>自己</value></data>
@@ -80,6 +94,11 @@
   <data name="Overlay_Action_EnableClickThrough" xml:space="preserve"><value>啟用點擊穿透</value></data>
   <data name="Overlay_Action_Hide" xml:space="preserve"><value>隱藏懸浮窗</value></data>
   <data name="Overlay_Action_Restore" xml:space="preserve"><value>恢復懸浮窗</value></data>
+  <data name="SkillMonitor_Title" xml:space="preserve"><value>技能監控</value></data>
+  <data name="SkillMonitor_Buffs" xml:space="preserve"><value>Buff</value></data>
+  <data name="SkillMonitor_Cooldowns" xml:space="preserve"><value>技能冷卻</value></data>
+  <data name="SkillMonitor_Indefinite" xml:space="preserve"><value>∞</value></data>
+  <data name="SkillMonitor_UnknownSkill" xml:space="preserve"><value>未關聯技能</value></data>
   <data name="Settings_Update_Check" xml:space="preserve"><value>檢查更新</value></data>
   <data name="Settings_Update_Restart" xml:space="preserve"><value>重啟以更新</value></data>
   <data name="Settings_Update_Checking" xml:space="preserve"><value>正在檢查更新…</value></data>

@@ -135,7 +135,7 @@ public readonly record struct ScenePlaybackEventMarker(
     public long? MaxHp => Marker.MaxHp;
     public AuraLifecycleEventKind LifecycleEventKind => Marker.LifecycleEventKind;
     public int ResultCode => Marker.ResultCode;
-    public int DurationMilliseconds => Marker.DurationMilliseconds;
+    public long DurationMilliseconds => Marker.DurationMilliseconds;
     public ResourceEffectRef DisplayResourceEffectRef => Marker.DisplayResourceEffectRef;
     public AuraSemanticValue AuraSemantics => Marker.AuraSemantics;
     public AuraDisposition AuraDisposition => Marker.AuraDisposition;

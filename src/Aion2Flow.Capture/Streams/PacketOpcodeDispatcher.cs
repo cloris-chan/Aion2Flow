@@ -26,6 +26,8 @@ internal static class PacketOpcodeDispatcher
             (0x04, 0x38) => PacketCombatHandler.Parse0438ValuePacket(packet, ref context),
             (0x05, 0x38) => PacketCombatHandler.ParsePeriodicValuePacket(packet, ref context),
             (0x06, 0x38) => PacketCombatHandler.ParseCompactControl0638Packet(packet, ref context),
+            (0x22, 0x38) => PacketCooldownHandler.Parse2238Packet(packet, ref context),
+            (0x47, 0x38) => PacketCooldownHandler.Parse4738Packet(packet, ref context),
             (0x00, 0x61) => PacketStateHandler.ParseMapScopeSignalPacket(packet, ref context, 0x0061),
             (0x01, 0x61) => PacketStateHandler.ParseMapScopeSignalPacket(packet, ref context, 0x0161),
             (0x21, 0x36) => PacketStateHandler.ParseState2136Packet(packet, ref context),

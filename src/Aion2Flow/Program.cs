@@ -15,6 +15,7 @@ using Cloris.Aion2Flow.Services.Logging;
 using Cloris.Aion2Flow.Services.Overlay;
 using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
+using Cloris.Aion2Flow.Views;
 using Cloris.Aion2Flow.WinDivert;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
@@ -86,6 +87,7 @@ internal static class Program
         services.AddSingleton<WinDivertCaptureService>();
         services.AddSingleton<GlobalHotkeyService>();
         services.AddSingleton<OverlayInteractionController>();
+        services.AddSingleton<SkillMonitorWindowController>();
         services.AddSingleton<SettingsFlyoutViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainAppWindow>();

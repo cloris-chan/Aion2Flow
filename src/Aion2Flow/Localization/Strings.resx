@@ -63,6 +63,20 @@
   <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>Faction tint</value></data>
   <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>On</value></data>
   <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Settings_SkillMonitor" xml:space="preserve"><value>Skill monitor</value></data>
+  <data name="Settings_SkillMonitor_Enable" xml:space="preserve"><value>Enable</value></data>
+  <data name="Settings_SkillMonitor_Configure" xml:space="preserve"><value>Skill monitor settings</value></data>
+  <data name="Settings_SkillMonitor_On" xml:space="preserve"><value>On</value></data>
+  <data name="Settings_SkillMonitor_Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>Select all</value></data>
+  <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>Clear all</value></data>
+  <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>Buff duration</value></data>
+  <data name="Settings_SkillMonitor_CooldownDisplay" xml:space="preserve"><value>Cooldown</value></data>
+  <data name="Settings_SkillMonitor_BuffColumn" xml:space="preserve"><value>Buff</value></data>
+  <data name="Settings_SkillMonitor_CooldownColumn" xml:space="preserve"><value>Cooldown</value></data>
+  <data name="Settings_SkillMonitor_BuffSelectedFormat" xml:space="preserve"><value>Buffs {0}/{1}</value></data>
+  <data name="Settings_SkillMonitor_CooldownSelectedFormat" xml:space="preserve"><value>Cooldowns {0}/{1}</value></data>
+  <data name="Settings_SkillMonitor_Scale" xml:space="preserve"><value>Monitor scale</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>Visible rows</value></data>
   <data name="Settings_CombatantStatisticsScope" xml:space="preserve"><value>Statistics scope</value></data>
   <data name="Settings_CombatantStatisticsScope_Self" xml:space="preserve"><value>Self</value></data>
@@ -80,6 +94,11 @@
   <data name="Overlay_Action_EnableClickThrough" xml:space="preserve"><value>Enable click-through</value></data>
   <data name="Overlay_Action_Hide" xml:space="preserve"><value>Hide overlay</value></data>
   <data name="Overlay_Action_Restore" xml:space="preserve"><value>Restore overlay</value></data>
+  <data name="SkillMonitor_Title" xml:space="preserve"><value>Skill monitor</value></data>
+  <data name="SkillMonitor_Buffs" xml:space="preserve"><value>Buffs</value></data>
+  <data name="SkillMonitor_Cooldowns" xml:space="preserve"><value>Cooldowns</value></data>
+  <data name="SkillMonitor_Indefinite" xml:space="preserve"><value>∞</value></data>
+  <data name="SkillMonitor_UnknownSkill" xml:space="preserve"><value>Unresolved skill</value></data>
   <data name="Settings_Update_Check" xml:space="preserve"><value>Check for updates</value></data>
   <data name="Settings_Update_Restart" xml:space="preserve"><value>Restart to update</value></data>
   <data name="Settings_Update_Checking" xml:space="preserve"><value>Checking for updates…</value></data>

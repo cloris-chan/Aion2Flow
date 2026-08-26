@@ -46,6 +46,32 @@ public sealed class SettingsFlyoutViewModelTests
     }
 
     [Fact]
+    public void SkillMonitorEnabled_LoadsAndPersistsThroughViewModel()
+    {
+        using var fixture = new SettingsViewModelFixture(static settings =>
+        {
+            settings.SkillMonitorEnabled = false;
+            settings.SkillMonitorBuffSelectAll = false;
+            settings.SkillMonitorBuffSkillIds = [13_050_000];
+            settings.SkillMonitorCooldownSelectAll = false;
+            settings.SkillMonitorCooldownSkillIds = [13_130_000];
+            settings.SkillMonitorWidth = 740;
+        });
+
+        Assert.False(fixture.ViewModel.SkillMonitorEnabled);
+
+        fixture.ViewModel.SkillMonitorEnabled = true;
+
+        var persisted = new SettingsService(fixture.SettingsPath).Current;
+        Assert.True(persisted.SkillMonitorEnabled);
+        Assert.False(persisted.SkillMonitorBuffSelectAll);
+        Assert.Equal([13_050_000], persisted.SkillMonitorBuffSkillIds);
+        Assert.False(persisted.SkillMonitorCooldownSelectAll);
+        Assert.Equal([13_130_000], persisted.SkillMonitorCooldownSkillIds);
+        Assert.Equal(740, persisted.SkillMonitorWidth);
+    }
+
+    [Fact]
     public void EncounterTimeDisplayFormat_DefaultsAndPersistsThroughViewModel()
     {
         using var fixture = new SettingsViewModelFixture();

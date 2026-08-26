@@ -12,7 +12,9 @@ internal readonly record struct Packet0238CompactControl(
     int TailLength,
     int TailFirstValue,
     int TailSecondValue,
-    int TailThirdValue);
+    int TailThirdValue,
+    int? AvailableCountAfterControl,
+    int? CooldownMilliseconds);
 
 internal static class Packet0238CompactControlParser
 {
@@ -34,7 +36,13 @@ internal static class Packet0238CompactControlParser
         if (!reader.TryReadByte(out var flag)) return false;
         if (!reader.TryReadVarInt(out var echoSourceId)) return false;
         var tailLength = reader.Remaining;
-        ParseZeroPrefixedTail(reader.RemainingSpan, out var tailFirstValue, out var tailSecondValue, out var tailThirdValue);
+        var tail = reader.RemainingSpan;
+        ParseZeroPrefixedTail(tail, out var tailFirstValue, out var tailSecondValue, out var tailThirdValue);
+        var hasCooldown = TryParseCooldownTail(
+            tail,
+            out var availableCountAfterControl,
+            out var parsedCooldownMilliseconds);
+        int? cooldownMilliseconds = hasCooldown ? parsedCooldownMilliseconds : null;
         if (!reader.TryAdvance(reader.Remaining)) return false;
 
         result = new Packet0238CompactControl(
@@ -47,7 +55,9 @@ internal static class Packet0238CompactControlParser
             tailLength,
             tailFirstValue,
             tailSecondValue,
-            tailThirdValue);
+            tailThirdValue,
+            hasCooldown ? availableCountAfterControl : null,
+            cooldownMilliseconds);
         return true;
     }
 
@@ -94,5 +104,76 @@ internal static class Packet0238CompactControlParser
 
         consumed = reader.Offset;
         return true;
+    }
+
+    private static bool TryParseCooldownTail(
+        ReadOnlySpan<byte> tail,
+        out int? availableCountAfterControl,
+        out int cooldownMilliseconds)
+    {
+        return TryParseCooldownTail(tail, 4, out availableCountAfterControl, out cooldownMilliseconds) ||
+               TryParseCooldownTail(tail, 16, out availableCountAfterControl, out cooldownMilliseconds);
+    }
+
+    private static bool TryParseCooldownTail(
+        ReadOnlySpan<byte> tail,
+        int opaquePrefixLength,
+        out int? availableCountAfterControl,
+        out int cooldownMilliseconds)
+    {
+        availableCountAfterControl = null;
+        cooldownMilliseconds = 0;
+        if (tail.Length <= opaquePrefixLength)
+            return false;
+
+        var reader = new PacketSpanReader(tail);
+        if (!reader.TryAdvance(opaquePrefixLength))
+            return false;
+
+        Span<int> values = stackalloc int[5];
+        var valueCount = 0;
+        while (reader.Remaining > 0 && valueCount < values.Length)
+        {
+            if (!TryReadCanonicalVarInt(ref reader, out values[valueCount]))
+                return false;
+
+            valueCount++;
+        }
+
+        if (reader.Remaining != 0 || valueCount is < 3 or > 5 || values[1] is not 1 and not 2)
+        {
+            return false;
+        }
+
+        if (valueCount > 3 && values[2] != 0)
+            return false;
+
+        if (valueCount == 5)
+        {
+            if (values[3] <= 0)
+                return false;
+            availableCountAfterControl = values[3];
+        }
+
+        cooldownMilliseconds = values[valueCount - 1];
+        return true;
+    }
+
+    private static bool TryReadCanonicalVarInt(ref PacketSpanReader reader, out int value)
+    {
+        var offset = reader.Offset;
+        if (!reader.TryReadVarInt(out value) || value < 0)
+            return false;
+
+        var encodedLength = reader.Offset - offset;
+        var remaining = (uint)value;
+        var canonicalLength = 1;
+        while (remaining >= 0x80)
+        {
+            remaining >>= 7;
+            canonicalLength++;
+        }
+
+        return encodedLength == canonicalLength;
     }
 }
