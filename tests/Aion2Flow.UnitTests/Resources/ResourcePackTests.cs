@@ -227,6 +227,8 @@ public sealed class ResourcePackTests
     [InlineData(12240010, "ICON_TE_SKILL_004.webp")]
     [InlineData(16030047, "ICON_EL_SKILL_003.webp")]
     [InlineData(16300243, "ICON_EL_SKILL_030.webp")]
+    [InlineData(11250000, "ICON_GL_SKILL_040.webp")]
+    [InlineData(11400000, "ICON_GL_SKILL_024.webp")]
     [InlineData(17270040, "ICON_CL_SKILL_026.webp")]
     [InlineData(17280010, "ICON_CL_SKILL_027.webp")]
     [InlineData(17290000, "ICON_CL_SKILL_028.webp")]
