@@ -81,8 +81,7 @@ public sealed partial class SkillMonitorSettingsViewModel : ObservableObject, ID
     private void RebuildGroups()
     {
         var entries = _resources.Skills
-            .Where(static entry => entry.SourceType == SkillSourceType.PcSkill)
-            .Where(entry => ProfessionCategories.Contains(entry.Category))
+            .Where(PlayerProfessionSkillFilter.Includes)
             .Select(entry => new SkillMonitorCatalogEntry(
                 _resources.ResolveBaseSkillIdForCode(entry.SkillId),
                 entry.Name,

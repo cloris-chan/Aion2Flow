@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Globalization;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.Resources.Generated;
@@ -10,6 +11,7 @@ public sealed class GameResourceService : IDisposable
     private readonly LanguageService _languageService;
     private readonly Lock _lock = new();
     private ResourceCatalogSnapshot _catalog = null!;
+    private FrozenSet<int> _playerProfessionBaseSkillIds = Array.Empty<int>().ToFrozenSet();
 
     public event EventHandler<string>? ResourcesChanged;
 
@@ -71,6 +73,20 @@ public sealed class GameResourceService : IDisposable
         lock (_lock)
         {
             return ResolveBaseSkillIdForCode(_catalog, skillCode);
+        }
+    }
+
+    public bool IsPlayerProfessionSkill(int skillCode)
+    {
+        if (skillCode <= 0)
+        {
+            return false;
+        }
+
+        lock (_lock)
+        {
+            var baseSkillId = ResolveBaseSkillIdForCode(_catalog, skillCode);
+            return _playerProfessionBaseSkillIds.Contains(baseSkillId);
         }
     }
 
@@ -294,11 +310,17 @@ public sealed class GameResourceService : IDisposable
     private void Reload(string language)
     {
         var catalog = ResourceCatalog.Load(language);
+        var playerProfessionBaseSkillIds = catalog.Skills
+            .Where(PlayerProfessionSkillFilter.Includes)
+            .Select(skill => ResolveBaseSkillIdForCode(catalog, skill.SkillId))
+            .Where(static skillId => skillId > 0)
+            .ToFrozenSet();
 
         lock (_lock)
         {
             CurrentLanguage = language;
             _catalog = catalog;
+            _playerProfessionBaseSkillIds = playerProfessionBaseSkillIds;
             Skills = catalog.Skills;
             NpcCatalog = catalog.NpcCatalog;
             Maps = catalog.Maps;

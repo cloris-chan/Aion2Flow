@@ -24,6 +24,8 @@ public sealed class SkillMonitorSettingsViewModelTests
         Assert.Empty(fixture.Settings.Current.SkillMonitorBuffSkillIds);
         Assert.True(fixture.Settings.Current.SkillMonitorCooldownSelectAll);
         Assert.Empty(fixture.Settings.Current.SkillMonitorCooldownSkillIds);
+        Assert.False(SkillMonitorSelection.IncludesBuff(fixture.Settings.Current, fixture.Resources, 2_210_103));
+        Assert.False(SkillMonitorSelection.IncludesCooldown(fixture.Settings.Current, fixture.Resources, 2_210_103));
     }
 
     [Fact]
@@ -41,9 +43,9 @@ public sealed class SkillMonitorSettingsViewModelTests
         Assert.Equal(skills.Length - 1, fixture.Settings.Current.SkillMonitorBuffSkillIds.Count);
         Assert.True(fixture.Settings.Current.SkillMonitorCooldownSelectAll);
         Assert.True(excludedBuff.IsCooldownSelected);
-        Assert.False(SkillMonitorSelection.IncludesBuff(fixture.Settings.Current, excludedBuff.SkillId));
-        Assert.True(SkillMonitorSelection.IncludesBuff(fixture.Settings.Current, excludedCooldown.SkillId));
-        Assert.True(SkillMonitorSelection.IncludesCooldown(fixture.Settings.Current, excludedBuff.SkillId));
+        Assert.False(SkillMonitorSelection.IncludesBuff(fixture.Settings.Current, fixture.Resources, excludedBuff.SkillId));
+        Assert.True(SkillMonitorSelection.IncludesBuff(fixture.Settings.Current, fixture.Resources, excludedCooldown.SkillId));
+        Assert.True(SkillMonitorSelection.IncludesCooldown(fixture.Settings.Current, fixture.Resources, excludedBuff.SkillId));
 
         excludedCooldown.IsCooldownSelected = false;
 
@@ -51,8 +53,8 @@ public sealed class SkillMonitorSettingsViewModelTests
         Assert.DoesNotContain(excludedCooldown.SkillId, fixture.Settings.Current.SkillMonitorCooldownSkillIds);
         Assert.Equal(skills.Length - 1, fixture.Settings.Current.SkillMonitorCooldownSkillIds.Count);
         Assert.True(excludedCooldown.IsBuffSelected);
-        Assert.False(SkillMonitorSelection.IncludesCooldown(fixture.Settings.Current, excludedCooldown.SkillId));
-        Assert.True(SkillMonitorSelection.IncludesCooldown(fixture.Settings.Current, excludedBuff.SkillId));
+        Assert.False(SkillMonitorSelection.IncludesCooldown(fixture.Settings.Current, fixture.Resources, excludedCooldown.SkillId));
+        Assert.True(SkillMonitorSelection.IncludesCooldown(fixture.Settings.Current, fixture.Resources, excludedBuff.SkillId));
     }
 
     [Fact]
@@ -120,6 +122,8 @@ public sealed class SkillMonitorSettingsViewModelTests
         }
 
         public SettingsService Settings { get; }
+
+        public GameResourceService Resources => _resources;
 
         public SkillMonitorSettingsViewModel ViewModel { get; }
 

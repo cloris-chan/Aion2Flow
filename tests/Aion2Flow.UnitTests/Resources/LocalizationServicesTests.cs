@@ -185,6 +185,20 @@ public sealed class LocalizationServicesTests
     }
 
     [Theory]
+    [InlineData(11_250_000, true)]
+    [InlineData(11_250_010, true)]
+    [InlineData(2_210_103, false)]
+    [InlineData(3_001_110, false)]
+    public void GameResourceService_Identifies_Player_Profession_Skills(int skillCode, bool expected)
+    {
+        var languageService = new LanguageService();
+        languageService.SetLanguage(LanguageService.TraditionalChinese);
+        using var resources = new GameResourceService(languageService);
+
+        Assert.Equal(expected, resources.IsPlayerProfessionSkill(skillCode));
+    }
+
+    [Theory]
     [InlineData(12130030, "捕獲")]
     [InlineData(12780001, "激昂")]
     [InlineData(2210103, "疾走咒文書")]

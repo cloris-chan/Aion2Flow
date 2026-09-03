@@ -343,10 +343,10 @@ public sealed class SkillMonitorViewModel : ObservableObject
     }
 
     private bool IsBuffMonitored(int rowBaseSkillId)
-        => SkillMonitorSelection.IncludesBuff(_settings.Current, rowBaseSkillId);
+        => SkillMonitorSelection.IncludesBuff(_settings.Current, _resources, rowBaseSkillId);
 
     private bool IsCooldownMonitored(int rowBaseSkillId)
-        => SkillMonitorSelection.IncludesCooldown(_settings.Current, rowBaseSkillId);
+        => SkillMonitorSelection.IncludesCooldown(_settings.Current, _resources, rowBaseSkillId);
 
     private string CreateSkillToolTip(
         in SkillMonitorSkillSlotState slot,
