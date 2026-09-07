@@ -33,8 +33,41 @@ internal static class Program
         if (!appInstance.IsPrimary)
             return;
 
-        VelopackApp.Build().Run();
+        using var logWriter = new AppLogWriter(
+#if DEBUG
+            AppLogLevel.Debug
+#else
+            AppLogLevel.Info
+#endif
+        );
+        AppLog.Initialize(logWriter);
 
+        void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            AppLog.Write(AppLogLevel.Error, $"Unhandled application exception. IsTerminating={e.IsTerminating}: {e.ExceptionObject}");
+            if (e.IsTerminating)
+                logWriter.Dispose();
+        }
+
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        try
+        {
+            VelopackApp.Build().Run();
+            await RunApplicationAsync(args).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            AppLog.Write(AppLogLevel.Error, $"Application terminated with an exception: {exception}");
+            throw;
+        }
+        finally
+        {
+            AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
+        }
+    }
+
+    private static async Task RunApplicationAsync(string[] args)
+    {
         var serviceProvider = CreateServiceProvider();
         var mainViewModel = serviceProvider.GetRequiredService<MainViewModel>();
         try
@@ -55,15 +88,6 @@ internal static class Program
     {
         var services = new ServiceCollection();
 
-        var logWriter = new AppLogWriter(
-#if DEBUG
-            AppLogLevel.Debug
-#else
-            AppLogLevel.Info
-#endif
-        );
-        services.AddSingleton(logWriter);
-        AppLog.Initialize(logWriter);
         CaptureLog.Sink = static (level, message) => AppLog.Write(MapLogLevel(level), message);
         WinDivertLog.Sink = static (level, message) => AppLog.Write(MapLogLevel(level), $"[WinDivert] {message}");
         WinDivertRuntime.Initialize();

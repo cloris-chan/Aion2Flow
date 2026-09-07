@@ -163,13 +163,16 @@ public sealed class AuraStore
         return result;
     }
 
-    public void CopyActiveSnapshotTo(long observedAtMilliseconds, List<AuraInstanceState> destination)
+    internal void CopyActiveAurasTo(int targetEntityId, long observedAtMilliseconds, List<AuraInstanceState> destination)
     {
         ArgumentNullException.ThrowIfNull(destination);
         destination.Clear();
+        if (targetEntityId <= 0)
+            return;
+
         foreach (var state in _instances.Values)
         {
-            if (state.IsActiveAt(observedAtMilliseconds))
+            if (state.TargetEntityId == targetEntityId && state.IsActiveAt(observedAtMilliseconds))
                 destination.Add(state);
         }
 

@@ -172,23 +172,27 @@ public sealed class AuraStoreTests
     }
 
     [Fact]
-    public void CopyActiveSnapshotTo_ReusesDestinationAndPreservesSnapshotOrder()
+    public void CopyActiveAurasTo_FiltersTargetAndExpiryAndReusesDestination()
     {
         var harness = new Harness();
         _ = harness.Open(1_002, 2_002, 32, 1_000, durationMilliseconds: ushort.MaxValue);
+        _ = harness.Open(1_001, 2_002, 33, 1_000, durationMilliseconds: ushort.MaxValue);
         _ = harness.Open(1_001, 2_001, 31, 1_000, durationMilliseconds: 500);
         var destination = new List<AuraInstanceState> { default };
 
-        harness.Store.CopyActiveSnapshotTo(1_499, destination);
+        harness.Store.CopyActiveAurasTo(1_001, 1_499, destination);
 
         Assert.Equal(2, destination.Count);
         Assert.Equal(new AuraInstanceKey(1_001, 31), destination[0].Key);
-        Assert.Equal(new AuraInstanceKey(1_002, 32), destination[1].Key);
+        Assert.Equal(new AuraInstanceKey(1_001, 33), destination[1].Key);
 
-        harness.Store.CopyActiveSnapshotTo(1_500, destination);
+        harness.Store.CopyActiveAurasTo(1_001, 1_500, destination);
 
         Assert.Single(destination);
-        Assert.Equal(new AuraInstanceKey(1_002, 32), destination[0].Key);
+        Assert.Equal(new AuraInstanceKey(1_001, 33), destination[0].Key);
+
+        harness.Store.CopyActiveAurasTo(0, 1_500, destination);
+        Assert.Empty(destination);
     }
 
     [Fact]

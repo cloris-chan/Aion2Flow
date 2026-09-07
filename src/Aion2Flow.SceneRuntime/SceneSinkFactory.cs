@@ -219,6 +219,18 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         }
     }
 
+    public SceneLocalPlayerFrame CopyLocalPlayerAurasTo(List<AuraInstanceState> destination)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+
+        lock (_gate)
+        {
+            var frame = _owner.CopyLocalPlayerAurasTo(destination);
+            RefreshBossStateCore();
+            return frame;
+        }
+    }
+
     public SceneArchivePayload? ChangeKind(SceneKind kind, DateTimeOffset sessionStarted, bool archiveCurrent)
     {
         lock (_gate)

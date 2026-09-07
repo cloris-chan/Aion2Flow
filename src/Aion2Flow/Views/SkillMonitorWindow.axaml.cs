@@ -87,7 +87,7 @@ public partial class SkillMonitorWindow : Window
         base.OnClosed(e);
     }
 
-    private void OnAnimationFrame(object? sender, AvaloniaFrameEventArgs e) => DataContext.ProcessUiFrame(e.Timestamp);
+    private void OnAnimationFrame(object? sender, AvaloniaFrameEventArgs e) => DataContext.ProcessUiFrame();
 
     private void OnLanguageChanged(object? sender, EventArgs e) => RefreshLocalizedText();
 

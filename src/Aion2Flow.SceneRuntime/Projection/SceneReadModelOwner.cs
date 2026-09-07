@@ -249,6 +249,18 @@ public sealed class SceneReadModelOwner(
         }
     }
 
+    internal SceneLocalPlayerFrame CopyLocalPlayerAurasTo(List<AuraInstanceState> destination)
+    {
+        lock (_gate)
+        {
+            RefreshCore();
+            var entityId = MetadataRegistry.LocalPlayerEntityId;
+            var observedAtMilliseconds = GetSceneNowMilliseconds();
+            Auras.CopyActiveAurasTo(entityId, observedAtMilliseconds, destination);
+            return new SceneLocalPlayerFrame(EncounterId, SceneStartObservationOrdinal, AppliedNextObservationOrdinal, entityId, observedAtMilliseconds);
+        }
+    }
+
     internal BossFocusGroupState GetActiveBossFocusState()
     {
         lock (_gate)

@@ -3,9 +3,9 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Protocol.Combat;
-using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
+using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Stores;
 using Cloris.Aion2Flow.Presentation;
@@ -18,7 +18,6 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed class SkillMonitorViewModel : ObservableObject
 {
     private const int JournalReadBatchSize = 2_048;
-    private const long UpdateIntervalMilliseconds = 100;
     private readonly WinDivertCaptureService _captureService;
     private readonly GameResourceService _resources;
     private readonly LocalizationService _localization;
@@ -33,7 +32,6 @@ public sealed class SkillMonitorViewModel : ObservableObject
     private readonly SkillMonitorSkillRowCollection _skillRows = [];
     private Guid _sessionId;
     private JournalCursor _journalCursor;
-    private long _lastUpdateTimestampMilliseconds = long.MinValue;
     private EncounterTimeDisplayFormat _encounterTimeDisplayFormat;
 
     public SkillMonitorViewModel(
@@ -58,60 +56,41 @@ public sealed class SkillMonitorViewModel : ObservableObject
         set => SetProperty(ref _encounterTimeDisplayFormat, value);
     }
 
-    public void ProcessUiFrame(TimeSpan timestamp)
+    public void ProcessUiFrame()
     {
-        if (timestamp.TotalMilliseconds < 0)
-            return;
-
-        var timestampMilliseconds = (long)timestamp.TotalMilliseconds;
         var scene = _captureService.Scene;
         if (!_captureService.IsDriverActive)
         {
-            _lastUpdateTimestampMilliseconds = long.MinValue;
             if (_skillRows.Count != 0)
                 _skillRows.Clear();
             _skillSlotPresentationTracker.Clear();
             return;
         }
 
-        var sessionChanged = EnsureSession(scene);
-        var monitorStateChanged = ReadCooldownJournal(scene);
-        if (!sessionChanged &&
-            !monitorStateChanged &&
-            _lastUpdateTimestampMilliseconds != long.MinValue &&
-            timestampMilliseconds >= _lastUpdateTimestampMilliseconds &&
-            timestampMilliseconds - _lastUpdateTimestampMilliseconds < UpdateIntervalMilliseconds)
-        {
-            return;
-        }
-
-        _lastUpdateTimestampMilliseconds = timestampMilliseconds;
-        scene.CreateFrame();
-        var nowMilliseconds = ResolveSceneNowMilliseconds(scene);
-        scene.Owner.Auras.CopyActiveSnapshotTo(nowMilliseconds, _activeAuras);
-        RefreshSkillRows(CollectionsMarshal.AsSpan(_activeAuras), scene.MetadataRegistry.LocalPlayerEntityId, nowMilliseconds);
+        var frame = scene.CopyLocalPlayerAurasTo(_activeAuras);
+        EnsureSession(in frame);
+        ReadCooldownJournal(scene.Journal, in frame);
+        RefreshSkillRows(CollectionsMarshal.AsSpan(_activeAuras), frame.EntityId, frame.ObservedAtMilliseconds);
     }
 
-    private bool EnsureSession(SceneLiveReadModel scene)
+    private void EnsureSession(in SceneLocalPlayerFrame frame)
     {
-        if (_sessionId == scene.SessionId)
-            return false;
+        if (_sessionId == frame.SessionId)
+            return;
 
-        _sessionId = scene.SessionId;
+        _sessionId = frame.SessionId;
         _cooldowns.Clear();
         _skillSlotPresentationTracker.Clear();
-        _journalCursor = scene.Journal.CreateCursor(scene.Owner.SceneStartObservationOrdinal);
-        return true;
+        _journalCursor = new JournalCursor(frame.StartObservationOrdinal);
     }
 
-    private bool ReadCooldownJournal(SceneLiveReadModel scene)
+    private void ReadCooldownJournal(ObservedEventJournal journal, in SceneLocalPlayerFrame frame)
     {
-        var localPlayerEntityId = scene.MetadataRegistry.LocalPlayerEntityId;
-        var monitorStateChanged = false;
+        var localPlayerEntityId = frame.EntityId;
 
-        while (true)
+        while (_journalCursor.NextObservationOrdinal < frame.EndObservationOrdinalExclusive)
         {
-            var result = scene.Journal.ReadEntries(_journalCursor, JournalReadBatchSize, entries =>
+            var result = journal.ReadEntries(_journalCursor, frame.EndObservationOrdinalExclusive, JournalReadBatchSize, entries =>
             {
                 for (var index = 0; index < entries.Count; index++)
                 {
@@ -120,7 +99,7 @@ public sealed class SkillMonitorViewModel : ObservableObject
                     {
                         var raw = entry.Raw;
                         var combat = entry.Combat;
-                        monitorStateChanged |= ObserveSkillPacket(
+                        ObserveSkillPacket(
                             entry.ObservedAtMilliseconds,
                             entry.SourceEntityId,
                             localPlayerEntityId,
@@ -129,7 +108,7 @@ public sealed class SkillMonitorViewModel : ObservableObject
                     }
                     else if (entry.Domain == ObservedEventDomain.State && entry.State.StateCode == StateCodes.CooldownStart0238)
                     {
-                        monitorStateChanged |= ObserveCooldownStart(
+                        ObserveCooldownStart(
                             entry.ObservedAtMilliseconds,
                             entry.SourceEntityId,
                             localPlayerEntityId,
@@ -139,29 +118,25 @@ public sealed class SkillMonitorViewModel : ObservableObject
                     }
                     else if (entry.Domain == ObservedEventDomain.State && entry.State.StateCode == StateCodes.Cooldown4738)
                     {
-                        monitorStateChanged |= ObserveCooldownUpdate(
+                        ObserveCooldownUpdate(
                             entry.ObservedAtMilliseconds,
                             entry.State.Value0,
                             entry.State.Value1);
                     }
                     else if (entry.Domain == ObservedEventDomain.State && entry.State.StateCode == StateCodes.CooldownCharge2238)
                     {
-                        monitorStateChanged |= ObserveCooldownCharge(
+                        ObserveCooldownCharge(
                             entry.ObservedAtMilliseconds,
                             entry.State.Value0,
                             entry.State.Value1,
                             entry.State.DetailRaw);
-                    }
-                    else if (entry.Domain == ObservedEventDomain.Aura)
-                    {
-                        monitorStateChanged = true;
                     }
                 }
             });
 
             _journalCursor = result.Cursor;
             if (result.Count == 0)
-                return monitorStateChanged;
+                return;
         }
     }
 
@@ -426,9 +401,6 @@ public sealed class SkillMonitorViewModel : ObservableObject
 
         return true;
     }
-
-    private static long ResolveSceneNowMilliseconds(SceneLiveReadModel scene)
-        => Math.Max(0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - scene.SessionStarted.ToUnixTimeMilliseconds());
 
     private string FormatDuration(long milliseconds)
         => SkillMonitorTimeFormatter.Format(milliseconds, EncounterTimeDisplayFormat);
