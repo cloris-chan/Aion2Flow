@@ -8,6 +8,7 @@ internal readonly record struct Packet4136State(int EntityId, byte Mode0, byte M
 internal static class Packet4136Parser
 {
     private const int NpcCodeOffsetFromModes = 5;
+    private const int DirectMode5FMinimumNpcCodeOffsetFromModes = 4;
     private const int ExtendedStateBodyLength = 106;
     private const int ExtendedNpcStateBodyLength = 116;
 
@@ -46,8 +47,7 @@ internal static class Packet4136Parser
         }
         else
         {
-            var npcCodeOffset = tailStart + NpcCodeOffsetFromModes;
-            if (PacketNpcStateFields.TryReadNpcCatalogCode(packet, npcCodeOffset, out var parsedNpcCode))
+            if (TryReadNpcCode(packet, tailStart, mode0, mode2, out var parsedNpcCode, out var npcCodeOffset))
             {
                 npcCode = parsedNpcCode;
                 var hpOffset = npcCodeOffset + ResolveHpPairOffsetFromNpcCodeStart(packet.Length - tailStart, mode0, mode1, mode2);
@@ -75,6 +75,28 @@ internal static class Packet4136Parser
         return PacketNpcStateFields.StateHpPairOffsetFromNpcCodeStart;
     }
 
+    private static bool TryReadNpcCode(ReadOnlySpan<byte> packet, int tailStart, byte mode0, byte mode2, out int npcCode, out int npcCodeOffset)
+    {
+        if (mode0 == 0x5f && mode2 == 0x00)
+        {
+            for (var offsetFromModes = DirectMode5FMinimumNpcCodeOffsetFromModes; offsetFromModes <= NpcCodeOffsetFromModes; offsetFromModes++)
+            {
+                npcCodeOffset = tailStart + offsetFromModes;
+                if (PacketNpcStateFields.TryReadNpcCatalogCode(packet, npcCodeOffset, out npcCode))
+                {
+                    return true;
+                }
+            }
+
+            npcCode = 0;
+            npcCodeOffset = 0;
+            return false;
+        }
+
+        npcCodeOffset = tailStart + NpcCodeOffsetFromModes;
+        return PacketNpcStateFields.TryReadNpcCatalogCode(packet, npcCodeOffset, out npcCode);
+    }
+
     private static bool TryReadOwnedNpc(
         ReadOnlySpan<byte> packet,
         int tailStart,
@@ -88,11 +110,46 @@ internal static class Packet4136Parser
         npcCode = 0;
         ownerId = 0;
 
-        return mode0 == 0x1f &&
-               mode1 == 0x00 &&
-               mode2 == 0x00 &&
-               TryReadNamePrefixedOwnedNpc(packet, tailStart, entityId, out npcCode, out ownerId);
+        if (mode0 == 0x5f &&
+            mode1 == 0x00 &&
+            mode2 == 0x00 &&
+            HasNamePrefixedNpcLayout(packet, tailStart) &&
+            TryReadNamePrefixedOwnedNpc(packet, tailStart, entityId, out npcCode, out ownerId))
+        {
+            return true;
+        }
+
+        if (mode0 == 0x5f && mode2 == 0x00)
+        {
+            for (var offsetFromModes = DirectMode5FMinimumNpcCodeOffsetFromModes; offsetFromModes <= NpcCodeOffsetFromModes; offsetFromModes++)
+            {
+                if (TryReadOwnedNpcAt(packet, entityId, tailStart + offsetFromModes, out npcCode, out ownerId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if (mode0 != 0x1f || mode1 != 0x00 || mode2 != 0x00)
+        {
+            return false;
+        }
+
+        if (HasNamePrefixedNpcLayout(packet, tailStart) &&
+            TryReadNamePrefixedOwnedNpc(packet, tailStart, entityId, out npcCode, out ownerId))
+        {
+            return true;
+        }
+
+        return TryReadOwnedNpcAt(packet, entityId, tailStart + NpcCodeOffsetFromModes, out npcCode, out ownerId);
     }
+
+    private static bool HasNamePrefixedNpcLayout(ReadOnlySpan<byte> packet, int tailStart) =>
+        (uint)(tailStart + 5) < (uint)packet.Length &&
+        packet[tailStart + 3] == 0x00 &&
+        packet[tailStart + 4] == 0x01;
 
     private static bool TryReadNamePrefixedOwnedNpc(ReadOnlySpan<byte> packet, int tailStart, int entityId, out int npcCode, out int ownerId)
     {

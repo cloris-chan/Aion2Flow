@@ -318,6 +318,76 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260909214537_Resolves_Current4136_SummonOwnership()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentSummonOwnershipLayout}"));
+
+        Assert4136OwnedNpc(replay, entityId: 37_116, ownerId: 7_778);
+        Assert4136OwnedNpc(replay, entityId: 26_658, ownerId: 7_778);
+        Assert4136OwnedNpc(replay, entityId: 18_902, ownerId: 7_778);
+        Assert4136OwnedNpc(replay, entityId: 33_564, ownerId: 7_778);
+        Assert4136OwnedNpc(replay, entityId: 22_801, ownerId: 7_778);
+        Assert4136OwnedNpc(replay, entityId: 38_096, ownerId: 2_653);
+
+        var ownedSummons = replay.SceneOwner.Entities.Entities.Values
+            .Where(static entity => entity.OwnerKind == EntityOwnerKind.Summon)
+            .ToArray();
+        Assert.Equal(6, ownedSummons.Length);
+        Assert.Equal(5, ownedSummons.Count(static summon => summon.OwnerEntityId == 7_778));
+        Assert.Contains(ownedSummons, static summon => summon.EntityId == 38_096 && summon.OwnerEntityId == 2_653);
+    }
+
+    [Fact]
+    public void Replay_20260909222525_Resolves_Current4136_NamedSummonOwnership()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentNamedSummonOwnershipLayout}"));
+
+        Assert4136OwnedNpc(replay, entityId: 22_813, ownerId: 12_602);
+    }
+
+    [Fact]
+    public void Replay_20260909232117_Resolves_Current4136_ElementalistSummonOwnership()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentElementalistSummonOwnershipLayout}"));
+
+        Assert4136OwnedNpc(replay, entityId: 32_588, ownerId: 8_459);
+        Assert4136OwnedNpc(replay, entityId: 36_986, ownerId: 8_459);
+        Assert4136OwnedNpc(replay, entityId: 18_407, ownerId: 8_459);
+        Assert4136OwnedNpc(replay, entityId: 26_593, ownerId: 8_459);
+        Assert4136OwnedNpc(replay, entityId: 38_728, ownerId: 8_459);
+
+        int[] expectedElementalistSummonIds =
+        [
+            18_328, 18_407, 18_952, 20_017, 21_753, 22_029, 22_859, 23_126, 23_312, 23_677,
+            23_747, 26_593, 28_930, 28_933, 30_182, 30_395, 30_913, 31_673, 32_449, 32_588,
+            36_036, 36_986, 37_611, 37_929, 38_053, 38_728, 39_374, 39_867, 40_026
+        ];
+        var actualElementalistSummonIds = SceneReplayTestView.SummonOwnerByInstance(replay)
+            .Where(static pair => pair.Value == 8_459)
+            .Select(static pair => pair.Key)
+            .Order()
+            .ToArray();
+        Assert.Equal(expectedElementalistSummonIds, actualElementalistSummonIds);
+    }
+
+    [Fact]
+    public void Replay_20260910001840_Resolves_Current4136_DirectMode1FSummonOwnership()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentDirectMode1FSummonOwnershipLayout}"));
+
+        Assert4136OwnedNpc(replay, entityId: 33_185, ownerId: 8_966);
+        Assert4136OwnedNpc(replay, entityId: 38_173, ownerId: 8_966);
+    }
+
+    [Fact]
     public void Replay_20260702054027_Applies_Current3336_SelfIdentity()
     {
         SetResources();
@@ -1100,6 +1170,20 @@ public sealed class PacketLogReplayServiceTests
         Assert.True(replay.SceneOwner.Entities.TryGet(entityId, out var entity));
         Assert.Equal(npcCode, entity.NpcCode);
         Assert.Equal(kind, entity.Kind);
+    }
+
+    private static void Assert4136OwnedNpc(PacketLogReplayResult replay, int entityId, int ownerId)
+    {
+        Assert.True(replay.SceneOwner.Entities.TryGet(entityId, out var entity));
+        Assert.Equal(EntityOwnerKind.Summon, entity.OwnerKind);
+        Assert.Equal(ownerId, entity.OwnerEntityId);
+        Assert.Contains(
+            ReadAllJournalEntries(replay),
+            entry => entry.Raw.Opcode == 0x4136 &&
+                     entry.SourceEntityId == ownerId &&
+                     entry.State is { EntityId: var stateEntityId, StateCode: 0, Value0: var stateOwnerId } &&
+                     stateEntityId == entityId &&
+                     stateOwnerId == ownerId);
     }
 
     private static void AssertForceRosterProfile(IReadOnlyList<ReplayJournalEntrySnapshot> entries, string nickname, int originServerId, byte memberSlotIndex)
