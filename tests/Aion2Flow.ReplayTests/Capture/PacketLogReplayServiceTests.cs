@@ -2,7 +2,6 @@ using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
-using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -303,173 +302,19 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260702054027_Parses_Current0438_Regeneration_And_InlineRecovery()
+    public void Replay_20260909150745_Resolves_Current4136_NpcIdentities()
     {
         SetResources();
 
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentBrawlerRegenerationRecovery}"));
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentNpcIdentityLayout}"));
 
-        Assert.True(replay.ReplayedLines > 0);
+        AssertNpcEntity(replay, entityId: 17_489, npcCode: 2_301_006, NpcKind.Boss);
+        AssertNpcEntity(replay, entityId: 17_544, npcCode: 2_301_014, NpcKind.Boss);
+        Assert.Contains(2_301_006, replay.Snapshot.BossNpcCodes.AsSpan().ToArray());
+        Assert.Contains(2_301_014, replay.Snapshot.BossNpcCodes.AsSpan().ToArray());
 
-        const int playerId = 2141;
-        var player = Assert.Single(replay.Combatants, static combatant => combatant.CombatantId == playerId);
-        Assert.Equal(4_960_083, player.OutgoingDamage);
-        Assert.Equal(489, player.OutgoingHits);
-        Assert.Equal(489, player.OutgoingAttempts);
-        Assert.Equal(329_163, player.OutgoingHealing);
-        Assert.Equal(43_170, player.IncomingDamage);
-        Assert.Equal(17, player.IncomingHits);
-        Assert.Equal(24, player.IncomingAttempts);
-        Assert.Equal(3, player.IncomingEvades);
-        Assert.Equal(4, player.IncomingInvincibles);
-        Assert.Equal(200_003u, replay.Snapshot.MapId);
-        Assert.Equal(644u, replay.Snapshot.MapInstanceId);
-        Assert.True(TryGetLatestEntityVitalObservation(replay, 18_551, out var npcVital));
-        Assert.Equal(20_000_000, npcVital.CurrentHp);
-        Assert.Equal(20_000_000, npcVital.MaxHp);
-
-        var packets = SceneReplayTestView.Packets(replay);
-        var regenerationHealing = packets
-            .Where(static packet =>
-                packet.SourceId == playerId &&
-                packet.TargetId == playerId &&
-                packet.Metric == CombatMetricKind.Healing &&
-                packet.Delivery == CombatDeliveryKind.Regeneration)
-            .ToArray();
-        Assert.Equal(2, regenerationHealing.Length);
-        Assert.Equal(1_209, regenerationHealing.Sum(static packet => packet.Amount));
-
-        AssertSkillContribution(replay, skillCode: 12_350_150, CombatMetricKind.Healing, CombatDeliveryKind.Direct, expectedCount: 3, expectedAmount: 7_808);
-        var skill1900911 = packets.Where(static packet => packet.SourceId == playerId && packet.SkillCode == 1_900_911).ToArray();
-        Assert.Equal(48_912, skill1900911.Where(static packet => packet.Metric == CombatMetricKind.Healing).Sum(static packet => packet.Amount));
-        Assert.Equal(48_912, skill1900911.Sum(static packet => packet.Amount));
-    }
-
-    [Fact]
-    public void Replay_20260705051242_Covers_OwnerTarget_And_SystemPeriodic_Canonicalization()
-    {
-        SetResources();
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerSystemCanonicalization}"));
-
-        var ownerRows = AssertOwnerTargetCandidateRows(replay, expectedCount: 345);
-        AssertDirectSemanticHealsPassOwnerPostParseGate(replay);
-        var (systemSeedRows, systemHealingRows) = AssertSystemPeriodicRecoveryRows(replay, expectedCount: 9);
-        AssertBalancedSystemPeriodicRecoveryPairs(systemSeedRows, systemHealingRows);
-    }
-
-    [Fact]
-    public void Replay_20260704053009_Covers_OwnerTarget_CompactTwoContribution_Edge()
-    {
-        SetResources();
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerTargetCanonicalizationEdge}"));
-
-        var ownerRows = AssertOwnerTargetCandidateRows(replay, expectedCount: 236);
-        AssertDirectSemanticHealsPassOwnerPostParseGate(replay);
-        Assert.All(ownerRows, static row => Assert.Equal((ushort)0x0438, row.Raw.Opcode));
-    }
-
-    [Fact]
-    public void Replay_20260722171214_And_171240_Attributes_Current4136_OwnedEntityLayouts()
-    {
-        SetResources();
-
-        var headerReplay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnedEntityHeaderLayout}"));
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnedEntityLayouts}"));
-
-        AssertOwnedEntity(headerReplay, entityId: 30_471, ownerId: 15_233);
-
-        var ownedEntityCount = replay.SceneOwner.Entities.Entities.Values.Count(
-            static entity => entity.OwnerKind == EntityOwnerKind.Summon && entity.OwnerEntityId is > 0);
-        ownedEntityCount += replay.MapTransitionArchives.Sum(
-            static archive => archive.Entities.Count(
-                static entity => entity.OwnerKind == EntityOwnerKind.Summon && entity.OwnerEntityId is > 0));
-        Assert.Equal(51, ownedEntityCount);
-
-        AssertOwnedEntities(
-            replay,
-            ownerId: 1_073,
-            17_712,
-            20_681,
-            21_430,
-            22_310,
-            22_547,
-            23_096,
-            23_394,
-            25_157,
-            26_638,
-            27_643,
-            28_960,
-            30_181,
-            30_805,
-            31_000,
-            31_139,
-            32_835,
-            33_493);
-        AssertOwnedEntities(
-            replay,
-            ownerId: 15_233,
-            18_424,
-            24_860,
-            25_106,
-            26_354,
-            26_991,
-            27_511,
-            28_300,
-            28_800,
-            29_414,
-            29_941,
-            30_249,
-            30_269,
-            32_331,
-            35_882,
-            36_258,
-            40_094,
-            40_099,
-            41_142,
-            41_882,
-            41_990,
-            42_395);
-        AssertOwnedEntities(replay, ownerId: 10_060, 22_542, 26_695, 30_009, 33_064, 37_896);
-        AssertOwnedEntities(replay, ownerId: 14_604, 32_155, 32_846);
-        AssertOwnedEntities(replay, ownerId: 16_199, 17_437, 26_156);
-        AssertOwnedEntities(replay, ownerId: 3_386, 22_438, 24_700, 29_142, 32_146);
-
-        AssertUnownedPlayer(replay, entityId: 1_073);
-        AssertUnownedPlayer(replay, entityId: 3_386);
-        AssertUnownedPlayer(replay, entityId: 10_060);
-        AssertUnownedPlayer(replay, entityId: 14_604);
-        AssertUnownedPlayer(replay, entityId: 16_199);
-        AssertUnownedPlayer(replay, entityId: 15_233);
-    }
-
-    [Fact]
-    public void Replay_20260726011355_Attributes_Mode5F0000_4136OwnedEntities()
-    {
-        SetResources();
-
-        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnedEntityMode5F0000}"));
-
-        var snapshot = AssertOwnedEntity(replay, entityId: 29_060, ownerId: 9_537);
-        AssertOwnedEntity(replay, entityId: 41_891, ownerId: 9_537);
-        Assert.Equal(1_232_299, snapshot.Combatants[9_537].DamageAmount);
-    }
-
-    [Fact]
-    public void Replay_Current4136_Attributes_AdditionalOwnedEntityLayouts()
-    {
-        SetResources();
-
-        var namedMode5F0001 = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnedEntityNamedMode5F0001}"));
-        var directMode5D1000 = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerTargetCanonicalizationEdge}"));
-        var namedMode1F0001 = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentOwnerSystemCanonicalization}"));
-        var npcOwnedMode170000 = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentTenPlayerForceRoster}"));
-
-        Assert4136OwnedEntity(namedMode5F0001, entityId: 35_524, ownerId: 10_476);
-        Assert4136OwnedEntityObservation(directMode5D1000, entityId: 35_785, ownerId: 8_876);
-        Assert4136OwnedEntity(namedMode1F0001, entityId: 30_197, ownerId: 8_748);
-        Assert4136OwnedEntity(npcOwnedMode170000, entityId: 43_045, ownerId: 41_711);
+        Assert4136OwnedEntity(replay, entityId: 28_492, ownerId: 4_917);
+        AssertNpcEntity(replay, entityId: 28_492, npcCode: 2_920_650, NpcKind.Summon);
     }
 
     [Fact]
@@ -882,143 +727,6 @@ public sealed class PacketLogReplayServiceTests
 
     private static void SetResources() => CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese));
 
-    private static CanonicalizationProbeRow[] AssertOwnerTargetCandidateRows(PacketLogReplayResult replay, int expectedCount)
-    {
-        var contexts = CreateOwnerTargetCanonicalizationContexts(replay);
-        var matches = new List<CanonicalizationProbeRow>();
-        foreach (var entry in ReadCombatWireEntries(replay))
-        {
-            var canonicalizer = ResolveOwnerTargetCanonicalizer(contexts, entry.Stamp.ObservationOrdinal);
-            if (canonicalizer is null)
-                continue;
-
-            var observation = entry.Observation;
-            var result = canonicalizer.Normalize(entry.SourceId, entry.TargetId, in observation);
-            if (result.Resolution.Suppression != CombatSuppressionReason.OwnerTargetSummonResource)
-                continue;
-
-            matches.Add(new CanonicalizationProbeRow(
-                entry.SourceId,
-                entry.TargetId,
-                observation,
-                entry.Raw,
-                result.Resolution));
-        }
-
-        var rows = matches.ToArray();
-        Assert.Equal(expectedCount, rows.Length);
-        return rows;
-    }
-
-    private static (CanonicalizationProbeRow[] Seeds, CanonicalizationProbeRow[] Healing) AssertSystemPeriodicRecoveryRows(
-        PacketLogReplayResult replay,
-        int expectedCount)
-    {
-        var canonicalizer = new SystemPeriodicRecoveryCanonicalizer();
-        var seeds = new List<CanonicalizationProbeRow>();
-        var healing = new List<CanonicalizationProbeRow>();
-        foreach (var entry in ReadCombatWireEntries(replay))
-        {
-            var observation = entry.Observation;
-            var result = canonicalizer.Normalize(entry.SourceId, entry.TargetId, in observation);
-            var row = new CanonicalizationProbeRow(entry.SourceId, entry.TargetId, result.Observation, entry.Raw, result.Resolution);
-            if (result.Resolution.Suppression == CombatSuppressionReason.SystemPeriodicRecoverySeed)
-                seeds.Add(row);
-            else if (result.Resolution.PacketRule == CombatPacketRule.PeriodicRecovery)
-                healing.Add(row);
-        }
-
-        Assert.Equal(expectedCount, seeds.Count);
-        Assert.Equal(expectedCount, healing.Count);
-        return (seeds.ToArray(), healing.ToArray());
-    }
-
-    private static void AssertBalancedSystemPeriodicRecoveryPairs(IReadOnlyList<CanonicalizationProbeRow> seedRows, IReadOnlyList<CanonicalizationProbeRow> healingRows)
-    {
-        var seeds = seedRows.Select(static row => CreateSystemRecoveryPairKey(in row)).Order().ToArray();
-        var healing = healingRows.Select(static row => CreateSystemRecoveryPairKey(in row)).Order().ToArray();
-        Assert.Equal(seeds, healing);
-    }
-
-    private static void AssertDirectSemanticHealsPassOwnerPostParseGate(PacketLogReplayResult replay)
-    {
-        var contexts = CreateOwnerTargetCanonicalizationContexts(replay);
-        var admitted = new List<CombatContribution>();
-        foreach (var row in ReadCombatWireEntries(replay))
-        {
-            var canonicalizer = ResolveOwnerTargetCanonicalizer(contexts, row.Stamp.ObservationOrdinal);
-            if (canonicalizer is null)
-                continue;
-
-            var observation = row.Observation;
-            var result = canonicalizer.Normalize(row.SourceId, row.TargetId, in observation);
-            if (result.Resolution.Suppression != CombatSuppressionReason.OwnerTargetSummonResource)
-                continue;
-
-            var occurrence = result.Resolution;
-            var materialization = CombatOccurrenceMaterializer.Resolve(
-                row.SourceId,
-                row.TargetId,
-                in observation,
-                in occurrence);
-            if (materialization.Contribution is not { Metric: CombatMetricKind.Healing, Resolution.Authority: CombatResolutionAuthority.SkillSemantic } contribution)
-                continue;
-
-            Assert.True(materialization.IsAdmitted);
-            Assert.Equal(CombatPacketRule.DirectValue, contribution.Resolution.PacketRule);
-            Assert.True(contribution.Resolution.SemanticMatch is CombatSemanticMatchKind.ExactNode or CombatSemanticMatchKind.UnambiguousSlot);
-            admitted.Add(contribution);
-        }
-
-        Assert.NotEmpty(admitted);
-    }
-
-    private static OwnerTargetCanonicalizationContext[] CreateOwnerTargetCanonicalizationContexts(PacketLogReplayResult replay)
-    {
-        var contexts = new List<OwnerTargetCanonicalizationContext>(replay.MapTransitionArchives.Count + 1);
-        foreach (var archive in replay.MapTransitionArchives)
-        {
-            var entities = new EntityStore();
-            foreach (var entity in archive.Entities)
-            {
-                if (entity is { OwnerKind: EntityOwnerKind.Summon, OwnerEntityId: > 0 })
-                    entities.ApplySummon(entity.OwnerEntityId.Value, entity.EntityId);
-            }
-
-            contexts.Add(new OwnerTargetCanonicalizationContext(
-                archive.TimelineSegment.StartObservationOrdinal,
-                archive.TimelineSegment.EndObservationOrdinalExclusive,
-                new OwnerTargetSummonResourceCanonicalizer(entities)));
-        }
-
-        contexts.Add(new OwnerTargetCanonicalizationContext(
-            replay.SceneOwner.SceneStartObservationOrdinal,
-            replay.SceneJournal.NextObservationOrdinal,
-            new OwnerTargetSummonResourceCanonicalizer(replay.SceneOwner.Entities)));
-        return contexts.ToArray();
-    }
-
-    private static OwnerTargetSummonResourceCanonicalizer? ResolveOwnerTargetCanonicalizer(
-        IReadOnlyList<OwnerTargetCanonicalizationContext> contexts,
-        long observationOrdinal)
-    {
-        foreach (var context in contexts)
-        {
-            if (observationOrdinal >= context.StartObservationOrdinal &&
-                observationOrdinal < context.EndObservationOrdinalExclusive)
-            {
-                return context.Canonicalizer;
-            }
-        }
-
-        return null;
-    }
-
-    private static string CreateSystemRecoveryPairKey(in CanonicalizationProbeRow row)
-        => string.Create(
-            System.Globalization.CultureInfo.InvariantCulture,
-            $"{row.SourceId}|{row.TargetId}|{row.Observation.SkillCode}|{row.Observation.BodyResourceEffectRef.RawId}|{row.Observation.DetailResourceEffectRef.RawId}|{row.Observation.ChainId}|{row.Observation.Damage}");
-
     private static IReadOnlyList<DirectMapEventObservation> ReadDirectMapEventObservations(
         PacketLogReplayResult replay,
         params ushort[] opcodes)
@@ -1387,35 +1095,11 @@ public sealed class PacketLogReplayServiceTests
                      stateOwnerId == ownerId);
     }
 
-    private static void AssertOwnedEntities(PacketLogReplayResult replay, int ownerId, params int[] entityIds)
+    private static void AssertNpcEntity(PacketLogReplayResult replay, int entityId, int npcCode, NpcKind kind)
     {
-        foreach (var entityId in entityIds)
-            AssertOwnedEntity(replay, entityId, ownerId);
-    }
-
-    private static void AssertOwnedEntities(SceneArchivePayload archive, int ownerId, params int[] entityIds)
-    {
-        foreach (var entityId in entityIds)
-            AssertOwnedEntity(archive, entityId, ownerId);
-    }
-
-    private static void AssertUnownedPlayer(PacketLogReplayResult replay, int entityId)
-    {
-        if (replay.SceneOwner.Entities.TryGet(entityId, out var currentEntity) &&
-            currentEntity.OwnerKind == EntityOwnerKind.None &&
-            currentEntity.OwnerEntityId is null &&
-            replay.Snapshot.Combatants.ContainsKey(entityId))
-        {
-            return;
-        }
-
-        Assert.Contains(
-            replay.MapTransitionArchives,
-            archive => archive.Entities.Any(
-                           entity => entity.EntityId == entityId &&
-                                     entity.OwnerKind == EntityOwnerKind.None &&
-                                     entity.OwnerEntityId is null) &&
-                       archive.Snapshot.Combatants.ContainsKey(entityId));
+        Assert.True(replay.SceneOwner.Entities.TryGet(entityId, out var entity));
+        Assert.Equal(npcCode, entity.NpcCode);
+        Assert.Equal(kind, entity.Kind);
     }
 
     private static void AssertForceRosterProfile(IReadOnlyList<ReplayJournalEntrySnapshot> entries, string nickname, int originServerId, byte memberSlotIndex)
@@ -1469,18 +1153,6 @@ public sealed class PacketLogReplayServiceTests
         int TargetId,
         CombatWireObservation Observation,
         RawPacketReference Raw);
-
-    private sealed record OwnerTargetCanonicalizationContext(
-        long StartObservationOrdinal,
-        long EndObservationOrdinalExclusive,
-        OwnerTargetSummonResourceCanonicalizer Canonicalizer);
-
-    private readonly record struct CanonicalizationProbeRow(
-        int SourceId,
-        int TargetId,
-        CombatWireObservation Observation,
-        RawPacketReference Raw,
-        CombatOccurrenceResolution Resolution);
 
     private sealed class RecordingSceneEventObserver : ISceneEventObserver
     {

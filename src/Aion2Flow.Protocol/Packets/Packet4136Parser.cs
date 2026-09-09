@@ -7,10 +7,9 @@ internal readonly record struct Packet4136State(int EntityId, byte Mode0, byte M
 
 internal static class Packet4136Parser
 {
-    private const int NpcCodeOffsetFromModes = 3;
-    private const int SummonCreateNpcCodeOffsetFromModes = 16;
-    private const int ExtendedStateBodyLength = 104;
-    private const int ExtendedNpcStateBodyLength = 114;
+    private const int NpcCodeOffsetFromModes = 5;
+    private const int ExtendedStateBodyLength = 106;
+    private const int ExtendedNpcStateBodyLength = 116;
 
     private static ReadOnlySpan<byte> OwnerSectionSentinel => [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
 
@@ -89,39 +88,11 @@ internal static class Packet4136Parser
         npcCode = 0;
         ownerId = 0;
 
-        if (mode2 == 0x00 && IsDirectNpcCodeLayout(mode0, mode1))
-        {
-            return TryReadOwnedNpcAt(packet, entityId, tailStart + NpcCodeOffsetFromModes, out npcCode, out ownerId);
-        }
-
-        if (mode1 != 0x00 || mode2 != 0x01)
-        {
-            return false;
-        }
-
-        if (mode0 == 0x5f)
-        {
-            return TryReadOwnedNpcAt(packet, entityId, tailStart + SummonCreateNpcCodeOffsetFromModes, out npcCode, out ownerId) ||
-                   TryReadNamePrefixedOwnedNpc(packet, tailStart, entityId, out npcCode, out ownerId);
-        }
-
-        if (mode0 == 0x1f)
-        {
-            return TryReadNamePrefixedOwnedNpc(packet, tailStart, entityId, out npcCode, out ownerId);
-        }
-
-        return false;
+        return mode0 == 0x1f &&
+               mode1 == 0x00 &&
+               mode2 == 0x00 &&
+               TryReadNamePrefixedOwnedNpc(packet, tailStart, entityId, out npcCode, out ownerId);
     }
-
-    private static bool IsDirectNpcCodeLayout(byte mode0, byte mode1) =>
-        (mode0, mode1) is
-            (0x17, 0x00) or
-            (0x1d, 0x10) or
-            (0x1f, 0x00) or
-            (0x1f, 0x10) or
-            (0x5d, 0x10) or
-            (0x5f, 0x00) or
-            (0x5f, 0x10);
 
     private static bool TryReadNamePrefixedOwnedNpc(ReadOnlySpan<byte> packet, int tailStart, int entityId, out int npcCode, out int ownerId)
     {

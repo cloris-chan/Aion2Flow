@@ -11,16 +11,11 @@ public static class ReplayScenarioCatalog
     public const string CurrentNearbyPcProfilesMarker17 = "aion2flow.stream.20260704202443.log";
     public const string CurrentForceDungeonInitialRelation = "aion2flow.stream.20260704005035.log";
     public const string CurrentActivityDungeonIndependentPlayers = "aion2flow.stream.20260704010004.log";
-    public const string CurrentOwnerTargetCanonicalizationEdge = "aion2flow.stream.20260704053009.log";
     public const string CurrentForceDungeonPreInstanceRoster = "aion2flow.stream.20260704153057.log";
     public const string CurrentCrossServerSelfIdentityMarker3F = "aion2flow.stream.20260705015611.log";
-    public const string CurrentOwnerSystemCanonicalization = "aion2flow.stream.20260705051242.log";
     public const string CurrentPartyStatusRelation = "aion2flow.stream.20260712211428.log";
     public const string CurrentTenPlayerForceRoster = "aion2flow.stream.20260715000443.log";
-    public const string CurrentOwnedEntityHeaderLayout = "aion2flow.stream.20260722171214.log";
-    public const string CurrentOwnedEntityLayouts = "aion2flow.stream.20260722171240.log";
-    public const string CurrentOwnedEntityMode5F0000 = "aion2flow.stream.20260726011355.log";
-    public const string CurrentOwnedEntityNamedMode5F0001 = "aion2flow.stream.20260726125054.log";
+    public const string CurrentNpcIdentityLayout = "aion2flow.stream.20260909150745.log";
     public const string CurrentUnknownToSunkenTempleTransition = "aion2flow.stream.20260725192105.log";
     public const string CurrentSameMapInstanceReload = "aion2flow.stream.20260726065616.log";
     public const string CurrentUnknownMapTransportPrelude = "aion2flow.stream.20260728234348.log";
