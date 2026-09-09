@@ -82,8 +82,8 @@ public sealed class ProtocolRoundTripClockTests
     [Fact]
     public void CurrentEchoReachesObserverBeforeUtcCorrection()
     {
-        const long clientSentUnixMilliseconds = 1_786_515_131_286;
-        const long serverUnixMilliseconds = 1_786_515_131_416;
+        const long clientSentUnixMilliseconds = 1_788_923_116_757;
+        const long serverUnixMilliseconds = 1_788_923_116_862;
         const long arrivalTimestamp = 123_456_789;
         var processingTimestamp = new PacketProcessingTimestamp(
             clientSentUnixMilliseconds + 54,
@@ -94,7 +94,7 @@ public sealed class ProtocolRoundTripClockTests
             value => observation = value);
 
         Assert.True(processor.AppendAndProcess(
-            Convert.FromHexString("1A033600009663C606233A0000188C99F49F010000D620"),
+            Convert.FromHexString("1803360000D5544D96233A00003E7D2084A0010000"),
             in Connection,
             in processingTimestamp));
         Assert.True(observation.HasValue);
@@ -241,14 +241,11 @@ public sealed class ProtocolRoundTripClockTests
     private static byte[] Build0336(long clientSentUnixMilliseconds, long serverUnixMilliseconds)
     {
         const long yearOneToUnixEpochMilliseconds = 62_135_596_800_000;
-        var body = new byte[20];
+        var body = new byte[18];
         BinaryPrimitives.WriteInt64LittleEndian(
             body.AsSpan(2),
             yearOneToUnixEpochMilliseconds + clientSentUnixMilliseconds);
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(10), serverUnixMilliseconds);
-        body[18] = 0xd6;
-        body[19] = 0x20;
-
         Span<byte> prefix = stackalloc byte[5];
         Assert.True(PacketTransportCodec.TryWriteVarInt(body.Length + 6, prefix, out var prefixLength));
         var frame = new byte[prefixLength + sizeof(ushort) + body.Length];

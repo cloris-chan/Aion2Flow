@@ -256,25 +256,24 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void ReplayMany_20260812_RoundTripLifecycle_EmitsCurrentEchoes()
+    public void Replay_20260809050345_EmitsCurrentRoundTripEchoes()
     {
-        var paths = ReplayScenarioCatalog.CurrentRoundTripLifecycle
-            .Select(static fileName => FixtureHelper.GetPath($"logs/{fileName}"))
-            .ToArray();
         var observations = new List<ProtocolRoundTripObservation>();
 
-        var replay = PacketLogReplayService.ReplayMany(paths, observations.Add);
+        var replay = PacketLogReplayService.ReplayMany(
+            [FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentChargeCooldown}")],
+            observations.Add);
 
-        Assert.Equal(3_314, replay.TotalLines);
-        Assert.Equal(8, observations.Count);
+        Assert.Equal(2_145, replay.TotalLines);
+        Assert.Equal(10, observations.Count);
         Assert.All(observations, static observation =>
             Assert.InRange(
                 observation.ServerUnixMilliseconds - observation.ClientSentUnixMilliseconds,
-                129,
-                132));
+                139,
+                144));
         Assert.Contains(observations, static observation =>
-            observation.ClientSentUnixMilliseconds == 1_786_515_131_286 &&
-            observation.ServerUnixMilliseconds == 1_786_515_131_416);
+            observation.ClientSentUnixMilliseconds == 1_786_223_034_263 &&
+            observation.ServerUnixMilliseconds == 1_786_223_034_407);
     }
 
     [Fact]

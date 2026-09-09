@@ -531,13 +531,11 @@ public sealed class PacketTransportStreamDeframerTests
 
     private static byte[] Build0336(long clientSentUnixMilliseconds, long serverUnixMilliseconds)
     {
-        var body = new byte[20];
+        var body = new byte[18];
         BinaryPrimitives.WriteInt64LittleEndian(
             body.AsSpan(2),
             YearOneToUnixEpochMilliseconds + clientSentUnixMilliseconds);
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(10), serverUnixMilliseconds);
-        body[18] = 0xd6;
-        body[19] = 0x20;
         return BuildFrame(0x03, 0x36, body);
     }
 
