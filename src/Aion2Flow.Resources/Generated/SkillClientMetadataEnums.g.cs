@@ -121,6 +121,20 @@ public enum SkillClientElementalSummonGroupType : int
     Wind = 16
 }
 
+public enum SkillClientGroundType : byte
+{
+    None = 0,
+    Direction = 1,
+    Location = 2
+}
+
+public enum SkillClientGroundShapeType : byte
+{
+    None = 0,
+    Circle = 1,
+    Rectangle = 2
+}
+
 public enum SkillClientSkillAutoType : byte
 {
     None = 0,
