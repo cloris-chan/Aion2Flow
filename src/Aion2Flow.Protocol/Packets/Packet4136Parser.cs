@@ -132,7 +132,7 @@ internal static class Packet4136Parser
             return false;
         }
 
-        if (mode0 != 0x1f || mode1 != 0x00 || mode2 != 0x00)
+        if (mode0 != 0x1f || mode1 is not (0x00 or 0x10) || mode2 != 0x00)
         {
             return false;
         }

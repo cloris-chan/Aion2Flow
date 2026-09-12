@@ -388,6 +388,29 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
+    public void Replay_20260912203027_Resolves_Current4136_DirectMode1F10SummonOwnership()
+    {
+        SetResources();
+
+        var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentDirectMode1F10SummonOwnershipLayout}"));
+
+        int[] expectedSummonIds =
+        [
+            21_846, 22_854, 23_191, 23_917, 24_274, 25_019, 28_058, 28_518, 28_520, 31_645,
+            34_330, 34_991, 34_998, 35_220, 36_336, 37_447, 37_712, 37_741, 39_684,
+            39_854, 40_682, 42_867, 42_871, 43_310, 44_397, 44_830, 44_843, 45_019
+        ];
+        var actualSummonIds = SceneReplayTestView.SummonOwnerByInstance(replay)
+            .Where(static pair => pair.Value == 9_303)
+            .Select(static pair => pair.Key)
+            .Order()
+            .ToArray();
+        Assert.Equal(expectedSummonIds, actualSummonIds);
+        Assert4136OwnedNpc(replay, entityId: 40_682, ownerId: 9_303);
+        Assert.Equal(381_926_629, replay.Snapshot.Combatants[9_303].DamageAmount);
+    }
+
+    [Fact]
     public void Replay_20260702054027_Applies_Current3336_SelfIdentity()
     {
         SetResources();

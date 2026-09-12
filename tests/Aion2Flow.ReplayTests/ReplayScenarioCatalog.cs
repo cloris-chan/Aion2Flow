@@ -20,6 +20,7 @@ public static class ReplayScenarioCatalog
     public const string CurrentNamedSummonOwnershipLayout = "aion2flow.stream.20260909222525.log";
     public const string CurrentElementalistSummonOwnershipLayout = "aion2flow.stream.20260909232117.log";
     public const string CurrentDirectMode1FSummonOwnershipLayout = "aion2flow.stream.20260910001840.log";
+    public const string CurrentDirectMode1F10SummonOwnershipLayout = "aion2flow.stream.20260912203027.log";
     public const string CurrentUnknownToSunkenTempleTransition = "aion2flow.stream.20260725192105.log";
     public const string CurrentSameMapInstanceReload = "aion2flow.stream.20260726065616.log";
     public const string CurrentUnknownMapTransportPrelude = "aion2flow.stream.20260728234348.log";

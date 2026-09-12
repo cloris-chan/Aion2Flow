@@ -16,4 +16,18 @@ public sealed class Packet4136ParserTests
         Assert.Equal(2_921_378, parsed.NpcCode);
         Assert.Equal(7_778, parsed.OwnerId);
     }
+
+    [Fact]
+    public void Parses_Current1F1000_SummonOwnerFrame()
+    {
+        var packet = Convert.FromHexString(
+            "AD014136EABD021F10000000FE8E2C00400200750FC7004706C700F457469A89FC42CB5901CCC30ACCC30AFC1B0000FC1B0000000000000000000000000000F0C6020064000000F04902000100000000000000A086010000000000C8C611000101011101A58DAF09FFFFFFFFFFFFFFFF8075D52ABB030000D748190251870FC7EE1F07C7002C57460702065724000003CD0094120000D00054030000D600C8000000320000004C1E030000");
+
+        Assert.True(Packet4136Parser.TryParse(packet, out var parsed));
+        Assert.Equal(40_682, parsed.EntityId);
+        Assert.Equal(0x1f, parsed.Mode0);
+        Assert.Equal(0x10, parsed.Mode1);
+        Assert.Equal(2_920_190, parsed.NpcCode);
+        Assert.Equal(9_303, parsed.OwnerId);
+    }
 }
