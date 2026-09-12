@@ -423,6 +423,12 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _latestLiveSnapshot = nextLiveFrame.Snapshot;
         RefreshCaptureIndicators();
 
+        if (ShouldReturnToLiveAfterBoss(nextLiveFrame.Snapshot))
+        {
+            ReturnToLive();
+            return;
+        }
+
         if (IsViewingArchivedEncounter)
         {
             return;
@@ -569,6 +575,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                     SettingsFlyout.CombatantStatisticsScope,
                     Combatants.ContainsKey,
                     _bossFocusDisplayGroups);
+                if (SettingsFlyout.ShowFocusStatusBar)
+                    SyncBossFocuses();
                 RefreshCombatantBossShares(_bossFocusDisplayGroups, _archivedBossDamageContributions);
             }
             else
@@ -1100,9 +1108,26 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         {
             RawPacketDump.RotateLogs();
             if (payload is not null)
-                _encounterArchiveService.Archive(payload, "map-transition", isAutomatic: true);
+            {
+                var record = _encounterArchiveService.Archive(payload, "map-transition", isAutomatic: true);
+                if (record is not null && payload.Kind == SceneKind.Boss && !IsViewingArchivedEncounter)
+                    SelectMapTransitionHistory(record);
+            }
         }
     }
+
+    private void SelectMapTransitionHistory(ArchivedEncounterRecord record)
+    {
+        RebuildEncounterHistory();
+        var history = EncounterHistory.FirstOrDefault(item => item.Record.Id == record.Id);
+        if (history is not null)
+            SelectedEncounterHistory = history;
+    }
+
+    private bool ShouldReturnToLiveAfterBoss(SceneCombatSnapshot liveSnapshot) =>
+        IsViewingArchivedEncounter &&
+        liveSnapshot.Kind == SceneKind.Boss &&
+        liveSnapshot.BossFocuses.Count > 0;
 
     private void ResetLivePresentation()
     {

@@ -967,6 +967,7 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.NotNull(record.ScenePayload);
         Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
         Assert.NotNull(record.ScenePayload);
+        Assert.False(fixture.ViewModel.IsViewingArchivedEncounter);
     }
 
     [Fact]
@@ -986,6 +987,65 @@ public sealed class MainViewModelCombatantFilterTests
         Assert.Equal(600002u, record.ScenePayload.Snapshot.MapId);
         Assert.Equal(396972u, record.ScenePayload.Snapshot.MapInstanceId);
         Assert.Equal(400, record.ScenePayload!.CreateDetailDelta(300).Combatant!.Value.OutgoingDamage);
+    }
+
+    [Fact]
+    public void RefreshCombatStats_BossScene_MapTransitionKeepsArchivedContextUntilNextBoss()
+    {
+        var fixture = MainViewModelFixture.Create(SceneKind.Boss);
+        var sink = fixture.CreateLiveSink();
+        var origin = fixture.SceneStartedMilliseconds;
+        var mapSource = new PacketObservationSource(origin + 1, 0, 0x2136, 0, 1, default);
+        sink.SetCurrentMap(in mapSource, 200003);
+
+        var metadataSource = new PacketObservationSource(origin + 100, 0, 0, 0, 100, default);
+        sink.AppendNickname(in metadataSource, 100, "Player", characterClass: CharacterClass.Gladiator);
+        sink.AppendNpcCode(in metadataSource, 300, 2_100_002);
+        sink.AppendNpcKind(in metadataSource, 300, NpcKind.Boss);
+        AppendDamage(sink, 100, 300, 11000010, 350, origin + 1_000, 1);
+        AppendDamage(sink, 100, 300, 11000010, 350, origin + 2_000, 2);
+        sink.CompleteFlush(1);
+        sink.CompleteFlush(2);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        var liveBoss = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.False(fixture.ViewModel.IsViewingArchivedEncounter);
+        Assert.Equal(300, liveBoss.InstanceId);
+        var livePlayer = Assert.Single(fixture.ViewModel.Combatants);
+        var liveDps = livePlayer.DamagePerSecond;
+        var liveTotalDps = fixture.ViewModel.TotalFilteredDamagePerSecond;
+        Assert.Equal(700, livePlayer.Damage);
+
+        fixture.AppendSceneMap(200004, 113516);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.Single(fixture.Archive.History);
+        Assert.Equal(SceneKind.Boss, fixture.Archive.History[0].ScenePayload.Kind);
+        Assert.True(fixture.ViewModel.IsViewingArchivedEncounter);
+        Assert.NotNull(fixture.ViewModel.SelectedEncounterHistory);
+        Assert.Equal(200004u, fixture.CreateSceneSnapshot().MapId);
+        Assert.Equal(200003u, fixture.ViewModel.LiveSceneMapId);
+        var archivedBoss = Assert.Single(fixture.ViewModel.BossFocuses);
+        Assert.Equal(300, archivedBoss.InstanceId);
+        var archivedPlayer = Assert.Single(fixture.ViewModel.Combatants);
+        Assert.Equal(700, archivedPlayer.Damage);
+        Assert.Equal(liveDps, archivedPlayer.DamagePerSecond);
+        Assert.Equal(liveTotalDps, fixture.ViewModel.TotalFilteredDamagePerSecond);
+
+        var nextSink = fixture.CreateLiveSink();
+        var nextOrigin = fixture.SceneStartedMilliseconds;
+        var nextMetadataSource = new PacketObservationSource(nextOrigin + 100, 3, 0, 0, 100, default);
+        nextSink.AppendNpcCode(in nextMetadataSource, 301, 2_100_351);
+        nextSink.AppendNpcKind(in nextMetadataSource, 301, NpcKind.Boss);
+        AppendDamage(nextSink, 100, 301, 11000010, 900, nextOrigin + 1_000, 3);
+        nextSink.CompleteFlush(3);
+        fixture.ViewModel.RefreshCombatStatsForTesting();
+
+        Assert.False(fixture.ViewModel.IsViewingArchivedEncounter);
+        Assert.Null(fixture.ViewModel.SelectedEncounterHistory);
+        Assert.Equal(200004u, fixture.ViewModel.LiveSceneMapId);
+        Assert.Equal(900, Assert.Single(fixture.ViewModel.Combatants).Damage);
+        Assert.Equal(301, Assert.Single(fixture.ViewModel.BossFocuses).InstanceId);
     }
 
     [Fact]
