@@ -5,14 +5,14 @@ internal readonly record struct ResourceLocalePackEntry(string Language, string 
 internal static class ResourcePackManifest
 {
     public const string SharedResourceName = "Cloris.Aion2Flow.Resources.Packs.shared.bin";
-    public const int SharedUncompressedLength = 2785864;
-    public const ulong SharedChecksum = 13144929307590307511UL;
+    public const int SharedUncompressedLength = 2788100;
+    public const ulong SharedChecksum = 12746622487154871836UL;
 
     public static IReadOnlyList<ResourceLocalePackEntry> Locales { get; } =
     [
-        new("en-US", "Cloris.Aion2Flow.Resources.Packs.en-US.bin", 654254, 13706723376715609278UL),
-        new("ko-KR", "Cloris.Aion2Flow.Resources.Packs.ko-KR.bin", 704526, 7901082218958593786UL),
-        new("zh-TW", "Cloris.Aion2Flow.Resources.Packs.zh-TW.bin", 658956, 16389532605076298282UL)
+        new("en-US", "Cloris.Aion2Flow.Resources.Packs.en-US.bin", 654350, 13111914259075473266UL),
+        new("ko-KR", "Cloris.Aion2Flow.Resources.Packs.ko-KR.bin", 704629, 570520127579564427UL),
+        new("zh-TW", "Cloris.Aion2Flow.Resources.Packs.zh-TW.bin", 659044, 3884827554829978513UL)
     ];
 
     public static ResourceLocalePackEntry GetLocale(string language)
