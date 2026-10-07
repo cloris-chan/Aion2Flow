@@ -255,7 +255,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260809050345_EmitsCurrentRoundTripEchoes()
+    public void Replay_20260809050345_IgnoresLegacyRoundTripTimestamps()
     {
         var observations = new List<ProtocolRoundTripObservation>();
 
@@ -264,15 +264,7 @@ public sealed class PacketLogReplayServiceTests
             observations.Add);
 
         Assert.Equal(2_145, replay.TotalLines);
-        Assert.Equal(10, observations.Count);
-        Assert.All(observations, static observation =>
-            Assert.InRange(
-                observation.ServerUnixMilliseconds - observation.ClientSentUnixMilliseconds,
-                139,
-                144));
-        Assert.Contains(observations, static observation =>
-            observation.ClientSentUnixMilliseconds == 1_786_223_034_263 &&
-            observation.ServerUnixMilliseconds == 1_786_223_034_407);
+        Assert.Empty(observations);
     }
 
     [Fact]

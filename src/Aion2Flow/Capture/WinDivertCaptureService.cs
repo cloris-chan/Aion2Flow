@@ -683,7 +683,6 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
 
         if (TryObserveProtocolRoundTrip(
                 in observation,
-                _captureTimestampMapper.ToCurrentUtcUnixMilliseconds(observation.ArrivalTimestamp),
                 Stopwatch.GetTimestamp(),
                 out var roundTripMilliseconds))
         {
@@ -693,7 +692,6 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
 
     internal bool TryObserveProtocolRoundTrip(
         in ProtocolRoundTripObservation observation,
-        long arrivalUnixMilliseconds,
         long nowTimestamp,
         out double roundTripMilliseconds)
     {
@@ -707,8 +705,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
 
         return _protocolRttEstimator.TryObserveEcho(
             admission.Generation,
-            observation.ClientSentUnixMilliseconds,
-            arrivalUnixMilliseconds,
+            observation.ClientSentMonotonicMilliseconds,
             observation.ArrivalTimestamp,
             nowTimestamp,
             out roundTripMilliseconds);

@@ -11,7 +11,7 @@ internal static class PacketTelemetryHandler
             return false;
         }
 
-        context.ObserveProtocolRoundTrip(parsed.ClientSentUnixMilliseconds, parsed.ServerUnixMilliseconds);
+        context.ObserveProtocolRoundTrip(parsed.ClientSentMonotonicMilliseconds);
         return context.MarkParsed();
     }
 }

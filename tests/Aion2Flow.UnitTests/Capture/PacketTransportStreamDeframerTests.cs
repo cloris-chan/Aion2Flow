@@ -11,7 +11,6 @@ namespace Cloris.Aion2Flow.Tests.Capture;
 
 public sealed class PacketTransportStreamDeframerTests
 {
-    private const long YearOneToUnixEpochMilliseconds = 62_135_596_800_000;
     private static readonly TcpConnection Connection = new(1, 2, 3, 4);
 
     [Fact]
@@ -171,10 +170,10 @@ public sealed class PacketTransportStreamDeframerTests
     [Fact]
     public void FixedLengthCompressedFrameReachesPacketProcessor()
     {
-        const long clientSentUnixMilliseconds = 1_800_000_000_000;
-        const long serverUnixMilliseconds = clientSentUnixMilliseconds + 25;
+        const uint clientSentMonotonicMilliseconds = 6_364_226;
+        const long serverUnixMilliseconds = 1_800_000_000_025;
         const long arrivalTimestamp = 123_456_789;
-        var inner = Build0336(clientSentUnixMilliseconds, serverUnixMilliseconds);
+        var inner = Build0336(clientSentMonotonicMilliseconds, serverUnixMilliseconds);
         var compressed = BuildCompressedFrame(inner);
         ProtocolRoundTripObservation? observation = null;
         using var processor = new PacketStreamProcessor(
@@ -189,21 +188,20 @@ public sealed class PacketTransportStreamDeframerTests
             in Connection,
             in timestamp));
         Assert.True(observation.HasValue);
-        Assert.Equal(clientSentUnixMilliseconds, observation.Value.ClientSentUnixMilliseconds);
-        Assert.Equal(serverUnixMilliseconds, observation.Value.ServerUnixMilliseconds);
+        Assert.Equal(clientSentMonotonicMilliseconds, observation.Value.ClientSentMonotonicMilliseconds);
         Assert.Equal(arrivalTimestamp, observation.Value.ArrivalTimestamp);
     }
 
     [Fact]
     public void ParsedFrameCompletesFlushWithTrailingPartialEnvelopeHeader()
     {
-        const long clientSentUnixMilliseconds = 1_800_000_000_000;
-        const long serverUnixMilliseconds = clientSentUnixMilliseconds + 25;
+        const uint clientSentMonotonicMilliseconds = 6_364_226;
+        const long serverUnixMilliseconds = 1_800_000_000_025;
         var scene = new SceneLiveReadModel();
         using var processor = new PacketStreamProcessor(
             SceneSinkFactory.CreateForLive(scene)(),
             null);
-        var frame = Build0336(clientSentUnixMilliseconds, serverUnixMilliseconds);
+        var frame = Build0336(clientSentMonotonicMilliseconds, serverUnixMilliseconds);
         var nextEnvelope = BuildEnvelope(BuildFrame(0x15, 0x36, new byte[16]));
 
         Assert.True(processor.AppendAndProcess(
@@ -286,7 +284,7 @@ public sealed class PacketTransportStreamDeframerTests
     public void DirectTickCrossingPlausibleEnvelopeHeaderReachesRoundTripParser()
     {
         const long serverUnixMilliseconds = 0x000000000546AD01;
-        const long clientUnixMilliseconds = serverUnixMilliseconds - 25;
+        const long clientMonotonicMilliseconds = serverUnixMilliseconds - 25;
         var leadingFrame = BuildFrame(0x15, 0x36, new byte[392]);
         var crossingFrame = BuildFrame(0x23, 0x36, new byte[24]);
         crossingFrame[19] = 0xad;
@@ -294,7 +292,7 @@ public sealed class PacketTransportStreamDeframerTests
         crossingFrame[21] = 0x05;
         crossingFrame[22] = 0x00;
         var tick = BuildFrame(0x00, 0x36, WriteInt64(serverUnixMilliseconds));
-        var roundTrip = Build0336(clientUnixMilliseconds, serverUnixMilliseconds);
+        var roundTrip = Build0336(clientMonotonicMilliseconds, serverUnixMilliseconds);
         var payload = Concat(
             [0x9f, 0x01, 0x00, 0x00],
             leadingFrame,
@@ -312,8 +310,7 @@ public sealed class PacketTransportStreamDeframerTests
             in Connection,
             serverUnixMilliseconds));
         Assert.True(observation.HasValue);
-        Assert.Equal(clientUnixMilliseconds, observation.Value.ClientSentUnixMilliseconds);
-        Assert.Equal(serverUnixMilliseconds, observation.Value.ServerUnixMilliseconds);
+        Assert.Equal((uint)(clientMonotonicMilliseconds & 0x00ff_ffff), observation.Value.ClientSentMonotonicMilliseconds);
     }
 
     [Fact]
@@ -529,12 +526,12 @@ public sealed class PacketTransportStreamDeframerTests
         Assert.Equal(frame, deframer.CanonicalData.ToArray());
     }
 
-    private static byte[] Build0336(long clientSentUnixMilliseconds, long serverUnixMilliseconds)
+    private static byte[] Build0336(long clientSentMonotonicMilliseconds, long serverUnixMilliseconds)
     {
         var body = new byte[18];
-        BinaryPrimitives.WriteInt64LittleEndian(
+        BinaryPrimitives.WriteUInt64LittleEndian(
             body.AsSpan(2),
-            YearOneToUnixEpochMilliseconds + clientSentUnixMilliseconds);
+            (1_000UL << 24) | ((ulong)clientSentMonotonicMilliseconds & 0x00ff_ffff));
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(10), serverUnixMilliseconds);
         return BuildFrame(0x03, 0x36, body);
     }

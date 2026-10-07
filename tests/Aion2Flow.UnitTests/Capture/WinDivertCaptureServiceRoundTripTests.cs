@@ -31,17 +31,16 @@ public sealed class WinDivertCaptureServiceRoundTripTests
             var arrivalTimestamp = Stopwatch.GetTimestamp();
             var observation = new ProtocolRoundTripObservation(
                 supplemental,
-                ClientSentUnixMilliseconds: 1_000,
-                ServerUnixMilliseconds: 0,
+                ClientSentMonotonicMilliseconds: GetClientTimestampBefore(arrivalTimestamp, 78),
                 ArrivalTimestamp: arrivalTimestamp);
 
             Assert.True(capture.TryObserveProtocolRoundTrip(
                 in observation,
-                arrivalUnixMilliseconds: 1_078,
                 nowTimestamp: arrivalTimestamp,
                 out var roundTripMilliseconds));
-            Assert.Equal(78, roundTripMilliseconds);
-            Assert.Equal(78, capture.CurrentRoundTripTimeMilliseconds);
+            Assert.InRange(roundTripMilliseconds, 78, 79);
+            Assert.NotNull(capture.CurrentRoundTripTimeMilliseconds);
+            Assert.InRange(capture.CurrentRoundTripTimeMilliseconds.Value, 78, 79);
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
             Assert.Equal(primary, lockedConnection);
 
@@ -52,7 +51,8 @@ public sealed class WinDivertCaptureServiceRoundTripTests
                 out _));
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out lockedConnection));
             Assert.Equal(supplemental, lockedConnection);
-            Assert.Equal(78, capture.CurrentRoundTripTimeMilliseconds);
+            Assert.NotNull(capture.CurrentRoundTripTimeMilliseconds);
+            Assert.InRange(capture.CurrentRoundTripTimeMilliseconds.Value, 78, 79);
 
             var replacement = new TcpConnection(0x0700000A, 0x0800000A, 7_135, 1_543);
             Assert.True(CaptureConnectionGate.TryPromote(
@@ -89,13 +89,11 @@ public sealed class WinDivertCaptureServiceRoundTripTests
             var arrivalTimestamp = Stopwatch.GetTimestamp();
             var observation = new ProtocolRoundTripObservation(
                 unknown,
-                ClientSentUnixMilliseconds: 1_000,
-                ServerUnixMilliseconds: 0,
+                ClientSentMonotonicMilliseconds: GetClientTimestampBefore(arrivalTimestamp, 78),
                 ArrivalTimestamp: arrivalTimestamp);
 
             Assert.False(capture.TryObserveProtocolRoundTrip(
                 in observation,
-                arrivalUnixMilliseconds: 1_078,
                 nowTimestamp: arrivalTimestamp,
                 out _));
             Assert.Null(capture.CurrentRoundTripTimeMilliseconds);
@@ -104,5 +102,11 @@ public sealed class WinDivertCaptureServiceRoundTripTests
         {
             CaptureConnectionGate.Unlock();
         }
+    }
+
+    private static uint GetClientTimestampBefore(long arrivalTimestamp, int roundTripMilliseconds)
+    {
+        var arrivalMilliseconds = (long)Math.Floor(arrivalTimestamp * 1_000d / Stopwatch.Frequency);
+        return (uint)((arrivalMilliseconds - roundTripMilliseconds) & 0x00ff_ffff);
     }
 }

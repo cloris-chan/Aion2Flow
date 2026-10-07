@@ -3,12 +3,12 @@ using Cloris.Aion2Flow.Protocol.Readers;
 
 namespace Cloris.Aion2Flow.Protocol.Packets;
 
-internal readonly record struct Packet0336RoundTrip(long ClientSentUnixMilliseconds, long ServerUnixMilliseconds);
+internal readonly record struct Packet0336RoundTrip(uint ClientSentMonotonicMilliseconds, long ServerUnixMilliseconds);
 
 internal static class Packet0336RoundTripParser
 {
-    private const long UnixEpochOffsetMilliseconds = 62_135_596_800_000;
-    private const long MaximumRoundTripMilliseconds = 10_000;
+    private const ulong ClientTimestampMarker = 1_000;
+    private const ulong ClientTimestampMask = (1UL << 24) - 1;
     private const int FrameLength = 21;
     private const int DeclaredLength = 24;
 
@@ -38,21 +38,15 @@ internal static class Packet0336RoundTripParser
 
         var clientRawMilliseconds = BinaryPrimitives.ReadUInt64LittleEndian(packet.Slice(reader.Offset + 4, sizeof(ulong)));
         var serverRawMilliseconds = BinaryPrimitives.ReadUInt64LittleEndian(packet.Slice(reader.Offset + 12, sizeof(ulong)));
-        if (clientRawMilliseconds < UnixEpochOffsetMilliseconds ||
-            clientRawMilliseconds > long.MaxValue ||
+        if (clientRawMilliseconds >> 24 != ClientTimestampMarker ||
             serverRawMilliseconds > long.MaxValue)
         {
             return false;
         }
 
         result = new Packet0336RoundTrip(
-            (long)clientRawMilliseconds - UnixEpochOffsetMilliseconds,
+            (uint)(clientRawMilliseconds & ClientTimestampMask),
             (long)serverRawMilliseconds);
         return true;
     }
-
-    public static bool IsPlausibleClientEcho(long clientSentUnixMilliseconds, long arrivalUnixMilliseconds)
-        => clientSentUnixMilliseconds >= 0 &&
-           arrivalUnixMilliseconds >= clientSentUnixMilliseconds &&
-           arrivalUnixMilliseconds - clientSentUnixMilliseconds <= MaximumRoundTripMilliseconds;
 }

@@ -499,8 +499,7 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         return (opcode0, opcode1) switch
         {
             (0x03, 0x36) =>
-                Packet0336RoundTripParser.TryParse(frame, out var echo) &&
-                Packet0336RoundTripParser.IsPlausibleClientEcho(echo.ClientSentUnixMilliseconds, completionCaptureMilliseconds),
+                Packet0336RoundTripParser.TryParse(frame, out _),
             (0x33, 0x36) => Packet3336NicknameParser.TryParse(frame, out _),
             (0x45, 0x36) => Packet4536PcMetadataParser.TryParse(frame, out _),
             (0x04, 0x8d) => Packet048DNicknameParser.TryParse(frame, out _),

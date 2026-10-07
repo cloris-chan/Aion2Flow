@@ -6,184 +6,252 @@ namespace Cloris.Aion2Flow.Tests.Capture;
 public sealed class ProtocolRoundTripEstimatorTests
 {
     private const long SessionGeneration = 1;
+    private const long ClientClockModulusMilliseconds = 1L << 24;
+    private const uint ClientClockMask = 0x00ff_ffff;
 
     [Fact]
-    public void ObserveEcho_Uses_Echoed_Client_Timestamp_Directly()
+    public void ObserveEcho_UsesClientMonotonicTimestampAndCaptureQpc()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var observedTimestamp = Stopwatch.GetTimestamp();
+        const long arrivalMilliseconds = 100_000;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
 
         var resolved = estimator.TryObserveEcho(
             SessionGeneration,
-            1_000,
-            1_078,
-            observedTimestamp,
-            observedTimestamp,
+            ClientTimestampAt(arrivalMilliseconds - 78),
+            arrivalTimestamp,
+            arrivalTimestamp,
             out var roundTripMilliseconds);
 
         Assert.True(resolved);
-        Assert.Equal(78, roundTripMilliseconds);
-        Assert.Equal(78, estimator.GetCurrentMilliseconds(SessionGeneration, observedTimestamp));
+        Assert.Equal(78, roundTripMilliseconds, 2);
+        Assert.Equal(78, estimator.GetCurrentMilliseconds(SessionGeneration, arrivalTimestamp)!.Value, 2);
     }
 
     [Fact]
-    public void ObserveEcho_Replaces_Previous_Sample_Without_Smoothing()
+    public void ObserveEcho_HandlesClientClockWraparound()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var observedTimestamp = Stopwatch.GetTimestamp();
-        estimator.TryObserveEcho(SessionGeneration, 1_000, 1_120, observedTimestamp, observedTimestamp, out _);
-
-        estimator.TryObserveEcho(
-            SessionGeneration,
-            11_000,
-            11_055,
-            observedTimestamp + 1,
-            observedTimestamp + 1,
-            out var roundTripMilliseconds);
-
-        Assert.Equal(55, roundTripMilliseconds);
-        Assert.Equal(55, estimator.GetCurrentMilliseconds(SessionGeneration, observedTimestamp + 1));
-    }
-
-    [Theory]
-    [InlineData(1_001, 1_000)]
-    [InlineData(1_000, 11_001)]
-    [InlineData(-1, 1_000)]
-    public void ObserveEcho_Rejects_Implausible_Time_Ranges(long clientSentUnixMilliseconds, long arrivalUnixMilliseconds)
-    {
-        var estimator = new ProtocolRoundTripEstimator();
-        var observedTimestamp = Stopwatch.GetTimestamp();
+        const long arrivalMilliseconds = ClientClockModulusMilliseconds + 9;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
 
         var resolved = estimator.TryObserveEcho(
             SessionGeneration,
-            clientSentUnixMilliseconds,
-            arrivalUnixMilliseconds,
-            observedTimestamp,
-            observedTimestamp,
-            out _);
+            ClientTimestampAt(ClientClockModulusMilliseconds - 41),
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out var roundTripMilliseconds);
 
-        Assert.False(resolved);
-        Assert.Null(estimator.GetCurrentMilliseconds(SessionGeneration, observedTimestamp));
+        Assert.True(resolved);
+        Assert.Equal(50, roundTripMilliseconds, 2);
     }
 
     [Fact]
-    public void CurrentSample_Expires_After_Thirty_Seconds()
+    public void ObserveEcho_RejectsRoundTripLongerThanTenSeconds()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var observedTimestamp = Stopwatch.GetTimestamp();
-        estimator.TryObserveEcho(SessionGeneration, 1_000, 1_080, observedTimestamp, observedTimestamp, out _);
+        const long arrivalMilliseconds = 100_000;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
 
-        Assert.Equal(80, estimator.GetCurrentMilliseconds(SessionGeneration, observedTimestamp + 30 * Stopwatch.Frequency));
-        Assert.Null(estimator.GetCurrentMilliseconds(SessionGeneration, observedTimestamp + 30 * Stopwatch.Frequency + 1));
+        Assert.False(estimator.TryObserveEcho(
+            SessionGeneration,
+            ClientTimestampAt(arrivalMilliseconds - 10_001),
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out _));
+        Assert.Null(estimator.GetCurrentMilliseconds(SessionGeneration, arrivalTimestamp));
     }
 
     [Fact]
-    public void Clear_Removes_Current_Sample()
+    public void ObserveEcho_RejectsTimestampOutsideTwentyFourBitCounter()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var observedTimestamp = Stopwatch.GetTimestamp();
-        estimator.TryObserveEcho(SessionGeneration, 1_000, 1_080, observedTimestamp, observedTimestamp, out _);
+        var arrivalTimestamp = ToTimestamp(100_000);
+
+        Assert.False(estimator.TryObserveEcho(
+            SessionGeneration,
+            ClientClockMask + 1,
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out _));
+    }
+
+    [Fact]
+    public void ObserveEcho_RejectsClientTimestampInTheFuture()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        const long arrivalMilliseconds = 100_000;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
+
+        Assert.False(estimator.TryObserveEcho(
+            SessionGeneration,
+            ClientTimestampAt(arrivalMilliseconds + 1),
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out _));
+    }
+
+    [Fact]
+    public void ObserveEcho_ReplacesPreviousSampleWithoutSmoothing()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        const long firstArrivalMilliseconds = 100_000;
+        var firstArrivalTimestamp = ToTimestamp(firstArrivalMilliseconds);
+        Assert.True(estimator.TryObserveEcho(
+            SessionGeneration,
+            ClientTimestampAt(firstArrivalMilliseconds - 120),
+            firstArrivalTimestamp,
+            firstArrivalTimestamp,
+            out _));
+
+        const long secondArrivalMilliseconds = 101_000;
+        var secondArrivalTimestamp = ToTimestamp(secondArrivalMilliseconds);
+        Assert.True(estimator.TryObserveEcho(
+            SessionGeneration,
+            ClientTimestampAt(secondArrivalMilliseconds - 55),
+            secondArrivalTimestamp,
+            secondArrivalTimestamp,
+            out var roundTripMilliseconds));
+
+        Assert.Equal(55, roundTripMilliseconds, 2);
+        Assert.Equal(55, estimator.GetCurrentMilliseconds(SessionGeneration, secondArrivalTimestamp)!.Value, 2);
+    }
+
+    [Fact]
+    public void CurrentSampleExpiresAfterThirtySeconds()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        const long arrivalMilliseconds = 100_000;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
+        Assert.True(estimator.TryObserveEcho(
+            SessionGeneration,
+            ClientTimestampAt(arrivalMilliseconds - 80),
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out _));
+
+        Assert.NotNull(estimator.GetCurrentMilliseconds(
+            SessionGeneration,
+            arrivalTimestamp + 30 * Stopwatch.Frequency));
+        Assert.Null(estimator.GetCurrentMilliseconds(
+            SessionGeneration,
+            arrivalTimestamp + 30 * Stopwatch.Frequency + 1));
+    }
+
+    [Fact]
+    public void ClearRemovesCurrentSample()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        var arrivalTimestamp = ToTimestamp(100_000);
+        Assert.True(estimator.TryObserveEcho(
+            SessionGeneration,
+            ClientTimestampAt(99_920),
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out _));
 
         estimator.Clear();
 
-        Assert.Null(estimator.GetCurrentMilliseconds(SessionGeneration, observedTimestamp));
+        Assert.Null(estimator.GetCurrentMilliseconds(SessionGeneration, arrivalTimestamp));
     }
 
     [Fact]
     public void CurrentSampleIsNotReusedForAnotherSessionGeneration()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var observedTimestamp = Stopwatch.GetTimestamp();
-        estimator.TryObserveEcho(SessionGeneration, 1_000, 1_080, observedTimestamp, observedTimestamp, out _);
+        var arrivalTimestamp = ToTimestamp(100_000);
+        Assert.True(estimator.TryObserveEcho(
+            SessionGeneration,
+            ClientTimestampAt(99_920),
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out _));
 
-        Assert.Null(estimator.GetCurrentMilliseconds(SessionGeneration + 1, observedTimestamp));
+        Assert.Null(estimator.GetCurrentMilliseconds(SessionGeneration + 1, arrivalTimestamp));
     }
 
     [Fact]
     public void DelayedSampleOlderThanThirtySecondsDoesNotReplaceCurrent()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var nowTimestamp = 100 * Stopwatch.Frequency;
+        const long nowMilliseconds = 100_000;
+        var nowTimestamp = ToTimestamp(nowMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            1_000,
-            1_080,
+            ClientTimestampAt(nowMilliseconds - 80),
             nowTimestamp,
             nowTimestamp,
             out _));
 
-        var delayedArrivalTimestamp = nowTimestamp - 31 * Stopwatch.Frequency;
+        const long delayedArrivalMilliseconds = nowMilliseconds - 31_000;
+        var delayedArrivalTimestamp = ToTimestamp(delayedArrivalMilliseconds);
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            2_000,
-            2_120,
+            ClientTimestampAt(delayedArrivalMilliseconds - 120),
             delayedArrivalTimestamp,
             nowTimestamp,
             out _));
-        Assert.Equal(80, estimator.GetCurrentMilliseconds(SessionGeneration, nowTimestamp));
+        Assert.Equal(80, estimator.GetCurrentMilliseconds(SessionGeneration, nowTimestamp)!.Value, 2);
     }
 
     [Fact]
     public void OlderArrivalDoesNotReplaceNewerSample()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var nowTimestamp = 100 * Stopwatch.Frequency;
+        const long nowMilliseconds = 100_000;
+        var nowTimestamp = ToTimestamp(nowMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            1_000,
-            1_080,
+            ClientTimestampAt(nowMilliseconds - 80),
             nowTimestamp,
             nowTimestamp,
             out _));
 
-        var olderArrivalTimestamp = nowTimestamp - Stopwatch.Frequency;
+        const long olderArrivalMilliseconds = nowMilliseconds - 1_000;
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            2_000,
-            2_120,
-            olderArrivalTimestamp,
+            ClientTimestampAt(olderArrivalMilliseconds - 120),
+            ToTimestamp(olderArrivalMilliseconds),
             nowTimestamp,
             out _));
-        Assert.Equal(80, estimator.GetCurrentMilliseconds(SessionGeneration, nowTimestamp));
+        Assert.Equal(80, estimator.GetCurrentMilliseconds(SessionGeneration, nowTimestamp)!.Value, 2);
     }
 
     [Fact]
     public void EchoesFromSameCapturedChunkUseParseOrder()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var arrivalTimestamp = 100 * Stopwatch.Frequency;
+        const long arrivalMilliseconds = 100_000;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            1_000,
-            1_080,
+            ClientTimestampAt(arrivalMilliseconds - 80),
             arrivalTimestamp,
             arrivalTimestamp,
             out _));
 
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            2_000,
-            2_055,
+            ClientTimestampAt(arrivalMilliseconds - 55),
             arrivalTimestamp,
             arrivalTimestamp,
             out var roundTripMilliseconds));
-        Assert.Equal(55, roundTripMilliseconds);
-        Assert.Equal(55, estimator.GetCurrentMilliseconds(SessionGeneration, arrivalTimestamp));
+        Assert.Equal(55, roundTripMilliseconds, 2);
+        Assert.Equal(55, estimator.GetCurrentMilliseconds(SessionGeneration, arrivalTimestamp)!.Value, 2);
     }
 
     [Fact]
     public void SampleAtStaleBoundaryIsAccepted()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var arrivalTimestamp = 100 * Stopwatch.Frequency;
-        var nowTimestamp = arrivalTimestamp + 30 * Stopwatch.Frequency;
+        const long arrivalMilliseconds = 100_000;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
 
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            1_000,
-            1_080,
+            ClientTimestampAt(arrivalMilliseconds - 80),
             arrivalTimestamp,
-            nowTimestamp,
+            arrivalTimestamp + 30 * Stopwatch.Frequency,
             out _));
     }
 
@@ -191,15 +259,14 @@ public sealed class ProtocolRoundTripEstimatorTests
     public void SampleBeyondStaleBoundaryIsRejected()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var arrivalTimestamp = 100 * Stopwatch.Frequency;
-        var nowTimestamp = arrivalTimestamp + 30 * Stopwatch.Frequency + 1;
+        const long arrivalMilliseconds = 100_000;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
 
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            1_000,
-            1_080,
+            ClientTimestampAt(arrivalMilliseconds - 80),
             arrivalTimestamp,
-            nowTimestamp,
+            arrivalTimestamp + 30 * Stopwatch.Frequency + 1,
             out _));
     }
 
@@ -207,14 +274,20 @@ public sealed class ProtocolRoundTripEstimatorTests
     public void FutureArrivalTimestampIsRejected()
     {
         var estimator = new ProtocolRoundTripEstimator();
-        var nowTimestamp = 100 * Stopwatch.Frequency;
+        const long nowMilliseconds = 100_000;
+        var nowTimestamp = ToTimestamp(nowMilliseconds);
 
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            1_000,
-            1_080,
-            nowTimestamp + 1,
+            ClientTimestampAt(nowMilliseconds + 1 - 80),
+            ToTimestamp(nowMilliseconds + 1),
             nowTimestamp,
             out _));
     }
+
+    private static uint ClientTimestampAt(long milliseconds)
+        => (uint)(milliseconds & ClientClockMask);
+
+    private static long ToTimestamp(long milliseconds)
+        => checked((long)Math.Ceiling(milliseconds * (double)Stopwatch.Frequency / 1_000));
 }

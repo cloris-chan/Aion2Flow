@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Streams;
+using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
@@ -24,93 +26,72 @@ public sealed class ProtocolRoundTripClockTests
         var sendTimestamp = ToTimestamp(runtimeMilliseconds);
         var arrivalTimestamp = sendTimestamp + ToTimestamp(roundTripMilliseconds);
         var parserTimestamp = arrivalTimestamp + ToTimestamp(parserDelayMilliseconds);
-        var clientSentUnixMilliseconds = Origin.ToUnixTimeMilliseconds() +
-            runtimeMilliseconds +
-            utcOffsetMilliseconds;
+        var clientSentUnixMilliseconds = Origin.ToUnixTimeMilliseconds() + runtimeMilliseconds + utcOffsetMilliseconds;
 
         timeProvider.Set(
             parserTimestamp,
-            Origin.AddMilliseconds(
-                runtimeMilliseconds +
-                roundTripMilliseconds +
-                parserDelayMilliseconds +
-                utcOffsetMilliseconds));
+            Origin.AddMilliseconds(runtimeMilliseconds + roundTripMilliseconds + parserDelayMilliseconds + utcOffsetMilliseconds));
         var timelineArrivalUnixMilliseconds = mapper.ToTimelineUnixMilliseconds(arrivalTimestamp);
         var correctedArrivalUnixMilliseconds = mapper.ToCurrentUtcUnixMilliseconds(arrivalTimestamp);
-        var estimator = new ProtocolRoundTripEstimator();
 
         Assert.Equal(
-            Origin.ToUnixTimeMilliseconds() +
-            runtimeMilliseconds +
-            roundTripMilliseconds +
-            utcOffsetMilliseconds,
+            Origin.ToUnixTimeMilliseconds() + runtimeMilliseconds + roundTripMilliseconds + utcOffsetMilliseconds,
             correctedArrivalUnixMilliseconds);
         Assert.NotEqual(roundTripMilliseconds, timelineArrivalUnixMilliseconds - clientSentUnixMilliseconds);
-        Assert.True(estimator.TryObserveEcho(
-            1,
-            clientSentUnixMilliseconds,
-            correctedArrivalUnixMilliseconds,
-            arrivalTimestamp,
-            parserTimestamp,
-            out var estimatedRoundTripMilliseconds));
-        Assert.Equal(roundTripMilliseconds, estimatedRoundTripMilliseconds);
     }
 
     [Fact]
-    public void StructurallyValidEchoReachesObserverBeforeUtcCorrection()
+    public void Current0336FormatReachesObserverWithClientMonotonicTimestamp()
     {
-        var mappedArrivalUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var clientSentUnixMilliseconds = mappedArrivalUnixMilliseconds + 100;
-        const long arrivalTimestamp = 123_456_789;
-        var processingTimestamp = new PacketProcessingTimestamp(
-            mappedArrivalUnixMilliseconds + 500,
-            arrivalTimestamp);
+        const uint clientSentMonotonicMilliseconds = 6_364_226;
+        const long captureTimestampAtTenMegahertz = 63_642_752_478;
+        var captureTimestamp = (long)Math.Round(
+            captureTimestampAtTenMegahertz * (double)Stopwatch.Frequency / TestTimestampFrequency);
+        var packet = Convert.FromHexString("1803360000421C61E8030000009AE75815A1010000");
+        var processingTimestamp = new PacketProcessingTimestamp(1_791_359_510_419, captureTimestamp);
         ProtocolRoundTripObservation? observation = null;
         using var processor = new PacketStreamProcessor(
             SceneSinkFactory.CreateForLive(new SceneLiveReadModel())(),
             value => observation = value);
 
-        Assert.True(processor.AppendAndProcess(
-            Build0336(clientSentUnixMilliseconds, mappedArrivalUnixMilliseconds),
-            in Connection,
-            in processingTimestamp));
+        Assert.True(Packet0336RoundTripParser.TryParse(packet, out var parsed));
+        Assert.Equal(clientSentMonotonicMilliseconds, parsed.ClientSentMonotonicMilliseconds);
+        Assert.True(processor.AppendAndProcess(packet, in Connection, in processingTimestamp));
         Assert.True(observation.HasValue);
-        Assert.Equal(clientSentUnixMilliseconds, observation.Value.ClientSentUnixMilliseconds);
-        Assert.Equal(arrivalTimestamp, observation.Value.ArrivalTimestamp);
+        Assert.Equal(clientSentMonotonicMilliseconds, observation.Value.ClientSentMonotonicMilliseconds);
+        Assert.Equal(captureTimestamp, observation.Value.ArrivalTimestamp);
     }
 
     [Fact]
-    public void CurrentEchoReachesObserverBeforeUtcCorrection()
+    public void Current0336FormatCalculatesRoundTripFromCaptureQpc()
     {
-        const long clientSentUnixMilliseconds = 1_788_923_116_757;
-        const long serverUnixMilliseconds = 1_788_923_116_862;
-        const long arrivalTimestamp = 123_456_789;
-        var processingTimestamp = new PacketProcessingTimestamp(
-            clientSentUnixMilliseconds + 54,
-            arrivalTimestamp);
+        const long captureTimestampAtTenMegahertz = 63_642_752_478;
+        var captureTimestamp = (long)Math.Round(
+            captureTimestampAtTenMegahertz * (double)Stopwatch.Frequency / TestTimestampFrequency);
+        var packet = Convert.FromHexString("1803360000421C61E8030000009AE75815A1010000");
+        var processingTimestamp = new PacketProcessingTimestamp(1_791_359_510_419, captureTimestamp);
         ProtocolRoundTripObservation? observation = null;
         using var processor = new PacketStreamProcessor(
             SceneSinkFactory.CreateForLive(new SceneLiveReadModel())(),
             value => observation = value);
-
-        Assert.True(processor.AppendAndProcess(
-            Convert.FromHexString("1803360000D5544D96233A00003E7D2084A0010000"),
-            in Connection,
-            in processingTimestamp));
-        Assert.True(observation.HasValue);
-        Assert.Equal(clientSentUnixMilliseconds, observation.Value.ClientSentUnixMilliseconds);
-        Assert.Equal(serverUnixMilliseconds, observation.Value.ServerUnixMilliseconds);
-        Assert.Equal(arrivalTimestamp, observation.Value.ArrivalTimestamp);
+        Assert.True(processor.AppendAndProcess(packet, in Connection, in processingTimestamp));
 
         var estimator = new ProtocolRoundTripEstimator();
         Assert.True(estimator.TryObserveEcho(
             1,
-            observation.Value.ClientSentUnixMilliseconds,
-            clientSentUnixMilliseconds + 54,
+            observation!.Value.ClientSentMonotonicMilliseconds,
             observation.Value.ArrivalTimestamp,
             observation.Value.ArrivalTimestamp,
             out var roundTripMilliseconds));
-        Assert.Equal(54, roundTripMilliseconds);
+        Assert.Equal(49.248, roundTripMilliseconds, 3);
+    }
+
+    [Fact]
+    public void LegacyUtcTimestampFormatIsNotAcceptedAsCurrentEcho()
+    {
+        var packet = Convert.FromHexString("1803360000D5544D96233A00003E7D2084A0010000");
+
+        Assert.False(Packet0336RoundTripParser.TryParse(packet, out _));
     }
 
     [Fact]
@@ -135,7 +116,7 @@ public sealed class ProtocolRoundTripClockTests
             var firstPacket = CapturedPacket.CreateCopy(
                 firstConnection,
                 firstAdmission,
-                Build0336(laterUnixMilliseconds - 50, laterUnixMilliseconds),
+                Build0336(6_364_226, laterUnixMilliseconds),
                 sequenceNumber: 100,
                 captureTimestampMilliseconds: laterUnixMilliseconds,
                 captureTimestamp: laterArrivalTimestamp);
@@ -152,7 +133,7 @@ public sealed class ProtocolRoundTripClockTests
             var secondPacket = CapturedPacket.CreateCopy(
                 secondConnection,
                 secondAdmission,
-                Build0336(earlierUnixMilliseconds - 50, earlierUnixMilliseconds),
+                Build0336(6_374_226, earlierUnixMilliseconds),
                 sequenceNumber: 200,
                 captureTimestampMilliseconds: earlierUnixMilliseconds,
                 captureTimestamp: earlierArrivalTimestamp);
@@ -188,7 +169,7 @@ public sealed class ProtocolRoundTripClockTests
             SceneSinkFactory.CreateForLive(new SceneLiveReadModel(Origin)),
             value => observation = value,
             connectionLockedObserver: null);
-        var frame = Build0336(headUnixMilliseconds - 50, headUnixMilliseconds);
+        var frame = Build0336(6_454_226, headUnixMilliseconds);
         var split = frame.Length / 2;
         const uint sequenceNumber = 1_000;
 
@@ -238,13 +219,12 @@ public sealed class ProtocolRoundTripClockTests
         }
     }
 
-    private static byte[] Build0336(long clientSentUnixMilliseconds, long serverUnixMilliseconds)
+    private static byte[] Build0336(uint clientSentMonotonicMilliseconds, long serverUnixMilliseconds)
     {
-        const long yearOneToUnixEpochMilliseconds = 62_135_596_800_000;
         var body = new byte[18];
-        BinaryPrimitives.WriteInt64LittleEndian(
+        BinaryPrimitives.WriteUInt64LittleEndian(
             body.AsSpan(2),
-            yearOneToUnixEpochMilliseconds + clientSentUnixMilliseconds);
+            (1_000UL << 24) | clientSentMonotonicMilliseconds);
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(10), serverUnixMilliseconds);
         Span<byte> prefix = stackalloc byte[5];
         Assert.True(PacketTransportCodec.TryWriteVarInt(body.Length + 6, prefix, out var prefixLength));
