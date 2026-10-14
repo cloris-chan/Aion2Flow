@@ -62,7 +62,7 @@ public sealed class PlayerNameDisplayServiceTests
             SelfMarkerDisplayMode = PlayerSelfMarkerDisplayMode.Always
         };
 
-        Assert.Equal("⭐Perigee[希埃]<Aether>", display.FormatPcName(context, 100));
+        Assert.Equal("⭐Perigee[希埃爾]<Aether>", display.FormatPcName(context, 100));
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class PlayerNameDisplayServiceTests
         Assert.True(context.TryResolvePcMetadata(100, out var metadata));
         Assert.Equal(1001, metadata.OriginServerId);
         Assert.Equal("Aether", metadata.LegionName);
-        Assert.Equal("Perigee[希埃]<Aether>", display.FormatPcName(context, 100));
+        Assert.Equal("Perigee[希埃爾]<Aether>", display.FormatPcName(context, 100));
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public sealed class PlayerNameDisplayServiceTests
         using var resources = new GameResourceService(language);
         var context = new SceneDisplayContext(SceneIdentityScope.Empty, null, null, resources, "Unknown");
 
-        Assert.Equal("希埃", context.ResolveShortServerName(1001));
+        Assert.Equal("希埃爾", context.ResolveShortServerName(1001));
     }
 
     [Fact]
