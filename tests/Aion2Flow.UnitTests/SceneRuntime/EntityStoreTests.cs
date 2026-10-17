@@ -524,7 +524,7 @@ public class CombatStoreTests
         var store = new CombatStore();
         var mechanics = new MechanicStore();
         var resources = new ResourceStore();
-        for (var i = 0; i < CombatEventJournal.SegmentCapacity + 1; i++)
+        for (var i = 0; i < EventJournal<CombatEventRecord>.SegmentCapacity + 1; i++)
             store.ApplyResolvedDamage(mechanics, resources, 100, 200, i + 1, 1, 1, i + 1);
 
         var segment = store.FreezeEventSegment();
@@ -534,10 +534,10 @@ public class CombatStoreTests
         resources.Clear();
         store.ApplyResolvedDamage(mechanics, resources, 100, 200, 999, 1, 1, 3_000);
 
-        Assert.Equal(CombatEventJournal.SegmentCapacity + 1, segment.Count);
+        Assert.Equal(EventJournal<CombatEventRecord>.SegmentCapacity + 1, segment.Count);
         Assert.Equal(1, segment.GetEvent(segment.StartEventOrdinal).Observation.Damage);
-        Assert.Equal(CombatEventJournal.SegmentCapacity, segment.GetEvent(CombatEventJournal.SegmentCapacity - 1).Observation.Damage);
-        Assert.Equal(CombatEventJournal.SegmentCapacity + 1, segment.GetEvent(CombatEventJournal.SegmentCapacity).Observation.Damage);
+        Assert.Equal(EventJournal<CombatEventRecord>.SegmentCapacity, segment.GetEvent(EventJournal<CombatEventRecord>.SegmentCapacity - 1).Observation.Damage);
+        Assert.Equal(EventJournal<CombatEventRecord>.SegmentCapacity + 1, segment.GetEvent(EventJournal<CombatEventRecord>.SegmentCapacity).Observation.Damage);
         Assert.Single(store.Events);
         Assert.Equal(999, store.Events[0].Observation.Damage);
     }

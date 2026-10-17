@@ -214,36 +214,6 @@ public class CombatDetailSubscriptionTests
         Assert.Equal(2, writer.MetricEvents.Count);
     }
 
-    [Fact]
-    public void Subscription_Update_FromSnapshotKeepsHistoryWithoutReplayingHistoricalChanges()
-    {
-        var (store, mechanics, resources, _, _) = CreateProjection();
-        var restored = CombatStore.FromSnapshot(store.CreateSnapshot());
-        var restoredMechanics = MechanicStore.FromSnapshot(mechanics.CreateSnapshot());
-        var restoredResources = ResourceStore.FromSnapshot(resources.CreateSnapshot());
-        var adapter = CreateAdapter(restored, restoredMechanics, restoredResources);
-        var snapshot = adapter.CreateSnapshot();
-        var writer = new TestDetailWriter();
-        var sub = CreateSubscription(restored, restoredMechanics, 100, restoredResources);
-
-        var full = sub.Update(adapter, snapshot, forceRefresh: false, writer);
-
-        Assert.True(full.IsFullSnapshot);
-        Assert.Equal(2, full.AddedMetricEventCount);
-        Assert.Equal(2, writer.MetricEvents.Count);
-        Assert.False(sub.Update(adapter, snapshot, forceRefresh: false, writer).HasChanges);
-
-        ApplyMetricDamage(restored, 100, 200, 300, 3000);
-        adapter = CreateAdapter(restored, restoredMechanics, restoredResources);
-        snapshot = adapter.CreateSnapshot();
-        var warm = sub.Update(adapter, snapshot, forceRefresh: false, writer);
-
-        Assert.False(warm.IsFullSnapshot);
-        Assert.True(warm.HasChanges);
-        Assert.Equal(1, warm.AddedMetricEventCount);
-        Assert.Equal(3, writer.MetricEvents.Count);
-    }
-
     private static (CombatStore Store, MechanicStore Mechanics, ResourceStore Resources, SceneCombatSnapshotAdapter Adapter, SceneCombatSnapshot Snapshot) CreateProjection(Guid? encounterId = null)
     {
         var store = new CombatStore();

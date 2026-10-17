@@ -61,13 +61,6 @@ public sealed class SceneBoundaryService
     internal SceneBoundaryServiceSnapshot CreateSnapshot() =>
         new(CurrentMapId, CurrentMapInstanceId, SceneTransitionRevision);
 
-    internal static SceneBoundaryService FromSnapshot(SceneBoundaryServiceSnapshot snapshot) => new()
-    {
-        CurrentMapId = snapshot.CurrentMapId,
-        CurrentMapInstanceId = snapshot.CurrentMapInstanceId,
-        SceneTransitionRevision = snapshot.SceneTransitionRevision
-    };
-
     public void Clear()
     {
         CurrentMapId = 0;

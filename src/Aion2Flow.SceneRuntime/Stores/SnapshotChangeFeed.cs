@@ -1,5 +1,6 @@
 namespace Cloris.Aion2Flow.SceneRuntime.Stores;
 
+// Offset counts changes already consumed within the revision after Revision.
 public readonly record struct SnapshotChangeCursor(long Revision, int Offset);
 
 public readonly record struct SnapshotChangeBatch<TChange>(long FromRevision, long ToRevision, IReadOnlyList<TChange> Changes, bool HasMore);
@@ -8,6 +9,7 @@ public interface ISnapshotChangeFeed<TChange>
 {
     SnapshotChangeCursor CreateCursor(long afterRevision);
     SnapshotChangeBatch<TChange> ReadChanges(SnapshotChangeCursor cursor, int maxChanges);
+    SnapshotChangeCopyResult CopyChanges(SnapshotChangeCursor cursor, Span<TChange> destination);
 }
 
 public readonly record struct SnapshotChangeCopyResult(SnapshotChangeCursor Cursor, long FromRevision, long ToRevision, int Count, bool HasMore);

@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Services.Logging;
 
 namespace Cloris.Aion2Flow.Tests.Services;
@@ -66,15 +67,14 @@ public sealed class LogDirectoryResolverTests
     }
 
     [Fact]
-    public void ResolveDumpLogDirectory_Places_Dump_Files_In_Dumps_Timestamp_Subdirectory()
+    public void ResolveUniqueDumpLogDirectory_Places_Dump_Files_In_Dumps_Timestamp_Subdirectory()
     {
         var logDirectory = Path.Combine("portable-root", "logs");
         var timestamp = new DateTimeOffset(2026, 4, 25, 13, 45, 36, TimeSpan.Zero);
 
-        var dumpDirectory = LogDirectoryResolver.ResolveDumpLogDirectory(logDirectory, timestamp);
+        var dumpDirectory = RawPacketDump.ResolveUniqueDumpLogDirectory(logDirectory, timestamp);
 
         Assert.Equal(Path.Combine(logDirectory, "dumps", "20260425134536"), dumpDirectory);
-        Assert.Equal("20260425134536", LogDirectoryResolver.FormatLogSessionTimestamp(timestamp));
     }
 
     [Fact]
@@ -86,9 +86,9 @@ public sealed class LogDirectoryResolverTests
 
         try
         {
-            Directory.CreateDirectory(LogDirectoryResolver.ResolveDumpLogDirectory(logDirectory, timestamp));
+            Directory.CreateDirectory(Path.Combine(logDirectory, "dumps", "20260425134536"));
 
-            var dumpDirectory = LogDirectoryResolver.ResolveUniqueDumpLogDirectory(logDirectory, timestamp);
+            var dumpDirectory = RawPacketDump.ResolveUniqueDumpLogDirectory(logDirectory, timestamp);
 
             Assert.Equal(Path.Combine(logDirectory, "dumps", "20260425134536-01"), dumpDirectory);
         }

@@ -9,6 +9,8 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
 using K4os.Compression.LZ4;
 
+using static Cloris.Aion2Flow.Tests.Capture.TransportTestData;
+
 namespace Cloris.Aion2Flow.Tests.Capture;
 
 public sealed class ConnectionAdmissionTests
@@ -578,10 +580,7 @@ public sealed class ConnectionAdmissionTests
         }
         finally
         {
-            if (promotion is not null)
-            {
-                promotion.Return();
-            }
+            promotion?.Return();
 
             CaptureConnectionGate.Unlock();
         }
@@ -2063,7 +2062,7 @@ public sealed class ConnectionAdmissionTests
                 supplementals.Add((connection, admission));
             }
 
-            var victim = supplementals[1];
+            var (Connection, Admission) = supplementals[1];
             var refreshTimestamp = Stopwatch.GetTimestamp() + CaptureBufferLimits.CandidateStreamCountLimit;
             for (var index = 0; index < supplementals.Count; index++)
             {
@@ -2088,16 +2087,16 @@ public sealed class ConnectionAdmissionTests
                 out var eviction));
 
             Assert.True(eviction.HasValue);
-            Assert.Equal(victim.Connection, eviction.Connection);
-            Assert.Equal(victim.Admission.ConnectionOrdinal, eviction.ConnectionOrdinal);
+            Assert.Equal(Connection, eviction.Connection);
+            Assert.Equal(Admission.ConnectionOrdinal, eviction.ConnectionOrdinal);
             Assert.True(CaptureConnectionGate.IsAdmissionCurrent(in primary, in primaryAdmission));
-            Assert.False(CaptureConnectionGate.IsAdmissionCurrent(in victim.Connection, in victim.Admission));
+            Assert.False(CaptureConnectionGate.IsAdmissionCurrent(in Connection, in Admission));
             Assert.True(CaptureConnectionGate.IsAdmissionCurrent(in incoming, in incomingAdmission));
 
             var activeCount = 2;
             foreach (var supplemental in supplementals)
             {
-                if (supplemental.Connection == victim.Connection)
+                if (supplemental.Connection == Connection)
                     continue;
 
                 Assert.True(CaptureConnectionGate.IsAdmissionCurrent(
@@ -2110,17 +2109,17 @@ public sealed class ConnectionAdmissionTests
             Assert.True(CaptureConnectionGate.TryGetLockedConnection(out var lockedConnection));
             Assert.Equal(primary, lockedConnection);
             Assert.False(CaptureConnectionGate.TryPromoteSupplemental(
-                in victim.Connection,
-                victim.Admission.ConnectionOrdinal,
+                in Connection,
+                Admission.ConnectionOrdinal,
                 out _,
                 out _));
             Assert.True(CaptureConnectionGate.TryPromoteSupplemental(
-                in victim.Connection,
+                in Connection,
                 CaptureBufferLimits.CandidateStreamCountLimit + 2,
                 out var restartedAdmission,
                 out _));
             Assert.True(CaptureConnectionGate.IsAdmissionCurrent(
-                in victim.Connection,
+                in Connection,
                 in restartedAdmission));
         }
         finally
@@ -3184,43 +3183,6 @@ public sealed class ConnectionAdmissionTests
         return count;
     }
 
-    private static byte[] BuildCompressedFrame(ReadOnlySpan<byte> inner)
-    {
-        var compressedBuffer = new byte[LZ4Codec.MaximumOutputSize(inner.Length)];
-        var compressedLength = LZ4Codec.Encode(inner, compressedBuffer);
-        Assert.True(compressedLength > 0);
-
-        Span<byte> prefix = stackalloc byte[5];
-        Assert.True(PacketTransportCodec.TryWriteVarInt(compressedLength + 10, prefix, out var prefixLength));
-        var frame = new byte[prefixLength + 6 + compressedLength];
-        prefix[..prefixLength].CopyTo(frame);
-        frame[prefixLength] = 0xff;
-        frame[prefixLength + 1] = 0xff;
-        BinaryPrimitives.WriteInt32LittleEndian(frame.AsSpan(prefixLength + 2), inner.Length);
-        compressedBuffer.AsSpan(0, compressedLength).CopyTo(frame.AsSpan(prefixLength + 6));
-        return frame;
-    }
-
-    private static byte[] BuildFrame(byte opcode0, byte opcode1, ReadOnlySpan<byte> body)
-    {
-        Span<byte> prefix = stackalloc byte[5];
-        Assert.True(PacketTransportCodec.TryWriteVarInt(body.Length + 6, prefix, out var prefixLength));
-        var frame = new byte[prefixLength + sizeof(ushort) + body.Length];
-        prefix[..prefixLength].CopyTo(frame);
-        frame[prefixLength] = opcode0;
-        frame[prefixLength + 1] = opcode1;
-        body.CopyTo(frame.AsSpan(prefixLength + sizeof(ushort)));
-        return frame;
-    }
-
-    private static byte[] BuildLengthPrefixedEnvelope(ReadOnlySpan<byte> body)
-    {
-        var envelope = new byte[sizeof(int) + body.Length];
-        BinaryPrimitives.WriteInt32LittleEndian(envelope, body.Length);
-        body.CopyTo(envelope.AsSpan(sizeof(int)));
-        return envelope;
-    }
-
     private static byte[] WriteInt64(long value)
     {
         var bytes = new byte[sizeof(long)];
@@ -3228,16 +3190,4 @@ public sealed class ConnectionAdmissionTests
         return bytes;
     }
 
-    private static byte[] Concat(params byte[][] parts)
-    {
-        var result = new byte[parts.Sum(static part => part.Length)];
-        var offset = 0;
-        foreach (var part in parts)
-        {
-            part.CopyTo(result, offset);
-            offset += part.Length;
-        }
-
-        return result;
-    }
 }

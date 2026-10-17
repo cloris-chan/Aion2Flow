@@ -1,26 +1,17 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Media;
 using Cloris.Aion2Flow.Presentation;
 
 namespace Cloris.Aion2Flow.Controls;
 
-public sealed class PlaybackTimelineRulerView : Control
+public sealed class PlaybackTimelineRulerView : PlaybackTimelineControl
 {
     private const double TargetMajorTickSpacing = 96d;
     private const double MinimumLabelGap = 8d;
     private const int MaximumTickCount = 2048;
     private const int MaximumLabelCacheEntries = 128;
-
-    public static readonly DirectProperty<PlaybackTimelineRulerView, PlaybackTimelineViewport> ViewportProperty =
-        AvaloniaProperty.RegisterDirect<PlaybackTimelineRulerView, PlaybackTimelineViewport>(nameof(Viewport), view => view.Viewport, (view, value) => view.Viewport = value);
-
-    public static readonly DirectProperty<PlaybackTimelineRulerView, double> PositionMillisecondsProperty =
-        AvaloniaProperty.RegisterDirect<PlaybackTimelineRulerView, double>(nameof(PositionMilliseconds), view => view.PositionMilliseconds, (view, value) => view.PositionMilliseconds = value);
-
-    public static readonly StyledProperty<IBrush?> TrackBrushProperty = AvaloniaProperty.Register<PlaybackTimelineRulerView, IBrush?>(nameof(TrackBrush));
 
     public static readonly StyledProperty<IBrush?> TickBrushProperty = AvaloniaProperty.Register<PlaybackTimelineRulerView, IBrush?>(nameof(TickBrush));
 
@@ -44,18 +35,9 @@ public sealed class PlaybackTimelineRulerView : Control
 
     public static readonly StyledProperty<IBrush?> ForegroundProperty = TextBlock.ForegroundProperty.AddOwner<PlaybackTimelineRulerView>();
 
-    public static readonly StyledProperty<IBrush?> PlayheadBrushProperty = AvaloniaProperty.Register<PlaybackTimelineRulerView, IBrush?>(nameof(PlayheadBrush));
-
-    public static readonly StyledProperty<double> PlayheadThicknessProperty = AvaloniaProperty.Register<PlaybackTimelineRulerView, double>(nameof(PlayheadThickness), 2d);
-
-    public static readonly StyledProperty<bool> IsPlayheadVisibleProperty = AvaloniaProperty.Register<PlaybackTimelineRulerView, bool>(nameof(IsPlayheadVisible), true);
-
     static PlaybackTimelineRulerView()
     {
         AffectsRender<PlaybackTimelineRulerView>(
-            ViewportProperty,
-            PositionMillisecondsProperty,
-            TrackBrushProperty,
             TickBrushProperty,
             MinorTickBrushProperty,
             TickThicknessProperty,
@@ -66,46 +48,17 @@ public sealed class PlaybackTimelineRulerView : Control
             FontStyleProperty,
             FontWeightProperty,
             FontStretchProperty,
-            ForegroundProperty,
-            PlayheadBrushProperty,
-            PlayheadThicknessProperty,
-            IsPlayheadVisibleProperty);
+            ForegroundProperty);
     }
 
     private readonly Dictionary<LabelCacheKey, FormattedText> _labelCache = [];
-    private PlaybackTimelineViewport _viewport;
-    private double _positionMilliseconds;
     private LabelStyleKey _labelStyleKey;
     private Typeface? _labelTypeface;
     private IBrush? _cachedTickBrush;
     private IBrush? _cachedMinorTickBrush;
-    private IBrush? _cachedPlayheadBrush;
     private double _cachedTickThickness;
-    private double _cachedPlayheadThickness;
     private Pen? _tickPen;
     private Pen? _minorTickPen;
-    private Pen? _playheadPen;
-
-    public event EventHandler<PlaybackSeekRequestedEventArgs>? SeekRequested;
-
-    public PlaybackTimelineViewport Viewport
-    {
-        get => _viewport;
-        set => SetAndRaise(ViewportProperty, ref _viewport, value);
-    }
-
-    public double PositionMilliseconds
-    {
-        get => _positionMilliseconds;
-        set => SetAndRaise(PositionMillisecondsProperty, ref _positionMilliseconds, value);
-    }
-
-    public IBrush? TrackBrush
-    {
-        get => GetValue(TrackBrushProperty);
-        set => SetValue(TrackBrushProperty, value);
-    }
-
     public IBrush? TickBrush
     {
         get => GetValue(TickBrushProperty);
@@ -172,74 +125,10 @@ public sealed class PlaybackTimelineRulerView : Control
         set => SetValue(ForegroundProperty, value);
     }
 
-    public IBrush? PlayheadBrush
+    protected override void RenderTimeline(DrawingContext context, PlaybackTimelineViewport viewport, Rect bounds)
     {
-        get => GetValue(PlayheadBrushProperty);
-        set => SetValue(PlayheadBrushProperty, value);
-    }
-
-    public double PlayheadThickness
-    {
-        get => GetValue(PlayheadThicknessProperty);
-        set => SetValue(PlayheadThicknessProperty, value);
-    }
-
-    public bool IsPlayheadVisible
-    {
-        get => GetValue(IsPlayheadVisibleProperty);
-        set => SetValue(IsPlayheadVisibleProperty, value);
-    }
-
-    public override void Render(DrawingContext context)
-    {
-        var bounds = new Rect(Bounds.Size);
-        if (bounds.Width <= 0d || bounds.Height <= 0d)
-            return;
-
-        using var clip = context.PushClip(bounds);
-        context.FillRectangle(TrackBrush ?? Brushes.Transparent, bounds);
-
-        var viewport = Viewport;
-        if (viewport.IsEmpty)
-            return;
-
         var tickScale = ResolveTickScale(viewport.DurationMilliseconds, bounds.Width);
         DrawTicks(context, viewport, bounds, tickScale);
-
-        var positionMilliseconds = PositionMilliseconds;
-        if (IsPlayheadVisible && viewport.Contains(positionMilliseconds))
-        {
-            var playheadX = PlaybackTimelineGeometry.PositionToX(positionMilliseconds, viewport, bounds.Width);
-            context.DrawLine(GetPlayheadPen(), new Point(playheadX, 0d), new Point(playheadX, bounds.Height));
-        }
-    }
-
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
-    {
-        base.OnPointerPressed(e);
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            e.Pointer.Capture(this);
-            RequestSeek(e.GetPosition(this).X);
-            e.Handled = true;
-        }
-    }
-
-    protected override void OnPointerMoved(PointerEventArgs e)
-    {
-        base.OnPointerMoved(e);
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && e.Pointer.Captured == this)
-        {
-            RequestSeek(e.GetPosition(this).X);
-            e.Handled = true;
-        }
-    }
-
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
-    {
-        base.OnPointerReleased(e);
-        if (e.Pointer.Captured == this)
-            e.Pointer.Capture(null);
     }
 
     private void DrawTicks(DrawingContext context, PlaybackTimelineViewport viewport, Rect bounds, TickScale tickScale)
@@ -329,16 +218,6 @@ public sealed class PlaybackTimelineRulerView : Control
         return typeface;
     }
 
-    private void RequestSeek(double x)
-    {
-        var viewport = Viewport;
-        var width = Bounds.Width;
-        if (viewport.IsEmpty || width <= 0d)
-            return;
-
-        SeekRequested?.Invoke(this, new PlaybackSeekRequestedEventArgs(PlaybackTimelineGeometry.XToPosition(x, viewport, width)));
-    }
-
     private Pen GetTickPen()
     {
         var brush = TickBrush ?? Brushes.Gray;
@@ -364,20 +243,6 @@ public sealed class PlaybackTimelineRulerView : Control
         }
 
         return _minorTickPen;
-    }
-
-    private Pen GetPlayheadPen()
-    {
-        var brush = PlayheadBrush ?? Brushes.White;
-        var thickness = Math.Max(1d, PlayheadThickness);
-        if (_playheadPen is null || !ReferenceEquals(_cachedPlayheadBrush, brush) || Math.Abs(_cachedPlayheadThickness - thickness) > double.Epsilon)
-        {
-            _cachedPlayheadBrush = brush;
-            _cachedPlayheadThickness = thickness;
-            _playheadPen = new Pen(brush, thickness);
-        }
-
-        return _playheadPen;
     }
 
     private static TickScale ResolveTickScale(double durationMilliseconds, double width)

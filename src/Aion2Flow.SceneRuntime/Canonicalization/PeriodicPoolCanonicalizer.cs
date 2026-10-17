@@ -28,31 +28,6 @@ public sealed class PeriodicPoolCanonicalizer
         };
     }
 
-    internal PeriodicPoolCanonicalizerSnapshot CreateSnapshot()
-    {
-        if (_states.Count == 0)
-            return new PeriodicPoolCanonicalizerSnapshot([]);
-
-        var states = new PeriodicPoolCanonicalizerStateSnapshot[_states.Count];
-        var index = 0;
-        foreach (var (key, state) in _states)
-            states[index++] = new PeriodicPoolCanonicalizerStateSnapshot(key.TargetId, key.ChainId, key.SkillIdentityCode, state.Remaining, state.CasterId, state.GrantSourceId, state.GrantTargetId, state.Grant, state.PacketGrantEmitted);
-        return new PeriodicPoolCanonicalizerSnapshot(states);
-    }
-
-    internal static PeriodicPoolCanonicalizer FromSnapshot(PeriodicPoolCanonicalizerSnapshot snapshot)
-    {
-        var canonicalizer = new PeriodicPoolCanonicalizer();
-        for (var i = 0; i < snapshot.States.Length; i++)
-        {
-            var state = snapshot.States[i];
-            var key = new PeriodicPoolKey(state.TargetId, state.ChainId, state.SkillIdentityCode);
-            canonicalizer._states[key] = new RemainingValueState(state.Remaining, state.CasterId, state.GrantSourceId, state.GrantTargetId, state.Grant, state.PacketGrantEmitted);
-        }
-
-        return canonicalizer;
-    }
-
     private CombatCanonicalizationBatch OpenState(int sourceId, int targetId, PeriodicPoolKey key, in CombatWireObservation observation)
     {
         if (observation.Damage <= 0 || sourceId <= 0 || targetId <= 0)
@@ -162,10 +137,6 @@ public sealed class PeriodicPoolCanonicalizer
             absorbedResult);
     }
 }
-
-internal sealed record PeriodicPoolCanonicalizerSnapshot(PeriodicPoolCanonicalizerStateSnapshot[] States);
-
-internal readonly record struct PeriodicPoolCanonicalizerStateSnapshot(int TargetId, int ChainId, int SkillIdentityCode, long Remaining, int CasterId, int GrantSourceId, int GrantTargetId, CombatWireObservation Grant, bool PacketGrantEmitted);
 
 public readonly record struct CombatCanonicalizationResult(int SourceId, int TargetId, CombatWireObservation Observation, CombatOccurrenceResolution Resolution)
 {

@@ -487,7 +487,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
         }
     }
 
-    private void ProcessClassEvidenceEvents(CombatEventRange events)
+    private void ProcessClassEvidenceEvents(EventRange<CombatEventRecord> events)
     {
         foreach (ref readonly var record in events)
         {
@@ -723,9 +723,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
 
     private static long ObservedAt(in CombatEventRecord e) =>
         e.ObservedAtMilliseconds;
-
-    private static long FirstObservedAt(CombatPairRecord pair) =>
-        pair.FirstObserved;
 
     private static long ObservedAt(CombatPairRecord pair) =>
         pair.LastObserved;

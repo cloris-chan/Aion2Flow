@@ -85,7 +85,7 @@ internal sealed class ScenePlaybackMaterializedEventIndex
     }
 
     private void Rebuild(
-        CombatEventRange metricEvents,
+        EventRange<CombatEventRecord> metricEvents,
         IReadOnlyList<CombatMechanicEventRecord> mechanicEvents,
         IReadOnlyList<CombatResourceEventRecord> resourceEvents,
         SceneCombatSnapshotAdapter adapter,
@@ -111,7 +111,7 @@ internal sealed class ScenePlaybackMaterializedEventIndex
         _hasProjectionVersion = true;
     }
 
-    private void AppendMetrics(CombatEventRange events, SceneCombatSnapshotAdapter adapter, int startIndex)
+    private void AppendMetrics(EventRange<CombatEventRecord> events, SceneCombatSnapshotAdapter adapter, int startIndex)
     {
         for (var eventIndex = startIndex; eventIndex < events.Length; eventIndex++)
         {

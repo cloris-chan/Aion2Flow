@@ -175,41 +175,7 @@ public sealed class CombatDetailSubscription(CombatStore store, MechanicStore me
         };
     }
 
-    private bool ConsumeChanges(CombatStore source, ref SnapshotChangeCursor cursor, Span<CombatSnapshotChange> changes, SceneCombatSnapshotAdapter? adapter)
-    {
-        var affected = false;
-        while (true)
-        {
-            var batch = source.CopyChanges(cursor, changes);
-            if (batch.Count == 0)
-                return affected;
-
-            for (var i = 0; i < batch.Count; i++)
-                affected |= IsRelevant(in changes[i], adapter);
-            cursor = batch.Cursor;
-            if (!batch.HasMore)
-                return affected;
-        }
-    }
-
-    private bool ConsumeChanges(MechanicStore source, ref SnapshotChangeCursor cursor, Span<CombatSnapshotChange> changes, SceneCombatSnapshotAdapter? adapter)
-    {
-        var affected = false;
-        while (true)
-        {
-            var batch = source.CopyChanges(cursor, changes);
-            if (batch.Count == 0)
-                return affected;
-
-            for (var i = 0; i < batch.Count; i++)
-                affected |= IsRelevant(in changes[i], adapter);
-            cursor = batch.Cursor;
-            if (!batch.HasMore)
-                return affected;
-        }
-    }
-
-    private bool ConsumeChanges(ResourceStore source, ref SnapshotChangeCursor cursor, Span<CombatSnapshotChange> changes, SceneCombatSnapshotAdapter? adapter)
+    private bool ConsumeChanges(ISnapshotChangeFeed<CombatSnapshotChange> source, ref SnapshotChangeCursor cursor, Span<CombatSnapshotChange> changes, SceneCombatSnapshotAdapter? adapter)
     {
         var affected = false;
         while (true)

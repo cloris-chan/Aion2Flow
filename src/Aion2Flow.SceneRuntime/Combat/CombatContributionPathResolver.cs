@@ -21,12 +21,6 @@ public sealed class CombatContributionPathResolver
         Path = path;
     }
 
-    private CombatContributionPathResolver(CombatContributionPathResolverSnapshot snapshot)
-    {
-        Path = snapshot.Path;
-        _materializedSemanticPoolGrants.UnionWith(snapshot.MaterializedSemanticPoolGrants);
-    }
-
     public CombatContributionPath Path { get; }
 
     public bool TryResolve(
@@ -125,11 +119,6 @@ public sealed class CombatContributionPathResolver
         }
     }
 
-    internal CombatContributionPathResolverSnapshot CreateSnapshot() =>
-        new(Path, [.. _materializedSemanticPoolGrants]);
-
-    internal static CombatContributionPathResolver FromSnapshot(CombatContributionPathResolverSnapshot snapshot) =>
-        new(snapshot);
 }
 
 internal readonly record struct PeriodicPoolKey(int TargetId, int ChainId, int SkillIdentityCode)
@@ -137,7 +126,3 @@ internal readonly record struct PeriodicPoolKey(int TargetId, int ChainId, int S
     public static PeriodicPoolKey Create(int targetId, in CombatWireObservation observation) =>
         new(targetId, observation.ChainId, Math.Max(0, observation.PeriodicTailSkillCodeRaw));
 }
-
-internal sealed record CombatContributionPathResolverSnapshot(
-    CombatContributionPath Path,
-    PeriodicPoolKey[] MaterializedSemanticPoolGrants);

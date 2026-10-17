@@ -3,6 +3,8 @@ using System.Diagnostics;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Streams;
 
+using static Cloris.Aion2Flow.Tests.Capture.TransportTestData;
+
 namespace Cloris.Aion2Flow.Tests.Capture;
 
 public sealed class TcpWorldConnectionCandidatePriorityTests
@@ -714,15 +716,4 @@ public sealed class TcpWorldConnectionCandidatePriorityTests
         return BuildFrame(0x00, 0x36, bytes);
     }
 
-    private static byte[] BuildFrame(byte opcode0, byte opcode1, ReadOnlySpan<byte> body)
-    {
-        Span<byte> prefix = stackalloc byte[5];
-        Assert.True(PacketTransportCodec.TryWriteVarInt(body.Length + 6, prefix, out var prefixLength));
-        var frame = new byte[prefixLength + sizeof(ushort) + body.Length];
-        prefix[..prefixLength].CopyTo(frame);
-        frame[prefixLength] = opcode0;
-        frame[prefixLength + 1] = opcode1;
-        body.CopyTo(frame.AsSpan(prefixLength + sizeof(ushort)));
-        return frame;
-    }
 }

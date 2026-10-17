@@ -158,7 +158,7 @@ internal static class RawPacketDump
         writer = null;
     }
 
-    private static string ResolveUniqueDumpLogDirectory(string logDirectory, DateTimeOffset timestamp)
+    internal static string ResolveUniqueDumpLogDirectory(string logDirectory, DateTimeOffset timestamp)
     {
         var baseDirectory = ResolveDumpLogDirectory(logDirectory, timestamp);
         if (!Directory.Exists(baseDirectory))

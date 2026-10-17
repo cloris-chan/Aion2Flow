@@ -11,7 +11,7 @@ public sealed class CompactAvoidanceCanonicalizer
     private const int CurrentSkillCodeExclusiveUpperBound = 20_000_000;
 
     private readonly record struct CompactAvoidanceKey(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker);
-    internal readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw);
+    private readonly record struct PendingCompactAvoidance(int SourceId, int TargetId, int BodySkillVariantRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw);
 
     private readonly List<PendingCompactAvoidance> _pendingCompact = new(MaxPendingAvoidances);
     private CompactAvoidanceKey _lastCompactAvoidanceKey;
@@ -59,20 +59,6 @@ public sealed class CompactAvoidanceCanonicalizer
             return StampedCombatCanonicalizationBatch.Empty;
 
         return FlushPendingCompact();
-    }
-
-    internal CompactAvoidanceCanonicalizerSnapshot CreateSnapshot() => new([.. _pendingCompact], _hasLastCompactAvoidanceKey, _lastCompactAvoidanceKey.SourceId, _lastCompactAvoidanceKey.TargetId, _lastCompactAvoidanceKey.BodySkillVariantRaw, _lastCompactAvoidanceKey.Marker, _lastCompactAvoidanceLayoutTag);
-
-    internal static CompactAvoidanceCanonicalizer FromSnapshot(CompactAvoidanceCanonicalizerSnapshot snapshot)
-    {
-        var canonicalizer = new CompactAvoidanceCanonicalizer
-        {
-            _hasLastCompactAvoidanceKey = snapshot.HasLastCompactAvoidanceKey,
-            _lastCompactAvoidanceKey = new CompactAvoidanceKey(snapshot.LastSourceId, snapshot.LastTargetId, snapshot.LastBodySkillVariantRaw, snapshot.LastMarker),
-            _lastCompactAvoidanceLayoutTag = snapshot.LastLayoutTag
-        };
-        canonicalizer._pendingCompact.AddRange(snapshot.Pending);
-        return canonicalizer;
     }
 
     private bool TryObserveCompactAvoidance(int sourceId, int targetId, in TimelineStamp stamp, in CombatWireObservation observation, long observedAtMilliseconds, RawPacketReference raw)
@@ -175,8 +161,6 @@ public sealed class CompactAvoidanceCanonicalizer
     }
 
 }
-
-internal sealed record CompactAvoidanceCanonicalizerSnapshot(CompactAvoidanceCanonicalizer.PendingCompactAvoidance[] Pending, bool HasLastCompactAvoidanceKey, int LastSourceId, int LastTargetId, int LastBodySkillVariantRaw, int LastMarker, int LastLayoutTag);
 
 public readonly record struct StampedCombatCanonicalizationResult(int SourceId, int TargetId, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatWireObservation Observation, CombatOccurrenceResolution Resolution)
 {

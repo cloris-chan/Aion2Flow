@@ -2,9 +2,10 @@ using System.Buffers.Binary;
 using System.Text;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
-using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+
+using static Cloris.Aion2Flow.Tests.Capture.TransportTestData;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
 
@@ -420,18 +421,6 @@ public sealed class PacketLogReplayTransportAttemptTests
         offset += sizeof(ushort) + sizeof(int);
         body[offset] = 1;
         return BuildFrame(0x33, 0x36, body);
-    }
-
-    private static byte[] BuildFrame(byte opcode0, byte opcode1, ReadOnlySpan<byte> body)
-    {
-        Span<byte> prefix = stackalloc byte[5];
-        Assert.True(PacketTransportCodec.TryWriteVarInt(body.Length + 6, prefix, out var prefixLength));
-        var frame = new byte[prefixLength + sizeof(ushort) + body.Length];
-        prefix[..prefixLength].CopyTo(frame);
-        frame[prefixLength] = opcode0;
-        frame[prefixLength + 1] = opcode1;
-        body.CopyTo(frame.AsSpan(prefixLength + sizeof(ushort)));
-        return frame;
     }
 
     private readonly record struct JournalObservation(

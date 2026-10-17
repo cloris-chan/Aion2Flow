@@ -49,25 +49,9 @@ public readonly record struct AuraLifecycleTransition(
     public bool HasState => State.HasIdentity;
 }
 
-public sealed class AuraStore
+public sealed class AuraStore(int capacity = 0)
 {
-    private readonly Dictionary<AuraInstanceKey, AuraInstanceState> _instances;
-
-    public AuraStore(int capacity = 0)
-        => _instances = capacity > 0 ? new Dictionary<AuraInstanceKey, AuraInstanceState>(capacity) : [];
-
-    private AuraStore(AuraStoreSnapshot snapshot)
-    {
-        _instances = new Dictionary<AuraInstanceKey, AuraInstanceState>(snapshot.Instances.Length);
-        for (var i = 0; i < snapshot.Instances.Length; i++)
-        {
-            var state = snapshot.Instances[i];
-            if (state.HasIdentity)
-                _instances[state.Key] = state;
-        }
-
-        Revision = snapshot.Revision;
-    }
+    private readonly Dictionary<AuraInstanceKey, AuraInstanceState> _instances = capacity > 0 ? new Dictionary<AuraInstanceKey, AuraInstanceState>(capacity) : [];
 
     public int Count => _instances.Count;
 
@@ -179,15 +163,6 @@ public sealed class AuraStore
         destination.Sort(Compare);
     }
 
-    internal AuraStoreSnapshot CreateSnapshot()
-    {
-        var instances = _instances.Count == 0 ? [] : _instances.Values.ToArray();
-        Sort(instances);
-        return new AuraStoreSnapshot(instances, Revision);
-    }
-
-    internal static AuraStore FromSnapshot(AuraStoreSnapshot snapshot) => new(snapshot);
-
     internal static bool IsTrackableOpen(in AuraObservation observation) =>
         observation.Kind == AuraObservationKind.Open &&
         observation.EntityId > 0 &&
@@ -258,5 +233,3 @@ public sealed class AuraStore
         return comparison != 0 ? comparison : left.InstanceSequenceId.CompareTo(right.InstanceSequenceId);
     }
 }
-
-internal sealed record AuraStoreSnapshot(AuraInstanceState[] Instances, long Revision);

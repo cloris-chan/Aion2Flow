@@ -195,51 +195,6 @@ public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entity
             _revision++;
     }
 
-    internal BossFocusStoreSnapshot CreateSnapshot()
-    {
-        var observed = new BossFocusObservedSnapshot[_observed.Count];
-        var index = 0;
-        foreach (var (instanceId, snapshot) in _observed)
-            observed[index++] = new BossFocusObservedSnapshot(instanceId, snapshot);
-        var cleared = new BossFocusClearedSnapshot[_lastClearedAtMilliseconds.Count];
-        index = 0;
-        foreach (var (instanceId, observedAtMilliseconds) in _lastClearedAtMilliseconds)
-            cleared[index++] = new BossFocusClearedSnapshot(instanceId, observedAtMilliseconds);
-        var encounterBosses = new BossFocusObservedSnapshot[_encounterBossOrder.Count];
-        for (var i = 0; i < encounterBosses.Length; i++)
-        {
-            var instanceId = _encounterBossOrder[i];
-            encounterBosses[i] = new BossFocusObservedSnapshot(instanceId, _encounterBosses[instanceId]);
-        }
-        return new BossFocusStoreSnapshot(observed, cleared, encounterBosses, _revision);
-    }
-
-    internal void RestoreSnapshot(BossFocusStoreSnapshot snapshot)
-    {
-        _observed.Clear();
-        _encounterBosses.Clear();
-        _encounterBossOrder.Clear();
-        _lastClearedAtMilliseconds.Clear();
-        for (var i = 0; i < snapshot.Observed.Length; i++)
-        {
-            var observed = snapshot.Observed[i];
-            _observed[observed.InstanceId] = observed.Snapshot;
-        }
-
-        for (var i = 0; i < snapshot.Cleared.Length; i++)
-        {
-            var cleared = snapshot.Cleared[i];
-            _lastClearedAtMilliseconds[cleared.InstanceId] = cleared.ObservedAtMilliseconds;
-        }
-        for (var i = 0; i < snapshot.EncounterBosses.Length; i++)
-        {
-            var encounterBoss = snapshot.EncounterBosses[i];
-            _encounterBossOrder.Add(encounterBoss.InstanceId);
-            _encounterBosses[encounterBoss.InstanceId] = encounterBoss.Snapshot;
-        }
-        _revision = snapshot.Revision;
-    }
-
     private void Clear(int instanceId, long observedAtMilliseconds)
     {
         var changed = _observed.Remove(instanceId);
@@ -265,8 +220,6 @@ public sealed class BossFocusStore(EntityStore entities, EntityVitalStore entity
         for (var i = 0; i < expired.Count; i++)
         {
             var instanceId = expired[i];
-            // Expiry only removes the current visibility projection. A later scope
-            // reconciliation may legitimately restore activity from encounter history.
             _observed.Remove(instanceId);
         }
         _revision++;
@@ -433,9 +386,3 @@ internal enum BossFocusGroupState : byte
     ActiveOrUnknown,
     AllDead
 }
-
-internal sealed record BossFocusStoreSnapshot(BossFocusObservedSnapshot[] Observed, BossFocusClearedSnapshot[] Cleared, BossFocusObservedSnapshot[] EncounterBosses, long Revision);
-
-internal readonly record struct BossFocusObservedSnapshot(int InstanceId, BossFocusStore.Snapshot Snapshot);
-
-internal readonly record struct BossFocusClearedSnapshot(int InstanceId, long ObservedAtMilliseconds);

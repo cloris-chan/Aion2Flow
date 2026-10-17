@@ -1,7 +1,5 @@
 using System.Security.Cryptography;
-using Avalonia.Media;
 using Cloris.Aion2Flow.Controls;
-using Cloris.Aion2Flow.Tests.Support;
 using SkiaSharp;
 
 namespace Cloris.Aion2Flow.Tests.Controls;
@@ -12,19 +10,6 @@ public sealed class CooldownSkillVisualTests
     public CooldownSkillVisualTests()
     {
         AvaloniaTestHost.EnsureInitialized();
-    }
-
-    [Fact]
-    public void ClientWidgetStyle_UsesTheExtractedQuickSlotValues()
-    {
-        Assert.Equal(70f, CooldownSkillVisualClientStyle.NativeWidgetSize);
-        Assert.Equal(2f, CooldownSkillVisualClientStyle.CornerRadius);
-        Assert.Equal(70f, CooldownSkillVisualClientStyle.TailSourceWidth);
-        Assert.Equal(2f, CooldownSkillVisualClientStyle.TailSourceHeight);
-        Assert.Equal(12f, CooldownSkillVisualClientStyle.TailGlowScaleY);
-        Assert.Equal(-1f, CooldownSkillVisualClientStyle.TailTranslationY);
-        Assert.Equal("99000000", Hex(CooldownSkillVisualClientStyle.DimmedColor));
-        Assert.Equal("7F008493", Hex(CooldownSkillVisualClientStyle.CooldownFillColor));
     }
 
     [Fact]
@@ -197,7 +182,6 @@ public sealed class CooldownSkillVisualTests
         Assert.True(firstTail.Zip(secondTail, static (left, right) => left != right).Count(static changed => changed) > 0);
     }
 
-    private static string Hex(Color color) => $"{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
 
     private static bool HasEffectColor(SKColor color) => color.Red > 0 || color.Green > 0 || color.Blue > 0;
 

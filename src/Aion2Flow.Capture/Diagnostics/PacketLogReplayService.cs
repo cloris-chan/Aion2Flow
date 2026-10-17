@@ -486,10 +486,10 @@ public sealed class PacketLogReplayService
 
     private readonly ref struct CombatEventSpan
     {
-        private readonly CombatEventRange _events;
+        private readonly EventRange<CombatEventRecord> _events;
         private readonly List<int> _indices;
 
-        public CombatEventSpan(CombatEventRange events, List<int> indices)
+        public CombatEventSpan(EventRange<CombatEventRecord> events, List<int> indices)
         {
             _events = events;
             _indices = indices;
@@ -499,10 +499,10 @@ public sealed class PacketLogReplayService
 
         public ref struct Enumerator
         {
-            private readonly CombatEventRange _events;
+            private readonly EventRange<CombatEventRecord> _events;
             private List<int>.Enumerator _indices;
 
-            public Enumerator(CombatEventRange events, List<int> indices)
+            public Enumerator(EventRange<CombatEventRecord> events, List<int> indices)
             {
                 _events = events;
                 _indices = indices.GetEnumerator();
@@ -1285,31 +1285,19 @@ public sealed class PacketLogReplayService
         TcpConnection Connection,
         long TimestampMilliseconds);
 
-    private sealed class ReplayConnectionProcessor : IDisposable
+    private sealed class ReplayConnectionProcessor(
+        Func<IRuntimeObservationSink> liveSinkFactory,
+        CanonicalPacketMirrorDeduplicator mirrorDeduplicator,
+        long connectionOrdinal,
+        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver) : IDisposable
     {
         private readonly TcpConnectionStartClassifier _classifier = new();
-        private readonly Func<IRuntimeObservationSink> _liveSinkFactory;
-        private readonly CanonicalPacketMirrorDeduplicator _mirrorDeduplicator;
-        private readonly Action<ProtocolRoundTripObservation>? _protocolRoundTripObserver;
-        private readonly long _connectionOrdinal;
         private readonly List<ReplayAcceptedPayload> _pendingPayloads = [];
         private int _transportPrefixLength;
         private PacketTransportFraming _framing;
         private bool _hasFraming;
         private PacketStreamProcessor? _probeProcessor;
         private PacketStreamProcessor? _activeProcessor;
-
-        public ReplayConnectionProcessor(
-            Func<IRuntimeObservationSink> liveSinkFactory,
-            CanonicalPacketMirrorDeduplicator mirrorDeduplicator,
-            long connectionOrdinal,
-            Action<ProtocolRoundTripObservation>? protocolRoundTripObserver)
-        {
-            _liveSinkFactory = liveSinkFactory;
-            _mirrorDeduplicator = mirrorDeduplicator;
-            _connectionOrdinal = connectionOrdinal;
-            _protocolRoundTripObserver = protocolRoundTripObserver;
-        }
 
         public long LastUseOrdinal { get; set; }
 
@@ -1360,14 +1348,14 @@ public sealed class PacketLogReplayService
             if (_activeProcessor is not null)
                 return true;
 
-            var sink = _liveSinkFactory();
+            var sink = liveSinkFactory();
             _activeProcessor = new PacketStreamProcessor(
                 sink,
-                _protocolRoundTripObserver,
+                protocolRoundTripObserver,
                 _framing,
                 _transportPrefixLength,
-                mirrorDeduplicator: _mirrorDeduplicator,
-                connectionOrdinal: _connectionOrdinal);
+                mirrorDeduplicator: mirrorDeduplicator,
+                connectionOrdinal: connectionOrdinal);
             if (markTransportStreamActivated)
                 sink.MarkTransportStreamActivated(in source);
 

@@ -40,30 +40,6 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
             CombatMaterializationKind.PeriodicRecovery);
     }
 
-    internal SystemPeriodicRecoveryCanonicalizerSnapshot CreateSnapshot()
-    {
-        if (_seeds.Count == 0)
-            return new SystemPeriodicRecoveryCanonicalizerSnapshot([]);
-
-        var seeds = new SystemPeriodicRecoverySeedSnapshot[_seeds.Count];
-        var index = 0;
-        foreach (var (key, state) in _seeds)
-            seeds[index++] = new SystemPeriodicRecoverySeedSnapshot(key.SourceId, key.TargetId, key.ChainId, key.TailSkillCodeRaw, state.Damage);
-        return new SystemPeriodicRecoveryCanonicalizerSnapshot(seeds);
-    }
-
-    internal static SystemPeriodicRecoveryCanonicalizer FromSnapshot(SystemPeriodicRecoveryCanonicalizerSnapshot snapshot)
-    {
-        var canonicalizer = new SystemPeriodicRecoveryCanonicalizer();
-        for (var i = 0; i < snapshot.Seeds.Length; i++)
-        {
-            var seed = snapshot.Seeds[i];
-            canonicalizer._seeds[new Key(seed.SourceId, seed.TargetId, seed.ChainId, seed.TailSkillCodeRaw)] = new State(seed.Damage);
-        }
-
-        return canonicalizer;
-    }
-
     private static bool TryGetKey(int sourceId, int targetId, in CombatWireObservation observation, out Key key, out bool isSeed)
     {
         key = default;
@@ -83,7 +59,3 @@ public sealed class SystemPeriodicRecoveryCanonicalizer
         return true;
     }
 }
-
-internal sealed record SystemPeriodicRecoveryCanonicalizerSnapshot(SystemPeriodicRecoverySeedSnapshot[] Seeds);
-
-internal readonly record struct SystemPeriodicRecoverySeedSnapshot(int SourceId, int TargetId, int ChainId, int TailSkillCodeRaw, long Damage);

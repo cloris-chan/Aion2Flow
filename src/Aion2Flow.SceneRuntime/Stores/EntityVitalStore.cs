@@ -9,18 +9,6 @@ public sealed class EntityVitalStore(int capacity = 0)
     private readonly Dictionary<int, EntityVitalState> _states = capacity > 0 ? new Dictionary<int, EntityVitalState>(capacity) : [];
     private long _revision;
 
-    private EntityVitalStore(EntityVitalStoreSnapshot snapshot)
-        : this(snapshot.States.Length)
-    {
-        for (var i = 0; i < snapshot.States.Length; i++)
-        {
-            var state = snapshot.States[i];
-            _states.Add(state.EntityId, state);
-        }
-
-        _revision = snapshot.Revision;
-    }
-
     public IReadOnlyDictionary<int, EntityVitalState> States => _states;
 
     public long Revision => _revision;
@@ -82,9 +70,6 @@ public sealed class EntityVitalStore(int capacity = 0)
         _revision++;
     }
 
-    internal EntityVitalStoreSnapshot CreateSnapshot() => new(CreateStateSnapshot(), _revision);
-
-    internal static EntityVitalStore FromSnapshot(EntityVitalStoreSnapshot snapshot) => new(snapshot);
 }
 
 public readonly record struct EntityVitalState(
@@ -94,5 +79,3 @@ public readonly record struct EntityVitalState(
     long ObservedAtMilliseconds,
     long ObservationOrdinal,
     long Revision);
-
-internal sealed record EntityVitalStoreSnapshot(EntityVitalState[] States, long Revision);

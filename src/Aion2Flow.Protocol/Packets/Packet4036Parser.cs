@@ -167,7 +167,7 @@ internal static class Packet4036Parser
 
     private static int ReadVarIntAt(ReadOnlySpan<byte> buffer, int offset)
     {
-        if (!TryReadVarInt(buffer, offset, out var value))
+        if (!PacketSpanReader.TryReadVarInt(buffer, offset, out var value))
         {
             return 0;
         }
@@ -177,12 +177,12 @@ internal static class Packet4036Parser
 
     private static int ReadRepeatedVarInt(ReadOnlySpan<byte> buffer, int offset)
     {
-        if (!TryReadVarInt(buffer, offset, out var first, out var firstLength))
+        if (!PacketSpanReader.TryReadVarInt(buffer, offset, out var first, out var firstLength))
         {
             return 0;
         }
 
-        if (!TryReadVarInt(buffer, offset + firstLength, out var second, out _))
+        if (!PacketSpanReader.TryReadVarInt(buffer, offset + firstLength, out var second, out _))
         {
             return 0;
         }
@@ -198,38 +198,5 @@ internal static class Packet4036Parser
         }
 
         return buffer[offset];
-    }
-
-    private static bool TryReadVarInt(ReadOnlySpan<byte> buffer, int offset, out int value)
-        => TryReadVarInt(buffer, offset, out value, out _);
-
-    private static bool TryReadVarInt(ReadOnlySpan<byte> buffer, int offset, out int value, out int consumed)
-    {
-        value = 0;
-        consumed = 0;
-        var shift = 0;
-
-        for (var i = 0; i < 5; i++)
-        {
-            var index = offset + i;
-            if ((uint)index >= (uint)buffer.Length)
-            {
-                return false;
-            }
-
-            var current = buffer[index];
-            value |= (current & 0x7f) << shift;
-            consumed = i + 1;
-            if ((current & 0x80) == 0)
-            {
-                return true;
-            }
-
-            shift += 7;
-        }
-
-        value = 0;
-        consumed = 0;
-        return false;
     }
 }

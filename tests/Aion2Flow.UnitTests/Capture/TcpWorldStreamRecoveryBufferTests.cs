@@ -2,6 +2,8 @@ using System.Buffers.Binary;
 using System.Text;
 using Cloris.Aion2Flow.Capture.Streams;
 
+using static Cloris.Aion2Flow.Tests.Capture.TransportTestData;
+
 namespace Cloris.Aion2Flow.Tests.Capture;
 
 public sealed class TcpWorldStreamRecoveryBufferTests
@@ -75,26 +77,6 @@ public sealed class TcpWorldStreamRecoveryBufferTests
         return BuildFrame(0x33, 0x36, body);
     }
 
-    private static byte[] BuildFrame(byte opcode0, byte opcode1, ReadOnlySpan<byte> body)
-    {
-        Span<byte> prefix = stackalloc byte[5];
-        Assert.True(PacketTransportCodec.TryWriteVarInt(body.Length + 6, prefix, out var prefixLength));
-        var frame = new byte[prefixLength + sizeof(ushort) + body.Length];
-        prefix[..prefixLength].CopyTo(frame);
-        frame[prefixLength] = opcode0;
-        frame[prefixLength + 1] = opcode1;
-        body.CopyTo(frame.AsSpan(prefixLength + sizeof(ushort)));
-        return frame;
-    }
-
-    private static byte[] BuildLengthPrefixedEnvelope(ReadOnlySpan<byte> body)
-    {
-        var envelope = new byte[sizeof(int) + body.Length];
-        BinaryPrimitives.WriteInt32LittleEndian(envelope, body.Length);
-        body.CopyTo(envelope.AsSpan(sizeof(int)));
-        return envelope;
-    }
-
     private static byte[] WriteInt64(long value)
     {
         var result = new byte[sizeof(long)];
@@ -102,16 +84,4 @@ public sealed class TcpWorldStreamRecoveryBufferTests
         return result;
     }
 
-    private static byte[] Concat(params byte[][] parts)
-    {
-        var result = new byte[parts.Sum(static part => part.Length)];
-        var offset = 0;
-        foreach (var part in parts)
-        {
-            part.CopyTo(result, offset);
-            offset += part.Length;
-        }
-
-        return result;
-    }
 }

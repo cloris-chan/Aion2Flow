@@ -17,9 +17,9 @@ public sealed class SceneArchivePayload
         SceneKind kind,
         DateTimeOffset sceneStarted,
         SceneJournalSegment timelineSegment,
-        CombatEventSegment combatEvents,
-        CombatMechanicEventRecord[] mechanicEvents,
-        CombatResourceEventRecord[] resourceEvents,
+        EventSegment<CombatEventRecord> combatEvents,
+        EventSegment<CombatMechanicEventRecord> mechanicEvents,
+        EventSegment<CombatResourceEventRecord> resourceEvents,
         SceneIdentityScope identityScope,
         DirectedPairSnapshot[] pairs,
         CombatantSummary[] combatants,
@@ -34,8 +34,8 @@ public sealed class SceneArchivePayload
         SceneStarted = sceneStarted;
         TimelineSegment = timelineSegment;
         CombatEvents = combatEvents;
-        MechanicEvents = new SnapshotList<CombatMechanicEventRecord>(mechanicEvents);
-        ResourceEvents = new SnapshotList<CombatResourceEventRecord>(resourceEvents);
+        MechanicEvents = mechanicEvents;
+        ResourceEvents = resourceEvents;
         IdentityScope = identityScope;
         Pairs = new SnapshotList<DirectedPairSnapshot>(pairs);
         Combatants = new SnapshotList<CombatantSummary>(combatants);
@@ -50,9 +50,9 @@ public sealed class SceneArchivePayload
     public SceneKind Kind { get; }
     public DateTimeOffset SceneStarted { get; }
     public SceneJournalSegment TimelineSegment { get; }
-    public CombatEventSegment CombatEvents { get; }
-    public SnapshotList<CombatMechanicEventRecord> MechanicEvents { get; }
-    public SnapshotList<CombatResourceEventRecord> ResourceEvents { get; }
+    public EventSegment<CombatEventRecord> CombatEvents { get; }
+    public EventSegment<CombatMechanicEventRecord> MechanicEvents { get; }
+    public EventSegment<CombatResourceEventRecord> ResourceEvents { get; }
     public SceneIdentityScope IdentityScope { get; }
     public SnapshotList<DirectedPairSnapshot> Pairs { get; }
     public SnapshotList<CombatantSummary> Combatants { get; }
@@ -86,8 +86,8 @@ public sealed class SceneArchivePayload
             AddEntity(entityIds, targetId);
 
         var combatEvents = combat.FreezeEventSegment();
-        var mechanicEvents = mechanics.Events.ToArray();
-        var resourceEvents = resources.Events.ToArray();
+        var mechanicEvents = mechanics.FreezeEventSegment();
+        var resourceEvents = resources.FreezeEventSegment();
         var combatArchive = BuildCombatArchive(archivedSnapshot, combatEvents, mechanicEvents, resourceEvents, adapter, entityIds);
         AddResourceEventEntities(entityIds, resourceEvents);
         AddKnownEntities(entityIds, entities);
@@ -253,9 +253,9 @@ public sealed class SceneArchivePayload
             AddEntity(entityIds, entityId);
     }
 
-    private static void AddResourceEventEntities(HashSet<int> entityIds, CombatResourceEventRecord[] resourceEvents)
+    private static void AddResourceEventEntities(HashSet<int> entityIds, EventSegment<CombatResourceEventRecord> resourceEvents)
     {
-        for (var i = 0; i < resourceEvents.Length; i++)
+        for (var i = 0; i < resourceEvents.Count; i++)
         {
             AddEntity(entityIds, resourceEvents[i].SourceId);
             AddEntity(entityIds, resourceEvents[i].TargetId);
@@ -340,15 +340,15 @@ public sealed class SceneArchivePayload
 
     private static CombatArchiveBuild BuildCombatArchive(
         SceneCombatSnapshot snapshot,
-        CombatEventSegment events,
-        CombatMechanicEventRecord[] mechanicEvents,
-        CombatResourceEventRecord[] resourceEvents,
+        EventSegment<CombatEventRecord> events,
+        EventSegment<CombatMechanicEventRecord> mechanicEvents,
+        EventSegment<CombatResourceEventRecord> resourceEvents,
         SceneCombatSnapshotAdapter adapter,
         HashSet<int> entityIds)
     {
-        var metricEventOrdinalBuilders = new Dictionary<int, LongArrayBuilder>();
-        var mechanicEventIndexBuilders = new Dictionary<int, IntArrayBuilder>();
-        var resourceEventIndexBuilders = new Dictionary<int, IntArrayBuilder>();
+        var metricEventOrdinalBuilders = new Dictionary<int, ArrayBuilder<long>>();
+        var mechanicEventIndexBuilders = new Dictionary<int, ArrayBuilder<int>>();
+        var resourceEventIndexBuilders = new Dictionary<int, ArrayBuilder<int>>();
         var projectedMetricSources = new Dictionary<long, int>();
         var projectedMechanicSources = new Dictionary<int, int>();
         var projectedResourceSources = new Dictionary<int, int>();
@@ -362,9 +362,9 @@ public sealed class SceneArchivePayload
             var targetId = record.TargetId;
             AddEntity(entityIds, sourceId);
             AddEntity(entityIds, targetId);
-            AddEventOrdinal(metricEventOrdinalBuilders, sourceId, eventOrdinal);
+            AddEventPosting(metricEventOrdinalBuilders, sourceId, eventOrdinal);
             if (targetId != sourceId)
-                AddEventOrdinal(metricEventOrdinalBuilders, targetId, eventOrdinal);
+                AddEventPosting(metricEventOrdinalBuilders, targetId, eventOrdinal);
 
             if (sourceId != record.SourceId)
                 projectedMetricSources.Add(eventOrdinal, sourceId);
@@ -382,7 +382,7 @@ public sealed class SceneArchivePayload
             pair.Apply(in record);
         }
 
-        for (var i = 0; i < mechanicEvents.Length; i++)
+        for (var i = 0; i < mechanicEvents.Count; i++)
         {
             ref readonly var record = ref mechanicEvents[i];
             if (record.ObservedAtMilliseconds < snapshot.EncounterStartTime ||
@@ -396,9 +396,9 @@ public sealed class SceneArchivePayload
             var targetId = record.TargetId;
             AddEntity(entityIds, sourceId);
             AddEntity(entityIds, targetId);
-            AddEventIndex(mechanicEventIndexBuilders, sourceId, i);
+            AddEventPosting(mechanicEventIndexBuilders, sourceId, i);
             if (targetId != sourceId)
-                AddEventIndex(mechanicEventIndexBuilders, targetId, i);
+                AddEventPosting(mechanicEventIndexBuilders, targetId, i);
             if (sourceId != record.SourceId)
                 projectedMechanicSources.Add(i, sourceId);
             if (sourceId <= 0 || targetId <= 0)
@@ -414,7 +414,7 @@ public sealed class SceneArchivePayload
             pair.Apply(in record);
         }
 
-        for (var i = 0; i < resourceEvents.Length; i++)
+        for (var i = 0; i < resourceEvents.Count; i++)
         {
             ref readonly var record = ref resourceEvents[i];
             if (record.ObservedAtMilliseconds < snapshot.EncounterStartTime ||
@@ -427,9 +427,9 @@ public sealed class SceneArchivePayload
             var targetId = record.TargetId;
             AddEntity(entityIds, sourceId);
             AddEntity(entityIds, targetId);
-            AddEventIndex(resourceEventIndexBuilders, sourceId, i);
+            AddEventPosting(resourceEventIndexBuilders, sourceId, i);
             if (targetId != sourceId)
-                AddEventIndex(resourceEventIndexBuilders, targetId, i);
+                AddEventPosting(resourceEventIndexBuilders, targetId, i);
             if (sourceId != record.SourceId)
                 projectedResourceSources.Add(i, sourceId);
             if (sourceId <= 0 || targetId <= 0)
@@ -445,9 +445,9 @@ public sealed class SceneArchivePayload
             pair.Apply(in record);
         }
 
-        var metricEventOrdinalsByCombatant = FreezeEventOrdinals(metricEventOrdinalBuilders);
-        var mechanicEventIndexesByCombatant = FreezeEventIndexes(mechanicEventIndexBuilders);
-        var resourceEventIndexesByCombatant = FreezeEventIndexes(resourceEventIndexBuilders);
+        var metricEventOrdinalsByCombatant = FreezeEventPostings(metricEventOrdinalBuilders);
+        var mechanicEventIndexesByCombatant = FreezeEventPostings(mechanicEventIndexBuilders);
+        var resourceEventIndexesByCombatant = FreezeEventPostings(resourceEventIndexBuilders);
 
         DirectedPairSnapshot[] pairSnapshots;
         if (pairs.Count == 0)
@@ -478,7 +478,7 @@ public sealed class SceneArchivePayload
             projectedResourceSources);
     }
 
-    private static void AddEventOrdinal(Dictionary<int, LongArrayBuilder> builders, int combatantId, long eventOrdinal)
+    private static void AddEventPosting<T>(Dictionary<int, ArrayBuilder<T>> builders, int combatantId, T eventOrdinal)
     {
         if (combatantId <= 0)
             return;
@@ -487,26 +487,9 @@ public sealed class SceneArchivePayload
         builder.Add(eventOrdinal);
     }
 
-    private static void AddEventIndex(Dictionary<int, IntArrayBuilder> builders, int combatantId, int eventIndex)
+    private static Dictionary<int, T[]> FreezeEventPostings<T>(Dictionary<int, ArrayBuilder<T>> builders)
     {
-        if (combatantId <= 0)
-            return;
-
-        ref var builder = ref CollectionsMarshal.GetValueRefOrAddDefault(builders, combatantId, out _);
-        builder.Add(eventIndex);
-    }
-
-    private static Dictionary<int, long[]> FreezeEventOrdinals(Dictionary<int, LongArrayBuilder> builders)
-    {
-        var result = new Dictionary<int, long[]>(builders.Count);
-        foreach (var (combatantId, builder) in builders)
-            result.Add(combatantId, builder.ToArray());
-        return result;
-    }
-
-    private static Dictionary<int, int[]> FreezeEventIndexes(Dictionary<int, IntArrayBuilder> builders)
-    {
-        var result = new Dictionary<int, int[]>(builders.Count);
+        var result = new Dictionary<int, T[]>(builders.Count);
         foreach (var (combatantId, builder) in builders)
             result.Add(combatantId, builder.ToArray());
         return result;
@@ -515,7 +498,7 @@ public sealed class SceneArchivePayload
     private static CombatantSummary[] BuildCombatants(
         DirectedPairSnapshot[] pairs,
         IReadOnlyDictionary<int, int[]> resourceEventIndexesByCombatant,
-        CombatResourceEventRecord[] resourceEvents)
+        EventSegment<CombatResourceEventRecord> resourceEvents)
     {
         var combatants = new Dictionary<int, CombatantAccumulator>();
         for (var i = 0; i < pairs.Length; i++)
@@ -875,8 +858,8 @@ public sealed class SceneArchivePayload
             IReadOnlyList<DirectedPairSnapshot> pairs,
             IReadOnlyList<CombatantSummary> combatants)
         {
-            var outgoingBuilders = new Dictionary<int, PairKeyArrayBuilder>();
-            var incomingBuilders = new Dictionary<int, PairKeyArrayBuilder>();
+            var outgoingBuilders = new Dictionary<int, ArrayBuilder<DirectedPairKey>>();
+            var incomingBuilders = new Dictionary<int, ArrayBuilder<DirectedPairKey>>();
             for (var i = 0; i < pairs.Count; i++)
                 AddPair(outgoingBuilders, incomingBuilders, pairs[i].Key);
 
@@ -929,7 +912,7 @@ public sealed class SceneArchivePayload
         public CombatantSummary? GetCombatant(int combatantId)
             => _combatantsById.TryGetValue(combatantId, out var combatant) ? combatant : null;
 
-        private static void AddPair(Dictionary<int, PairKeyArrayBuilder> outgoingBuilders, Dictionary<int, PairKeyArrayBuilder> incomingBuilders, DirectedPairKey key)
+        private static void AddPair(Dictionary<int, ArrayBuilder<DirectedPairKey>> outgoingBuilders, Dictionary<int, ArrayBuilder<DirectedPairKey>> incomingBuilders, DirectedPairKey key)
         {
             if (key.SourceId <= 0 || key.TargetId <= 0)
                 return;
@@ -938,13 +921,13 @@ public sealed class SceneArchivePayload
             AddPairKey(incomingBuilders, key.TargetId, key);
         }
 
-        private static void AddPairKey(Dictionary<int, PairKeyArrayBuilder> builders, int combatantId, DirectedPairKey key)
+        private static void AddPairKey(Dictionary<int, ArrayBuilder<DirectedPairKey>> builders, int combatantId, DirectedPairKey key)
         {
             ref var builder = ref CollectionsMarshal.GetValueRefOrAddDefault(builders, combatantId, out _);
             builder.Add(key);
         }
 
-        private static Dictionary<int, DirectedPairKey[]> FreezePairs(Dictionary<int, PairKeyArrayBuilder> builders)
+        private static Dictionary<int, DirectedPairKey[]> FreezePairs(Dictionary<int, ArrayBuilder<DirectedPairKey>> builders)
         {
             var result = new Dictionary<int, DirectedPairKey[]>(builders.Count);
             foreach (var (combatantId, builder) in builders)
@@ -964,12 +947,12 @@ public sealed class SceneArchivePayload
         }
     }
 
-    private struct LongArrayBuilder
+    private struct ArrayBuilder<T>
     {
-        private long[]? _items;
+        private T[]? _items;
         private int _count;
 
-        public void Add(long value)
+        public void Add(T value)
         {
             var items = _items;
             if (items is null)
@@ -988,82 +971,12 @@ public sealed class SceneArchivePayload
             items[_count++] = value;
         }
 
-        public readonly long[] ToArray()
+        public readonly T[] ToArray()
         {
             if (_count == 0)
                 return [];
 
-            var result = new long[_count];
-            Array.Copy(_items!, result, _count);
-            return result;
-        }
-    }
-
-    private struct PairKeyArrayBuilder
-    {
-        private DirectedPairKey[]? _items;
-        private int _count;
-
-        public void Add(DirectedPairKey value)
-        {
-            var items = _items;
-            if (items is null)
-            {
-                _items = [value];
-                _count = 1;
-                return;
-            }
-
-            if (_count == items.Length)
-            {
-                Array.Resize(ref items, items.Length << 1);
-                _items = items;
-            }
-
-            items[_count++] = value;
-        }
-
-        public readonly DirectedPairKey[] ToArray()
-        {
-            if (_count == 0)
-                return [];
-
-            var result = new DirectedPairKey[_count];
-            Array.Copy(_items!, result, _count);
-            return result;
-        }
-    }
-
-    private struct IntArrayBuilder
-    {
-        private int[]? _items;
-        private int _count;
-
-        public void Add(int value)
-        {
-            var items = _items;
-            if (items is null)
-            {
-                _items = [value];
-                _count = 1;
-                return;
-            }
-
-            if (_count == items.Length)
-            {
-                Array.Resize(ref items, items.Length << 1);
-                _items = items;
-            }
-
-            items[_count++] = value;
-        }
-
-        public readonly int[] ToArray()
-        {
-            if (_count == 0)
-                return [];
-
-            var result = new int[_count];
+            var result = new T[_count];
             Array.Copy(_items!, result, _count);
             return result;
         }

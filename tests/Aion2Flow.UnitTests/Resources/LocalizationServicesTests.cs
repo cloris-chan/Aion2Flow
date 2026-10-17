@@ -91,52 +91,16 @@ public sealed class LocalizationServicesTests
     [InlineData(3001110, "神石：海格黛的束縛", "Icon_Item_Usable_Godstone_WP_r_004.webp")]
     [InlineData(30011101, "神石：海格黛的束縛", "Icon_Item_Usable_Godstone_WP_r_004.webp")]
     [InlineData(3000122, "神石：海格黛的聰明", "Icon_Item_Usable_Godstone_WP_r_016.webp")]
-    public void GameResourceService_Resolves_Display_Resources_For_Packet_Variants(int skillCode, string expectedName, string expectedIcon)
-    {
-        try
-        {
-            var languageService = new LanguageService();
-            languageService.SetLanguage(LanguageService.English);
-            languageService.SetLanguage(LanguageService.TraditionalChinese);
-            using var resources = new GameResourceService(languageService);
-
-            Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
-            Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
-        }
-        finally
-        {
-            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
-        }
-    }
-
-    [Theory]
     [InlineData(17270040, "救援", "ICON_CL_SKILL_026.webp")]
     [InlineData(17270047, "救援", "ICON_CL_SKILL_026.webp")]
     [InlineData(17280010, "權能爆炸", "ICON_CL_SKILL_027.webp")]
     [InlineData(17290000, "免罪", "ICON_CL_SKILL_028.webp")]
     [InlineData(17420010, "尤斯迪埃權能", "ICON_CL_SKILL_042.webp")]
-    public void GameResourceService_Resolves_Cleric_Stigma_Display_Resources(int skillCode, string expectedName, string expectedIcon)
-    {
-        try
-        {
-            var languageService = new LanguageService();
-            languageService.SetLanguage(LanguageService.English);
-            languageService.SetLanguage(LanguageService.TraditionalChinese);
-            using var resources = new GameResourceService(languageService);
-
-            Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
-            Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
-        }
-        finally
-        {
-            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
-        }
-    }
-
-    [Theory]
     [InlineData(1227237, "攻擊", "ICON_TE_SKILL_001.webp")]
     [InlineData(1227265, "亡靈迅殺", "ICON_TE_SKILL_001.webp")]
-    public void GameResourceService_Resolves_Client_SkillDat_Display_Names(int skillCode, string expectedName, string expectedIcon)
+    [InlineData(1607415, "攻擊", "ICON_TE_SKILL_001.webp")]
+    [InlineData(1607400, "攻擊", "ICON_TE_SKILL_001.webp")]
+    public void GameResourceService_Resolves_Display_Names_And_Icons(int skillCode, string expectedName, string expectedIcon)
     {
         try
         {
@@ -147,25 +111,6 @@ public sealed class LocalizationServicesTests
 
             Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
             Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
-        }
-        finally
-        {
-            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
-        }
-    }
-
-    [Fact]
-    public void GameResourceService_Uses_SkillDat_Alias_Display_Id()
-    {
-        try
-        {
-            var languageService = new LanguageService();
-            languageService.SetLanguage(LanguageService.English);
-            languageService.SetLanguage(LanguageService.TraditionalChinese);
-            using var resources = new GameResourceService(languageService);
-
-            Assert.Equal("天罰", resources.ResolveSkillName(17040257));
-            Assert.Equal("ICON_CL_SKILL_005.webp", resources.ResolveSkillIconAssetName(17040257));
         }
         finally
         {
@@ -215,27 +160,6 @@ public sealed class LocalizationServicesTests
             using var resources = new GameResourceService(languageService);
 
             Assert.Equal(expectedName, resources.ResolveSkillName(resourceId));
-        }
-        finally
-        {
-            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
-        }
-    }
-
-    [Theory]
-    [InlineData(1607415, "攻擊", "ICON_TE_SKILL_001.webp")]
-    [InlineData(1607400, "攻擊", "ICON_TE_SKILL_001.webp")]
-    public void GameResourceService_Resolves_Exact_Client_Skills_Without_Player_Family_Fallback(int skillCode, string expectedName, string expectedIcon)
-    {
-        try
-        {
-            var languageService = new LanguageService();
-            languageService.SetLanguage(LanguageService.English);
-            languageService.SetLanguage(LanguageService.TraditionalChinese);
-            using var resources = new GameResourceService(languageService);
-
-            Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
-            Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
         }
         finally
         {

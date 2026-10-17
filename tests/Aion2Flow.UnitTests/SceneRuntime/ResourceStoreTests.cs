@@ -8,7 +8,7 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public sealed class ResourceStoreTests
 {
     [Fact]
-    public void SnapshotRoundTrip_PreservesAggregatesAndEvents()
+    public void Apply_AggregatesResourceFlowsAndPreservesEventEvidence()
     {
         var store = new ResourceStore();
         Apply(store, CombatResourceKind.Health, CombatResourceFlowKind.Restore, 100, skillCode: 1_001, observedAtMilliseconds: 100, sourceObservationOrdinal: 7);
@@ -17,14 +17,17 @@ public sealed class ResourceStoreTests
         Apply(store, CombatResourceKind.Mana, CombatResourceFlowKind.Spend, 40, skillCode: 1_004, observedAtMilliseconds: 400, sourceObservationOrdinal: 10);
         Apply(store, CombatResourceKind.Mana, CombatResourceFlowKind.Unknown, 50, skillCode: 1_005, observedAtMilliseconds: 500, sourceObservationOrdinal: 11);
 
-        var restored = ResourceStore.FromSnapshot(store.CreateSnapshot());
-
-        Assert.Equal(store.Revision, restored.Revision);
-        Assert.Equal(store.Events.Count, restored.Events.Count);
+        Assert.Equal(5, store.Revision);
+        Assert.Equal(5, store.Events.Count);
         for (var i = 0; i < store.Events.Count; i++)
-            Assert.Equal(store.Events[i], restored.Events[i]);
+        {
+            var record = store.Events[i];
+            Assert.Equal(i + 1, record.Revision);
+            Assert.Equal(i + 7, record.SourceObservationOrdinal);
+            Assert.Equal(new RawPacketReference(0x0438, 64, i + 7), record.Raw);
+        }
 
-        Assert.True(restored.TryGetPair(100, 200, out var pair));
+        Assert.True(store.TryGetPair(100, 200, out var pair));
         Assert.Equal(100, pair!.HealthRestored);
         Assert.Equal(20, pair.HealthUnknown);
         Assert.Equal(30, pair.ManaRestored);

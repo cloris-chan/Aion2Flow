@@ -9,6 +9,23 @@ public ref struct PacketSpanReader(ReadOnlySpan<byte> buffer)
 
     public readonly ReadOnlySpan<byte> RemainingSpan => _buffer[Offset..];
 
+    public static bool TryReadVarInt(ReadOnlySpan<byte> buffer, int offset, out int value)
+        => TryReadVarInt(buffer, offset, out value, out _);
+
+    public static bool TryReadVarInt(ReadOnlySpan<byte> buffer, int offset, out int value, out int consumed)
+    {
+        var reader = new PacketSpanReader(buffer);
+        if (reader.TryAdvance(offset) && reader.TryReadVarInt(out value))
+        {
+            consumed = reader.Offset - offset;
+            return true;
+        }
+
+        value = 0;
+        consumed = 0;
+        return false;
+    }
+
     public bool TryAdvance(int count)
     {
         if ((uint)count > (uint)Remaining) return false;

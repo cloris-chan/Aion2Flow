@@ -14,12 +14,12 @@ public sealed class CompactDirectValueCanonicalizer
     private const int MaxSamePayloadSelfRecoveryGroups = 128;
     private const int MaxSamePayloadSelfPairRecoveryGroups = 128;
 
-    internal readonly record struct PendingCompactOpener(int SourceId, uint BodyCodeRaw, int Marker, int Mode, int Flag, int EchoSourceId, int MatchedValueCount);
-    internal readonly record struct PendingCompactValue(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatWireObservation Observation);
-    internal readonly record struct PendingCompactSidecar(int SourceId, int TargetId, uint BodyCodeRaw, int Marker);
-    internal readonly record struct PendingCompactInlineRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker);
-    internal readonly record struct PendingSamePayloadSelfRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, uint DetailRefBase, PacketStructureKind ParentKind, int ParentScopeId);
-    internal readonly record struct PendingSamePayloadSelfPairRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, uint FirstDetailRef, uint SecondDetailRef, PacketStructureKind ParentKind, int ParentScopeId);
+    private readonly record struct PendingCompactOpener(int SourceId, uint BodyCodeRaw, int Marker, int Mode, int Flag, int EchoSourceId, int MatchedValueCount);
+    private readonly record struct PendingCompactValue(int SourceId, int TargetId, uint BodyCodeRaw, int Marker, TimelineStamp Stamp, long ObservedAtMilliseconds, RawPacketReference Raw, CombatWireObservation Observation);
+    private readonly record struct PendingCompactSidecar(int SourceId, int TargetId, uint BodyCodeRaw, int Marker);
+    private readonly record struct PendingCompactInlineRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker);
+    private readonly record struct PendingSamePayloadSelfRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, uint DetailRefBase, PacketStructureKind ParentKind, int ParentScopeId);
+    private readonly record struct PendingSamePayloadSelfPairRecoveryGroup(int SourceId, uint BodyCodeRaw, int Marker, uint FirstDetailRef, uint SecondDetailRef, PacketStructureKind ParentKind, int ParentScopeId);
     private readonly List<PendingCompactOpener> _pendingOpeners = new(MaxPendingOpeners);
     private readonly List<PendingCompactOpener> _closedOpeners = new(MaxPendingOpeners);
     private readonly List<PendingCompactValue> _pendingValues = new(MaxPendingValues);
@@ -177,21 +177,6 @@ public sealed class CompactDirectValueCanonicalizer
         }
 
         return false;
-    }
-
-    internal CompactDirectValueCanonicalizerSnapshot CreateSnapshot() => new([.. _pendingOpeners], [.. _closedOpeners], [.. _pendingValues], [.. _pendingSidecars], [.. _inlineRecoveryGroups], [.. _samePayloadSelfRecoveryGroups], [.. _samePayloadSelfPairRecoveryGroups]);
-
-    internal static CompactDirectValueCanonicalizer FromSnapshot(CompactDirectValueCanonicalizerSnapshot snapshot)
-    {
-        var canonicalizer = new CompactDirectValueCanonicalizer();
-        canonicalizer._pendingOpeners.AddRange(snapshot.PendingOpeners);
-        canonicalizer._closedOpeners.AddRange(snapshot.ClosedOpeners);
-        canonicalizer._pendingValues.AddRange(snapshot.PendingValues);
-        canonicalizer._pendingSidecars.AddRange(snapshot.PendingSidecars);
-        canonicalizer._inlineRecoveryGroups.AddRange(snapshot.InlineRecoveryGroups);
-        canonicalizer._samePayloadSelfRecoveryGroups.AddRange(snapshot.SamePayloadSelfRecoveryGroups);
-        canonicalizer._samePayloadSelfPairRecoveryGroups.AddRange(snapshot.SamePayloadSelfPairRecoveryGroups);
-        return canonicalizer;
     }
 
     private StampedCombatCanonicalizationBatch FlushValuesMatchedBy(in PendingCompactOpener opener)
@@ -839,12 +824,3 @@ public sealed class CompactDirectValueCanonicalizer
     }
 
 }
-
-internal sealed record CompactDirectValueCanonicalizerSnapshot(
-    CompactDirectValueCanonicalizer.PendingCompactOpener[] PendingOpeners,
-    CompactDirectValueCanonicalizer.PendingCompactOpener[] ClosedOpeners,
-    CompactDirectValueCanonicalizer.PendingCompactValue[] PendingValues,
-    CompactDirectValueCanonicalizer.PendingCompactSidecar[] PendingSidecars,
-    CompactDirectValueCanonicalizer.PendingCompactInlineRecoveryGroup[] InlineRecoveryGroups,
-    CompactDirectValueCanonicalizer.PendingSamePayloadSelfRecoveryGroup[] SamePayloadSelfRecoveryGroups,
-    CompactDirectValueCanonicalizer.PendingSamePayloadSelfPairRecoveryGroup[] SamePayloadSelfPairRecoveryGroups);

@@ -5,7 +5,8 @@ using Cloris.Aion2Flow.Capture.Streams;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
-using K4os.Compression.LZ4;
+
+using static Cloris.Aion2Flow.Tests.Capture.TransportTestData;
 
 namespace Cloris.Aion2Flow.Tests.Capture;
 
@@ -543,35 +544,6 @@ public sealed class PacketTransportStreamDeframerTests
         return result;
     }
 
-    private static byte[] BuildCompressedFrame(ReadOnlySpan<byte> inner)
-    {
-        var compressedBuffer = new byte[LZ4Codec.MaximumOutputSize(inner.Length)];
-        var compressedLength = LZ4Codec.Encode(inner, compressedBuffer);
-        Assert.True(compressedLength > 0);
-
-        Span<byte> prefix = stackalloc byte[5];
-        Assert.True(PacketTransportCodec.TryWriteVarInt(compressedLength + 10, prefix, out var prefixLength));
-        var frame = new byte[prefixLength + 6 + compressedLength];
-        prefix[..prefixLength].CopyTo(frame);
-        frame[prefixLength] = 0xff;
-        frame[prefixLength + 1] = 0xff;
-        BinaryPrimitives.WriteInt32LittleEndian(frame.AsSpan(prefixLength + 2), inner.Length);
-        compressedBuffer.AsSpan(0, compressedLength).CopyTo(frame.AsSpan(prefixLength + 6));
-        return frame;
-    }
-
-    private static byte[] BuildFrame(byte opcode0, byte opcode1, ReadOnlySpan<byte> body)
-    {
-        Span<byte> prefix = stackalloc byte[5];
-        Assert.True(PacketTransportCodec.TryWriteVarInt(body.Length + 6, prefix, out var prefixLength));
-        var frame = new byte[prefixLength + sizeof(ushort) + body.Length];
-        prefix[..prefixLength].CopyTo(frame);
-        frame[prefixLength] = opcode0;
-        frame[prefixLength + 1] = opcode1;
-        body.CopyTo(frame.AsSpan(prefixLength + sizeof(ushort)));
-        return frame;
-    }
-
     private static byte[] BuildEnvelope(ReadOnlySpan<byte> body)
     {
         var envelope = new byte[PacketTransportCodec.LengthPrefixedHeaderLength + body.Length];
@@ -580,16 +552,4 @@ public sealed class PacketTransportStreamDeframerTests
         return envelope;
     }
 
-    private static byte[] Concat(params byte[][] parts)
-    {
-        var result = new byte[parts.Sum(static part => part.Length)];
-        var offset = 0;
-        foreach (var part in parts)
-        {
-            part.CopyTo(result, offset);
-            offset += part.Length;
-        }
-
-        return result;
-    }
 }

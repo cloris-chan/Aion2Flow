@@ -478,7 +478,6 @@ public class PeriodicPoolCanonicalizerTests
             new CombatContributionCandidate(CombatMetricKind.ShieldGranted, CombatDeliveryKind.Pool, grant.Damage));
 
         Assert.True(resolver.TryResolve(targetId, targetId, in grant, in grantOccurrence, default, in semantic, out _));
-        Assert.Single(resolver.CreateSnapshot().MaterializedSemanticPoolGrants);
 
         var terminal = CreatePeriodicObservation(
             tailSkillCode,
@@ -498,7 +497,14 @@ public class PeriodicPoolCanonicalizerTests
             null);
 
         Assert.False(resolver.TryResolve(136787, targetId, in terminal, in terminalOccurrence, in terminalPacket, default, out _));
-        Assert.Empty(resolver.CreateSnapshot().MaterializedSemanticPoolGrants);
+        var nextGrantOccurrence = grantOccurrence with
+        {
+            PacketRule = CombatPacketRule.PeriodicShieldGrant,
+            Suppression = CombatSuppressionReason.None
+        };
+        Assert.True(resolver.TryResolve(targetId, targetId, in grant, in nextGrantOccurrence, default, in semantic, out var nextGrant));
+        Assert.Equal(CombatMetricKind.ShieldGranted, nextGrant.Metric);
+        Assert.Equal(grant.Damage, nextGrant.Amount);
     }
 
     [Fact]

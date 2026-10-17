@@ -196,25 +196,6 @@ public sealed class AuraStoreTests
     }
 
     [Fact]
-    public void SnapshotRestore_PreservesStateAndRevision()
-    {
-        var harness = new Harness();
-        _ = harness.Open(1_001, 0, 31, 1_000, durationMilliseconds: 500);
-        _ = harness.Renew(1_001, 2_001, 31, 1_200, resourceEffectRefRaw: 71_001);
-        var expectedSnapshot = harness.Store.CreateSnapshot();
-
-        var restored = AuraStore.FromSnapshot(expectedSnapshot);
-
-        Assert.Equal(harness.Store.Count, restored.Count);
-        Assert.Equal(harness.Store.Revision, restored.Revision);
-        Assert.Equal(expectedSnapshot.Revision, restored.Revision);
-        Assert.True(harness.Store.TryGet(new AuraInstanceKey(1_001, 31), out var expectedState));
-        Assert.True(restored.TryGet(new AuraInstanceKey(1_001, 31), out var restoredState));
-        Assert.Equal(expectedState, restoredState);
-        Assert.Equal(expectedSnapshot.Instances[0], restoredState);
-    }
-
-    [Fact]
     public void JournalObservationOrdinal_IsCarriedAcrossLifecycleTransitions()
     {
         var harness = new Harness();

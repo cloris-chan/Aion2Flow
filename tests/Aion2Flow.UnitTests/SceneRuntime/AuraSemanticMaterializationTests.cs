@@ -97,7 +97,7 @@ public sealed class AuraSemanticMaterializationTests
     }
 
     [Fact]
-    public void SnapshotAndPlayback_PreserveAuraSemanticValue()
+    public void ActiveSnapshotAndPlayback_PreserveAuraSemanticValue()
     {
         var journal = new ObservedEventJournal();
         var sceneSessionId = Guid.NewGuid();
@@ -109,9 +109,7 @@ public sealed class AuraSemanticMaterializationTests
         Assert.True(owner.Auras.TryGet(new AuraInstanceKey(200, 7), out var liveState));
         Assert.Equal(AuraDisposition.Buff, liveState.Semantics.Disposition);
 
-        var restored = AuraStore.FromSnapshot(owner.Auras.CreateSnapshot());
-        Assert.True(restored.TryGet(liveState.Key, out var restoredState));
-        Assert.Equal(liveState.Semantics, restoredState.Semantics);
+        Assert.Equal(liveState, Assert.Single(owner.Auras.CreateActiveSnapshot(500)));
 
         var segment = owner.CreateLiveTimelineSegment();
         var frame = new ScenePlaybackSession(new TestPlaybackSource(sceneSessionId, segment)).Seek(500, TestContext.Current.CancellationToken);

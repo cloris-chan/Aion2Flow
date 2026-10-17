@@ -121,7 +121,7 @@ internal static class Packet4036CreateParser
         if (!afterMarker.StartsWith(OwnerHeaderMarker))
             return false;
 
-        if (!TryReadVarInt(afterMarker, OwnerHeaderMarker.Length, out var candidate, out var consumed))
+        if (!PacketSpanReader.TryReadVarInt(afterMarker, OwnerHeaderMarker.Length, out var candidate, out var consumed))
             return false;
 
         var offset = OwnerHeaderMarker.Length + consumed;
@@ -197,35 +197,5 @@ internal static class Packet4036CreateParser
 
         result = new Packet4036NpcSpawn(kind, entityId, npcCode, currentHp, maxHp);
         return true;
-    }
-
-    private static bool TryReadVarInt(ReadOnlySpan<byte> buffer, int offset, out int value, out int consumed)
-    {
-        value = 0;
-        consumed = 0;
-        var shift = 0;
-
-        for (var i = 0; i < 5; i++)
-        {
-            var index = offset + i;
-            if ((uint)index >= (uint)buffer.Length)
-            {
-                return false;
-            }
-
-            var current = buffer[index];
-            value |= (current & 0x7f) << shift;
-            consumed = i + 1;
-            if ((current & 0x80) == 0)
-            {
-                return true;
-            }
-
-            shift += 7;
-        }
-
-        value = 0;
-        consumed = 0;
-        return false;
     }
 }

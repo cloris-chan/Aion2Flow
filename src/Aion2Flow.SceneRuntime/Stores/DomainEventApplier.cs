@@ -18,19 +18,30 @@ public sealed class DomainEventApplier
     private readonly ResourceStore _resources;
     private readonly ICombatOccurrenceObserver? _combatOccurrenceObserver;
     private readonly IAuraLifecycleObserver? _auraLifecycleObserver;
-    private readonly CombatContributionPathResolver _contributionPathResolver;
-    private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery;
-    private readonly PeriodicPoolCanonicalizer _periodicPool;
-    private readonly CompactDirectValueCanonicalizer _compactDirectValue;
+    private readonly CombatContributionPathResolver _contributionPathResolver = new(CombatContributionPath.ProductionFallback);
+    private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
+    private readonly PeriodicPoolCanonicalizer _periodicPool = new();
+    private readonly CompactDirectValueCanonicalizer _compactDirectValue = new();
     private readonly OwnerTargetSummonResourceCanonicalizer _ownerTargetSummonResource;
-    private readonly CompactAvoidanceCanonicalizer _compactAvoidance;
-    private readonly EntityVitalStore _entityVitals;
-    private readonly AuraStore _auras;
+    private readonly CompactAvoidanceCanonicalizer _compactAvoidance = new();
+    private readonly EntityVitalStore _entityVitals = new();
+    private readonly AuraStore _auras = new();
     private readonly BossFocusStore _bossFocus;
     private readonly Func<int, bool> _bossFocusActivitySourcePredicate;
+
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null)
-        : this(entities, boundary, metadataRegistry, combat, new SystemPeriodicRecoveryCanonicalizer(), new PeriodicPoolCanonicalizer(), new CompactDirectValueCanonicalizer(), new CompactAvoidanceCanonicalizer(), new EntityVitalStore(), new AuraStore(), new MechanicStore(), new ResourceStore(), combatOccurrenceObserver, auraLifecycleObserver)
     {
+        _entities = entities;
+        _boundary = boundary;
+        _metadataRegistry = metadataRegistry;
+        _combat = combat;
+        _mechanics = new MechanicStore();
+        _resources = new ResourceStore();
+        _combatOccurrenceObserver = combatOccurrenceObserver;
+        _auraLifecycleObserver = auraLifecycleObserver;
+        _ownerTargetSummonResource = new OwnerTargetSummonResourceCanonicalizer(entities);
+        _bossFocus = new BossFocusStore(entities, _entityVitals);
+        _bossFocusActivitySourcePredicate = IsBossFocusActivitySource;
     }
 
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat)
@@ -46,28 +57,6 @@ public sealed class DomainEventApplier
     public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, ISceneEventObserver sceneEventObserver)
         : this(entities, boundary, new RuntimeMetadataRegistry(), combat, sceneEventObserver, sceneEventObserver)
     {
-    }
-
-    internal DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, SystemPeriodicRecoveryCanonicalizer systemPeriodicRecovery, PeriodicPoolCanonicalizer periodicPool, CompactDirectValueCanonicalizer compactDirectValue, CompactAvoidanceCanonicalizer compactAvoidance, EntityVitalStore entityVitals, AuraStore auras, MechanicStore mechanics, ResourceStore resources, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null, CombatContributionPathResolver? contributionPathResolver = null)
-    {
-        _entities = entities;
-        _boundary = boundary;
-        _metadataRegistry = metadataRegistry;
-        _combat = combat;
-        _mechanics = mechanics;
-        _resources = resources;
-        _combatOccurrenceObserver = combatOccurrenceObserver;
-        _auraLifecycleObserver = auraLifecycleObserver;
-        _contributionPathResolver = contributionPathResolver ?? new CombatContributionPathResolver(CombatContributionPath.ProductionFallback);
-        _systemPeriodicRecovery = systemPeriodicRecovery;
-        _periodicPool = periodicPool;
-        _compactDirectValue = compactDirectValue;
-        _ownerTargetSummonResource = new OwnerTargetSummonResourceCanonicalizer(entities);
-        _compactAvoidance = compactAvoidance;
-        _entityVitals = entityVitals;
-        _auras = auras;
-        _bossFocus = new BossFocusStore(entities, entityVitals);
-        _bossFocusActivitySourcePredicate = IsBossFocusActivitySource;
     }
 
     public EntityStore Entities => _entities;
@@ -93,39 +82,6 @@ public sealed class DomainEventApplier
             _combatantStatisticsScope = value;
             _bossFocus.ReconcileActivity(ResolveBossCombatActivityObservedAt);
         }
-    }
-
-    internal DomainEventApplierSnapshot CreateSnapshot() => new(
-        _systemPeriodicRecovery.CreateSnapshot(),
-        _periodicPool.CreateSnapshot(),
-        _compactDirectValue.CreateSnapshot(),
-        _compactAvoidance.CreateSnapshot(),
-        _entityVitals.CreateSnapshot(),
-        _auras.CreateSnapshot(),
-        _mechanics.CreateSnapshot(),
-        _resources.CreateSnapshot(),
-        _contributionPathResolver.CreateSnapshot(),
-        _bossFocus.CreateSnapshot());
-
-    internal static DomainEventApplier FromSnapshot(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, DomainEventApplierSnapshot snapshot)
-    {
-        var entityVitals = EntityVitalStore.FromSnapshot(snapshot.EntityVitals);
-        var applier = new DomainEventApplier(
-            entities,
-            boundary,
-            metadataRegistry,
-            combat,
-            SystemPeriodicRecoveryCanonicalizer.FromSnapshot(snapshot.SystemPeriodicRecovery),
-            PeriodicPoolCanonicalizer.FromSnapshot(snapshot.PeriodicPool),
-            CompactDirectValueCanonicalizer.FromSnapshot(snapshot.CompactDirectValue),
-            CompactAvoidanceCanonicalizer.FromSnapshot(snapshot.CompactAvoidance),
-            entityVitals,
-            AuraStore.FromSnapshot(snapshot.Auras),
-            MechanicStore.FromSnapshot(snapshot.Mechanics),
-            ResourceStore.FromSnapshot(snapshot.Resources),
-            contributionPathResolver: CombatContributionPathResolver.FromSnapshot(snapshot.ContributionPath));
-        applier._bossFocus.RestoreSnapshot(snapshot.BossFocus);
-        return applier;
     }
 
     public void ApplyJournal(ObservedEventJournal journal)
@@ -722,17 +678,5 @@ public sealed class DomainEventApplier
             _ => false
         };
 }
-
-internal sealed record DomainEventApplierSnapshot(
-    SystemPeriodicRecoveryCanonicalizerSnapshot SystemPeriodicRecovery,
-    PeriodicPoolCanonicalizerSnapshot PeriodicPool,
-    CompactDirectValueCanonicalizerSnapshot CompactDirectValue,
-    CompactAvoidanceCanonicalizerSnapshot CompactAvoidance,
-    EntityVitalStoreSnapshot EntityVitals,
-    AuraStoreSnapshot Auras,
-    MechanicStoreSnapshot Mechanics,
-    ResourceStoreSnapshot Resources,
-    CombatContributionPathResolverSnapshot ContributionPath,
-    BossFocusStoreSnapshot BossFocus);
 
 public readonly record struct DomainEventMaterialization(AuraLifecycleTransition AuraLifecycle);
