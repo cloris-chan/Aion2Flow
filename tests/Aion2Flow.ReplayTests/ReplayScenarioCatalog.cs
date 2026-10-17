@@ -41,4 +41,6 @@ public static class ReplayScenarioCatalog
     ];
 
     public const string CurrentChargeCooldown = "aion2flow.stream.20260809050345.log";
+    public const string CurrentRoundTripShortUptime = "aion2flow.stream.20261007155148.log";
+    public const string CurrentRoundTripLongUptime = "aion2flow.stream.20261017050224.log";
 }

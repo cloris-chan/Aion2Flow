@@ -33,7 +33,7 @@ internal ref struct PacketParseContext(
     public readonly PacketObservationSource CreateObservationSource(ushort opcode, int payloadLength, long captureSequence = 0)
         => new(TimestampMilliseconds, FlushId, opcode, payloadLength, captureSequence > 0 ? captureSequence : CaptureSequence, CurrentStructurePath);
 
-    public readonly void ObserveProtocolRoundTrip(uint clientSentMonotonicMilliseconds)
+    public readonly void ObserveProtocolRoundTrip(long clientSentMonotonicMilliseconds)
         => protocolRoundTripObserver?.Invoke(new ProtocolRoundTripObservation(
             Connection,
             clientSentMonotonicMilliseconds,

@@ -311,7 +311,7 @@ public sealed class PacketTransportStreamDeframerTests
             in Connection,
             serverUnixMilliseconds));
         Assert.True(observation.HasValue);
-        Assert.Equal((uint)(clientMonotonicMilliseconds & 0x00ff_ffff), observation.Value.ClientSentMonotonicMilliseconds);
+        Assert.Equal(clientMonotonicMilliseconds, observation.Value.ClientSentMonotonicMilliseconds);
     }
 
     [Fact]
@@ -532,7 +532,7 @@ public sealed class PacketTransportStreamDeframerTests
         var body = new byte[18];
         BinaryPrimitives.WriteUInt64LittleEndian(
             body.AsSpan(2),
-            (1_000UL << 24) | ((ulong)clientSentMonotonicMilliseconds & 0x00ff_ffff));
+            (1_000UL << 24) + (ulong)clientSentMonotonicMilliseconds);
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(10), serverUnixMilliseconds);
         return BuildFrame(0x03, 0x36, body);
     }

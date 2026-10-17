@@ -2960,8 +2960,8 @@ public sealed class ConnectionAdmissionTests
         var body = new byte[18];
         body[0] = 0;
         body[1] = 0;
-        var clientTimestamp = (ulong)(captureMilliseconds - 50) & 0x00ff_ffff;
-        BinaryPrimitives.WriteUInt64LittleEndian(body.AsSpan(2), (1_000UL << 24) | clientTimestamp);
+        var clientTimestamp = (ulong)(captureMilliseconds - 50);
+        BinaryPrimitives.WriteUInt64LittleEndian(body.AsSpan(2), (1_000UL << 24) + clientTimestamp);
         BinaryPrimitives.WriteInt64LittleEndian(body.AsSpan(10), captureMilliseconds);
         return BuildFrame(0x03, 0x36, body);
     }

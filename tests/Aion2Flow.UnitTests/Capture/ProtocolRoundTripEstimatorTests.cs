@@ -6,8 +6,6 @@ namespace Cloris.Aion2Flow.Tests.Capture;
 public sealed class ProtocolRoundTripEstimatorTests
 {
     private const long SessionGeneration = 1;
-    private const long ClientClockModulusMilliseconds = 1L << 24;
-    private const uint ClientClockMask = 0x00ff_ffff;
 
     [Fact]
     public void ObserveEcho_UsesClientMonotonicTimestampAndCaptureQpc()
@@ -18,7 +16,7 @@ public sealed class ProtocolRoundTripEstimatorTests
 
         var resolved = estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(arrivalMilliseconds - 78),
+            arrivalMilliseconds - 78,
             arrivalTimestamp,
             arrivalTimestamp,
             out var roundTripMilliseconds);
@@ -28,16 +26,18 @@ public sealed class ProtocolRoundTripEstimatorTests
         Assert.Equal(78, estimator.GetCurrentMilliseconds(SessionGeneration, arrivalTimestamp)!.Value, 2);
     }
 
-    [Fact]
-    public void ObserveEcho_HandlesClientClockWraparound()
+    [Theory]
+    [InlineData((1L << 24) + 9)]
+    [InlineData(9 * (1L << 24) + 9)]
+    [InlineData(5_000_000_009L)]
+    public void ObserveEcho_PreservesCompleteClockBeyondTwentyFourAndThirtyTwoBits(long arrivalMilliseconds)
     {
         var estimator = new ProtocolRoundTripEstimator();
-        const long arrivalMilliseconds = ClientClockModulusMilliseconds + 9;
         var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
 
         var resolved = estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(ClientClockModulusMilliseconds - 41),
+            arrivalMilliseconds - 50,
             arrivalTimestamp,
             arrivalTimestamp,
             out var roundTripMilliseconds);
@@ -55,7 +55,7 @@ public sealed class ProtocolRoundTripEstimatorTests
 
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(arrivalMilliseconds - 10_001),
+            arrivalMilliseconds - 10_001,
             arrivalTimestamp,
             arrivalTimestamp,
             out _));
@@ -63,14 +63,14 @@ public sealed class ProtocolRoundTripEstimatorTests
     }
 
     [Fact]
-    public void ObserveEcho_RejectsTimestampOutsideTwentyFourBitCounter()
+    public void ObserveEcho_RejectsNegativeClientTimestamp()
     {
         var estimator = new ProtocolRoundTripEstimator();
         var arrivalTimestamp = ToTimestamp(100_000);
 
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientClockMask + 1,
+            -1,
             arrivalTimestamp,
             arrivalTimestamp,
             out _));
@@ -85,7 +85,7 @@ public sealed class ProtocolRoundTripEstimatorTests
 
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(arrivalMilliseconds + 1),
+            arrivalMilliseconds + 1,
             arrivalTimestamp,
             arrivalTimestamp,
             out _));
@@ -99,7 +99,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var firstArrivalTimestamp = ToTimestamp(firstArrivalMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(firstArrivalMilliseconds - 120),
+            firstArrivalMilliseconds - 120,
             firstArrivalTimestamp,
             firstArrivalTimestamp,
             out _));
@@ -108,7 +108,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var secondArrivalTimestamp = ToTimestamp(secondArrivalMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(secondArrivalMilliseconds - 55),
+            secondArrivalMilliseconds - 55,
             secondArrivalTimestamp,
             secondArrivalTimestamp,
             out var roundTripMilliseconds));
@@ -125,7 +125,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(arrivalMilliseconds - 80),
+            arrivalMilliseconds - 80,
             arrivalTimestamp,
             arrivalTimestamp,
             out _));
@@ -145,7 +145,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var arrivalTimestamp = ToTimestamp(100_000);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(99_920),
+            99_920,
             arrivalTimestamp,
             arrivalTimestamp,
             out _));
@@ -162,7 +162,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var arrivalTimestamp = ToTimestamp(100_000);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(99_920),
+            99_920,
             arrivalTimestamp,
             arrivalTimestamp,
             out _));
@@ -178,7 +178,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var nowTimestamp = ToTimestamp(nowMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(nowMilliseconds - 80),
+            nowMilliseconds - 80,
             nowTimestamp,
             nowTimestamp,
             out _));
@@ -187,7 +187,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var delayedArrivalTimestamp = ToTimestamp(delayedArrivalMilliseconds);
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(delayedArrivalMilliseconds - 120),
+            delayedArrivalMilliseconds - 120,
             delayedArrivalTimestamp,
             nowTimestamp,
             out _));
@@ -202,7 +202,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         var nowTimestamp = ToTimestamp(nowMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(nowMilliseconds - 80),
+            nowMilliseconds - 80,
             nowTimestamp,
             nowTimestamp,
             out _));
@@ -210,7 +210,7 @@ public sealed class ProtocolRoundTripEstimatorTests
         const long olderArrivalMilliseconds = nowMilliseconds - 1_000;
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(olderArrivalMilliseconds - 120),
+            olderArrivalMilliseconds - 120,
             ToTimestamp(olderArrivalMilliseconds),
             nowTimestamp,
             out _));
@@ -225,14 +225,14 @@ public sealed class ProtocolRoundTripEstimatorTests
         var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(arrivalMilliseconds - 80),
+            arrivalMilliseconds - 80,
             arrivalTimestamp,
             arrivalTimestamp,
             out _));
 
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(arrivalMilliseconds - 55),
+            arrivalMilliseconds - 55,
             arrivalTimestamp,
             arrivalTimestamp,
             out var roundTripMilliseconds));
@@ -249,7 +249,7 @@ public sealed class ProtocolRoundTripEstimatorTests
 
         Assert.True(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(arrivalMilliseconds - 80),
+            arrivalMilliseconds - 80,
             arrivalTimestamp,
             arrivalTimestamp + 30 * Stopwatch.Frequency,
             out _));
@@ -264,7 +264,7 @@ public sealed class ProtocolRoundTripEstimatorTests
 
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(arrivalMilliseconds - 80),
+            arrivalMilliseconds - 80,
             arrivalTimestamp,
             arrivalTimestamp + 30 * Stopwatch.Frequency + 1,
             out _));
@@ -279,14 +279,27 @@ public sealed class ProtocolRoundTripEstimatorTests
 
         Assert.False(estimator.TryObserveEcho(
             SessionGeneration,
-            ClientTimestampAt(nowMilliseconds + 1 - 80),
+            nowMilliseconds + 1 - 80,
             ToTimestamp(nowMilliseconds + 1),
             nowTimestamp,
             out _));
     }
 
-    private static uint ClientTimestampAt(long milliseconds)
-        => (uint)(milliseconds & ClientClockMask);
+    [Fact]
+    public void ObserveEcho_RejectsOldClockWithMatchingLowTwentyFourBits()
+    {
+        var estimator = new ProtocolRoundTripEstimator();
+        const long arrivalMilliseconds = 10 * (1L << 24) + 100_000;
+        var arrivalTimestamp = ToTimestamp(arrivalMilliseconds);
+
+        Assert.False(estimator.TryObserveEcho(
+            SessionGeneration,
+            arrivalMilliseconds - (1L << 24) - 80,
+            arrivalTimestamp,
+            arrivalTimestamp,
+            out _));
+        Assert.Null(estimator.GetCurrentMilliseconds(SessionGeneration, arrivalTimestamp));
+    }
 
     private static long ToTimestamp(long milliseconds)
         => checked((long)Math.Ceiling(milliseconds * (double)Stopwatch.Frequency / 1_000));

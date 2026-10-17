@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Resources.Catalog;
@@ -255,7 +256,7 @@ public sealed class PacketLogReplayServiceTests
     }
 
     [Fact]
-    public void Replay_20260809050345_IgnoresLegacyRoundTripTimestamps()
+    public void Replay_20260809050345_LegacyClockCannotProduceRoundTrip()
     {
         var observations = new List<ProtocolRoundTripObservation>();
 
@@ -264,7 +265,67 @@ public sealed class PacketLogReplayServiceTests
             observations.Add);
 
         Assert.Equal(2_145, replay.TotalLines);
-        Assert.Empty(observations);
+        Assert.NotEmpty(observations);
+        var estimator = new ProtocolRoundTripEstimator();
+        var arrivalTimestamp = 10_000 * Stopwatch.Frequency;
+        foreach (var observation in observations)
+        {
+            Assert.False(estimator.TryObserveEcho(
+                1,
+                observation.ClientSentMonotonicMilliseconds,
+                arrivalTimestamp,
+                arrivalTimestamp,
+                out _));
+        }
+
+        Assert.Null(estimator.GetCurrentMilliseconds(1, arrivalTimestamp));
+    }
+
+    [Fact]
+    public void Replay_20261017050224_PreservesCompleteClientMonotonicClock()
+    {
+        var observations = new List<ProtocolRoundTripObservation>();
+
+        var replay = PacketLogReplayService.ReplayMany(
+            [FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentRoundTripLongUptime}")],
+            observations.Add);
+
+        Assert.True(replay.ReplayedLines > 0);
+        Assert.Equal(
+            [157_424_622L, 157_434_622L, 157_444_622L, 157_454_622L, 157_464_622L, 157_474_622L, 157_484_622L],
+            observations.Select(static observation => observation.ClientSentMonotonicMilliseconds));
+    }
+
+    [Theory]
+    [InlineData(ReplayScenarioCatalog.CurrentRoundTripShortUptime, 6_364_226L, 63_642_752_478L, 49.2478)]
+    [InlineData(ReplayScenarioCatalog.CurrentRoundTripLongUptime, 157_434_622L, 1_574_346_671_771L, 45.1771)]
+    [InlineData(ReplayScenarioCatalog.CurrentRoundTripLongUptime, 157_484_622L, 1_574_846_668_230L, 44.8230)]
+    public void Replay_Current0336CalculatesRoundTripFromCapturedQpc(
+        string fixture,
+        long clientSentMonotonicMilliseconds,
+        long captureTimestampAtTenMegahertz,
+        double expectedRoundTripMilliseconds)
+    {
+        var observations = new List<ProtocolRoundTripObservation>();
+        PacketLogReplayService.ReplayMany(
+            [FixtureHelper.GetPath($"logs/{fixture}")],
+            observations.Add);
+        var matchingObservations = observations.Where(
+            observation => observation.ClientSentMonotonicMilliseconds == clientSentMonotonicMilliseconds).ToArray();
+        Assert.NotEmpty(matchingObservations);
+        var arrivalTimestamp = (long)Math.Round(captureTimestampAtTenMegahertz * (double)Stopwatch.Frequency / 10_000_000);
+        var estimator = new ProtocolRoundTripEstimator();
+
+        foreach (var observation in matchingObservations)
+        {
+            Assert.True(estimator.TryObserveEcho(
+                1,
+                observation.ClientSentMonotonicMilliseconds,
+                arrivalTimestamp,
+                arrivalTimestamp,
+                out var roundTripMilliseconds));
+            Assert.Equal(expectedRoundTripMilliseconds, roundTripMilliseconds, 4);
+        }
     }
 
     [Fact]

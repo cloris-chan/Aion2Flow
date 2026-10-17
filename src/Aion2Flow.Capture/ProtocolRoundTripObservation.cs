@@ -4,5 +4,5 @@ namespace Cloris.Aion2Flow.Capture;
 
 internal readonly record struct ProtocolRoundTripObservation(
     TcpConnection Connection,
-    uint ClientSentMonotonicMilliseconds,
+    long ClientSentMonotonicMilliseconds,
     long ArrivalTimestamp);

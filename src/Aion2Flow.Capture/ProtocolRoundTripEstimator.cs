@@ -5,7 +5,6 @@ namespace Cloris.Aion2Flow.Capture;
 internal sealed class ProtocolRoundTripEstimator
 {
     internal const long SampleStaleAfterMilliseconds = 30_000;
-    private const long ClientClockModulusMilliseconds = 1L << 24;
     private const double MaximumRoundTripMilliseconds = 10_000;
 
     private RoundTripSample? _current;
@@ -17,7 +16,7 @@ internal sealed class ProtocolRoundTripEstimator
 
     public bool TryObserveEcho(
         long sessionGeneration,
-        uint clientSentMonotonicMilliseconds,
+        long clientSentMonotonicMilliseconds,
         long arrivalTimestamp,
         out double roundTripMilliseconds)
     {
@@ -31,27 +30,22 @@ internal sealed class ProtocolRoundTripEstimator
 
     internal bool TryObserveEcho(
         long sessionGeneration,
-        uint clientSentMonotonicMilliseconds,
+        long clientSentMonotonicMilliseconds,
         long arrivalTimestamp,
         long nowTimestamp,
         out double roundTripMilliseconds)
     {
         if (sessionGeneration <= 0 ||
             !IsFreshArrival(arrivalTimestamp, nowTimestamp) ||
-            clientSentMonotonicMilliseconds >= ClientClockModulusMilliseconds)
+            clientSentMonotonicMilliseconds < 0)
         {
             roundTripMilliseconds = 0;
             return false;
         }
 
-        var arrivalMonotonicMilliseconds = GetMonotonicMillisecondsModulo(arrivalTimestamp);
+        var arrivalMonotonicMilliseconds = GetMonotonicMilliseconds(arrivalTimestamp);
         var elapsedMilliseconds = arrivalMonotonicMilliseconds - clientSentMonotonicMilliseconds;
-        if (elapsedMilliseconds < 0)
-        {
-            elapsedMilliseconds += ClientClockModulusMilliseconds;
-        }
-
-        if (elapsedMilliseconds > MaximumRoundTripMilliseconds)
+        if (elapsedMilliseconds < 0 || elapsedMilliseconds > MaximumRoundTripMilliseconds)
         {
             roundTripMilliseconds = 0;
             return false;
@@ -99,12 +93,11 @@ internal sealed class ProtocolRoundTripEstimator
                Stopwatch.GetElapsedTime(arrivalTimestamp, nowTimestamp).TotalMilliseconds <= SampleStaleAfterMilliseconds;
     }
 
-    private static double GetMonotonicMillisecondsModulo(long timestamp)
+    private static double GetMonotonicMilliseconds(long timestamp)
     {
-        var wholeSecondsModulo = timestamp / Stopwatch.Frequency % ClientClockModulusMilliseconds;
+        var wholeSeconds = timestamp / Stopwatch.Frequency;
         var remainingTicks = timestamp % Stopwatch.Frequency;
-        return (wholeSecondsModulo * 1_000d % ClientClockModulusMilliseconds +
-                remainingTicks * 1_000d / Stopwatch.Frequency) % ClientClockModulusMilliseconds;
+        return wholeSeconds * 1_000d + remainingTicks * 1_000d / Stopwatch.Frequency;
     }
 
     private sealed record RoundTripSample(

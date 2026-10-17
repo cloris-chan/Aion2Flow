@@ -104,9 +104,9 @@ public sealed class WinDivertCaptureServiceRoundTripTests
         }
     }
 
-    private static uint GetClientTimestampBefore(long arrivalTimestamp, int roundTripMilliseconds)
+    private static long GetClientTimestampBefore(long arrivalTimestamp, int roundTripMilliseconds)
     {
         var arrivalMilliseconds = (long)Math.Floor(arrivalTimestamp * 1_000d / Stopwatch.Frequency);
-        return (uint)((arrivalMilliseconds - roundTripMilliseconds) & 0x00ff_ffff);
+        return arrivalMilliseconds - roundTripMilliseconds;
     }
 }
