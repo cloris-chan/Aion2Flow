@@ -21,7 +21,7 @@ public sealed class ResourcePackTests
         Assert.Equal(language, snapshot.Language);
         Assert.Equal(16_056, snapshot.SkillDefinitions.Count);
         Assert.Equal(16_056, snapshot.Skills.Count);
-        Assert.Equal(13_017, snapshot.NpcCatalog.Count);
+        Assert.Equal(13_030, snapshot.NpcCatalog.Count);
         Assert.True(snapshot.Maps.Count > 600);
         Assert.True(snapshot.ServerNames.Count > 100);
     }
@@ -137,8 +137,8 @@ public sealed class ResourcePackTests
     {
         var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
 
-        Assert.Equal(16_837, runtime.SkillCount);
-        Assert.Equal(26_593, runtime.SlotCount);
+        Assert.Equal(16_909, runtime.SkillCount);
+        Assert.Equal(26_666, runtime.SlotCount);
         Assert.True(runtime.NodeCount > 50_000);
         Assert.True(runtime.NodeSlotReferenceCount > runtime.SlotCount);
         Assert.True(runtime.TryResolveEffect(101000011, out var directHeal));
@@ -153,6 +153,13 @@ public sealed class ResourcePackTests
     [Theory]
     [InlineData(10_003u)]
     [InlineData(300_711u)]
+    [InlineData(11_010_011u)]
+    [InlineData(11_010_012u)]
+    [InlineData(50_020_306u)]
+    [InlineData(50_020_406u)]
+    [InlineData(50_030_103u)]
+    [InlineData(1_111_000_022u)]
+    [InlineData(1_308_000_015u)]
     public void RuntimeSemanticIndex_Classifies_Current_NonQuantified_Abnormal_Effects(uint resourceId)
     {
         var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
@@ -269,7 +276,7 @@ public sealed class ResourcePackTests
 
     [Theory]
     [InlineData(ResourceLanguage.English, 1001, "Siel", "SIE")]
-    [InlineData(ResourceLanguage.TraditionalChinese, 1001, "希埃爾", "希埃爾")]
+    [InlineData(ResourceLanguage.TraditionalChinese, 1001, "希埃爾", "希埃")]
     [InlineData(ResourceLanguage.TraditionalChinese, 2001, "伊斯拉佩爾", "伊斯")]
     public void ServerNames_Resolve_ServerName_Dat_Names(string language, int code, string expectedServerName, string expectedShortServerName)
     {

@@ -21,19 +21,19 @@ internal sealed class SkillSemanticValueIndex
 
     private static readonly FrozenSet<string> KnownNonQuantifiedAbnormalEffectTypes = new[]
     {
-        "AbnormalClear", "ActivateSkill", "AddAbnormalByCondition", "AdjustMaxAddDamage", "AdjustMaxSkillRate", "AdjustMinAddDamage",
+        "AbnormalClear", "ActivateSkill", "AddAbnormalByCondition", "AddSkillLevel", "AdjustMaxAddDamage", "AdjustMaxSkillRate", "AdjustMinAddDamage",
         "AdjustMinSkillRate", "AdjustSecondaryStatMaxValue", "AdjustSecondaryStatMinValue", "Aerial", "ArenaActiveParticipation", "BattlePass", "BeamPierce", "Bind",
         "Bleed", "Blind", "BlockActive", "Blockade", "BlockAniHit", "BlockComposite", "BlockFlight", "BlockGlide", "BlockInteract", "BlockInteractGather",
         "BlockItemCasting", "BlockItemEquipItem", "BlockJump", "BlockLooting", "BlockMoveControl", "BlockMovePosition", "BlockRaidEnter",
         "BlockRotate", "BlockSelfRebirth", "BlockSkill", "BlockSpringboard", "BlockSprint", "BlockTargeting", "BlockTargetSkill",
         "CastingCancel", "CastSkill", "CastSkillByCaster", "CastSkillToCaster", "ChangeJumpZvelocity", "ChangeRelationshipEntity",
         "CloneSkillEffect", "CondDefenceBlock", "CondDefenceEvade", "CondDefenceMiss", "CondDefenceShieldBlock", "CondDefenceWeaponBlock", "ConvertDamageToMP",
-        "DamageMultiply", "DamageTransfer", "DecreaseCastingTime", "DecreaseCooltimeByContribute", "DecreaseCooltimeByKill", "DeletableFear",
+        "DamageMultiply", "DamageTransfer", "DecreaseCastingTime", "DecreaseCooltimeByContribute", "DecreaseCooltimeByKill", "DecreaseCooltimeBySelfBlock", "DecreaseCooltimeBySelfEvade", "DeletableFear",
         "Dpot", "Dpot_Item", "Dpot_Ratio", "DpotRatio_Item", "EndCastSkill", "EndCastSkillByCaster", "EndCastSkillToCaster", "EndMotion",
-        "EquipItemStatAmplify_Accessory", "EquipItemStatAmplify_Weapon", "ExposeMinimapAsGenocider", "Fear", "FixSkillLevel",
+        "EquipItemStatAmplify_Accessory", "EquipItemStatAmplify_Weapon", "EquipSpecializedSkillParts", "ExposeMinimapAsGenocider", "Fear", "FixSkillLevel",
         "ForceCriticalDamage", "ForceCriticalDamageByCaster", "ForceKill", "ForceKillByGetDamage", "ForceMissDamage",
         "ForceMissDamageToCaster", "Fot", "Fot_Item", "Fot_Ratio", "FotRatio_Item", "Frozen", "GaugeEffect", "GetDamageMultiply",
-        "GetDamageMultiplyByCaster", "GimmickA", "GimmickB", "GimmickGauge", "Groggy", "GroggyGuard", "GroggyPause", "HandToHandCombat", "Hold",
+        "GetDamageMultiplyByCaster", "GimmickA", "GimmickB", "GimmickC", "GimmickD", "GimmickGauge", "Groggy", "GroggyGuard", "GroggyPause", "HandToHandCombat", "Hold",
         "IgnoreBackAttack", "IgnoreCollision", "IgnoreFrontAttack", "IgnorePenaltyLoss_Exp_PvE", "IgnorePenaltyLoss_Exp_PvP",
         "IgnorePenaltyLoss_Item_PvE", "IgnorePenaltyLoss_Item_PvP", "ImmuneAbnormal", "ImmuneBind", "ImmuneDecreaseHP",
         "ImmuneGroggyGuardDecreaseEnergy", "ImmuneSkill", "ImmuneSkillEffectGroup", "KillZone", "KiskBlock", "KnockdownInstant", "Loophole",
@@ -44,7 +44,7 @@ internal sealed class SkillSemanticValueIndex
         "SotRatio_Item", "StanceCriticalDamage", "StanceMissDamage", "StanceShieldBlock", "StanceWeaponBlock", "StatChange", "StatConvert",
         "Stealth", "StealthSeek", "Stiffen", "Stone", "Stun", "Taunt", "TeleportCasterTarget", "ToggleAbnormal",
         "TriggerSkillByAddAbnormal", "TriggerSkillByAttackAll", "TriggerSkillByGetAbnormal", "TriggerSkillByGetDamage", "TriggerSkillByKill",
-        "TriggerSkillBySelfBlock", "TriggerSkillBySelfEvade", "TriggerSkillBySelfShieldBlock", "TriggerSkillBySelfWeaponBlock", "TriggerSkillCheck_BossMonster",
+        "TriggerSkillBySelfBlock", "TriggerSkillBySelfEvade", "TriggerSkillBySelfShieldBlock", "TriggerSkillBySelfWeaponBlock", "TriggerSkillBySkillStart", "TriggerSkillCheck_BossMonster",
         "UndeletableFear", "UnLockNpcLanguageType", "UsableItemCooltimeChange", "UseRebirth", "WeaponEquipable"
     }.ToFrozenSet(StringComparer.Ordinal);
 
